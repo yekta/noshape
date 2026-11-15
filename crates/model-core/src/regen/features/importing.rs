@@ -1,14 +1,15 @@
 //! Import features (Derived, Derived mirror, Import of CAD files) and the
 //! not-yet-supported Decal (Wrap lives in `surfacing_c`).
 
-use super::bshared::new_face_names;
+use super::bshared::{add_wire_body, new_face_names};
 use crate::display::BodyKind;
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, NamedShape, err};
 use super::sheetmetal_form::frame_matrix;
 use glam::{DMat4, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::ShapeType;
-use crate::reference::FeatureId;
+use crate::reference::{BodyId, FeatureId, Reference};
+use crate::regen::context::PointEntity;
 
 /// std ErrorStringEnum.DERIVED_NO_INSTANCING (live text, ui 10-22 b).
 pub const DERIVED_NO_INSTANCING: &str = "Using derived feature to make instances is not recommended. Consider using an Assembly instead.";
@@ -262,6 +263,10 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
     // Wire bodies, each with the number of tools before it in the file (a
     // native assembly's thread curves come before their part, live G41).
     let mut wires: Vec<(usize, k::Shape, Look)> = Vec::new();
+    // An in-context entity's points (Onshape's frozen copy of an assembly's vertex: a point body, asm-keyboard-pattern
+    // studio 2bb133's Plane 1 through one).
+    let in_context = ev.bool("isInContext");
+    let mut points: Vec<k::Shape> = Vec::new();
     // Mesh imports (STL, OBJ, PVZ; Onshape G22/G27): per part, its closed
     // pieces make a mesh part; the open pieces of a part whose mesh doesn't
     // close become surfaces grouped in a closed composite part.
@@ -292,6 +297,8 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
                 // Wire bodies come in as curves ("Curve 1", live G38/G38d).
                 if p.count(ShapeType::Edge) > 0 {
                     wires.push((tools.len(), p, Look { name: part.name.clone(), color: part.color, opacity: part.opacity, faces: Vec::new() }));
+                } else if in_context {
+                    points.extend((0..p.count(ShapeType::Vertex)).filter_map(|i| p.sub_shape(ShapeType::Vertex, i).ok()));
                 }
                 continue;
             }
@@ -300,7 +307,7 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             tools.push(p);
         }
     }
-    if tools.is_empty() && open_groups.is_empty() && wires.is_empty() {
+    if tools.is_empty() && open_groups.is_empty() && wires.is_empty() && points.is_empty() {
         return err("Part import failed.");
     }
     // "Join adjacent surfaces": sew the surface bodies along shared edges
@@ -370,6 +377,12 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             return Err(FeatureError::new("Part import failed."));
         }
         super::refgeom::make_composite(ev, &idx, true, 30_000 + gi as u32)?;
+    }
+    for v in points {
+        let position = v.vertex_point()?;
+        add_wire_body(ev, v, next, BodyKind::Point);
+        ev.ctx.points.push(PointEntity { reference: Reference::Body(BodyId { feature: ev.feature, index: next }), position });
+        next += 1;
     }
     Ok(())
 }

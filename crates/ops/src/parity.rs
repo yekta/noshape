@@ -943,8 +943,8 @@ impl<'a> Translator<'a> {
     }
 
     /// In-context sub-feature `sub`'s bodies as live evaluated them (`context_entities`), each imported: a planar sheet
-    /// of one face as that face (its edges chained into loops in its plane, the largest its outer one), any other
-    /// body as its edges. The Import with a face first (the one its "created by" queries take; with whether there is
+    /// of one face as that face (its edges chained into loops in its plane, the largest its outer one), a point body
+    /// as its vertex, any other body as its edges. The Import with a face first (the one its "created by" queries take; with whether there is
     /// one), then the others.
     fn context_bodies(&mut self, sub: &str) -> Result<(Vec<String>, bool), String> {
         let lines: Vec<Value> = self.context_entities.iter().filter(|l| l["subFeature"] == sub).cloned().collect();
@@ -964,6 +964,16 @@ impl<'a> Translator<'a> {
             let edges: Vec<&Value> = of.iter().copied().filter(|l| l["kind"] == "EDGE").collect();
             let faces: Vec<&Value> = of.iter().copied().filter(|l| l["kind"] == "FACE").collect();
             let planar = matches!(faces.as_slice(), [f] if f["surfaceType"] == "PLANE");
+            // A point body: its vertex (asm-keyboard-pattern 2bb133's Plane 1 goes through one).
+            if of.iter().any(|l| l["kind"] == "BODY" && l["bodyType"] == "POINT") {
+                let mut vertices: Vec<noshape_kernel::Shape> = of.iter().filter(|l| l["kind"] == "VERTEX").filter_map(|l| noshape_kernel::make_vertex(glam::DVec3::from(f3(&l["point"])?)).ok()).collect();
+                match vertices.len() {
+                    0 => problems.push(format!("body {body}: no vertex")),
+                    1 => shapes.push((false, vertices.remove(0))),
+                    _ => shapes.push((false, noshape_kernel::Shape::compound(&vertices))),
+                }
+                continue;
+            }
             let made = if planar { context_face(faces[0], &edges).map(|f| (true, f)) } else { Err(String::new()) };
             match made.or_else(|_| context_wire(&edges).map(|w| (false, w))) {
                 Ok(shape) => shapes.push(shape),

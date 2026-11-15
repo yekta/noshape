@@ -3838,3 +3838,22 @@ fn an_extrude_of_an_in_context_face_extrudes_lives_face() {
     assert_eq!(parts.len(), 1, "{p}");
     assert!((parts[0]["volume"].as_f64().unwrap() - 12.0 * 8.0 * 9.0).abs() < 1e-3, "{p}");
 }
+
+/// A Point-Plane through a point of the assembly's (its in-context sub-feature a point body, asm-keyboard-pattern
+/// studio 2bb133's Plane 1): live's vertex imported as a point body, the plane through it.
+#[test]
+fn a_plane_through_an_in_context_point_builds() {
+    let plane = json!({ "btType": "BTMFeature-134", "featureType": "cPlane", "featureId": "FP", "name": "Plane 1", "parameters": [
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [
+            { "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"], "queryString": "" },
+            { "btType": "BTMIndividualCreatedByQuery-137", "deterministicIds": ["IF"], "queryString": "", "entityType": "VERTEX", "featureId": "FSUB" }] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "cplaneType", "enumName": "CPlaneType", "value": "PLANE_POINT" }],
+        "subFeatures": [{ "btType": "BTMFeature-134", "featureType": "importForeign", "featureId": "FSUB", "parameters": [{ "btType": "BTMParameterBoolean-144", "parameterId": "isInContext", "value": true }] }] });
+    let features = json!({ "features": [plane], "contextEntities": [
+        { "subFeature": "FSUB", "body": "JFD", "id": "JFD", "kind": "BODY", "bodyType": "POINT" },
+        { "subFeature": "FSUB", "body": "JFD", "id": "IF", "kind": "VERTEX", "point": [0.004, -0.011, -0.007] }] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("in-context-point.noshape"), &features, Default::default()).unwrap();
+    let s = t.step(0);
+    assert!(s.ours.is_some() && s.problems.is_empty() && s.status.as_deref() == Some("Ok"), "{:?} {:?} {:?}", s.status, s.message, s.problems);
+}
