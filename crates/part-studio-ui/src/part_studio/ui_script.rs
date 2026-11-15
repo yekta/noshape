@@ -522,7 +522,10 @@ impl PartStudioView {
             };
             driven.push(kind);
         }
-        let mut pattern_seeds = Vec::new();
+        // Live's model holds a sketch pattern as two constraints, whatever its instance count (sketch-circular-pattern-
+        // click-commit, sketch-linear-pattern-click-commit, a hexagon's sketch-circumscribed-polygon): one per pattern's
+        // centre / shared step here.
+        let (mut circular, mut linear) = (Vec::new(), Vec::new());
         let in_text_box = |c: &noshape_sketch::Constraint| !matches!(c.kind, K::Horizontal { .. }) && c.kind.entities().iter().all(|e| text_box.contains(e));
         for c in sk.constraints().filter(|c| c.driving && !in_text_box(c)) {
             let mm = |v: f64| (v * 1e3 * 1e6).round() / 1e6;
@@ -536,17 +539,21 @@ impl PartStudioView {
                 // A conic's Rho is one of its constraints in live's model (sketch-tool-conic: "RHO").
                 K::Rho { .. } => constraints.push("RHO".into()),
                 k if k.is_dimension() => dimensions.push((k.name().to_uppercase().replace(' ', "_"), c.kind.value().unwrap_or(0.0), length)),
-                // Live's model lists a pattern by its seed's points (a polygon's: two, ui-parity sketch-circumscribed-polygon),
-                // not one link per instance point.
-                K::CircularPatternLink { seed, center, .. } => {
-                    if !pattern_seeds.contains(&(*seed, *center)) {
-                        pattern_seeds.push((*seed, *center));
-                        constraints.push("CIRCULAR_PATTERN".into());
+                K::CircularPatternLink { center, .. } => {
+                    if !circular.contains(center) {
+                        circular.push(*center);
+                    }
+                }
+                K::PatternLink { ref_seed, ref_inst, .. } => {
+                    if !linear.contains(&(*ref_seed, *ref_inst)) {
+                        linear.push((*ref_seed, *ref_inst));
                     }
                 }
                 k => constraints.push(k.name().to_uppercase().replace(' ', "_")),
             }
         }
+        constraints.extend(std::iter::repeat_n("CIRCULAR_PATTERN".to_string(), 2 * circular.len()));
+        constraints.extend(std::iter::repeat_n("LINEAR_PATTERN".to_string(), 2 * linear.len()));
         constraints.sort();
         dimensions.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
         let mut dimensions: Vec<Value> = dimensions.into_iter().map(|(kind, value, expression)| json!({ "kind": kind, "value": value, "expression": expression })).collect();
