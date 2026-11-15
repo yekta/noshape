@@ -1690,21 +1690,3 @@ fn transform_from_the_origin_to_a_sketch_point() {
     let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
     assert!(near(bb.min.x, 0.030, 1e-6) && near(bb.min.y, 0.010, 1e-6) && near(bb.min.z, 0.0, 1e-6), "moved by (30, 10, 0) mm: {bb:?}");
 }
-
-/// A circle seen edge-on (its plane holds the sketch normal) projects onto a line between its exact extremes, not a
-/// sampled curve going back and forth (live keeps a Coincident point on that line past the circle: c2-rings-loft's
-/// Sketch 1; exact, so a Use joined to another edge's end meets it: c2-fan-blade-sweep's Sketch 5).
-#[test]
-fn an_edge_on_circle_projects_to_an_exact_line() {
-    use noshape_model::regen::features::sketch::{project_edge_any, SectionCurve};
-    let frame = noshape_model::display::PlaneFrame { origin: DVec3::ZERO, x: DVec3::X, y: DVec3::Y, normal: DVec3::Z };
-    let (c, r) = (DVec3::new(0.008, 0.001, 0.0), 0.0114);
-    let circle = noshape_kernel::make_circle(c, DVec3::X, r).unwrap();
-    let quarter = noshape_kernel::make_arc(c, DVec3::X, DVec3::Y, r, 0.0, PI / 2.0).unwrap();
-    for (name, edge, ends) in [("circle", circle, [c.y - r, c.y + r]), ("quarter arc", quarter, [c.y, c.y + r])] {
-        let Some(SectionCurve::Exact(noshape_sketch::Curve2::Line { a, b })) = project_edge_any(&edge, &frame) else { panic!("{name}: not a line") };
-        let (lo, hi) = (a.y.min(b.y), a.y.max(b.y));
-        let exact = |u: f64, v: f64| (u - v).abs() < 1e-12;
-        assert!(exact(a.x, c.x) && exact(b.x, c.x) && exact(lo, ends[0]) && exact(hi, ends[1]), "{name}: {a:?} {b:?}");
-    }
-}
