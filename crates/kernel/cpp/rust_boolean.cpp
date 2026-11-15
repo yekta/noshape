@@ -3216,8 +3216,9 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
 
 // A plane against a torus face (c2-rings-loft's ring against its patterned prongs: ~300 plane / torus pairs of OCCT's
 // marching): round the axis at angle u the plane meets the tube's circle where A + B cos v + C sin v = 0, two branches
-// v = phi +- acos(-A / rho), exact point by point; each run of a branch within both faces' boxes interpolated. A run
-// ends where the plane crosses a side of the face (found exactly) or leaves the plane face's box (bisected). False
+// v = phi +- acos(-A / rho), exact point by point; each run of a branch within both faces' boxes (OCCT's: the plane's a
+// tenth wider) interpolated. A run ends where the plane crosses a side of the face (found exactly) or leaves the plane
+// face's box (bisected). False
 // where the branches meet inside the face (the plane all but tangent to the tube), or the plane is across the axis or
 // holds it (its sections circles: OCCT's then).
 bool plane_torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
@@ -3247,8 +3248,14 @@ bool plane_torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vec
   BRepTools::UVBounds(f, u0, u1, v0, v1);
   if (!(u1 > u0) || !(v1 > v0) || v1 - v0 > 2 * M_PI + 1e-9 || u1 - u0 > 2 * M_PI + 1e-9)
     return false;
+  // (The plane face's box widened a tenth each way, as OCCT's against a quadric (CorrectPlaneBoundaries); the torus
+  // face's as it is.)
   double pu0 = 0, pu1 = 0, pv0 = 0, pv1 = 0;
   BRepTools::UVBounds(p_first ? fa : fb, pu0, pu1, pv0, pv1);
+  {
+    const double du = 0.1 * (pu1 - pu0), dv = 0.1 * (pv1 - pv0);
+    pu0 -= du, pu1 += du, pv0 -= dv, pv1 += dv;
+  }
   const double pe = 1e-9 * std::max(pu1 - pu0, pv1 - pv0), ve = 1e-12;
   // A + B cos v + C sin v at u; the branch's v (branch -1 or +1), false where the circle misses the plane.
   auto abc = [&](double u, double& A, double& B, double& C) {
