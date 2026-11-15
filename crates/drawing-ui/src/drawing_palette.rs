@@ -82,6 +82,8 @@ pub struct PaletteDlg {
     pub tol: &'static str,
     /// Where it opened (editor px); it stays there while the text changes.
     at: Option<[f32; 2]>,
+    /// A click went into it: from then on its halo keeps it open (live2 dim-palette-halo).
+    touched: bool,
     pub orig: Annotation,
     /// The edited annotation; on a hole callout its format's precision /
     /// tolerance are the selected value's (`hole_sel`), the hole Ø's kept in
@@ -234,7 +236,7 @@ impl DrawingEditor {
         let diam = (a.format.precision, a.format.tolerance.clone());
         let multi = !others.is_empty();
         let committed = if crate::ui_script::active() { self.ui_annotations().into_iter().map(|(id, _, t)| (id, t)).collect() } else { Vec::new() };
-        self.palette = Some(PaletteDlg { id, committed, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, at: None, orig: a.clone(), base: a.clone(), cur: a, hole_sel: HoleValue::Diameter, diam, others, varies, _subs: subs });
+        self.palette = Some(PaletteDlg { id, committed, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, at: None, touched: false, orig: a.clone(), base: a.clone(), cur: a, hole_sel: HoleValue::Diameter, diam, others, varies, _subs: subs });
         // Several: what the palette shows as opened is the base the edits are
         // measured from.
         if multi {
@@ -381,10 +383,11 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// Where the palette sits (editor px): its left edge just right of the annotation's text, vertically centred on
-    /// it (live2 feel/drawing.json dimensionPalette: a 407 x 133 popup).
+    /// Where the palette sits (editor px): its left edge just right of the annotation's text, its main row starting at
+    /// the text's centre line, 42 px below its top (live2 dim-palette-halo: a 407 x 133 popup at y 594 for text centred
+    /// at 636.5).
     pub(crate) fn palette_at(&self, id: u64) -> [f32; 2] {
-        const PALETTE_H: f64 = 133.;
+        const MAIN_ROW: f64 = 42.;
         let Some(b) = &self.built else { return [200., 120.] };
         let picks = self.picks_of(Sel::Annotation(id));
         let (mut x, mut lo, mut hi) = (f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY);
@@ -408,7 +411,7 @@ impl DrawingEditor {
         let s = self.size_px();
         let px_x = (x - self.center[0]) * self.zoom + s[0] / 2.0;
         let px_mid = (self.center[1] - (lo + hi) / 2.0) * self.zoom + s[1] / 2.0;
-        [(px_x as f32).clamp(0., (s[0] as f32 - 500.).max(0.)), ((px_mid - PALETTE_H / 2.0) as f32).clamp(0., (s[1] as f32 - 200.).max(0.))]
+        [(px_x as f32).clamp(0., (s[0] as f32 - 500.).max(0.)), ((px_mid - MAIN_ROW) as f32).clamp(0., (s[1] as f32 - 200.).max(0.))]
     }
 
     pub fn render_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -904,8 +907,8 @@ impl DrawingEditor {
             .when(hole, |e| e.child(crate::ui_script::wrap(menu("dp-hprec", small(prec_label.clone()), 110., prec_items), || "dropdown:Precision".into())).child(menu("dp-htol", small(tol.to_string()), 150., tol_items)))
             .when(matches!(tol, "Symmetrical" | "Deviation" | "Limits"), |e| e.child(crate::ui_script::wrap(field(&d.tol_a, Some(70.), 26.).into_any_element(), || "field:Tolerance".into())))
             .when(matches!(tol, "Deviation" | "Limits"), |e| e.child(flip("dp-flip-a", true, cx)).child(field(&d.tol_b, Some(70.), 26.)).child(flip("dp-flip-b", false, cx)));
-        Some(
-            v_flex()
+        let touched = d.touched;
+        let palette = v_flex()
                 .id("dr-dim-palette")
                 // Esc in any of its fields puts the annotation back.
                 .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
@@ -921,9 +924,6 @@ impl DrawingEditor {
                         this.launcher_palette_left(cx);
                     }
                 }))
-                .absolute()
-                .left(px(at[0]))
-                .top(px(at[1]))
                 .w(px(if hole { 497. } else { 405. }))
                 // Live: 1 px body padding, rows 2 px apart (hole callouts 3).
                 .p(px(if hole { 3. } else { 1. }))
@@ -935,6 +935,11 @@ impl DrawingEditor {
                 .border_color(gpui_kit::rgb(0xbbbbbb))
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(ink)
+                .capture_any_mouse_down(cx.listener(|this, _, _, _| {
+                    if let Some(p) = &mut this.palette {
+                        p.touched = true;
+                    }
+                }))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 // The drag handle.
@@ -945,7 +950,26 @@ impl DrawingEditor {
                 .child(field(&d.below, None, 22.))
                 .child(toggles)
                 .when(show_tol && (hole || tol != "None") && tol != VARIES, |e| e.child(tol_row))
-                .when(show_tol && fit, |e| e.child(fit_row()))
+                .when(show_tol && fit, |e| e.child(fit_row()));
+        // Live's halo (40 px left, 20 right, 30 above and below): a click there closes a palette not yet clicked into,
+        // and is swallowed once it has been (live2 dim-palette-halo: after a Precision pick or a click into Prefix).
+        Some(
+            div()
+                .id("dr-dim-palette-halo")
+                .absolute()
+                .left(px(at[0] - 40.))
+                .top(px(at[1] - 30.))
+                .pl(px(40.))
+                .pr(px(20.))
+                .py(px(30.))
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                    cx.stop_propagation();
+                    if !touched {
+                        this.close_palette(true, cx);
+                    }
+                }))
+                .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .child(palette)
                 .into_any_element(),
         )
     }

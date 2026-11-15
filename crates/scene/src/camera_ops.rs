@@ -197,13 +197,12 @@ pub fn selection_bounds(display: &StudioDisplay, refs: &[Reference]) -> Option<(
 
 /// A drawing sheet's Zoom to fit: the zoom (pixels per mm) and the sheet
 /// point at the canvas centre for a canvas of `size` pixels showing the
-/// content box `(x0, y0, w, h)` (sheet mm). Live (drawing/156, ISO A3):
-/// 40 px clear on each side, the bottom measured as if the canvas ran under
-/// the 30 px tab bar.
+/// content box `(x0, y0, w, h)` (sheet mm). Live (live2 sheet-fit, ANSI A / B, ISO A3 in a 973 px canvas): the
+/// paper 926 px tall, 14.75 px below the canvas centre (as if the canvas ran under the 30 px tab bar).
 pub fn drawing_fit(size: [f64; 2], content: (f64, f64, f64, f64)) -> (f64, [f64; 2]) {
     const UNDER: f64 = 30.0;
     let (x0, y0, w, h) = content;
-    let zoom = ((size[0] - 80.0) / w).min((size[1] + UNDER - 80.0) / h).clamp(0.05, 200.0);
+    let zoom = ((size[0] - 80.0) / w).min((size[1] + UNDER - 77.0) / h).clamp(0.05, 200.0);
     (zoom, [x0 + w / 2.0, y0 + h / 2.0 + UNDER / 2.0 / zoom])
 }
 
@@ -324,4 +323,23 @@ pub fn faces_under(display: &StudioDisplay, origin: DVec3, dir: DVec3) -> Vec<(f
     }
     out.sort_by(|a, b| a.0.total_cmp(&b.0));
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Live2 sheet-fit (window 1919 x 1079, canvas 1879 x 973): ANSI A, ANSI B and ISO A3 after Zoom to fit, the paper's
+    /// height in px (live 922.5..928 px between sizes) and its centre below the canvas centre.
+    #[test]
+    fn a_sheet_fits_as_live() {
+        for (w, h, live) in [(279.4, 215.9, 927.5), (431.8, 279.4, 928.0), (420.0, 297.0, 922.5)] {
+            let size = [1879.0, 973.0];
+            let (zoom, center) = drawing_fit(size, (0.0, 0.0, w, h));
+            assert!((h * zoom - live).abs() <= 4.0, "{w} x {h}: {} px, live {live}", h * zoom);
+            let below = (center[1] - h / 2.0) * zoom;
+            assert!((below - 14.75).abs() <= 0.5, "{w} x {h}: {below} px low");
+            assert!((center[0] - w / 2.0).abs() < 1e-9);
+        }
+    }
 }

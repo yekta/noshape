@@ -14,6 +14,7 @@ fields get focus events as on a desktop.
 """
 
 import argparse
+import datetime
 import json
 import re
 import os
@@ -50,8 +51,77 @@ def remembered_settings(seed):
     return {ty: {g: {p: value(g, v) for p, v in params.items()} for g, params in groups.items()} for ty, groups in seed.items()}
 
 
-def run_one(app, scenario, out, display, timeout):
+def recorded_window_height(live):
+    """The height of live's page in a take (its runners' Chrome windows were 1919 x 992 and, on some of live2's lanes
+    from 11-14, 1919 x 1079), read from the take: the recorder's app.viewport, else a camera's graphics area (886 or 973 px, 106 px under the page's
+    height), else a drawing's sheet_point click against the sheet's fit (ANSI A paper 926 px of the canvas, 15 px below
+    its centre: camera_ops::drawing_fit). None: the app's default."""
+    try:
+        d = json.loads(Path(live).read_text())
+    except (OSError, ValueError):
+        return None
+    vp = (d.get("app") or {}).get("viewport")
+    if isinstance(vp, list) and len(vp) == 2 and isinstance(vp[1], (int, float)):
+        return round(vp[1])
+    def cameras(o):
+        if isinstance(o, dict):
+            if isinstance(o.get("height_mm"), (int, float)) and o.get("mmPerPixel"):
+                yield o
+            for v in o.values():
+                yield from cameras(v)
+        elif isinstance(o, list):
+            for v in o:
+                yield from cameras(v)
+    for cam in cameras(d.get("steps")):
+        return round(cam["height_mm"] / cam["mmPerPixel"]) + 106
+    for s in d.get("steps") or []:
+        on = (s.get("do") or {}).get("on") or {}
+        at = s.get("at")
+        if not (isinstance(on, dict) and isinstance(on.get("sheet_point"), list) and isinstance(at, list)):
+            continue
+        (px, py), (x, y) = on["sheet_point"], at
+        a = (py - 215.9 / 2) / 215.9
+        canvas = (y - 76 - 15 - 47 * a) / (0.5 - a)
+        # Only an ANSI A sheet at its fit: its x lands where that zoom puts it.
+        if abs(x - (40 + 1879 / 2 + (px - 279.4 / 2) * (canvas - 47) / 215.9)) > 3:
+            return None
+        return 1079 if canvas > 930 else 992
+    return None
+
+
+def window_heights(live_dir):
+    """Each take's page height: its own (recorded_window_height), else that of the nearest take of the same live2 lane
+    within 6 h (a lane's Chrome window keeps its size for hours: lane 1 at 1079 from 11-13 17:22, lane 2 from 11-14 11:19, lane 4
+    at 1079 from 11-14 05:32 to 06:24; lane 3 and live's own runner at 992)."""
+    takes = []
+    for f in Path(live_dir).glob("*.json"):
+        try:
+            d = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        takes.append((f.stem, (d.get("live") or {}).get("runner"), d.get("recorded") or "", recorded_window_height(f)))
+    def t(iso):
+        try:
+            return datetime.datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return None
+    known = {}
+    for name, lane, at, h in takes:
+        if h and lane and t(at) is not None:
+            known.setdefault(lane, []).append((t(at), h))
+    heights = {}
+    for name, lane, at, h in takes:
+        if not h and lane in known and t(at) is not None:
+            near = min(known[lane], key=lambda k: abs(k[0] - t(at)))
+            h = near[1] if abs(near[0] - t(at)) < 6 * 3600 else None
+        heights[name] = h
+    return heights
+
+
+def run_one(app, scenario, out, display, timeout, height=None):
     env = dict(os.environ)
+    if height:
+        env["NOSHAPE_UI_WINDOW_HEIGHT"] = str(height)
     config = tempfile.mkdtemp(prefix="noshape-uip-config-")
     seed = json.loads(Path(scenario).read_text()).get("remembered")
     if seed:
@@ -1285,17 +1355,19 @@ def main():
         print(f"no scenarios with a live recording in {live_dir} (--all runs them anyway)")
         return 1
     score, steps_ok, steps_all = 0, 0, 0
+    heights = {} if args.compare_only else window_heights(live_dir)
     for name in names:
         out = out_dir / f"{name}.json"
         if not (scen_dir / f"{name}.json").exists():
             print(f"{name}: no scenario file")
             continue
         if not args.compare_only:
-            problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout)
+            height = heights.get(name)
+            problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout, height)
             # The display refusing a new client now and then (Xvfb): once more.
             if problem and "platform.rs" in problem:
                 time.sleep(2)
-                problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout)
+                problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout, height)
             if problem:
                 print(f"{name}: {problem}")
                 continue

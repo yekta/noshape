@@ -55,11 +55,18 @@ Open items:
 - drw-insert-view-top-1to1: live reads VIEW where five other Insert view takes read EDGE (the reader's pixels).
 - drw-hole-callout-palette steps 17-18: our callout's leader is lit inside Top's box after the palette closes; live
   reads []. Near the reader's 60 px threshold.
-- Hole callout text width: live's "3X ∅.197 THRU" is 29.6 mm at 0.12 in (two MTEXTs, style
-  Onshape-Standard-Hole-Callout, ~9.7 text heights); Noto Sans gives ~7. Ours sits 0.09 in past a 0.18 in shoulder as
-  live's DXF; the width (font or spacing) is open.
-- A view's on-screen placement is 2-3 px off live's at the same zoom (drw-broken-out-section clicks 721 / 783 vs live's
-  718 / 781): low priority after the drawing matrix refresh (lead 11-15). dx compares that take within ±1 px.
+- Hole callout text width: live's "3X ∅.197 THRU" is 29.6 mm at 0.12 in. Its DXF's style is Noto Sans and " THRU"
+  starts 0.6925 in after "3X ∅.197": Noto Sans with 0.12 in as the cap height (em = h / 0.714), not the em. Ours draws
+  every sheet text in the stroke font's widths (`font::text_width`; ⌀ isn't in `fill_supported`, and filled glyphs are
+  squeezed to the stroke widths), so this is all drawing text, not the callout: measure a note's and a dimension's
+  width against live before changing `font.rs`.
+- A view's on-screen placement (lead 11-15, low priority): the runner sized our window 1919x992 (live's viewport before
+  10-31), live's has been 1919x1079 since, so our drawing canvas was 886 px tall against live's 973 (live2 block-drawing
+  rects: canvas page (40, 76)-(1919, 1049), ANSI A sheet 378.5..1579.5 x 113.5..1041 = 4.30 px/mm; ours 3.87). ui_script
+  now opens 1079 tall (`"window": {"height": …}` overrides); our chrome is live's (canvas at y 76, tab bar 30, rail 40).
+  `camera_ops::drawing_fit` now fits the paper at 926 px of a 973 px canvas, 15 px below its centre (live2 sheet-fit:
+  ANSI A 927.5, ANSI B 928, ISO A3 922.5 px; T1 `a_sheet_fits_as_live`). ISO A4 (both orientations) fits larger in
+  live, its frame's bottom at y 1039 and the paper off the canvas: not modelled (live/feel/sheet-fit/).
 - docs/parity/drawing-matrix.md: refresh it with a whole drawing-suite run (`drawing_matrix.py --run <uip dir>`) once the
   queued batches land.
 - Hole sizes through the API (lead 11-15): feature_add keeps a size the caller gives (sets tableSynced), Onshape's

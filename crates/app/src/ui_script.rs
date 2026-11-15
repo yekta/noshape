@@ -439,7 +439,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
     // Live's page (Chrome's viewport on its runner): the same toolbar groups and dialog places; a scenario's own width
     // and theme as live's runner sets them (live 2466).
     apply_view(&scenario);
-    window.resize(size(px(view_width(&scenario)), px(992.)));
+    window.resize(size(px(view_width(&scenario)), px(view_height(&scenario))));
     window.activate_window();
     cx.activate(true);
     cx.spawn_in(window, async move |_, cx| {
@@ -836,6 +836,13 @@ async fn newest_page_state(cx: &mut AsyncApp) -> Value {
 /// The scenario's window width (`"window": {"width": 1480}`, live 2466), else live's runner's 1919 px.
 fn view_width(scenario: &Value) -> f32 {
     scenario["window"]["width"].as_f64().map_or(1919.0, |w| w as f32)
+}
+
+/// The window's height: the take's (NOSHAPE_UI_WINDOW_HEIGHT, which the runner reads from the recording: live2's lanes
+/// record at 992 or 1079), else the scenario's, else 992.
+fn view_height(scenario: &Value) -> f32 {
+    let take = std::env::var("NOSHAPE_UI_WINDOW_HEIGHT").ok().and_then(|h| h.parse::<f32>().ok());
+    take.or(scenario["window"]["height"].as_f64().map(|h| h as f32)).unwrap_or(992.0)
 }
 
 /// The scenario's theme (`"theme": "dark"`, live 2466: Preferences › dark set for the take).

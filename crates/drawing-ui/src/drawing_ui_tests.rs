@@ -350,7 +350,8 @@ fn the_dimension_palette_stays_open_on_enter_and_closes_on_a_click_away(cx: &mut
         (e.palette.is_some(), e.current_sheet().annotations.iter().find(|a| a.id == id).map(|a| a.format.prefix.clone()))
     });
     assert!(open, "Enter leaves the palette open");
-    // Live2 dimensionPalette: its left edge just right of the dimension's text, vertically centred on it (133 px).
+    // Live2 dim-palette-halo: its left edge just right of the dimension's text, its main row (42 px down) starting at
+    // the text's centre line.
     let (at, x_px, y_px) = cx.update(|cx| {
         let e = editor.read(cx);
         let (b, picks, s) = (e.built.clone().unwrap(), e.picks_of(crate::drawing_view::Sel::Annotation(id)), e.size_px());
@@ -358,7 +359,7 @@ fn the_dimension_palette_stays_open_on_enter_and_closes_on_a_click_away(cx: &mut
         (e.palette_at(id), ((t.pos[0] - e.center[0]) * e.zoom + s[0] / 2.0) as f32, ((e.center[1] - t.pos[1]) * e.zoom + s[1] / 2.0) as f32)
     });
     assert!(at[0] > x_px, "right of the text: {at:?} vs x {x_px}");
-    assert!((at[1] + 66.5 - y_px).abs() < 12., "centred on the text: top {} vs text y {y_px}", at[1]);
+    assert!((at[1] + 42. - y_px).abs() < 12., "main row at the text: top {} vs text y {y_px}", at[1]);
     assert_eq!(prefix.as_deref(), Some("R"), "Enter made the edit");
     let empty = empty_sheet_point(cx, window, &editor);
     click_sheet(cx, window, &editor, empty);
@@ -373,6 +374,39 @@ fn the_dimension_palette_stays_open_on_enter_and_closes_on_a_click_away(cx: &mut
     cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
     draw(cx, window);
     assert!(cx.update(|cx| editor.read(cx).palette.is_none()), "Esc closes it");
+}
+
+/// Live2 dim-palette-halo: a transparent halo (40 px left, 20 right, 30 above and below) around the dimension palette
+/// closes a palette not yet clicked into, and keeps it open once it has been (a click into Prefix, a Precision pick).
+#[gpui_kit::test]
+fn the_dimension_palettes_halo_keeps_it_open_once_clicked_into(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "palette-halo");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| a.kind.is_dimension()).map(|a| a.id)).expect("a dimension");
+    let open = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_dim_palette(id, w, cx))).unwrap();
+        draw(cx, window);
+    };
+    let click = |cx: &mut TestAppContext, dx: f32, dy: f32| {
+        let p = cx.update(|cx| {
+            let e = editor.read(cx);
+            let at = e.palette_at(id);
+            e.bounds.origin + Point::new(px(at[0] + dx), px(at[1] + dy))
+        });
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(p, Modifiers::default());
+        draw(cx, window);
+        cx.update(|cx| editor.read(cx).palette.is_some())
+    };
+    open(cx);
+    assert!(!click(cx, -20., 60.), "a click in the halo closes a palette not clicked into");
+    open(cx);
+    assert!(click(cx, 40., 52.), "a click into Prefix keeps it open");
+    assert!(click(cx, -20., 60.), "then a click in the halo keeps it open");
+    assert!(click(cx, 200., -15.), "twice, above it too");
+    assert!(!click(cx, 200., -60.), "a click past the halo closes it");
 }
 
 /// A sheet point (mm) with nothing under the pointer: no view, frame or annotation.
