@@ -42,6 +42,8 @@
 #include <BRepBuilderAPI_ModifyShape.hxx>
 #include <BRepTools_TrsfModification.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepCheck_Shell.hxx>
+#include <BRepCheck_Solid.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
 #include <Geom2dConvert.hxx>
@@ -2142,6 +2144,34 @@ TopoDS_Shape unify(const TopoDS_Shape& s0, HHist& hist)
   return unify_in(s0, hist, nullptr, nullptr);
 }
 
+// Whether `s`'s shells, and its solids with them, check clean (BRepCheck_Shell's and BRepCheck_Solid's: closed, oriented,
+// the faces joined), its faces taken as they are.
+static bool shells_valid(const TopoDS_Shape& s)
+{
+  const auto clean = [](const NCollection_List<BRepCheck_Status>& l) {
+    for (const BRepCheck_Status st : l)
+      if (st != BRepCheck_NoError)
+        return false;
+    return true;
+  };
+  for (TopExp_Explorer so(s, TopAbs_SOLID); so.More(); so.Next())
+  {
+    for (TopExp_Explorer sh(so.Current(), TopAbs_SHELL); sh.More(); sh.Next())
+    {
+      const occ::handle<BRepCheck_Shell> r = new BRepCheck_Shell(TopoDS::Shell(sh.Current()));
+      r->InContext(so.Current());
+      if (!clean(r->Status()) || !clean(r->StatusOnShape(so.Current())))
+        return false;
+    }
+    if (!clean(occ::handle<BRepCheck_Solid>(new BRepCheck_Solid(TopoDS::Solid(so.Current())))->Status()))
+      return false;
+  }
+  for (TopExp_Explorer sh(s, TopAbs_SHELL, TopAbs_SOLID); sh.More(); sh.Next())
+    if (!clean(occ::handle<BRepCheck_Shell>(new BRepCheck_Shell(TopoDS::Shell(sh.Current())))->Status()))
+      return false;
+  return true;
+}
+
 // Two faces on one cylinder meeting at a full ring, each a band closed at
 // its far end by one circle (a circle extruded both ways from its plane: the
 // halves' axes and seams point opposite ways, live's frames), stay two after
@@ -2149,8 +2179,8 @@ TopoDS_Shape unify(const TopoDS_Shape& s0, HHist& hist)
 // face). Merged here: one face on the first band's surface over both, its far
 // circle, a new circle at the second band's far end (put into that end's cap
 // face), one new seam. The shape unchanged when there's no such pair or the
-// merge doesn't come out valid with the same volume.
-TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
+// merge doesn't come out valid with the same volume. `vol`: the shape's volume where known (below 0 not yet).
+TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist, double vol = -1)
 {
   ShapeAncMap ef;
   unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
@@ -2389,13 +2419,36 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
     else
       rs->Replace(bb.end.Oriented(TopAbs_FORWARD), b_new);
     const TopoDS_Shape out = rs->Apply(s);
-    if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+    if (out.IsNull())
       continue;
-    GProp_GProps g0, g1;
-    BRepGProp::VolumeProperties(s, g0);
-    BRepGProp::VolumeProperties(out, g1);
+    // (Only what it changed checked and integrated, against the whole shape's twice a pair before (c2-impeller-loft's
+    // Extrude Bohrungssitz Ansaugflansch: its B-spline faces, 1 s): the new faces each, the shells as they join; the
+    // volume the changed faces' shares after less before, one integral each as the whole shape's.)
+    ShapeIMap before, after;
+    TopExp::MapShapes(s, TopAbs_FACE, before);
+    TopExp::MapShapes(out, TopAbs_FACE, after);
+    std::vector<TopoDS_Shape> changed;
+    bool                      valid = true;
+    for (TopExp_Explorer x(out, TopAbs_FACE); x.More() && valid; x.Next())
+      if (!before.Contains(x.Current()))
+      {
+        changed.push_back(x.Current());
+        valid = BRepCheck_Analyzer(x.Current()).IsValid();
+      }
+    if (!valid || !shells_valid(out))
+      continue;
+    for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+      if (!after.Contains(x.Current()))
+        changed.push_back(x.Current().Reversed());
+    if (vol < 0)
+    {
+      GProp_GProps g0;
+      BRepGProp::VolumeProperties(s, g0);
+      vol = g0.Mass();
+    }
+    const double dv = faces_volume(changed);
     // (Within the integration's noise: a seam moved round a torus cap reads 2e-7 apart, the PEM FH4 stud's.)
-    if (std::abs(g1.Mass() - g0.Mass()) > 1e-6 * std::abs(g0.Mass()))
+    if (std::abs(dv) > 1e-6 * std::abs(vol))
       continue;
     if (hist.IsNull())
       hist = new BRepTools_History();
@@ -2414,7 +2467,7 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
       h->Remove(e);
     hist->Merge(h);
     // One pair at a time: the shape changed, look again.
-    return merge_cylinder_bands(out, hist);
+    return merge_cylinder_bands(out, hist, vol + dv);
   }
   return s;
 }
