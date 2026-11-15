@@ -4,6 +4,18 @@ qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA)
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 
+## 11-15 11:00: interaction latency on the private documents; QUIT-ABORT-DOCK
+- Harness: /root/qa-scratch/lat/hat (mkscen.py + split.py: one round per UI-script file, the runner's 180 s cap; the feature
+  list filtered to reach the last feature; lat-priv.sh: rounds + cold / reopen + rotate / pan / zoom by xdotool, NOSHAPE_FRAME_LOG,
+  NOSHAPE_PERF=1; lat-open.py; ../lat-steps.py's quiet rule 450 ms (a field caret blinks every ~500 ms: psui)). Absolute numbers
+  only from qa-w7-nightly's 02:00 vibe7 window (lead), which now runs hat15 / dock / block after the CLI timings ->
+  nightly/lat-<mmdd>.txt. vibe6 runs are for candidates only.
+- QUIT-ABORT-DOCK (TICKETS qa 11-15): an exit race (core: threads in the kernel under exit()'s static destructors), in every
+  release since at least 0.4.48; shortest repro lat/hat/qa-asm-a.json (6/6 on 0.4.52), loop quitv.sh. core's _Exit fix: re-run
+  qa-asm-a + qa-tabs 10x each on its green.
+- qa-suites' assembly / exchange stage defaults to vibe5 (lead 11-15: vibe6/7 carry asm); vibe5's fzrun.sh kills the app's own
+  `--reopen` restarts on its display after each run.
+
 ## 11-15 05:10: qa restarted on a new account; the nightly speed window is a repeating unit
 - **qa-w7-nightly** (systemd, bin/w7-nightly.sh): sleeps to 02:00 UTC every night, runs the newest release's Linux CLI on vibe7
   (downloads it to ~/qa-rel/<v> if missing) with opentime.py + modeltime.py as 11-14's run (3 runs; the scripts in vibe7
