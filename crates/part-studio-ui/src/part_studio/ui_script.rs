@@ -552,6 +552,7 @@ impl PartStudioView {
             Reference::Edge(n) => topo("EDGE", n),
             Reference::Vertex(n) => topo("VERTEX", n),
             Reference::Body(_) => ("BODY", body(r)),
+            Reference::MeshPoint { .. } => ("VERTEX", body(r)),
             Reference::Plane(p) => ("PLANE", format!("{p:?}")),
             Reference::Origin => ("VERTEX", "Origin".to_string()),
             Reference::SketchEntity { sketch, .. } => ("SKETCH_ENTITY", feature_name(*sketch)),

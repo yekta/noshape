@@ -35,7 +35,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     for (eid, r) in &data.external_refs {
         let id = noshape_sketch::EntityId(*eid);
         // Projected model vertices (snapped to while sketching).
-        if matches!(r, crate::reference::Reference::Vertex(_)) {
+        if matches!(r, crate::reference::Reference::Vertex(_) | crate::reference::Reference::MeshPoint { .. }) {
             match ev.resolve_vertex_point(r) {
                 Some(p) => {
                     let _ = sk.set_point(id, frame.to_local(p));

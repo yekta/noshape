@@ -256,15 +256,23 @@ pub enum Reference {
     /// helpers accept it too. Serialized as `{"QueryVariable":"name"}`;
     /// documents without it deserialize unchanged.
     QueryVariable(String),
+    /// A node of a mesh body (Onshape's mesh parts have no vertices, but their nodes can be Used in a sketch: live
+    /// c2-hex-bookcase-derived), by where it is: `at` in nanometres, the body's nearest node when resolved.
+    MeshPoint { body: BodyId, at: [i64; 3] },
 }
 
 impl Reference {
+    /// The mesh point of `body` at `p` (metres).
+    pub fn mesh_point(body: BodyId, p: [f64; 3]) -> Reference {
+        Reference::MeshPoint { body, at: p.map(|c| (c * 1e9).round() as i64) }
+    }
+
     /// Feature this reference depends on, if any (for dependency tracking).
     pub fn depends_on(&self) -> Option<FeatureId> {
         match self {
             Reference::Origin | Reference::Plane(_) => None,
             Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => n.creator(),
-            Reference::Body(b) => Some(b.feature),
+            Reference::Body(b) | Reference::MeshPoint { body: b, .. } => Some(b.feature),
             Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::SketchRegionEdge { sketch, .. } | Reference::SketchCurveEnd { sketch, .. } | Reference::SketchBody { sketch, .. } | Reference::Sketch(sketch) => Some(*sketch),
             Reference::FeaturePlane(f) | Reference::Feature(f) => Some(*f),
             Reference::MateConnector { feature, .. } | Reference::ConstructionPlane { feature, .. } => Some(*feature),
@@ -284,7 +292,7 @@ impl Reference {
             Reference::Plane(DatumPlane::Right) => "Right plane",
             Reference::Face(_) => "Face",
             Reference::Edge(_) => "Edge",
-            Reference::Vertex(_) => "Vertex",
+            Reference::Vertex(_) | Reference::MeshPoint { .. } => "Vertex",
             Reference::Body(_) => "Part",
             Reference::SketchEntity { .. } => "Sketch entity",
             Reference::SketchRegion { .. } => "Sketch region",

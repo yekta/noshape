@@ -146,7 +146,7 @@ pub fn ops() -> Vec<Op> {
         op(
             "use",
             "Use (project) model geometry into the sketch (the Use tool)",
-            "Projects each reference onto the sketch plane as fixed geometry linked to the model (it follows model changes): edges and vertices (`edge:…`, `vertex:…` from query_entities), other sketches' entities, a planar face (all its edges), a curved face (its silhouettes) or a plane (its trace line). Returns the created entity ids.",
+            "Projects each reference onto the sketch plane as fixed geometry linked to the model (it follows model changes): edges and vertices (`edge:…`, `vertex:…` from query_entities; a mesh part's nodes, `meshpoint:…`), other sketches' entities, a planar face (all its edges), a curved face (its silhouettes) or a plane (its trace line). Returns the created entity ids.",
             vec![req("references", ids(), "Model reference ids.")],
             use_refs,
         ),

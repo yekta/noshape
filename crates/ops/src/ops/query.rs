@@ -33,7 +33,7 @@ pub fn ops() -> Vec<Op> {
             fields: vec![
                 doc_field(),
                 tab_field(),
-                req("kind", json!({ "type": "string", "enum": ["faces", "edges", "vertices"] }), "Which entities."),
+                req("kind", json!({ "type": "string", "enum": ["faces", "edges", "vertices"] }), "Which entities. A mesh part (imported STL, OBJ, …) has no edges or vertices: `vertices` lists its nodes (`meshpoint:…` ids), which a sketch can Use."),
                 opt("part", s(), "Only this part (`body:…` id or part name)."),
                 opt("surface", json!({ "type": "string", "enum": ["plane", "cylinder", "cone", "sphere", "torus", "bspline", "extruded", "revolved", "other"] }), "Faces: only this surface type."),
                 opt("curve", json!({ "type": "string", "enum": ["line", "circle", "ellipse", "bspline", "other"] }), "Edges: only this curve type."),
@@ -547,6 +547,14 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 }
             }
             "vertices" => {
+                // A mesh body's nodes (it has no vertices; a sketch can Use them: live c2-hex-bookcase-derived).
+                if b.shape.is_mesh() {
+                    for p in noshape_model::regen::eval::mesh_nodes(&b.shape) {
+                        let v = json!({ "id": refs::to_id(&Reference::mesh_point(b.id.clone(), p.to_array())), "part": refs::body_id(&b.id), "position": pt(p, k) });
+                        out.push((near.map(|q| q.distance(p)).unwrap_or(0.0), p, v, None));
+                    }
+                    continue;
+                }
                 // Onshape's vertices only (none at seam ends or on full circles).
                 let shown = b.shape.shown_topology().unwrap_or_default();
                 for i in 0..b.vertices.len() {

@@ -65,6 +65,16 @@ pub fn resolve_shapes(ctx: &Context, r: &Reference) -> Vec<Shape> {
                 }
             }
         }
+        // A mesh node: a vertex where it is (measure, Use).
+        Reference::MeshPoint { body, at } => {
+            let want = glam::DVec3::new(at[0] as f64, at[1] as f64, at[2] as f64) * 1e-9;
+            if let Some(b) = ctx.bodies.iter().find(|b| &b.id == body)
+                && let Some(p) = super::eval::mesh_nodes(&b.shape).into_iter().min_by(|p, q| p.distance_squared(want).total_cmp(&q.distance_squared(want)))
+                && let Ok(v) = noshape_kernel::make_vertex(p)
+            {
+                out.push(v);
+            }
+        }
         Reference::Body(id) => {
             if let Some(b) = ctx.body(id) {
                 // A curve of one edge (its Parts list row) measures as that edge

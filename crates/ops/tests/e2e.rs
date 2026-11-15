@@ -2684,6 +2684,38 @@ fn import_defaults_are_onshapes() {
     assert!((v - v0).abs() < v0 * 1e-6, "IGES postprocessing keeps the solid: {v} vs {v0} in³");
 }
 
+/// A mesh part's nodes (it has no vertices, live c2-hex-bookcase-derived: 1 face, 0 edges, 0 vertices) are listed with
+/// ids, and the Use tool takes one into a sketch, where it stays on regeneration.
+#[test]
+fn a_mesh_parts_nodes_can_be_used_in_a_sketch() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "mesh_use");
+    let stl = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STL", "file": scratch("mesh_use.stl").to_str().unwrap(), "units": "Millimeter" }))["file"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "import_files", json!({ "files": [stl], "keep_files": false }));
+    let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["name"].as_str().unwrap().to_string();
+    let nodes = call(&mut ctx, "query_entities", json!({ "tab": studio, "kind": "vertices", "near": [100, 100, 100] }));
+    let node = &nodes["vertices"][0];
+    let id = node["id"].as_str().expect("a mesh node has an id").to_string();
+    assert!(id.starts_with("meshpoint:"), "{node}");
+    let at: Vec<f64> = node["position"].as_array().unwrap().iter().map(num).collect();
+    let sk = call(&mut ctx, "sketch_create", json!({ "tab": studio, "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    let used = call(&mut ctx, "sketch_use", json!({ "tab": studio, "sketch": sk, "references": [id] }));
+    let pts = created(&used, "point");
+    assert_eq!(pts.len(), 1, "{used}");
+    let pid = pts[0]["id"].clone();
+    let doc = format!("{}.noshape", scratch("mesh_use").display());
+    let point = |ctx: &mut Ctx| {
+        let s = call(ctx, "sketch_get", json!({ "doc": doc, "tab": studio, "sketch": sk }));
+        let e = s["entities"].as_array().unwrap().iter().find(|e| e["id"] == pid).cloned().unwrap_or_else(|| panic!("the used point: {s}"));
+        (num(&e["at"][0]), num(&e["at"][1]))
+    };
+    let (x, y) = point(&mut ctx);
+    assert!((x - at[0]).abs() < 1e-6 && (y - at[1]).abs() < 1e-6, "({x}, {y}) vs {at:?}");
+    // Regenerated (a fresh session reads the file): the point is still there.
+    let (x2, y2) = point(&mut Ctx::new());
+    assert!((x2 - x).abs() < 1e-9 && (y2 - y).abs() < 1e-9);
+}
+
 /// Every format the Import dialog takes that we can write: the block is
 /// exported in each and imported back. B-rep formats keep the volume;
 /// mesh formats come back as one mesh part.

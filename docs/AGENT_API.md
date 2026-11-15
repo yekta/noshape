@@ -1987,7 +1987,7 @@ Examples:
 
 Use (project) model geometry into the sketch (the Use tool) (edits the document (one undoable history entry)).
 
-Projects each reference onto the sketch plane as fixed geometry linked to the model (it follows model changes): edges and vertices (`edge:…`, `vertex:…` from query_entities), other sketches' entities, a planar face (all its edges), a curved face (its silhouettes) or a plane (its trace line). Returns the created entity ids.
+Projects each reference onto the sketch plane as fixed geometry linked to the model (it follows model changes): edges and vertices (`edge:…`, `vertex:…` from query_entities; a mesh part's nodes, `meshpoint:…`), other sketches' entities, a planar face (all its edges), a curved face (its silhouettes) or a plane (its trace line). Returns the created entity ids.
 
 Examples:
 
@@ -6533,7 +6533,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
-| `kind` | one of `faces`, `edges`, `vertices` | required | Which entities. |
+| `kind` | one of `faces`, `edges`, `vertices` | required | Which entities. A mesh part (imported STL, OBJ, …) has no edges or vertices: `vertices` lists its nodes (`meshpoint:…` ids), which a sketch can Use. |
 | `part` | string |  | Only this part (`body:…` id or part name). |
 | `surface` | one of `plane`, `cylinder`, `cone`, `sphere`, `torus`, `bspline`, `extruded`, `revolved`, `other` |  | Faces: only this surface type. |
 | `curve` | one of `line`, `circle`, `ellipse`, `bspline`, `other` |  | Edges: only this curve type. |

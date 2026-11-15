@@ -603,6 +603,11 @@ impl<'a> EvalCtx<'a> {
             Reference::SketchRegionEdge { sketch, region, edge, end: Some(end) } => sketch_region_edge(self.ctx.sketch(*sketch)?, region, *edge, Some(*end))?.0.vertex_point().ok(),
             Reference::MateConnector { .. } | Reference::Implicit { .. } => self.raw_connector(r).map(|c| c.origin),
             Reference::QueryVariable(_) => self.raw_vertex_point(&self.qv_first(r)?),
+            Reference::MeshPoint { body, at } => {
+                let b = &self.ctx.bodies[self.ctx.bodies.position_id(body)?];
+                let want = DVec3::new(at[0] as f64, at[1] as f64, at[2] as f64) * 1e-9;
+                mesh_nodes(&b.shape).into_iter().min_by(|p, q| p.distance_squared(want).total_cmp(&q.distance_squared(want)))
+            }
             _ => None,
         }
     }
@@ -2107,4 +2112,14 @@ mod region_area_tests {
         assert!(encloses_no_area(&region(&[a, b, DVec2::new(0.01, 0.0)])));
         assert!(!encloses_no_area(&region(&[a, b, DVec2::new(0.02, 1e-5), DVec2::new(0.0, 1e-5)])));
     }
+}
+
+/// A mesh body's nodes (its faces' stored triangulations; none for a B-rep body).
+pub fn mesh_nodes(shape: &Shape) -> Vec<DVec3> {
+    if !shape.is_mesh() {
+        return Vec::new();
+    }
+    let Ok(t) = noshape_kernel::tessellate(shape, 1.0, 1.0, false) else { return Vec::new() };
+    let mut seen = std::collections::HashSet::new();
+    t.positions.iter().filter(|p| seen.insert(p.map(f32::to_bits))).map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).collect()
 }

@@ -116,6 +116,7 @@ pub fn to_id(r: &Reference) -> String {
         Reference::Feature(f) => format!("feature:{f}"),
         Reference::Implicit { on, inference } => format!("implicit:{}:{}", inference_name(*inference), to_id(on)),
         Reference::QueryVariable(n) => format!("qvar:{n}"),
+        Reference::MeshPoint { body, at } => format!("meshpoint:{}.{}:{},{},{}", body.feature, body.index, at[0], at[1], at[2]),
     }
 }
 
@@ -145,6 +146,12 @@ pub fn parse_str(s: &str) -> Option<Reference> {
         "body" => {
             let (feature, index) = parse_dotted(rest)?;
             Reference::Body(BodyId { feature, index })
+        }
+        "meshpoint" => {
+            let (b, at) = rest.split_once(':')?;
+            let (feature, index) = parse_dotted(b)?;
+            let at: Vec<i64> = at.split(',').map(|x| x.trim().parse().ok()).collect::<Option<_>>()?;
+            Reference::MeshPoint { body: BodyId { feature, index }, at: at.try_into().ok()? }
         }
         "entity" => {
             let (f, e) = rest.split_once(':')?;

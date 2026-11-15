@@ -281,7 +281,7 @@ fn reference_label(r: &crate::reference::Reference, studio: &PartStudio) -> Stri
         Reference::Plane(DatumPlane::Right) => "Right plane".into(),
         Reference::Face(n) => format!("Face of {}", n.creator().map(fname).unwrap_or_else(|| "part".into())),
         Reference::Edge(n) => format!("Edge of {}", creator(n).map(fname).unwrap_or_else(|| "part".into())),
-        Reference::Vertex(_) => "Vertex".into(),
+        Reference::Vertex(_) | Reference::MeshPoint { .. } => "Vertex".into(),
         Reference::Body(_) => "Part".into(),
         Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::SketchRegionEdge { sketch, .. } | Reference::SketchCurveEnd { sketch, .. } | Reference::SketchBody { sketch, .. } | Reference::Sketch(sketch) => fname(*sketch),
         Reference::FeaturePlane(f) | Reference::Feature(f) | Reference::MateConnector { feature: f, .. } => fname(*f),

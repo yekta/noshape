@@ -1880,7 +1880,7 @@ impl PartStudioView {
                     let latest = faces.iter().filter_map(|f| owner(f.creator())).max_by_key(|id| names.iter().position(|(i, _)| i == id));
                     latest.map(|id| format!("Vertex of {}", fname(id))).unwrap_or_else(|| "Vertex".into())
                 }
-                Reference::Vertex(_) => "Vertex".into(),
+                Reference::Vertex(_) | Reference::MeshPoint { .. } => "Vertex".into(),
                 Reference::Body(b) => bodies.iter().find(|(i, _)| i == b).map(|(_, n)| n.clone()).unwrap_or_else(|| "Part".into()),
                 // Live (qa5 P1-12, behaviours 208 / 2693): a sketch curve is
                 // "Edge of Sketch N", a sketch point "Vertex of Sketch N".

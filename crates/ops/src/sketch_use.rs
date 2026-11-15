@@ -119,7 +119,7 @@ impl Model<'_> {
 /// in an empty sketch.
 pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, cursor: DVec2, r: &Reference, pierce: bool, construction: bool) -> Option<EntityId> {
     let frame = model.frame;
-    let want_point = pierce || matches!(r, Reference::Vertex(_));
+    let want_point = pierce || matches!(r, Reference::Vertex(_) | Reference::MeshPoint { .. });
     if let Some(id) = data.external_refs.iter().find(|(id, v)| *v == r && data.sketch.entity(EntityId(**id)).is_some_and(|e| (e.kind() == EntityKind::Point) == want_point)).map(|(id, _)| EntityId(*id)) {
         // Use on geometry a dimension already refers to makes it sketch geometry.
         if !construction && data.sketch.entity(id).is_some_and(|e| e.reference_only) {
@@ -183,7 +183,7 @@ pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, c
 /// edges. Returns whether anything was added.
 pub fn use_reference(data: &mut SketchData, model: Model, world_per_px: f64, cursor: DVec2, r: &Reference) -> bool {
     match r {
-        Reference::Vertex(_) | Reference::SketchEntity { .. } | Reference::Edge(_) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
+        Reference::Vertex(_) | Reference::MeshPoint { .. } | Reference::SketchEntity { .. } | Reference::Edge(_) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         Reference::Face(_) if model.curved_face(r) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         Reference::Face(_) => {
             let mut changed = false;
