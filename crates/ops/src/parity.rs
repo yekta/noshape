@@ -5449,7 +5449,9 @@ impl<'a> Translator<'a> {
                     continue;
                 }
                 if let Some(v) = par(n).and_then(|p| p["value"].as_str().map(str::to_string)).filter(|v| !v.is_empty()) {
-                    match self.sketch_entities.get(&(oid.to_string(), v.clone())) {
+                    // (A line of zero length, a point here: a distance to it is the distance to that point.)
+                    let zero_line = || if kind == "distance" { self.sketch_entities.get(&(oid.to_string(), format!("{v}.start"))) } else { None };
+                    match self.sketch_entities.get(&(oid.to_string(), v.clone())).or_else(zero_line) {
                         Some(e) => entities.push(e.clone()),
                         None => match self.handle_lines.get(&(oid.to_string(), v.clone())) {
                             Some(line) => handle = Some(line.clone()),

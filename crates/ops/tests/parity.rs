@@ -1463,6 +1463,32 @@ fn a_concentric_between_two_points_takes_the_arc_whose_centre_it_names() {
     assert!(g["constraints"].as_array().is_some_and(|c| c.iter().any(|c| c["type"] == "Concentric")), "{g}");
 }
 
+/// A rectangle's side two sketch fillets used up (live keeps it, zero long: c2-fan-blade-sweep's Sketch 2): the
+/// rectangle's width, a DISTANCE to that side, holds as a distance to the point it is.
+#[test]
+fn a_distance_to_a_line_of_zero_length_is_to_its_point() {
+    let line = |id: &str, p: [f64; 2], d: [f64; 2], t: [f64; 2]| json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": t[0], "endParam": t[1], "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": p[0], "pntY": p[1], "dirX": d[0], "dirY": d[1] } });
+    let s = |id: &str, v: &str| json!({ "btType": "BTMParameterString-149", "parameterId": id, "value": v });
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }],
+          "entities": [
+              line("r.left", [0.06, 0.013], [0.0, -1.0], [-0.013, 0.013]),
+              line("r.right", [0.086, 0.013], [0.0, -1.0], [0.0, 0.0])
+          ],
+          "constraints": [
+              { "btType": "BTMSketchConstraint-2", "constraintType": "DISTANCE", "parameters": [s("localFirst", "r.left"), s("localSecond", "r.right"), s("direction", "MINIMUM"),
+                  { "btType": "BTMParameterQuantity-147", "parameterId": "length", "expression": "26 mm" }] }
+          ] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("zero-line-distance.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(!step.problems.iter().any(|p| p.contains("DISTANCE")), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    assert!(g["constraints"].as_array().is_some_and(|c| c.iter().any(|c| c["type"] == "Distance")), "{g}");
+}
+
 #[test]
 fn translates_a_sketch_extrude_and_fillet() {
     let (features, mut live, refs) = block_model();
@@ -2278,9 +2304,9 @@ fn lives_sketch_patterns_are_linked() {
     let sketch = step.ours.unwrap();
     let g = t.call("sketch_get", json!({ "sketch": sketch })).unwrap();
     let count = |ty: &str| g["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == ty).count();
-    // Each instance circle's centre to its seed's, its radius equal; each grid point but the two reference copies
-    // (one step along each direction, as our tool leaves them).
-    assert_eq!((count("Circular pattern"), count("Equal"), count("Linear pattern")), (2, 2, 3), "{g}");
+    // Each instance circle's centre to its seed's and the circle to its seed (its radius), no Equal (as live); each
+    // grid point but the two reference copies (one step along each direction, as our tool leaves them).
+    assert_eq!((count("Circular pattern"), count("Equal"), count("Linear pattern")), (4, 0, 3), "{g}");
     // The seed circle dimensioned further out: its instances follow round the pivot.
     let seed = g["entities"].as_array().unwrap().iter().find(|e| e["type"] == "circle" && e["center"] == json!([20.0, 0.0])).unwrap()["center_point"].clone();
     let pivot = g["entities"].as_array().unwrap().iter().find(|e| e["type"] == "point" && e["at"] == json!([0.0, 0.0])).unwrap()["id"].clone();
