@@ -5,6 +5,24 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 07:40 UTC: exports 81 / 84 by count; spur gear bisected to blend; 1dc32b 15 -> 9 failing
+- Landed: hatch spacing (one region: diag / 9, several: / 13, spline control boxes), aux viewing line (W/2 + 3.63 mm,
+  W/4 + 10.96 mm off, W the parent view's width), a Single centermark on an automatic one's hole is that mark, crop
+  profiles as POLYLINEs, evEdgeConvexity one sample on steady edges, composite parts mapped by their feature
+  (DUMMY BODY of F….opCreateCompositePart). Main went red at 3e4dfb1b1 from the centermark rule (an e2e clicked the old
+  arm): fixed by 233c023c (07:02).
+- Gating (vibe7 dx-gate-pt): 5a41348bf, an Edge point (cPoint) on a sketch curve (1dc32b Transform 23 / 28's in-feature
+  Edge point). 1dc32b on main + composite mapping: 9 not OK; left after this: Large wheel cross section (external
+  refs), Fillet 2 / 12 (blend?), Extrude 34 / Chamfer 3 (live geometry asked, REQUESTS 05:29), Hole 2 (core gating),
+  Draft 1 (core).
+- Exchange on today's files (live re-imported 03:41): ours imports live's 48/48, live imports ours 39/48, read back
+  47/48. Spur gear (3 formats): blend's cb0551bfe (opChamfer distance face with Opposite direction; bisected with
+  qa-rel CLIs, v0.4.43 4879.55 -> 4883.28 mm²); blend asked live (REQUESTS 06:14). STL (3, < 0.12 %): the suite's
+  ours.stl inherits Medium's min facet width; tried 0.001 mm: not the whole gap, parked. Hose x_t 12/24/24 (split rings).
+- Exports left: crop DXF (click positions, 3 %), note leader shoulder (one sample), inspection PDF (an extra live path).
+- Builds on the Mac (NOSHAPE_RB_HOST=mac), suites / ui-parity on vibe6 / vibe7 (/root/dx-scratch/exprun.sh takes
+  EXPHOST).
+
 ## 11-15 03:24 UTC: drawing exports 73 / 84 on main; mesh points; 1dc32b Extrude 49-51 build
 - Landed since 01:45: ordinate leaders from the Geometry gap; ANSI break lines 0.1 in past; leader arrowheads at the
   set size (were size^2/3); coincident view edges written once on paper (`drop_coincident_edges` in export::prepare);
