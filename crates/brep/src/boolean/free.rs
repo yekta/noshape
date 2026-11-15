@@ -150,6 +150,32 @@ pub(super) fn patches(g: &GFace) -> Vec<Patch> {
         let grow = DVec3::splat(1e-9);
         return hs.iter().filter(|h| h.uv[1] >= uv[0] && h.uv[0] <= uv[1] && h.uv[3] >= uv[2] && h.uv[2] <= uv[3]).map(|h| Patch { lo: h.lo - grow, hi: h.hi + grow, uv: h.uv, piece: true, pts: h.pts.clone() }).collect();
     }
+    // (A NURBS surface of several spans or an extrusion: its spans' Bézier patches over the face, each halved the
+    // longer way twice, as pieces held by their control points' boxes: a ray met ~45 of the grid's grown boxes on
+    // c2-helical-sweep's flanks, 12 Newton steps each. Past PIECES of them, the grid's.)
+    const PIECES: usize = 256;
+    if let Some(bs) = bezier_patches(ns, uv) {
+        let over = |b: &Bez| b.uv[1] >= uv[0] && b.uv[0] <= uv[1] && b.uv[3] >= uv[2] && b.uv[2] <= uv[3];
+        let mut stack: Vec<(Bez, u32)> = bs.into_iter().filter(&over).map(|b| (b, 0)).collect();
+        let mut out = Vec::new();
+        while let Some((b, depth)) = stack.pop() {
+            if out.len() + stack.len() > PIECES {
+                out.clear();
+                break;
+            }
+            if depth < 2 {
+                let (l, r) = b.halves(b.longer_along_u());
+                stack.extend([(r, depth + 1), (l, depth + 1)].into_iter().filter(|x| over(&x.0)));
+                continue;
+            }
+            let h = b.hull();
+            let grow = DVec3::splat(1e-9);
+            out.push(Patch { lo: h.lo - grow, hi: h.hi + grow, uv: b.uv, piece: true, pts: h.pts });
+        }
+        if !out.is_empty() {
+            return out;
+        }
+    }
     let (mut us, mut vs) = (splits(ns, true, uv[0], uv[1], 4), splits(ns, false, uv[2], uv[3], 4));
     for s in [&mut us, &mut vs] {
         if s.len() < 9 {
