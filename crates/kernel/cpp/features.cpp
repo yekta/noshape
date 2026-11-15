@@ -10619,6 +10619,32 @@ OpOut op_offset_faces(const OcShape& s, const OcShapeList& faces,
   mo.MakeOffsetShape();
   if (!mo.IsDone())
     fail_op("offset face failed (error " + std::to_string((int)mo.Error()) + ")");
+  // An empty result: again in millimetres (OCCT's offset in metres came back empty on asm-bjr-config 5d8bc1's Kerf
+  // Compensation 1: a 1.5 mm plate's three sides and three countersunk holes, +0.09 mm).
+  auto usable = [](const TopoDS_Shape& r) { return !r.IsNull() && TopExp_Explorer(r, TopAbs_FACE).More() && BRepCheck_Analyzer(r).IsValid(); };
+  if (mo.Shape().IsNull() || !TopExp_Explorer(mo.Shape(), TopAbs_FACE).More())
+  {
+    gp_Trsf up, down;
+    up.SetScale(gp_Pnt(0, 0, 0), 1000.0);
+    down.SetScale(gp_Pnt(0, 0, 0), 1e-3);
+    BRepBuilderAPI_Transform big(s.shape, up, true);
+    BRepOffset_MakeOffset    mm;
+    mm.Initialize(big.Shape(), 0.0, 1e-6 * 1000.0, BRepOffset_Skin, false, false, GeomAbs_Intersection);
+    for (size_t i = 0; i < faces.items.size(); ++i)
+      mm.SetOffsetOnFace(TopoDS::Face(big.ModifiedShape(faces.items[i])), 1000.0 * (offsets.size() == 1 ? offsets[0] : offsets[i]));
+    mm.MakeOffsetShape();
+    if (mm.IsDone() && usable(mm.Shape()))
+    {
+      BRepBuilderAPI_Transform back(mm.Shape(), down, true);
+      if (back.IsDone() && usable(back.Shape()))
+      {
+        HHist h = history_of(args, big);
+        merge_into(h, history_of({big.Shape()}, mm));
+        merge_into(h, history_of({mm.Shape()}, back));
+        return make_result(args, back.Shape(), h.get());
+      }
+    }
+  }
   HHist h = history_of(args, mo);
   return make_result(args, mo.Shape(), h.get());
 }

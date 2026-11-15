@@ -79,6 +79,7 @@ fn replay_as(name: &str, describe: bool) -> String {
             extrude_up_to(&parts[0], v3(&after(&p, "dir", 3)), &parts[1], after(&p, "start_offset", 1)[0])
         }
         "defeature" => delete_faces(&s, &subs),
+        "offset" => offset_faces(&s, &subs, after(&p, "offset", 1)[0]),
         other => panic!("unknown op {other}"),
     };
     match r {
@@ -107,7 +108,7 @@ fn crashing_kernel_inputs_return() {
     assert!((b.volume().unwrap() - 1.0).abs() < 1e-12);
 }
 
-/// Replays one NOSHAPE_DUMP_OPS capture (fillet, draft, shell, prism_until, defeature, project_along) and times it:
+/// Replays one NOSHAPE_DUMP_OPS capture (fillet, draft, shell, prism_until, defeature, offsetfaces, project_along) and times it:
 /// `NOSHAPE_REPLAY=<dir>/<name> cargo test -p noshape-kernel --test all crash_inputs::replay_one -- --ignored --nocapture`.
 #[test]
 #[ignore = "T2: a tool; needs NOSHAPE_REPLAY"]
@@ -159,4 +160,18 @@ fn a_draft_leaving_a_huge_tolerance_fails_and_the_wedges_build_it() {
     assert!(e.to_string().contains("tolerance"), "{e}");
     let r = draft_wedges(&s, &subs, pull, &plane, angle).expect("the wedge draft");
     assert!(r.shape.is_valid());
+}
+
+/// asm-bjr-config 5d8bc1's Kerf Compensation 1 (dx): a 1.5 mm triangular plate's three sides, three countersinks and
+/// their bores offset out by 0.09 mm. OCCT's offset in metres came back empty ("Could not offset selected faces as
+/// requested."); in millimetres it builds: 11 faces, the input's 3685.749 mm³ plus ~0.09 mm over ~483 mm² of faces.
+#[test]
+fn a_plates_sides_and_countersinks_offset_by_a_kerf() {
+    let _ = set_working_scale(1000.0);
+    let (s, subs, _) = load("kerf-offset");
+    let r = offset_faces(&s, &subs, 0.00009).unwrap().shape;
+    assert!(r.is_valid());
+    assert_eq!(r.faces().len(), 11);
+    let v = r.volume().unwrap() * 1e9;
+    assert!((v - 3729.04).abs() < 0.01, "{v} mm³");
 }

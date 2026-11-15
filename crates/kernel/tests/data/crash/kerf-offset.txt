@@ -1,0 +1,10 @@
+face 0
+face 1
+face 2
+face 5
+face 6
+face 7
+face 8
+face 9
+face 10
+offset 0.000090
