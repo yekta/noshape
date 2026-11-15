@@ -1,6 +1,6 @@
 {
  "name": "routing-curve-new-edit-reedit",
- "about": "Routing curve through two box corners, then Closed; ✓; edit it (double-click), change it, ✓; re-edit: the dialog shows the edited values; Esc",
+ "about": "Routing curve through three box top corners (each vertex pick adds a point; the row is named by its length: 91.693 mm); ✓; edit it (double-click), Closed (134.227 mm), ✓; re-edit: the dialog shows Closed; Esc. Live 11-15: a pick on (0,0,10) lands on Point 0's triad at the origin and adds nothing",
  "area": "psui",
  "source": "psui coverage audit batch 2, 2026-11-12 (lead: every toolbar dialog's open, fields, preview, ✓/✗, edit and re-edit)",
  "start": "curves",
@@ -20,8 +20,18 @@
    "do": "click",
    "on": {
     "vertex": [
+     40,
+     30,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
      0,
-     0,
+     30,
      10
     ]
    }
@@ -31,7 +41,7 @@
    "on": {
     "vertex": [
      40,
-     30,
+     0,
      10
     ]
    }
@@ -53,7 +63,7 @@
   {
    "do": "dblclick",
    "on": {
-    "feature": "Routing curve 1"
+    "feature": "Routing curve (91.693 mm)"
    }
   },
   {
@@ -83,7 +93,7 @@
   {
    "do": "dblclick",
    "on": {
-    "feature": "Routing curve 1"
+    "feature": "Routing curve (134.227 mm)"
    }
   },
   {
