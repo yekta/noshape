@@ -277,6 +277,14 @@ offset-surface-new-edit-reedit were 55ea6c02's blamed-field case (match). gusset
 remembered 20 / 10 mm (skasm). Asked live2 (REQUESTS 13:57): does Chrome's own menu show on a right-clicked Depth
 (dialog-number-rclick-menu: ours opens the input's Cut / Copy / Paste, which takes live's dialog-closing Escape).
 asm took context-create-version-update's Where used… row (38bfccbf).
+**11-15 18:56:** P0 data loss fixed (acff4a83): a part's Properties saved off the undo stack (my 2823df1a6) came back
+empty on any Undo / Redo of an earlier step; undo / redo now keep the current metadata (`keep_part_metadata` in
+ops/session.rs), Save is no undo step in ops either unless it renames or changes the mass override. Coincident edges
+(a mitred frame corner) pick the first drawn, the earlier part (line-pick depth Greater; 36 sampled edge scenarios
+unchanged). Sketch patterns read as two constraints each and end their tool on a white-space accept (skasm). Waiting:
+live2 REQUESTS 13:57 (Depth right-click menu), 16:04 (Boundary surface selection drop; Thickness analysis on Pro),
+context navbar workspace label; skasm: gusset-rectangle-aligned / end-cap-profile-internal validation, tab /
+bend-relief labels. Decision asked of the lead: ±1 px on click-placed sketch readouts (6 takes stop there).
 **11-14 18:16 (viewport speed, Linux numbers):** vibe7 (load ~16), release, llvmpipe, 60 samples, mode-700 copies
 deleted after. Pointer / click to the frame with its highlight or selection, p50: dock hover 370 ms, pick 620; hat15
 hover 381-856, pick 1074: llvmpipe drawing the models. To its submission p50 0.4-1.9 ms; the maxima (69-985 ms, one
