@@ -540,6 +540,40 @@ fn hiding_hidden_mates_is_an_undo_step(cx: &mut TestAppContext) {
     });
 }
 
+/// Saving and deleting a named view are no undo steps (live ui-parity named-views-add: Undo stays off), as in a Part
+/// Studio.
+#[gpui::test]
+fn a_named_view_is_no_undo_step(cx: &mut TestAppContext) {
+    use crate::named_views_dialog::Action;
+    let (window, view) = pattern_assembly(cx, "named-view-undo");
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    let undo_before = cx.update(|cx| doc.read(cx).can_undo());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.toggle_named_views(w, cx);
+            v.on_named_views_action(Action::Add, w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update(|cx| {
+        assert_eq!(view.read(cx).assembly(cx).unwrap().named_views.iter().map(|v| v.name.as_str()).collect::<Vec<_>>(), ["View 1"]);
+        assert_eq!(doc.read(cx).can_undo(), undo_before, "saving a view is no undo step");
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.ui.named_view_picked = Some("View 1".into());
+            v.on_named_views_action(Action::Remove, w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update(|cx| {
+        assert!(view.read(cx).assembly(cx).unwrap().named_views.is_empty());
+        assert_eq!(doc.read(cx).can_undo(), undo_before, "deleting a view is no undo step");
+    });
+}
+
 /// A new List input opens its italic "Name" row for typing, and the recorded focus is that input (live2 2208).
 #[gpui::test]
 fn a_new_list_input_types_into_its_name_row(cx: &mut TestAppContext) {

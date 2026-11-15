@@ -1542,6 +1542,18 @@ impl AssemblyView {
         self.edit_as(desc, false, cx, f)
     }
 
+    /// [`Self::edit`] that is no undo step (live: saving or deleting a named view leaves Undo as it was).
+    fn edit_not_undoable(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly)) {
+        let tab = self.tab;
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_tab_not_undoable(tab, desc, cx, |c| {
+                if let TabContent::Assembly(a) = c {
+                    f(a);
+                }
+            });
+        });
+    }
+
     /// [`Self::edit`] as an undo step even when it changes nothing (live: Hide mates on hidden mates).
     pub(super) fn edit_step<R>(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly) -> R) -> Option<R> {
         self.edit_as(desc, true, cx, f)
@@ -6543,7 +6555,8 @@ impl AssemblyView {
                 let cam = self.viewport.read(cx).camera;
                 let section = self.ui.section.as_ref().map(|s| s.planes.iter().map(|p| { let (n, d) = p.clip(); [n.x, n.y, n.z, d] }).collect()).unwrap_or_default();
                 let view = noshape_model::partstudio::NamedView { name: name.clone(), target: cam.target.to_array(), rotation: cam.rotation.to_array(), distance: cam.distance, perspective: cam.projection == noshape_render::Projection::Perspective, section };
-                self.edit(&format!("Save view : {name}"), cx, |asm| {
+                // Not an undo step (live ui-parity named-views-add: Undo stays off after the view is saved).
+                self.edit_not_undoable(&format!("Save view : {name}"), cx, |asm| {
                     asm.named_views.retain(|v| v.name != view.name);
                     asm.named_views.push(view);
                 });
@@ -6573,7 +6586,7 @@ impl AssemblyView {
             }
             Action::Remove => {
                 let Some(name) = self.ui.named_view_picked.take() else { return };
-                self.edit(&format!("Delete view : {name}"), cx, |asm| asm.named_views.retain(|v| v.name != name));
+                self.edit_not_undoable(&format!("Delete view : {name}"), cx, |asm| asm.named_views.retain(|v| v.name != name));
             }
         }
         cx.notify();
