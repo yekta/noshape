@@ -1212,6 +1212,11 @@ fn with_input_focus_in(s: &mut Value, window: &mut Window, cx: &mut App) {
         s["focus"] = json!({ "kind": "field", "label": label, "text": text, "selection": [a, b], "all": all, "dialog": s["dialog"]["title"] });
         return;
     }
+    // The sketch Text dialog's text box: a field without a label (live sketch-text-font-typed-ok: its textarea).
+    if s["dialog"]["kind"] == "sketch-text" {
+        s["focus"] = json!({ "kind": "field", "label": null, "text": text, "selection": [a, b], "all": all });
+        return;
+    }
     s["focus"] = json!({ "kind": "other", "text": text, "selection": [a, b], "all": all });
 }
 
