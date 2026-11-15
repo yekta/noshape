@@ -3579,16 +3579,30 @@ bool march_offsets(const Surf* S[2], const TopoDS_Edge& e, const TopoDS_Face F[2
         x.uv[g] = gp_Pnt2d(0.5 * (pts[k].uv[g].XY() + pts[k + 1].uv[g].XY()));
       if (!solve(sm, x) && !at(sm, &pts[k], x))
         return false;
-      double err = out.c3->Value(sm).Distance(gp_Pnt(x.p));
+      // (Measured as the edge needs it: its 3D curve on each offset, at its curve on a free-form one's point; not
+      // against the point solved there, which two offsets meeting at a small angle place only loosely along their
+      // common tangent: c2-rings-loft's 4 such edges stalled at 1e-7 m after eight halvings.)
+      const gp_XYZ c = out.c3->Value(sm).XYZ();
+      double       err = 0;
       for (int g = 0; g < 2; ++g)
+      {
         if (S[g]->general)
         {
           const gp_Pnt2d q = out.pc[g]->Value(sm);
           gp_XYZ         P, Pu, Pv;
           if (!offset_d1(*S[g], q.X(), q.Y(), P, Pu, Pv))
             return false;
-          err = std::max(err, (P - x.p).Modulus());
+          err = std::max(err, (P - c).Modulus());
         }
+        else
+        {
+          gp_XYZ gr;
+          err = std::max(err, std::abs(eval_grad(*S[g], c, gr)));
+        }
+      }
+      // (And within 1e-4 of the part's size of the solved point: on the offsets' intersection, not off along it.)
+      if ((c - x.p).Modulus() > 1e-4 * size)
+        err = std::max(err, 2 * fit_tol);
       if (err > fit_tol)
       {
         next.push_back(x);
