@@ -5,6 +5,15 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 17:52 UTC: studio refs' boxes are live's loose ones; infento 74d3d6 to core's Extrude 4
+- Live (dx/q-box): studios/<element>.refs.jsonl boxes are evBox3d tight=false (Multi angle joint tight +-20, loose
+  -20.2605..20.2665; tyre +-169 / +-171.7748); only lines with "tight" in `source` (the 56-348 refetch) are tight.
+  The studio-alone scripts (vibe7 ~/tmp/dx/st74.sh, st1dc14.sh, st5d8.sh) run ~/tmp/dx/loosen.py first: it sets
+  `looseBoxes` on the other lines (ours inside live's box). The assembly suite matches studio parts by volume and
+  centroid, not boxes: nothing to change there.
+- infento 74d3d6 with loose boxes: 9/127; first difference Extrude 4's "Knurled disc" (6/11/6, live 4/4/0): core's
+  parked up-to imprints. bjr 5d8bc1 waits on core's Sweep 1; 1dc32b Fillet 3 on blend's Chamfer 3.
+
 ## 11-15 17:45 UTC: 1dc32b pulley = live to Draft 1; bjr 5d8bc1 Sweep 1 to core
 - 1dc32b (vibe7 ~/tmp/dx/st1dc14.sh, save ~/agents/dx-keep/repro-1dc/st22.noshape): with live's Fillet 5 entities
   (dx/q-f5: 10 concave arcs + plane RbDa) in the refs too, the pulley matches live through Fillet 5 (29213.392 /
