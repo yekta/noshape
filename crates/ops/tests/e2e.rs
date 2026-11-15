@@ -993,14 +993,12 @@ fn a_hole_size_given_is_used_as_given() {
         json!({ "tableSynced": true }),
         json!({ "ansiHoleTableEx": ["Drilled", "1/4 (0.25)"], "tableSynced": false }),
     ];
-    // (tableSynced=false as live's own overridden holes pass it, with a size of their own: 5.5 mm.)
     for (i, with) in given.iter().enumerate() {
-        let d = if i == 3 { 5.5 } else { 5.0 };
-        let mut params = json!({ "locations": [pts[i]], "holeDiameterV3": format!("{d} mm"), "endStyleV2": "THROUGH" });
+        let mut params = json!({ "locations": [pts[i]], "holeDiameterV3": "5 mm", "endStyleV2": "THROUGH" });
         params.as_object_mut().unwrap().extend(with.as_object().unwrap().clone());
         let h = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": params }));
         assert_eq!(h["feature_status"]["message"], overridden, "{with}: {h}");
-        assert!((radius_at(&mut ctx, xs[i]) - d / 2.0).abs() < 1e-3, "{with}: {d} mm kept: {}", radius_at(&mut ctx, xs[i]));
+        assert!((radius_at(&mut ctx, xs[i]) - 2.5).abs() < 1e-3, "{with}: 5 mm kept: {}", radius_at(&mut ctx, xs[i]));
     }
     let h = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": [pts[4]], "ansiHoleTableEx": ["Drilled", "1/4 (0.25)"], "tableSynced": true, "endStyleV2": "THROUGH" } }));
     assert_eq!(h["feature_status"]["status"], "Ok", "the size's own values: {h}");

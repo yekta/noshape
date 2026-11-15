@@ -247,12 +247,13 @@ fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> boo
     use noshape_model::features::hole_tables as ht;
     use noshape_model::params::ParamValue;
     // A size the caller gives is theirs, a schema default's value too (5 mm): never replaced by the Standard's, with
-    // or without a Standard's size or tableSynced given. Where it differs from the Standard's the Hole reads as live's
-    // overridden holes: Onshape's "Parameters have been overridden. Check input." (lead 11-15, the model suite's live
-    // holes). A Standard's size alone (tableSynced=true or not) takes the Standard's values.
+    // or without a Standard's size or tableSynced given (tableSynced=false with exactly the default 5 mm too). Where it
+    // differs from the Standard's the Hole reads as live's overridden holes: Onshape's "Parameters have been
+    // overridden. Check input." (lead 11-15, the model suite's live holes). A Standard's size alone (tableSynced=true
+    // or not) takes the Standard's values.
     const DIMS: [&str; 6] = ["holeDiameterV3", "tapDrillDiameterV3", "cBoreDiameterV3", "cBoreDepthV3", "cSinkDiameterV3", "cSinkAngleV3"];
     const SIZES: [&str; 4] = ["ansiHoleTableEx", "ansiHoleTable", "isoHoleTableEx", "isoHoleTable"];
-    if !set(ht::TABLE_SYNCED_PARAM) && DIMS.iter().any(|k| set(k)) {
+    if DIMS.iter().any(|k| set(k)) {
         feature.params.set(ht::TABLE_SYNCED_PARAM, ParamValue::Bool(true));
     }
     // A Standard given without Units: the tab that shows it.
