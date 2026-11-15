@@ -497,38 +497,7 @@ pub fn project_edge_any(edge: &noshape_kernel::Shape, frame: &crate::display::Pl
         let (lo, hi) = (snap(lo), snap(hi));
         return Some(SectionCurve::Exact(noshape_sketch::Curve2::Line { a: foot(lo), b: foot(hi) }));
     }
-    // Each sample on the edge itself (the tessellation's chords lie up to its 10 µm tolerance off the curve: a point
-    // Coincident with c2-impeller-loft's arc edge moved 5 µm onto them, its Stefevenrohr Führung).
-    let pl3: Vec<DVec3> = t.edge_polyline(0).iter().map(|v| DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64)).collect();
-    let samples = resample_with(&pl, &pl3, SECTION_SAMPLES)?;
-    let on_edge = |p: DVec3| k::make_vertex(p).ok().and_then(|v| k::distance(&v, edge).ok()).map_or(p, |d| d.point_b);
-    Some(SectionCurve::Sampled(samples.into_iter().map(|p| frame.to_local(on_edge(p))).collect()))
-}
-
-/// [`resample`]'s positions (evenly along the projected polyline `pl`) in the 3D polyline `pl3` it projects from.
-fn resample_with(pl: &[glam::DVec2], pl3: &[glam::DVec3], n: usize) -> Option<Vec<glam::DVec3>> {
-    if pl.len() < 2 || pl.len() != pl3.len() || n < 2 {
-        return None;
-    }
-    let mut acc = vec![0.0];
-    for w in pl.windows(2) {
-        acc.push(acc.last().unwrap() + (w[1] - w[0]).length());
-    }
-    let total = *acc.last().unwrap();
-    if total < 1e-12 {
-        return None;
-    }
-    let mut out = Vec::with_capacity(n);
-    let mut j = 0;
-    for i in 0..n {
-        let s = total * i as f64 / (n - 1) as f64;
-        while j + 2 < acc.len() && acc[j + 1] < s {
-            j += 1;
-        }
-        let seg = (acc[j + 1] - acc[j]).max(1e-300);
-        out.push(pl3[j].lerp(pl3[j + 1], ((s - acc[j]) / seg).clamp(0.0, 1.0)));
-    }
-    Some(out)
+    resample(&pl, SECTION_SAMPLES).map(SectionCurve::Sampled)
 }
 
 /// Where an edge crosses the sketch plane (Pierce).
