@@ -5,6 +5,24 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-15 07:35 UTC)
+- **P0 landed 608e3b40:** qa's rust-zero-solid-f197 Fillet 1 failed since 1ac08e247 (an extruded circle kept on the
+  sketch circle's frame, trimmed to [a, a + 2π]: OCCT's fillet fails on it). The circle runs from 0 round the seam
+  again; Helix › Circle on such an edge takes the sketch's x from the edge's name (`sketch_x_of_edge`, curves.rs).
+  f197 identical to v0.4.51. T1 features_b::an_extruded_circles_edges_start_at_zero_and_fillet (fails on the old kernel).
+- **Landed:** 00a8d4e3 (guided solid loft refuses an open shell; translator: nested edge+face external queries aren't
+  lost: knife 31 -> 33 / 52 after live's 15-51 refetch), 2cc476fe (1dc32b region keys bounded by imprinted curves;
+  a hole made before V1900 takes an equal-depth counterbore). Queued: ab85e152 (model suite `LIVE_LINES_AS_OTHER`:
+  impeller Flansch verbreitern, PARITY-SUITES.md "Straight edges of offset faces"), 510ed68f re-queued (a hole on a
+  bore already there cuts by its counterbore's disk: 1dc32b Hole 2; its first land failed on main's red e2e, dx's).
+- **E1 Govde (dock, lead accepted):** 539/304 -> 538/303 is bf26f8759: a 0.5 mm seam line of a split Revolve band.
+- **Open, mine:** 1dc32b Draft 1: OCCT's draft of one pulley window (rim, 2 spoke walls, 3 corner fillets by tangent
+  propagation) self-intersects, ShapeFix doesn't mend it, the wedge fallback fails too (repro vibe7
+  ~/agents/core-keep/draft-1dc/draft-74, NOSHAPE_REPLAY). Knife lean loft (core-lean) waits on blend's leanf8.
+  valve Circular pattern 1's time is bool's Boolean (tight through-all tools changed nothing, reverted).
+- **Handed on:** boss-block Mirror New -> Add (evCollision clash types, dx; probe vibe7 ~/agents/core-keep/
+  mirror-probe.patch); L-joint Fillet 2 (blend, normal priority).
+
 ## core state (11-15 01:24 UTC)
 - **Landed 149e2906:** offset curve down a cylinder / cone (psui's offset-curve-* scenarios).
 - **Queued 3c55a04e** (dx's 1dc32b Extrude 49): a part pattern's Remove / Intersect takes its
