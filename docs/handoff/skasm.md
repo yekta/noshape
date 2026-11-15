@@ -1,5 +1,20 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-15 05:37 UTC): live fuzz probes 20 (s228) 11/11; P0 hats fixed
+- P0 (lead 05:00): the hats' "Seat lip 45° chamfer" warning came from 74bbe81ba (sampled projections' samples on the
+  edge): Riser legs / Seat lip project the Mac mini's rounded corners as 13-point fits; on the edge they made the
+  region 0.67 mm2 larger and the seat lip merge split Fan Riser's faces. Reverted (db0fbba8); edge-on lines
+  (65d808387) kept: hats identical with or without it. Bisect binaries: vibe5 ~/agents/skasm-keep/cli-*; scripts
+  in vibe5 ~/tmp/skasm (userdocs.py copy, frsk.py sketch dump); never keep the private documents' outputs. The dock
+  difference isn't ours (lead: from b5e3174a).
+- Probes 20 (s228 leave-one-out) 0 -> 11/11, fuzz 769 of 830, no case worse, other probes unchanged:
+  `grow_slot` (a free slot whose arcs grow keeps the side with fewer Tangents, first on a tie; arcs grow away),
+  `turn_loop_whole` (a loop of lines that only turns: whole, about its first line's start), `place_quad` (a
+  four-sided loop that turns and resizes: anchor = first side's start when placed geometry turns it, else the H/V
+  corner; two sides placed from it with new / own direction and length, the other two close). T1
+  live_fuzz::a_growing_slot_keeps_its_less_tied_side. Mac: write_batch's "generator changed" there is float digits
+  (aarch64), not a change.
+
 ## Resume here (2026-11-15 04:25 UTC): sketch constraints the model suite leaves to the solved geometry (lead)
 - 04:25: 269 -> 107 (full suite, vibe7: 80/87, 878/947; only knife changed, main's). Since 03:10: dx's mesh points
   link hex-bookcase's Uses (PROJECTED 46 -> 29); ellipse centres and conic points mapped; Use of a circular edge's
