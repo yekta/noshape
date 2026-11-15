@@ -8,6 +8,7 @@
 #include <deque>
 #include <functional>
 #include <mutex>
+#include <unordered_map>
 #include <optional>
 #include <thread>
 #include <cstdlib>
@@ -137,26 +138,43 @@ occ::handle<Geom_Surface> as_plane(const occ::handle<Geom_Surface>& s, const Top
     for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
       if (BRep_Tool::IsClosed(TopoDS::Edge(x.Current()), f))
         return s;
-  const GeomLib_IsPlanarSurface planar(base, Precision::Confusion());
-  if (!planar.IsPlanar())
-    return s;
-  // (Its normal the surface's own, so the face stays the same way round.)
-  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
-  base->Bounds(u0, u1, v0, v1);
-  const auto at = [](double a, double b, double k) { return Precision::IsInfinite(a) || Precision::IsInfinite(b) ? 0.0 : a + k * (b - a); };
-  for (const double k : {0.5, 0.25, 0.75})
+  // (Each surface once: every conversion of a body tested all its free-form faces again, 121 ms of c2-hunting-knife's
+  // fillets' acceptance checks. The surface kept with its answer, so its address isn't reused while known.)
+  static std::mutex memo_mutex;
+  static std::unordered_map<const Standard_Transient*, std::pair<occ::handle<Geom_Surface>, occ::handle<Geom_Plane>>> memo;
   {
-    gp_Pnt p;
-    gp_Vec du, dv;
-    base->D1(at(u0, u1, k), at(v0, v1, k), p, du, dv);
-    const gp_Vec n = du.Crossed(dv);
-    if (n.Magnitude() < 1e-12)
-      continue;
-    const gp_Ax3  a = planar.Plan().Position();
-    const gp_Dir  z = a.XDirection().Crossed(a.YDirection());
-    return new Geom_Plane(gp_Ax3(a.Location(), n.Dot(gp_Vec(z)) < 0 ? z.Reversed() : z, a.XDirection()));
+    const std::lock_guard<std::mutex> lock(memo_mutex);
+    if (const auto it = memo.find(base.get()); it != memo.end())
+      return it->second.second.IsNull() ? s : occ::handle<Geom_Surface>(occ::down_cast<Geom_Surface>(it->second.second->Copy()));
   }
-  return s;
+  occ::handle<Geom_Plane> plane;
+  if (const GeomLib_IsPlanarSurface planar(base, Precision::Confusion()); planar.IsPlanar())
+  {
+    // (Its normal the surface's own, so the face stays the same way round.)
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    base->Bounds(u0, u1, v0, v1);
+    const auto at = [](double a, double b, double k) { return Precision::IsInfinite(a) || Precision::IsInfinite(b) ? 0.0 : a + k * (b - a); };
+    for (const double k : {0.5, 0.25, 0.75})
+    {
+      gp_Pnt p;
+      gp_Vec du, dv;
+      base->D1(at(u0, u1, k), at(v0, v1, k), p, du, dv);
+      const gp_Vec n = du.Crossed(dv);
+      if (n.Magnitude() < 1e-12)
+        continue;
+      const gp_Ax3 a = planar.Plan().Position();
+      const gp_Dir z = a.XDirection().Crossed(a.YDirection());
+      plane          = new Geom_Plane(gp_Ax3(a.Location(), n.Dot(gp_Vec(z)) < 0 ? z.Reversed() : z, a.XDirection()));
+      break;
+    }
+  }
+  {
+    const std::lock_guard<std::mutex> lock(memo_mutex);
+    if (memo.size() >= 4096)
+      memo.clear();
+    memo.emplace(base.get(), std::make_pair(base, plane));
+  }
+  return plane.IsNull() ? s : occ::handle<Geom_Surface>(occ::down_cast<Geom_Surface>(plane->Copy()));
 }
 
 // A B-spline face lying on a cylinder (a thread's inner face swept on its shaft's: asm-hand-drill-pinslot's Sweep 1):
