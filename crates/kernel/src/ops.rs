@@ -723,6 +723,19 @@ pub fn draft(shape: &Shape, faces: &[Shape], pull_direction: DVec3, neutral: &Pl
     op(ffi::op_draft(shape.raw(), &l, p3(pull_direction), &neutral.ffi(), angle))
 }
 
+/// Runs `f` with this thread's OCCT draft bounded by `steps` of work (OCCT's break-hook checks; tests), past which
+/// [`draft`] fails; 0 for the default bound.
+pub fn with_draft_work<T>(steps: u64, f: impl FnOnce() -> T) -> T {
+    struct Restore(u64);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            ffi::set_draft_work(self.0);
+        }
+    }
+    let _restore = Restore(ffi::set_draft_work(steps));
+    f()
+}
+
 /// A thin loft's wall grown `t` outward along the loft sheet's normals (two profiles, ruled faces), the faces'
 /// offsets mitred where they crease, trimmed to the profile planes `p0` / `p1` (Onshape's Thin loft with Trim
 /// ends), or (`trim_ends` false) ending at the profiles with caps ruled from each profile edge to its offset (live:

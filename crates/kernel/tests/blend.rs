@@ -221,6 +221,21 @@ fn draft_wedges_take_a_notched_fillet_band() {
     assert!(inside > 0.1 && (vol_mm3(&r) - want).abs() < 1e-6 * want, "{} vs {want} (notch inside {inside})", vol_mm3(&r));
 }
 
+/// OCCT's draft is bounded by work, not time (1dc32b's Draft 1 never ended in OCCT): past its bound it fails at once,
+/// the same on every machine, and leaves nothing behind (the next draft on the thread, unbounded, builds).
+#[test]
+fn a_draft_past_its_work_bound_fails_and_the_next_one_builds() {
+    setup();
+    let b = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    let sides: Vec<Shape> = b.faces().into_iter().filter(|f| matches!(f.face_surface().unwrap(), Surface::Plane(p) if p.normal.z.abs() < 1e-9)).collect();
+    let neutral = Plane::from_normal(DVec3::ZERO, DVec3::Z);
+    let a = 5f64.to_radians();
+    let stopped = with_draft_work(1, || draft(&b, &sides, DVec3::Z, &neutral, a));
+    assert!(stopped.as_ref().is_err_and(|e| e.to_string().contains("draft took too long")), "{:?}", stopped.map(|r| vol_mm3(&r.shape)));
+    let r = draft(&b, &sides, DVec3::Z, &neutral, a).expect("the draft builds").shape;
+    assert!(r.is_valid() && vol_mm3(&r) < 8000.0 - 1.0, "{}", vol_mm3(&r));
+}
+
 /// A prism whose sides are all drafted about its base, its profile curved (an ellipse in two arcs, which OCCT offsets
 /// as B-spline pieces, as a gear's involutes): its far cap is the base offset inward, each side ruled from its base
 /// edge to that edge's offset. For a convex smooth profile the volume is Steiner's: V = A·h − L·tanα·h²/2 +

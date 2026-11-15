@@ -918,6 +918,8 @@ pub(crate) mod ffi {
         /// The work an exact HLR may take on this thread before it is redone on the triangulation (0: the default
         /// bound); returns the previous.
         fn set_hlr_exact_work(steps: u64) -> u64;
+        /// The work OCCT's draft may take on this thread before it fails (0: the default bound); returns the previous.
+        fn set_draft_work(steps: u64) -> u64;
     }
 }
 

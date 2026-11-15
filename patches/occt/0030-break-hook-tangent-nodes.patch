@@ -1,0 +1,14 @@
+diff -ru a/src/ModelingAlgorithms/TKGeomAlgo/IntStart/IntStart_SearchOnBoundaries.gxx b/src/ModelingAlgorithms/TKGeomAlgo/IntStart/IntStart_SearchOnBoundaries.gxx
+--- a/src/ModelingAlgorithms/TKGeomAlgo/IntStart/IntStart_SearchOnBoundaries.gxx	2026-11-15 13:54:41.335277136 +0000
++++ b/src/ModelingAlgorithms/TKGeomAlgo/IntStart/IntStart_SearchOnBoundaries.gxx	2026-11-15 13:54:51.925362223 +0000
+@@ -663,6 +663,10 @@
+ 
+               for (ii = 0; ii <= aNbNodes + 1; ii++)
+               {
++                // noshape (patch 0030): the nodes are TolBoundary * 1000 apart, so a long tangent interval has
++                // billions (1dc32b's Draft 1, cone against cone: minutes without a check).
++                if ((ii & 1023) == 0 && noshape_should_break() != 0)
++                  throw Standard_Failure("noshape: stopped");
+                 aCurPar = (ii < aNbNodes + 1) ? para + ii * aDelta : parap1;
+ 
+                 if (Func.Value(aCurPar, aCurVal))

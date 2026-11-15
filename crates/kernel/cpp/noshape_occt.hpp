@@ -320,10 +320,13 @@ int run_budgeted(double cpu_seconds, F&& f)
   // on pool workers is out of the budget's reach (qa DRAFT-BUDGET-POOL: a
   // worker's endless intersection line went on past the budget).
   const int pairs_outer = noshape_bop_set_pairs_parallel_here(0);
-  Deadline* const deadline_outer = t_deadline;
-  const size_t    rss_start      = process_resident_bytes();
+  Deadline* const   deadline_outer = t_deadline;
+  WorkBudget* const work_outer     = t_work;
+  const size_t      rss_start      = process_resident_bytes();
   if (sigsetjmp(env, 1) != 0)
   {
+    // (The jump skipped the ScopedWorks' destructors in between.)
+    t_work = work_outer;
     trim_if_grown(rss_start);
     budget_timer_stop(timer);
     budget_timer_live = nullptr;
@@ -1105,6 +1108,7 @@ bool                     has_triangulation(const OcShape& s);
 
 // ---- HLR (hlr.cpp)
 uint64_t set_hlr_exact_work(uint64_t steps);
+uint64_t set_draft_work(uint64_t steps);
 HlrOut project_hlr(const OcShape& s, P3 dir, P3 up,
                    bool exact, double deflection);
 

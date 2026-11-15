@@ -9501,6 +9501,21 @@ static TopoDS_Shape end_cone_at_apex(const TopoDS_Shape& input, const TopoDS_Fac
   }
 }
 
+// OCCT's draft's bound by work (break hook checks, the same on any machine and load), so a draft OCCT can't end fails
+// before the time budget and the wedge draft runs: the model suite's drafts take 152 at most; 1dc32b's Draft 1 (a
+// cone's tangent interval sampled at billions of nodes, patch 0030) passes 250k in 30 s. NOSHAPE_WORK_TRACE=1 prints
+// each draft's work.
+constexpr uint64_t DRAFT_WORK = 20000;
+// set_draft_work's (tests): this thread's bound instead (0: DRAFT_WORK).
+thread_local uint64_t t_draft_work = 0;
+
+uint64_t set_draft_work(uint64_t steps)
+{
+  const uint64_t was = t_draft_work;
+  t_draft_work       = steps;
+  return was;
+}
+
 static OpOut op_draft_unbudgeted(const OcShape& s, const OcShapeList& faces, P3 dir, const PlaneF& neutral,
                double angle)
 {
@@ -9535,7 +9550,22 @@ static OpOut op_draft_unbudgeted(const OcShape& s, const OcShapeList& faces, P3 
     if (!mk.AddDone())
       return sloped();
   }
-  mk.Build();
+  {
+    const ScopedWork work(t_draft_work != 0 ? t_draft_work : DRAFT_WORK);
+    try
+    {
+      mk.Build();
+    }
+    catch (const Standard_Failure&)
+    {
+      if (!work.w.hit)
+        throw;
+    }
+    if (std::getenv("NOSHAPE_WORK_TRACE"))
+      std::fprintf(stderr, "work: draft %llu steps%s\n", (unsigned long long)work.w.used, work.w.hit ? " (spent)" : "");
+    if (work.w.hit)
+      fail_op("draft took too long");
+  }
   if (!mk.IsDone())
     return sloped();
   HHist        h = modifier_history(s.shape, mk);
