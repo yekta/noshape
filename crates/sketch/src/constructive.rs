@@ -534,7 +534,7 @@ impl Sketch {
             if placed.contains(&u) {
                 continue;
             }
-            if let Some(ring) = self.turn_loop_whole(u, cons, &holds, &placed) {
+            if let Some(ring) = self.turn_loop_whole(u, cons, &holds, &placed).or_else(|| self.place_quad(u, cons, &holds, &placed)) {
                 placed.extend(ring.iter().copied());
                 kept.extend(ring.iter().copied());
                 let unheld = self.unheld_constraints(1e-9);
@@ -2264,6 +2264,140 @@ impl Sketch {
         let rot = DVec2::from_angle(t);
         for (p, at) in &was {
             let _ = self.set_point(*p, pivot + rot.rotate(*at - pivot));
+        }
+        let unheld = self.unheld_constraints(1e-9);
+        if cons.iter().any(|(c, us)| us.iter().any(|x| ring.contains(x)) && unheld.contains(c)) {
+            for (p, at) in was {
+                let _ = self.set_point(p, at);
+            }
+            return None;
+        }
+        Some(ring)
+    }
+
+    /// A four-sided loop of lines that turns to placed geometry or its own Horizontal / Vertical, one side perhaps
+    /// with a new Length (live probes 20 k13 / k14 / k17 / k19): from its anchor (the first side's start when placed
+    /// geometry turns that side, else the corner between its Horizontal and Vertical sides, else the first side's
+    /// start) two sides are placed, each with its new direction (or its own) and its new length (or its own): the
+    /// two at the anchor when the resized side is one of them, else the one leading to it and that side; the other
+    /// two close the loop where their directions meet.
+    fn place_quad(&mut self, u: EntityId, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], holds: &HashMap<crate::ids::ConstraintId, bool>, placed: &BTreeSet<EntityId>) -> Option<BTreeSet<EntityId>> {
+        let ring = self.ring_of(u, cons);
+        if ring.len() != 4 || ring.iter().any(|x| self.kind(*x) != Some(EntityKind::Line) || placed.contains(x)) || !self.closed(&ring) {
+            return None;
+        }
+        let kind = |c: crate::ids::ConstraintId| self.constraint(c).map(|k| k.kind.clone());
+        // Each side's new direction (from its own H / V or a relation to placed geometry) and new length.
+        let mut dir: HashMap<EntityId, DVec2> = HashMap::new();
+        let mut length: HashMap<EntityId, f64> = HashMap::new();
+        let mut by_placed: BTreeSet<EntityId> = BTreeSet::new();
+        let (mut horizontal, mut vertical) = (BTreeSet::new(), BTreeSet::new());
+        let own = |x: EntityId| self.line_pts(x).map(|(a, b)| b - a);
+        for (c, us) in cons.iter().filter(|(c, us)| !holds[c] && us.iter().any(|x| ring.contains(x))) {
+            match kind(*c)? {
+                ConstraintKind::Horizontal { a, b: None } if ring.contains(&a) => {
+                    dir.insert(a, DVec2::X);
+                    horizontal.insert(a);
+                }
+                ConstraintKind::Vertical { a, b: None } if ring.contains(&a) => {
+                    dir.insert(a, DVec2::Y);
+                    vertical.insert(a);
+                }
+                k @ (ConstraintKind::Parallel { .. } | ConstraintKind::Perpendicular { .. }) => {
+                    let (a, b) = match k {
+                        ConstraintKind::Parallel { a, b } | ConstraintKind::Perpendicular { a, b } => (a, b),
+                        _ => unreachable!(),
+                    };
+                    let (mine, other) = if ring.contains(&a) && placed.contains(&b) { (a, b) } else if ring.contains(&b) && placed.contains(&a) { (b, a) } else { return None };
+                    let d = own(other)?.normalize_or_zero();
+                    dir.insert(mine, if matches!(k, ConstraintKind::Perpendicular { .. }) { d.perp() } else { d });
+                    by_placed.insert(mine);
+                }
+                ConstraintKind::Length { curve, value } if ring.contains(&curve) && length.is_empty() => {
+                    length.insert(curve, value);
+                }
+                _ => return None,
+            }
+            let _ = us;
+        }
+        // Only a loop that has to turn.
+        if dir.is_empty() {
+            return None;
+        }
+        // Every side keeps its sense; one with no new direction keeps its own.
+        for &x in &ring {
+            let o = own(x)?;
+            let d = dir.get(&x).copied().unwrap_or(o).normalize_or_zero();
+            if d == DVec2::ZERO {
+                return None;
+            }
+            dir.insert(x, if d.dot(o) < 0.0 { -d } else { d });
+        }
+        // The sides in order round the loop from the first: each one's end meets the next one's start.
+        let class = |p: EntityId| -> Vec<EntityId> { std::iter::once(p).chain(self.coincident_class(p)).collect() };
+        let first = *ring.iter().min()?;
+        let mut order = vec![first];
+        while order.len() < 4 {
+            let (_, e) = self.endpoints(*order.last()?)?;
+            let next = ring.iter().copied().find(|y| !order.contains(y) && self.endpoints(*y).is_some_and(|(s, _)| class(e).contains(&s)))?;
+            order.push(next);
+        }
+        let side = |i: usize| order[i % 4];
+        // The anchor: a corner, as the index of the side starting there.
+        let hv_corner = (0..4).find(|&i| {
+            let (a, b) = (side(i + 3), side(i));
+            (horizontal.contains(&a) && vertical.contains(&b)) || (vertical.contains(&a) && horizontal.contains(&b))
+        });
+        let at = if by_placed.contains(&first) { 0 } else { hv_corner.unwrap_or(0) };
+        let sized = order.iter().position(|x| length.contains_key(x));
+        // The two sides placed, as a walk from the anchor: forward (the side starting there) or backward.
+        let forward = match sized {
+            Some(k) if k == at || k == (at + 3) % 4 => None,
+            Some(k) if k == (at + 1) % 4 => Some(true),
+            Some(_) => Some(false),
+            None => None,
+        };
+        let (s0, _) = self.endpoints(side(at))?;
+        let anchor = self.point(s0)?;
+        let len = |x: EntityId| length.get(&x).copied().or_else(|| own(x).map(|v| v.length()));
+        // Corner positions: corner i is where side i starts.
+        let mut corner: [Option<DVec2>; 4] = [None; 4];
+        corner[at] = Some(anchor);
+        match forward {
+            None => {
+                corner[(at + 1) % 4] = Some(anchor + dir[&side(at)] * len(side(at))?);
+                corner[(at + 3) % 4] = Some(anchor - dir[&side(at + 3)] * len(side(at + 3))?);
+            }
+            Some(true) => {
+                corner[(at + 1) % 4] = Some(anchor + dir[&side(at)] * len(side(at))?);
+                corner[(at + 2) % 4] = Some(corner[(at + 1) % 4]? + dir[&side(at + 1)] * len(side(at + 1))?);
+            }
+            Some(false) => {
+                corner[(at + 3) % 4] = Some(anchor - dir[&side(at + 3)] * len(side(at + 3))?);
+                corner[(at + 2) % 4] = Some(corner[(at + 3) % 4]? - dir[&side(at + 2)] * len(side(at + 2))?);
+            }
+        }
+        // The open corner: where the two closing sides' lines meet.
+        let open = (0..4).find(|i| corner[*i].is_none())?;
+        let (pa, da) = (corner[(open + 3) % 4]?, dir[&side(open + 3)]);
+        let (pb, db) = (corner[(open + 1) % 4]?, dir[&side(open)]);
+        let den = da.perp_dot(db);
+        if den.abs() < 1e-9 {
+            return None;
+        }
+        let t = (pb - pa).perp_dot(db) / den;
+        corner[open] = Some(pa + da * t);
+        let pts: BTreeSet<EntityId> = ring.iter().filter_map(|x| self.entity(*x)).flat_map(|e| e.point_refs()).collect();
+        let was: Vec<(EntityId, DVec2)> = pts.iter().filter_map(|p| Some((*p, self.point(*p)?))).collect();
+        let mut moves: Vec<(EntityId, DVec2)> = Vec::new();
+        for (i, at) in corner.iter().enumerate() {
+            let (s, _) = self.endpoints(side(i))?;
+            let (_, e) = self.endpoints(side(i + 3))?;
+            let at = (*at)?;
+            moves.extend(class(s).into_iter().chain(class(e)).filter(|p| pts.contains(p)).map(|p| (p, at)));
+        }
+        for (p, at) in moves {
+            let _ = self.set_point(p, at);
         }
         let unheld = self.unheld_constraints(1e-9);
         if cons.iter().any(|(c, us)| us.iter().any(|x| ring.contains(x)) && unheld.contains(c)) {
