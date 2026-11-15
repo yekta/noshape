@@ -85,8 +85,8 @@ Open items:
   `camera_ops::drawing_fit` now fits the paper at 926 px of a 973 px canvas, 15 px below its centre (live2 sheet-fit:
   ANSI A 927.5, ANSI B 928, ISO A3 922.5 px; T1 `a_sheet_fits_as_live`). ISO A4 (both orientations) fits larger in
   live, its frame's bottom at y 1039 and the paper off the canvas: not modelled (live/feel/sheet-fit/).
-- docs/parity/drawing-matrix.md: refresh it with a whole drawing-suite run (`drawing_matrix.py --run <uip dir>`) once the
-  queued batches land.
+- docs/parity/drawing-matrix.md refreshed 11-15 14:30 (949 of 1868 live items compared and matching, none missing;
+  drw-surface-finish-flip is older than live's surface-finish menu without Flip: retake asked of live2).
 - Hole sizes through the API (lead 11-15): feature_add keeps a size the caller gives (sets tableSynced), Onshape's
   "Parameters have been overridden. Check input." where it differs from the Standard's (e2e
   a_hole_size_given_is_used_as_given); the ui-parity start builder no longer special-cases it.

@@ -98,6 +98,16 @@ def norm(s):
     return re.sub(r"\s+", " ", s)
 
 
+def menu_row_in_sources(src, row):
+    """A dump's menu row in our sources; a submenu's ("Merge ▸ All | Horizontal | Vertical") when its name and each of
+    its rows are (a "(…)" note in place of rows: the name alone)."""
+    if "▸" not in row:
+        return in_sources(src, row) or in_sources(src, row.rstrip("…."))
+    name, _, subs = row.partition("▸")
+    subs = [x.strip() for x in subs.split("|") if x.strip() and not x.strip().startswith("(")]
+    return in_sources(src, name.strip()) and all(in_sources(src, x) for x in subs)
+
+
 def key(s):
     return re.sub(r"\s*\((?:[a-z]|shift\+[a-z]|ctrl\+[a-z])\)$", "", norm(s).rstrip("…").strip()).lower()
 
@@ -320,7 +330,7 @@ def main():
                 st = "=" if k in mine_keys else ("≠" if in_sources(src, it) else "missing")
                 rows.append((f"Menu: {entity}", it, st, "our menu"))
             else:
-                rows.append((f"Menu: {entity}", it, status(menu_seen.get(k), in_sources(src, it) or in_sources(src, it.rstrip("…."))), ""))
+                rows.append((f"Menu: {entity}", it, status(menu_seen.get(k), menu_row_in_sources(src, it)), ""))
         # A row of ours live's menu doesn't have.
         for r in mine or []:
             if r != "——" and key(r.removesuffix(" ▸")) not in {key(x) for x in items}:
