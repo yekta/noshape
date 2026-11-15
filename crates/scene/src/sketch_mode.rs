@@ -1440,9 +1440,10 @@ impl SketchEditor {
                 }
                 EditOutcome::redraw()
             }
-            // Live (sketch-mirror recording, sketch-mirror-preselected-batch): a line in the preselection is the mirror
-            // line, the rest is mirrored at once and the tool asks for more.
-            Tool::Mirror if let Some(axis) = self.selection.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Line)) => {
+            // Live (sketch-mirror recording, sketch-mirror-preselected-batch): the one line in the preselection is the
+            // mirror line, the rest is mirrored at once and the tool asks for more. Two lines or more: no mirror line,
+            // the selection stays and the tool asks for one (live2 feel/mirror-preselected).
+            Tool::Mirror if let [axis] = self.selection.iter().copied().filter(|e| data.sketch.kind(*e) == Some(EntityKind::Line)).collect::<Vec<_>>()[..] => {
                 self.mirror_axis = Some(axis);
                 self.message = Some(MIRROR_ENTITIES_PROMPT.into());
                 let rest: Vec<EntityId> = std::mem::take(&mut self.selection).into_iter().filter(|e| *e != axis).collect();
@@ -1528,6 +1529,10 @@ impl SketchEditor {
             }
             self.set_tool(Tool::Select);
             return true;
+        }
+        // Live2 (feel/mirror-preselected): Escape out of Mirror still asking for its line clears the selection.
+        if self.tool == Tool::Mirror {
+            self.selection.clear();
         }
         if self.tool != Tool::Select {
             self.set_tool(Tool::Select);
@@ -10745,6 +10750,26 @@ mod tests {
         assert_eq!(count(&d, EntityKind::Circle), 2);
         assert!(ed.selection.is_empty());
         assert_eq!((ed.tool, ed.message.as_deref()), (Tool::Mirror, Some(MIRROR_ENTITIES_PROMPT)));
+    }
+
+    /// Live2 (feel/mirror-preselected): two lines and a circle selected, Mirror takes neither line, copies nothing and
+    /// asks for the mirror line with all three still selected; Escape clears them.
+    #[test]
+    fn mirror_with_two_preselected_lines_asks_for_the_line() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let a = d.sketch.add_line(v(0.0, 0.0), v(0.0, 0.04));
+        let b = d.sketch.add_line(v(0.005, 0.0), v(0.015, 0.01));
+        let c = d.sketch.add_circle(v(0.02, 0.02), 0.003);
+        ed.selection = vec![b, c, a];
+        ed.set_tool(Tool::Mirror);
+        ed.apply_preselection(&mut d);
+        assert_eq!((count(&d, EntityKind::Line), count(&d, EntityKind::Circle)), (2, 1), "nothing copied");
+        assert_eq!(ed.selection, vec![b, c, a]);
+        assert!(!ed.has_mirror_axis());
+        assert_eq!((ed.tool, ed.message.as_deref()), (Tool::Mirror, Some(MIRROR_LINE_PROMPT)));
+        assert!(ed.cancel());
+        assert!(ed.selection.is_empty());
+        assert_eq!(ed.tool, Tool::Select);
     }
 
     #[test]
