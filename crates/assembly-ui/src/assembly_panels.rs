@@ -1062,6 +1062,8 @@ impl AssemblyView {
             Some(m) => format!("{} did not regenerate properly: {m}", s.name),
             None => e.to_string(),
         });
+        // (A Derived copy not created yet: red too, live 68.)
+        let failing = err.is_some() || mirror_pending(s);
         let pal = p();
         let icon = match s.kind {
             PatternDialogKind::Linear | PatternDialogKind::PartPattern => "linear-pattern",
@@ -1069,20 +1071,23 @@ impl AssemblyView {
             PatternDialogKind::Mirror => "mirror",
             PatternDialogKind::Replicate => "replicate",
         };
+        // Live 62 / in-933: the row being made is bold, highlighted across the list, its icon badged while in error.
         Some(
             h_flex()
                 .id("pat-pending")
+                .w_full()
                 .h(px(24.))
                 .pl(px(6.))
                 .pr_1()
                 .gap_1p5()
                 .text_sm()
-                .text_color(if err.is_some() { pal.error } else { pal.text })
+                .font_weight(FontWeight::BOLD)
+                .text_color(if failing { pal.error } else { pal.text })
                 .bg(pal.accent_soft)
                 .child(div().w(px(12.)))
-                .child(svg().path(icon_path(icon)).size_3p5().text_color(pal.text_muted))
+                .child(pattern_icon(icon, failing, cx))
                 .child(div().flex_1().truncate().child(crate::ui::user_text(s.name.clone())))
-                .when_some(err, |d, e| d.child(div().id("pat-pending-err").size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
+                .when_some(err, |d, e| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx)))
                 .into_any_element(),
         )
     }
@@ -1098,10 +1103,13 @@ impl AssemblyView {
             PatternKind::Replicate { .. } => "replicate",
         };
         // An open Group dialog's patterns are highlighted too (live 1681).
-        let selected = self.selected_mate == Some(id) || self.ui.range_patterns.contains(&id) || (self.ui.group.is_some() && self.ui.group_patterns.contains(&id));
+        let edited = self.pattern.as_ref().is_some_and(|p| p.editing == Some(id));
+        let selected = edited || self.selected_mate == Some(id) || self.ui.range_patterns.contains(&id) || (self.ui.group.is_some() && self.ui.group_patterns.contains(&id));
         let suppressed = pat.suppressed;
         let row = h_flex()
             .id(SharedString::from(format!("pat-{}", id.0)))
+            .w_full()
+            .when(edited, |d| d.font_weight(FontWeight::BOLD))
             .h(px(24.))
             .pl(px(6.))
             .pr_1()
@@ -1125,9 +1133,9 @@ impl AssemblyView {
                         cx.notify();
                     })),
             )
-            .child(svg().path(icon_path(icon)).size_3p5().text_color(pal.text_muted))
+            .child(pattern_icon(icon, error.is_some() && !suppressed, cx))
             .child(crate::assembly_view::suppressed_text(div().flex_1().truncate(), suppressed).child(crate::ui::user_text(pat.name.clone())))
-            .when_some(error, |d, e| d.child(div().id(SharedString::from(format!("pat-err-{}", id.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
+            .when_some(error, |d, e| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx)))
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 let new = if *h { Some(id) } else { None };
                 if this.list_hover_mate != new {
@@ -1521,7 +1529,7 @@ impl AssemblyView {
             }
             created
         });
-        self.expanded.insert(vec![InstanceId(id.0)]);
+        // (Collapsed, as live leaves it: 70, asm-linear-pattern-commit.)
         self.update_capture(cx);
         cx.notify();
     }
@@ -1578,9 +1586,11 @@ impl AssemblyView {
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
         // Live (dom/dialog-asm-*-filled): a chip's tooltip is its label; its ×
         // ("Delete <label>") removes it.
-        let chip = |id: SharedString, label: String, cx: &mut Context<Self>, remove: Box<dyn Fn(&mut Self)>| -> AnyElement {
+        // (`connector`: a mate connector made on the pick shows its icon before the × , live 64.)
+        let chip = |id: SharedString, label: String, connector: bool, cx: &mut Context<Self>, remove: Box<dyn Fn(&mut Self)>| -> AnyElement {
             os::query_row(id.clone(), label.clone())
                 .tooltip(crate::ui::tooltip(label.clone()))
+                .when(connector, |d| d.child(div().flex_none().opacity(0.6).child(crate::assets::icon("mc-select", 16., cx))))
                 .child(
                     div()
                         .id(SharedString::from(format!("{id}-x")))
@@ -1609,6 +1619,7 @@ impl AssemblyView {
                 chip(
                     SharedString::from(format!("pat-seed-{k}")),
                     n,
+                    false,
                     cx,
                     Box::new(move |this: &mut Self| {
                         if let Some(p) = &mut this.pattern {
@@ -1640,14 +1651,16 @@ impl AssemblyView {
                     // -mirror-filled): Direction / Axis name the picked
                     // entity ("Edge of Part 1 <2>", "Face of Part 2 <1>"); a
                     // mirror plane picked on geometry reads "Mate connector".
+                    let made = matches!((&c.reference, c.connector), (noshape_model::reference::Reference::Implicit { .. }, None)) && label == "Mirror plane";
                     let text = match (&c.reference, c.connector) {
-                        (noshape_model::reference::Reference::Implicit { .. }, None) if label == "Mirror plane" => "Mate connector".to_string(),
+                        _ if made => "Mate connector".to_string(),
                         (noshape_model::reference::Reference::Implicit { on, .. }, None) => (this.labeler(cx))(&MateConnectorRef { reference: (**on).clone(), ..c.clone() }),
                         _ => (this.labeler(cx))(c),
                     };
                     vec![chip(
                         SharedString::from(format!("{id}-v")),
                         text,
+                        made,
                         cx,
                         Box::new(move |this: &mut Self| {
                             if let Some(p) = &mut this.pattern {
@@ -1663,10 +1676,14 @@ impl AssemblyView {
                 })
                 .unwrap_or_default();
             let active = this.pattern.as_ref().is_some_and(|p| p.active == Some(field));
+            // Live 63: the first direction / plane, empty once Instances is filled, is red (as the recorder reads it).
+            let missing = field == 0 && value.is_none() && !active && this.pattern.as_ref().is_some_and(|p| !p.seeds.is_empty());
+            let field_box = os::query_box(id, label, active, rows);
+            let field_box = if missing { os::query_box_error(field_box) } else { field_box };
             // Live: the field ends where the button starts, both top-aligned.
             h_flex()
                 .items_start()
-                .child(crate::ui_script::mark(div().flex_1().min_w_0(), move || format!("field:{label}")).child(os::query_box(id, label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                .child(crate::ui_script::mark(div().flex_1().min_w_0(), move || format!("field:{label}")).child(field_box.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(p) = &mut this.pattern {
                         p.active = Some(field);
                     }
@@ -1693,6 +1710,8 @@ impl AssemblyView {
                 PatternDialogKind::PartPattern => s.mate.is_some(),
                 PatternDialogKind::Replicate => s.mate.is_some() && !s.scope_refs.is_empty(),
             };
+        // ✓ on once the dialog was changed, still red (live 63; the recorder's `ok`); an incomplete one says why.
+        let ok_on = valid || (s.touched && !mirror_pending(s));
         let toggle = |id: &'static str, icon: &'static str, on: bool, cx: &mut Context<Self>, f: fn(&mut Self)| {
             div()
                 .id(id)
@@ -1977,7 +1996,7 @@ impl AssemblyView {
             .on_action(cx.listener(|_, _: &crate::actions::DialogTab, window, cx| window.focus_next(cx)))
             .on_action(cx.listener(|_, _: &crate::actions::DialogTabPrev, window, cx| window.focus_prev(cx)))
             .on_action(cx.listener(move |this, _: &crate::actions::Accept, _, cx| {
-                if valid {
+                if ok_on {
                     this.accept_pattern(cx);
                 }
             }))
@@ -2018,11 +2037,11 @@ impl AssemblyView {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(pal.accept).when(!valid, crate::ui::disabled_accept)
-                            .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
+                            .bg(pal.accept).when(!ok_on, crate::ui::disabled_accept)
+                            .when(ok_on, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
                             .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                if valid {
+                                if ok_on {
                                     this.accept_pattern(cx);
                                 }
                             })),
@@ -2272,7 +2291,7 @@ impl AssemblyView {
             .unwrap_or_default();
             let id = *id;
             let view = cx.entity().downgrade();
-            let action = os::select_field(SharedString::from(format!("ms-act-{k}")), vec!["Transform".into(), "Derived".into()], usize::from(row.derived), {
+            let action = os::select_field_flat(SharedString::from(format!("ms-act-{k}")), vec!["Transform".into(), "Derived".into()], Vec::new(), usize::MAX, usize::from(row.derived), {
                 let view = view.clone();
                 move |i, _, cx| {
                     if let Some(v) = view.upgrade() {
@@ -2293,10 +2312,10 @@ impl AssemblyView {
                 _ => div().into_any_element(),
             };
             let placement: AnyElement = if row.derived {
-                div().child(row.placement.label()).into_any_element()
+                div().h_full().flex().items_center().child(row.placement.label()).into_any_element()
             } else {
                 let view = view.clone();
-                os::select_field(SharedString::from(format!("ms-pl-{k}")), MirrorPlacement::ALL.iter().map(|p| p.label().to_string()).collect(), MirrorPlacement::ALL.iter().position(|p| *p == row.placement).unwrap_or(0), move |i, _, cx| {
+                os::select_field_flat(SharedString::from(format!("ms-pl-{k}")), MirrorPlacement::ALL.iter().map(|p| p.label().to_string()).collect(), Vec::new(), usize::MAX, MirrorPlacement::ALL.iter().position(|p| *p == row.placement).unwrap_or(0), move |i, _, cx| {
                     if let Some(v) = view.upgrade() {
                         v.update(cx, |this, cx| {
                             if let Some(p) = &mut this.pattern {
@@ -2306,17 +2325,27 @@ impl AssemblyView {
                         });
                     }
                 })
+                .size_full()
                 .into_any_element()
             };
             table = table.child(
                 h_flex()
+                    .id(SharedString::from(format!("ms-row-{k}")))
                     .h(px(33.))
                     .border_b_1()
                     .border_color(grid)
                     .text_size(px(13.33))
+                    // Live 66 / 67: the row's instance lights up in the graphics area while the pointer is on it.
+                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        let new = h.then_some(id);
+                        if this.ui.list_hover != new && (*h || this.ui.list_hover == Some(id)) {
+                            this.ui.list_hover = new;
+                            this.refresh_scene(false, cx);
+                        }
+                    }))
                     .child(cell(0, true).justify_center().gap(px(4.)).child(crate::assets::icon("part", 16., cx)).child(inst.name.clone()))
                     // Live: the source workspace ("Main").
-                    .child(cell(1, true).justify_center().gap(px(4.)).child(crate::assets::icon("branch", 14., cx)).child("Main"))
+                    .child(cell(1, true).justify_center().gap(px(4.)).child(crate::assets::icon("legend-workspace", 14., cx)).child("Main"))
                     // Live: the part's detected symmetry, "Symmetric" /
                     // "Non-symmetric" (behaviours "skb (10-23 15:30)" (2)).
                     .child({
@@ -2327,9 +2356,10 @@ impl AssemblyView {
                             .tooltip(crate::ui::tooltip(if sym { "Symmetric" } else { "Non-symmetric" }))
                             .child(crate::assets::icon(if sym { "symmetric" } else { "asymmetric" }, 18., cx))
                     })
-                    .child(cell(3, false).child(div().w_full().child(action)))
+                    // Live 66: the select fills its cell.
+                    .child(cell(3, false).px_0().child(div().size_full().child(action.size_full())))
                     .child(cell(4, true).child(reference))
-                    .child(cell(5, !row.derived).when(!row.derived, |d| d.bg(rgb(0xffffff))).child(div().w_full().child(placement))),
+                    .child(cell(5, !row.derived).when(!row.derived, |d| d.bg(rgb(0xffffff)).px_0()).child(div().size_full().child(placement))),
             );
         }
         let pending = s.seeds.iter().filter(|id| s.mirror_rows.get(id).is_some_and(|r| r.derived && !r.created)).count();
@@ -2352,7 +2382,8 @@ impl AssemblyView {
                 .top_0()
                 .left_0()
                 .w(px(781.))
-                .bg(pal.dialog_bg)
+                // Solid: the feature dialog's ✓ / ✕ under it don't show through (live 65).
+                .bg(Rgba { a: 1.0, ..pal.dialog_bg })
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .text_color(pal.text)
                 .child(
@@ -5070,7 +5101,17 @@ fn canon_dir(p: &std::path::Path) -> std::path::PathBuf {
 
 /// A Derived row of live's Mirror strategy still waiting for Update (the
 /// dialog's Mirror strategy… and title are red until then).
-fn mirror_pending(s: &PatternSession) -> bool {
+/// A pattern row's icon, with the red "!" disc at its lower right while it is in error (live 62, in-933; as a mate's).
+fn pattern_icon(icon: &'static str, error: bool, cx: &App) -> AnyElement {
+    div()
+        .flex_none()
+        .relative()
+        .child(svg().path(icon_path(icon)).size_3p5().text_color(p().text_muted))
+        .when(error, |d| d.child(div().absolute().right(px(-4.)).bottom(px(-4.)).child(crate::assets::icon(&icon_path("error"), 10., cx))))
+        .into_any_element()
+}
+
+pub(super) fn mirror_pending(s: &PatternSession) -> bool {
     s.kind == PatternDialogKind::Mirror && s.seeds.iter().any(|id| s.mirror_rows.get(id).is_some_and(|r| r.derived && !r.created))
 }
 

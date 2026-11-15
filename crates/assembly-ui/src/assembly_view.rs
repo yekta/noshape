@@ -258,6 +258,8 @@ struct DragState {
     origin: HashMap<InstanceId, Placement>,
     /// The last step landed the dragged points (`Prepared::solve_drag`).
     landed: bool,
+    /// Let go while a solve was still running: the move is made when it lands (a quick drag: asm-drag-free-part).
+    released: bool,
 }
 
 /// Snap mode drag: a connector of one instance dragged onto another's.
@@ -1086,9 +1088,21 @@ impl AssemblyView {
         }
         // Instances selected through their entities show only those (amber);
         // the others (list rows, boxes) are filled whole.
-        let tops: Vec<InstanceId> = self.selected.iter().copied().filter(|t| !self.ui.entity_sel.iter().any(|(p, _)| p[0] == *t)).collect();
+        // A pattern's other field active: the selection is that field's pick, its entity outlined, not the Instances
+        // (live 64: Mirror plane's face; as the recorder reads it).
+        let pattern_pick = self.pattern.as_ref().and_then(|p| p.active.map(|k| [&p.axis, &p.axis2, &p.axis3].get(k).and_then(|a| (*a).clone())));
+        let tops: Vec<InstanceId> = if pattern_pick.is_some() { Vec::new() } else { self.selected.iter().copied().filter(|t| !self.ui.entity_sel.iter().any(|(p, _)| p[0] == *t)).collect() };
         let Some(built) = &self.built else { return };
         let mut h = Highlights { selected_tops: tops, selected_entities: self.ui.entity_sel.clone(), ..Default::default() };
+        if let Some(Some(c)) = &pattern_pick {
+            let mut path = c.path.clone();
+            path.push(c.instance);
+            let entity = match &c.reference {
+                Reference::Implicit { on, .. } => (**on).clone(),
+                r => r.clone(),
+            };
+            h.selected_entities.push((path, entity));
+        }
         // A mate's connector open from its chip (live assembly/578,
         // MATE-CONNECTOR-PANEL-HIGHLIGHT): only its origin entity is shown,
         // selected; no whole-part amber.
@@ -1463,7 +1477,7 @@ impl AssemblyView {
 
     /// Instances the manipulator moves.
     fn manip_targets(&self, cx: &App) -> Vec<InstanceId> {
-        if self.mate.is_some() || self.anim.is_some() || self.placing.is_some() || self.snap.is_some() || self.snap_drag.is_some() || self.pick_mode(cx).is_some() || self.selected.is_empty() || self.ui.group.is_some() || self.replace_panel.is_some() || self.ui.interference.is_some() {
+        if self.mate.is_some() || self.pattern.is_some() || self.anim.is_some() || self.placing.is_some() || self.snap.is_some() || self.snap_drag.is_some() || self.pick_mode(cx).is_some() || self.selected.is_empty() || self.ui.group.is_some() || self.replace_panel.is_some() || self.ui.interference.is_some() {
             return vec![];
         }
         let Some(asm) = self.assembly(cx) else { return vec![] };
@@ -3040,6 +3054,7 @@ impl AssemblyView {
                         solved: None,
                         origin: self.result.solved.placements.iter().cloned().collect(),
                         landed: true,
+                        released: false,
                     });
                     return;
                 }
@@ -3059,11 +3074,14 @@ impl AssemblyView {
                     self.start_snap_drag(*position, cx);
                     return;
                 }
-                if self.hover.is_none() && !self.selected.is_empty() && !self.explode_edit {
+                // What is under the press, also before the pick buffer's hover caught up (a press right after the
+                // pointer got there: asm-drag-free-part).
+                let under = self.hover.clone().or_else(|| self.raycast(*position, &[], cx));
+                if under.is_none() && !self.selected.is_empty() && !self.explode_edit {
                     self.start_selection_drag(*position, cx);
                     return;
                 }
-                let Some(t) = self.hover.clone() else { return };
+                let Some(t) = under else { return };
                 let top = t.path[0];
                 // A part of a flexible subassembly is dragged on its own (Onshape).
                 let nested = (t.path.len() > 1 && self.result.prepared.is_flexible_child(top, t.path[1])).then(|| t.path[1]);
@@ -3107,6 +3125,7 @@ impl AssemblyView {
                     solved: None,
                     origin: self.result.solved.placements.iter().cloned().collect(),
                     landed: true,
+                    released: false,
                 });
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -3205,7 +3224,7 @@ impl AssemblyView {
                 if self.drag.as_ref().is_some_and(|d| d.explode) {
                     self.update_explode_preview(cx);
                 } else if !self.drag.as_ref().is_some_and(|d| d.busy) {
-                    self.run_drag_solve(cx);
+                    self.run_drag_solve(window, cx);
                 }
             }
             ViewportEvent::ToolUp { modifiers, .. } => {
@@ -3239,31 +3258,17 @@ impl AssemblyView {
                     cx.notify();
                     return;
                 }
-                if d.started {
-                    if d.explode {
-                        if let Some(step) = self.explode_preview.take()
-                            && (d.value.abs() > 1e-9 || d.offset.length() > 1e-9)
-                        {
-                            self.push_explode_step(step, cx);
-                            // Live 805: the "Explode step" dialog opens at once.
-                            if let Some(k) = self.explode_view(cx).map(|v| v.steps.len().saturating_sub(1)) {
-                                self.open_step_edit(k, true, window, cx);
-                            }
-                        }
-                        self.reapply_display(cx);
-                    } else {
-                        let name = self.assembly(cx).and_then(|a| a.instance(d.top).map(|i| i.name.clone())).unwrap_or_default();
-                        let fixed = self.assembly(cx).and_then(|a| a.instance(d.top)).is_some_and(|i| i.fixed);
-                        if fixed {
-                            self.ui.fixed_drag = None;
-                            cx.notify();
-                        } else {
-                            self.edit(&format!("Move : {name}"), cx, |_| {});
-                            if d.handle.is_some() {
-                                self.open_manip_value(&d, window, cx);
-                            }
-                        }
+                if d.started && !d.explode && (d.busy || d.pending.is_some()) {
+                    // The last pointer position's solve still to land: the move is made then.
+                    let solve = !d.busy;
+                    self.drag = Some(DragState { released: true, ..d });
+                    if solve {
+                        self.run_drag_solve(window, cx);
                     }
+                    return;
+                }
+                if d.started {
+                    self.finish_drag(d, window, cx);
                 } else if d.handle.is_none() {
                     // A press on geometry that didn't drag: a click.
                     let t = self.hover.clone();
@@ -3431,6 +3436,7 @@ impl AssemblyView {
             solved: None,
             origin: self.result.solved.placements.iter().cloned().collect(),
             landed: true,
+            released: false,
         });
     }
 
@@ -3473,7 +3479,10 @@ impl AssemblyView {
         if double {
             self.clear_selection();
         } else {
+            // A pattern's Instances field takes the whole instance (live 63: Part 2 <1> lit whole, an INSTANCE selected).
+            let instances_field = self.pattern.as_ref().is_some_and(|p| p.active.is_none());
             match target {
+                Some(t) if instances_field => self.select_target(Some(t), true, cx),
                 Some(t) if matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.select_entity(t, !additive),
                 // Mass properties shows the selection as its chips; an empty
                 // click keeps a dialog's chips (live qa5 pass 7).
@@ -3590,7 +3599,35 @@ impl AssemblyView {
         best.map(|t| o + d * t)
     }
 
-    fn run_drag_solve(&mut self, cx: &mut Context<Self>) {
+    /// A drag let go: an explode step is made, or the instances' move.
+    fn finish_drag(&mut self, d: DragState, window: &mut Window, cx: &mut Context<Self>) {
+        if d.explode {
+            if let Some(step) = self.explode_preview.take()
+                && (d.value.abs() > 1e-9 || d.offset.length() > 1e-9)
+            {
+                self.push_explode_step(step, cx);
+                // Live 805: the "Explode step" dialog opens at once.
+                if let Some(k) = self.explode_view(cx).map(|v| v.steps.len().saturating_sub(1)) {
+                    self.open_step_edit(k, true, window, cx);
+                }
+            }
+            self.reapply_display(cx);
+            return;
+        }
+        let name = self.assembly(cx).and_then(|a| a.instance(d.top).map(|i| i.name.clone())).unwrap_or_default();
+        let fixed = self.assembly(cx).and_then(|a| a.instance(d.top)).is_some_and(|i| i.fixed);
+        if fixed {
+            self.ui.fixed_drag = None;
+            cx.notify();
+            return;
+        }
+        self.edit(&format!("Move : {name}"), cx, |_| {});
+        if d.handle.is_some() {
+            self.open_manip_value(&d, window, cx);
+        }
+    }
+
+    fn run_drag_solve(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(d) = &mut self.drag else { return };
         let Some(target) = d.pending.take() else { return };
         if d.solved == Some((target, d.value)) {
@@ -3629,7 +3666,7 @@ impl AssemblyView {
         // thread: apply + scene rebuild), a.drag_step (target to applied).
         let asked = std::time::Instant::now();
         let try_one = d.landed;
-        cx.spawn(async move |this, cx| {
+        cx.spawn_in(window, async move |this, cx| {
             let (solved, landed) = cx
                 .background_spawn(async move {
                     let t = std::time::Instant::now();
@@ -3640,7 +3677,7 @@ impl AssemblyView {
                     (s, landed)
                 })
                 .await;
-            let _ = this.update(cx, |this: &mut Self, cx| {
+            let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 let Some(d) = &mut this.drag else { return };
                 d.busy = false;
                 d.landed = landed;
@@ -3651,7 +3688,11 @@ impl AssemblyView {
                 noshape_render::perf::record("a.drag_apply", t.elapsed());
                 noshape_render::perf::record("a.drag_step", asked.elapsed());
                 if again {
-                    this.run_drag_solve(cx);
+                    this.run_drag_solve(window, cx);
+                } else if this.drag.as_ref().is_some_and(|d| d.released)
+                    && let Some(d) = this.drag.take()
+                {
+                    this.finish_drag(d, window, cx);
                 }
                 cx.notify();
             });
@@ -3918,7 +3959,14 @@ impl AssemblyView {
         let newer_badge = update.is_some() && versioned == Some(false) && !pinned;
         let dof = if is_top { node.and_then(|n| n.dof) } else { None };
         // An open Group dialog's instances are highlighted (live 1681).
-        let selected = is_top && (self.selected.contains(&top) || self.chip_mc_owner() == Some(top) || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&top)));
+        // (A pattern's other field active: its pick's instance, not the Instances (asm-linear-pattern-commit); none for a
+        // Mirror plane, a mate connector (live 64).)
+        let pattern_pick = self.pattern.as_ref().and_then(|p| p.active.map(|k| [&p.axis, &p.axis2, &p.axis3].get(k).and_then(|a| a.as_ref().map(|c| c.instance)).filter(|_| p.kind != PatternDialogKind::Mirror)));
+        let picked = match pattern_pick {
+            Some(pick) => pick == Some(top),
+            None => self.selected.contains(&top),
+        };
+        let selected = is_top && (picked || self.chip_mc_owner() == Some(top) || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&top)));
         let has_children = node.is_some_and(|n| !n.children.is_empty());
         let expanded = self.expanded.contains(&path);
         let icon = match kind {

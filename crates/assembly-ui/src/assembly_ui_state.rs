@@ -162,7 +162,8 @@ impl AssemblyView {
             // (A pattern's other field active: its Instances aren't the selection, live asm-linear-pattern-commit.)
             let selected = (self.selected.contains(&i.id) && !self.pattern.as_ref().is_some_and(|p| p.active.is_some()))
                 // (Its pick's instance instead: Direction on an edge of Part 1 selects Part 1's row.)
-                || self.pattern.as_ref().and_then(|p| p.active.and_then(|k| [&p.axis, &p.axis2, &p.axis3].get(k).and_then(|a| a.as_ref()))).is_some_and(|c| c.instance == i.id)
+                // (Not a Mirror plane's: a mate connector, live 64.)
+                || self.pattern.as_ref().filter(|p| p.kind != PatternDialogKind::Mirror).and_then(|p| p.active.and_then(|k| [&p.axis, &p.axis2, &p.axis3].get(k).and_then(|a| a.as_ref()))).is_some_and(|c| c.instance == i.id)
                 || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&i.id))
                 || matches!(&self.ui.dynamic_suppression, Some((super::props::DynTarget::Instance(x), _, _)) if *x == i.id)
                 || self.mc_picks().iter().any(|c| c.instance == i.id);
@@ -174,7 +175,7 @@ impl AssemblyView {
             }
         }
         if let Some(p) = self.pattern.as_ref().filter(|p| p.editing.is_none()) {
-            let ok = self.pattern_from_session(p, cx).is_ok();
+            let ok = self.pattern_from_session(p, cx).is_ok() && !super::panels::mirror_pending(p);
             rows.push(row(&p.name, if ok { "ok" } else { "error" }, true, true, false, false));
         }
         // The mate whose dialog is open too (live asm-mate-menu-edit, asm-mate-edit-escape).
