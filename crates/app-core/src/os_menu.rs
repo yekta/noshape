@@ -238,9 +238,6 @@ pub struct OsMenu {
     /// One-shot Esc handler: the first Esc runs it and the menu stays open
     /// (a sketch tool's menu: Esc exits the tool), the next one dismisses.
     on_escape: Option<EscapeHandler>,
-    /// Run after an Esc closed the menu (a dialog field's menu: the field gives up the keyboard, live
-    /// dialog-number-rclick-menu).
-    after_escape: Option<EscapeHandler>,
     /// A page's dropdown (a panel's ⋯, the in-context carets): Escape leaves it open (live: the page keeps the
     /// keyboard, the key never reaches a Bootstrap dropdown).
     page: bool,
@@ -271,7 +268,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, flip: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, sep_margin: 0., text_inset: None, text_px: None, camera: false, on_escape: None, after_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, flip: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, sep_margin: 0., text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -368,12 +365,6 @@ impl OsMenu {
     /// Run `f` on the first Esc instead of dismissing (see `on_escape`).
     pub fn on_first_escape(mut self, f: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.on_escape = Some(Rc::new(f));
-        self
-    }
-
-    /// Run `f` after an Esc closed the menu (not after an item's click).
-    pub fn after_escape(mut self, f: impl Fn(&mut Window, &mut App) + 'static) -> Self {
-        self.after_escape = Some(Rc::new(f));
         self
     }
 
@@ -816,9 +807,6 @@ impl Render for OsMenu {
                 None if this.page => {}
                 None => {
                     this.dismiss(window, cx);
-                    if let Some(f) = this.after_escape.take() {
-                        window.defer(cx, move |window, cx| f(window, cx));
-                    }
                 }
             }))
             .on_action(cx.listener(|this, _: &MenuLeft, window, cx| {

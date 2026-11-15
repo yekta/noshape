@@ -2501,13 +2501,7 @@ impl FeatureDialog {
                                 Self::leave_keyboard_after_menu(&v, window, cx);
                             }));
                         }
-                        // Esc closes it with the keyboard off the field (live dialog-number-rclick-menu).
-                        let m = configure_items(m, &view, &pid, is_configured);
-                        if query {
-                            return m;
-                        }
-                        let v = view.clone();
-                        m.after_escape(move |window, cx| Self::leave_keyboard_after_menu(&v, window, cx))
+                        configure_items(m, &view, &pid, is_configured)
                     };
                     // Over a number field the menu wins over the input's own
                     // Cut / Copy / Paste (live: none); pick rows keep theirs.
