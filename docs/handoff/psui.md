@@ -243,6 +243,14 @@ part order / vertex names (core), jog angles (core), edit-curve approximation, a
 sub-pixel readouts; live's seeds for hole-remembers-last, corner-new-edit-reedit, external-thread-split-face and the
 shift-d re-record (45a713c0). Open: context-create-version-update (live lists Part 1 only in context; ours Part 1 and
 Part 2), boundary-surface-new-edit-reedit's selection (live's own state odd), part-properties-* (managed workflows).
+**11-15 08:20 (lead: the user's Mirror request, side by sides in /root/psui-scratch/mirror-sxs with README):** live's
+12 Mirror takes 3/12 (147/196 states) -> 9/12 (184/202); all 25 Mirror scenarios 22/25. Since: a Create selection
+pick lights its feature's row; sketch Mirror with two lines or more preselected takes no axis, keeps the selection,
+Escape clears it (live2 feel/mirror-preselected); the Create selection panel's rows and caret as 54b; the assembly
+Mirror strategy table as 65 (34/35 px rows, icon sizes, `mirror-symmetric` icon, thin close X; its button is the
+target `button:Mirror strategy…`). Open: live swallows the first click after a sketch box select (live2: 3 runs) — a
+lost click, not copied; decision to the lead (sketch-mirror-preselected-batch stays at 19/24). The shot scenarios
+(shot-*.json, starts.json) are in /root/psui-scratch/mshots/scen; mshots.sh runs them with NOSHAPE_UI_SHOTS.
 **11-14 18:16 (viewport speed, Linux numbers):** vibe7 (load ~16), release, llvmpipe, 60 samples, mode-700 copies
 deleted after. Pointer / click to the frame with its highlight or selection, p50: dock hover 370 ms, pick 620; hat15
 hover 381-856, pick 1074: llvmpipe drawing the models. To its submission p50 0.4-1.9 ms; the maxima (69-985 ms, one
