@@ -35,7 +35,7 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   lagging gutter mark (line 1). fs-ps-custom-feature-error: after Commit with `uip(` live's Part Studio doesn't
   regenerate at all (every row `not-computed`, Parts (0), the feature's name without its "uF" icon text, its tooltip
   the name only); ours regenerates Sketch 1 and Extrude 1 and fails the custom feature with the compile error.
-  Decision asked of the lead (parity vs "not its failures").
+  Lead 11-15: ours kept (a failure we can do the work for); the take's `live_defects` from step 11.
 - fs-ac-fn-std-list's tie: neither the import tree's pre- nor post-order puts tool.fs before
   booleanoperationtype.gen.fs; live2 asked for fs-ac-tie-{operationt,op,dir,bound,bodyt} (/root/studios-scratch/
   ac_ties.py, ac_cand.py find the ties).

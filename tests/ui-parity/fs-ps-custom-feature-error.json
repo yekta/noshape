@@ -4,6 +4,12 @@
  "area": "dx",
  "source": "universe feature-studio fs-ps-custom-feature-error (batch fs-1 (dx 11-08, Feature Studio coverage))",
  "start": "fs-custom",
+ "live_defects": [
+  {
+   "from_step": 11,
+   "why": "Onshape stops regenerating the whole Part Studio when an imported Feature Studio has a compile error (every feature not-computed, Parts (0): live2 8252c646, 2026-11-15). A failure we can do the work for, not copied (lead 11-15, AGENTS.md parity rule): ours regenerates Sketch 1 and Extrude 1 and fails only the custom feature, its tooltip the compile error."
+  }
+ ],
  "steps": [
   {
    "do": "click",
