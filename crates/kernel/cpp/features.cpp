@@ -8383,7 +8383,23 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     OpOut out = scaled_blend(in, checked, rmax, "fillet", [&](const Scaled& sc) { return fillet_build(sc, es, rs); });
     // OCCT's round of a tangent chain crossing from one support to the next with a sliver face at the joint (cf-snap-hook's
     // Fillet 6: six 0.1 mm slivers where its lip's arcs meet; live 84 faces): the chain's rounds built exact instead.
-    if (checked && !legacy_blend_finish() && blend_slivers(in, out.shape->shape, rmax))
+    // (Only where fillet_by_tools could build the rounds: lines and arcs, or edges between two cylinders (a mitre's
+    // ball); each new face's area took 77 ms of c2-hunting-knife's fillets on its free-form edges.)
+    ShapeAncMap ef;
+    TopExp::MapShapesAndUniqueAncestors(in, TopAbs_EDGE, TopAbs_FACE, ef);
+    const bool as_tools = std::all_of(es.begin(), es.end(), [&ef](const TopoDS_Edge& e) {
+      const GeomAbs_CurveType t = BRepAdaptor_Curve(e).GetType();
+      if (t == GeomAbs_Line || t == GeomAbs_Circle)
+        return true;
+      const ShapeList* fs = ef.Seek(e);
+      if (fs == nullptr || fs->Extent() != 2)
+        return true;
+      for (ShapeList::Iterator it(*fs); it.More(); it.Next())
+        if (BRepAdaptor_Surface(TopoDS::Face(it.Value()), false).GetType() != GeomAbs_Cylinder)
+          return false;
+      return true;
+    });
+    if (checked && !legacy_blend_finish() && as_tools && blend_slivers(in, out.shape->shape, rmax))
     {
       const KernelTimer timer("blend.slivers.by_tools");
       if (std::optional<std::pair<TopoDS_Shape, HHist>> by = fillet_by_tools(in, es, rs, 1))
