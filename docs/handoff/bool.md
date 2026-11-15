@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-15 22:57 UTC.
+Updated 11-15 23:05 UTC.
 
 ## In flight
 - Landed: fd462b7a (snap hook stack) 11-15 21:23.
@@ -23,7 +23,12 @@ Updated 11-15 22:57 UTC.
   30.08 / 64.34. The housing's inner top edge (offset -3 mm face x plane z=0, 243.27 mm) and the flange's top edge
   (its extruded wall x its z=0 plane) are the same curve: the two walls meet along it (a touching, branched section
   there). Probe: xprobe probe_case_unify (bool-hat copy) with PROBE_GONE=1, PROBE_AT=x,y,z (edges / faces near a point,
-  inputs too). OCCT's own fuse is wrong (16/47/36, volume 27 mm3 off). Our unify also joins 3 input arcs live keeps
+  inputs too). Root: over part of y = +-27 the housing's offset wall and the flange's extruded wall lie in one plane;
+  live bounds that shared region by a vertical edge at x 63.50 where the flange's profile leaves y = 27 tangentially
+  (no input edge there): 45 deg edge (59.86,27,-4) -> (63.50,27,-0.35), then 0.35 mm up to z=0; ours runs the 45 deg edge
+  to (63.86,27,0) (edge 26, offset x extrusion; the same with NOSHAPE_OWN_SECTIONS=0; not one of the ahead batch's
+  curves). Fix: coincident-region bounds in our Boolean (next after the Shell filter lands). Notes:
+  /root/bool-scratch/notes-snap.txt. OCCT's own fuse is wrong (16/47/36, volume 27 mm3 off). Our unify also joins 3 input arcs live keeps
   (probe only; the feature's own counts keep them).
 
 ## Parked (branches / diffs, not landing as they are)
