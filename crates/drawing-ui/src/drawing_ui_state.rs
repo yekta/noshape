@@ -335,6 +335,21 @@ impl DrawingEditor {
             // Line to line and its angular one: the first line stays in the hover colour until the second is
             // picked (live2 drw-dimension-line-to-line, -angular).
             Tool::Dimension { kind: DimTool::LineLine | DimTool::Angle, picks } if picks.len() < 2 => {}
+            // 3 point angular: its picked points' orange markers (and the preview after the third), then the placed
+            // dimension, read as an edge from the first point on (live2 drw-dimension-3-point-angular 11-15 retake).
+            Tool::Dimension { kind: DimTool::Angle3, picks } => {
+                let placed = self.made_by_tool().into_iter().find_map(|s| match s {
+                    Sel::Annotation(id) => self.current_sheet().annotations.iter().find(|a| a.id == id).and_then(|a| a.kind.view()),
+                    _ => None,
+                });
+                let view = match picks.first() {
+                    Some(Pick::Point(PickedPoint { view, .. })) => Some(*view),
+                    _ => placed,
+                };
+                if let Some(v) = view {
+                    selection.push(("EDGE".into(), self.ui_view_name(v)));
+                }
+            }
             Tool::Dimension { picks, .. } => {
                 for p in picks {
                     match p {

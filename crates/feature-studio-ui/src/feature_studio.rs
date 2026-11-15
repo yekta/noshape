@@ -524,7 +524,8 @@ pub struct FsUiState {
     /// Edits not yet saved into the document (the toolbar's Undo already undoes them).
     pub unsaved: bool,
     pub notices: usize,
-    /// The gutter's marked rows: one per line holding notices (live's markers fill rows 1..N, behaviours 1683).
+    /// The gutter's marked rows: one per line holding notices (live's markers fill rows 1..N, behaviours 1683), and
+    /// a squiggle's tooltip while it shows.
     pub notice_lines: usize,
     pub completion: Option<Vec<String>>,
     /// Each row's kind at its right ("snippet", "keyword", "function"…).
@@ -599,7 +600,10 @@ impl FeatureStudioView {
             committed,
             unsaved: text != self.synced,
             notices: self.notices.len(),
-            notice_lines: self.notices.iter().filter(|n| n.line > 0).map(|n| n.line).collect::<std::collections::BTreeSet<_>>().len(),
+            // Live's reader counts the marked gutter cells and Ace's squiggle tooltip, which reuses their class (live2
+            // fs-squiggle-hover-gutter: 1 → 2 while hovering uipUnknown).
+            notice_lines: self.notices.iter().filter(|n| n.line > 0).map(|n| n.line).collect::<std::collections::BTreeSet<_>>().len()
+                + usize::from(self.hover_at.is_some() && ed.hovered_diagnostic().is_some()),
             // The rows Ace draws: the 8 shown and the next (live fs-ac-fn-std-list reads 9 of 11).
             completion: menu.open.then(|| menu.items.iter().take(ACE_DRAWN_ROWS).map(|i| i.label.clone()).collect()),
             completion_kinds: menu.open.then(|| menu.items.iter().take(ACE_DRAWN_ROWS).map(|i| i.detail.clone().unwrap_or_default()).collect()),

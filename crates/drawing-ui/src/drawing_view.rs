@@ -1351,11 +1351,9 @@ impl DrawingEditor {
         if s[0] < 10.0 || s[1] < 10.0 {
             return;
         }
-        // A model space has no paper: fit its content.
-        let (x0, y0, w, h) = noshape_scene::camera_ops::drawing_content(self.current_sheet());
-        // Live (drawing/156, ISO A3): sheet 1304×922 centred at y 577 in a
-        // 1919×1079 window.
-        (self.zoom, self.center) = noshape_scene::camera_ops::drawing_fit(s, (x0, y0, w, h));
+        // A model space has no paper: fit its content (live drawing/156, ISO A3: sheet 1304×922 centred at y 577 in a
+        // 1919×1079 window).
+        (self.zoom, self.center) = noshape_scene::camera_ops::drawing_fit_sheet(s, self.current_sheet());
         self.fitted = true;
         self.frame_dirty = true;
         cx.notify();

@@ -206,6 +206,21 @@ pub fn drawing_fit(size: [f64; 2], content: (f64, f64, f64, f64)) -> (f64, [f64;
     (zoom, [x0 + w / 2.0, y0 + h / 2.0 + UNDER / 2.0 / zoom])
 }
 
+/// A sheet's Zoom to fit: [`drawing_fit`] on its paper, except an ISO A4 sheet, whose template draws nothing
+/// beyond its frame: live fits what is drawn, the frame 954 px tall in a 973 px canvas, centred (live2
+/// sheet-fit A4P-empty-fit / A4L-empty-fit: frame y 85..1039, 3.448 px/mm portrait, 5.02 landscape).
+pub fn drawing_fit_sheet(size: [f64; 2], sheet: &noshape_model::drawing::Sheet) -> (f64, [f64; 2]) {
+    use noshape_model::drawing::SheetSize;
+    let content = drawing_content(sheet);
+    let modelled = sheet.imported.as_ref().is_some_and(|m| m.model);
+    if modelled || !matches!(sheet.size, SheetSize::A4 | SheetSize::A4Portrait) {
+        return drawing_fit(size, content);
+    }
+    let [x0, y0, x1, y1] = sheet.size.frame_rect();
+    let zoom = ((size[0] - 80.0) / (x1 - x0)).min((size[1] - 19.0) / (y1 - y0)).clamp(0.05, 200.0);
+    (zoom, [(x0 + x1) / 2.0, (y0 + y1) / 2.0])
+}
+
 /// A drawing zoomed by `factor` about the sheet point `at` (it stays under
 /// the cursor): the new zoom and centre.
 pub fn drawing_zoom_about(zoom: f64, center: [f64; 2], factor: f64, at: [f64; 2]) -> (f64, [f64; 2]) {
@@ -340,6 +355,24 @@ mod tests {
             let below = (center[1] - h / 2.0) * zoom;
             assert!((below - 14.75).abs() <= 0.5, "{w} x {h}: {below} px low");
             assert!((center[0] - w / 2.0).abs() < 1e-9);
+        }
+    }
+
+    /// Live2 A4P-empty-fit / A4L-empty-fit: an A4 sheet's frame fills y 85..1039 of the canvas (76..1049), 3.448 px
+    /// per mm portrait, 5.02 landscape (the paper running off it).
+    #[test]
+    fn an_a4_sheet_fits_its_frame() {
+        use noshape_model::drawing::{Sheet, SheetSize};
+        let size = [1879.0, 973.0];
+        for (sheet_size, live) in [(SheetSize::A4Portrait, 3.448), (SheetSize::A4, 5.02)] {
+            let sheet = Sheet { size: sheet_size, ..Default::default() };
+            let (zoom, center) = drawing_fit_sheet(size, &sheet);
+            assert!((zoom - live).abs() < 0.01, "{sheet_size:?}: {zoom} px/mm, live {live}");
+            let [x0, y0, x1, y1] = sheet_size.frame_rect();
+            let top = 76.0 + size[1] / 2.0 - (y1 - center[1]) * zoom;
+            let bottom = 76.0 + size[1] / 2.0 + (center[1] - y0) * zoom;
+            assert!((top - 85.0).abs() <= 2.0 && (bottom - 1039.0).abs() <= 2.0, "{sheet_size:?}: frame {top}..{bottom}");
+            assert!(((x0 + x1) / 2.0 - center[0]).abs() < 1e-9);
         }
     }
 }

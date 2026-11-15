@@ -1669,8 +1669,23 @@ impl SheetGeometry {
                     let (h, a_len) = (self.style.dim_text, self.style.dim_arrow);
                     let gap = self.dim_label_width(&env.text(a, a1 - a0, true, ""), h) / 2.0 + 0.65 * h;
                     let squeezed = !self.style.iso && !self.flip_arrows && text_angle.is_none() && 2.0 * gap + 2.0 * a_len > (a1 - a0) * radius;
+                    let tau = std::f64::consts::TAU;
+                    let mid = (a0 + a1) / 2.0 + text_angle.unwrap_or(0.0);
+                    // ANSI: the value on the arc, the arc broken around it (as a linear value, live asbdt-1); ISO: above it.
+                    let inline = !self.style.iso;
+                    let rel = (mid - a0).rem_euclid(tau);
                     if !squeezed {
-                        arc(self, a0, a1, 24);
+                        let half = gap / radius.max(1e-9);
+                        if inline && rel <= a1 - a0 {
+                            let m = a0 + rel;
+                            for (from, to) in [(a0, m - half), (m + half, a1)] {
+                                if to > from {
+                                    arc(self, from, to, 12);
+                                }
+                            }
+                        } else {
+                            arc(self, a0, a1, 24);
+                        }
                     }
                     let e0 = [v[0] + radius * a0.cos(), v[1] + radius * a0.sin()];
                     let e1 = [v[0] + radius * a1.cos(), v[1] + radius * a1.sin()];
@@ -1701,13 +1716,12 @@ impl SheetGeometry {
                     for t in [a0 + k, a1 - k] {
                         self.grips.push(Grip { pick, pos: [v[0] + radius * t.cos(), v[1] + radius * t.sin()], kind: GripKind::Handle });
                     }
-                    let tau = std::f64::consts::TAU;
-                    let mid = (a0 + a1) / 2.0 + text_angle.unwrap_or(0.0);
                     // A label dragged past an end: the arc carried round to
                     // it from the nearer end.
-                    let rel = (mid - a0).rem_euclid(tau);
                     if rel > a1 - a0 {
                         let (from, to) = if rel - (a1 - a0) <= tau - rel { (a1, a0 + rel) } else { (a0, a0 + rel - tau) };
+                        // (Inline: up to the value's gap.)
+                        let to = if inline { to - (to - from).signum() * gap / radius.max(1e-9) } else { to };
                         let seg: Vec<[f64; 2]> = (0..=12).map(|i| {
                             let t = from + (to - from) * i as f64 / 12.0;
                             [v[0] + radius * t.cos(), v[1] + radius * t.sin()]
@@ -1715,7 +1729,8 @@ impl SheetGeometry {
                         self.lines.push(Polyline2 { points: seg, style: LineStyle::Thin, closed: false, pick });
                     }
                     let t = env.text(a, a1 - a0, true, "");
-                    self.dim_label([v[0] + (radius + 3.0) * mid.cos(), v[1] + (radius + 3.0) * mid.sin()], 0.0, 0.5, true, &t, dh, pick);
+                    let at = if inline { *radius } else { radius + 3.0 };
+                    self.dim_label([v[0] + at * mid.cos(), v[1] + at * mid.sin()], 0.0, 0.5, true, &t, dh, pick);
                 }
                 AnnotationKind::Centermark { view, center, .. } if env.covered_centermark(*view, *center) => {}
                 AnnotationKind::Centermark { view, center, size, angle, arms } => {

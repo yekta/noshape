@@ -9,45 +9,32 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-15 19:25 UTC.
+Updated 2026-11-15 20:10 UTC.
 
 ## In flight
 
-Worktree /root/projects/noshape-wt/studios, branch studios-0811a, on main 482d52e7 plus the uncommitted batch below.
-Nothing is queued to land; every earlier commit is on main (last: 53a5e6d0 → 482d52e7, 18:35).
-
-Uncommitted batch (one commit when green):
-- Feature Studio completion (fs_complete.rs, ace_order.txt; live2 feel/fs-ac-ties): the score is live's completer's:
-  one per matched letter among the name's first 32, −1 when the match doesn't start the name, −1 per extra run. Ties
-  keep live's completer list order (ace_order.txt, 1038 names). Constants are listed ("constant"). Only modules
-  common.fs re-exports (`export import`) are offered. T1 `ties_keep_lives_list_order`; all 6 fs_complete tests pass.
-- Notices count (feature_studio.rs `notice_lines`): the marked gutter lines plus 1 while a squiggle's tooltip shows.
-  Live's tooltip reuses the gutter cell's class (live2 fs-squiggle-hover-gutter).
-- Angular dimension (model-data sheet.rs), ANSI only: the value's centre sits on the arc and the arc is broken
-  around it, as ANSI linear values. Live's DXF puts the text centre at the arc's radius (0.3215 in); ours was 0.1 in
-  out. ISO keeps the value above the arc. drw-dimension-angular matches with it (vibe6 19:20).
-  - Open: T1 `a_tight_angular_dimension_puts_its_arrows_outside` fails its "value on the arc" assert. The message
-    was being read on the Mac (task bb2xa4foi): either the test's box centre or a real offset.
-- ISO A4 Zoom to fit (camera_ops `drawing_fit_sheet`, used by drawing_view and ops camera): the frame fills the
-  canvas less 19 px, centred: 3.448 px/mm portrait, 5.02 landscape, frame y 85..1039 (live2 A4P/A4L-empty-fit).
-  Other sizes fit the paper (926 px, 14.75 px low). T1 `an_a4_sheet_fits_its_frame`, not run yet.
-- 3 point angular (drawing_ui_state.rs): after the third point the selection reads EDGE of the view. Live shows
-  the points' orange markers and the preview (live2 retake 11-15 19:27). Not built yet.
-
-Last run (vibe6 19:20, fs-* and drw-dimension-*, before the 3-point rule): 127/132.
-- drw-dimension-3-point-angular: fixed in the batch.
-- drw-dimension-foreshorten: live2's retake (now EDGE like ours) is in their land queue.
-- fs-key-forward-reference, fs-ps-added-tool-menu, fs-tb-narrow-import: not run (app start / X flake). Rerun them.
+Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-None.
+- The 20:10 batch (one commit):
+  - Feature Studio completion: live's completer score (one per matched letter among the first 32, −1 off the
+    name's start, −1 per extra run), ties in live's list order (ace_order.txt, live2 feel/fs-ac-ties), constants
+    listed, only what common.fs re-exports. The kind column has two more letters in a list short enough to show
+    without a scrollbar (8 rows or fewer).
+  - Notices: the squiggle's tooltip counts.
+  - ANSI angular value on its arc, the arc broken around it.
+  - ISO A4 Zoom to fit fills the frame.
+  - 3 point angular reads EDGE from its first point to after Esc.
+  - Checked on vibe5 20:05: drw-dimension-*, fs-ac-*, fs-ed-error-squiggle and the 3 earlier not-run takes all
+    match except drw-dimension-foreshorten (next item 1).
 
 ## Waiting on others
-- live2: drw-dimension-foreshorten and drw-dimension-3-point-angular retakes (queued 19:27); the five fs-ac-tie-*
-  scenarios and takes (queued 18:21). Rerun all once on main.
+- live2 (asked 19:58): retakes with screenshots for drw-insert-view-top-1to1, drw-hole-callout-palette,
+  drw-note-move-to-title-block, drw-view-align-horizontally, drw-datum-target-hide-dim,
+  drw-auxiliary-view-no-indicator, drw-datum-copy-paste, drw-dimension-dblclick-precision /
+  -tolerance-symmetrical (live's "(in)" panel), context-create-version-update, drw-centermark(-align).
 
 ## Open (no owner action possible yet)
-- fs-ac-fn-std-list's tie: solved by the batch (NewBodyOperationType 917 before BooleanOperationType 925 in live's list).
 - drw-insert-view-top-1to1: live reads VIEW where five other Insert view takes read EDGE (the reader's pixels).
 - drw-hole-callout-palette steps 17-18: our callout's leader is lit inside Top's box after the palette closes; live
   reads []. Near the reader's 60 px threshold.
@@ -65,12 +52,19 @@ None.
   the code before taking an item from it.
 
 ## Next, in order
-1. Read the angular test's message, fix it, run noshape-drawing, drawing-ui, scene, feature-studio-ui, model-data on
-   the Mac, rebuild on vibe6. Rerun fs-*, drw-dimension-* and the 3 not-run takes, then land the batch.
-2. When live2's retakes are on main: rerun drw-dimension-foreshorten, -3-point-angular and fs-ac-tie-*.
+1. drw-dimension-foreshorten (live2's 11-15 retake, recorder 2026-11-15.3; screenshots
+   live/feel/dim-retakes-1115/):
+   - the radial's menu in live's order: Edit..., Paste as table, Foreshorten, Unbreak dimension | Clear selection,
+     Zoom to fit, Delete; no "Show as diameter" (not in live's)
+   - foreshortened: Paste as table, Remove foreshorten, Unbreak dimension | the tail (no Edit...)
+   - Foreshorten and Remove foreshorten leave the value where it was (live 83.5, 160.8 throughout; ours moves it,
+     and Remove puts it at 109.7)
+   - the dropped value's centre is 2.6 mm right of the hole's centre in live (ours on it)
+   - live reads the radial selected after Esc (its value is lit inside Top's box)
+2. Rerun the takes live2 retakes (list above) as they land.
 3. Refresh docs/parity/drawing-matrix.md (last 11-15 14:30: 949 of 1868 live items compared and matching).
 4. interaction-feel.md's remaining "?" rows in Drawings / Documents / Assembly (ask live2 for the missing captures).
-5. A full run of my areas' takes (655 non-drawing, about 290 drawing) to catch regressions since 15:05.
+5. A full run of my areas' takes (655 non-drawing, about 290 drawing) on vibe5 to catch regressions since 15:05.
 
 ## How to run
 
@@ -85,13 +79,15 @@ NOSHAPE_RB_HOST=vibe6 tools/tiers/rb.sh bash -c 'cargo build -p noshape; cp $CAR
 ```
 An rb.sh build to vibe6 deletes untracked takes there: put them back after it.
 
-ui-parity on vibe6 (≤2 apps while psui runs there; heavy runs through `~/bin/slot <cmd>`, lead 11-15):
-- Sync: `rsync -a tools/ui-parity/ tests/ui-parity/` to `vibe6:agents/studios/src/…`.
-- Run: `~/bin/slot bash ~/agents/studios-keep/shards-names.sh ~/tmp/studios/noshape <out> <names file> 2 381`.
+ui-parity on vibe5 (lead 11-15 19:50: vibe6 loaded; ≤3 apps, always through `~/bin/slot <cmd>`):
+- Sync: `rsync -a tools/ui-parity/ tests/ui-parity/` to `vibe5:agents/studios/src/…`. The app binary is
+  `~/tmp/studios/noshape` there: build with `NOSHAPE_RB_HOST=vibe5 rb.sh …` (as for vibe6 above), or relay a built
+  one (`ssh vibe6 'zstd -c …' | ssh vibe5 'zstd -d > …'`; the hosts have no keys to each other).
+- Run: `~/bin/slot bash ~/agents/studios-keep/shards-names.sh ~/tmp/studios/noshape <out> <names file> 3 381`.
 - Compare again without a run: `python3 tools/ui-parity/run.py --compare-only --out <out> <names…>` in
   ~/agents/studios/src.
-- The script's master copy is /root/studios-scratch/bin/shards-names.sh. vibe6's ~/tmp is pruned after 6-12 h, so
-  keep the script in ~/agents/studios-keep.
+- The script's master copy is /root/studios-scratch/bin/shards-names.sh. The hosts' ~/tmp is pruned after 6-12 h,
+  so keep the script in ~/agents/studios-keep (on vibe5 and vibe6).
 - NOSHAPE_UIP_LOGS=1 keeps the app's stderr per take.
 
 Land:

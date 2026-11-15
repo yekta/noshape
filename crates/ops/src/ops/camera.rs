@@ -287,9 +287,8 @@ fn sheet(ctx: &mut Ctx, a: &Args, tab: TabId, action: &str, size: Option<DVec2>)
     let od = ctx.doc(a.opt_str("doc")?)?;
     let d = crate::drawing::drawing_of(od.doc(), tab).ok_or_else(|| OpError::invalid("not a drawing").with_param("tab"))?;
     let sh = &d.sheets[d.active_sheet.min(d.sheets.len().saturating_sub(1))];
-    let content = co::drawing_content(sh);
     let fitted = |size: [f64; 2]| {
-        let (zoom, center) = co::drawing_fit(size, content);
+        let (zoom, center) = co::drawing_fit_sheet(size, sh);
         SheetView { zoom, center, size }
     };
     let mut sv = od.window.sheets.get(&tab).copied().unwrap_or_else(|| fitted(VIEWPORT));

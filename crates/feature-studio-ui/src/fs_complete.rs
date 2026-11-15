@@ -19,22 +19,39 @@ pub struct Entry {
     pub template: String,
     /// The doc tooltip (Markdown): the call, the description, the parameters.
     pub doc: String,
-    /// Ace's completer score: functions and predicates over enums (live "opE": surfaceOperationTypePredicate, at
-    /// 7, before lastModifyingOperationId, at 13; the enums after them).
+    /// 0 for an enum's value (only after its enum's dot), else a row of the list.
     rank: i32,
+    /// Its place in live's completer list (ties keep that order), past the end for a name live's hasn't.
+    order: usize,
 }
 
 /// std's completions, in the order a studio's `common.fs` import brings the modules in.
 pub fn index() -> &'static [Entry] {
-    static INDEX: LazyLock<Vec<Entry>> = LazyLock::new(|| modules().into_iter().flat_map(|m| parse_module(source(m))).collect());
+    static INDEX: LazyLock<Vec<Entry>> = LazyLock::new(|| {
+        let mut entries: Vec<Entry> = modules().into_iter().flat_map(|m| parse_module(source(m))).collect();
+        // An overloaded name is in live's list once per overload: the k-th of ours takes its k-th place.
+        let mut places: std::collections::HashMap<&str, std::collections::VecDeque<usize>> = std::collections::HashMap::new();
+        for (i, name) in ACE_ORDER.lines().enumerate() {
+            places.entry(name).or_default().push_back(i);
+        }
+        for e in entries.iter_mut().filter(|e| e.rank > 0) {
+            e.order = places.get_mut(e.name.as_str()).and_then(|q| q.pop_front()).unwrap_or(usize::MAX);
+        }
+        entries
+    });
     &INDEX
 }
+
+/// The functions, predicates, constants and enums of live's completer list for a studio importing `common.fs`, in
+/// its order (live2 feel/fs-ac-ties/completions-all.json, 1057 rows less the locals, snippets and keywords).
+const ACE_ORDER: &str = include_str!("ace_order.txt");
 
 fn source(module: &str) -> &'static str {
     noshape_model::custom::STD_SOURCES.iter().find(|(n, _)| *n == module).map(|(_, s)| *s).unwrap_or("")
 }
 
-/// The modules `common.fs` imports, depth first, each once.
+/// The modules `common.fs` re-exports (`export import`, a plain import isn't visible to the studio: live's list has
+/// no SMThicknessDirection), depth first, each once.
 fn modules() -> Vec<&'static str> {
     fn visit(m: &'static str, out: &mut Vec<&'static str>) {
         if out.contains(&m) {
@@ -45,12 +62,13 @@ fn modules() -> Vec<&'static str> {
         let src = source(name);
         let mut rest = src;
         while let Some(i) = rest.find("import(path") {
+            let exported = rest[..i].trim_end_matches([' ', '\t']).ends_with("export");
             rest = &rest[i..];
             let Some(start) = rest.find("\"onshape/std/") else { break };
             let after = &rest[start + 13..];
             let Some(end) = after.find('"') else { break };
             let module = &after[..end];
-            if let Some(found) = noshape_model::custom::STD_SOURCES.iter().map(|(n, _)| *n).find(|n| *n == module) {
+            if exported && let Some(found) = noshape_model::custom::STD_SOURCES.iter().map(|(n, _)| *n).find(|n| *n == module) {
                 visit(found, out);
             }
             rest = &after[end..];
@@ -341,7 +359,7 @@ fn parse_module(src: &str) -> Vec<Entry> {
             let snippet = call_snippet(&name, &params, &doc, false);
             let template = call_snippet(&name, &params, &doc, true);
             let doc = function_doc(&snippet, &params, &doc);
-            out.push(Entry { name, kind: kind.into(), snippet, template, doc, rank: 3 });
+            out.push(Entry { name, kind: kind.into(), snippet, template, doc, rank: 3, order: usize::MAX });
         };
         if let Some(r) = rest.strip_prefix("function ") {
             function(ident(r), list_from(r), "function", &mut out);
@@ -352,10 +370,13 @@ fn parse_module(src: &str) -> Vec<Entry> {
             let value = r.split_once('=').map(|(_, v)| v.trim()).unwrap_or("");
             if let Some(f) = value.strip_prefix("function").or_else(|| value.strip_prefix("defineFeature(function")) {
                 function(name, list_from(f), "function", &mut out);
+            } else if !name.is_empty() {
+                // Live: X_DIRECTION, LENGTH_BOUNDS… read "constant".
+                out.push(Entry { name: name.clone(), kind: "constant".into(), snippet: name.clone(), template: name.clone(), doc: doc.description.clone(), rank: 2, order: usize::MAX });
             }
         } else if let Some(r) = rest.strip_prefix("enum ") {
             let name = ident(r);
-            out.push(Entry { name: name.clone(), kind: "enum".into(), snippet: name.clone(), template: name.clone(), doc: doc.description.clone(), rank: 1 });
+            out.push(Entry { name: name.clone(), kind: "enum".into(), snippet: name.clone(), template: name.clone(), doc: doc.description.clone(), rank: 1, order: usize::MAX });
             // The values, in declaration order, up to the closing brace.
             let mut j = i + 1;
             while j < lines.len() && !lines[j].trim().starts_with('}') {
@@ -365,7 +386,7 @@ fn parse_module(src: &str) -> Vec<Entry> {
                         let value = ident(part.trim());
                         if !value.is_empty() {
                             let text = doc.values.iter().find(|(n, _)| n == &value).map(|(_, t)| t.clone()).unwrap_or_default();
-                            out.push(Entry { name: value.clone(), kind: name.clone(), snippet: value.clone(), template: value.clone(), doc: if text.is_empty() { value.clone() } else { format!("{value}\n\n{text}") }, rank: 0 });
+                            out.push(Entry { name: value.clone(), kind: name.clone(), snippet: value.clone(), template: value.clone(), doc: if text.is_empty() { value.clone() } else { format!("{value}\n\n{text}") }, rank: 0, order: usize::MAX });
                         }
                     }
                 }
@@ -381,9 +402,11 @@ fn parse_module(src: &str) -> Vec<Entry> {
 /// A row matched against the typed word. It matches when the word can be cut into pieces that each run on from
 /// the start of one of the name's humps, in order (case-insensitive): "opE" in opSplitEdges (op + E) and in
 /// lastModifyingOperationId (Ope), not in qLoopEdges or setProperty, whose "ope" starts inside a hump, and "opExt"
-/// in neither opMergeContexts nor ToleranceTypeExtended (live "opE" / "opExt"). Its cost is Ace's: the word's
-/// position when the name contains it, else each gap of its letters' first matches in order, plus 10 when the
-/// first isn't the name's first. `None`: no match. The second value is the matched letters' byte ranges.
+/// in neither opMergeContexts nor ToleranceTypeExtended (live "opE" / "opExt"). The matched letters are the word's
+/// first whole occurrence starting a hump, else those pieces. Its score is live's completer's (live2
+/// feel/fs-ac-ties): one per matched letter among the name's first 32 (its match mask's bits), less one when the
+/// first isn't the name's first letter and one per further run. `None`: no match. The second value is the matched
+/// letters' byte ranges.
 fn score(name: &str, needle: &str) -> Option<(i32, Vec<std::ops::Range<usize>>)> {
     if needle.is_empty() {
         return Some((0, Vec::new()));
@@ -392,51 +415,32 @@ fn score(name: &str, needle: &str) -> Option<(i32, Vec<std::ops::Range<usize>>)>
     let starts = hump_starts(&chars);
     let lower = |c: char| c.to_lowercase().next().unwrap_or(c);
     let want: Vec<char> = needle.chars().map(lower).collect();
-    // From name char `i` (inside a piece) or only at hump starts, does `want[k..]` match?
-    fn fits(chars: &[(usize, char)], starts: &[bool], want: &[char], k: usize, i: usize, inside: bool, lower: &dyn Fn(char) -> char) -> bool {
+    // From name char `i` (inside a piece) or only at hump starts, the positions matching `want[k..]`.
+    fn fits(chars: &[(usize, char)], starts: &[bool], want: &[char], k: usize, i: usize, inside: bool, lower: &dyn Fn(char) -> char) -> Option<Vec<usize>> {
         if k == want.len() {
-            return true;
+            return Some(Vec::new());
         }
-        if inside && i < chars.len() && lower(chars[i].1) == want[k] && fits(chars, starts, want, k + 1, i + 1, true, lower) {
-            return true;
+        let from = |j: usize| {
+            fits(chars, starts, want, k + 1, j + 1, true, lower).map(|mut rest| {
+                rest.insert(0, j);
+                rest
+            })
+        };
+        if inside && i < chars.len() && lower(chars[i].1) == want[k]
+            && let Some(p) = from(i)
+        {
+            return Some(p);
         }
-        (i..chars.len()).any(|j| starts[j] && lower(chars[j].1) == want[k] && fits(chars, starts, want, k + 1, j + 1, true, lower))
+        (i..chars.len()).filter(|&j| starts[j] && lower(chars[j].1) == want[k]).find_map(from)
     }
-    if !fits(&chars, &starts, &want, 0, 0, false, &lower) {
-        return None;
-    }
-    let name_lower = name.to_lowercase();
-    if name_lower.len() == name.len()
-        && let Some(at) = name_lower.find(&needle.to_lowercase())
-    {
-        return Some((at as i32, std::iter::once(at..at + needle.len()).collect()));
-    }
-    let mut last: isize = -1;
-    let mut penalty = 0;
-    let mut hits = Vec::new();
-    for c in needle.chars() {
-        let from = (last + 1) as usize;
-        let lo = lower(c);
-        let up = c.to_uppercase().next().unwrap_or(c);
-        let i1 = chars.iter().skip(from).position(|(_, x)| *x == lo).map(|p| p + from);
-        let i2 = chars.iter().skip(from).position(|(_, x)| *x == up).map(|p| p + from);
-        let index = match (i1, i2) {
-            (Some(a), Some(b)) => a.min(b),
-            (Some(a), None) | (None, Some(a)) => a,
-            (None, None) => return None,
-        } as isize;
-        let distance = index - last - 1;
-        if distance > 0 {
-            if last == -1 {
-                penalty += 10;
-            }
-            penalty += distance as i32;
-        }
-        let (b, ch) = chars[index as usize];
-        hits.push(b..b + ch.len_utf8());
-        last = index;
-    }
-    Some((penalty, hits))
+    let pieces = fits(&chars, &starts, &want, 0, 0, false, &lower)?;
+    let whole = (0..chars.len()).find(|&i| starts[i] && i + want.len() <= chars.len() && (0..want.len()).all(|k| lower(chars[i + k].1) == want[k]));
+    let positions: Vec<usize> = whole.map(|i| (i..i + want.len()).collect()).unwrap_or(pieces);
+    let mask: Vec<usize> = positions.iter().copied().filter(|&p| p < 32).collect();
+    let runs = mask.windows(2).filter(|w| w[1] != w[0] + 1).count() as i32;
+    let score = if mask.is_empty() { 0 } else { mask.len() as i32 - i32::from(mask[0] > 0) - runs };
+    let hits = positions.iter().map(|&p| chars[p].0..chars[p].0 + chars[p].1.len_utf8()).collect();
+    Some((score, hits))
 }
 
 /// Where a name's humps start: its first letter, after `_`, a capital after a small letter or digit, and the last
@@ -456,17 +460,22 @@ fn hump_starts(chars: &[(usize, char)]) -> Vec<bool> {
         .collect()
 }
 
-/// The list's width in characters (live: 33; Ace's popup).
+/// The list's width in characters with its scrollbar (live: 33; Ace's popup), two more without one.
 const ACE_COLUMNS: usize = 33;
 
+/// The rows Ace's popup shows before it scrolls.
+const ACE_VISIBLE_ROWS: usize = 8;
+
 /// A row's kind as Ace shows it: cut with "…" when name and kind don't fit the list's width (live "opE":
-/// surfaceOperationTypePredicate's "p…", lastModifyingOperationId's "functi…").
-pub fn ace_meta(caption: &str, meta: &str) -> String {
+/// surfaceOperationTypePredicate's "p…", lastModifyingOperationId's "functi…"; a list of `rows` that fits without a
+/// scrollbar has two more columns: live2 fs-ac-tie-operationt's five rows, "pre…").
+pub fn ace_meta(caption: &str, meta: &str, rows: usize) -> String {
+    let columns = if rows > ACE_VISIBLE_ROWS { ACE_COLUMNS } else { ACE_COLUMNS + 2 };
     let (c, m) = (caption.chars().count(), meta.chars().count());
-    if m + c <= ACE_COLUMNS - 2 {
+    if m + c <= columns - 2 {
         return meta.to_string();
     }
-    let keep = ACE_COLUMNS.saturating_sub(c + 3);
+    let keep = columns.saturating_sub(c + 3);
     format!("{}…", meta.chars().take(keep).collect::<String>())
 }
 
@@ -476,16 +485,17 @@ pub struct Match<'a> {
     pub hits: Vec<std::ops::Range<usize>>,
 }
 
-/// The rows for the word `needle`, Ace's order: exact (no-gap) matches first, then by score, std's order within.
+/// The rows for the word `needle`, live's order: the name typed in full first, then by score, ties in live's
+/// completer order (live2 feel/fs-ac-ties: Ace's stable sort over its unfiltered list), then std's.
 pub fn matches<'a>(entries: &'a [Entry], needle: &str) -> Vec<Match<'a>> {
     let mut rows: Vec<(bool, i32, Match<'a>)> = entries
         .iter()
         .filter_map(|e| {
-            let (penalty, hits) = score(&e.name, needle)?;
-            Some((penalty == 0, e.rank * 1000 - penalty, Match { entry: e, hits }))
+            let (score, hits) = score(&e.name, needle)?;
+            Some((e.name == needle, score, Match { entry: e, hits }))
         })
         .collect();
-    rows.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
+    rows.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)).then(a.2.entry.order.cmp(&b.2.entry.order)));
     rows.into_iter().map(|(_, _, m)| m).collect()
 }
 
@@ -573,7 +583,7 @@ fn top_level() -> &'static [TopSnippet] {
             }
             out + rest
         };
-        let snippet = |triggers: &'static [&'static str], caption: &str, template: String| TopSnippet { triggers, entry: Entry { name: caption.into(), kind: "snippet".into(), snippet: plain(&template), template, doc: String::new(), rank: 0 } };
+        let snippet = |triggers: &'static [&'static str], caption: &str, template: String| TopSnippet { triggers, entry: Entry { name: caption.into(), kind: "snippet".into(), snippet: plain(&template), template, doc: String::new(), rank: 0, order: usize::MAX } };
         // Live studios 2334 / 2337: each text, what Enter selects and where each Tab goes.
         let feature = crate::feature_studio::NEW_FEATURE
             .replacen("\"My Feature\"", "\"${1:My Feature}\"", 1)
@@ -602,7 +612,7 @@ fn top_level() -> &'static [TopSnippet] {
         const KEYWORDS: [&[&str]; 7] = [&["const"], &["enum"], &["export"], &["function"], &["operator"], &["predicate"], &["type"]];
         for triggers in KEYWORDS {
             let kw = triggers[0];
-            out.push(TopSnippet { triggers, entry: Entry { name: kw.into(), kind: "keyword".into(), snippet: kw.into(), template: kw.into(), doc: String::new(), rank: 0 } });
+            out.push(TopSnippet { triggers, entry: Entry { name: kw.into(), kind: "keyword".into(), snippet: kw.into(), template: kw.into(), doc: String::new(), rank: 0, order: usize::MAX } });
         }
         out
     });
@@ -688,10 +698,11 @@ fn completion_items(text: &gpui_kit::component::input::Rope, offset: usize) -> V
     if top { complete_top_level(&line) } else { complete_at(&line, line.len()) }
         .map(|(start, rows)| {
             let range = Range { start: text.offset_to_position(line_start + start), end: text.offset_to_position(offset) };
+            let count = rows.len();
             rows.into_iter()
                 .map(|m| CompletionItem {
                     label: m.entry.name.clone(),
-                    detail: Some(ace_meta(&m.entry.name, &m.entry.kind)),
+                    detail: Some(ace_meta(&m.entry.name, &m.entry.kind, count)),
                     // A function's call as an Ace snippet (its values selected in turn by Tab).
                     text_edit: Some(CompletionTextEdit::Edit(TextEdit { range, new_text: indented(&m.entry.template, &indent) })),
                     insert_text_format: (m.entry.template != m.entry.snippet).then_some(InsertTextFormat::SNIPPET),
@@ -785,11 +796,29 @@ mod tests {
         let pos: Vec<usize> = want.iter().map(|w| got.iter().position(|g| g == w).unwrap_or_else(|| panic!("{w} missing: {got:?}"))).collect();
         assert!(pos.windows(2).all(|w| w[0] < w[1]), "{:?}", &got[..20.min(got.len())]);
         assert_eq!(&got[..3], &want[..3]);
-        assert_eq!(ace_meta("surfaceOperationTypePredicate", "predicate"), "p…");
-        assert_eq!(ace_meta("lastModifyingOperationId", "function"), "functi…");
-        assert_eq!(ace_meta("opExtrude", "function"), "function");
+        assert_eq!(ace_meta("surfaceOperationTypePredicate", "predicate", 11), "p…");
+        assert_eq!(ace_meta("lastModifyingOperationId", "function", 11), "functi…");
+        assert_eq!(ace_meta("opExtrude", "function", 11), "function");
+        // Five rows, no scrollbar (live2 fs-ac-tie-operationt).
+        assert_eq!(ace_meta("surfaceOperationTypePredicate", "predicate", 5), "pre…");
         // @internal functions are left out (live "opExt": only opExtractWires and opExtrude).
         assert_eq!(names(&complete_at("opExt", 5).unwrap().1), ["opExtractWires", "opExtrude"]);
+    }
+
+    /// Live2 feel/fs-ac-ties (fs-ac-tie-*): the rows by live's completer score, its ties in live's list order
+    /// (NewBodyOperationType before BooleanOperationType), constants among them.
+    #[test]
+    fn ties_keep_lives_list_order() {
+        let rows = |w: &str| names(&complete_at(w, w.len()).unwrap().1);
+        assert_eq!(rows("OperationT"), ["surfaceOperationTypePredicate", "NewBodyOperationType", "NewSurfaceOperationType", "BooleanOperationType", "SplitOperationKeepType"]);
+        assert_eq!(rows("Dir"), ["qPlanesParallelToDirection", "qFacesParallelToDirection", "is2dDirection", "is3dDirection", "extractDirection", "DimensionMeasurementReferenceType", "X_DIRECTION", "Y_DIRECTION", "Z_DIRECTION"]);
+        assert_eq!(rows("BodyT"), ["BodyType", "qBodyType", "qBodyType", "BodyDraftSelectionType", "BodyDraftConcaveRepairType", "BodyDraftMatchFaceType", "BodyDraftCornerType", "ToolBodyType", "ExtendedToolBodyType", "convertNewBodyOpToBoolOp", "NewBodyOperationType"]);
+        let bound = rows("Bound");
+        assert_eq!(&bound[..14], ["BoundingType", "opMoveCurveBoundary", "opBoundarySurface", "qLoopBoundedFaces", "qFaceOrEdgeBoundedFaces", "canBeLengthBoundSpec", "canBeAngleBoundSpec", "canBeIntegerBoundSpec", "canBeRealBoundSpec", "getToleranceBounds", "getToleranceBounds", "TABLE_INDEX_BOUNDS", "LENGTH_BOUNDS", "NONNEGATIVE_LENGTH_BOUNDS"]);
+        assert_eq!(bound.len(), 44, "{bound:?}");
+        let op = rows("Op");
+        assert_eq!(&op[..9], ["opMoveCurveBoundary", "opBodyDraft", "opBoolean", "opBoundarySurface", "opCreateBSplineCurve", "opCreateBSplineSurface", "opCreateCompositePart", "opModifyCompositePart", "opChamfer"]);
+        assert_eq!(op.len(), 71, "{op:?}");
     }
 
     /// Live (A): "op" starts with std's op functions in their declaration order.

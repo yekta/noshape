@@ -4823,23 +4823,33 @@ fn an_angular_label_dragged_past_an_edge_stays_there() {
 }
 
 /// ANSI: an angle whose value doesn't fit between its arrows has them outside pointing in, each with a tail of its
-/// own length, and no arc between (live drw-dimension-angular.dxf); a roomy one keeps its whole arc.
+/// own length, and no arc between (live drw-dimension-angular.dxf); a roomy one keeps its arc, broken around the
+/// value. Either way the value's middle is on the arc (the live DXF's text at the arc's 0.3215 in radius).
 #[test]
 fn a_tight_angular_dimension_puts_its_arrows_outside() {
     let (doc, mut drawing) = demo();
     let sources = regenerate_sources(&doc, &drawing);
     drawing.sheets[0].size = SheetSize::AnsiD;
     let quarter = |radius: f64| AnnotationKind::AngularDimension { view: ViewId(2), vertex: [0.0, 0.0], a: [0.01, 0.0], b: [0.0, 0.01], radius, three_point: false, flip_a: false, flip_b: false, text_angle: None };
-    let mut mid_arc = |radius: f64| {
+    let mut arc_inside = |radius: f64| {
         drawing.sheets[0].annotations.retain(|a| a.id != 971);
         drawing.sheets[0].annotations.push(Annotation { id: 971, kind: quarter(radius), position: [0.0; 2], ..Default::default() });
         let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
         let v = built.placement(ViewId(2)).unwrap().to_sheet([0.0, 0.0]);
-        let at = [v[0] + radius * std::f64::consts::FRAC_PI_4.cos(), v[1] + radius * std::f64::consts::FRAC_PI_4.sin()];
-        built.geometry.lines.iter().any(|l| l.points.iter().any(|p| (p[0] - at[0]).hypot(p[1] - at[1]) < 1e-6))
+        let on_arc = |p: &[f64; 2]| ((p[0] - v[0]).hypot(p[1] - v[1]) - radius).abs() < 1e-6;
+        let inside = |p: &[f64; 2]| (p[1] - v[1]).atan2(p[0] - v[0]).to_degrees();
+        let t = built.geometry.texts.iter().find(|t| t.text == "90.0°").expect("the value");
+        let centre = font::text_box(t).into_iter().fold([0.0, 0.0], |c, p| [c[0] + p[0] / 4.0, c[1] + p[1] / 4.0]);
+        let off = (centre[0] - v[0]).hypot(centre[1] - v[1]) - radius;
+        // (The label is centred on its cap height, its glyph box a little lower: 0.37 mm radially at 45°.)
+        assert!(off.abs() < 0.6, "the value on the arc at {radius}: {off} mm off");
+        let at_mid = |p: &[f64; 2]| (inside(p) - 45.0).abs() < 2.0;
+        let arc: Vec<&[f64; 2]> = built.geometry.lines.iter().flat_map(|l| l.points.iter()).filter(|p| on_arc(p) && (5.0..85.0).contains(&inside(p))).collect();
+        assert!(!arc.iter().any(|p| at_mid(p)), "no arc through the value");
+        !arc.is_empty()
     };
-    assert!(mid_arc(30.0), "a roomy angle keeps its arc");
-    assert!(!mid_arc(6.0), "a tight one has no arc between its arrows");
+    assert!(arc_inside(30.0), "a roomy angle keeps its arc");
+    assert!(!arc_inside(6.0), "a tight one has no arc between its arrows");
 }
 
 /// A hole callout takes more leaders (live A56, qa
