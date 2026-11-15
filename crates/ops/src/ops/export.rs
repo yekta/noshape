@@ -26,7 +26,7 @@ pub fn ops() -> Vec<Op> {
             opt("resolution", json!({ "type": "string", "enum": ["Coarse", "Medium", "Fine", "Custom"] }), "Mesh resolution (default Medium); Custom takes the fields below."),
             opt("chordal_tolerance", json!({ "type": "number", "exclusiveMinimum": 0 }), "Custom, STL: Chordal tolerance (mm)."),
             opt("angular_deviation", json!({ "type": "number", "exclusiveMinimum": 0 }), "Custom, STL: Angular deviation (deg)."),
-            opt("min_facet_width", json!({ "type": "number", "minimum": 0 }), "Custom, STL: Minimum facet width (mm; kept, not applied by our mesher)."),
+            opt("min_facet_width", json!({ "type": "number", "minimum": 0 }), "Custom, STL: Minimum facet width (mm): the mesh's segments no shorter than about it."),
             opt("distance_tolerance", json!({ "type": "number", "exclusiveMinimum": 0 }), "Custom, glTF / GLB / OBJ / 3MF: Distance tolerance (m)."),
             opt("angular_tolerance", json!({ "type": "number", "exclusiveMinimum": 0 }), "Custom, glTF / GLB / OBJ / 3MF: Angular tolerance (deg)."),
             opt("max_chord_length", json!({ "type": "number", "minimum": 0 }), "Custom, glTF / GLB / OBJ / 3MF: Maximum chord length (m; kept, not applied by our mesher)."),

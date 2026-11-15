@@ -7308,7 +7308,7 @@ Examples:
 | `resolution` | one of `Coarse`, `Medium`, `Fine`, `Custom` |  | Mesh resolution (default Medium); Custom takes the fields below. |
 | `chordal_tolerance` | number |  | Custom, STL: Chordal tolerance (mm). |
 | `angular_deviation` | number |  | Custom, STL: Angular deviation (deg). |
-| `min_facet_width` | number |  | Custom, STL: Minimum facet width (mm; kept, not applied by our mesher). |
+| `min_facet_width` | number |  | Custom, STL: Minimum facet width (mm): the mesh's segments no shorter than about it. |
 | `distance_tolerance` | number |  | Custom, glTF / GLB / OBJ / 3MF: Distance tolerance (m). |
 | `angular_tolerance` | number |  | Custom, glTF / GLB / OBJ / 3MF: Angular tolerance (deg). |
 | `max_chord_length` | number |  | Custom, glTF / GLB / OBJ / 3MF: Maximum chord length (m; kept, not applied by our mesher). |
