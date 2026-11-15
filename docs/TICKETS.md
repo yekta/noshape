@@ -5,6 +5,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa, 2026-11-15
+- [ ] P0 QUIT-ABORT-DOCK (core; asm / studios for the tab side) The user's dock document (private: vibe5 ~/lead-private/dock.noshape,
+  only as a mode-700 copy in ~/tmp/<agent>) aborts the app as it quits: glibc "corrupted size vs. prev_size while consolidating" /
+  "noshape: the kernel aborted; not recoverable" (exit 134, core dumped), after the UI-script runner's "UI-SCRIPT done". v0.4.52's
+  Linux release app on vibe6 (llvmpipe, :661): 4 of 9 runs of a script that switches tabs A - Yumusak Kutu -> B - Cakil Tasi ->
+  Assembly 1 -> A (4 s waits, then the script ends and the app quits; qa-scratch/lat/hat/qa-tabs.json, quit.sh); 0 of 3 with the
+  same session's edit / undo steps alone (qa-edit.json), 0 of 6 with only A -> B then quit after 4 s or 40 s, 0 of 9 on hat15
+  with the edit / undo / view-cube round. A heap corruption, so not only a quit problem: likely the assembly tab's (or B's)
+  background evaluation still in the kernel while the app tears down, or a write before it. The release binary is stripped
+  (addr2line gives nothing); please reproduce on a symbol build / valgrind. Live: no crash. (qa 2026-11-15 10:03, v0.4.52)
+
 ## blend, 2026-11-13
 - [ ] P2 PRISM-ROUNDS-RUNOUT (blend; 2026-11-13 07:01 UTC; parked by the lead, **needs a direct builder for prismatic rounds**)
   asm-hand-drill-pinslot's studio 9fbc05 (a 33-tooth spur gear from the Spur gear feature): Fillet 1, 0.3 mm with tangent
