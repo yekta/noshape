@@ -3229,9 +3229,9 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
 // angle u the other surface meets the tube's circle where A + B cos v + C sin v = 0 (A = a0 + a1 c, B = b0 + b1 c, C
 // = c0 for c = cos(u - psi)), two branches v = phi +- acos(-A / rho), exact point by point; each run of a branch
 // within both faces' boxes (OCCT's: a plane's a tenth wider) interpolated. A run ends where the other surface crosses
-// a side of the face (found exactly) or leaves the other face's box (bisected). False where the branches meet inside
-// the face (all but tangent to the tube), or a plane is across the axis or holds it or a sphere's centre is on it
-// (the sections circles: OCCT's then).
+// a side of the face (found exactly) or leaves the other face's box (bisected). Where the branches meet inside the face,
+// the same by v round the tube (u = psi +- acos(c)). False where they meet both ways (all but tangent to the tube), or
+// a plane is across the axis or holds it or a sphere's centre is on it (the sections circles: OCCT's then).
 bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
 {
   auto bare = [](const TopoDS_Face& face) {
@@ -3340,100 +3340,224 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
   };
   // The u where a run may end: the face's ends, where the plane crosses its sides v = v0 and v = v1, where the branches
   // meet (A^2 = B^2 + C^2), and where a branch leaves the plane face's box (bisected between samples).
-  std::vector<double> cuts{u0, u1};
-  auto add_cos = [&](double c) {
-    if (std::abs(c) > 1)
-      return;
-    const double a = std::acos(c);
-    for (const double w : {psi + a, psi - a})
-      for (int turn = -2; turn <= 2; ++turn)
-        if (const double u = w + 2 * M_PI * turn; u > u0 && u < u1)
-          cuts.push_back(u);
-  };
-  for (const double vs : {v0, v1})
-    add_cos(-(a0 + b0 * std::cos(vs) + c0 * std::sin(vs)) / (a1 + b1 * std::cos(vs)));
-  {
-    // ((a0 + a1 c)^2 = (b0 + b1 c)^2 + c0^2 in c = cos(u - psi).)
-    const double qa = a1 * a1 - b1 * b1, qb = 2 * (a0 * a1 - b0 * b1), qc = a0 * a0 - b0 * b0 - c0 * c0;
-    const double disc = qb * qb - 4 * qa * qc;
-    if (disc >= 0)
-      for (const double sg : {-1.0, 1.0})
-        add_cos((-qb + sg * std::sqrt(disc)) / (2 * qa));
-  }
-  std::sort(cuts.begin(), cuts.end());
-  {
-    const std::vector<double> sides = cuts;
-    for (size_t i = 0; i + 1 < sides.size(); ++i)
-      for (const int k : {-1, 1})
-      {
-        const int m = 64;
-        for (int j = 1; j <= m; ++j)
+  // By u: runs of each branch round the axis.
+  auto by_u = [&](std::vector<IntTools_Curve>& found) {
+    std::vector<double> cuts{u0, u1};
+    auto add_cos = [&](double c) {
+      if (std::abs(c) > 1)
+        return;
+      const double a = std::acos(c);
+      for (const double w : {psi + a, psi - a})
+        for (int turn = -2; turn <= 2; ++turn)
+          if (const double u = w + 2 * M_PI * turn; u > u0 && u < u1)
+            cuts.push_back(u);
+    };
+    for (const double vs : {v0, v1})
+      add_cos(-(a0 + b0 * std::cos(vs) + c0 * std::sin(vs)) / (a1 + b1 * std::cos(vs)));
+    {
+      // ((a0 + a1 c)^2 = (b0 + b1 c)^2 + c0^2 in c = cos(u - psi).)
+      const double qa = a1 * a1 - b1 * b1, qb = 2 * (a0 * a1 - b0 * b1), qc = a0 * a0 - b0 * b0 - c0 * c0;
+      const double disc = qb * qb - 4 * qa * qc;
+      if (disc >= 0)
+        for (const double sg : {-1.0, 1.0})
+          add_cos((-qb + sg * std::sqrt(disc)) / (2 * qa));
+    }
+    std::sort(cuts.begin(), cuts.end());
+    {
+      const std::vector<double> sides = cuts;
+      for (size_t i = 0; i + 1 < sides.size(); ++i)
+        for (const int k : {-1, 1})
         {
-          double a = sides[i] + (sides[i + 1] - sides[i]) * (j - 1) / m, b = sides[i] + (sides[i + 1] - sides[i]) * j / m;
-          double va = 0, vb = 0;
-          if (!branch(k, a, va) || !branch(k, b, vb) || va > v1 + ve || vb > v1 + ve)
-            continue;
-          const bool ia = on_plane(point(a, va));
-          if (ia == on_plane(point(b, vb)))
-            continue;
-          for (int it = 0; it < 80 && b - a > 1e-14 * (1 + std::abs(u0) + std::abs(u1)); ++it)
+          const int m = 64;
+          for (int j = 1; j <= m; ++j)
           {
-            const double mid = 0.5 * (a + b);
-            double       vm  = 0;
-            if (!branch(k, mid, vm) || vm > v1 + ve)
-              return false;
-            (on_plane(point(mid, vm)) == ia ? a : b) = mid;
+            double a = sides[i] + (sides[i + 1] - sides[i]) * (j - 1) / m, b = sides[i] + (sides[i + 1] - sides[i]) * j / m;
+            double va = 0, vb = 0;
+            if (!branch(k, a, va) || !branch(k, b, vb) || va > v1 + ve || vb > v1 + ve)
+              continue;
+            const bool ia = on_plane(point(a, va));
+            if (ia == on_plane(point(b, vb)))
+              continue;
+            for (int it = 0; it < 80 && b - a > 1e-14 * (1 + std::abs(u0) + std::abs(u1)); ++it)
+            {
+              const double mid = 0.5 * (a + b);
+              double       vm  = 0;
+              if (!branch(k, mid, vm) || vm > v1 + ve)
+                return false;
+              (on_plane(point(mid, vm)) == ia ? a : b) = mid;
+            }
+            cuts.push_back(0.5 * (a + b));
           }
-          cuts.push_back(0.5 * (a + b));
         }
-      }
-  }
-  std::sort(cuts.begin(), cuts.end());
-  std::vector<IntTools_Curve> found;
-  for (const int k : {-1, 1})
-  {
-    // Its runs: the pieces between cuts with the branch in range at their middles, joined end to end.
-    std::vector<std::pair<double, double>> runs;
-    for (size_t i = 0; i + 1 < cuts.size(); ++i)
-    {
-      const double a = cuts[i], b = cuts[i + 1];
-      if (b - a <= 1e-12 * (u1 - u0) || !in_range(k, 0.5 * (a + b)))
-        continue;
-      if (!runs.empty() && std::abs(runs.back().second - a) <= 1e-12 * (u1 - u0))
-        runs.back().second = b;
-      else
-        runs.emplace_back(a, b);
     }
-    for (const auto& [a, b] : runs)
+    std::sort(cuts.begin(), cuts.end());
+    for (const int k : {-1, 1})
     {
-      // (Not to where the branches meet: steep there in u.)
-      for (const double e : {a, b})
+      // Its runs: the pieces between cuts with the branch in range at their middles, joined end to end.
+      std::vector<std::pair<double, double>> runs;
+      for (size_t i = 0; i + 1 < cuts.size(); ++i)
       {
-        double A, B, C;
-        abc(e, A, B, C);
-        if (std::abs(A) > (1 - 1e-6) * std::hypot(B, C))
-          return false;
+        const double a = cuts[i], b = cuts[i + 1];
+        if (b - a <= 1e-12 * (u1 - u0) || !in_range(k, 0.5 * (a + b)))
+          continue;
+        if (!runs.empty() && std::abs(runs.back().second - a) <= 1e-12 * (u1 - u0))
+          runs.back().second = b;
+        else
+          runs.emplace_back(a, b);
       }
-      double vmid = 0;
-      if (!branch(k, 0.5 * (a + b), vmid, 0.5 * (v0 + v1)))
-        return false;
-      auto at = [&](double u, gp_Pnt& x, gp_Pnt2d& g, gp_Pnt2d& c) {
-        double v = 0;
-        if (!branch(k, u, v, vmid) || v > v1 + ve)
+      for (const auto& [a, b] : runs)
+      {
+        // (Not to where the branches meet: steep there in u.)
+        for (const double e : {a, b})
+        {
+          double A, B, C;
+          abc(e, A, B, C);
+          if (std::abs(A) > (1 - 1e-6) * std::hypot(B, C))
+            return false;
+        }
+        double vmid = 0;
+        if (!branch(k, 0.5 * (a + b), vmid, 0.5 * (v0 + v1)))
           return false;
-        x         = point(u, v);
-        double pu = 0, pv = 0;
-        params_on(x, pu, pv);
-        const gp_Pnt2d on_t(u, v), on_p(pu, pv);
-        g = p_first ? on_p : on_t;
-        c = p_first ? on_t : on_p;
-        return true;
-      };
-      IntTools_Curve ic;
-      if (!interpolated(at, a, b, 8, ic))
-        return false;
-      found.push_back(ic);
+        auto at = [&](double u, gp_Pnt& x, gp_Pnt2d& g, gp_Pnt2d& c) {
+          double v = 0;
+          if (!branch(k, u, v, vmid) || v > v1 + ve)
+            return false;
+          x         = point(u, v);
+          double pu = 0, pv = 0;
+          params_on(x, pu, pv);
+          const gp_Pnt2d on_t(u, v), on_p(pu, pv);
+          g = p_first ? on_p : on_t;
+          c = p_first ? on_t : on_p;
+          return true;
+        };
+        IntTools_Curve ic;
+        if (!interpolated(at, a, b, 8, ic))
+          return false;
+        found.push_back(ic);
+      }
     }
+    return true;
+  };
+  // (Where those fail, the branches meeting within the face (a plane all but holding the axis: its sections loops round
+  // the tube, cf-snap-hook's drafted sides): by v, the circle at v round the axis meeting the other surface where
+  // c = cos(u - psi) = -(a0 + b0 cos v + c0 sin v) / (a1 + b1 cos v), two branches u = psi +- acos(c), the same way.)
+  auto by_v = [&](std::vector<IntTools_Curve>& found) {
+    if (!(a1 > std::abs(b1)))
+      return false;
+    const double ue     = 1e-12;
+    auto         cos_at = [&](double v) { return -(a0 + b0 * std::cos(v) + c0 * std::sin(v)) / (a1 + b1 * std::cos(v)); };
+    auto         ubranch = [&](int k, double v, double& u, double to = 0) {
+      const double c = cos_at(v);
+      if (!(std::abs(c) <= 1 + 1e-12))
+        return false;
+      const double w = psi + k * std::acos(std::clamp(c, -1.0, 1.0));
+      double       gap = RealLast();
+      u                = RealLast();
+      for (int turn = -3; turn <= 3; ++turn)
+        if (const double x = w + 2 * M_PI * turn; x >= u0 - ue && x <= u1 + ue && std::abs(x - to) < gap)
+          gap = std::abs(x - to), u = x;
+      return true;
+    };
+    auto in_v = [&](int k, double v) {
+      double u = 0;
+      return ubranch(k, v, u) && u <= u1 + ue && on_plane(point(u, v));
+    };
+    // The v where a run may end: the face's sides, where the other surface crosses its ends u = u0 and u = u1, where the
+    // branches meet (c = +-1), and where a branch leaves the other face's box (bisected between samples).
+    std::vector<double> cuts{v0, v1};
+    auto                add_trig = [&](double A, double B, double C) {
+      const double rho = std::hypot(B, C);
+      if (!(rho > 0) || std::abs(A) > rho)
+        return;
+      const double phi = std::atan2(C, B), d = std::acos(std::clamp(-A / rho, -1.0, 1.0));
+      for (const double w : {phi + d, phi - d})
+        for (int turn = -2; turn <= 2; ++turn)
+          if (const double v = w + 2 * M_PI * turn; v > v0 && v < v1)
+            cuts.push_back(v);
+    };
+    for (const double us : {u0, u1})
+    {
+      const double cu = std::cos(us - psi);
+      add_trig(a0 + a1 * cu, b0 + b1 * cu, c0);
+    }
+    for (const double sg : {-1.0, 1.0})
+      add_trig(a0 + sg * a1, b0 + sg * b1, c0);
+    std::sort(cuts.begin(), cuts.end());
+    {
+      const std::vector<double> sides = cuts;
+      for (size_t i = 0; i + 1 < sides.size(); ++i)
+        for (const int k : {-1, 1})
+        {
+          const int m = 64;
+          for (int j = 1; j <= m; ++j)
+          {
+            double a = sides[i] + (sides[i + 1] - sides[i]) * (j - 1) / m, b = sides[i] + (sides[i + 1] - sides[i]) * j / m;
+            double ua = 0, ub = 0;
+            if (!ubranch(k, a, ua) || !ubranch(k, b, ub) || ua > u1 + ue || ub > u1 + ue)
+              continue;
+            const bool ia = on_plane(point(ua, a));
+            if (ia == on_plane(point(ub, b)))
+              continue;
+            for (int it = 0; it < 80 && b - a > 1e-14 * (1 + std::abs(v0) + std::abs(v1)); ++it)
+            {
+              const double mid = 0.5 * (a + b);
+              double       um  = 0;
+              if (!ubranch(k, mid, um) || um > u1 + ue)
+                return false;
+              (on_plane(point(um, mid)) == ia ? a : b) = mid;
+            }
+            cuts.push_back(0.5 * (a + b));
+          }
+        }
+    }
+    std::sort(cuts.begin(), cuts.end());
+    for (const int k : {-1, 1})
+    {
+      std::vector<std::pair<double, double>> runs;
+      for (size_t i = 0; i + 1 < cuts.size(); ++i)
+      {
+        const double a = cuts[i], b = cuts[i + 1];
+        if (b - a <= 1e-12 * (v1 - v0) || !in_v(k, 0.5 * (a + b)))
+          continue;
+        if (!runs.empty() && std::abs(runs.back().second - a) <= 1e-12 * (v1 - v0))
+          runs.back().second = b;
+        else
+          runs.emplace_back(a, b);
+      }
+      for (const auto& [a, b] : runs)
+      {
+        // (Not to where the branches meet: steep there in v.)
+        if (std::abs(cos_at(a)) > 1 - 1e-6 || std::abs(cos_at(b)) > 1 - 1e-6)
+          return false;
+        double umid = 0;
+        if (!ubranch(k, 0.5 * (a + b), umid, 0.5 * (u0 + u1)))
+          return false;
+        auto at = [&](double v, gp_Pnt& x, gp_Pnt2d& g, gp_Pnt2d& c) {
+          double u = 0;
+          if (!ubranch(k, v, u, umid) || u > u1 + ue)
+            return false;
+          x         = point(u, v);
+          double pu = 0, pv = 0;
+          params_on(x, pu, pv);
+          const gp_Pnt2d on_t(u, v), on_p(pu, pv);
+          g = p_first ? on_p : on_t;
+          c = p_first ? on_t : on_p;
+          return true;
+        };
+        IntTools_Curve ic;
+        if (!interpolated(at, a, b, 8, ic))
+          return false;
+        found.push_back(ic);
+      }
+    }
+    return true;
+  };
+  std::vector<IntTools_Curve> found;
+  if (!by_u(found))
+  {
+    found.clear();
+    if (!by_v(found))
+      return false;
   }
   out.insert(out.end(), found.begin(), found.end());
   return true;

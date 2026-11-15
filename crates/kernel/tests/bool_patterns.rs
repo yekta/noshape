@@ -2791,3 +2791,30 @@ fn a_rings_top_cut_along_its_axis_and_by_a_ball_as_occt() {
         assert!((v - w).abs() <= 1e-6 * w, "volume {v} vs OCCT's {w}");
     }
 }
+
+/// A ring's top cut by a box whose side is drafted 3° off its axis (cf-snap-hook's drafted sides against its rounds):
+/// the sections loops round the tube, each found by its angle round the tube; noshape's Boolean, valid and as OCCT's.
+#[test]
+fn a_rings_top_cut_by_a_side_drafted_off_its_axis_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let torus = k::make_torus(&z_frame(DVec3::ZERO), 0.027, 0.0145, TAU).unwrap();
+    let slab = k::make_box_corners(DVec3::new(-0.05, -0.05, 0.004), DVec3::new(0.05, 0.05, 0.02)).unwrap();
+    let ring = k::boolean(k::BooleanOp::Common, std::slice::from_ref(&torus), std::slice::from_ref(&slab), &k::BooleanOptions::default()).expect("the ring's top").shape;
+    let a = 3f64.to_radians();
+    let n = DVec3::new(0.0, a.cos(), a.sin());
+    let tool = k::make_box(&k::Plane::new(DVec3::new(-0.06, 0.01 - 0.05 * a.tan(), 0.05), n, DVec3::X), 0.12, 0.11, 0.06).unwrap();
+    let run = |rust: bool| {
+        k::set_rust_boolean(Some(rust));
+        let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&ring), std::slice::from_ref(&tool), &k::BooleanOptions::default()).expect("the cut");
+        let path = k::last_boolean_path();
+        k::set_rust_boolean(None);
+        (r.shape, path)
+    };
+    let ((ours, path), (occt, _)) = (run(true), run(false));
+    assert_eq!(path, "rust", "{}", k::last_rust_decline());
+    assert!(ours.is_valid() && occt.is_valid(), "valid");
+    assert_eq!(ours.count(k::ShapeType::Face), occt.count(k::ShapeType::Face), "faces");
+    assert_eq!(ours.count(k::ShapeType::Edge), occt.count(k::ShapeType::Edge), "edges");
+    let (v, w) = (ours.volume().unwrap(), occt.volume().unwrap());
+    assert!((v - w).abs() <= 1e-6 * w, "volume {v} vs OCCT's {w}");
+}
