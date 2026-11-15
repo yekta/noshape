@@ -146,3 +146,13 @@ print or commit them). Chrome runs on `DISPLAY=:107` with CDP on `127.0.0.1:9333
 
 docs/PLAN.md (how we work, speed targets), docs/PRIORITIES.md (P0–P3), docs/TESTS.md, docs/CRATES.md,
 docs/APP-ARCHITECTURE.md, docs/TICKETS.md, docs/handoff/<area>.md, and the checklists in docs/parity/.
+
+## Decisions and handoffs
+
+- docs/DECISIONS.md holds the lead's standing rulings; read it at the start of a session and after a compaction. A
+  ruling there wins over older notes.
+- docs/handoff/<agent>.md is your current state only, at most ~250 lines: in flight, queued to land, open questions,
+  next items, how to run. Rewrite it rather than append; move history to docs/handoff/archive/<agent>.md. Update it
+  whenever you land or report, so a compaction loses nothing.
+- Heavy runs on a vibe host (suites, gates, parity pairs) go through `~/bin/slot <cmd>` there: one at a time per host,
+  started only when enough memory is free.
