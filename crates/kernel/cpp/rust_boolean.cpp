@@ -2344,12 +2344,12 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         bb.Add(f, ww);
       }
     }
-    // On a plane, the curves of the edges it made stored, as OCCT's pieces have them (mass properties
-    // integrate along them; a big face's would cost more than they're worth).
+    // On a plane, the curves of the edges it made stored, as OCCT's pieces have them (mass properties integrate along
+    // them, and each query of the face without them projects every edge again: c2-sm-corner-break's std queries on a
+    // big face 30-120 us each).
     // (An ellipse's and a free-form section's always: its tolerance goes by them, below.)
     if (!round && !free_form)
     {
-      const bool small = b.loop_uses[b.face_loops[i + 1]] - b.loop_uses[b.face_loops[i]] <= 64;
       for (uint32_t k = b.loop_uses[b.face_loops[i]]; k < b.loop_uses[b.face_loops[i + 1]]; ++k)
       {
         const uint32_t ek = b.uses[k] / 2;
@@ -2363,7 +2363,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           if (const char* why = ellipse_pcurve(ells[ek], src, es[ek], s, loc, bb))
             return why;
         }
-        else if (r.edge_origin[3 * ek] != 0 && small)
+        else if (r.edge_origin[3 * ek] != 0)
           BRepLib::BuildPCurveForEdgeOnPlane(es[ek], f);
       }
     }
