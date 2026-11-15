@@ -6632,11 +6632,46 @@ static void finish_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHist
   rim_seams_off_joints(input, r, h);
 }
 
+// Whether an edge left out, under a quarter of the round's radius long, meets the end of one rounded edge: a step the
+// as-is round's corners overshoot (a user's dock: R 0.38 over a 0.08 mm step), so the working scale's is built. Not
+// where two rounded edges meet beside it (the dock's Halka Round, whose as-is round is kept).
+static bool short_step_beside(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& edges, double r)
+{
+  ShapeIMap chosen;
+  for (const TopoDS_Edge& e : edges)
+    chosen.Add(e);
+  ShapeAncMap ve;
+  TopExp::MapShapesAndUniqueAncestors(input, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  for (const TopoDS_Edge& e : edges)
+    for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More(); v.Next())
+    {
+      const ShapeList* es = ve.Seek(v.Current());
+      if (es == nullptr)
+        continue;
+      int rounded = 0;
+      for (ShapeList::Iterator it(*es); it.More(); it.Next())
+        rounded += chosen.Contains(it.Value()) ? 1 : 0;
+      if (rounded != 1)
+        continue;
+      for (ShapeList::Iterator it(*es); it.More(); it.Next())
+      {
+        const TopoDS_Edge& x = TopoDS::Edge(it.Value());
+        if (chosen.Contains(x) || BRep_Tool::Degenerated(x))
+          continue;
+        if (GCPnts_AbscissaPoint::Length(BRepAdaptor_Curve(x)) < 0.25 * r)
+          return true;
+      }
+    }
+  return false;
+}
+
 OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const char* what,
-                   const MakeBuild& make)
+                   const MakeBuild& make, bool step_beside = false)
 {
   bool as_is_failed = false;
-  if (checked)
+  // (Where the as-is round wouldn't be kept, its build is skipped: the working scale's is the result either way.)
+  const bool scale_first = step_beside && working_scale() != 1.0;
+  if (checked && !scale_first)
   {
     const Scaled as_is(input, 1.0);
     TopoDS_Shape r;
@@ -8755,7 +8790,7 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
   }
   try
   {
-    OpOut out = scaled_blend(in, checked, rmax, "fillet", [&](const Scaled& sc) { return fillet_build(sc, es, rs); });
+    OpOut out = scaled_blend(in, checked, rmax, "fillet", [&](const Scaled& sc) { return fillet_build(sc, es, rs); }, checked && short_step_beside(in, es, rmax));
     // OCCT's round of a tangent chain crossing from one support to the next with a sliver face at the joint (cf-snap-hook's
     // Fillet 6: six 0.1 mm slivers where its lip's arcs meet; live 84 faces): the chain's rounds built exact instead.
     // (Only where fillet_by_tools could build the rounds: lines and arcs, or edges between two cylinders (a mitre's
