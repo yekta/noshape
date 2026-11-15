@@ -1,18 +1,18 @@
 {
  "scenario": "drw-revision-callout-add",
- "recorded": "2026-11-14T15:26:35.325Z",
+ "recorded": "2026-11-15T02:29:21.349Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "aad1e5f0da457d3b68953eea",
-  "workspace": "d198e9762e004b9326e1968a",
-  "element": "89011f392baa4a3d2b3ecd81",
+  "document": "9e97e7fa36f0ed452ca0c5c0",
+  "workspace": "ff208b24428de4defbc1b80a",
+  "element": "6c36b26619291f184c980a7b",
   "start": "block-drawing",
-  "startElement": "89011f392baa4a3d2b3ecd81",
+  "startElement": "6c36b26619291f184c980a7b",
   "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
@@ -306,7 +306,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 204164
+   "t": 204217
   },
   {
    "step": 2,
@@ -483,7 +483,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 230928
+   "t": 229729
   },
   {
    "step": 3,
@@ -499,7 +499,7 @@
    "ok": true,
    "at": [
     1023,
-    370
+    397
    ],
    "state": {
     "focus": {
@@ -611,7 +611,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 256975
+   "t": 255840
   },
   {
    "step": 4,
@@ -731,7 +731,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 282330
+   "t": 281123
   },
   {
    "step": 5,
@@ -858,7 +858,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 307271
+   "t": 307278
   },
   {
    "step": 6,
@@ -867,14 +867,14 @@
     "on": {
      "sheet_point": [
       70,
-      137
+      130
      ]
     }
    },
    "ok": true,
    "at": [
     679,
-    452
+    483
    ],
    "state": {
     "focus": {
@@ -991,7 +991,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 333074
+   "t": 333886
   },
   {
    "step": 7,
@@ -1004,7 +1004,7 @@
    "ok": true,
    "at": [
     720,
-    478
+    508
    ],
    "state": {
     "focus": {
@@ -1121,7 +1121,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 359103
+   "t": 359713
   },
   {
    "step": 8,
@@ -1254,7 +1254,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 385370
+   "t": 385788
   },
   {
    "step": 9,
@@ -1379,7 +1379,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 410556
+   "t": 412357
   },
   {
    "step": 10,
@@ -1511,7 +1511,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 436330
+   "t": 438444
   }
  ]
 }

@@ -1,19 +1,19 @@
 {
  "scenario": "drw-revision-cell-resize",
- "recorded": "2026-11-14T15:34:51.710Z",
+ "recorded": "2026-11-15T03:06:36.278Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "8a02127c08fc7c4c68105557",
-  "workspace": "9dd124d31638fecc95209f0b",
-  "element": "2d9f903b5fef23dc97cb0b7e",
+  "document": "5a47521466b12a96707379a7",
+  "workspace": "b78eca1e3ef5b6249c65a5f8",
+  "element": "bf9ea879fa77eb5eba766b1e",
   "start": "block-drawing",
-  "startElement": "2d9f903b5fef23dc97cb0b7e",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "bf9ea879fa77eb5eba766b1e",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -306,7 +306,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 203369
+   "t": 205441
   },
   {
    "step": 2,
@@ -483,7 +483,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 229382
+   "t": 231043
   },
   {
    "step": 3,
@@ -499,7 +499,7 @@
    "ok": true,
    "at": [
     1023,
-    370
+    397
    ],
    "state": {
     "focus": {
@@ -611,7 +611,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 255449
+   "t": 257616
   },
   {
    "step": 4,
@@ -731,7 +731,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 281060
+   "t": 283402
   },
   {
    "step": 5,
@@ -858,7 +858,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 307522
+   "t": 309368
   },
   {
    "step": 6,
@@ -867,14 +867,14 @@
     "on": {
      "sheet_point": [
       70,
-      137
+      130
      ]
     }
    },
    "ok": true,
    "at": [
     679,
-    452
+    483
    ],
    "state": {
     "focus": {
@@ -1021,7 +1021,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 332530
+   "t": 335071
   },
   {
    "step": 7,
@@ -1176,7 +1176,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 358027
+   "t": 360951
   },
   {
    "step": 8,
@@ -1185,14 +1185,14 @@
     "on": {
      "sheet_point": [
       70,
-      137
+      130
      ]
     }
    },
    "ok": true,
    "at": [
     679,
-    452
+    483
    ],
    "state": {
     "focus": {
@@ -1339,7 +1339,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 383847
+   "t": 387466
   },
   {
    "step": 9,
@@ -1352,7 +1352,7 @@
    "ok": true,
    "at": [
     719,
-    454
+    484
    ],
    "state": {
     "focus": {
@@ -1472,7 +1472,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 409884
+   "t": 414212
   },
   {
    "step": 10,
@@ -1600,7 +1600,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 435212
+   "t": 439898
   },
   {
    "step": 11,
@@ -1762,7 +1762,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 461658
+   "t": 466633
   }
  ]
 }

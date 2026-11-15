@@ -3,7 +3,7 @@
   "about": "A selected revision table cell's menu › Resize...",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
-  "source": "coverage (lead 11-07: the revision table's rows; live's Free account has no Revision table tool, asked whether another can record); live2 11-14: steps follow live (a data-row cell at sheet (70, 137)); live2 11-14: steps follow live (a data-row cell at sheet (70, 137))",
+  "source": "coverage (lead 11-07: the revision table's rows; live's Free account has no Revision table tool, asked whether another can record); live2 11-14: steps follow live (a data-row cell at sheet (70, 130)); live2 11-14: steps follow live (a data-row cell at sheet (70, 130))",
   "start": "block-drawing",
   "steps": [
     {
@@ -40,7 +40,7 @@
       "on": {
         "sheet_point": [
           70,
-          137
+          130
         ]
       }
     },
@@ -54,7 +54,7 @@
       "on": {
         "sheet_point": [
           70,
-          137
+          130
         ]
       }
     },

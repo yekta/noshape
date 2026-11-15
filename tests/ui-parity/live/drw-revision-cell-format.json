@@ -1,18 +1,18 @@
 {
  "scenario": "drw-revision-cell-format",
- "recorded": "2026-11-14T15:34:21.286Z",
+ "recorded": "2026-11-15T02:37:10.979Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "7dd44ab2ee1ef85dce1e13d7",
-  "workspace": "8801b83a6d07579ad183ce5d",
-  "element": "07e86b55afefc742de7fe075",
+  "document": "3e50ec672753a5f78a4c97b7",
+  "workspace": "4d1f9f7822eb0621e5312c44",
+  "element": "30575d8f3c9007119ecc1c95",
   "start": "block-drawing",
-  "startElement": "07e86b55afefc742de7fe075",
+  "startElement": "30575d8f3c9007119ecc1c95",
   "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
@@ -306,7 +306,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 202780
+   "t": 203223
   },
   {
    "step": 2,
@@ -483,7 +483,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 228034
+   "t": 228936
   },
   {
    "step": 3,
@@ -499,7 +499,7 @@
    "ok": true,
    "at": [
     1023,
-    370
+    397
    ],
    "state": {
     "focus": {
@@ -611,7 +611,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 252548
+   "t": 254217
   },
   {
    "step": 4,
@@ -731,7 +731,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 277232
+   "t": 279930
   },
   {
    "step": 5,
@@ -858,7 +858,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 303148
+   "t": 305245
   },
   {
    "step": 6,
@@ -867,14 +867,14 @@
     "on": {
      "sheet_point": [
       70,
-      137
+      130
      ]
     }
    },
    "ok": true,
    "at": [
     679,
-    452
+    483
    ],
    "state": {
     "focus": {
@@ -1021,7 +1021,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 327810
+   "t": 330384
   },
   {
    "step": 7,
@@ -1176,7 +1176,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 353818
+   "t": 356174
   },
   {
    "step": 8,
@@ -1303,7 +1303,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 378868
+   "t": 382183
   }
  ]
 }
