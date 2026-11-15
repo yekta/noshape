@@ -21,6 +21,8 @@
 #include "internal.hpp"
 #include <atomic>
 #include <chrono>
+#include <BRepGProp_Vinert.hxx>
+#include <BRepGProp_Domain.hxx>
 #include <ShapeFix_Shape.hxx>
 #include <ShapeConstruct_ProjectCurveOnSurface.hxx>
 #include <cstring>
@@ -207,6 +209,43 @@ double rough_volume_of(const TopoDS_Shape& s)
   GProp_GProps g;
   BRepGProp::VolumeProperties(s, g, 1e-3, true);
   return g.Mass();
+}
+
+// rough_volume_of with its closed shells' faces integrated on threads of their own, from one origin (as OCCT's, the
+// vertices' mean): an offset loft's wall, 56 ms on one.
+double rough_volume_by_faces(const TopoDS_Shape& s)
+{
+  std::vector<TopoDS_Face> fs;
+  for (TopExp_Explorer x(s, TopAbs_SHELL); x.More(); x.Next())
+    if (BRep_Tool::IsClosed(x.Current()))
+      for (TopExp_Explorer y(x.Current(), TopAbs_FACE); y.More(); y.Next())
+        if (y.Current().Orientation() == TopAbs_FORWARD || y.Current().Orientation() == TopAbs_REVERSED)
+          fs.push_back(TopoDS::Face(y.Current()));
+  gp_XYZ c(0, 0, 0);
+  int    n = 0;
+  for (TopExp_Explorer x(s, TopAbs_VERTEX); x.More(); x.Next(), ++n)
+    c += BRep_Tool::Pnt(TopoDS::Vertex(x.Current())).XYZ();
+  const gp_Pnt        o(n > 0 ? c / n : c);
+  std::vector<double> v(fs.size(), 0);
+  OSD_Parallel::For(0, static_cast<int>(fs.size()), [&](int i) {
+    const TopoDS_Face& f = fs[(size_t)i];
+    TopLoc_Location    l;
+    if (BRep_Tool::Surface(f, l).IsNull())
+      return;
+    BRepGProp_Face   bf;
+    BRepGProp_Domain bd;
+    BRepGProp_Vinert g;
+    g.SetLocation(o);
+    bf.Load(f);
+    if (f.NbChildren() != 0)
+      bd.Init(f);
+    g.Perform(bf, bd, 1e-3);
+    v[(size_t)i] = g.Mass();
+  });
+  double sum = 0;
+  for (const double x : v)
+    sum += x;
+  return sum;
 }
 
 int solid_count(const TopoDS_Shape& s)
@@ -8899,7 +8938,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       return no("the offsets cross each other or the part");
   }
   lap("self-interference");
-  const double vw = rough_volume_of(wall), vs = rough_volume_of(so);
+  const double vw = rough_volume_by_faces(wall), vs = rough_volume_by_faces(so);
   lap("volumes");
   if (dbg)
     std::fprintf(stderr, "quadrics: wall volume %.17g solid %.17g\n", vw, vs);
