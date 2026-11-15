@@ -1082,6 +1082,17 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
     }
     for (uint32_t& j : fj)
       j = froot(j);
+    // Edges that bound no face, only lie inside them (INTERNAL: a Boolean leaves an edge ending inside a face so;
+    // Parasolid's faces don't keep one: asm's a2e4a2 Extrude 5, a hole's old seam across its new face, 2 edges and 2
+    // vertices more than live).
+    std::vector<uint8_t> bounds(em.Extent() + 1, 0);
+    for (int f = 1; f <= fm.Extent(); ++f)
+      for (TopExp_Explorer x(fm(f), TopAbs_EDGE); x.More(); x.Next())
+      {
+        const int j = em.FindIndex(x.Current());
+        if (j > 0)
+          bounds[(size_t)j] |= x.Current().Orientation() == TopAbs_FORWARD || x.Current().Orientation() == TopAbs_REVERSED ? 2 : 1;
+      }
     std::vector<bool> open(em.Extent() + 1, false);
     for (int i = 1; i <= em.Extent(); ++i)
     {
@@ -1090,7 +1101,8 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       bool seam = ef.first[(size_t)i] > ef.first[(size_t)i - 1];
       for (uint32_t k = ef.first[(size_t)i - 1]; k < ef.first[(size_t)i] && seam; ++k)
         seam = BRep_Tool::IsClosed(e, TopoDS::Face(fm((int)ef.second[k] + 1)));
-      const bool    shown = !BRep_Tool::Degenerated(e) && !seam && !joining[(size_t)i];
+      const bool    inside = bounds[(size_t)i] == 1;
+      const bool    shown = !BRep_Tool::Degenerated(e) && !seam && !inside && !joining[(size_t)i];
       TopoDS_Vertex a, b;
       TopExp::Vertices(e, a, b);
       open[i] = shown && !a.IsSame(b);

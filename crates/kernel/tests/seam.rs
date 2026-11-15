@@ -61,6 +61,16 @@ fn a_seam_moves_to_the_loop_round_the_axis_past_a_window() {
     assert_eq!(counts(&u), (18, 40, 24));
 }
 
+/// An edge left inside a face (INTERNAL: the Boolean's piece of a hole's old seam, ending inside the lens-shaped hole's
+/// new face) bounds nothing: no edge, and the arc it split one edge (asm's a2e4a2 Extrude 5: live's 32 / 72 / 40).
+#[test]
+fn an_edge_inside_a_face_is_not_an_edge() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/seam/a2e4a2-extrude5.brep");
+    let s = read_brep(&path).unwrap();
+    assert!(s.is_valid());
+    assert_eq!(counts(&s), (32, 72, 40));
+}
+
 /// A face pattern of a hole through a tube's wall, stitched (Parasolid's face pattern copies the faces: motor-mount-jack's
 /// slots, 5 ms in live): the copies' rims holes of the tube's two cylinders, their seams moved clear of every hole first,
 /// the walls copied. The same part as cutting all four holes.
