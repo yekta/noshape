@@ -840,6 +840,12 @@ fn a_create_selection_pick_lights_up_its_feature(cx: &mut TestAppContext) {
     view.update(cx, |v, cx| v.cs_pick(&top, noshape_scene::builder::PickKind::Face, cx));
     draw(cx, window);
     assert!(cx.update(|cx| view.read(cx).related_features(cx).contains(&maker)), "the picked face's feature lit");
+    // Add selection: the panel's Selection field takes the keyboard (live mirror-face-create-selection).
+    let add = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("cs-add").expect("Add selection drawn").center();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(add, Modifiers::default());
+    draw(cx, window);
+    let focused = cx.update_window(window, |_, w, cx| view.read(cx).ui.create_selection.as_ref().is_some_and(|c| c.focus.is_focused(w))).unwrap();
+    assert!(focused, "the Selection field has the keyboard");
 }
 
 /// Live (ui-parity extrude-remove-tab): Extrude opened on a part's face takes Add by itself, and that isn't an undo

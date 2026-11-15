@@ -48,6 +48,8 @@ pub struct CreateSelection {
     pub target: CsTarget,
     /// The criterion list is open (a native select: no search field).
     pub list_open: bool,
+    /// The Selection field: it takes the keyboard after Add selection (live mirror-face-create-selection).
+    pub focus: FocusHandle,
     grab: Arc<parking_lot::Mutex<Point<Pixels>>>,
 }
 
@@ -100,6 +102,7 @@ impl PartStudioView {
             pos,
             target,
             list_open: false,
+            focus: cx.focus_handle(),
             grab: Default::default(),
         });
         self.refresh_scene(false, cx);
@@ -378,6 +381,7 @@ impl PartStudioView {
         let empty = chips.is_empty();
         let field = v_flex()
             .id("cs-selection")
+            .track_focus(&cs.focus)
             .mx(px(3.))
             .mt(px(5.))
             .min_h(px(26.))
@@ -426,6 +430,7 @@ impl PartStudioView {
             }));
         let enabled = n > 0;
         let add = crate::ui_script::mark(div().id("cs-add"), || "button:Add selection".into())
+            .debug_selector(|| "cs-add".into())
             .w(px(135.))
             .h(px(27.))
             .flex()
@@ -438,7 +443,12 @@ impl PartStudioView {
             .text_size(px(12.25))
             .text_color(gpui_kit::rgb(0x333333))
             .when(!enabled, |d| d.opacity(0.4).text_color(gpui_kit::rgb(0x999999)))
-            .when(enabled, |d| d.cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0xf2f2f2))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cs_add(cx))))
+            .when(enabled, |d| d.cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0xf2f2f2))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                this.cs_add(cx);
+                if let Some(f) = this.ui.create_selection.as_ref().map(|c| c.focus.clone()) {
+                    window.focus(&f, cx);
+                }
+            })))
             .child("Add selection");
         let grab = cs.grab.clone();
         Some(

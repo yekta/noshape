@@ -31,6 +31,9 @@ impl PartStudioView {
             f["kind"] = "other".into();
             f["label"] = Value::Null;
             f
+        } else if self.ui.create_selection.as_ref().is_some_and(|c| c.focus.is_focused(window)) {
+            // Create selection's Selection field after Add selection (live mirror-face-create-selection).
+            json!({ "kind": "field", "label": "Selection", "text": null, "selection": null, "all": false })
         } else if let Some(st) = self.ui.material_panel.as_ref().map(|m| m.search.read(cx)).filter(|st| st.focus_handle(cx).is_focused(window)) {
             // The Material panel's search (live material-search-acetal-ok: a field, no label).
             let mut f = crate::feature_dialog::field_focus("", st);
