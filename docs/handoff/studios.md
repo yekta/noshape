@@ -28,6 +28,46 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-15 12:16 UTC: drawing and release re-takes, live2's 32 drawing-matrix takes, live's hole takes
+
+Where to work: builds and crate tests on the Mac (`NOSHAPE_RB_HOST=mac tools/tiers/rb.sh …`); ui-parity on vibe6
+(≤2 app instances while its load is ≥16, else ≤4): `NOSHAPE_RB_HOST=vibe6 rb.sh bash -c 'cargo build -p noshape; cp
+$CARGO_TARGET_DIR/debug/noshape ~/tmp/studios/noshape'`, then `systemd-run --user --unit=studios-X bash
+~/tmp/studios/shards-names.sh ~/tmp/studios/noshape <out> <names file> <shards> 381` (script in
+/root/studios-scratch/bin). An rb.sh build to vibe6 deletes untracked takes there: put them back after it. Land with
+`NOSHAPE_LAND_QUEUE_HOST=vibe5 NOSHAPE_LAND_HOSTS="vibe5 vibe3" tools/tiers/land.sh` (clippy -D warnings precheck).
+
+State: 98 of 102 drawing re-takes match (the 49 re-takes of 11-15, live2's 32 matrix takes, live's
+drw-hole-callout-palette / drw-hole-table-cell-format, the crop / broken-out / detail takes); 19 of 22 rel-* before.
+Queued: 1e662980 (the big batch), ff244f19 (profile snap reach 6 px), then the hole-size commit below.
+
+ui-parity runner (tools/ui-parity/run.py) learned this session: live's recorder 2026-11-15.1 reads panels as their
+controls (`cell-format`, `palette` with fields) and dropdowns open over the drawing (list kind "menu", `disabled` as
+per-row flags). Ours reports the new form with `old` (the older recorders' reading) and lists over the drawing with
+`drawing: true`; `recorder_form` picks by the take's recorder. Also: a view's dark frame drawn 0.25-0.4 s after its click
+(`view_frame_late`), drawing data written a step or two late (`texts_late`), a hole callout's export text (count and
+diameter only, `hole_callout_export_text`), the account's company row, menu rows found by part of their text.
+
+Open items:
+- drw-dimension-angular: live keeps the finished angular dimension selected after Esc (EDGE Isometric) and its value
+  sits 2.5 mm lower than ours. Selecting a placed dimension would break line-to-line and drw-dimension-edge (both read []
+  after Esc): needs a rule for when it counts.
+- drw-insert-view-top-1to1: live reads VIEW where five other Insert view takes read EDGE (the reader's pixels).
+- drw-hole-callout-palette steps 17-18: our callout's leader is lit inside Top's box after the palette closes; live
+  reads []. Near the reader's 60 px threshold.
+- Hole callout text width: live's "3X ∅.197 THRU" is 29.6 mm at 0.12 in (two MTEXTs, style
+  Onshape-Standard-Hole-Callout, ~9.7 text heights); Noto Sans gives ~7. Ours sits 0.09 in past a 0.18 in shoulder as
+  live's DXF; the width (font or spacing) is open.
+- A view's on-screen placement is 2-3 px off live's at the same zoom (drw-broken-out-section clicks 721 / 783 vs live's
+  718 / 781): low priority after the drawing matrix refresh (lead 11-15). dx compares that take within ±1 px.
+- docs/parity/drawing-matrix.md: refresh it with a whole drawing-suite run (`drawing_matrix.py --run <uip dir>`) once the
+  queued batches land.
+- Hole sizes through the API (lead 11-15): feature_add keeps a size the caller gives (sets tableSynced), Onshape's
+  "Parameters have been overridden. Check input." where it differs from the Standard's (e2e
+  a_hole_size_given_is_used_as_given); the ui-parity start builder no longer special-cases it.
+- Waiting on live2: none. Waiting on live: nothing (the cell's Size rows equally on unequal rows was not tested; ask if
+  needed).
+
 ### 2026-11-14 13:24 UTC: speed at scale (lead 11-14): five T2 UI benches, before / after
 - Benches (docs/TESTS.md "UI benches"): start-ui `bench::documents_page_at_scale` (2,000 documents, 50 folders),
   history-ui `version_graph_at_scale` (500 versions, 21 workspaces), variable-studio-ui `variable_studio_at_scale`

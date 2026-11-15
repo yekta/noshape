@@ -933,6 +933,32 @@ fn a_workspace_branches_from_a_version() {
     assert_eq!(e.param.as_deref(), Some("version"), "{}", e.to_json());
 }
 
+/// A Hole's size given through the API is used as given, the schema default's 5 mm too (lead 11-15: not replaced by
+/// the Standard's 1/4). Where it differs from the Standard's size (the default 1/4, or one given) the Hole says
+/// Onshape's "Parameters have been overridden. Check input." (live's REST-built holes say it too) and keeps it.
+#[test]
+fn a_hole_size_given_is_used_as_given() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "hole-size-given.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    let r = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r], "depth": "10 mm" } }));
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "at": [[30, 20, 10]] }))["faces"][0]["id"].clone();
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": top }))["sketch"].clone();
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": [[15, 20, 10], [45, 20, 10]] }));
+    let pts: Vec<Value> = p["created"].as_array().unwrap().iter().map(|x| x["id"].clone()).collect();
+    let radius_at = |ctx: &mut Ctx, x: f64| -> f64 {
+        let c = call(ctx, "query_entities", json!({ "kind": "edges", "curve": "circle", "near": [x, 20, 10] }));
+        num(&c["edges"][0]["radius"])
+    };
+    let h1 = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": [pts[0]], "holeDiameterV3": "5 mm", "endStyleV2": "THROUGH" } }));
+    assert_eq!(h1["feature_status"]["message"], "Parameters have been overridden. Check input.", "{h1}");
+    assert!((radius_at(&mut ctx, 15.0) - 2.5).abs() < 1e-3, "5 mm kept: {}", radius_at(&mut ctx, 15.0));
+    let h2 = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": [pts[1]], "ansiHoleTableEx": ["Drilled", "1/4 (0.25)"], "holeDiameterV3": "5 mm", "endStyleV2": "THROUGH" } }));
+    assert_eq!(h2["feature_status"]["message"], "Parameters have been overridden. Check input.", "{h2}");
+    assert!((radius_at(&mut ctx, 45.0) - 2.5).abs() < 1e-3, "5 mm over the 1/4 size: {}", radius_at(&mut ctx, 45.0));
+}
+
 /// Revision history's Export (live rel-rh-export): a Part Studio's parts as they are in a version, the workspace
 /// left as it is.
 #[test]

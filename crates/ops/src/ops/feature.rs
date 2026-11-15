@@ -246,6 +246,13 @@ pub fn ops() -> Vec<Op> {
 fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> bool) {
     use noshape_model::features::hole_tables as ht;
     use noshape_model::params::ParamValue;
+    // A size the caller gives is theirs, a schema default's value too (5 mm): not replaced by the Standard's size
+    // (the hole then reads as one whose values were set; Onshape's "Parameters have been overridden. Check input."
+    // where they differ from a size also given).
+    const DIMS: [&str; 6] = ["holeDiameterV3", "tapDrillDiameterV3", "cBoreDiameterV3", "cBoreDepthV3", "cSinkDiameterV3", "cSinkAngleV3"];
+    if !set(ht::TABLE_SYNCED_PARAM) && DIMS.iter().any(|k| set(k)) {
+        feature.params.set(ht::TABLE_SYNCED_PARAM, ParamValue::Bool(true));
+    }
     // A Standard given without Units: the tab that shows it.
     if !set("unitsSystem") {
         if set("isoHoleTableEx") || set("isoHoleTable") {
