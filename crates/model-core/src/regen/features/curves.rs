@@ -55,6 +55,10 @@ pub(crate) fn helix_frame(ev: &EvalCtx) -> FResult<(DVec3, DVec3, DVec3, f64, f6
             let Some(e) = curve_edges(ev, ev.query("edge")).ok().and_then(|v| v.into_iter().next()) else { return no_circle() };
             let k::Curve::Circle { center, axis, x_dir, radius } = e.edge_curve()? else { return no_circle() };
             let z = if opposite { -axis } else { axis };
+            // An extruded sketch circle's edge starts where the sketch circle does, at the sketch's x, as Parasolid's
+            // cap edge keeps the sketch circle (asm-hand-drill-pinslot studio bb72f3's Helix 1); ours sits on the
+            // cylinder's seam.
+            let x_dir = ev.query("edge").first().and_then(|r| sketch_x_of_edge(ev, r, axis)).unwrap_or(x_dir);
             (center, z.normalize(), x_dir, radius, 0.0, None)
         }
         _ => {
@@ -871,6 +875,21 @@ fn chain_split_pieces(split: &Shape, tools: &[Shape]) -> FResult<Vec<Shape>> {
 // ------------------------------------------------------------------ isocline / offset curve
 
 /// Offset curve on planar faces (geodesic = Euclidean on a plane).
+/// The x of the sketch whose curve an edge's face was swept from (the edge between an extrusion's side and a cap),
+/// square to `axis`; None for other edges.
+fn sketch_x_of_edge(ev: &EvalCtx, r: &Reference, axis: DVec3) -> Option<DVec3> {
+    use crate::reference::{Role, Source, TopoName};
+    let Reference::Edge(TopoName::Edge { faces, .. }) = r else { return None };
+    let sketch = faces.iter().find_map(|f| match f.as_ref() {
+        TopoName::Face { role: Role::Side(Source::Sketch { sketch, .. }), .. } => Some(*sketch),
+        _ => None,
+    })?;
+    let frame = ev.ctx.sketch(sketch)?.frame;
+    let a = axis.normalize();
+    let x = frame.x - a * frame.x.dot(a);
+    (x.length() > 1e-9).then(|| x.normalize())
+}
+
 pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
     let split = ev.is("scope", "OFFSET_EXTEND_AND_SPLIT");
     let extend = split || ev.is("scope", "OFFSET_AND_EXTEND");

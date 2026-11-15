@@ -357,6 +357,47 @@ fn helix_on_a_sketch_circle() {
     assert!(near(len, expected, expected * 1e-6), "length {len} vs {expected}");
 }
 
+/// An extruded circle's edges run from 0 round its cylinder's seam (qa's rust-zero-solid-f197: kept on the sketch
+/// circle's frame, trimmed to [a, a + 2π], they made Fillet 1 fail): a Ø25.8 circle on each datum plane extruded 10 mm
+/// either way, both its circular edges filleted R1.
+#[test]
+fn an_extruded_circles_edges_start_at_zero_and_fillet() {
+    for plane in [DatumPlane::Top, DatumPlane::Front, DatumPlane::Right] {
+        for opposite in [false, true] {
+            let mut s = Studio::new();
+            let mut sk = noshape_sketch::Sketch::new();
+            sk.add_circle(DVec2::new(0.003, 0.002), 0.0129);
+            let sid = s.sketch(Reference::Plane(plane), sk);
+            let r = s.regen();
+            let key = r.display.sketches.iter().find(|x| x.feature == sid).unwrap().regions[0].key.clone();
+            s.add("extrude", move |p| {
+                p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
+                p.set("depth", expr("10 mm"));
+                p.set("oppositeDirection", ParamValue::Bool(opposite));
+            });
+            let r = s.ok();
+            let b = r.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).expect("the disc");
+            let circles: Vec<usize> = b.shape.edges().iter().enumerate().filter(|(_, e)| e.edge_info().is_ok_and(|i| matches!(i.curve, noshape_kernel::Curve::Circle { .. }))).map(|(i, _)| i).collect();
+            assert_eq!(circles.len(), 2);
+            for &i in &circles {
+                let info = b.shape.edges()[i].edge_info().unwrap();
+                assert!(info.first_param.abs() < 1e-12 && (info.last_param - 2.0 * PI).abs() < 1e-12, "{plane:?} {opposite}: {} .. {}", info.first_param, info.last_param);
+            }
+            let edges: Vec<Reference> = circles.iter().map(|&i| Reference::Edge((*b.edges[i]).clone())).collect();
+            s.add("fillet", move |p| {
+                p.set("entities", ParamValue::Query(edges));
+                p.set("radius", expr("1 mm"));
+            });
+            let r = s.ok();
+            let v = r.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).unwrap().shape.volume().unwrap() * 1e9;
+            // Each rounded rim takes (1 − π/4)·f² of the section, its centroid f(10 − 3π)/(12 − 3π) in from the rim.
+            let (rr, h, f) = (12.9f64, 10.0f64, 1.0f64);
+            let want = PI * rr * rr * h - 2.0 * 2.0 * PI * (rr - f * (10.0 - 3.0 * PI) / (12.0 - 3.0 * PI)) * (1.0 - PI / 4.0) * f * f;
+            assert!((v - want).abs() < 0.5, "{plane:?} {opposite}: {v} mm³, {want}");
+        }
+    }
+}
+
 /// Helix › Circle on an extruded circle's edge starts at the sketch circle's x, as Parasolid's cap edge keeps the
 /// sketch circle (asm-hand-drill-pinslot studio bb72f3's Helix 1, live: at +x; ours started at -x, the cylinder's x).
 #[test]
