@@ -8,7 +8,36 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
-## Now (asm, 2026-11-15 01:50 UTC)
+## Now (asm, 2026-11-15 13:48 UTC)
+- Landed since 01:50: a press drags a part before its hover arrived (952fb14b), the parity translator's CENTER on a face
+  with a second id (71e05820) and its face Z only across the circle's axis (790ecad5): infento-subs 157 -> 178/198 mates
+  with core's Extrude 51 fix.
+- In this change: the translator carries a mate connector's own Flip primary / secondary axis / Move onto its mate end
+  (infento Fastened 18's Mate connector 1, 20 mm; not when it realigns to other entities, xdev-subs), reads a POINT
+  picked on a face (the vertex, Z along the face: Planar 15), pairs live's matedEntities with picks by occurrence (a
+  mate to the origin or one live can't resolve lists one); a torus's / sphere's / revolved face's axis points sit on its
+  axis (the tyre, Fastened 24; the UI offers none there); a pre-V1900 Hole whose counterbore is as wide as the hole is a
+  plain hole (handed to core, queued as 2aa59682); instances are known by (level, id): asm-suspension's Upper and Lower
+  Control Arm reuse six instance ids from two Part Studios (dba3f8 / dbd26f), one read as the other (suspension 4 -> 6/6
+  mates).
+- infento on live's 09:00 refetch: 144/167 occurrences, 176/182 mates, the same as main before this change (14
+  occurrences lost to the refetch: 1dc32b's Fillet 3 now resolves, its Chamfer 3 doesn't translate, with dx); this
+  change brings the parts our mates would move off live's place from 61 to 3. Left: 1dc32b connectors with dx/core (the
+  pulley, 1440 mm, and Sub dfc972's Composite part 7, 1272 mm); f0eedd Planar 10 / 11, Revolute 10 (Part 7's MID_POINT
+  face reads with normal z where live's Z is -x, then doesn't resolve on the occurrence); Planar 23 / 24 / 102 are live
+  errors (live resolves only one end) we solve.
+- An A/B's "before" must be built from the same base: land.sh rebases the worktree (my s16 was older main and made
+  core's and live's changes look like mine for two runs).
+- Runs ending `EXIT 143` are earlyoom's SIGTERM when others' builds land on the host mid-run (journalctl -u earlyoom):
+  rerun on the host with the most memory available. A/B against main at the same base (vibe7 ~/agents/asm-keep/abb,
+  ab21): suspension 4 -> 6/6 mates; isaac-ball, corexy, config-assembly, xdev-subs, clamp-pattern, robotic-arm,
+  bjr-config, hand-drill-pinslot, keyboard-pattern unchanged.
+- Also: an instance of another document's part lists Where used… after Export… (psui, live2
+  context-create-version-update), opening its Where used in the linked document.
+- suspension left: Studio 310e77's Extrude 1 (its up-to face's feature not built: Shock Mount Bracket not inserted),
+  805e29 Extrude 4 / dba3f8 Sketch 8's geometry (3 parts off): studio translation (dx).
+
+## Earlier (asm, 2026-11-15 01:50 UTC)
 - Landed since 15:40: the MID_POINT translator fix, the screen-constant triad, Derived mirror copies named
   "<part>-Mirrored <n>", the ring menu's View normal to over a face (live re-recorded rotate-90 / -180 / anti-align
   with the camera; all four triad takes match), conflict attribution by loops (a mate hanging off the conflicting
