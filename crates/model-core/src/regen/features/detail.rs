@@ -758,6 +758,17 @@ pub(super) fn law_hermite(ends: (f64, f64), points: &mut Vec<(f64, f64)>, smooth
 
 /// The edge's normalized parameter (0 at its start) at `p` when `p` lies on it (within 1e-6 of its length).
 fn param_on_edge(edge: &k::Shape, info: &k::EdgeInfo, p: glam::DVec3) -> Option<f64> {
+    // A line's in closed form (the search below took ~400 bridge calls a point: c2-tpd-fillet-variable's Fillet 1,
+    // 51320 of them, 12.6 ms).
+    if let k::Curve::Line { .. } = info.curve {
+        let d = info.end - info.start;
+        let len2 = d.length_squared();
+        if len2 <= 0.0 {
+            return None;
+        }
+        let f = ((p - info.start).dot(d) / len2).clamp(0.0, 1.0);
+        return ((info.start + d * f - p).length() <= 1e-6 * info.length.max(1e-9)).then_some(f);
+    }
     let (t0, t1) = (info.first_param, info.last_param);
     let at = |f: f64| edge.point_at(t0 + (t1 - t0) * f).ok().map_or(f64::INFINITY, |q| (q - p).length());
     let n = 256;
