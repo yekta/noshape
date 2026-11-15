@@ -749,6 +749,7 @@ pub(crate) mod ffi {
         /// Which way this thread's last op_shell_solid built its shell: "regions", "offset", "slabs".
         fn last_shell_path() -> String;
         fn op_unify_whole(s: &OcShape) -> Result<OpOut>;
+        fn op_unify_precise(s: &OcShape) -> Result<OpOut>;
         /// NOSHAPE_KERNEL_PROFILE: prints the calls since the last mark under `label` and starts again (an empty
         /// label: only starts again).
         fn kernel_profile_mark(label: &str);

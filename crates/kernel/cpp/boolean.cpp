@@ -3445,6 +3445,9 @@ bool valid_whole(const TopoDS_Shape& s)
   return BRepCheck_Analyzer(s, true, tight).IsValid();
 }
 
+// Whether this thread's unify is op_unify_precise's (merge_cylinder_groups' volume check by the segmented integrals).
+thread_local bool t_precise_cylinder_merge = false;
+
 // Faces on one cylinder whose frames differ (seams apart, either hand: a hole through a boss in a mirrored plate,
 // the plate's two half walls and the boss's), or any such faces with `any_frame` (after USD: those it left apart),
 // sharing edges, the group's edges used once two closed chains round it or one loop on a part of it: OCCT's unify
@@ -3635,18 +3638,16 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
         Bnd_Box box;
         BRepBndLib::Add(s, box, false);
         const double bv = box.IsVoid() ? 0 : std::pow(std::sqrt(box.SquareExtent()), 3);
-        // (OCCT's integrals; where they disagree and a curve of the face's isn't a line or conic, the segmented ones about
-        // the box's middle: GProp is loose on faces a Boolean's B-spline intersection curves bound, c2-impeller-loft's
-        // chamfer 26, 2.9 mm³ off. Faces of lines and circles keep its verdict, as OCCT's unify.)
+        // (OCCT's integrals; in op_unify_precise's unify, where they disagree, the segmented ones about the box's
+        // middle: GProp is loose on faces a Boolean's B-spline intersection curves bound, c2-impeller-loft's chamfer 26,
+        // 2.9 mm³ off. Elsewhere its verdict, as OCCT's unify: knurl grooves' cylinder pieces merged by the segmented
+        // check changed the Booleans' results.)
         if (std::abs(faces_volume({F.Oriented(a.Orientation())}) - faces_volume(before)) > 1e-9 * bv)
         {
-          bool free_curve = false;
-          for (TopExp_Explorer x(F, TopAbs_EDGE); x.More() && !free_curve; x.Next())
-            free_curve = BRepAdaptor_Curve(TopoDS::Edge(x.Current())).GetType() > GeomAbs_Parabola;
           double x0, y0, z0, x1, y1, z1;
           box.Get(x0, y0, z0, x1, y1, z1);
           const gp_XYZ o(0.5 * (x0 + x1), 0.5 * (y0 + y1), 0.5 * (z0 + z1));
-          if (!free_curve || std::abs(faces_volume_precise({F.Oriented(a.Orientation())}, o) - faces_volume_precise(before, o)) > 1e-9 * bv)
+          if (!t_precise_cylinder_merge || std::abs(faces_volume_precise({F.Oriented(a.Orientation())}, o) - faces_volume_precise(before, o)) > 1e-9 * bv)
             return false;
         }
         HHist h = rs->History();
@@ -9539,6 +9540,18 @@ thread_local const char* t_unify_path = "";
 } // namespace
 
 rust::String last_unify_path() { return rust::String(t_unify_path); }
+
+OpOut op_unify_precise(const OcShape& s)
+{
+  struct Flag
+  {
+    Flag() { t_precise_cylinder_merge = true; }
+    ~Flag() { t_precise_cylinder_merge = false; }
+    Flag(const Flag&)            = delete;
+    Flag& operator=(const Flag&) = delete;
+  } flag;
+  return op_unify(s);
+}
 
 OpOut op_unify_whole(const OcShape& s)
 {

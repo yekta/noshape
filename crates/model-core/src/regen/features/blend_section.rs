@@ -2612,7 +2612,8 @@ pub fn rim_chamfer_cut(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: k::Ch
         return Ok(false);
     }
     let cut = NamedShape::new(cut, names);
-    let un = k::unify_same_domain(&cut.shape)?;
+    // (The stop face's pieces the cut leaves merge with it: their curves are the cut's B-spline sections.)
+    let un = k::unify_same_domain_precise(&cut.shape)?;
     if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
         return Ok(false);
     }

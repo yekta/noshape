@@ -995,6 +995,7 @@ size_t                   set_budget_scope(size_t flag);
 rust::String             last_unify_path();
 rust::String             last_shell_path();
 OpOut                    op_unify_whole(const OcShape& s);
+OpOut                    op_unify_precise(const OcShape& s);
 rust::String             last_boolean_path();
 void                     kernel_profile_mark(rust::Str label);
 void                     set_kernel_profile(bool on);

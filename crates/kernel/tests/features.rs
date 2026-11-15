@@ -240,7 +240,7 @@ fn a_lofts_added_vertices_stay_for_good() {
 /// tube's side at 20°, of the tube end's arc and two 0.31 mm spline edges meeting it at 8.9°, which OCCT's chamfer
 /// can't build, as a cut by rim_chamfer's tool. The strips' chamfers run on along their spline to Part 3's cylinder, as
 /// live's (q2985c): the mitres at (5, ±2.59, -41.7795) mm, the run-on ends at (5, ±0.6138, -43.4532), 120.04 mm³ off
-/// (ours 119.67: the run-on's spline taken on past its end).
+/// (ours 119.67: the run-on's spline taken on past its end), three faces more.
 #[test]
 fn a_tube_ends_offset_chamfer_runs_on_to_the_face_beyond_as_live() {
     let _ = set_working_scale(1000.0);
@@ -265,6 +265,10 @@ fn a_tube_ends_offset_chamfer_runs_on_to_the_face_beyond_as_live() {
         let at = DVec3::new(5.0, y, z) * 1e-3;
         assert!(cut.vertices().iter().any(|v| v.vertex_point().is_ok_and(|p| p.distance(at) < 5e-6)), "no vertex near (5, {y}, {z}) mm");
     }
+    // The stop cylinder's pieces round the run-ons one face again: three faces more, as live's 30 -> 33.
+    let un = unify_same_domain_precise(&cut).unwrap().shape;
+    assert!(un.is_valid());
+    assert_eq!(un.count(ShapeType::Face), s.count(ShapeType::Face) + 3);
 }
 
 /// The impeller's Loft Gehäuse, a unit `mm` long: its sketches' circle (in two arcs) to the flange's D, Normal to

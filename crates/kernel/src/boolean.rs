@@ -501,6 +501,13 @@ pub fn unify_same_domain_whole(shape: &Shape) -> Result<OpResult> {
     Ok(OpResult::from_ffi(ck(ffi::op_unify_whole(shape.raw()))?))
 }
 
+/// [`unify_same_domain`] whose merges of faces on one cylinder bounded by B-spline curves are checked by the precise
+/// face integrals where OCCT's disagree (a cut's pieces of a cylinder, c2-impeller-loft's chamfer 26: OCCT's were
+/// 2.9 mm³ off); elsewhere OCCT's verdict stands (knurl grooves' pieces).
+pub fn unify_same_domain_precise(shape: &Shape) -> Result<OpResult> {
+    Ok(OpResult::from_ffi(ck(ffi::op_unify_precise(shape.raw()))?))
+}
+
 /// Which way this thread's last [`unify_same_domain`] went: "known" (an
 /// earlier unify found nothing to merge in the shape), "scoped" (a local
 /// Boolean's result: only where it changed the part), "whole".
