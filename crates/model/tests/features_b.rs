@@ -1766,3 +1766,17 @@ fn an_edge_on_circle_projects_to_an_exact_line() {
         assert!(exact(a.x, c.x) && exact(b.x, c.x) && exact(lo, ends[0]) && exact(hi, ends[1]), "{name}: {a:?} {b:?}");
     }
 }
+
+/// Move boundary with nothing selected marks its "Surface or boundary edges" field whatever the end condition, as
+/// live does with Up to part/surface, Up to face and Up to vertex (psui's move-boundary-up-to-* scenarios, step 3).
+#[test]
+fn move_boundary_with_nothing_selected_marks_its_selection_with_any_end_condition() {
+    for cond in ["BLIND", "UP_TO_BODY", "UP_TO_FACE", "UP_TO_VERTEX"] {
+        let mut s = Studio::new();
+        s.add("extendSurface", move |p| p.set("endCondition", ParamValue::Enum(cond.into())));
+        let r = s.regen();
+        let st = r.display.features.last().unwrap();
+        assert_eq!(st.status, FeatureStatus::Error, "{cond}");
+        assert_eq!(st.faulty, vec!["entities".to_string()], "{cond}: {:?}", st.message);
+    }
+}

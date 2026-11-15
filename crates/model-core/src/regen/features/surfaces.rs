@@ -325,9 +325,6 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
 // ------------------------------------------------------------------ move boundary
 
 pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
-    if !ev.is("endCondition", "BLIND") {
-        return err("Move boundary currently supports only the Blind end condition");
-    }
     let refs = ev.query("entities");
     let mut bodies: Vec<usize> = Vec::new();
     // Edges picked per body (a whole body picked: all its boundary edges).
@@ -352,8 +349,12 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
     }
     bodies.sort_unstable();
     bodies.dedup();
+    // (The selection first, whatever the end condition: live marks the empty field with Up to part/surface too.)
     if bodies.is_empty() {
         return crate::regen::eval::err_at(&["entities"], "Select a surface or boundary edges to move.");
+    }
+    if !ev.is("endCondition", "BLIND") {
+        return err("Move boundary currently supports only the Blind end condition");
     }
     let d = ev.length("extendDistance")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 };
     for bi in bodies {
