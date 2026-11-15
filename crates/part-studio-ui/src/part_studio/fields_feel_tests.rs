@@ -149,6 +149,19 @@ fn rows() -> Vec<Row> {
             let open = cx.update(|cx| dialog.read(cx).ui_list().is_some());
             expect((open, cx.update(|cx| view.read(cx).edit.is_some())), (false, true), "(list open, dialog open)")
         } },
+        Row { id: "right press: no menu, the field takes the keyboard; one Esc cancels", live: "live2 11-15 (dialog-number-rclick-menu): no menu, Chrome's or Onshape's; Depth focused, all selected; Esc closes the dialog", gap: false, check: |cx| {
+            let (window, view, _dialog) = edit_extrude(cx, "fl-rpress");
+            draw(cx, window);
+            let at = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("numf-depth").ok_or("no Depth field")?.center();
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::none() });
+            vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Right, position: at, modifiers: Modifiers::none(), click_count: 1, first_mouse: false });
+            vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Right, position: at, modifiers: Modifiers::none(), click_count: 1 });
+            draw(cx, window);
+            let menu = cx.update(|cx| crate::os_menu::is_open(cx));
+            keys(cx, window, &["escape"]);
+            expect((menu, cx.update(|cx| view.read(cx).edit.is_some())), (false, false), "(menu open, dialog open after Esc)")
+        } },
     ]
 }
 

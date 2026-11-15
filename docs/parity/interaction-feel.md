@@ -579,7 +579,7 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft angle). part-studio-ui
 `fields::the_fields_matrix_matches_live` (T1, no GPU) on the block start.
 
-**Matched: 9 / 9** (11-14 00:33 UTC; 6 / 9 at the first run).
+**Matched: 10 / 10** (11-15 20:06 UTC: the right press row added and fixed; 9 / 9 at 11-14 00:33 UTC; 6 / 9 at the first run).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -592,6 +592,7 @@ live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft an
 | Arrow keys | Up +1 unit, Down −1, Shift+Up +10, Alt+Up as Up | Alt+Up did nothing (the text field's own Alt move); now a step | = (fixed) |
 | Autocomplete | "1 m": m, max( x , y ), min( x , y ), mm; "1 i": in, isInteger( x ) | the same (its rows as drawn) | = |
 | Autocomplete's Esc | closes the list only | the same | = |
+| Right press (live2 11-15, dialog-number-rclick-menu) | no menu, Chrome's or Onshape's; the field takes the keyboard, all selected; one Esc cancels the dialog | the input's Cut / Copy / Paste opened and took that Esc; now no menu | = (fixed) |
 | Not yet in the matrix | Ctrl+Up ×0.1 (an existing test), the wheel over a focused field, the "#" list's New variable… and its popover, Tab taking the highlighted entry | – | – |
 
 ## Feedback (matrix, Part Studio rows)

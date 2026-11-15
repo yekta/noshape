@@ -1593,6 +1593,11 @@ impl FeatureDialog {
             return i.clone();
         }
         let state = cx.new(|cx| InputState::new(window, cx).default_value(initial.to_string()));
+        // A number field has no right-click menu (live dialog-number-rclick-menu, live2 11-15: neither Chrome's nor
+        // Onshape's; the press only gives it the keyboard, so one Esc then cancels the dialog).
+        if self.spec_for_path(path).is_some_and(|s| matches!(s.kind, ParamKind::Num(_))) {
+            state.update(cx, |s, _| s.set_context_menu_enabled(false));
+        }
         // The text before any typing (a field focused on opening is never drawn unfocused to record it).
         self.baselines.entry(path.to_string()).or_insert_with(|| initial.to_string());
         // A text field marked for initial focus (Variable's Name) takes the
