@@ -348,7 +348,7 @@ impl Shape {
 
     /// Area of a face / total area of all faces.
     pub fn area(&self) -> Result<f64> {
-        Ok(ck(ffi::props_surface(self.raw()))?.mass)
+        ck(ffi::area_fast(self.raw()))
     }
 
     /// Area centroid of a face (or set of faces).

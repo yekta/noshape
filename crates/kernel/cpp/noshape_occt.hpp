@@ -870,6 +870,7 @@ double                   set_blend_budget(double seconds);
 PropsF                   props_volume_precise(const OcShape& s);
 double                   max_edge_tolerance(const OcShape& s);
 PropsF                   props_surface(const OcShape& s);
+double                   area_fast(const OcShape& s);
 PropsF                   props_linear(const OcShape& s);
 PropsF                   props_bounds(const OcShape& s, uint8_t kind);
 DistanceF                min_distance(const OcShape& a, const OcShape& b);

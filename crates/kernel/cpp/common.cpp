@@ -51,6 +51,15 @@ extern "C" char etext;
 #include <Geom2d_Curve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
 #include <Geom2d_BSplineCurve.hxx>
+#include <Geom_SurfaceOfLinearExtrusion.hxx>
+#include <Geom_SurfaceOfRevolution.hxx>
+#include <Geom_ElementarySurface.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
+#include <Geom_ToroidalSurface.hxx>
+#include <Geom_CylindricalSurface.hxx>
+#include <Geom_SphericalSurface.hxx>
+#include <Geom_ConicalSurface.hxx>
+#include <Geom_OffsetSurface.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepLProp_CLProps.hxx>
 #include <BRepAdaptor_Surface.hxx>
@@ -2079,6 +2088,124 @@ GProp_GProps surface_props(const TopoDS_Shape& s)
     out.Add(MomentProps(face_moments(f, false)));
   }
   return out;
+}
+
+// A face's area where its surface's area element is a function of one parameter alone: g(v) du dv on a surface turned
+// about an axis by u (a plane, cylinder, cone, sphere, torus, surface of revolution, or an offset of one), h(u) du dv
+// on an extrusion (or an offset of one). By Green's theorem the area is then the integral of u g(v) dv (-v h(u) du)
+// round its boundary, along its curves on the face: g read off the surface at the face's first u (OCCT's adaptive
+// integral of a revolved round's corner 7 ms, an offset of one 13-25: cf-snap-hook's qLargest over 200 faces, 33
+// times quicker). -1 for another surface, a boundary with gaps, or one that doesn't close in the face's parameters.
+static double revolved_area(const TopoDS_Face& face)
+{
+  const TopoDS_Face         f = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
+  TopLoc_Location           loc;
+  occ::handle<Geom_Surface> S = BRep_Tool::Surface(f, loc);
+  // (Not across gaps in its boundary: face_moments closes them as Parasolid, by straight (u, v) segments.)
+  if (S.IsNull() || !uv_gaps(f).empty())
+    return -1;
+  auto untrimmed = [](occ::handle<Geom_Surface> x) {
+    while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(x))
+      x = t->BasisSurface();
+    return x;
+  };
+  S = untrimmed(S);
+  occ::handle<Geom_Surface> base = S;
+  if (const occ::handle<Geom_OffsetSurface> o = occ::down_cast<Geom_OffsetSurface>(S))
+    base = untrimmed(o->BasisSurface());
+  bool by_v;
+  if (occ::down_cast<Geom_ElementarySurface>(base) || occ::down_cast<Geom_SurfaceOfRevolution>(base))
+    by_v = true;
+  else if (occ::down_cast<Geom_SurfaceOfLinearExtrusion>(base))
+    by_v = false;
+  else
+    return -1;
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  const auto g = [&](double x) {
+    gp_Pnt P;
+    gp_Vec Su, Sv;
+    S->D1(by_v ? u0 : x, by_v ? x : v0, P, Su, Sv);
+    return Su.Crossed(Sv).Magnitude();
+  };
+  // (u g(v) v' (v h(u) u') along a curve on the face: 8 Gauss points on each of 8 pieces of each span between its
+  // knots; the closing check's g(v) v' alike.)
+  const std::vector<double> breaks = surface_breaks(BRepAdaptor_Surface(f, false), !by_v);
+  double                    sum = 0, closing = 0, scale = 0;
+  auto                      along = [&](const std::function<gp_Pnt2d(double, gp_Vec2d&)>& c, const std::vector<double>& cuts) {
+    for (size_t i = 0; i + 1 < cuts.size(); ++i)
+      for (int k = 0; k < 8; ++k)
+      {
+        const double a = cuts[i] + (cuts[i + 1] - cuts[i]) * k / 8, b = cuts[i] + (cuts[i + 1] - cuts[i]) * (k + 1) / 8;
+        for (int j = 0; j < 8; ++j)
+        {
+          gp_Vec2d       d;
+          const gp_Pnt2d p  = c(a + (b - a) * (kGaussX[j] + 1) / 2, d);
+          const double   w  = kGaussW[j] * (b - a) / 2;
+          const double   gv = by_v ? g(p.Y()) * d.Y() : g(p.X()) * d.X();
+          sum += w * (by_v ? p.X() : p.Y()) * gv;
+          closing += w * gv;
+          scale += std::abs(w * gv);
+        }
+      }
+  };
+  for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(ee.Current());
+    if (e.Orientation() == TopAbs_INTERNAL || e.Orientation() == TopAbs_EXTERNAL)
+      continue;
+    double                          a, b;
+    const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, f, a, b);
+    if (c.IsNull())
+      return -1;
+    std::vector<double> cuts{a, b};
+    occ::handle<Geom2d_Curve> basis = c;
+    while (const occ::handle<Geom2d_TrimmedCurve> tc = occ::down_cast<Geom2d_TrimmedCurve>(basis))
+      basis = tc->BasisCurve();
+    if (const occ::handle<Geom2d_BSplineCurve> bs = occ::down_cast<Geom2d_BSplineCurve>(basis))
+      for (int k = 1; k <= bs->NbKnots(); ++k)
+        if (bs->Knot(k) > a && bs->Knot(k) < b)
+          cuts.push_back(bs->Knot(k));
+    // (And where it crosses the surface's knots across g's parameter: g only C1 or C0 there.)
+    for (const double kv : breaks)
+      for (int k = 0; k < 64; ++k)
+      {
+        double       x = a + (b - a) * k / 64, y = a + (b - a) * (k + 1) / 64;
+        const auto   at = [&](double t) { const gp_Pnt2d q = c->Value(t); return (by_v ? q.Y() : q.X()) - kv; };
+        const double fx = at(x);
+        if (!(fx * at(y) < 0))
+          continue;
+        for (int it = 0; it < 60; ++it)
+        {
+          const double m = 0.5 * (x + y);
+          ((at(m) < 0) == (fx < 0) ? x : y) = m;
+        }
+        cuts.push_back(0.5 * (x + y));
+      }
+    std::sort(cuts.begin(), cuts.end());
+    if (e.Orientation() == TopAbs_REVERSED)
+      std::reverse(cuts.begin(), cuts.end());
+    along([&](double t, gp_Vec2d& d) { gp_Pnt2d p; c->D1(t, p, d); return p; }, cuts);
+  }
+  if (!(scale > 0) || std::abs(closing) > 1e-9 * scale)
+    return -1;
+  const double k = loc.IsIdentity() ? 1.0 : loc.Transformation().ScaleFactor();
+  return std::abs(sum) * k * k;
+}
+
+// The area of `s`'s faces: revolved_area's where it has one, else the surface properties' mass.
+double area_fast(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  if (has_mesh_faces(s.shape))
+    return surface_props(s.shape).Mass();
+  double total = 0;
+  for (TopExp_Explorer x(s.shape, TopAbs_FACE); x.More(); x.Next())
+  {
+    const double a = revolved_area(TopoDS::Face(x.Current()));
+    total += a >= 0 ? a : surface_props(x.Current()).Mass();
+  }
+  return total;
 }
 
 static bool self_intersects_unbudgeted(const TopoDS_Shape& shape);

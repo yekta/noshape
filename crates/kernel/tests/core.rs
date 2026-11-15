@@ -256,6 +256,33 @@ fn mass_properties_box() {
     assert!(close(d.distance, 3.0, 1e-9));
 }
 
+/// A face's area by its boundary's line integral (a plane's, cylinder's, cone's, sphere's or torus's, a surface of
+/// revolution's, an offset of one): the primitives' closed forms, and a rounded box's offset faces as the surface
+/// properties' integral.
+#[test]
+fn face_areas_by_their_boundary() {
+    let sum = |s: &Shape| s.faces().iter().map(|f| f.area().unwrap()).sum::<f64>();
+    let ball = make_sphere(&Plane::xy(), 2.0, 2.0 * PI).unwrap();
+    assert!(close(sum(&ball), 4.0 * PI * 4.0, 1e-12), "{}", sum(&ball));
+    let ring = make_torus(&Plane::xy(), 3.0, 1.0, 2.0 * PI).unwrap();
+    assert!(close(sum(&ring), 4.0 * PI * PI * 3.0, 1e-12), "{}", sum(&ring));
+    let can = make_cylinder(&Plane::xy(), 1.5, 2.0, 2.0 * PI).unwrap();
+    assert!(close(sum(&can), 2.0 * PI * 1.5 * 2.0 + 2.0 * PI * 1.5 * 1.5, 1e-12), "{}", sum(&can));
+    // (A cone frustum's side: pi (r1 + r2) times its slant.)
+    let cone = make_cone(&Plane::xy(), 2.0, 1.0, 3.0, 2.0 * PI).unwrap();
+    let side = PI * 3.0 * (1.0f64 + 9.0).sqrt();
+    assert!(close(sum(&cone), side + PI * 4.0 + PI, 1e-12), "{}", sum(&cone));
+    let b = make_box(&Plane::xy(), 4.0, 3.0, 2.0).unwrap();
+    let rounded = fillet(&b, &b.edges(), 0.4).unwrap().shape;
+    let grown = offset_shape(&rounded, 0.25, JoinType::Arc).unwrap().shape;
+    for s in [&rounded, &grown] {
+        for f in s.faces() {
+            let (a, p) = (f.area().unwrap(), surface_properties(&f).unwrap().mass);
+            assert!(close(a, p, 1e-9), "{a} against {p}: {:?}", f.face_surface().map(|x| std::mem::discriminant(&x)));
+        }
+    }
+}
+
 /// Measure's minimum distance between two parts (part_distance: boxes, coarse meshes, exact pairs) as BRepExtrema's
 /// whole-shape one: face to face, edge to edge, apart, a cylinder lying near a box, a ball off a box's corner, a ring
 /// round a box; the points on their parts and that far apart.
