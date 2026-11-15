@@ -72,6 +72,32 @@ fn kind_runs<T: PartialEq + Clone, S>(v: [&[Option<T>]; 3], mk: impl Fn([std::op
     out
 }
 
+/// A view's edges lying on one another (two parts' coincident edges: a pin in its hole) written once, as live's
+/// exports (drw-bom-table: one circle); the sheet keeps both for picking.
+fn drop_coincident_edges(g: &mut SheetGeometry) {
+    let q = |p: [f64; 2]| ((p[0] * 1e5).round() as i64, (p[1] * 1e5).round() as i64);
+    for (_, r) in g.view_edges.clone() {
+        // (Point count and the ends, in 10 nm steps, lower first.)
+        type Key = (usize, (i64, i64), (i64, i64));
+        let mut seen: std::collections::HashMap<Key, Vec<usize>> = std::collections::HashMap::new();
+        let n = g.lines.len();
+        for li in r.filter(|i| *i < n) {
+            let pts = g.lines[li].points.clone();
+            let (Some(a), Some(b)) = (pts.first(), pts.last()) else { continue };
+            let (a, b) = (q(*a).min(q(*b)), q(*a).max(q(*b)));
+            let same = |o: &[[f64; 2]]| o.len() == pts.len() && (o.iter().zip(&pts).all(|(x, y)| (x[0] - y[0]).abs() < 1e-5 && (x[1] - y[1]).abs() < 1e-5) || o.iter().zip(pts.iter().rev()).all(|(x, y)| (x[0] - y[0]).abs() < 1e-5 && (x[1] - y[1]).abs() < 1e-5));
+            let key = (pts.len(), a, b);
+            let style = g.lines[li].style;
+            let dup = seen.get(&key).is_some_and(|ls| ls.iter().any(|&o| g.lines[o].style == style && same(&g.lines[o].points)));
+            if dup {
+                g.lines[li].points.clear();
+            } else {
+                seen.entry(key).or_default().push(li);
+            }
+        }
+    }
+}
+
 /// A two-point line's ends moved in by `a` and `b` (mm), as long as some of it is left.
 fn inset_ends(pts: &mut [[f64; 2]], a: f64, b: f64) {
     let [p, q] = pts else { return };
@@ -102,6 +128,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
             inset_ends(&mut l.points, a, b);
         }
     }
+    drop_coincident_edges(&mut out);
     out.colors.clear();
     out.backdrops = g.backdrops.iter().filter_map(|(p, c)| tone(Some(*c)).map(|c| (p.clone(), c))).collect();
     let mut lc: Vec<Option<[u8; 3]>> = (0..g.lines.len()).map(|i| tone(g.line_color(i))).collect();
@@ -1220,6 +1247,21 @@ pub fn zip_store(files: &[(String, Vec<u8>)]) -> Vec<u8> {
 mod tests {
     use super::*;
     use crate::drawing::{DimOrientation, Sheet};
+
+    /// Live drw-bom-table.dxf: a pin's edge on its hole's (two parts, one circle) is written once; edges merely
+    /// touching stay.
+    #[test]
+    fn coincident_view_edges_are_written_once() {
+        use crate::drawing::sheet::LineStyle;
+        let mut g = SheetGeometry::new(420.0, 297.0);
+        g.line([10.0, 10.0], [50.0, 10.0], LineStyle::Visible);
+        g.line([50.0, 10.0], [10.0, 10.0], LineStyle::Visible);
+        g.line([50.0, 10.0], [90.0, 10.0], LineStyle::Visible);
+        g.view_edges.push((crate::drawing::ViewId(1), 0..3));
+        let p = prepare(&g, &ExportOptions::default());
+        assert_eq!(p.lines.iter().map(|l| l.points.len()).collect::<Vec<_>>(), [2, 0, 2]);
+        assert_eq!(g.lines[1].points.len(), 2, "the sheet keeps both");
+    }
 
     /// Live drw-inspection-item.pdf / .dxf: on paper a dimension's line runs between its arrows' bases; the sheet
     /// keeps it to the tips.
