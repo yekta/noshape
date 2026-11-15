@@ -1239,6 +1239,10 @@ enum Support {
     Plane { o: DVec3, n: DVec3 },
     Cylinder { o: DVec3, a: DVec3, r: f64, s: f64 },
     Face(Shape, f64),
+    /// A B-spline face by its own surface: each foot by Newton's method from the last one (the ball's centres move
+    /// little from section to section; a bridge projection each took ~0.4 ms on c2-hunting-knife's lofted handle, 3772
+    /// of them in Fillet 8), the first one the face's projection. `s`: the inward side of the surface's du x dv.
+    Nurbs { face: Shape, n: std::sync::Arc<k::NurbsSurface>, s: f64, last: std::sync::Arc<std::sync::Mutex<Option<glam::DVec2>>> },
 }
 
 impl Support {
@@ -1255,6 +1259,15 @@ impl Support {
                 let s = if (v - a * v.dot(a)).dot(inward) < 0.0 { -1.0 } else { 1.0 };
                 Support::Cylinder { o: origin, a, r: radius, s }
             }
+            k::Surface::BSpline { .. } => match face.face_nurbs()? {
+                Some(n) => {
+                    let pr = face.project_point(p)?;
+                    let [_, su, sv] = n.d1(pr.u, pr.v);
+                    let s = if su.cross(sv).dot(inward) < 0.0 { -1.0 } else { 1.0 };
+                    Support::Nurbs { face: face.clone(), n: std::sync::Arc::new(n), s, last: std::sync::Arc::new(std::sync::Mutex::new(Some(glam::DVec2::new(pr.u, pr.v)))) }
+                }
+                None => Support::Face(face.clone(), if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 }),
+            },
             _ => Support::Face(face.clone(), if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 }),
         })
     }
@@ -1275,6 +1288,19 @@ impl Support {
             Support::Face(f, s) => {
                 let pr = f.project_point(q)?;
                 (pr.point, f.normal_at_uv(pr.u, pr.v)?.normalize() * *s)
+            }
+            Support::Nurbs { face, n, s, last } => {
+                let seed = *last.lock().unwrap_or_else(|e| e.into_inner());
+                let uv = match seed {
+                    Some(seed) => n.param_of(q, Some(seed)).0,
+                    None => {
+                        let pr = face.project_point(q)?;
+                        glam::DVec2::new(pr.u, pr.v)
+                    }
+                };
+                *last.lock().unwrap_or_else(|e| e.into_inner()) = Some(uv);
+                let [p, su, sv] = n.d1(uv.x, uv.y);
+                (p, su.cross(sv).normalize() * *s)
             }
         })
     }
@@ -1634,7 +1660,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             starts.push(start);
         }
         // Past a free end the ball rolls on along the supports' surfaces, each station a step on from the last centre.
-        let extends = e.sup.iter().all(|s| !matches!(s, Support::Face(..)));
+        let extends = e.sup.iter().all(|s| !matches!(s, Support::Face(..) | Support::Nurbs { .. }));
         for (end, out) in outs.into_iter().enumerate() {
             if closed || !extends || !rolls_on(end) {
                 continue;

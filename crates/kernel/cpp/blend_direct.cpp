@@ -826,6 +826,8 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
   double snap = (std::getenv("BD_SNAP") ? std::atof(std::getenv("BD_SNAP")) : 1e-4) * size;
   ShapeIMap    pfaces;
   TopExp::MapShapes(P, TopAbs_FACE, pfaces);
+  ShapeAncMap pef;
+  TopExp::MapShapesAndUniqueAncestors(P, TopAbs_EDGE, TopAbs_FACE, pef);
   std::vector<Bnd_Box> pboxes(pfaces.Extent() + 1);
   for (int i = 1; i <= pfaces.Extent(); ++i)
     BRepBndLib::Add(pfaces(i), pboxes[i]);
@@ -926,6 +928,13 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     }
     if (blends[i].empty() || strips.IsEmpty())
       no("a tool with no blend face or none on the part");
+    // Its sides on both faces of the edge it rounds: one off its face would leave the round to be cut against that
+    // face, tangent to it along the spring line (seconds of intersection for a build that can't close: c2-hunting-
+    // knife's Fillet 8 on a lean lofted handle, 6.9 s).
+    if (const ShapeList* rf = pef.Seek(rim[i]))
+      for (ShapeList::Iterator it(*rf); it.More(); it.Next())
+        if (const int j = pfaces.FindIndex(it.Value()); j > 0 && std::find(coincident[i].begin(), coincident[i].end(), j) == coincident[i].end())
+          no("a tool's side off a face of its edge");
     // A strip's edges where the tool's other face there is off its surface (a blend, an end cap): onto every part face
     // of that surface.
     ShapeAncMap tef;
