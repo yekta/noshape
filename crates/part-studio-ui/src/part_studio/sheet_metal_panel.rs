@@ -270,6 +270,7 @@ impl PartStudioView {
                         if let Some(e) = edge {
                             this.selection = vec![e];
                             this.ui.analysis_tool = None;
+                            this.ui.analysis_menu_target = true;
                             this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
                         }
                     })

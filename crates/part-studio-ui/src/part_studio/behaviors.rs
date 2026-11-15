@@ -735,6 +735,8 @@ pub struct UiState {
     /// Open analysis tool dialog (Curve/surface, Dihedral…) and what each
     /// tool had selected last time.
     pub analysis_tool: Option<super::analysis_tools::AnalysisTool>,
+    /// The next Curve/surface analysis opens on the right-clicked entity (a context menu set the selection to it).
+    pub analysis_menu_target: bool,
     /// Show isocurves / ruled lines of the open dialog's feature, kept while
     /// the preview is the same.
     pub isocurves: std::cell::RefCell<Option<super::analysis_tools::IsocurveCache>>,
@@ -1021,6 +1023,7 @@ impl UiState {
             curvature_map: None,
             draft: None,
             analysis_tool: None,
+            analysis_menu_target: false,
             isocurves: Default::default(),
             tool_memory: Default::default(),
         }

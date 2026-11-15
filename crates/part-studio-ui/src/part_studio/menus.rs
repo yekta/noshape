@@ -238,6 +238,7 @@ impl PartStudioView {
                             .item(item("Curve/surface analysis…", Box::new(move |this, w, cx| {
                                 this.selection = vec![rc.clone()];
                                 this.ui.analysis_tool = None;
+                                this.ui.analysis_menu_target = true;
                                 this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
                             })))
                             .item(item("Isolate…", Box::new(move |this, w, cx| {
@@ -331,6 +332,7 @@ impl PartStudioView {
                         m = m.item(item("Curve/surface analysis…", Box::new(move |this, w, cx| {
                             this.selection = vec![rc.clone()];
                             this.ui.analysis_tool = None;
+                            this.ui.analysis_menu_target = true;
                             this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
                         })));
                         // Live (behaviours "More Part Studio menus": … Curve/surface analysis… | Create Drawing of
@@ -520,6 +522,7 @@ impl PartStudioView {
                             m = m.item(item("Curve/surface analysis…", Box::new(move |this, w, cx| {
                                 this.selection = vec![re.clone()];
                                 this.ui.analysis_tool = None;
+                                this.ui.analysis_menu_target = true;
                                 this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
                             })));
                         }

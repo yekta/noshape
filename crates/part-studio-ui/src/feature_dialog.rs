@@ -915,6 +915,7 @@ impl FeatureDialog {
         }
         let Some((vals, id)) = self.values_for_path_mut(&path) else { return false };
         let q = vals.query_mut(&id);
+        let was_empty = q.is_empty();
         let mut added = false;
         let mut removed = false;
         for r in refs {
@@ -934,8 +935,14 @@ impl FeatureDialog {
             }
         }
         let full = max.is_some_and(|n| q.len() >= n);
+        let filled = was_empty && !q.is_empty();
         if removed {
             self.advance_disarmed = Some(path.clone());
+        }
+        // An empty field blamed by the last regeneration isn't red once it has a pick: live clears it at the pick, before
+        // its preview (revolve-add-tab, plane-line-angle, move-face-rotate); the next regeneration says again.
+        if filled {
+            self.faulty.retain(|f| *f != path);
         }
         if added && full && self.advance_disarmed.as_deref() != Some(path.as_str()) {
             self.advance_query_focus(&path);

@@ -785,12 +785,49 @@ fn a_tab_that_swaps_a_field_for_its_twin_leaves_the_keyboard_off(cx: &mut TestAp
     assert_eq!(f1["kind"].as_str(), Some("none"), "{f1}");
 }
 
+/// Live analysis-zebra / -reflection / -connection: a preselected face stays selected while the tool is open; Esc
+/// leaves it selected after Zebra stripes and Reflection, clears it after Connection.
+#[gpui::test]
+fn closing_zebra_keeps_the_selection_closing_connection_clears_it(cx: &mut TestAppContext) {
+    use crate::part_studio::analysis_tools::ToolKind;
+    let (window, view, top, _) = block_part(cx, "analysis-close-selection");
+    for (kind, kept) in [(ToolKind::Zebra, true), (ToolKind::Reflection, true), (ToolKind::Connection, false)] {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| { v.selection = vec![top.clone()]; v.toggle_analysis_tool(kind, w, cx); })).unwrap();
+        draw(cx, window);
+        assert_eq!(cx.update(|cx| view.read(cx).selection.len()), 1, "{kind:?} open");
+        view.update(cx, |v, cx| { v.close_analysis_tool(cx); });
+        draw(cx, window);
+        assert_eq!(cx.update(|cx| view.read(cx).selection.len()), usize::from(kept), "{kind:?} closed");
+    }
+}
+
+/// Live analysis-curve-surface (live2 11-15): Curve/surface analysis from the toolbar with a face selected opens with
+/// its field empty and nothing selected; from a context menu it takes the right-clicked entity, which stays selected.
+#[gpui::test]
+fn curve_analysis_from_the_toolbar_drops_the_preselection(cx: &mut TestAppContext) {
+    use crate::part_studio::analysis_tools::ToolKind;
+    let (window, view, top, _) = block_part(cx, "curve-toolbar");
+    let open = |cx: &mut TestAppContext, menu: bool| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            v.close_analysis_tool(cx);
+            v.selection = vec![top.clone()];
+            v.ui.analysis_menu_target = menu;
+            v.toggle_analysis_tool(ToolKind::CurveSurface, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+        cx.update(|cx| { let v = view.read(cx); (v.selection.len(), v.ui.analysis_tool.as_ref().map(|t| t.selection.len())) })
+    };
+    assert_eq!(open(cx, false), (0, Some(0)), "toolbar: (selected, in the field)");
+    assert_eq!(open(cx, true), (1, Some(1)), "context menu");
+}
+
 /// Live edge-menu-curve-analysis: the open Curve/surface analysis panel is recorded as live's recorder reads it (its
 /// field, then each option in order, the U / V counts after their checkboxes, "Comb size" last).
 #[gpui::test]
 fn the_curve_analysis_panel_is_recorded(cx: &mut TestAppContext) {
     let (window, view, top, _) = block_part(cx, "curve-panel-state");
-    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| { v.selection = vec![top.clone()]; v.toggle_analysis_tool(crate::part_studio::analysis_tools::ToolKind::CurveSurface, w, cx); })).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| { v.selection = vec![top.clone()]; v.ui.analysis_menu_target = true; v.toggle_analysis_tool(crate::part_studio::analysis_tools::ToolKind::CurveSurface, w, cx); })).unwrap();
     draw(cx, window);
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
@@ -820,6 +857,20 @@ fn the_create_selection_panel_opens_under_its_button(cx: &mut TestAppContext) {
         (f32::from(b.top()), f32::from(v.ui.create_selection.as_ref().expect("the panel").pos.y), f32::from(v.viewport.read(cx).origin().y))
     });
     assert_eq!(panel_top + origin_y - button_top, 64.0, "64 px under the button");
+}
+
+/// Live revolve-add-tab: the empty field a new feature's error blames stops reading red at its first pick, before the
+/// preview regenerates (the state recorded straight after a pick had it red under load).
+#[gpui::test]
+fn a_blamed_empty_field_is_not_red_once_picked(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "picked-not-red");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("revolve", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Revolve dialog").dialog.clone());
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && dialog.read(cx).field_error("entities").is_some());
+    assert!(cx.update(|cx| dialog.read(cx).field_error("entities").is_some()), "empty: red");
+    cx.update(|cx| dialog.update(cx, |d, cx| { d.add_pick(top.clone(), cx); }));
+    assert!(cx.update(|cx| dialog.read(cx).field_error("entities").is_none()), "picked: not red, before any regeneration");
 }
 
 /// Live (ui-parity mirror-face-create-selection): a face picked in the open Create selection panel lights up the

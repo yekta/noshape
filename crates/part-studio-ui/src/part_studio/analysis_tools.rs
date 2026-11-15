@@ -33,7 +33,7 @@ pub enum ToolKind {
 }
 
 impl ToolKind {
-    /// Tools whose preselection stays selected while they are open and clears when they close (live's recordings
+    /// Tools whose preselection stays selected while they are open and (but Zebra / Reflection's) clears when they close (live's recordings
     /// analysis-connection / -dihedral / -interference / -deviation / -flatten / -zebra / -reflection,
     /// edge-menu-curve-analysis); Draft analysis takes it into its field at once (analysis-draft).
     pub fn keeps_selection(self) -> bool {
@@ -236,6 +236,11 @@ impl PartStudioView {
         // (Deviation takes preselected faces only, into the Surface tab: live doesn't take edges.)
         let takes = |r: &Reference| if kind == ToolKind::Deviation { matches!(r, Reference::Face(_)) } else { self.analysis_accepts(kind, r) };
         let pre: Vec<Reference> = self.selection.iter().filter(|r| takes(r)).filter_map(|r| self.tool_entity(kind, r)).collect();
+        // Curve/surface from the toolbar or Shift+C drops a preselection: its field opens empty, nothing selected (live
+        // analysis-curve-surface, live2 11-15); a context menu's opens on the right-clicked entity (edge-menu-curve-analysis).
+        let from_menu = std::mem::take(&mut self.ui.analysis_menu_target);
+        let dropped = kind == ToolKind::CurveSurface && !from_menu && self.sketch.is_none() && !pre.is_empty();
+        let pre = if dropped { Vec::new() } else { pre };
         // A bend line selected in the flat view (live request 1622: Shift+C
         // opens the panel with "Edge").
         let pre = if pre.is_empty() && kind == ToolKind::CurveSurface { self.ui.sm_flat_bend.and_then(|b| self.bend_line_edge(b)).into_iter().collect() } else { pre };
@@ -243,7 +248,10 @@ impl PartStudioView {
         let had_pre = !pre.is_empty();
         // Over a feature dialog the field starts empty (live "psui (10-27,
         // PANEL-BLEED)": the earlier run's pick is not brought back).
-        let remembered = if self.edit.is_some() { Vec::new() } else { self.ui.tool_memory.selection.get(key).cloned().unwrap_or_default() };
+        let remembered = if self.edit.is_some() || dropped { Vec::new() } else { self.ui.tool_memory.selection.get(key).cloned().unwrap_or_default() };
+        if dropped {
+            self.selection.clear();
+        }
         let mut selection = if pre.is_empty() { remembered } else { pre };
         if kind == ToolKind::Thickness {
             // Edit thickness analysis: the analyzed parts.
@@ -580,7 +588,8 @@ impl PartStudioView {
         if t.kind.is_view_mode() || matches!(t.kind, ToolKind::Interference | ToolKind::Deviation) {
             self.rebuild_scene(cx);
         }
-        if t.kind.keeps_selection() {
+        // Zebra stripes and Reflection leave it selected (live analysis-zebra, analysis-reflection: still 1 after Esc).
+        if t.kind.keeps_selection() && !matches!(t.kind, ToolKind::Zebra | ToolKind::Reflection) {
             self.selection.clear();
         }
         let key = t.kind.title();
