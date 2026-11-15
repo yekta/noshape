@@ -5,6 +5,18 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 17:45 UTC: 1dc32b pulley = live to Draft 1; bjr 5d8bc1 Sweep 1 to core
+- 1dc32b (vibe7 ~/tmp/dx/st1dc14.sh, save ~/agents/dx-keep/repro-1dc/st22.noshape): with live's Fillet 5 entities
+  (dx/q-f5: 10 concave arcs + plane RbDa) in the refs too, the pulley matches live through Fillet 5 (29213.392 /
+  225 faces, live 29213.395 / 225). Draft 1: core's (OCCT 0030 on main af81dda05, rechecking on this input). Core's
+  77715251 checks drafted faces only (draft_robust's is_valid lead). Studio split with asm (lead): isaac-ball and
+  config-assembly 20e932 asm's; infento (1dc32b, 74d3d6) and bjr-config 5d8bc1 mine.
+- bjr-config 5d8bc1 alone on main (vibe7 ~/tmp/dx/st5d8.sh): 52/124; first difference Extrude 55's "vanity plate
+  front" (369 faces, live 365; bool / core, parked). Sweep 1 (PlateCover: profile from the hexagon's centre to its
+  edge swept round the 6-line hexagon; live 14 faces 300626.043 mm³) fails in our sweep: core (repro vibe7
+  ~/agents/dx-keep/repro-5d8/5d8bc1.noshape). Shell 1 and Extrude 22 ("Only Remove can be used with sheet metal":
+  live's adds to PlateCover) follow from it; recheck Extrudes 9 / 11 / 14, Rib 1 after. Decal 1: its image unfetched.
+
 ## 11-15 16:22 UTC: 1dc32b pulley from live's refs; draft speed
 - 1dc32b's pulley (RvCD, our Part 15; core's Draft 1 input): Chamfer 4's query is an EDGE (live S0C5E, the r 48.25 rim
   at x -14), our translator made it a Ø6.3 hole wall; Fillet 5's 11 derivedFrom queries (10 concave arcs on the x -8
