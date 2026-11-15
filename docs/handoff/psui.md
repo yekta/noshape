@@ -259,6 +259,15 @@ open 12.7 s for 140 features, Tab's preview 252 ms, ✓ 139 ms, undo 24 ms. Also
 dropped the run entering the sketch started but kept its `pending`, so the working overlay stayed up until the sketch
 closed (fixed in `regen_sync`); ui-parity `live_defects` (README) for live shortcomings we don't copy. Full psui-area
 run (1021 with live takes) going on vibe6: ~/tmp/psui/full1115.
+**11-15 13:54 (the full psui-area run, 972 / 1021; ~/tmp/psui/full1115 on vibe6, names in psui-scratch/psui-names.txt):**
+fixed since (55ea6c02 + two Text commits): Zebra / Reflection keep their face selected when closed (Connection etc.
+clear it); Curve/surface analysis from the toolbar or Shift+C drops a preselection, from a context menu it takes the
+entity (`ui.analysis_menu_target`; live2's retakes 9c42f397); an empty field a feature error blamed stops reading red
+at its first pick (the flaky revolve-add-tab titleState); the sketch Text box reads as a field and its Font / B / I /
+flips are marked. Routed: move-boundary, edit-curve, offset-curve, fit-spline to core; bend-relief, jog, tab, end-cap,
+gusset to skasm; face-blend to blend (fixed); docs-account to studios (live2 retakes); context-create-version-update
+re-taken by live2 (d2dcdb37). Left: dialog-number-rclick-menu (recorder), part-properties (managed workflows),
+boundary-surface, sketch sub-pixel readouts, analysis-thickness (live account), face-rclick-export-dxf (dx).
 **11-14 18:16 (viewport speed, Linux numbers):** vibe7 (load ~16), release, llvmpipe, 60 samples, mode-700 copies
 deleted after. Pointer / click to the frame with its highlight or selection, p50: dock hover 370 ms, pick 620; hat15
 hover 381-856, pick 1074: llvmpipe drawing the models. To its submission p50 0.4-1.9 ms; the maxima (69-985 ms, one
