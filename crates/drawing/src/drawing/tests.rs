@@ -3157,6 +3157,36 @@ fn hole_callout_overrides_are_per_value() {
     assert!(a.hole.as_ref().unwrap().value(HoleValue::CboreDepth).is_some(), "kept");
 }
 
+/// A blind hole deeper than its part reads THRU (live drw-hole-table-collapse-off:
+/// Blind 12 mm through a 10 mm plate, "Ø.197 THRU"); one ending inside keeps its depth.
+#[test]
+fn a_blind_hole_out_of_its_part_reads_thru() {
+    let mut hole = crate::regen::context::HoleRecord {
+        feature: crate::reference::FeatureId(1),
+        start: glam::DVec3::ZERO,
+        dir: glam::DVec3::NEG_Z,
+        diameter: 0.005,
+        depth: Some(0.012),
+        through: false,
+        tap_drill: None,
+        tapped_depth: None,
+        thread: None,
+        thread_class: None,
+        cbore: None,
+        csink: None,
+        inch: false,
+        diameter_fit: None,
+        exits: true,
+        parts: Vec::new(),
+        tip_angle: None,
+    };
+    let drawing = Drawing::default();
+    let a = Annotation::default();
+    assert!(build::hole_callout_text(&drawing, &hole, 1, &a).join(" ").ends_with(" THRU"));
+    hole.exits = false;
+    assert!(build::hole_callout_text(&drawing, &hole, 1, &a).join(" ").contains('↧'));
+}
+
 /// A view of a named view with a section plane (live 3121-3127): the
 /// material beyond the plane cut away, the cut face hatched.
 #[test]

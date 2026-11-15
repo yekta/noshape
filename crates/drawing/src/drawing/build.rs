@@ -1326,7 +1326,9 @@ fn hole_callout_text_with(drawing: &Drawing, hole: &crate::regen::context::HoleR
     // dimensions).
     let build = |len: &dyn Fn(V, f64) -> String, dual: bool| -> Vec<String> {
         let count = if n > 1 { format!("{n}{} ", drawing.props.hole_indicator) } else { String::new() };
-        let depth = |k: V, d: Option<f64>| match (hole.through, d) {
+        // A blind hole that comes out of the part reads THRU too (live drw-hole-table-collapse-off: Blind 12 mm in
+        // a 10 mm plate, "Ø.197 THRU").
+        let depth = |k: V, d: Option<f64>| match (hole.through || hole.exits, d) {
             (true, _) => " THRU".to_string(),
             (false, Some(d)) => format!(" ↧ {}", len(k, d)),
             _ => String::new(),
