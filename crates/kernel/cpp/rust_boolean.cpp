@@ -1061,6 +1061,8 @@ struct ExactBoxes
 {
   std::mutex                                                          m;
   NCollection_DataMap<TopoDS_Shape, Bnd_Box, TopTools_ShapeMapHasher> boxes;
+  // The Boolean's arguments as shapes (the boxes kept on the one a face is of too), or none.
+  const std::vector<const OcShape*>*                                  srcs = nullptr;
   Bnd_Box                                                             of(const TopoDS_Face& f)
   {
     {
@@ -1068,9 +1070,35 @@ struct ExactBoxes
       if (const Bnd_Box* b = boxes.Seek(f))
         return *b;
     }
+    const OcShape* owner = nullptr;
+    if (srcs != nullptr)
+      for (const OcShape* x : *srcs)
+        if (x != nullptr && x->map(TopAbs_FACE).Contains(f))
+        {
+          owner = x;
+          break;
+        }
     Bnd_Box b;
-    if (!torus_box(f, b))
-      BRepBndLib::AddOptimal(f, b, false, false);
+    bool    known = false;
+    if (owner != nullptr)
+    {
+      const std::lock_guard<std::mutex> lock(owner->myExactLock);
+      if (const Bnd_Box* k = owner->myExactBoxes.Seek(f))
+      {
+        b     = *k;
+        known = true;
+      }
+    }
+    if (!known)
+    {
+      if (!torus_box(f, b))
+        BRepBndLib::AddOptimal(f, b, false, false);
+      if (owner != nullptr)
+      {
+        const std::lock_guard<std::mutex> lock(owner->myExactLock);
+        owner->myExactBoxes.Bind(f, b);
+      }
+    }
     const std::lock_guard<std::mutex> lock(m);
     boxes.Bind(f, b);
     return b;
@@ -5363,8 +5391,9 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   BrepResult   r;
   t_built.set = false;
   FreeSections free;
-  free.srcs = &srcs;
-  t_free    = &free;
+  free.srcs       = &srcs;
+  free.exact.srcs = &srcs;
+  t_free          = &free;
   struct Reset
   {
     ~Reset() { t_free = nullptr; }

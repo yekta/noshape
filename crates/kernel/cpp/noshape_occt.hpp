@@ -16,6 +16,7 @@
 #include <TopTools_ShapeMapHasher.hxx>
 #include <NCollection_IndexedMap.hxx>
 #include <NCollection_IndexedDataMap.hxx>
+#include <NCollection_DataMap.hxx>
 #include <NCollection_List.hxx>
 #include <TopoDS_Shape.hxx>
 
@@ -696,6 +697,11 @@ public:
   mutable std::atomic<int>                myInsideOut{-1};
   // A body still to remap onto this shape's maps (a result of that Boolean: rust_boolean.cpp), on first use.
   mutable std::function<std::shared_ptr<const BrepBody>(const OcShape&)> myBrepLazy;
+
+  // Its faces' exact boxes (noshape's Boolean's free-of-OCCT tests, rust_boolean.cpp's ExactBoxes), by face: a chain of
+  // Booleans on one part (a pattern fuse's trimmed cuts) finds each once; an offset face's takes OCCT's optimiser.
+  mutable std::mutex                                                          myExactLock;
+  mutable NCollection_DataMap<TopoDS_Shape, Bnd_Box, TopTools_ShapeMapHasher> myExactBoxes;
 
   // Ancestor maps (CSR offsets, values) by kind * 16 + ancestor kind,
   // computed once: regeneration asks for the same ones of a body many times.
