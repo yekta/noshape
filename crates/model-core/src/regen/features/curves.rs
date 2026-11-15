@@ -314,8 +314,16 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
         let mut tangents = Vec::new();
         if !closed {
             // The picked direction and the magnitude, negated by its flip (std).
-            let dir = |id: &'static str, mag: &'static str, flip: &str| -> FResult<Option<(DVec3, f64)>> {
-                let Some(r) = ev.query(id).first() else { return Ok(None) };
+            let dir = |id: &'static str, mag: &'static str, flip: &str, curvature: &str| -> FResult<Option<(DVec3, f64)>> {
+                // std's getEndCondition: matching curvature needs a direction, and an edge for it (psui's
+                // fit-spline-match-curvature: live marks Start direction).
+                let matching = ev.bool(curvature);
+                let Some(r) = ev.query(id).first() else {
+                    return if matching { crate::regen::eval::err_at(&[id], crate::regen::custom_features::error_text("FIT_SPLINE_NEED_DIRECTION_FOR_CURVATURE")) } else { Ok(None) };
+                };
+                if matching && matches!(r, Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::MateConnector { .. }) {
+                    return crate::regen::eval::err_at(&[id], crate::regen::custom_features::error_text("FIT_SPLINE_CURVATURE_FACE"));
+                }
                 let d = ev.resolve_direction(r).ok_or_else(|| FeatureError::at(&[id], "Cannot evaluate tangency for end condition."))?;
                 let m = ev.real(mag)?;
                 if m.abs() < 1e-12 {
@@ -323,8 +331,8 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
                 }
                 Ok(Some((d.normalize_or_zero(), m * if ev.bool(flip) { -1.0 } else { 1.0 })))
             };
-            let s = dir("startDirection", "startMagnitude", "oppositeDirectionStart")?;
-            let e = dir("endDirection", "endMagnitude", "oppositeDirectionEnd")?;
+            let s = dir("startDirection", "startMagnitude", "oppositeDirectionStart", "matchStartCurvature")?;
+            let e = dir("endDirection", "endMagnitude", "oppositeDirectionEnd", "matchEndCurvature")?;
             // std's addFitSplineManipulators: at each end with a direction, an arrow along the picked direction
             // (back from the end) whose offset is the signed magnitude times the points' box diagonal / 3.
             let (lo, hi) = pts.iter().fold((pts[0], pts[0]), |(lo, hi), p| (lo.min(*p), hi.max(*p)));

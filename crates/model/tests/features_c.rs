@@ -3385,6 +3385,31 @@ fn fit_spline_through_two_vertices_is_a_line() {
     assert!(start.length() < 1e-12 && ((end - start).length() - i.length).abs() < 1e-12, "{start} {end}");
 }
 
+/// A fit spline matching curvature at its start needs a start direction, an edge (std fitSpline.fs getEndCondition;
+/// psui's fit-spline-match-curvature: live marks Start direction): none, or the Top plane, is an error there.
+#[test]
+fn fit_spline_matching_curvature_needs_an_edge_direction() {
+    for (direction, want) in [(None, "Cannot match curvature if direction is not defined."), (Some(Reference::Plane(DatumPlane::Top)), "Can match curvature only if direction is defined by an edge.")] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let pts = [DVec2::new(0.0, 0.0), DVec2::new(0.02, 0.01), DVec2::new(0.04, 0.0)].map(|p| sk.add_point(p));
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let se = |e: u32| Reference::SketchEntity { sketch: sid, entity: e };
+        let vertices: Vec<Reference> = pts.iter().map(|p| se(p.0)).collect();
+        s.add("fitSpline", move |p| {
+            p.set("vertices", ParamValue::Query(vertices));
+            p.set("matchStartCurvature", ParamValue::Bool(true));
+            if let Some(d) = direction {
+                p.set("startDirection", ParamValue::Query(vec![d]));
+            }
+        });
+        let r = s.regen();
+        let st = r.display.features.last().unwrap();
+        assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some(want)));
+        assert_eq!(st.faulty, vec!["startDirection".to_string()]);
+    }
+}
+
 /// Move curve boundary's distance arrow (audit-part-studio M10; moveCurveBoundary.fs addExtendCurveManipulator):
 /// a composite curve from (0, 30) to (20, 30) to (20, 50) mm on Top, the help point at (40, 0) nearest its start:
 /// the arrow starts there pointing −X, so its tip at 10 mm is the extended end (std's arrow base); Opposite
