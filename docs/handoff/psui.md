@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-15 19:21 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-15 20:31 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -38,27 +38,34 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
 
-- Full psui-area rerun (1021 scenarios), vibe6, 3 shards, started 19:02 UTC (not through slot: started before the
-  rule): out /home/ngyekta/tmp/psui/full1115e, log /root/psui-scratch/full1115e.log. Lead 11-15: fix what it shows.
-  Baseline: the 11-15 morning run, /root/psui-scratch/full1115-score.log (972 / 1021).
+- Lead P1 (the user's Mac): Extrude Depth "#" / "asin" list pushed the rows below 2 px down. Cause: popups hung
+  from a zero-height box in the field's flex column, which still takes the column's gap. Fix: `ui::popup_anchor()`
+  (absolute, at the parent's bottom) for var_complete, os_select, create_selection, Create variable, the sketch
+  dimension's list; fields matrix row "autocomplete: the open list moves nothing" (row bounds, `row-<param>`
+  debug selectors). Corners: live2 asked (11-15 20:20) for the menu's radius / padding and the highlighted row's
+  inset / radius; match once it answers. The feature list's folder-name prompt keeps its in-flow anchor (no gap there).
+- full1115e done: 995 / 1021 (morning 972). Misses in /root/psui-scratch/full1115e-miss.txt. The 7 new since the
+  morning were load flakes (all match on rerun, new7, 20:50). boundary-surface now fails only at step 4 `.message`
+  (live's "Boolean resulted in no geometry change…"): sent to core.
+- qa P0 (dock tab B 7-10 s): not run yet. Likely the document thumbnail's own full regeneration of B next to the
+  view's (Thumbnailer `decide` returns Regenerate before the view has registered `pending`). Repro: tabab.sh via
+  rb.sh on vibe6 with a mode-700 dock copy (scp -3 from vibe5 ~/lead-private/dock.noshape to
+  /home/ngyekta/tmp/psui/priv); the script deletes it at the end.
+- Mac target over 20 GB: prune with tools/tiers/prune-target.py between builds (lead 11-15).
 
 ## Queued to land
 
-- Nothing (all landed as of 2a525af7, 19:15 UTC).
+- b43ce2d0 (20:19 UTC): bsurf two picks + advance, number field no right-click menu, thumbnail perf notes, handoff.
 
 ## Waiting on others
 
-- live2 (REQUESTS): 13:57 does Chrome's own menu show on a right-clicked Depth (dialog-number-rclick-menu: ours opens
-  the input's Cut / Copy / Paste, which takes live's dialog-closing Escape); 16:04 Boundary surface's selection drop
-  after the second pick, 3 runs (boundary-surface-new-edit-reedit; every other dialog keeps its picks); 16:04
-  analysis-thickness ×3 retaken on Pro (ours has Thickness analysis; the free plan didn't). Answered 17:38: the
-  in-context navbar shows "<source> Main" as ours (a recorder miss); context-create-version-update re-recorded and
-  queued by live2: rerun it once on main.
-- skasm: gusset-rectangle-aligned step 7 and end-cap-profile-internal step 5 (live titleState error, ours ok: their
-  validation); tab / bend-relief owner labels ("Face of Flange 1" vs "Sheet metal model 1"; their REQUESTS 16:27);
-  sketch Linear pattern without Equal + its construction direction line (after 58a0bd16, the circular one).
-- studios: docs-account-* (live2 retakes).
-- dx: face-rclick-export-dxf.
+- skasm: bend-relief-* "Vertex of Flange 1" (label after the feature that first created the definition entity: theirs,
+  in progress). tab-new-edit-reedit is a pick: live's ray passes ~0.3 mm above Flange 1's top edge and hovers its outer
+  wall; ours the plate's top. Mine: queue after the P1.
+- skasm: gusset-rectangle-aligned step 7, end-cap-profile-internal step 5 (their validation); sketch circular pattern
+  Equal (sketch-circular-pattern-click-commit constraints[2]).
+- live2: analysis-thickness ×3 (our list lacks the Pro rows?), context-create-version-update retake on main.
+- dx: face-rclick-export-dxf. core: boundary-surface (with my 11620bb3).
 
 ## Known, left as they are
 
@@ -70,9 +77,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Next, in order
 
-1. When full1115e finishes: `grep -v ': match'` its score.log, compare with the morning baseline, fix psui misses,
-   route the others (owners: core model/regen, skasm sketch solver / sheet metal / frames, blend fillets, asm assembly
-   menus, studios drawings / documents / account, dx exchange).
+1. The P1 corners (live2's numbers), land; then qa's P0 (tabab); then the tab pick
+   (skasm's note); end-cap-profile-circle step 3 focus (old, mine?).
 2. Rerun after the others' fixes land: boundary-surface-new-edit-reedit (core 658bef9d), the gussets and end-caps
    (skasm), sketch pattern takes (skasm 58a0bd16 + linear), context-create-version-update (live2's retake).
 3. Older open items (11-06 to 11-08 "Next, in order" in the archive) were not re-verified this session; check them
