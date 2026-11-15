@@ -1,0 +1,67 @@
+--- a/src/ModelingData/TKG3d/Adaptor3d/Adaptor3d_TopolTool.cxx
++++ b/src/ModelingData/TKG3d/Adaptor3d/Adaptor3d_TopolTool.cxx
+@@ -1331,6 +1331,18 @@
+     aVPars(k) = t1;
+   }
+ 
++  // noshape (patch 0031): the grid's points evaluated once, row by row (the passes below read each many times,
++  // alternating spans, and every evaluation off the cached span rebuilt the cache: c2-impeller-loft's Extrude 4,
++  // 42 % of its Boolean). Each point is the same: a parameter's span does not depend on the one cached before.
++  NCollection_Array2<gp_Pnt> aPnts(1, nbsu, 1, nbsv);
++  for (i = 1; i <= nbsv; ++i)
++  {
++    for (k = 1; k <= nbsu; ++k)
++    {
++      aPnts(k, i) = myS->Value(anUPars(k), aVPars(i));
++    }
++  }
++
+   // Analysis of deflection
+ 
+   double aDefl2 = std::max(theDefl * theDefl, 1.e-9);
+@@ -1355,11 +1367,11 @@
+       }
+ 
+       t2        = anUPars(j);
+-      gp_Pnt p1 = myS->Value(t2, t1);
++      gp_Pnt p1 = aPnts(j, i);
+       for (k = j + 2; k <= nbsu; ++k)
+       {
+         t2        = anUPars(k);
+-        gp_Pnt p2 = myS->Value(t2, t1);
++        gp_Pnt p2 = aPnts(k, i);
+         // gce_MakeLin MkLin(p1, p2);
+         // const gp_Lin& lin = MkLin.Value();
+ 
+@@ -1379,7 +1391,7 @@
+             break;
+           }
+ 
+-          gp_Pnt pp = myS->Value(anUPars(l), t1);
++          gp_Pnt pp = aPnts(l, i);
+           double d  = lin.SquareDistance(pp);
+ 
+           if (d <= aDefl2)
+@@ -1470,11 +1482,11 @@
+       }
+ 
+       t2        = aVPars(j);
+-      gp_Pnt p1 = myS->Value(t1, t2);
++      gp_Pnt p1 = aPnts(i, j);
+       for (k = j + 2; k <= nbsv; ++k)
+       {
+         t2        = aVPars(k);
+-        gp_Pnt p2 = myS->Value(t1, t2);
++        gp_Pnt p2 = aPnts(i, k);
+ 
+         if (p1.SquareDistance(p2) <= tol)
+         {
+@@ -1493,7 +1505,7 @@
+             break;
+           }
+ 
+-          gp_Pnt pp = myS->Value(t1, aVPars(l));
++          gp_Pnt pp = aPnts(i, l);
+           double d  = lin.SquareDistance(pp);
+ 
+           if (d <= aDefl2)
