@@ -78,6 +78,9 @@ pub fn regen_started(path: &Path, tab: TabId, cx: &mut App) {
     shown.pending.get_or_insert_with(Instant::now);
     if let Some(job) = cx.try_global::<ThumbnailJobs>().and_then(|j| j.0.get(path)) {
         job.abort();
+        if noshape_render::perf::enabled() {
+            log::info!(target: "perf", "thumbnail: stopped, tab {} regenerates in its view", tab.0);
+        }
     }
 }
 
@@ -162,6 +165,9 @@ impl Job {
             let display = match self.shown {
                 Some(d) => d,
                 None => {
+                    if noshape_render::perf::enabled() {
+                        log::info!(target: "perf", "thumbnail: regenerating tab {} ({} features)", self.tab.0, self.studio.features.len());
+                    }
                     let opts = RegenOptions { document_variables: self.doc_vars, cancel: Some(self.cancel.clone()), ..Default::default() };
                     let r = engine.regen.regenerate(&self.studio, &self.config, &self.units, &opts);
                     if r.cancelled {
