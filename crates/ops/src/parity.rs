@@ -62,6 +62,9 @@ pub struct LiveRef {
     pub sketch_of: Option<String>,
     /// Which of its parameter's queries live evaluated to it (refs.jsonl `query`).
     pub query: Option<usize>,
+    /// The sketch constraints and their parameters live evaluated it for (refs.jsonl `constraintId`, `parameter`): a
+    /// constraint's model query live's fetch gave no ids for (c2-hunting-knife's co-edge queries) is these.
+    pub constraints: Vec<(String, String)>,
 }
 
 /// What became of one Onshape feature.
@@ -244,7 +247,7 @@ fn doc_units(u: &Value) -> (Option<&'static str>, Option<&'static str>) {
 
 /// Parses `refs.jsonl` (one referenced id per line, see the module docs).
 pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
-    let mut out = HashMap::new();
+    let mut out: HashMap<(usize, String), LiveRef> = HashMap::new();
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
@@ -255,8 +258,15 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         // A curved face's normal is its tangent plane's at a point: no filter for planar faces of ours (c2-hunting-knife's
         // Extrude 10 took the blade's flat spine for the handle's B-spline side through the same point).
         let normal = f3(&v["normal"]).filter(|_| v["surfaceType"].as_str().is_none_or(|t| t.eq_ignore_ascii_case("plane")));
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize) };
-        out.insert((k as usize, id.to_string()), r);
+        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new() };
+        let key = (k as usize, id.to_string());
+        if let Some(old) = out.remove(&key) {
+            r.constraints = old.constraints;
+        }
+        if let (Some(c), Some(p)) = (v["constraintId"].as_str(), v["parameter"].as_str()) {
+            r.constraints.push((c.to_string(), p.to_string()));
+        }
+        out.insert(key, r);
     }
     out
 }
@@ -4394,7 +4404,7 @@ impl<'a> Translator<'a> {
                 self.silhouettes.insert((oid.clone(), l.to_string()));
             }
         }
-        let projected: HashMap<String, Value> = f["constraints"]
+        let projected: HashMap<String, (String, Value)> = f["constraints"]
             .as_array()
             .into_iter()
             .flatten()
@@ -4403,7 +4413,8 @@ impl<'a> Translator<'a> {
                 // (A silhouette: its curve and the curved face it outlines.)
                 let params = c["parameters"].as_array()?;
                 let local = params.iter().find(|p| p["parameterId"] == "localFirst" || p["parameterId"] == "localCurve")?["value"].as_str()?.to_string();
-                Some((local, params.iter().find(|p| p["parameterId"] == "externalSecond" || p["parameterId"] == "externalFace")?.clone()))
+                let external = params.iter().find(|p| p["parameterId"] == "externalSecond" || p["parameterId"] == "externalFace")?.clone();
+                Some((local, (c["entityId"].as_str().unwrap_or("").to_string(), external)))
             })
             .collect();
         let mut uses: Vec<Use> = Vec::new();
@@ -4538,7 +4549,7 @@ impl<'a> Translator<'a> {
             if let Some(poly) = poly {
                 self.curves.insert((oid.clone(), eid.clone()), poly);
             }
-            let used = shape.as_ref().and_then(|_| projected.get(&eid)).and_then(|p| self.external_ref(k, p));
+            let used = shape.as_ref().and_then(|_| projected.get(&eid)).and_then(|(cid, p)| self.external_ref(k, cid, p));
             match shape {
                 Some(s) if used.is_some() => {
                     let point = (s["tool"] == "point").then(|| [e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0)]);
@@ -4987,14 +4998,14 @@ impl<'a> Translator<'a> {
                 let ext = n.replacen("local", "external", 1);
                 if let Some(p) = param(&ext).filter(|p| p["queries"].as_array().is_some_and(|q| !q.is_empty())) {
                     placed.push(ext);
-                    match self.external_ref(k, &p) {
+                    match self.external_ref(k, c["entityId"].as_str().unwrap_or(""), &p) {
                         Some(e) => entities.push(e),
                         None => external = true,
                     }
                 }
             }
             for p in c["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external") && !placed.iter().any(|x| x == n))) {
-                match self.external_ref(k, p) {
+                match self.external_ref(k, c["entityId"].as_str().unwrap_or(""), p) {
                     Some(e) => entities.push(e),
                     None => external = true,
                 }
@@ -5090,7 +5101,7 @@ impl<'a> Translator<'a> {
     /// A constraint's or dimension's model geometry (`external…`): the
     /// Origin, or the one entity of ours its query maps to (the sketch takes
     /// it in as Use would).
-    fn external_ref(&mut self, k: usize, p: &Value) -> Option<String> {
+    fn external_ref(&mut self, k: usize, cid: &str, p: &Value) -> Option<String> {
         let queries: Vec<Value> = p["queries"].as_array().cloned().unwrap_or_default();
         let text: String = queries.iter().filter_map(|q| q["queryString"].as_str()).collect();
         // The Origin: its deterministic id is "IB".
@@ -5100,8 +5111,18 @@ impl<'a> Translator<'a> {
         }
         let [q] = queries.as_slice() else { return None };
         // A co-edge query (an edge as one face's boundary): the edge.
-        let q = if q["edgeQuery"].is_object() { &q["edgeQuery"] } else { q };
-        let r = self.query(k, q);
+        let co_edge = q["edgeQuery"].is_object();
+        let q = if co_edge { &q["edgeQuery"] } else { q };
+        let mut r = self.query(k, q);
+        // No ids in live's fetch and none of ours by its text: the ids live's refs lines give the constraint's parameter.
+        let name = p["parameterId"].as_str().unwrap_or("");
+        let key = if co_edge { format!("{name}.edgeQuery") } else { name.to_string() };
+        if !matches!(&r, Ok(ids) if ids.len() == 1)
+            && q["deterministicIds"].as_array().is_none_or(Vec::is_empty)
+            && let [id] = self.refs.iter().filter(|((j, _), l)| *j == k && l.constraints.iter().any(|(c, n)| c == cid && *n == key)).map(|((_, id), _)| id.clone()).collect::<Vec<_>>().as_slice()
+        {
+            r = self.query(k, &json!({ "btType": q["btType"], "deterministicIds": [id] }));
+        }
         if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() && !matches!(&r, Ok(ids) if ids.len() == 1) {
             eprintln!("TRACE external {}: {:?}", p["parameterId"].as_str().unwrap_or(""), r.as_ref().map(|ids| ids.len()));
         }
@@ -5385,7 +5406,7 @@ impl<'a> Translator<'a> {
             for n in ["localFirst", "externalFirst", "localSecond", "externalSecond", "localEntity1", "localEntity2"] {
                 if n.starts_with("external") {
                     let Some(ext) = par(n) else { continue };
-                    match self.external_ref(k, &ext) {
+                    match self.external_ref(k, c["entityId"].as_str().unwrap_or(""), &ext) {
                         Some(e) => {
                             if kind == "distance" {
                                 external_circle = self.circle_in_sketch(oid, &e);
@@ -5898,7 +5919,7 @@ fn circle_through(poly: &[[f64; 2]]) -> Option<([f64; 2], f64)> {
 /// neighbour's end, the pole next to it along the neighbour's direction. Live's model edges are tangent there (a fillet's edge
 /// beside the faces it rounds), its stored curves 1e-5 to 4e-4 rad off, and a loft through them reads corners
 /// (c2-hunting-knife's Loft 1: 5 side faces for live's 1).
-fn smooth_use_splines(entities: &mut [Value], projected: &HashMap<String, Value>) {
+fn smooth_use_splines(entities: &mut [Value], projected: &HashMap<String, (String, Value)>) {
     let used = |e: &Value| e["entityId"].as_str().is_some_and(|id| projected.contains_key(id));
     // Each Used line's and arc's ends with their directions there.
     let mut tangents: Vec<(glam::DVec2, glam::DVec2)> = Vec::new();

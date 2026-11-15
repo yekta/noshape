@@ -1413,6 +1413,34 @@ fn a_missing_external_reference_warns_as_live() {
     assert!(!s.problems.iter().any(|p| p.contains("external geometry")), "{:?}", s.problems);
 }
 
+/// A sketch constraint's model query live's fetch gives no ids for (c2-hunting-knife's co-edge queries): the ids
+/// live's refs line gives for that constraint and parameter (refs.jsonl `constraintId`, `parameter`).
+#[test]
+fn a_constraints_model_query_without_ids_takes_the_ids_of_its_refs_line() {
+    let (mut features, _, mut refs) = block_model();
+    let point = json!({ "btType": "BTMSketchPoint-158", "entityId": "p0", "isConstruction": false, "x": 0.06, "y": 0.0 });
+    let coincident = json!({ "btType": "BTMSketchConstraint-2", "constraintType": "COINCIDENT", "entityId": "pc", "parameters": [
+        { "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "p0" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "externalSecond", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=qCompressed(1.0,\"%B5$unread\",id);" }] }] });
+    let mut sketch = features["features"][0].clone();
+    sketch["featureId"] = json!("FS2");
+    sketch["name"] = json!("Sketch 2");
+    sketch["entities"] = json!([point]);
+    sketch["constraints"] = json!([coincident]);
+    features["features"].as_array_mut().unwrap().push(sketch);
+    for (id, constraint) in [("JHv", "pc"), ("JHw", "other")] {
+        let at = if id == "JHv" { [0.06, 0.0, 0.0] } else { [0.0, 0.04, 0.0] };
+        refs.push_str(&format!("\n{}", json!({ "index": 3, "id": id, "kind": "VERTEX", "point": at, "constraintId": constraint, "parameter": "externalSecond" })));
+    }
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("constraint-refs.noshape"), &features, parse_refs(&refs)).unwrap();
+    let s = (0..4).map(|k| t.step(k)).last().unwrap();
+    assert!(!s.problems.iter().any(|p| p.contains("external geometry")), "{:?}", s.problems);
+    let g = t.call("sketch_get", json!({ "sketch": s.ours.clone().unwrap() })).unwrap();
+    let to_vertex = |c: &Value| c["type"] == "Coincident" && c["entities"][1].as_str().is_some_and(|e| e.starts_with("vertex:"));
+    assert!(g["constraints"].as_array().is_some_and(|c| c.iter().filter(|c| to_vertex(c)).count() == 1), "{g} {:?}", s.problems);
+}
+
 #[test]
 fn translates_a_sketch_extrude_and_fillet() {
     let (features, mut live, refs) = block_model();
