@@ -2789,6 +2789,11 @@ impl<'a> Translator<'a> {
             }
             let Some((head, keys)) = id.rsplit_once(':') else { return id.to_string() };
             let kept: Vec<&str> = keys.split(',').enumerate().filter(|(i, k)| *i == 0 || k.parse::<u64>().is_ok_and(|v| v < 1 << 31)).map(|(_, k)| k).collect();
+            // (Bounded by imprinted curves alone, it keeps them: no key is left otherwise, asm-infento-subs' 1dc32b
+            // Extrude 48.)
+            if kept.len() < 2 {
+                return id.to_string();
+            }
             format!("{head}:{}", kept.join(","))
         };
         // Onshape names the region by enough of its boundary curves to tell
