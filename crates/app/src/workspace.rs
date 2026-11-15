@@ -1980,8 +1980,11 @@ impl Workspace {
                         // has revisions.
                         let menu = if matches!(kind, "assembly" | "drawing" | "variables") || kind.starts_with("file") {
                             let (d1, d2) = (view.read(cx).doc.clone(), view.read(cx).doc.clone());
-                            let pn = crate::release_dialog::tab_part_number(d1.read(cx), id);
-                            let has_revisions = !pn.is_empty() && !crate::release_dialog::release_log(d1.read(cx)).revisions(&pn).is_empty();
+                            // (The tab's own part number, else the one it was released with: the workspace keeps none after a
+                            // release, live feel/release.json 12_studios_drawing_assembly_properties.)
+                            let log = crate::release_dialog::release_log(d1.read(cx));
+                            let pn = Some(crate::release_dialog::tab_part_number(d1.read(cx), id)).filter(|p| !p.is_empty()).or_else(|| log.part_number_released(id, None)).unwrap_or_default();
+                            let has_revisions = !pn.is_empty() && !log.revisions(&pn).is_empty();
                             let menu = menu.when(noshape_ops::release_settings::managed_workflows(), |m| m.item(I::new("Release…").on_click(move |_, w, cx| {
                                 let items = crate::release_dialog::tab_items(d1.read(cx), id);
                                 crate::release_dialog::open_release_candidate(d1.clone(), items, w, cx)
