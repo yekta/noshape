@@ -1935,7 +1935,7 @@ impl PartStudioView {
         // B / I show only for fonts that have the style (live: hidden, not greyed).
         let (has_bold, has_italic) = SKETCH_FONTS.get(at).map_or((true, true), |f| (f.bold, f.italic));
         let mut row = h_flex().gap_1().child(
-            div().w(px(218.)).flex_none().child(
+            crate::ui_script::mark(div().w(px(218.)).flex_none(), || "dropdown:Font".into()).child(
                 crate::os_ui::select_field("sk-text-font", SKETCH_FONTS.iter().map(|f| f.name.to_string()).collect(), at, move |i, _, cx| {
                     if let Some(f) = SKETCH_FONTS.get(i) {
                         view.update(cx, |this, cx| this.set_text_style(TextStyle::Font(f.name), cx));
@@ -1953,12 +1953,12 @@ impl PartStudioView {
         row = row
             // Live (dom dialog-sketch-text): a 25 px bold "B" and italic "I" in
             // #1651b0 (33 / 30 x 30 buttons), then the two flip icons (20 px).
-            .when(has_bold, |r| r.child(Button::new("sk-text-bold").child(div().text_size(px(25.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x1651b0)).child("B")).ghost().w(px(33.)).h(px(30.)).selected(bold).tooltip("Bold").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Bold, cx)))))
-            .when(has_italic, |r| r.child(Button::new("sk-text-italic").child(div().text_size(px(25.)).italic().text_color(gpui_kit::rgb(0x1651b0)).child("I")).ghost().w(px(30.)).h(px(30.)).selected(italic).tooltip("Italic").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Italic, cx)))));
+            .when(has_bold, |r| r.child(crate::ui_script::mark(Button::new("sk-text-bold").child(div().text_size(px(25.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x1651b0)).child("B")).ghost().w(px(33.)).h(px(30.)).selected(bold).tooltip("Bold").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Bold, cx))), || "button:Bold".into())))
+            .when(has_italic, |r| r.child(crate::ui_script::mark(Button::new("sk-text-italic").child(div().text_size(px(25.)).italic().text_color(gpui_kit::rgb(0x1651b0)).child("I")).ghost().w(px(30.)).h(px(30.)).selected(italic).tooltip("Italic").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Italic, cx))), || "button:Italic".into())));
         if let Some((fh, fv)) = flips {
             row = row
-                .child(Button::new("sk-text-fliph").child(crate::ui::glyph("sketch-flip-horizontal", 20., gpui_kit::rgb(0x333333))).ghost().w(px(30.)).h(px(30.)).ml(px(6.)).selected(fh).tooltip("Flip horizontal").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipHorizontal, cx))))
-                .child(Button::new("sk-text-flipv").child(crate::ui::glyph("sketch-flip-vertical", 20., gpui_kit::rgb(0x333333))).ghost().w(px(30.)).h(px(30.)).ml(px(6.)).selected(fv).tooltip("Flip vertical").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipVertical, cx))));
+                .child(crate::ui_script::mark(Button::new("sk-text-fliph").child(crate::ui::glyph("sketch-flip-horizontal", 20., gpui_kit::rgb(0x333333))).ghost().w(px(30.)).h(px(30.)).ml(px(6.)).selected(fh).tooltip("Flip horizontal").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipHorizontal, cx))), || "button:Flip horizontal".into()))
+                .child(crate::ui_script::mark(Button::new("sk-text-flipv").child(crate::ui::glyph("sketch-flip-vertical", 20., gpui_kit::rgb(0x333333))).ghost().w(px(30.)).h(px(30.)).ml(px(6.)).selected(fv).tooltip("Flip vertical").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipVertical, cx))), || "button:Flip vertical".into()));
         }
         let _ = pal;
         row.into_any_element()
