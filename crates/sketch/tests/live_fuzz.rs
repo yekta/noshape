@@ -3497,6 +3497,12 @@ fn probes19() -> Vec<(String, Case)> {
     out
 }
 
+/// s228 left one constraint out at a time: which of its ties keeps the slot's bottom line when its arcs grow (live
+/// keeps l1; the dimensioned slots s320 / s422 keep the top).
+fn probes20() -> Vec<(String, Case)> {
+    leave_one_out(&[228])
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
@@ -3511,7 +3517,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17()), (18, probes18()), (19, probes19())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17()), (18, probes18()), (19, probes19()), (20, probes20())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
@@ -3541,7 +3547,7 @@ fn probe_matches() {
 fn one_case() {
     let probe = std::env::var("FUZZ_PROBE").ok();
     // (FUZZ_PROBE=<set>:<name> where names repeat across sets, e.g. 14:q2.)
-    let sets = || [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17()), (18, probes18()), (19, probes19())];
+    let sets = || [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17()), (18, probes18()), (19, probes19()), (20, probes20())];
     let Some(mut c) = probe.as_ref().and_then(|p| {
         let (set, name) = p.split_once(':').map_or((None, p.as_str()), |(s, n)| (s.parse::<u32>().ok(), n));
         sets().into_iter().filter(|(k, _)| set.is_none_or(|s| s == *k)).flat_map(|(_, l)| l).find(|(n, _)| n.split(' ').next() == Some(name)).map(|(_, c)| c)
