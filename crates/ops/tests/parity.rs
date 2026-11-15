@@ -662,14 +662,15 @@ fn exchange_round_trip() {
                 // (Live's import of ours: held to the model; where live's own import is off it, as close as that, a
                 // quarter more (live reads its own 32-tooth gear's STEP 9.7 mm³ over its model, ours 10.7; its IGES of
                 // either the same); where live fails its own file (the wave spring's STEP), the model's.)
-                Some(x) if format != "STL" && ours => Some(held_to_model(own, x, 1.25, true)),
+                Some(x) if format != "STL" && ours => Some(held_to_model(own, x, 1.25, true, false)),
                 Some(x) if format != "STL" && (volume(&own) - volume(x)).abs() > 1e-3 * volume(x).abs() => {
                     println!("{name}: live's own {format} import is off ({:.3} mm³, its Parasolid's {:.3}): compared with the Parasolid's", volume(&own) * 1e9, volume(x) * 1e9);
                     Some(x.clone())
                 }
-                // (An STL mesh too, within twice live's own STL's error: the same density, its vertices elsewhere.)
-                Some(x) if format == "STL" => Some(held_to_model(own, x, 2.0, ours)),
-                Some(x) => Some(held_to_model(own, x, 1.0, false)),
+                // (An STL mesh too, within twice live's own STL's error: the same density, its vertices elsewhere; at
+                // 15° cf-spur-gear's 65-tooth gear is 5 % under its model in live's own, 5601 mm³ for 5915.7.)
+                Some(x) if format == "STL" => Some(held_to_model(own, x, 2.0, ours, true)),
+                Some(x) => Some(held_to_model(own, x, 1.0, false, false)),
                 _ => Some(own),
             }
         };
@@ -722,13 +723,14 @@ fn exchange_round_trip() {
         for (format, ext) in FORMATS {
             let file = dir.join(format!("ours.{ext}"));
             let mut args = json!({ "format": format, "file": file });
-            // STL as live.stl was made, REST's default tessellation: 5° arcs, no chord limit (live 2319; clamp-hms
-            // 4,576 triangles, ours 4,568).
+            // STL as live.stl was made, REST's default tessellation: no chord limit, 5° arcs, 15° when the exported
+            // parts have over 500 faces (live2 exchange-kw: 498 faces 5°, 501 15°; cf-spur-gear's 848: its Ø10
+            // keyway bore 22 segments; live 2319: clamp-hms 4,576 triangles, ours 4,568).
             if format == "STL" {
                 args["units"] = json!("Millimeter");
                 args["resolution"] = json!("custom");
                 args["chordal_tolerance"] = json!(100);
-                args["angular_deviation"] = json!(5);
+                args["angular_deviation"] = json!(if native.iter().map(|p| p.faces).sum::<u64>() > 500 { 15 } else { 5 });
             }
             if let Err(e) = t.call("export_parts", args) {
                 println!("{name}: ours.{ext} not exported: {e}");
@@ -814,7 +816,9 @@ fn splits_no_more(held: &[PartState], own: &[PartState], read: &[PartState]) -> 
 /// Live's import of its own export, each part's volume and area held to its model's (its Parasolid import) where the
 /// import is off from it by up to 1 %, within as much as the import is off (cf-spur-gear's STEP: no pcurves, the
 /// tooth chamfers' edges 4-pole curves; live reads its 32-tooth gear 0.2 % over its model: ours is held to be as close).
-fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64, failures_to_model: bool) -> Vec<PartState> {
+/// A mesh's (`mesh`: an STL) error is its tessellation's at live's density, however far: live's import of ours within
+/// as much, never held to the model as a failure.
+fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64, failures_to_model: bool, mesh: bool) -> Vec<PartState> {
     if own.len() != model.len() {
         return own;
     }
@@ -841,9 +845,9 @@ fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64, failures_
             }
             continue;
         }
-        // An STL of live's off its model by over 1 % (cf-spur-gear's 65-tooth gear: 5601 mm³ for 5915.7, live's
-        // failure, no target): for live's import of ours, the model's, within 1 % as an STL read back is.
-        if d > 1e-2 * b.abs() {
+        // An import of live's off its model by over 1 % (cf-wave-spring's STEP: 7559 mm³ for 916.5, live's failure, no
+        // target): for live's import of ours, the model's, within 1 %.
+        if d > 1e-2 * b.abs() && !(mesh && failures_to_model) {
             if failures_to_model {
                 let p = &mut out[o];
                 p.volume = Some(b);
@@ -874,7 +878,7 @@ fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64, failures_
 #[test]
 fn a_mesh_area_off_the_model_is_held_to_it() {
     let part = |volume: f64, area: f64, band: f64| PartState { name: "Part 2".into(), volume: Some(volume), volume_band: Some([volume - 1e-13, volume + 1e-13]), area: Some(area), area_band: Some([area - band, area + band]), ..Default::default() };
-    let held = held_to_model(vec![part(7.7646e-12, 3.28792e-7, 2e-10)], &[part(7.854e-12, 3.29867e-7, 2e-10)], 2.0, true);
+    let held = held_to_model(vec![part(7.7646e-12, 3.28792e-7, 2e-10)], &[part(7.854e-12, 3.29867e-7, 2e-10)], 2.0, true, true);
     let [lo, hi] = held[0].area_band.expect("band");
     assert!((lo..=hi).contains(&3.29748e-7), "ours, nearer the model than live's own STL");
     assert!(!(lo..=hi).contains(&3.26e-7), "off the model by more than twice live's own");
@@ -887,11 +891,11 @@ fn a_mesh_area_off_the_model_is_held_to_it() {
 #[test]
 fn live_reading_its_own_step_off_holds_ours_as_close() {
     let part = |volume: f64| PartState { name: "Spur gear (32 teeth)".into(), faces: 262, edges: 780, vertices: 520, volume: Some(volume * 1e-9), volume_band: Some([volume * 1e-9 - 1e-14, volume * 1e-9 + 1e-14]), ..Default::default() };
-    let held = held_to_model(vec![part(4771.704)], &[part(4761.972)], 1.25, false);
+    let held = held_to_model(vec![part(4771.704)], &[part(4761.972)], 1.25, false, false);
     assert!(differences(&held, &[part(4772.713)]).is_empty(), "{:?}", differences(&held, &[part(4772.713)]));
     assert!(!differences(&held, &[part(4781.5)]).is_empty());
     // Live's failure on its own file (the wave spring's STEP read 7559 mm³ for 916.5): ours held to the model.
-    let held = held_to_model(vec![part(7559.004)], &[part(916.533)], 1.25, true);
+    let held = held_to_model(vec![part(7559.004)], &[part(916.533)], 1.25, true, false);
     assert!(differences(&held, &[part(916.722)]).is_empty());
 }
 
@@ -922,15 +926,16 @@ fn read_back_within_edge_tolerance() {
 fn an_import_off_its_model_holds_ours_as_close() {
     let part = |volume: f64, band: f64| PartState { name: "Part 1".into(), faces: 6, edges: 12, vertices: 8, volume: Some(volume), volume_band: Some([volume - band, volume + band]), ..Default::default() };
     let model = [part(4761.97e-9, 1.3e-9), part(100.0e-9, 0.01e-9)];
-    let held = held_to_model(vec![part(4771.70e-9, 0.3e-9), part(100.0e-9, 0.01e-9)], &model, 1.0, false);
+    let held = held_to_model(vec![part(4771.70e-9, 0.3e-9), part(100.0e-9, 0.01e-9)], &model, 1.0, false, false);
     assert!(differences(&held, &[part(4757.60e-9, 0.0), part(100.0e-9, 0.0)]).is_empty(), "ours 0.09 % under the model, live's 0.2 % over");
     assert!(!differences(&held, &[part(4750.0e-9, 0.0), part(100.0e-9, 0.0)]).is_empty(), "further from the model than live");
-    // An STL of live's 5 % off its model (cf-spur-gear's 65-tooth gear): live's import of ours is held to the model.
+    // An STL of live's 5 % off its model (cf-spur-gear's 65-tooth gear at 15°, its tessellation): live's import of
+    // ours within twice as far from the model.
     let model = [part(5915.65e-9, 0.0)];
     let off = vec![part(5601.22e-9, 0.0)];
-    let ours = [part(5906.96e-9, 0.0)];
-    assert!(differences(&held_to_model(off.clone(), &model, 2.0, true), &ours).is_empty(), "ours within 1 % of the model");
-    assert!(!differences(&held_to_model(off, &model, 2.0, false), &ours).is_empty(), "importing live's own file: live's reading");
+    assert!(differences(&held_to_model(off.clone(), &model, 2.0, true, true), &[part(5624.08e-9, 0.0)]).is_empty(), "ours 4.9 % under at 15°");
+    assert!(!differences(&held_to_model(off.clone(), &model, 2.0, true, true), &[part(5200.0e-9, 0.0)]).is_empty(), "12 % under: coarser than live's");
+    assert!(!differences(&held_to_model(off, &model, 2.0, false, true), &[part(5906.96e-9, 0.0)]).is_empty(), "importing live's own file: live's reading");
 }
 
 /// Live's import that splits its own model's edges (the hose's STEP) is its shortcoming: ours is held to the model's
