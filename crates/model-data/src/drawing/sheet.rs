@@ -1366,10 +1366,12 @@ impl SheetGeometry {
             && let Some((pts, _)) = outlines.first()
         {
             // Solid fill: the shape filled in its own colour (live: orange
-            // under a black border and number, drawing/1710).
-            for i in 1..pts.len().saturating_sub(1) {
-                self.fills.push(Fill2 { points: vec![pts[0], pts[i], pts[i + 1]] });
-            }
+            // under a black border and number, drawing/1710). One path, outlined in the fill's colour as well: the
+            // ring, a line to the centre and back (live drw-inspection-item.pdf, 0.12 pt).
+            let mut points = pts.clone();
+            points.extend([pts[0], c]);
+            self.outlined_fills.push(self.fills.len());
+            self.fills.push(Fill2 { points });
             let fill = ColorSpan { lines: 0..0, texts: 0..0, fills: m.2..self.fills.len(), rgb: style.fill_color.unwrap_or(INSPECTION_FILL) };
             self.colors.push(fill);
             if shape == S::Circle {
@@ -3977,6 +3979,21 @@ mod tests {
         assert!((0..g.lines.len()).all(|i| g.cad_line_layer(i) == CadLayer::InspectionCallout));
         assert!((0..g.fills.len()).all(|i| g.cad_fill_layer(i) == CadLayer::InspectionCallout));
         assert!(matches!(g.cad_objects.as_slice(), [CadObject::SolidDisk { r: rr, .. }] if (rr - r).abs() < 1e-9));
+    }
+
+    /// Live drw-inspection-item.pdf (live2 11-15): the solid fill is one path, filled and outlined in its colour: the
+    /// ring, then a line to the centre and back (perimeter + 2 r at 0.12 pt).
+    #[test]
+    fn inspection_bubble_fill_is_one_outlined_path() {
+        let style = InspectionStyle { shape: super::super::InspectionShape::Circle, text_height: 2.032, border: 1.2, chars: 2, color: None, solid: true, font: None, text_color: None, fill_color: None };
+        let mut g = SheetGeometry::new(300.0, 300.0);
+        g.inspection_bubble([100.0, 50.0], 1, &style, 1);
+        let r = 2.032 * 1.5;
+        assert_eq!((g.fills.len(), g.outlined_fills.as_slice()), (1, [0].as_slice()));
+        let p = &g.fills[0].points;
+        let length: f64 = p.windows(2).chain(std::iter::once([p[p.len() - 1], p[0]].as_slice())).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum();
+        let ring = 2.0 * std::f64::consts::PI * r;
+        assert!((length - (ring + 2.0 * r)).abs() < 0.01 * ring, "{length} vs {}", ring + 2.0 * r);
     }
 
     /// Live 3094 (text 0.08 in): a circle bubble's radius is 0.08 / 0.12 / 0.16 / 0.20 / 0.24 in for 1-5 characters,
