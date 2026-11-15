@@ -6658,15 +6658,24 @@ fn retarget_auto(c: AutoConstraint, from: EntityId, to: EntityId) -> AutoConstra
 /// step's length is a spacing dimension and an axis-aligned step keeps its
 /// direction. Instance points are found by position (seed + k * step).
 fn linear_grid_pattern(data: &mut SketchData, seeds: &[EntityId], x: (DVec2, usize), y: (DVec2, usize), wpp: f64) -> Result<Vec<Vec<EntityId>>, noshape_sketch::SketchError> {
+    // A direction line goes with the pattern's instances (an edit replaces it with them).
+    let with_line = |data: &SketchData, groups: &mut [Vec<EntityId>], line: Option<EntityId>| {
+        if let (Some(line), Some(first)) = (line, groups.first_mut()) {
+            first.push(line);
+            first.extend(data.sketch.endpoints(line).map(|(a, b)| [a, b]).into_iter().flatten());
+        }
+    };
     let mut groups = data.sketch.linear_pattern_groups(seeds, x.0, x.1)?;
-    link_linear_pattern(data, seeds, &groups, x.0, wpp);
+    let line = link_linear_pattern(data, seeds, &groups, x.0, wpp);
     if y.1 > 1 {
         let mut row = seeds.to_vec();
         row.extend(groups.iter().flatten().copied());
-        let rows = data.sketch.linear_pattern_groups(&row, y.0, y.1)?;
-        link_linear_pattern(data, &row, &rows, y.0, wpp);
+        let mut rows = data.sketch.linear_pattern_groups(&row, y.0, y.1)?;
+        let second = link_linear_pattern(data, &row, &rows, y.0, wpp);
+        with_line(data, &mut rows, second);
         groups.extend(rows);
     }
+    with_line(data, &mut groups, line);
     Ok(groups)
 }
 
@@ -6839,7 +6848,7 @@ pub fn link_linear_pattern_grid(data: &mut SketchData, grid: &[Vec<Vec<EntityId>
             }
             for (seed, inst) in base.iter().zip(g) {
                 if sk.kind(*seed) == Some(EntityKind::Circle) {
-                    links.push(ConstraintKind::Equal { a: *seed, b: *inst });
+                    links.push(ConstraintKind::PatternLink { seed: *seed, inst: *inst, ref_seed: s0, ref_inst: r, k: k as f64 });
                 }
             }
             groups.push(g.clone());
@@ -6871,7 +6880,7 @@ fn record_pattern(data: &mut SketchData, mut p: noshape_model::sketch_feature::S
     id
 }
 
-fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<EntityId>], step: DVec2, wpp: f64) {
+fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<EntityId>], step: DVec2, wpp: f64) -> Option<EntityId> {
     let sk = &mut data.sketch;
     let seed_points: Vec<EntityId> = seeds
         .iter()
@@ -6884,9 +6893,9 @@ fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<
         });
     let tol = step.length().max(1e-9) * 1e-7;
     let find = |sk: &Sketch, g: &[EntityId], at: DVec2| g.iter().copied().find(|e| is_point(sk, *e) && sk.point(*e).is_some_and(|q| (q - at).length() <= tol));
-    let Some(&s0) = seed_points.first() else { return };
-    let Some(p0) = sk.point(s0) else { return };
-    let Some(first0) = groups.first().and_then(|g| find(sk, g, p0 + step)) else { return };
+    let s0 = *seed_points.first()?;
+    let p0 = sk.point(s0)?;
+    let first0 = groups.first().and_then(|g| find(sk, g, p0 + step))?;
     for (k, g) in groups.iter().enumerate() {
         let kk = (k + 1) as f64;
         for (j, seed) in seed_points.iter().enumerate() {
@@ -6905,18 +6914,25 @@ fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<
             let target = center + step * kk;
             let inst = g.iter().copied().find(|e| matches!(sk.curve(*e), Some(Curve2::Circle { center: c, .. }) if (c - target).length() <= tol));
             if let Some(inst) = inst {
-                let _ = sk.add_constraint(ConstraintKind::Equal { a: *seed, b: inst });
+                let _ = sk.add_constraint(ConstraintKind::PatternLink { seed: *seed, inst, ref_seed: s0, ref_inst: first0, k: kk });
             }
         }
     }
-    // Spacing dimension and direction.
+    // Live's direction (a pattern's `direction1` / `direction2`): a construction line from the seed to its first
+    // instance, its ends on them, horizontal / vertical along an axis, its length the spacing dimension.
+    let line = sk.add_line(p0, p0 + step);
+    let _ = sk.set_construction(line, true);
+    let (a, b) = sk.endpoints(line)?;
+    let _ = sk.add_constraint(ConstraintKind::Coincident { a, b: s0 });
+    let _ = sk.add_constraint(ConstraintKind::Coincident { a: b, b: first0 });
     if step.y.abs() < 1e-12 {
-        let _ = sk.add_constraint(ConstraintKind::Horizontal { a: s0, b: Some(first0) });
+        let _ = sk.add_constraint(ConstraintKind::Horizontal { a: line, b: None });
     } else if step.x.abs() < 1e-12 {
-        let _ = sk.add_constraint(ConstraintKind::Vertical { a: s0, b: Some(first0) });
+        let _ = sk.add_constraint(ConstraintKind::Vertical { a: line, b: None });
     }
     let label = p0 + step * 0.5 + step.try_normalize().unwrap_or(DVec2::X).perp() * wpp * 24.0;
-    add_dimension(data, ConstraintKind::Distance { a: s0, b: first0, value: step.length(), mode: DistanceMode::Center }, Some(label), None);
+    add_dimension(data, ConstraintKind::Length { curve: line, value: step.length() }, Some(label), None);
+    Some(line)
 }
 
 /// Lower-left corner and height of an image rectangle dragged from `a` to
@@ -9993,10 +10009,46 @@ mod tests {
         assert!(ed.apply_pattern(&mut d).changed);
         assert_eq!(count(&d, EntityKind::Circle), 5, "edit replaces the old instances");
         assert_eq!(d.patterns.len(), 1);
+        assert_eq!(direction_lines(&d), 1, "an edit replaces the direction line with the instances");
         // Esc cancels a pattern being set up
         ed.selection = vec![c];
         assert!(ed.cancel());
         assert!(ed.selection.is_empty());
+    }
+
+    fn direction_lines(d: &SketchData) -> usize {
+        d.sketch.entities().filter(|e| e.kind() == EntityKind::Line && e.construction).count()
+    }
+
+    /// Live sketch-linear-pattern-click-commit: a circle's linear pattern adds no Equal; a construction line runs
+    /// from the seed's centre to the first instance's (both ends Coincident), horizontal, its length the spacing.
+    #[test]
+    fn a_linear_pattern_draws_its_direction_line_as_live() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let c = d.sketch.add_circle(v(0.01, 0.01), 0.002);
+        ed.selection = vec![c];
+        ed.set_tool(Tool::LinearPattern);
+        ed.pattern_count = 3;
+        ed.pattern_distance = 0.01;
+        ed.pattern_angle = 0.0;
+        click(&mut ed, &mut d, v(0.04, 0.04));
+        let kinds: Vec<&str> = d.sketch.constraints().map(|c| c.kind.name()).collect();
+        assert!(!kinds.contains(&"Equal"), "{kinds:?}");
+        assert_eq!(direction_lines(&d), 1);
+        let line = d.sketch.entities().find(|e| e.kind() == EntityKind::Line && e.construction).unwrap().id;
+        let (a, b) = d.sketch.endpoints(line).unwrap();
+        assert!((d.sketch.point(a).unwrap() - v(0.01, 0.01)).length() < 1e-9);
+        assert!((d.sketch.point(b).unwrap() - v(0.02, 0.01)).length() < 1e-9);
+        let on = |p: EntityId| d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, .. } if a == p));
+        assert!(on(a) && on(b), "{kinds:?}");
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: None } if a == line)));
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Length { curve, value } if curve == line && (value - 0.01).abs() < 1e-12)));
+        assert!(d.sketch.solve().is_solved());
+        // The instances keep the seed's radius through the pattern itself.
+        d.sketch.add_constraint(ConstraintKind::Radius { curve: c, value: 0.003 }).unwrap();
+        assert!(d.sketch.solve().is_solved());
+        let radii: Vec<f64> = d.sketch.entities().filter_map(|e| match d.sketch.curve(e.id) { Some(Curve2::Circle { radius, .. }) => Some(radius), _ => None }).collect();
+        assert!(radii.iter().all(|r| (r - radii[0]).abs() < 1e-9), "{radii:?}");
     }
 
     #[test]

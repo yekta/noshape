@@ -1,5 +1,16 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-15 18:21 UTC): sketch patterns as live (psui's sketch rows)
+- 58a0bd16 (queued): a circular pattern of circles holds their radii in CircularPatternLink, no Equal (live
+  sketch-circular-pattern-click-commit: [CP, CP, H]).
+- Linear pattern (this entry's commit): PatternLink holds circles' radii (no Equal); live's direction line: a
+  construction line seed -> first instance, both ends Coincident, H / V along an axis, Length = spacing; it goes in
+  the first instance group so an edit replaces it (T1 a_linear_pattern_draws_its_direction_line_as_live).
+  psui's exporter lists CIRCULAR_PATTERN per (seed point, centre) and LINEAR_PATTERN per constraint, live lists
+  each pattern twice; and our tool stays "Linear pattern" after commit (live null): told psui.
+- Speed: shaped-flange's time is bool's Booleans (recordings handed to bool). Tried square bend-end cuts in
+  host/sheetmetal.rs: no gain, dropped.
+
 ## Resume here (2026-11-15 16:46 UTC): Offset of model edges landed; frame numbering; waiting on 3 live captures
 - 215050df (lead's decision): sketch Offset takes model edges / other sketches' curves (op `sketch_offset`, app
   Offset tool, translator's externalMaster / externalSecond via link_sketch_offset): a hidden reference-only

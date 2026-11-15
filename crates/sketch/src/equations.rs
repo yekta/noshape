@@ -1908,6 +1908,12 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 }
                 _ => Err("arc angle needs an arc".into()),
             },
+            // A circle: the seed's radius (its centre has its own link).
+            K::PatternLink { seed, inst, .. } if self.sk.kind(*seed) == Some(EntityKind::Circle) => {
+                let (rs, ri) = (self.radius(*seed)?, self.radius(*inst)?);
+                self.lin(Lin::new().rad(1.0, &ri).rad(-1.0, &rs));
+                Ok(())
+            }
             K::PatternLink { seed, inst, ref_seed, ref_inst, k } => {
                 let (s, i, rs, ri) = (self.pt(*seed)?, self.pt(*inst)?, self.pt(*ref_seed)?, self.pt(*ref_inst)?);
                 for comp in 0..2 {

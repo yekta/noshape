@@ -94,7 +94,7 @@ pub enum ConstraintKind {
     EllipseRadius { ellipse: EntityId, major: bool, value: f64 },
     /// Linear pattern link: `inst - seed = k * (ref_inst - ref_seed)` for
     /// points (Onshape's linear pattern constraint: every instance follows
-    /// its seed and one shared step).
+    /// its seed and one shared step); a circle keeps its seed's radius.
     PatternLink { seed: EntityId, inst: EntityId, ref_seed: EntityId, ref_inst: EntityId, k: f64 },
     /// Circular pattern: a point is a rotated copy about a shared center.
     /// For ellipses this relates the major vectors and minor radii instead, for
