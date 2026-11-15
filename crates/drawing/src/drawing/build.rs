@@ -2341,7 +2341,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 let pick = if br.inherited { view_pick } else { picks.id(PickTarget::BreakLine { view: v.id, index: br.index as usize }) };
                 let style = br.style;
                 let other = 1 - br.axis as usize;
-                let margin = 3.0 / (pl.scale * 1000.0);
+                // Past the geometry: 0.1 in on ANSI (live drw-break-view-straight.dxf); ISO not captured.
+                let margin = if drawing.is_ansi() { 2.54 } else { 3.0 } / (pl.scale * 1000.0);
                 let (o0, o1) = (geo.min[other] - margin, geo.max[other] + margin);
                 let nrm = pl.dir_to_sheet(if br.axis == 0 { [1.0, 0.0] } else { [0.0, 1.0] });
                 for at in [br.a, br.b] {

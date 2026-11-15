@@ -1942,7 +1942,7 @@ impl SheetGeometry {
                         let last = points[points.len() - 2];
                         self.lines.push(Polyline2 { points: points.clone(), style: LineStyle::Thin, closed: false, pick });
                         self.leader_paths.push((a.id, li, LeaderPath { points, head: 1 }));
-                        self.arrow(t, [t[0] - last[0], t[1] - last[1]], self.style.ann_arrow);
+                        self.arrow(t, [t[0] - last[0], t[1] - last[1]], 3.0);
                     }
                     let symbol = self.mark();
                     self.surface_finish_symbol(p, &env.expand(value), spec, ah, pick);
@@ -2857,7 +2857,7 @@ impl SheetGeometry {
                     [p[0] + 0.6 * t.cos(), p[1] + 0.6 * t.sin()]
                 }).collect() });
             } else {
-                self.arrow(p, [p[0] - last[0], p[1] - last[1]], self.style.ann_arrow);
+                self.arrow(p, [p[0] - last[0], p[1] - last[1]], 3.0);
             }
         }
     }

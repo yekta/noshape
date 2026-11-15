@@ -236,6 +236,15 @@ fn rotated_and_broken_views() {
     }
     assert!(texts(&br).iter().any(|t| t == "100"));
     assert_eq!(br.picks.iter().filter(|t| matches!(t, PickTarget::BreakLine { .. })).count(), 1);
+    // ANSI: a straight break line runs 0.1 in past the view's geometry (live drw-break-view-straight.dxf).
+    drawing.sheets[0].size = SheetSize::AnsiD;
+    drawing.sheets[0].view_mut(ViewId(1)).unwrap().breaks[0].style = BreakStyle::Straight;
+    let br = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let p3 = *br.placement(ViewId(1)).unwrap();
+    let bp = pick_of(&br, PickTarget::BreakLine { view: ViewId(1), index: 0 });
+    let ys: Vec<f64> = br.geometry.lines.iter().filter(|l| l.pick == bp).flat_map(|l| l.points.iter().map(|p| p[1])).collect();
+    let span = ys.iter().cloned().fold(f64::MIN, f64::max) - ys.iter().cloned().fold(f64::MAX, f64::min);
+    assert!((span - (p3.max[1] - p3.min[1] + 2.0 * 2.54)).abs() < 1e-6, "{span} vs {}", p3.max[1] - p3.min[1]);
 }
 
 #[test]
@@ -4034,6 +4043,13 @@ fn callout_leaders_take_nodes_and_branches() {
     };
     let p = paths(&s);
     assert_eq!(p.len(), 2);
+    // Its arrowhead is the annotations' Arrowhead long, not more (live drw-callout-shape-hexagon.pdf: 0.18 in).
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.style.ann_arrow = 4.572;
+    g.add_annotations(&s, &env);
+    let head = g.fills.iter().find(|f| f.points.len() == 3 && f.points[0] == [100.0, 50.0]).expect("the anchor's arrowhead");
+    let base = [(head.points[1][0] + head.points[2][0]) / 2.0, (head.points[1][1] + head.points[2][1]) / 2.0];
+    assert!(((base[0] - 100.0).hypot(base[1] - 50.0) - g.style.ann_arrow).abs() < 1e-9, "{head:?}");
     // From the border towards the node, through it, to the anchor.
     let (id, i, main) = &p[0];
     assert_eq!((*id, *i, main.len()), (7, 0, 3));
