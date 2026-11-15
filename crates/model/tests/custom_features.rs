@@ -447,6 +447,46 @@ export const plate = defineFeature(function(context is Context, id is Id, defini
     assert_eq!(vis(&v), ["round", "chamfer"]);
 }
 
+/// A feature whose definition map has another name (asm-isaac-ball's GearLab: `def is map`): its parameters as
+/// `definition`'s, conditions included.
+#[test]
+fn a_definition_named_otherwise_declares_its_parameters() {
+    let src = r#"
+export enum Method
+{
+    annotation { "Name" : "Manual" }
+    MANUAL,
+    annotation { "Name" : "Inherit" }
+    INHERIT
+}
+
+annotation { "Feature Type Name" : "Gear" }
+export const gear = defineFeature(function(context is Context, id is Id, def is map)
+    precondition
+    {
+        annotation { "Name" : "Build method" }
+        def.method is Method;
+        if (def.method == Method.MANUAL)
+        {
+            annotation { "Name" : "Module" }
+            isLength(def.m, BLEND_BOUNDS);
+        }
+        annotation { "Name" : "Teeth" }
+        isInteger(def.z, POSITIVE_COUNT_BOUNDS);
+    }
+    {
+    });
+"#;
+    let fx = Fixture::new(&studio(src));
+    let t = noshape_model::features::get(&fx.ty("gear")).unwrap();
+    let mut v = noshape_model::params::ParamValues::default();
+    noshape_model::params::fill_defaults(&t.params, &mut v, &fx.units);
+    let vis = |v: &noshape_model::params::ParamValues| t.params.iter().filter(|p| p.is_visible(v)).map(|p| p.id).collect::<Vec<_>>();
+    assert_eq!(vis(&v), ["method", "m", "z"]);
+    v.set("method", ParamValue::Enum("INHERIT".into()));
+    assert_eq!(vis(&v), ["method", "z"]);
+}
+
 #[test]
 fn demo_feature_studio_regenerates() {
     let doc = noshape_model::demo::demo_document();

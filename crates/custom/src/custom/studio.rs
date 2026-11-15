@@ -111,14 +111,14 @@ fn compile_uncached(tab: TabId, studio: &str, source: &str, hash: u64, resolver:
             let lambda = defined_lambda(init, "defineTable");
             // Live: a table function without a precondition is only warned
             // about, and is not offered anywhere.
-            let Some(p) = lambda.and_then(|f| f.precondition.as_ref()) else {
+            let Some(lambda) = lambda.filter(|f| f.precondition.is_some()) else {
                 if let Some(f) = lambda {
                     out.diagnostics.push(Diagnostic { severity: Severity::Warning, line: f.pos.line as usize, column: f.pos.col as usize, message: format!("Nonconforming table function '{}': Missing precondition", d.name), parse: false });
                 }
                 continue;
             };
             let mut params = Vec::new();
-            collect_params(&module, p, &mut params);
+            collect_params(&module, lambda, &mut params);
             out.tables.push(CustomTableDef {
                 name: d.name.to_string(),
                 display_name: display,
@@ -129,10 +129,9 @@ fn compile_uncached(tab: TabId, studio: &str, source: &str, hash: u64, resolver:
             continue;
         }
         let Some(display) = ann.str("Feature Type Name").map(|s| s.to_string()) else { continue };
-        let precondition = feature_lambda(init).and_then(|f| f.precondition.as_ref());
         let mut params = Vec::new();
-        if let Some(p) = precondition {
-            collect_params(&module, p, &mut params);
+        if let Some(f) = feature_lambda(init) {
+            collect_params(&module, f, &mut params);
         }
         let type_id = super::studio_type_id(studio, &d.name);
         let description = ann.str("Feature Type Description").unwrap_or("").to_string();
@@ -349,8 +348,12 @@ fn compile_condition(module: &CompiledModule, cond: &ast::Expr, root: &str) -> O
     module.compile_lambda(&[root], cond).ok()
 }
 
-pub(crate) fn collect_params(module: &Arc<CompiledModule>, s: &ast::Stmt, out: &mut Vec<ParamDecl>) {
-    collect_in(module, s, &[], None, &[], out)
+/// The parameters `f`'s precondition declares on its definition map (its last parameter, whatever its name: GearLab's
+/// `def`, asm-isaac-ball's gears).
+pub(crate) fn collect_params(module: &Arc<CompiledModule>, f: &ast::FnDef, out: &mut Vec<ParamDecl>) {
+    let Some(s) = &f.precondition else { return };
+    let root = f.params.last().map_or("definition", |p| &*p.name);
+    collect_in(module, s, &[], None, &[root], out)
 }
 
 /// `ann`: the annotation on `s` (evaluated, and its expression).

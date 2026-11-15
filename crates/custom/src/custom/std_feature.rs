@@ -81,9 +81,7 @@ fn load(module: &str, name: &str) -> Option<Arc<StdFeature>> {
     let (editing, manipulator_change) = (function("Editing Logic Function"), function("Manipulator Change Function"));
     let lambda = defined_lambda(init, "defineSheetMetalFeature").or_else(|| defined_lambda(init, "defineFeature"))?;
     let mut params = Vec::new();
-    if let Some(p) = &lambda.precondition {
-        collect_params(&m, p, &mut params);
-    }
+    collect_params(&m, lambda, &mut params);
     // The built-in feature std's feature stands for (Transform: fTransform).
     let ty = crate::regen::std_route::core_type(name);
     let mut specs = crate::features::get(ty).map(|t| t.params.clone()).unwrap_or_default();

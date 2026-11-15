@@ -312,6 +312,8 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
         Ok(Ok(r)) => r,
         _ => (Err("Feature evaluation crashed".to_string()), Vec::new(), String::new(), Vec::new()),
     };
+    // (NOSHAPE_FS_TRACE=1: why a custom feature failed, as its FeatureScript notices and console say.)
+    let trace = host::trace_ops().then(|| format!("{result:?}; notices {notices:?}; output {}", output.chars().take(4000).collect::<String>()));
     OUTPUT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     OUTPUTS.lock().insert(ev.feature, FeatureOutput { type_id: type_id.clone(), feature_name: ev.name.to_string(), notices, output, line_times });
 
@@ -319,6 +321,11 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     let mut st = cx.state.lock();
     let top = vec![Arc::<str>::from(ev.feature.to_string())];
     let status = st.status.get(&top).cloned();
+    if let Some(t) = &trace
+        && (result.is_err() || status.as_ref().is_some_and(|s| s.get("statusType").as_str().is_some_and(|k| &*k == "ERROR")))
+    {
+        eprintln!("[fs] {} failed: {t}; status {status:?}", ev.name);
+    }
     let debug = std::mem::take(&mut st.debug_entities);
     // std's addManipulators (Flange's length, custom features' handles).
     ev.manipulators = std::mem::take(&mut st.manipulators);
