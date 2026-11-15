@@ -28,6 +28,33 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-15 17:24 UTC: the API Hole rule (P0 fixed), live2's selection answers, my areas' run
+
+Where to work: ui-parity on vibe6 again (lead 11-15 16:50: vibe7 loaded; ≤2 apps while psui runs there), builds and
+crate tests on the Mac. `~/tmp/studios/shards-names.sh` is on vibe6 and vibe7.
+
+- Hole through the API (lead 11-15, final): a size given (holeDiameterV3, tap drill, cbore, csink) is never refused or
+  replaced, with or without a Standard's size or tableSynced (true or false), the schema default's 5 mm too: the hole
+  is marked as holding its values (tableSynced true) and reads Onshape's "Parameters have been overridden. Check
+  input." where they differ from the Standard's; a Standard's size given without sizes takes the Standard's. An
+  edit's unchanged values (feature_get's passed back) count as not given. My 8aea0c3c4 (refusing a size that differed)
+  cost the model suite clamp-abhil, clamp-hms, prize-wheel-tim and pipeflange-steven (skasm 16:10); fixed in
+  7d84bc8d (16:47); all ten Part Studio documents with Holes match to the end with today's rule (vibe6 17:15).
+  e2e `a_hole_size_given_is_used_as_given`, `hole_standard_sets_the_table_sizes`.
+- Live2's answers: a new line to line angular dimension stays selected after Esc (other dimensions don't: diameter,
+  line-to-line, point-to-point read none); a selected hole callout is an orange box behind its text, its leader black,
+  its holes light blue (`push_hole_callout_selection`; the reader counts its text only); a surface finish standing on
+  an edge without a leader has Flip where a free or led one has Add leader; the dimension palette's halo; an empty
+  Part Studio's tab menu has no Export… while it is the open tab.
+- Runner: live's recorder 2026-11-15.2 reads a drawing's context menu ("RmbMenu", "" separators, check flags):
+  ours reports it marked `drawing` (dropped for older takes); a live list's `name` isn't compared; a field's list
+  live didn't read (`select_unread`), a document live read before it loaded (`document_loading`).
+- My non-drawing areas (655 takes, vibe7 15:05): 642 match. Left: fs-ac-fn-std-list (the 9th row: two enums tie on
+  the match, live lists NewBodyOperationType before BooleanOperationType: std's entry order, not known),
+  fs-ed-error-squiggle / fs-ps-custom-feature-error (notice counts: texts asked of live2), fs-tb-redo (live's Undo
+  split the typed run: retake asked), ver-vh-header-release (fixed: Create release candidate from the history header
+  closes the panel, landing now).
+
 ### 2026-11-15 14:12 UTC: live's page height per take, sheet fit, dimension palette halo
 
 Where to work: as below, but ui-parity runs on vibe7 now (lead 11-15 12:50: ≤3 apps; vibe6 is psui's and blend's).
@@ -85,9 +112,7 @@ Open items:
   live, its frame's bottom at y 1039 and the paper off the canvas: not modelled (live/feel/sheet-fit/).
 - docs/parity/drawing-matrix.md refreshed 11-15 14:30 (949 of 1868 live items compared and matching, none missing;
   drw-surface-finish-flip is older than live's surface-finish menu without Flip: retake asked of live2).
-- Hole sizes through the API (lead 11-15): feature_add keeps a size the caller gives (sets tableSynced), Onshape's
-  "Parameters have been overridden. Check input." where it differs from the Standard's (e2e
-  a_hole_size_given_is_used_as_given); the ui-parity start builder no longer special-cases it.
+- Hole sizes through the API: see the 17:24 entry.
 - Waiting on live2: none. Waiting on live: nothing (the cell's Size rows equally on unequal rows was not tested; ask if
   needed).
 

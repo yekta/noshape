@@ -1708,6 +1708,8 @@ impl Render for HistoryPanel {
                         move |_, window, cx| {
                             let tab = doc.read(cx).session.active_tab;
                             let items = tab.map(|t| crate::release_dialog::tab_items(doc.read(cx), t)).unwrap_or_default();
+                            // The panel closes behind the dialog (live2 ver-vh-header-release: no history from then on).
+                            window.dispatch_action(Box::new(crate::actions::ToggleVersionGraph), cx);
                             crate::release_dialog::open_release_candidate(doc.clone(), items, window, cx)
                         }
                     })))
