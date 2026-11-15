@@ -2447,7 +2447,12 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       if (a < sa - past || z > sz + past)
         return "a piece across its surface's seam angle";
     }
-    if (z - a > 2 * M_PI + 1e-6)
+    // (Past a turn within its edges' tolerance round the axis: OCCT's section's curve on it ending off the seam by
+    // its own error, as OCCT's own (c2-helical-sweep's thread across the bar's seam, 1e-4 rad on a 5.8 um edge).)
+    double etol = 0;
+    for (TopExp_Explorer x(fs[i], TopAbs_EDGE); x.More(); x.Next())
+      etol = std::max(etol, BRep_Tool::Tolerance(TopoDS::Edge(x.Current())));
+    if (z - a > 2 * M_PI + (radius > 1e-9 ? std::max(1e-6, etol / radius) : 1e-6))
       return "a face's curves over more than a turn";
   }
   TopoDS_Compound out;

@@ -1904,6 +1904,31 @@ impl Ctx<'_> {
         Ok(())
     }
 
+    /// A new vertex within `stol` (a section's tolerance) of `p`, a section's end where it crosses an edge of face
+    /// `fs` or `ft`, lying on that edge within `stol` too: another section's end there (two faces' sections with a
+    /// third, each ending where it crosses the edge between those two, 2.2 um apart on c2-helical-sweep's thread
+    /// cutter at the bar's rim: OCCT's one pave of that edge on the third face).
+    fn end_on_edge(&self, fs: usize, ft: usize, p: DVec3, stol: f64) -> Option<u32> {
+        if stol <= self.pool.pair(0.0, 0.0) {
+            return None;
+        }
+        let edges: Vec<Seg> = [fs, ft]
+            .iter()
+            .flat_map(|&f| self.faces[f].edges.iter())
+            .filter(|&&(e, _)| {
+                let (u, d) = self.seg_param(&self.edge_seg(e), p);
+                d <= self.pool.pair(self.edges[e].t, 0.0) && (0.0..=1.0).contains(&u)
+            })
+            .map(|&(e, _)| self.edge_seg(e))
+            .collect();
+        self.pool
+            .near_tol(p, stol)
+            .into_iter()
+            .filter(|&(w, _, _)| self.pool.inputs[w as usize].is_empty() && edges.iter().any(|s| s.v[0] != w && s.v[1] != w && self.seg_param(s, self.p(w)).1 <= stol))
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|x| x.0)
+    }
+
     /// Where both faces' intervals of a section overlap: its edges, in both faces.
     fn section_from(&mut self, fs: usize, ft: usize, path: Path, ia: Vec<Ival>, ib: Vec<Ival>) -> R<()> {
         let tol = self.tol;
@@ -1965,18 +1990,28 @@ impl Ctx<'_> {
                     None => {
                         // (On an edge of one face lying on the other, only within the section's own tolerance (the
                         // impeller's flange wall leaving the shell's edge it was drawn from, OCCT's curve 2 um off it
-                        // there): a vertex on the edge reaching the curve's end, as OCCT's pave on it.)
+                        // there): a vertex on the edge reaching the curve's end, as OCCT's pave on it. Or on one's
+                        // seam (c2-helical-sweep's thread cutter crossing the bar's seam, OCCT's curve up to 1.7 um
+                        // off it).)
                         let c: &Ctx = cx;
+                        let seam = |f: usize, e: usize| c.faces[f].edges.iter().filter(|x| x.0 == e).count() == 2;
                         let (d, q) = [(fs, ft), (ft, fs)]
                             .into_iter()
-                            .flat_map(|(f, g)| c.faces[f].edges.iter().filter(move |x| c.in_face_done.contains(&(x.0, g))))
+                            .flat_map(|(f, g)| c.faces[f].edges.iter().filter(move |x| c.in_face_done.contains(&(x.0, g)) || seam(f, x.0)))
                             .map(|&(e, _)| {
                                 let s = c.edge_seg(e);
                                 let (u, d) = c.seg_param(&s, p);
                                 if (-0.01..=1.01).contains(&u) { (d, c.seg_at(&s, u.clamp(0.0, 1.0))) } else { (f64::INFINITY, p) }
                             })
                             .fold((f64::INFINITY, p), |m, x| if x.0 < m.0 { x } else { m });
-                        if d > cx.pool.pair(0.0, 0.0) && d <= stol { cx.pool.add_tol(q, 1.5 * d)? } else { cx.pool.add(p)? }
+                        if d > cx.pool.pair(0.0, 0.0) && d <= stol {
+                            cx.pool.add_tol(q, 1.5 * d)?
+                        } else if let Some(w) = cx.end_on_edge(fs, ft, p, stol) {
+                            cx.pool.merge_with(w, p, 0.0);
+                            w
+                        } else {
+                            cx.pool.add(p)?
+                        }
                     }
                 },
             };
