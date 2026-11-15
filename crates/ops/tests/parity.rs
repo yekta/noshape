@@ -504,6 +504,50 @@ fn read_studios(dir: &Path, features: &mut Value) {
     }
 }
 
+/// `fetched`'s Feature Studios (read_studios') that `features`' own import, and those they import in turn, by the element
+/// id ending an import's path; with the files they import (icons) when it has any.
+fn add_imported_studios(features: &mut Value, fetched: &Value) {
+    let Some(pool) = fetched["featureStudios"].as_object() else { return };
+    let mut todo: Vec<String> = features["featureStudios"].as_object().into_iter().flatten().filter_map(|(_, s)| s["source"].as_str().map(str::to_string)).collect();
+    if todo.is_empty() {
+        return;
+    }
+    while let Some(source) = todo.pop() {
+        let paths = source.split("import(").skip(1).filter_map(|r| r.split_once("path")?.1.split('"').nth(1)).map(|p| p.rsplit('/').next().unwrap_or(p).to_string()).collect::<Vec<_>>();
+        for id in paths {
+            if !features["featureStudios"][id.as_str()].is_null() {
+                continue;
+            }
+            let Some(studio) = pool.get(&id) else { continue };
+            features["featureStudios"][id.as_str()] = studio.clone();
+            todo.extend(studio["source"].as_str().map(str::to_string));
+        }
+    }
+    for (id, file) in fetched["fileElements"].as_object().into_iter().flatten() {
+        if features["fileElements"][id.as_str()].is_null() {
+            features["fileElements"][id.as_str()] = file.clone();
+        }
+    }
+}
+
+#[test]
+fn assembly_studios_take_the_feature_studios_theirs_import() {
+    let fetched = json!({ "featureStudios": {
+        "aaa": { "name": "A", "source": "export import(path : \"d1/v1/bbb\", version : \"x\");" },
+        "bbb": { "name": "B", "source": "import(path : \"onshape/std/common.fs\", version : \"1948.0\");" },
+        "ccc": { "name": "C", "source": "" },
+    } });
+    let mut features = json!({ "featureStudios": { "own": { "name": "Own", "source": "export import(path : \"aaa\", version : \"y\");" } } });
+    add_imported_studios(&mut features, &fetched);
+    let mut ids: Vec<&String> = features["featureStudios"].as_object().unwrap().keys().collect();
+    ids.sort();
+    assert_eq!(ids, ["aaa", "bbb", "own"]);
+    // A studio with no Feature Studios of its own takes none.
+    let mut plain = json!({});
+    add_imported_studios(&mut plain, &fetched);
+    assert!(plain["featureStudios"].is_null());
+}
+
 /// Every document's Feature Studios (live's FeatureScript corpus, studios/
 /// fetched before its features): each compiled in a new document at the std
 /// its header pins, as parity_models loads them; per document what fails to
@@ -2509,6 +2553,10 @@ fn parity_assemblies() {
                 derived.insert(element, json!({ "doc": doc, "live": lines, "refs": refs }));
             }
         }
+        // Feature Studios fetched beside the studios (<element>.fs, laid out as a Part Studio corpus'): the ones the
+        // studios' own import from other elements (live, dx 11-15 19:19: asm-bjr-config's Kerf Compensation and Text).
+        let mut fetched = json!({});
+        read_studios(&dir, &mut fetched);
         let mut studios = Vec::new();
         for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().filter_map(|e| e.ok()) {
             let file = e.file_name().to_string_lossy().to_string();
@@ -2546,6 +2594,7 @@ fn parity_assemblies() {
             if !live.is_empty() {
                 features["live"] = Value::Array(live.clone());
             }
+            add_imported_studios(&mut features, &fetched);
             if let Ok(refs) = std::fs::read_to_string(dir.join("studios").join(format!("{element}.refs.jsonl"))) {
                 features["refs"] = json!(refs);
             }
