@@ -1049,8 +1049,9 @@ fn offset_parallels(face: &Shape, edges: &[Shape], d: f64, euclidean: bool) -> F
         if ca.normalize().cross(axis).length() > 1e-9 {
             return unsupported();
         }
+        // (Live marks the Edges field: psui's offset-curve-euclidean-round.)
         if euclidean && d >= radius - 1e-9 {
-            return err(FAILED);
+            return crate::regen::eval::err_at(&["edges"], FAILED);
         }
         let info = e.edge_info()?;
         let pts: Vec<DVec3> = [0.0, 0.5, 1.0].iter().map(|t| e.point_at(info.first_param + (info.last_param - info.first_param) * t)).collect::<Result<_, _>>()?;
@@ -1064,7 +1065,7 @@ fn offset_parallels(face: &Shape, edges: &[Shape], d: f64, euclidean: bool) -> F
     };
     let tol = 1e-7 * d.max(1e-3);
     let s = [d, -d].into_iter().map(|s| (off_face(s), s)).filter(|(g, _)| *g < tol).map(|(_, s)| s).next();
-    let Some(s) = s else { return err(FAILED) };
+    let Some(s) = s else { return crate::regen::eval::err_at(&["edges"], FAILED) };
     moved.iter().map(|(pts, closed)| {
         let q = at(pts, s);
         let shape = if *closed {
@@ -1074,7 +1075,7 @@ fn offset_parallels(face: &Shape, edges: &[Shape], d: f64, euclidean: bool) -> F
         } else {
             k::make_arc_3pts(q[0], q[1], q[2])
         };
-        shape.map_err(|e| FeatureError::new(format!("{FAILED} ({e})")))
+        shape.map_err(|e| FeatureError::at(&["edges"], format!("{FAILED} ({e})")))
     }).collect()
 }
 

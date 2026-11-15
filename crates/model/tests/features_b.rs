@@ -1176,7 +1176,7 @@ fn offset_curve_extends_to_the_face_boundary() {
 
 /// Offset curve on start pin (live 2538, psui's offset-curve scenarios): a Ø10 × 30 pin's top edge, no targets.
 /// Geodesic 2 mm runs down the side (the circle at z 28), 25 mm too (z 5), Flip onto the top face (Ø6 at z 30);
-/// Euclidean 25 mm fails in live; Offset, extend and split cuts the side in two.
+/// Euclidean 25 mm fails in live, its Edges field marked; Offset, extend and split cuts the side in two.
 #[test]
 fn offset_curve_runs_down_a_cylinder() {
     let mut s = Studio::new();
@@ -1210,6 +1210,8 @@ fn offset_curve_runs_down_a_cylinder() {
     let r = s.regen();
     let st = r.display.features.iter().find(|x| x.id == f).unwrap();
     assert!(st.status == FeatureStatus::Error && st.message.as_deref() == Some("Could not compute offset with given parameters."), "{:?} {:?}", st.status, st.message);
+    // Live marks the Edges field (psui's offset-curve-euclidean-round).
+    assert_eq!(st.faulty, vec!["edges".to_string()]);
     s.ps.features.retain(|x| x.id != f);
     let f = add(&mut s, "25 mm", false, false, "OFFSET_EXTEND_AND_SPLIT");
     let r = s.ok();
