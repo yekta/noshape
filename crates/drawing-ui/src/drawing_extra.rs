@@ -2271,11 +2271,19 @@ impl DrawingEditor {
     /// tool's symbols placed meanwhile go too (help surface_finish: ✕
     /// cancels).
     pub fn cancel_panel(&mut self, cx: &mut Context<Self>) {
-        if let Some(Panel::SurfaceFinish { edit: None, placed, .. }) = self.panel.take() {
-            if !placed.is_empty() {
-                self.edit_sheet("Surface finish", cx, |s| s.annotations.retain(|a| !placed.contains(&a.id)));
+        match self.panel.take() {
+            Some(Panel::SurfaceFinish { edit: None, placed, .. }) => {
+                if !placed.is_empty() {
+                    self.edit_sheet("Surface finish", cx, |s| s.annotations.retain(|a| !placed.contains(&a.id)));
+                }
+                self.tool = Tool::Select;
             }
-            self.tool = Tool::Select;
+            // The note editor: Esc ends the Note tool too (live2 drw-note-editor).
+            Some(Panel::Note { .. }) if matches!(self.tool, Tool::Note) => {
+                self.note_leader = None;
+                self.tool = Tool::Select;
+            }
+            _ => {}
         }
         cx.notify();
     }

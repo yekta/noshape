@@ -527,6 +527,7 @@ impl Render for CreateDrawingDialog {
         let page_tab = |label: &'static str, on: bool, cx: &mut Context<Self>, value: bool| {
             div()
                 .id(SharedString::from(format!("cd-page-{label}")))
+                .map(|d| crate::ui_script::mark(d, move || format!("button:{label}")))
                 .mr(px(19.))
                 .pb(px(6.))
                 .text_size(px(16.))

@@ -516,6 +516,8 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-gdt-dlg")
+                // Esc in its fields closes it (actions.rs; live2 drw-geometric-tolerance-dialog).
+                .key_context("GdtDialog")
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))

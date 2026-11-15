@@ -299,7 +299,8 @@ pub fn revision_callout_label(drawing: &Drawing, revisions: &[RevisionRow], rev:
     if *hide_callouts && !shown.iter().any(|r| r.revision == rev) {
         return None;
     }
-    let pending = revisions.iter().rev().find(|r| r.revision == rev).is_some_and(|r| r.pending);
+    // A revision not in the log yet (the drawing's first, unreleased) is pending too: "A*" (live2 feel/callout-placed).
+    let pending = revisions.iter().rev().find(|r| r.revision == rev).is_none_or(|r| r.pending);
     Some(if pending { pending_label(rev) } else { rev.to_string() })
 }
 
@@ -840,6 +841,9 @@ pub struct TableLayout {
     /// Row boundaries (top to bottom), `rows + 1` values (title row first).
     pub ys: Vec<f64>,
     pub title: bool,
+    /// Its merged cells, the table's own and the data's (a hole table's SIZE and QTY per size).
+    #[serde(default)]
+    pub merges: Vec<super::CellMerge>,
 }
 
 impl TableLayout {
@@ -1049,7 +1053,7 @@ pub fn layout(table: &Table, data: &TableData) -> TableLayout {
     for hi in &heights {
         ys.push(ys.last().unwrap() - hi);
     }
-    TableLayout { xs, ys, title: data.title.is_some() }
+    TableLayout { xs, ys, title: data.title.is_some(), merges: table.merges.clone() }
 }
 
 /// Push runs of consecutive `keep` cells as polylines along a grid line.
@@ -1241,7 +1245,7 @@ mod tests {
     /// resize grips on the edges away from it.
     #[test]
     fn table_grips_follow_the_fixed_corner() {
-        let l = TableLayout { xs: vec![10.0, 30.0, 50.0], ys: vec![100.0, 93.0, 86.0], title: false };
+        let l = TableLayout { xs: vec![10.0, 30.0, 50.0], ys: vec![100.0, 93.0, 86.0], title: false, merges: Vec::new() };
         assert_eq!(l.corners(), [[10.0, 100.0], [50.0, 100.0], [10.0, 86.0], [50.0, 86.0]]);
         assert_eq!(l.fixed_corner(TableCorner::TopRight), [50.0, 100.0]);
         assert_eq!(l.resize_grips(TableCorner::TopRight), [[10.0, 93.0], [30.0, 86.0]]);

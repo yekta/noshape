@@ -128,6 +128,13 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
+        // Add revision callout: Esc ends it, the table kept selected (live2 drw-revision-callout-add).
+        if matches!(self.tool, Tool::RevisionCallout { .. }) {
+            self.tool = Tool::Select;
+            self.status = None;
+            cx.notify();
+            return;
+        }
         // Picked cells: Esc closes their Cell panel and drops them (live2 drw-revision-cell-format); a panel over it
         // (Resize…) goes first (drw-revision-cell-resize).
         if self.panel.is_none() && self.cell_sel.take().is_some() {
@@ -170,6 +177,14 @@ impl DrawingEditor {
         }
         // The Surface finish tool: Esc ends it, the symbols placed stay (live drw-surface-finish).
         if matches!(self.tool, Tool::SurfaceFinish) && matches!(self.panel, Some(Panel::SurfaceFinish { edit: None, .. })) {
+            self.panel = None;
+            self.note_leader = None;
+            self.tool = Tool::Select;
+            cx.notify();
+            return;
+        }
+        // The note editor: Esc closes it and ends the Note tool (live2 drw-note-editor).
+        if matches!(self.tool, Tool::Note) && matches!(self.panel, Some(Panel::Note { .. })) {
             self.panel = None;
             self.note_leader = None;
             self.tool = Tool::Select;

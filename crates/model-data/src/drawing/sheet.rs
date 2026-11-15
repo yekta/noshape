@@ -1774,7 +1774,9 @@ impl SheetGeometry {
                     // Leader from the circle to a short shoulder at the text.
                     let on = [c[0] + u[0] * r, c[1] + u[1] * r];
                     let right = t[0] >= c[0];
-                    let shoulder = [t[0] + if right { -4.0 } else { 4.0 }, t[1]];
+                    // A 0.18 in shoulder ending at the landing (live's DXF of drw-hole-callout-palette's callout).
+                    const SHOULDER: f64 = 0.18 * 25.4;
+                    let shoulder = [t[0] + if right { -SHOULDER } else { SHOULDER }, t[1]];
                     self.lines.push(Polyline2 { points: vec![on, shoulder, t], style: LineStyle::Thin, closed: false, pick });
                     self.arrow(on, [-u[0], -u[1]], 3.0);
                     // Added leaders: from the same shoulder, an arrow on each hole.
@@ -1786,8 +1788,11 @@ impl SheetGeometry {
                         self.lines.push(Polyline2 { points: vec![shoulder, p], style: LineStyle::Thin, closed: false, pick });
                         self.arrow(p, [p[0] - shoulder[0], p[1] - shoulder[1]], 3.0);
                     }
-                    let w = lines.iter().map(|s| super::format::flatten_stacked(s).chars().count()).max().unwrap_or(0) as f64 * h * 0.62;
-                    let x0 = if right { t[0] + 1.0 } else { t[0] - 1.0 - w };
+                    let w = lines.iter().map(|s| font::text_width(&super::format::flatten_stacked(s), h)).fold(0.0, f64::max);
+                    // The text 0.09 in past the landing, its box centred on it (live drw-hole-callout-palette's
+                    // holeCallout: the box ends 2.29 mm before the textPosition, the click).
+                    const GAP: f64 = 0.09 * 25.4;
+                    let x0 = if right { t[0] + GAP } else { t[0] - GAP - w };
                     let n = lines.len() as f64;
                     for (i, line) in lines.iter().enumerate() {
                         // Lines stacked around the shoulder (bottom-left anchored).

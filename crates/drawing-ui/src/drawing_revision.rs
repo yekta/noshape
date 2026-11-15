@@ -113,8 +113,8 @@ impl DrawingEditor {
     pub fn place_revision_callout(&mut self, revision: String, c: [f64; 2], cx: &mut Context<Self>) {
         let id = self.drawing.sheets[self.sheet].next_annotation_id();
         self.edit_sheet("Revision callout", cx, |s| s.annotations.push(noshape_scene::drawing_tools::revision_callout(id, c, revision)));
-        self.tool = Tool::Select;
-        self.selection = vec![Sel::Annotation(id)];
+        // Placed, not selected, the tool kept for the next one: the table stays selected, Esc ends the tool alone
+        // (live2 drw-revision-callout-add, feel/callout-placed).
         cx.notify();
     }
 

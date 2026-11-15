@@ -10,7 +10,7 @@ use super::SheetPick;
 use super::Sel;
 use noshape_model::drawing::build::ViewPlacement;
 use noshape_model::drawing::views::{self, SnapKind};
-use noshape_model::drawing::{Annotation, AnnotationRef, PointRef, ViewId};
+use noshape_model::drawing::{Annotation, AnnotationKind, AnnotationRef, PointRef, ViewId};
 
 /// What Select for replication picked: the annotations (with their
 /// reference points, view coordinates), the source view's placement and
@@ -50,7 +50,9 @@ impl SheetPick<'_> {
             (r[0][0]..=r[1][0]).contains(&c[0]) && (r[0][1]..=r[1][1]).contains(&c[1])
         };
         let mut items = Vec::new();
-        for a in sheet.annotations.iter().filter(|a| a.kind.view() == Some(view) && inside(a)) {
+        // (Callouts aren't replicated: live2 drw-view-replicate-annotations, a view with one callout, answers "No
+        // annotation is available for copy".)
+        for a in sheet.annotations.iter().filter(|a| a.kind.view() == Some(view) && inside(a) && !matches!(a.kind, AnnotationKind::Balloon { .. })) {
             let pts: Option<Vec<[f64; 2]>> = a.refs.iter().map(|r| views::resolve_in_view(&ctx, &geo, &r.point).map(|(p, _)| p)).collect();
             if let Some(pts) = pts {
                 items.push((a.clone(), pts));

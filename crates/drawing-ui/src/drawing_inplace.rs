@@ -63,6 +63,11 @@ impl DrawingEditor {
     /// Close the in-place note / cell editor without applying it (Esc, ✕);
     /// the hidden sheet text shows again at once.
     pub fn discard_inplace(&mut self, cx: &mut Context<Self>) {
+        // A new note's editor: Esc ends the Note tool too (live2 drw-note-editor).
+        if matches!(self.panel, Some(Panel::Note { .. })) && matches!(self.tool, Tool::Note) {
+            self.note_leader = None;
+            self.tool = Tool::Select;
+        }
         self.panel = None;
         self.inplace_hidden = None;
         self.inplace_cell = None;

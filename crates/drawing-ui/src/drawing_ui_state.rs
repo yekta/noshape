@@ -166,8 +166,9 @@ impl DrawingEditor {
             .annotations
             .iter()
             .filter(|a| Some(a.id) != placing)
-            // Not in live's drawing export, which its recorder reads (live2 2181): weld and edge condition symbols.
-            .filter(|a| !matches!(a.kind, AnnotationKind::Weld { .. } | AnnotationKind::EdgeCondition { .. }))
+            // Not in live's drawing export, which its recorder reads (live2 2181): weld and edge condition symbols,
+            // revision callouts (live2 drw-revision-callout-add).
+            .filter(|a| !matches!(a.kind, AnnotationKind::Weld { .. } | AnnotationKind::EdgeCondition { .. } | AnnotationKind::RevisionCallout { .. }))
             // An exploded note is polylines in the export (help: "explode the note into polylines upon export"; live2
             // drw-note-explode lists none).
             .filter(|a| !matches!(&a.kind, AnnotationKind::Note { style, .. } if style.explode))
@@ -331,6 +332,9 @@ impl DrawingEditor {
         match &self.tool {
             // (Live keeps every pick orange, a line's first too: live2 11-14, drw-dimension-edge re-recorded; the older
             // takes' [] after a first line pick was their reader missing an edge on the view's box.)
+            // Line to line and its angular one: the first line stays in the hover colour until the second is
+            // picked (live2 drw-dimension-line-to-line, -angular).
+            Tool::Dimension { kind: DimTool::LineLine | DimTool::Angle, picks } if picks.len() < 2 => {}
             Tool::Dimension { picks, .. } => {
                 for p in picks {
                     match p {
@@ -354,6 +358,10 @@ impl DrawingEditor {
                 }
             }
             Tool::BrokenOut { parent: Some(v), done: true, .. } => selection.push(("EDGE".into(), self.ui_view_name(*v))),
+            // The hole a Hole/thread callout is being placed for (live drw-hole-callout-palette).
+            Tool::HoleCallout { circle: Some((v, ..)) } => selection.push(("EDGE".into(), self.ui_view_name(*v))),
+            // An ordinate's datum and its values while the tool runs (live2 drw-ordinate-rclick).
+            Tool::Ordinate { origin: Some(o), .. } => selection.push(("EDGE".into(), self.ui_view_name(o.view))),
             _ => {}
         }
         // The edge an Edge condition symbol is put on (drw-edge-condition).
@@ -392,8 +400,9 @@ impl DrawingEditor {
         // under a selected BOM table). Only while nothing else is going on: a tool or a panel takes the highlight
         // (drw-dimension-foreshorten, Edit hatch region in drw-hatch-edit; BOM table properties keeps it,
         // drw-bom-table-properties); a centermark's thin lines don't count (drw-centermark-align).
-        // (Placing a revision callout keeps its table lit: live2 drw-revision-callout-add.)
-        if let Some(b) = self.built.as_ref().filter(|_| matches!(self.tool, Tool::Select | Tool::RevisionCallout { .. }) && self.panel.is_none() && self.hatch_dlg.is_none()) {
+        // (Placing a revision callout keeps its table lit: live2 drw-revision-callout-add; an open dimension palette
+        // reads none: live drw-hole-callout-palette, live2 drw-dimension-dblclick-precision.)
+        if let Some(b) = self.built.as_ref().filter(|_| matches!(self.tool, Tool::Select | Tool::RevisionCallout { .. }) && self.panel.is_none() && self.hatch_dlg.is_none() && self.palette.is_none()) {
             let thin = |id: u64| sheet.annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. } | AnnotationKind::CircleCenterline { .. }));
             let lit = |pick: u32| {
                 let Some(p) = b.picks.get(pick as usize) else { return false };
@@ -463,7 +472,7 @@ impl DrawingEditor {
     /// "other"; the Insert view chooser's search box and list a panel "field"; a menu of the window's (a document
     /// tab's) takes it off the drawing.
     fn ui_focus(&self, cx: &App) -> Value {
-        if self.ui_list(cx).is_some() {
+        if self.ui_list(cx).is_some_and(|l| l.get("drawing").is_none()) {
             return json!({ "kind": "none" });
         }
         if self.insert.chooser.is_some() && !self.chooser.keyboard_left {
@@ -510,9 +519,13 @@ impl DrawingEditor {
             return None;
         }
         // A dropdown of a panel over the drawing (Drawing properties' selects, the Inspection table's ⋯): live's are
-        // in the drawing's iframe too (live2 drw-drawprops-*, drw-inspection-table-export-csv).
+        // in the drawing's iframe, which its recorder reads from 2026-11-15.1 on (live drw-hole-table-cell-format) and
+        // not before (live2 drw-drawprops-*, drw-inspection-table-export-csv): marked `drawing` for the runner.
         if noshape_app_core::os_menu::open_position(cx).is_some_and(|p| self.bounds.contains(&p)) {
-            return None;
+            return noshape_app_core::os_menu::ui_state(cx).map(|mut l| {
+                l["drawing"] = serde_json::json!(true);
+                l
+            });
         }
         noshape_app_core::os_menu::ui_state(cx).or_else(noshape_app_core::ui_script::open_list)
     }

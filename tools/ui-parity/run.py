@@ -405,7 +405,22 @@ def normalize_live(state):
         focus["text"] = re.sub(r"^live2 uip (\S+) \d{4}-\d\d-\d\dT[\d:]+", r"\1", focus["text"])
         if focus.get("selection") == [0, n]:
             focus["selection"] = [0, len(focus["text"])]
+    # A hole callout's text in live's drawing data spells ⌀ as DXF's %%c (live drw-hole-callout-palette: "3X %%c.197").
+    for an in (((state or {}).get("drawing") or {}).get("annotations") or []):
+        if isinstance(an, dict) and isinstance(an.get("text"), str) and "%%c" in an["text"]:
+            an["text"] = an["text"].replace("%%c", "⌀")
+    # The dimension palette's value (live drw-hole-callout-palette: "∅ .197 THRU"): live's palette spells the diameter
+    # ∅ (U+2205) apart from the number, ours (and its drawings) ⌀ (U+2300) before it.
+    pd = (state or {}).get("dialog")
+    if isinstance(pd, dict) and pd.get("kind") == "palette":
+        for f in pd.get("fields") or []:
+            if isinstance(f, dict) and f.get("label") == "Value" and isinstance(f.get("value"), str):
+                f["value"] = re.sub(r"∅ ?", "⌀", f["value"])
     lst = (state or {}).get("list")
+    # Live's recorder from 2026-11-15.1 gives a menu's disabled rows as one flag per row (live
+    # drw-hole-table-cell-format), before as the rows' indices (ours).
+    if isinstance(lst, dict) and isinstance(lst.get("disabled"), list) and lst["disabled"] and all(isinstance(v, bool) for v in lst["disabled"]):
+        lst["disabled"] = [i for i, v in enumerate(lst["disabled"]) if v]
     if isinstance(lst, dict):
         rows = lst.get("rows") or []
         hl = lst.get("highlighted")
@@ -493,6 +508,73 @@ def old_dimension_pick(a, b, recorded):
     la, lb = ((a or {}).get("drawing") or {}), ((b or {}).get("drawing") or {})
     if "imension" in str(lb.get("tool") or "") and la.get("selection") == [] and isinstance(lb.get("selection"), list):
         lb["selection"] = [x for x in lb["selection"] if not (isinstance(x, dict) and x.get("kind") == "EDGE")]
+
+
+def panel_fields_unread(a, b, recorded):
+    """A drawing panel's fields: live's recorder read none before 11-10 (drw-inspection-table-export-csv, 11-07:
+    "fields": []), so ours' aren't compared against those takes."""
+    da, db = (a or {}).get("dialog"), (b or {}).get("dialog")
+    if recorded < "2026-11-10" and isinstance(da, dict) and isinstance(db, dict) and da.get("kind") == "drawing-panel" and da.get("fields") == [] and db.get("fields"):
+        db["fields"] = []
+
+
+def texts_late(a, b, later):
+    """Annotation texts live's drawing data takes up to two steps late (`later`: its next states' texts; a palette's
+    edit is written ~0.6 s after the Esc that closes it, live drw-hole-callout-palette): where ours differs, live's next
+    different text is compared instead."""
+    la, lb = ((a or {}).get("drawing") or {}).get("annotations"), ((b or {}).get("drawing") or {}).get("annotations")
+    if not (isinstance(la, list) and isinstance(lb, list) and len(la) == len(lb)):
+        return
+    for k, (x, y) in enumerate(zip(la, lb)):
+        if not (isinstance(x, dict) and isinstance(y, dict)) or x.get("text") == y.get("text"):
+            continue
+        nxt = next((t[k] for t in (later or []) if len(t) == len(la) and t[k] is not None and t[k] != x.get("text")), None)
+        if nxt is not None:
+            x["text"] = nxt
+
+
+def recorder_form(b, live):
+    """Ours reports a panel as live's recorder reads it since 2026-11-15.1 (its controls: the Cell panel's
+    "cell-format") with `old`, the reading of older recorders (its texts); a take from before gets `old`. Likewise a
+    dropdown open over the drawing (`drawing`), which older recorders didn't read."""
+    m = re.search(r"live2 (\d{4}-\d\d-\d\d)\.(\d+)", str(((live or {}).get("app") or {}).get("recorder") or ""))
+    new = m is not None and (m.group(1), int(m.group(2))) >= ("2026-11-15", 1)
+    # A dropdown open over the drawing: older recorders didn't see it.
+    lst = (b or {}).get("list")
+    if isinstance(lst, dict) and lst.pop("drawing", False) and not new:
+        b["list"] = None
+    d = (b or {}).get("dialog")
+    if not (isinstance(d, dict) and "old" in d):
+        return
+    old = d.pop("old")
+    if not new:
+        b["dialog"] = old
+
+
+def hole_callout_export_text(a, b):
+    """A hole callout's text in live's drawing data is its count and diameter alone ("3X %%c.197", live 11-15: no THRU,
+    depth or end type in the export), where ours is the whole callout ("3X ⌀.197 THRU"): ours is compared up to live's."""
+    la, lb = ((a or {}).get("drawing") or {}).get("annotations"), ((b or {}).get("drawing") or {}).get("annotations")
+    if not (isinstance(la, list) and isinstance(lb, list)):
+        return
+    for x, y in zip(la, lb):
+        if isinstance(x, dict) and isinstance(y, dict) and x.get("kind") == y.get("kind") == "callout":
+            tx, ty = x.get("text"), y.get("text")
+            if isinstance(tx, str) and isinstance(ty, str) and "⌀" in tx and ty.startswith(tx + " "):
+                y["text"] = tx
+
+
+def view_frame_late(a, b, step):
+    """A view clicked this step: live draws its dark frame 0.25-0.4 s after the click (live2 11-15), after its recorder
+    read the state, which then says EDGE for that view where ours says VIEW (drw-views-shift-select-properties,
+    drw-view-replicate-annotations)."""
+    on = (step or {}).get("on")
+    if (step or {}).get("do") not in ("click", "rclick") or not isinstance(on, dict) or not isinstance(on.get("view"), str):
+        return
+    edge, view = {"kind": "EDGE", "owner": on["view"]}, {"kind": "VIEW", "owner": on["view"]}
+    la, lb = ((a or {}).get("drawing") or {}), ((b or {}).get("drawing") or {})
+    if edge in (la.get("selection") or []) and isinstance(lb.get("selection"), list):
+        lb["selection"] = sorted((edge if x == view else x for x in lb["selection"]), key=lambda x: (str(x.get("kind")), str(x.get("owner"))) if isinstance(x, dict) else ("", ""))
 
 
 def sheets_ref_hover_after_menu(a, b, resting):
@@ -833,6 +915,16 @@ def compare(live, ours, whole_document=True):
     picker_read = str(live.get("recorded") or "9") >= PICKER_READ_SINCE
     # Each step's next live message, for toasts live shows a step late.
     late_message = {}
+    # Each step's next live annotation texts, for drawing data live writes a step late (a palette's edit, written
+    # on the server ~0.6 s after the Esc that closes it: live drw-hole-callout-palette).
+    late_texts = {}
+    for i, st in enumerate(steps[:-1]):
+        later = []
+        for nx in steps[i + 1:i + 3]:
+            anns = ((nx.get("state") or {}).get("drawing") or {}).get("annotations")
+            if isinstance(anns, list):
+                later.append([x["text"].replace("%%c", "⌀") if isinstance(x.get("text"), str) else x.get("text") for x in anns if isinstance(x, dict)])
+        late_texts[f"step {st.get('step')}"] = later
     for i, st in enumerate(steps[:-1]):
         m = (steps[i + 1].get("state") or {}).get("message")
         if isinstance(m, str):
@@ -1122,7 +1214,12 @@ def compare(live, ours, whole_document=True):
         # drafts." after Save draft, rel-drafts-panel), ours at once: not a difference.
         if isinstance(a, dict) and isinstance(b, dict) and a.get("message") is None and b.get("message") and late_message.get(name) == b.get("message"):
             a["message"] = b["message"]
+        texts_late(a, b, late_texts.get(name))
         old_dimension_pick(a, b, str(live.get("recorded") or ""))
+        recorder_form(b, live)
+        panel_fields_unread(a, b, str(live.get("recorded") or ""))
+        hole_callout_export_text(a, b)
+        view_frame_late(a, b, step)
         placed_alike(a, b)
         cloud_menu(a, b)
         menu_badges(a, b)

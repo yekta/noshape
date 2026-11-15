@@ -289,6 +289,10 @@ impl DrawingEditor {
                 .line_height(px(20.))
                 .child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).child("Select a dimension or annotation or hatch region to change its style"))
                 .child(div().text_size(px(13.)).child("Select any dimension or annotation or hatch region to apply a different style from the drawing property."));
+            // (Live's reading: live2 drw-styles-panel.)
+            crate::ui_script::note_dialog(|| {
+                serde_json::json!({ "kind": "drawing-panel", "title": "Styles", "text": ["Styles", "Select a dimension or annotation or hatch region to change its style", "Select any dimension or annotation or hatch region to apply a different style from the drawing property.", "Revert to drawing properties"] })
+            });
             return Self::styles_with_footer(info.into_any_element(), "st-revert", |_, _, _| {}, cx);
         }
         let dims = sel.iter().all(|a| a.kind.is_dimension());

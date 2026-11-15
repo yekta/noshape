@@ -354,6 +354,11 @@ fn add_features(ctx: &mut Ctx, features: &Value) -> Result<(), String> {
                 };
                 params.insert(p.to_string(), resolve(ctx, v).map_err(what)?);
             }
+            // A start's Hole values are its own, not a table's left at their defaults (5 mm is the schema's: live's
+            // holes-plate-drawing reads Ø.197, not the ANSI table's 1/4).
+            if ty == "hole" {
+                params.entry("tableSynced").or_insert(json!(true));
+            }
             let mut args = json!({ "type": ty, "params": params });
             if let Some(n) = f["name"].as_str() {
                 args["name"] = json!(n);
@@ -447,6 +452,14 @@ mod tests {
         let list = call(&mut ctx, "feature_list", json!({})).unwrap();
         let hole = list["features"].as_array().unwrap().iter().find(|f| f["name"] == "Hole 1").cloned();
         assert!(hole.is_some(), "{list}");
+        // Its 5 mm (the schema's default) kept, not the ANSI table's 1/4 (live reads Ø.197).
+        let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ANSI A", "suggested_views": true })).unwrap();
+        let g = call(&mut ctx, "drawing_get", json!({ "drawing": d["drawing"] })).unwrap();
+        let view = g["views"].as_array().unwrap().iter().find(|v| v["edges"].as_array().is_some_and(|es| es.iter().filter(|e| e["type"] == "circle").count() >= 2)).cloned().expect("the view showing the holes");
+        let corner = view["edges"].as_array().unwrap().iter().find(|e| e["type"] == "line").map(|e| [e["a"][0].clone(), e["a"][1].clone()]).unwrap();
+        let ht = call(&mut ctx, "drawing_view_table", json!({ "drawing": d["drawing"], "kind": "hole", "view": view["id"], "origin": corner, "position": [20, 120] })).unwrap();
+        let t = call(&mut ctx, "drawing_get", json!({ "drawing": d["drawing"], "edges": false })).unwrap()["tables"].as_array().unwrap().iter().find(|t| t["id"] == ht["table"]).cloned().unwrap();
+        assert!(t["rows"][0].as_array().unwrap().iter().any(|c| c.as_str().is_some_and(|s| s.contains(".197"))), "Ø.197: {t}");
         let _ = std::fs::remove_dir_all(dir);
     }
 

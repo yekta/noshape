@@ -37,7 +37,8 @@ impl DrawingEditor {
         // Live: the Cell panel shows for one plain cell (none with a range or a merged cell selected).
         let one = cs.a == cs.b && t.merge_at(cs.a.0, cs.a.1).is_none();
         // A revision table's cell too (live2 drw-revision-*: its merge icons disabled).
-        (matches!(t.kind, TableKind::General { .. } | TableKind::Revision { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select) && one).then_some(cs)
+        // And a hole table's (live drw-hole-table-cell-format: its formats only).
+        (matches!(t.kind, TableKind::General { .. } | TableKind::Revision { .. } | TableKind::Hole { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select) && one).then_some(cs)
     }
 
     /// Create / drop the panel's state as the cell selection changes (from render).
@@ -176,7 +177,44 @@ impl DrawingEditor {
         // Row 1: rows / columns.
         let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
         let merged = t.merge_at(r0, c0).is_some();
-        let row1 = h_flex()
+        // A single cell can size the rows / columns it spans (live drw-hole-table-cell-format: a hole table's merged
+        // SIZE cell over three rows sizes them).
+        let merge = l.merges.iter().find(|m| m.contains(r0, c0)).copied().filter(|_| single);
+        let (cols_on, rows_on) = (!single || merge.is_some_and(|m| m.cols > 1), !single || merge.is_some_and(|m| m.rows > 1));
+        let (r0, r1, c0, c1) = merge.map_or((r0, r1, c0, c1), |m| (m.row, m.row + m.rows - 1, m.col, m.col + m.cols - 1));
+        let size_cols: AnyElement = {
+            let b = icon_btn("cp-eq-cols", "cell-size-cols-equal", "Size columns equally", false, cols_on, cx);
+            if !cols_on {
+                b.into_any_element()
+            } else {
+                let w = widths.clone();
+                b.on_click(table_op(
+                    "Size columns equally",
+                    std::rc::Rc::new(move |t: &mut Table| {
+                        let mut all = w.clone();
+                        let avg = all[c0..=c1.min(all.len() - 1)].iter().sum::<f64>() / (c1 - c0 + 1) as f64;
+                        for x in all.iter_mut().take(c1 + 1).skip(c0) {
+                            *x = avg;
+                        }
+                        t.col_widths = all;
+                    }),
+                    Some((0, 0)),
+                ))
+                .into_any_element()
+            }
+        };
+        let size_rows: AnyElement = {
+            let b = icon_btn("cp-eq-rows", "cell-size-rows-equal", "Size rows equally", false, rows_on, cx);
+            if !rows_on {
+                b.into_any_element()
+            } else {
+                let tallest = l.ys.windows(2).skip(l.title as usize).map(|w| w[0] - w[1]).fold(0.0, f64::max);
+                b.on_click(table_op("Size rows equally", std::rc::Rc::new(move |t: &mut Table| t.row_height = tallest), Some((0, 0)))).into_any_element()
+            }
+        };
+        // A hole table's cells: only its sizes (live drw-hole-table-cell-format).
+        let hole_table = matches!(t.kind, TableKind::Hole { .. });
+        let row1 = if hole_table { h_flex().h(px(30.)).pl(px(1.)).gap(px(2.)).child(size_cols).child(size_rows) } else { h_flex()
             .h(px(30.))
             .pl(px(1.))
             .gap(px(2.))
@@ -212,36 +250,8 @@ impl DrawingEditor {
             ))
             // Live 1143: a gap (no rule) before the size / merge group.
             .child(div().w(px(6.)))
-            .child({
-                let b = icon_btn("cp-eq-cols", "cell-size-cols-equal", "Size columns equally", false, !single, cx);
-                if single {
-                    b.into_any_element()
-                } else {
-                    let w = widths.clone();
-                    b.on_click(table_op(
-                        "Size columns equally",
-                        std::rc::Rc::new(move |t: &mut Table| {
-                            let mut all = w.clone();
-                            let avg = all[c0..=c1.min(all.len() - 1)].iter().sum::<f64>() / (c1 - c0 + 1) as f64;
-                            for x in all.iter_mut().take(c1 + 1).skip(c0) {
-                                *x = avg;
-                            }
-                            t.col_widths = all;
-                        }),
-                        Some((0, 0)),
-                    ))
-                    .into_any_element()
-                }
-            })
-            .child({
-                let b = icon_btn("cp-eq-rows", "cell-size-rows-equal", "Size rows equally", false, !single, cx);
-                if single {
-                    b.into_any_element()
-                } else {
-                    let tallest = l.ys.windows(2).skip(l.title as usize).map(|w| w[0] - w[1]).fold(0.0, f64::max);
-                    b.on_click(table_op("Size rows equally", std::rc::Rc::new(move |t: &mut Table| t.row_height = tallest), Some((0, 0)))).into_any_element()
-                }
-            })
+            .child(size_cols)
+            .child(size_rows)
             .child({
                 let b = popup_btn("cp-merge", "cell-merge", "Merge cells", !single, cx);
                 if single {
@@ -298,7 +308,7 @@ impl DrawingEditor {
                 } else {
                     b.into_any_element()
                 }
-            });
+            }) };
 
         // Row 2: font and text.
         let field = |w: f32| div().w(px(w)).h(px(24.)).bg(crate::theme::light().panel).border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(2.));
@@ -323,7 +333,7 @@ impl DrawingEditor {
             .child(div().flex_1().whitespace_nowrap().child(family.clone()))
             .child(crate::ui::glyph("ui-caret-down", 9.6, gpui_kit::rgb(0x555555)));
         let toggle = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, f: fn(&mut CellFormat, bool), cx: &mut Context<Self>| {
-            icon_btn(id, icon, tip, on, true, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.edit_cell_formats(tip, std::rc::Rc::new(move |fm: &mut CellFormat| f(fm, !on)), cx)))
+            crate::ui_script::mark(icon_btn(id, icon, tip, on, true, cx), move || format!("toggle:{tip}")).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.edit_cell_formats(tip, std::rc::Rc::new(move |fm: &mut CellFormat| f(fm, !on)), cx)))
         };
         let aligns = [(CellAlign::Left, "Left", "note-align-left"), (CellAlign::Center, "Center", "note-align-center"), (CellAlign::Right, "Right", "note-align-right")];
         let align_icon = aligns.iter().find(|a| a.0 == first.align).map(|a| a.2).unwrap_or("note-align-left");
@@ -342,10 +352,33 @@ impl DrawingEditor {
             .child(toggle("cp-u", "note-underline", "Underline", underline, |f, v| f.underline = v, cx))
             .child(toggle("cp-s", "note-strike", "Strikethrough", strike, |f, v| f.strikethrough = v, cx))
             .child(popup_btn("cp-spacing", "note-line-spacing", "Line spacing", false, cx))
-            .child(popup_btn("cp-align", align_icon, "Horizontal alignment", true, cx).os_dropdown_menu("cp-align-dd", false, fmt_menu(align)))
-            .child(popup_btn("cp-valign", valign_icon, "Vertical alignment", true, cx).os_dropdown_menu("cp-valign-dd", false, fmt_menu(valign)));
+            .child(crate::ui_script::mark(popup_btn("cp-align", align_icon, "Horizontal alignment", true, cx), || "dropdown:Horizontal alignment".into()).os_dropdown_menu("cp-align-dd", false, fmt_menu(align)))
+            .child(crate::ui_script::mark(popup_btn("cp-valign", valign_icon, "Vertical alignment", true, cx), || "dropdown:Vertical alignment".into()).os_dropdown_menu("cp-valign-dd", false, fmt_menu(valign)));
 
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Cell", "text": std::iter::once("Cell").chain(FONT_FAMILIES.iter().copied()).collect::<Vec<_>>() }));
+        // Live's recorder since 2026-11-15.1 reads its controls (live drw-hole-table-cell-format); the runner takes `old`, the
+        // panel's texts, for older takes (live2 drw-revision-cell-*).
+        crate::ui_script::note_dialog(|| {
+            let toggle = |label: &str, on: bool| serde_json::json!({ "label": label, "kind": "toggle", "value": on, "enabled": true });
+            let menu = |label: &str, enabled: bool| serde_json::json!({ "label": label, "kind": "menu-button", "enabled": enabled });
+            serde_json::json!({
+                "kind": "cell-format",
+                "title": "Cell",
+                "fields": [
+                    { "label": "Size columns equally", "kind": "button", "enabled": cols_on },
+                    { "label": "Size rows equally", "kind": "button", "enabled": rows_on },
+                    { "label": "Font", "kind": "select", "value": family },
+                    { "label": "Text height", "kind": "combo", "value": height.read(cx).value().to_string() },
+                    toggle("Bold", bold),
+                    toggle("Italic", italic),
+                    toggle("Underline", underline),
+                    toggle("Strikethrough", strike),
+                    menu("Line spacing", false),
+                    menu("Horizontal alignment", true),
+                    menu("Vertical alignment", true),
+                ],
+                "old": { "kind": "drawing-panel", "title": "Cell", "text": std::iter::once("Cell").chain(FONT_FAMILIES.iter().copied()).collect::<Vec<_>>() },
+            })
+        });
         Some(
             v_flex()
                 .id("dr-cell-panel")

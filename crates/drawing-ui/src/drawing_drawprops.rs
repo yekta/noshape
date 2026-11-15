@@ -67,11 +67,14 @@ pub struct DrawingPropsUi {
     pub wt_list: Option<usize>,
     /// The arrowhead picker whose list is open.
     pub arrow_menu: Option<&'static str>,
+    /// While a UI script records: texts drawn before the row label they follow (a select's options, a field's
+    /// unit), until that label is recorded.
+    pub rec_pending: std::cell::RefCell<Vec<String>>,
 }
 
 impl Default for DrawingPropsUi {
     fn default() -> Self {
-        Self { open: false, tab: 0, inspection_inputs: None, focused: None, scroll: ScrollHandle::new(), overflow: Default::default(), wt_list: None, arrow_menu: None }
+        Self { open: false, tab: 0, inspection_inputs: None, focused: None, scroll: ScrollHandle::new(), overflow: Default::default(), wt_list: None, arrow_menu: None, rec_pending: Default::default() }
     }
 }
 
@@ -649,6 +652,11 @@ impl DrawingEditor {
             .text_color(gpui_kit::rgb(0x555555))
             .when(f.invalid.get(), |i| i.bg(gpui_kit::rgba(INVALID_BG)));
         let unitless = matches!(f.kind, FieldKind::Spin { unitless: true, .. });
+        // The unit beside it follows the row's label in live's reading (live2 drw-properties-dimensions: "Text
+        // height", "in").
+        if !unitless && !matches!(f.kind, FieldKind::Text) && crate::ui_script::active() {
+            self.drawing_props.rec_pending.borrow_mut().push(if self.drawing.units_mm { "mm" } else { "in" }.into());
+        }
         let unit = (!unitless).then(|| div().w(px(24.)).flex_none().text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).opacity(0.65).flex().justify_center().child(if self.drawing.units_mm { "mm" } else { "in" }));
         let k = unit_k(f.kind, !self.drawing.units_mm);
         match f.kind {
@@ -805,11 +813,15 @@ impl DrawingEditor {
         // options): a select's options wait for the label of the row they are in.
         let recording = crate::ui_script::active();
         let rec: std::cell::RefCell<Vec<String>> = Default::default();
-        let pending: std::cell::RefCell<Vec<String>> = Default::default();
+        let pending = &self.drawing_props.rec_pending;
+        pending.borrow_mut().clear();
         let rec_label = |label: &str| {
             if recording {
                 let mut r = rec.borrow_mut();
-                r.push(label.to_string());
+                // (A row without a label has no text: live2 drw-properties-construction.)
+                if !label.is_empty() {
+                    r.push(label.to_string());
+                }
                 r.append(&mut pending.borrow_mut());
             }
         };
@@ -1140,7 +1152,8 @@ impl DrawingEditor {
                     None => row(label, body),
                 };
                 let sel_w = col.map_or(164., |c| 343. - c);
-                let color = lay("Color", false, if early { 31. } else { 32. }, if early { 0. } else { 1. }, swatch(ids[3], ts.color, std::rc::Rc::new(move |p: &mut DrawingProps, c| p.ann_type_mut(t).color = c)));
+                // (Made where it is placed: the recorder reads rows in order, live2 drw-properties-annotations.)
+                let color = || lay("Color", false, if early { 31. } else { 32. }, if early { 0. } else { 1. }, swatch(ids[3], ts.color, std::rc::Rc::new(move |p: &mut DrawingProps, c| p.ann_type_mut(t).color = c)));
                 body = body.child(section(t.name()));
                 if t == AnnType::WeldSymbols {
                     // The weld standard (separate from the drawing's; it
@@ -1152,14 +1165,14 @@ impl DrawingEditor {
                 body = body.child(lay("Font", true, if t == AnnType::FlagNotes { 33. } else { 32. }, 2., font_row(FontOf::Type(t), ts.font.clone(), sel_w)));
                 if t == AnnType::FlagNotes {
                     let shapes = choices(&noshape_model::drawing::note::FlagShape::ALL, props.flag_shape, |s| s.name(), |p, v| p.flag_shape = v);
-                    body = body.child(lay("Border shape", true, 34., 2., sel("dp-flag-shape", props.flag_shape.name().into(), shapes, sel_w))).child(color);
+                    body = body.child(lay("Border shape", true, 34., 2., sel("dp-flag-shape", props.flag_shape.name().into(), shapes, sel_w))).child(color());
                     continue;
                 }
                 body = body.child(lay("Text height", false, if early { 32. } else if t == AnnType::Datums { 30. } else { 31. }, 2., field(2 + i)));
                 if t == AnnType::Datums {
                     body = body.child(lay("Datum size", false, 31., 2., field(2 + AnnType::ALL.len())));
                 }
-                body = body.child(color);
+                body = body.child(color());
                 match t {
                     AnnType::Notes => {
                         body = body
@@ -1617,8 +1630,9 @@ impl DrawingEditor {
                 })))
             };
             let parse_items: Vec<(String, bool, Act)> = vec![
-                ("Parameter".into(), !props.inspection_row_parsing, std::rc::Rc::new(|p: &mut DrawingProps| p.inspection_row_parsing = false) as Act),
+                // (Live's order: live2 drw-properties-inspection.)
                 ("Row".into(), props.inspection_row_parsing, std::rc::Rc::new(|p: &mut DrawingProps| p.inspection_row_parsing = true) as Act),
+                ("Parameter".into(), !props.inspection_row_parsing, std::rc::Rc::new(|p: &mut DrawingProps| p.inspection_row_parsing = false) as Act),
             ];
             let shape_items: Vec<(String, bool, Act)> = InspectionShape::ALL.iter().map(|&s| (s.name().to_string(), s == props.inspection_shape, std::rc::Rc::new(move |p: &mut DrawingProps| p.inspection_shape = s) as Act)).collect();
             let border_items: Vec<(String, bool, Act)> = (0..=5u8).map(|n| (border_chars_label(n), n == props.inspection_border_chars, std::rc::Rc::new(move |p: &mut DrawingProps| p.inspection_border_chars = n) as Act)).collect();
@@ -1666,9 +1680,10 @@ impl DrawingEditor {
                 .child(div().px(px(12.)).py_2().text_size(px(12.)).text_color(pal.text_muted).child("These properties are set per item for now (select a dimension, note or table)."));
         }
         if recording {
-            // The first tab under the panel's title and its own; the others under their own (live2 drw-drawprops-*).
+            // Under the panel's title and the tab's own, but Annotations, Views and Tables under their own alone
+            // (live2 drw-drawprops-*, drw-properties-*).
             let tab = TABS.get(self.drawing_props.tab).map(|t| t.0).unwrap_or_default();
-            let mut text: Vec<String> = if self.drawing_props.tab == 0 { vec!["Drawing properties".into(), tab.into()] } else { vec![tab.into()] };
+            let mut text: Vec<String> = if matches!(tab, "Annotations" | "Views" | "Tables") { vec![tab.into()] } else { vec!["Drawing properties".into(), tab.into()] };
             text.append(&mut rec.borrow_mut());
             text.append(&mut pending.borrow_mut());
             let title = text[0].clone();

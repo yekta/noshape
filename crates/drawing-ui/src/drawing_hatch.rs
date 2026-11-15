@@ -455,6 +455,8 @@ impl DrawingEditor {
             div()
                 .id(("hd-tab", g))
                 .map(|d| crate::ui_script::mark(d, || format!("tab:{name}")))
+                // (Live's runner finds it by its tooltip too: live2 drw-hatch-*-patterns.)
+                .map(|d| crate::ui_script::mark(d, || format!("button:{name} patterns")))
                 .flex_1()
                 .h(px(26.))
                 .flex()

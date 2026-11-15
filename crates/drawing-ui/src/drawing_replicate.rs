@@ -94,6 +94,9 @@ impl DrawingEditor {
         // "✓ Successfully replicated 7/7 annotations ×".
         if n > 0 {
             self.show_toast(crate::i18n::tr("Successfully replicated __n__/__m__ annotations").replace("__n__", &n.to_string()).replace("__m__", &tried.to_string()), cx);
+        } else if tried == 0 {
+            // Nothing that can land on the view (live2 drw-view-replicate-annotations: a callout alone).
+            self.show_message("No annotation is available for copy", crate::os_ui::BubbleKind::Info, Some(std::time::Duration::from_millis(5100)), cx);
         } else {
             self.status = Some("No annotations replicated".into());
         }

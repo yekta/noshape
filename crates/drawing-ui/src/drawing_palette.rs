@@ -314,11 +314,14 @@ impl DrawingEditor {
     }
 
     /// Change the edited annotation (dropdowns, toggles) and preview it.
+    /// A pick in one of its lists or toggles: made at once, so Esc closing the palette keeps it (live: a precision
+    /// picked stays after Esc, behaviours "Dimension palette opened by double-click", drw-hole-callout-palette).
     fn edit_palette(&mut self, f: impl FnOnce(&mut PaletteDlg), cx: &mut Context<Self>) {
         if let Some(d) = &mut self.palette {
             f(d);
         }
         self.palette_from_inputs(cx);
+        self.commit_palette(cx);
     }
 
     fn palette_preview(&mut self, cx: &mut Context<Self>) {
@@ -629,7 +632,32 @@ impl DrawingEditor {
             // Its values: with Override, a click selects one (orange).
             let sel = opts.override_tol.then_some(d.hole_sel);
             let mut preview = Vec::new();
-            for (li, runs) in noshape_model::drawing::build::hole_callout_preview(&self.drawing, sheet, &self.sources, &core).unwrap_or_default().into_iter().enumerate() {
+            let lines = noshape_model::drawing::build::hole_callout_preview(&self.drawing, sheet, &self.sources, &core).unwrap_or_default();
+            // Live's recorder (2026-11-15.1, live drw-hole-callout-palette): the palette's fields, the value as one text
+            // and, under Override, the selected value at its precision.
+            if crate::ui_script::active() {
+                // (The count is its Quantity's, not the value's.)
+                let count = format!("{n}{} ", self.drawing.props.hole_indicator);
+                let value = lines.iter().map(|l| l.iter().map(|r| r.0.as_str()).collect::<String>()).collect::<Vec<_>>().join(" ");
+                let value = value.strip_prefix(&count).map(str::to_string).unwrap_or(value);
+                let picked = lines.iter().flatten().find(|r| r.1 == Some(d.hole_sel)).map(|r| r.0.clone()).unwrap_or_default();
+                let text = |st: &Entity<InputState>| st.read(cx).value().to_string();
+                let mut fields = vec![
+                    serde_json::json!({ "label": "Text above", "kind": "input", "value": text(&d.above) }),
+                    serde_json::json!({ "label": "Prefix", "kind": "input", "value": text(&d.prefix) }),
+                    serde_json::json!({ "label": "Quantity", "kind": "combo", "value": format!("{n}{}", self.drawing.props.hole_indicator) }),
+                    serde_json::json!({ "label": "Value", "kind": "text", "value": value }),
+                    serde_json::json!({ "label": "Units", "kind": "select", "value": unit_label }),
+                    serde_json::json!({ "label": "Suffix", "kind": "input", "value": text(&d.suffix) }),
+                    serde_json::json!({ "label": "Text below", "kind": "input", "value": text(&d.below) }),
+                    serde_json::json!({ "label": "Override precision/tolerance", "kind": "checkbox", "value": opts.override_tol }),
+                ];
+                if opts.override_tol {
+                    fields.push(serde_json::json!({ "label": "Precision", "kind": "combo", "value": picked }));
+                }
+                crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "palette", "title": "Dimension palette", "fields": fields }));
+            }
+            for (li, runs) in lines.into_iter().enumerate() {
                 let mut line = h_flex();
                 for (ri, (text, k)) in runs.into_iter().enumerate() {
                     let mut run = div().id(SharedString::from(format!("dp-hv-{li}-{ri}"))).child(text);
@@ -873,7 +901,7 @@ impl DrawingEditor {
         let tol_row = h_flex()
             .gap(px(4.))
             .pt(px(3.))
-            .when(hole, |e| e.child(menu("dp-hprec", small(prec_label.clone()), 110., prec_items)).child(menu("dp-htol", small(tol.to_string()), 150., tol_items)))
+            .when(hole, |e| e.child(crate::ui_script::wrap(menu("dp-hprec", small(prec_label.clone()), 110., prec_items), || "dropdown:Precision".into())).child(menu("dp-htol", small(tol.to_string()), 150., tol_items)))
             .when(matches!(tol, "Symmetrical" | "Deviation" | "Limits"), |e| e.child(crate::ui_script::wrap(field(&d.tol_a, Some(70.), 26.).into_any_element(), || "field:Tolerance".into())))
             .when(matches!(tol, "Deviation" | "Limits"), |e| e.child(flip("dp-flip-a", true, cx)).child(field(&d.tol_b, Some(70.), 26.)).child(flip("dp-flip-b", false, cx)));
         Some(

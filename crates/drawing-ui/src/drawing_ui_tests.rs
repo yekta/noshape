@@ -635,6 +635,63 @@ fn a_revision_tables_menus_are_lives(cx: &mut TestAppContext) {
     assert_eq!(cells, ["Size", "Resize...", "Copy"]);
 }
 
+/// Live2 drw-geometric-tolerance-dialog: one Esc, the Tolerance field focused, closes the Geometric tolerance
+/// panel and ends the tool.
+#[gpui::test]
+fn esc_closes_the_geometric_tolerance_panel_and_its_tool(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Tool;
+    let (window, editor) = drawing(cx, "gdt-esc");
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Gdt, cx)));
+    draw(cx, window);
+    draw(cx, window);
+    assert!(cx.update(|cx| editor.read(cx).gdt_dlg.is_some()), "the panel opens with the tool");
+    cx.update(|cx| cx.bind_keys(noshape_app_core::actions::default_key_bindings()));
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_keystrokes("escape");
+    draw(cx, window);
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(e.gdt_dlg.is_none() && matches!(e.tool, Tool::Select), "one Esc closes it and ends the tool");
+    });
+}
+
+/// Live2 drw-note-editor: Esc in the note editor closes it and ends the Note tool.
+#[gpui::test]
+fn esc_in_the_note_editor_ends_the_note_tool(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Tool;
+    let (window, editor) = drawing(cx, "note-esc");
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Note, cx)));
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        editor.update(cx, |e, cx| {
+            e.cursor = [60.0, 40.0];
+            e.tool_click(w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    assert!(cx.update(|cx| matches!(editor.read(cx).panel, Some(crate::drawing_view::Panel::Note { .. }))), "the note editor opens");
+    // (Esc in its text goes to `discard_inplace` or `cancel_panel`, elsewhere to `cancel`.)
+    for close in [crate::drawing_view::DrawingEditor::discard_inplace, crate::drawing_view::DrawingEditor::cancel_panel, crate::drawing_view::DrawingEditor::cancel] {
+        cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Note, cx)));
+        cx.update_window(window, |_, w, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = [60.0, 40.0];
+                e.tool_click(w, cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+        cx.update(|cx| editor.update(cx, close));
+        let e = editor.read_with(cx, |e, _| (e.panel.is_none(), matches!(e.tool, Tool::Select)));
+        assert_eq!(e, (true, true));
+    }
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(e.panel.is_none() && matches!(e.tool, Tool::Select));
+    });
+}
+
 /// Live2 drw-revision-table-properties: Esc closes a revision table's properties and drops its selection.
 #[gpui::test]
 fn esc_closes_revision_table_properties_and_drops_the_selection(cx: &mut TestAppContext) {

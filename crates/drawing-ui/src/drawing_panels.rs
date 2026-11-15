@@ -382,6 +382,7 @@ impl DrawingEditor {
             }
         }
         let current = self.mbd_model.min(models.len() - 1);
+        let model_names = models.clone();
         let entity = cx.entity().downgrade();
         let model = crate::os_ui::select_field_user_from("mbd-model", models, 2, current, move |i, _, cx| {
             let _ = entity.update(cx, |t: &mut Self, cx| {
@@ -405,9 +406,12 @@ impl DrawingEditor {
         // Limit; live request 1721), each grey with right-click › Show.
         let mut datums = v_flex().child(header(&["Name"]));
         let mut chars = v_flex().child(header(&["Type", "Nominal Value", "Tolerance", "Upper Limit", "Lower Limit"]));
+        // Their texts for the ui-parity runner: (datums', characteristics').
+        let mut texts: (Vec<String>, Vec<String>) = Default::default();
         for r in &missing {
             let (tab, id) = (r.tab, r.id);
             let cells: Vec<String> = if r.dimension { self.mbd_characteristic(r, cx).map(Vec::from).unwrap_or_else(|| vec![r.name.clone()]) } else { vec![r.name.clone()] };
+            if r.dimension { &mut texts.1 } else { &mut texts.0 }.extend(cells.iter().cloned());
             let row = h_flex()
                 .id(SharedString::from(format!("mbd-row-{}-{id}", tab.0)))
                 .h(px(34.))
@@ -443,6 +447,25 @@ impl DrawingEditor {
         };
         let missing_text = format!("{} of {} MBD requirements are not yet visible in any drawing view.", missing.len(), rows.len());
         let headline = if message.0.is_empty() { missing_text } else { message.0.to_string() };
+        // The panel in live's reading (live2 drw-mbd-status-panel): Model: and its options, each section with its
+        // rows, the message.
+        crate::ui_script::note_dialog(|| {
+            let mut text: Vec<String> = vec!["MBD status".into(), "Model:".into()];
+            text.extend(model_names.iter().cloned());
+            text.push("Datums".into());
+            if !rows.is_empty() {
+                text.push("Name".into());
+                text.extend(texts.0.iter().cloned());
+            }
+            text.push("Characteristics".into());
+            if !rows.is_empty() {
+                text.extend(["Type", "Nominal Value", "Tolerance", "Upper Limit", "Lower Limit"].map(String::from));
+                text.extend(texts.1.iter().cloned());
+            }
+            text.push(headline.clone());
+            text.extend(message.1.map(String::from));
+            serde_json::json!({ "kind": "drawing-panel", "title": "MBD status", "text": text, "fields": [{ "label": "Model:", "kind": "select", "value": model_names[current] }] })
+        });
         v_flex()
             .size_full()
             .child(h_flex().h(px(36.)).mt(px(5.)).px(px(7.)).gap(px(5.)).child(div().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Model:")).child(model))
