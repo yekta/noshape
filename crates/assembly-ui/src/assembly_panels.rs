@@ -1898,6 +1898,7 @@ impl AssemblyView {
                     .child(
                         h_flex()
                             .id("mir-strategy")
+                            .map(|d| crate::ui_script::mark(d, || "button:Mirror strategy…".into()))
                             .mx(px(3.))
                             .mt(px(5.))
                             // Live dom/dialog-asm-mirror-filled: 27 px, 2 px padding,
