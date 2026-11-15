@@ -359,8 +359,15 @@ pub fn point(ev: &mut EvalCtx) -> FResult<()> {
     let p = if ev.is("pointType", "MESH_POINT") {
         DVec3::new(ev.length("x")?, ev.length("y")?, ev.length("z")?)
     } else {
-        let Some(&(bi, ei)) = ev.resolve_edges(ev.query("entities")).first() else { return err("Cannot resolve entities.") };
-        let e = ev.edge_shape(bi, ei)?;
+        // A model edge, else a sketch's curve (asm-infento-subs' studio 1dc32b: Transform 23 / 28's "Edge point" on a
+        // sketch line).
+        let e = match ev.resolve_edges(ev.query("entities")).first() {
+            Some(&(bi, ei)) => ev.edge_shape(bi, ei)?,
+            None => {
+                let sketch = ev.query("entities").iter().find_map(|r| crate::regen::measure::resolve_shapes(&ev.ctx, r).into_iter().find(|s| s.shape_type() == ShapeType::Edge));
+                sketch.ok_or_else(|| FeatureError::new("Cannot resolve entities."))?
+            }
+        };
         let info = e.edge_info()?;
         let t = ev.real("parameter")?.clamp(0.0, 1.0);
         let t = if matches!(e.orientation(), k::Orientation::Reversed) { 1.0 - t } else { t };

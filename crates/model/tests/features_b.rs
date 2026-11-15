@@ -923,6 +923,23 @@ fn import_foreign_mesh_parts() {
     assert!(info.closed && info.members.len() == 2 && comp.name == "Composite part 1", "{info:?} {}", comp.name);
 }
 
+/// An Edge point on a sketch line (asm-infento-subs' studio 1dc32b: Transform 23 / 28's in-feature "Edge point"):
+/// the point at the parameter along the line, on its sketch plane.
+#[test]
+fn an_edge_point_on_a_sketch_line() {
+    let mut s = block();
+    let mut sk = noshape_sketch::Sketch::new();
+    let line = sk.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.04, 0.02));
+    let sketch = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    s.add("cPoint", move |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: line.0 }]));
+        p.set("parameter", expr("0.5"));
+    });
+    let r = s.ok();
+    let p = r.context.points.last().expect("the point").position;
+    assert!(vnear(p, DVec3::new(0.02, 0.0, 0.01)), "{p:?}");
+}
+
 #[test]
 fn reference_misc_point_composite_query() {
     let mut s = block();
