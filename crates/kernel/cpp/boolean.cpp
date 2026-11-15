@@ -5793,9 +5793,12 @@ bool fuse_trimmed(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_S
 }
 
 // fuse_trimmed with noshape's own Boolean throughout: each tool cut by the arguments, then the arguments fused with
-// what is left of the tools (they only touch now). False (nothing done) where any of them declines.
-bool rust_fuse_trimmed(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_Shape>& t, const BoolOpts& opts, TopoDS_Shape& out, HHist& hist)
+// what is left of the tools (they only touch now). False (nothing done) where any of them declines. `srcs`: the
+// arguments' and tools' shapes as the plain fuse had them (their bodies converted once: c2-impeller-loft's nine seats
+// converted its part ten times, 0.4 s each), or none.
+bool rust_fuse_trimmed(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_Shape>& t, const std::vector<const OcShape*>& srcs, const BoolOpts& opts, TopoDS_Shape& out, HHist& hist)
 {
+  auto src = [&](size_t k) { return k < srcs.size() ? srcs[k] : nullptr; };
   const RustLenient lenient;
   const size_t n = t.size();
   std::vector<TopoDS_Shape> trimmed(n);
@@ -5815,9 +5818,11 @@ bool rust_fuse_trimmed(const std::vector<TopoDS_Shape>& a, const std::vector<Top
     {
       const RustLenient                     lenient_here;
       std::vector<TopoDS_Shape>             in{t[static_cast<size_t>(i)]};
-      std::vector<const OcShape*>           rs;
+      std::vector<const OcShape*>           rs{src(a.size() + static_cast<size_t>(i))};
       std::vector<std::unique_ptr<OcShape>> own;
       in.insert(in.end(), a.begin(), a.end());
+      for (size_t k = 0; k < a.size(); ++k)
+        rs.push_back(src(k));
       if (!rust_boolean(1, in, rs, own, trimmed[static_cast<size_t>(i)], cuts[static_cast<size_t>(i)], opts.fuzzy, false))
       {
         failed[static_cast<size_t>(i)] = 1;
@@ -5847,6 +5852,8 @@ bool rust_fuse_trimmed(const std::vector<TopoDS_Shape>& a, const std::vector<Top
   HHist                                 h2;
   std::vector<const OcShape*>           rs;
   std::vector<std::unique_ptr<OcShape>> own;
+  for (size_t k = 0; k < a.size(); ++k)
+    rs.push_back(src(k));
   if (!rust_boolean(0, concat(a, rest), rs, own, fused, h2, opts.fuzzy, true) || !volumes_add_up(concat(a, rest), fused))
     return false;
   // History from the original inputs, as fuse_trimmed's: the arguments as the fuse has them; a tool's sub-shapes
@@ -8673,7 +8680,7 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
         if (!done && rust_last_decline() == "pattern instances overlapping")
         {
           const KernelTimer trim("boolean.rust.trimmed");
-          done = rust_fuse_trimmed(a, t, opts, out, h);
+          done = rust_fuse_trimmed(a, t, rs, opts, out, h);
           // (Instances overlapping one another too, so the trimmed ones don't just touch: OCCT's fuse_trimmed fails
           // there (their volumes don't add up) and OCCT runs the plain fuse; so does ours (c2-rings-loft's
           // Circular pattern 1: 8 rings, 222 ms against OCCT's 472).)
