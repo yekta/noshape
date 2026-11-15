@@ -4900,9 +4900,10 @@ impl<'a> Translator<'a> {
                     self.pin_external_vertex(k, oid, c);
                 }
                 // An external reference live's sketch no longer finds (its query empty): ours to nothing too, at
-                // the local point, so the sketch warns as live's.
+                // the local point, so the sketch warns as live's. (Not a query whose parts are nested, an edge's and a
+                // face's: c2-hunting-knife's Sketch 9 / 11 / 17, OK in live.)
                 let gone = c["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external"))).any(|p| {
-                    p["queries"].as_array().is_some_and(|qs| !qs.is_empty() && qs.iter().all(|q| q["queryString"].as_str().unwrap_or("").is_empty() && q["deterministicIds"].as_array().is_none_or(|ids| ids.iter().all(|i| i.as_str().is_none_or(str::is_empty)))))
+                    p["queries"].as_array().is_some_and(|qs| !qs.is_empty() && qs.iter().all(empty_live_query))
                 });
                 if gone && let Some(point) = entities.first() {
                     let mut args = json!({ "sketch": id, "entity": point });
@@ -7952,6 +7953,14 @@ fn pattern_alias(sketch: &Value, id: &str) -> Option<String> {
     None
 }
 
+/// A live sketch query that names nothing: no query string, no ids, and no nested query (an edge's and a face's) with
+/// a string either.
+fn empty_live_query(q: &Value) -> bool {
+    q["queryString"].as_str().unwrap_or("").is_empty()
+        && q["deterministicIds"].as_array().is_none_or(|ids| ids.iter().all(|i| i.as_str().is_none_or(str::is_empty)))
+        && q.as_object().is_none_or(|o| o.values().all(|v| v.get("queryString").and_then(Value::as_str).is_none_or(str::is_empty)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -8123,5 +8132,15 @@ mod tests {
         assert_eq!(x.len(), 2, "{x:?}");
         // Counter-clockwise from +X: the crossing at x < 0 comes first.
         assert!(x[0][0] < 0.0 && x[1][0] > 0.0 && x.iter().all(|p| (p[0].hypot(p[1]) - 0.0225).abs() < 1e-4), "{x:?}");
+    }
+
+    /// c2-hunting-knife's Sketch 9 (OK in live): an external point given by an edge's and a face's queries, its own
+    /// query string empty, isn't a reference live lost.
+    #[test]
+    fn a_nested_edge_and_face_query_is_not_empty() {
+        let lost = serde_json::json!({ "queryString": "", "deterministicIds": [] });
+        let nested = serde_json::json!({ "queryString": "", "deterministicIds": [], "edgeQuery": { "queryString": "query=qCompressed(1.0,\"&23a$x\",id);" }, "faceQuery": { "queryString": "query=qCompressed(1.0,\"&23a$y\",id);" } });
+        assert!(super::empty_live_query(&lost));
+        assert!(!super::empty_live_query(&nested));
     }
 }
