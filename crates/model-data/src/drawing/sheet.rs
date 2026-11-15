@@ -3190,7 +3190,8 @@ impl SheetGeometry {
         // tail, above the line carried on to its far end.
         let iso_squeezed = !inline && !self.flip_arrows && 2.0 * a_len > dl;
         let iso_out = iso_squeezed && self.text_along.is_none();
-        let s_along = if iso_out { half_line + 2.0 * a_len + font::text_width(&text.main, h) / 2.0 } else { self.text_along.unwrap_or(0.0) };
+        let jogged = (f.mid[0] - mid[0]) * dir[0] + (f.mid[1] - mid[1]) * dir[1];
+        let s_along = if iso_out { half_line + 2.0 * a_len + font::text_width(&text.main, h) / 2.0 } else { self.text_along.unwrap_or(0.0) + jogged };
         let c = [mid[0] + dir[0] * s_along, mid[1] + dir[1] * s_along];
         let outside = (s_along.abs() > half_line && self.text_along.is_some()) || iso_out;
         let squeezed = iso_squeezed || (inline && !self.flip_arrows && !outside && gap.is_some_and(|g| 2.0 * g + 2.0 * a_len > dl));
@@ -3325,6 +3326,10 @@ pub struct LinearFrame {
     pub dir: [f64; 2],
     pub dp: [f64; 2],
     pub dq: [f64; 2],
+    /// The dimension line's middle without its jogs: where the value stays
+    /// (live drw-dimension-add-jog: Add jog lengthens the line, the value
+    /// doesn't move along it).
+    pub mid: [f64; 2],
     pub ext: Vec<Vec<[f64; 2]>>,
     pub jog_points: Vec<[f64; 2]>,
     /// Per extension line: (model point, unit direction, length to the
@@ -3376,7 +3381,8 @@ pub fn linear_frame(p: [f64; 2], q: [f64; 2], offset: f64, orientation: DimOrien
             None => {}
         }
     }
-    LinearFrame { dir, dp: ends[0], dq: ends[1], ext: out, jog_points, legs }
+    let mid = { let (a, b) = (at(p), at(q)); [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0] };
+    LinearFrame { dir, dp: ends[0], dq: ends[1], mid, ext: out, jog_points, legs }
 }
 
 /// A polyline with gaps of `half` mm on each side of the `cuts` points

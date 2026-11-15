@@ -392,12 +392,15 @@ impl DrawingEditor {
         // under a selected BOM table). Only while nothing else is going on: a tool or a panel takes the highlight
         // (drw-dimension-foreshorten, Edit hatch region in drw-hatch-edit; BOM table properties keeps it,
         // drw-bom-table-properties); a centermark's thin lines don't count (drw-centermark-align).
-        if let Some(b) = self.built.as_ref().filter(|_| matches!(self.tool, Tool::Select) && self.panel.is_none() && self.hatch_dlg.is_none()) {
+        // (Placing a revision callout keeps its table lit: live2 drw-revision-callout-add.)
+        if let Some(b) = self.built.as_ref().filter(|_| matches!(self.tool, Tool::Select | Tool::RevisionCallout { .. }) && self.panel.is_none() && self.hatch_dlg.is_none()) {
             let thin = |id: u64| sheet.annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. } | AnnotationKind::CircleCenterline { .. }));
             let lit = |pick: u32| {
                 let Some(p) = b.picks.get(pick as usize) else { return false };
                 self.selection.iter().any(|s| match (s, p) {
-                    (Sel::Table(a), PickTarget::Table(t)) | (Sel::Hatch(a), PickTarget::Hatch(t)) => a == t,
+                    // A table with cells picked is orange only in them (live2 drw-revision-cell-*: no view's box reads it).
+                    (Sel::Table(a), PickTarget::Table(t)) => a == t && self.cell_sel.is_none_or(|c| c.table != *a),
+                    (Sel::Hatch(a), PickTarget::Hatch(t)) => a == t,
                     (Sel::Annotation(a), PickTarget::Annotation(t)) => a == t && !thin(*a),
                     (Sel::Sketch(a), PickTarget::SketchEntity(t)) => a == t,
                     _ => false,
@@ -565,8 +568,9 @@ impl DrawingEditor {
 
 fn ui_tool_name(t: &Tool) -> Option<&'static str> {
     Some(match t {
-        // Foreshorten (a radius's menu) is no toolbar tool.
-        Tool::Select | Tool::Foreshorten { .. } => return None,
+        // Foreshorten (a radius's menu) and Add revision callout (a revision table's) are no toolbar tools (live2
+        // drw-revision-callout-add).
+        Tool::Select | Tool::Foreshorten { .. } | Tool::RevisionCallout { .. } => return None,
         Tool::InsertView { .. } => "Insert view",
         Tool::Projected { .. } => "Projected view",
         Tool::Auxiliary { .. } => "Auxiliary view",

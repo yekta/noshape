@@ -277,9 +277,10 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
             }
         }
         // A field named by part of its label ("Distance" for "Offset distance"), a notice by part of its message, a
-        // button by the words of its tooltip ("Mass properties" for "Display mass and section properties", as live's
-        // runner), when only one matches.
-        for kind in ["field:", "button:", "notice:"] {
+        // menu row by part of its text ("Company settings" for "Loopelf company settings"), a button by the words of
+        // its tooltip ("Mass properties" for "Display mass and section properties", as live's runner), when only one
+        // matches.
+        for kind in ["field:", "button:", "notice:", "menu:"] {
             if let Some(f) = name.strip_prefix(kind).map(str::to_lowercase) {
                 let has = |k: &str| {
                     let k = k[kind.len()..].to_lowercase();

@@ -726,6 +726,15 @@ def insert_panel(state):
     return state
 
 
+def company_row(state):
+    """The account menu's "<company> company settings": live's company is its account's (Loopelf), ours the local user
+    (whoever runs the suite): the row reads alike on both sides."""
+    lst = (state or {}).get("list")
+    if isinstance(lst, dict) and isinstance(lst.get("rows"), list):
+        lst["rows"] = [re.sub(r"^.+ company settings$", "<company> company settings", r) if isinstance(r, str) else r for r in lst["rows"]]
+    return state
+
+
 def runner_names(state, start, live_side):
     """A panel's text naming the runners' own documents (asm-menu-change-configuration, -change-to-version): live2's
     document ("noshape ui parity live2-1") and ours (the start's name) read alike, and live2's Part Studio, which its
@@ -847,8 +856,8 @@ def compare(live, ours, whole_document=True):
         # Live's document runner (run.mjs) blanks the tooltip after every step but a hover; its page runner (a state
         # with `url`: docs-*, prefs-*) reads it.
         tip_blanked = isinstance(a, dict) and "url" not in a and (step or {}).get("do") != "hover"
-        a = insert_panel(runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True))
-        b = insert_panel(runner_names(old_workspace_labels(a, reference_manager_as_panel(a, material_as_panel(a, json.loads(json.dumps(b))))), start_name, False))
+        a = company_row(insert_panel(runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True)))
+        b = company_row(insert_panel(runner_names(old_workspace_labels(a, reference_manager_as_panel(a, material_as_panel(a, json.loads(json.dumps(b))))), start_name, False)))
         if free_plan:
             a, b = without_free_plan_rows(a), without_free_plan_rows(b)
         b = picker_as_read(b, picker_read)

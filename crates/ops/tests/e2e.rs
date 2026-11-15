@@ -933,6 +933,29 @@ fn a_workspace_branches_from_a_version() {
     assert_eq!(e.param.as_deref(), Some("version"), "{}", e.to_json());
 }
 
+/// Revision history's Export (live rel-rh-export): a Part Studio's parts as they are in a version, the workspace
+/// left as it is.
+#[test]
+fn export_parts_as_in_a_version() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "export-at-version.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [20, 10]] }));
+    let r = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r], "depth": "5 mm" } }));
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    call(&mut ctx, "feature_edit", json!({ "feature": "Extrude 1", "params": { "depth": "15 mm" } }));
+    let volume = |file: &std::path::Path| noshape_kernel::read_step(file, noshape_kernel::LengthUnit::Meter).expect("read STEP").iter().map(|s| s.shape.volume().unwrap()).sum::<f64>() * 1e9;
+    let at_v1 = scratch("export-at-v1.step");
+    let r = call(&mut ctx, "export_parts", json!({ "format": "STEP", "file": at_v1.to_str().unwrap(), "document_version": "V1" }));
+    assert_eq!(r["parts"], 1, "{r}");
+    assert!((volume(&at_v1) - 1000.0).abs() < 1.0, "V1's 20 x 10 x 5 block: {}", volume(&at_v1));
+    let now = scratch("export-now.step");
+    call(&mut ctx, "export_parts", json!({ "format": "STEP", "file": now.to_str().unwrap() }));
+    assert!((volume(&now) - 3000.0).abs() < 1.0, "the workspace's 15 mm block: {}", volume(&now));
+    let e = try_call(&mut ctx, "export_parts", json!({ "format": "STEP", "file": now.to_str().unwrap(), "document_version": "V9" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("document_version"), "{}", e.to_json());
+}
+
 // ------------------------------------------------------------ drawings
 
 /// A block 80 x 40 x 20 with a Ø10 through hole at its center.

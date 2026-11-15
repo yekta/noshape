@@ -3048,6 +3048,21 @@ pub fn request_export(tab: TabId, parts: Vec<noshape_model::BodyId>, window: &mu
     }
 }
 
+/// Revision history's Export of a released part: the Export modal over the workspace, the parts as in `version`.
+pub fn request_released_export(tab: TabId, parts: Vec<noshape_model::BodyId>, version: String, file_name: String, window: &mut Window, cx: &mut App) {
+    let Some(ws) = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<Workspace>().ok()) else { return };
+    ws.update(cx, |w, cx| {
+        w.activate(tab, window, cx);
+        let studio = match w.views.get(&tab) {
+            Some(TabView::PartStudio(v)) => Some(v.clone()),
+            _ => None,
+        };
+        if let Some(v) = studio {
+            v.update(cx, |v, cx| v.open_released_part_export(parts, version, file_name, window, cx));
+        }
+    });
+}
+
 /// The workspace's + › Import… (e.g. the drawing Insert view picker's
 /// "Import..." row).
 pub fn request_import(window: &mut Window, cx: &mut App) {

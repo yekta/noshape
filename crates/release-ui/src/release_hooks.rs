@@ -23,6 +23,9 @@ pub struct Hooks {
     pub create_version: fn(Entity<DocModel>, &mut Window, &mut App),
     /// The window's workspace exports a tab (or some of its parts).
     pub request_export: fn(TabId, Vec<BodyId>, &mut Window, &mut App),
+    /// The window's workspace exports parts of a Part Studio as they are in a version (its id), the file named
+    /// `file_name` (Revision history's Export).
+    pub request_released_export: fn(TabId, Vec<BodyId>, String, String, &mut Window, &mut App),
 }
 
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
@@ -50,4 +53,8 @@ pub fn create_version(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) 
 
 pub fn request_export(tab: TabId, parts: Vec<BodyId>, window: &mut Window, cx: &mut App) {
     (hooks().request_export)(tab, parts, window, cx)
+}
+
+pub fn request_released_export(tab: TabId, parts: Vec<BodyId>, version: String, file_name: String, window: &mut Window, cx: &mut App) {
+    (hooks().request_released_export)(tab, parts, version, file_name, window, cx)
 }

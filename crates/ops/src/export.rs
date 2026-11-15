@@ -420,6 +420,33 @@ pub fn cad_file_parts(f: &noshape_model::file_tab::FileTab, units: &noshape_unit
     parts
 }
 
+/// The parts of Part Studio `tab` in `doc`, a version's document (Revision history's Export: the parts as
+/// released), `only` those given (all when empty), for [`write_export`]: (name, shape, colour).
+pub fn version_parts(doc: noshape_model::Document, tab: noshape_model::document::TabId, only: &[noshape_model::BodyId]) -> anyhow::Result<Vec<(String, k::Shape, [f32; 4])>> {
+    let Some(noshape_model::TabContent::PartStudio(ps)) = doc.tab(tab).map(|t| &t.content) else {
+        anyhow::bail!("The Part Studio is not in that version");
+    };
+    let opts = noshape_model::regen::RegenOptions {
+        document_variables: noshape_model::variables::element_variables(&doc, tab),
+        derived: Some(crate::derived::DocStudios::new(doc.clone(), Default::default())),
+        custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&doc)),
+        ..Default::default()
+    };
+    let r = noshape_model::regen::Regenerator::default().regenerate(ps, &ps.configuration.defaults(), &doc.settings.units, &opts);
+    let parts: Vec<_> = r
+        .context
+        .bodies
+        .iter()
+        .filter(|b| only.is_empty() || only.contains(&b.id))
+        .map(|b| {
+            let d = r.display.body(&b.id);
+            (d.map(|d| d.name.clone()).unwrap_or_else(|| b.name.clone()), b.shape.clone(), d.map(|d| d.color).unwrap_or([0.7, 0.7, 0.7, 1.0]))
+        })
+        .collect();
+    anyhow::ensure!(only.is_empty() || parts.len() == only.len(), "The released part is not in its version");
+    Ok(parts)
+}
+
 pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(String, k::Shape, [f32; 4])>) -> anyhow::Result<std::path::PathBuf> {
     anyhow::ensure!(!parts.is_empty(), "Selected tab contains no supported geometry for export.");
     if let Some(msg) = missing_writer(s.format) {

@@ -20,6 +20,7 @@ fn register_hooks() {
         open_version_window: |_, _, _, _| Err(anyhow::anyhow!("no version windows in tests")),
         create_version: |_, _, _| {},
         request_export: |_, _, _, _| {},
+        request_released_export: |_, _, _, _, _, _| {},
     });
 }
 

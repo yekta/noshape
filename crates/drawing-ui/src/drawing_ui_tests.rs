@@ -635,6 +635,29 @@ fn a_revision_tables_menus_are_lives(cx: &mut TestAppContext) {
     assert_eq!(cells, ["Size", "Resize...", "Copy"]);
 }
 
+/// Live2 drw-revision-table-properties: Esc closes a revision table's properties and drops its selection.
+#[gpui::test]
+fn esc_closes_revision_table_properties_and_drops_the_selection(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Sel;
+    let (window, editor) = drawing(cx, "revision-props-esc");
+    cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let id = e.current_sheet().next_table_id();
+            let table = noshape_scene::drawing_tools::revision_table(id, &Default::default(), [300.0, 250.0]);
+            e.edit_sheet("Revision table", cx, |s| s.tables.push(table));
+            e.selection = vec![Sel::Table(id)];
+            e.open_revision_props(id, cx);
+        })
+    });
+    draw(cx, window);
+    assert!(cx.update(|cx| editor.read(cx).revision_dlg.is_some()));
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(e.revision_dlg.is_none() && e.selection.is_empty());
+    });
+}
+
 /// Live2 drw-section-view-section-depth: with Section depth on (Up to entity, nothing picked), a click off the views
 /// once the cutting line is placed places the view without making it: the mode tabs go and ✓ waits; picking the
 /// depth entity then makes the view there.

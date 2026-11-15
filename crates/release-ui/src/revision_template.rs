@@ -122,7 +122,8 @@ pub fn template_list(t: &RevisionTemplate, on_saved: OnSaved, cx: &App) -> AnyEl
         .child(div().w(px(cols_w)).overflow_hidden().child(columns_strip(t)))
         .child(
             Button::new("rt-template-edit")
-                .map(|d| crate::ui_script::mark(d, || "button:Edit revision table template".into()))
+                // (By its text, as live's runner finds it: rel-revtable-template.)
+                .map(|d| crate::ui_script::mark(d, || "button:Edit".into()))
                 .primary()
                 .child(div().text_size(px(12.)).child("Edit"))
                 .h(px(24.))

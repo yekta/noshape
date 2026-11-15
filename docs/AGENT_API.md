@@ -7304,6 +7304,7 @@ Examples:
 | `parts` | array of string |  | Part ids (`body:…`) or names; default all visible parts. |
 | `y_up` | boolean |  | Export models oriented Y axis up. |
 | `version` | string |  | Format version (e.g. "AP214", "35.1", "7"). |
+| `document_version` | string |  | A Part Studio's parts as they are in this version of the document (its name or id), the document left as it is: Revision history's Export of a released part. |
 | `units` | one of `Centimeter`, `Foot`, `Inch`, `Meter`, `Millimeter`, `Yard` |  | File units (STL, OBJ...; STEP: custom units). |
 | `resolution` | one of `Coarse`, `Medium`, `Fine`, `Custom` |  | Mesh resolution (default Medium); Custom takes the fields below. |
 | `chordal_tolerance` | number |  | Custom, STL: Chordal tolerance (mm). |

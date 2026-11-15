@@ -128,9 +128,18 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
-        // Revision table properties…: Esc closes it, as a cancel (live drw-revision-table-properties).
+        // Picked cells: Esc closes their Cell panel and drops them (live2 drw-revision-cell-format); a panel over it
+        // (Resize…) goes first (drw-revision-cell-resize).
+        if self.panel.is_none() && self.cell_sel.take().is_some() {
+            self.selection.clear();
+            cx.notify();
+            return;
+        }
+        // Revision table properties…: Esc closes it, as a cancel, and drops the selection (live
+        // drw-revision-table-properties).
         if self.revision_dlg.as_ref().is_some_and(|d| d.table.is_some()) {
             self.close_revision_dlg(false, cx);
+            self.selection.clear();
             return;
         }
         if self.zoom_window.take().is_some() || self.rotate_to_edge.take().is_some() || self.align_views.take().is_some() || self.sheet_props.take().is_some() || self.shortcut_toolbar.take().is_some() || self.measure.take().is_some() || self.align_centermark.take().is_some() || self.align_auto_centermark.take().is_some() || self.painter.take().is_some() || self.cancel_inspection(cx) || self.cancel_hatch(cx) {

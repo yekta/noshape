@@ -74,13 +74,55 @@ impl PartStudioView {
                 .collect();
             s.pmi = noshape_ops::export::studio_pmi(ps, ctx, &ids, &self.doc.read(cx).session.doc.settings.units, s.mbd_text());
         }
+        let several = if bodies.is_empty() { self.context.as_ref().is_some_and(|c| c.bodies.len() > 1) } else { bodies.len() > 1 };
+        match self.export_parts(&s, &bodies) {
+            Ok(parts) => self.save_parts_export(s, name, parts, several, window, cx),
+            Err(e) => self.flash_info(format!("Export failed: {e:#}"), cx),
+        }
+    }
+
+    /// Revision history's Export (live rel-rh-export): the dialog opens over the workspace with the file named
+    /// `file_name` ("<studio> - <part number>"); Export writes the parts as released, the Part Studio of `version`
+    /// regenerated off the UI thread.
+    pub fn open_released_part_export(&mut self, bodies: Vec<BodyId>, version: String, file_name: String, window: &mut Window, cx: &mut Context<Self>) {
+        let view = cx.entity();
+        open_export_modal_with(file_name, false, true, Rc::new(move |s, name, window, cx| {
+            let (bodies, version) = (bodies.clone(), version.clone());
+            view.update(cx, |this, cx| this.run_released_export(s, name, bodies, version, window, cx));
+        }), window, cx);
+    }
+
+    fn run_released_export(&mut self, s: ExportSettings, name: String, bodies: Vec<BodyId>, version: String, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(msg) = missing_writer(s.format) {
+            self.flash_info(msg, cx);
+            return;
+        }
+        let Ok(Some(doc)) = self.doc.read(cx).session.document_at_version(&version) else {
+            self.flash_info("Export failed: the released version is no longer in the document".into(), cx);
+            return;
+        };
+        self.flash_info("Exporting…".into(), cx);
+        let tab = self.tab;
+        let several = bodies.len() > 1;
+        let parts = cx.background_spawn(async move { noshape_ops::export::version_parts(doc, tab, &bodies) });
+        cx.spawn_in(window, async move |this, cx| {
+            let parts = parts.await;
+            let _ = this.update_in(cx, |this, window, cx| match parts {
+                Ok(parts) => this.save_parts_export(s, name, parts, several, window, cx),
+                Err(e) => this.flash_info(format!("Export failed: {e:#}"), cx),
+            });
+        })
+        .detach();
+    }
+
+    /// Save `parts` as the dialog's Options say: to a file the user picks, or stored in a new tab.
+    fn save_parts_export(&mut self, s: ExportSettings, name: String, parts: Vec<(String, k::Shape, [f32; 4])>, several: bool, window: &mut Window, cx: &mut Context<Self>) {
         let name = if name.is_empty() { self.studio_name(cx) } else { name };
         // The saved file's own extension (OBJ downloads a .zip, as live).
-        let several = if bodies.is_empty() { self.context.as_ref().is_some_and(|c| c.bodies.len() > 1) } else { bodies.len() > 1 };
         let ext = s.file_ext(several);
         // Options › Store file in a new tab: no download.
         if s.options == 2 {
-            let msg = match store_export(&self.doc, self.tab, &format!("{name}.{ext}"), |p| self.write_part_export(&s, p, &bodies), cx) {
+            let msg = match store_export(&self.doc, self.tab, &format!("{name}.{ext}"), |p| write_export(&s, p, parts), cx) {
                 Ok(file) => format!("Stored {file}"),
                 Err(e) => format!("Export failed: {e:#}"),
             };
@@ -90,7 +132,7 @@ impl PartStudioView {
         let view = cx.entity();
         crate::file_dialogs::request_save_path("Export", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
             view.update(cx, |this, cx| {
-                let msg = match this.write_part_export(&s, &path, &bodies) {
+                let msg = match write_export(&s, &path, parts) {
                     Ok(p) => {
                         // Download and store file in a new tab.
                         if s.options == 1 {
@@ -107,8 +149,13 @@ impl PartStudioView {
 
     /// Write the export: one file, or one per part next to `path`.
     pub fn write_part_export(&self, s: &ExportSettings, path: &std::path::Path, selected: &[BodyId]) -> anyhow::Result<std::path::PathBuf> {
+        write_export(s, path, self.export_parts(s, selected)?)
+    }
+
+    /// The parts an export writes: `selected`, else the visible ones (the hidden too with Include hidden).
+    fn export_parts(&self, s: &ExportSettings, selected: &[BodyId]) -> anyhow::Result<Vec<(String, k::Shape, [f32; 4])>> {
         let ctx = self.context.as_ref().ok_or_else(|| anyhow::anyhow!("Nothing to export yet"))?;
-        let parts: Vec<(String, k::Shape, [f32; 4])> = ctx
+        Ok(ctx
             .bodies
             .iter()
             .filter(|b| selected.is_empty() || selected.contains(&b.id))
@@ -121,8 +168,7 @@ impl PartStudioView {
                 let color = d.map(|d| d.color).unwrap_or([0.7, 0.7, 0.7, 1.0]);
                 Some((name, b.shape.clone(), color))
             })
-            .collect();
-        write_export(s, path, parts)
+            .collect())
     }
 }
 

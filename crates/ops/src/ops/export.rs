@@ -22,6 +22,7 @@ pub fn ops() -> Vec<Op> {
             opt("parts", strings(), "Part ids (`body:…`) or names; default all visible parts."),
             opt("y_up", json!({ "type": "boolean" }), "Export models oriented Y axis up."),
             opt("version", s(), "Format version (e.g. \"AP214\", \"35.1\", \"7\")."),
+            opt("document_version", s(), "A Part Studio's parts as they are in this version of the document (its name or id), the document left as it is: Revision history's Export of a released part."),
             opt("units", json!({ "type": "string", "enum": UNITS.iter().map(|u| u.0).collect::<Vec<_>>() }), "File units (STL, OBJ...; STEP: custom units)."),
             opt("resolution", json!({ "type": "string", "enum": ["Coarse", "Medium", "Fine", "Custom"] }), "Mesh resolution (default Medium); Custom takes the fields below."),
             opt("chordal_tolerance", json!({ "type": "number", "exclusiveMinimum": 0 }), "Custom, STL: Chordal tolerance (mm)."),
@@ -132,6 +133,14 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             .collect::<Result<_, _>>()?,
         None => Vec::new(),
     };
+    if let Some(v) = a.opt_str("document_version")? {
+        let versions = od.session.store.list_versions().map_err(|e| OpError::new("io", format!("{e:#}")))?;
+        let id = versions.iter().find(|x| x.name == v || x.id.to_string() == v).map(|x| x.id.to_string()).ok_or_else(|| OpError::param("document_version", &format!("no version named `{v}`")))?;
+        let doc = od.session.document_at_version(&id).map_err(|e| OpError::new("io", format!("{e:#}")))?.ok_or_else(|| OpError::param("document_version", "no such version"))?;
+        let list = crate::export::version_parts(doc, tab, &selected).map_err(|e| OpError::param("document_version", &format!("{e:#}")))?;
+        let n = list.len();
+        return write_out(od, tab, a, format, n, |file| crate::export::write_export(&s, file, list));
+    }
     // What the Part Studio's Export writes (write_part_export).
     let list: Vec<(String, noshape_kernel::Shape, [f32; 4])> = r
         .context

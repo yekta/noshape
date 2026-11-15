@@ -226,7 +226,6 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
 pub const MENUS: &[(&str, Cover)] = &[
     // The documents page (start-ui start_window.rs).
     ("documents:Any", Op("documents_details")),
-    ("documents:Company settings", Op("company_custom_properties")),
     ("documents:Copy workspace…", Op("documents_copy")),
     ("documents:Delete", Op("documents_delete")),
     ("documents:Details", Op("documents_details")),

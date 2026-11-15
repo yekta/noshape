@@ -4666,6 +4666,7 @@ pub const HELP_MENU: &str = "start-help-menu-dd";
 fn user_menu(cx: &App) -> AnyElement {
     let pal = p();
     let name = noshape_store::local_user_name();
+    let company = name.clone();
     let variant = ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.border.into()).active(pal.border.into()).shadow(false);
     Button::new("user-menu")
         .map(|d| crate::ui_script::mark(d, || "button:Account menu".into()))
@@ -4680,10 +4681,12 @@ fn user_menu(cx: &App) -> AnyElement {
                 .child(div().text_size(px(14.)).text_color(pal.text).max_w(px(150.)).truncate().child(crate::ui::user_text(name)))
                 .child(os::glyph(os::GLYPH_CARET, 8., pal.text)),
         )
-        .os_dropdown_menu("user-menu-dd", false, |m, _, _| {
-            // Live (cp-1719 c1-account-menu): My account · View support tickets · App Store dev portal · View in dark
-            // mode beta · Sign out; the cloud ones left out, Company settings kept (release management, local).
+        .os_dropdown_menu("user-menu-dd", false, move |m, _, _| {
+            // Live (Professional, live rel-settings): My account · <company> company settings · View support tickets ·
+            // App Store dev portal · View in dark mode beta · Sign out; the cloud ones left out. The company here is
+            // the local user.
             m.item(OsMenuItem::new("My account").on_click(|_, _, cx| crate::preferences_window::show(crate::preferences_window::Page::Profile, cx)))
+                .item(OsMenuItem::new(format!("{company} company settings")).on_click(|_, _, cx| crate::company_settings::show(crate::company_settings::Section::ReleaseManagement, cx)))
                 // Shown, not saved; turning dark says so (live docs-account-dark-mode).
                 .item_keep_open(OsMenuItem::new("View in dark mode beta").on_click(|_, window, cx| {
                     let dark = !gpui_kit::hex_theme_active();
@@ -4692,7 +4695,6 @@ fn user_menu(cx: &App) -> AnyElement {
                         StartView::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: None, text: "You are now viewing in dark mode. You may persist this setting. Go to user preferences.".into(), restore: Vec::new(), brief: false });
                     }
                 }))
-                .item(OsMenuItem::new("Company settings").on_click(|_, _, cx| crate::company_settings::show(crate::company_settings::Section::ReleaseManagement, cx)))
         })
         .into_any_element()
 }

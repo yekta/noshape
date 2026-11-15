@@ -296,15 +296,18 @@ impl DrawingEditor {
             .child(div().font_weight(FontWeight::BOLD).child(CHARS_EMPTY.0))
             .child(div().child(CHARS_EMPTY.1));
         let (dc, cc) = (self.insp_table.datums_closed, self.insp_table.chars_closed);
-        // The panel's texts in reading order for the ui-parity runner (live2 drw-inspection-table-*).
+        // The panel's texts in reading order for the ui-parity runner (live2 drw-inspection-table-*). Live's grid
+        // makes only the columns in view: the last one, scrolled out of the panel, isn't there to read (live2
+        // drw-inspection-table-assign-number).
+        const SEEN: usize = COLS.len() - 1;
+        let shown = if self.insp_table.current_sheet_only { "Current sheet" } else { "All sheets" };
         crate::ui_script::note_dialog(|| {
             let mut text: Vec<String> = ["Inspection table", "View:", "All sheets", "Current sheet", "Datums"].map(String::from).to_vec();
             let rows = |text: &mut Vec<String>, rows: &[noshape_model::drawing::inspection::InspectionRow]| {
-                text.extend(COLS.iter().map(|c| c.0.to_string()));
+                text.extend(COLS[..SEEN].iter().map(|c| c.0.to_string()));
                 for r in rows {
-                    let both = if r.tolerance.is_empty() { r.nominal.clone() } else { format!("{} {}", r.nominal, r.tolerance) };
                     let dash = |v: &str| if v.is_empty() { "--".to_string() } else { v.to_string() };
-                    text.extend([dash(&r.number), sheet_name(r.sheet), r.kind.clone(), r.unit.clone(), r.nominal.clone(), dash(&r.tolerance), dash(&r.upper), dash(&r.lower), both]);
+                    text.extend([dash(&r.number), sheet_name(r.sheet), r.kind.clone(), r.unit.clone(), r.nominal.clone(), dash(&r.tolerance), dash(&r.upper), dash(&r.lower)]);
                 }
             };
             if !dc {
@@ -322,7 +325,7 @@ impl DrawingEditor {
                     rows(&mut text, &chars);
                 }
             }
-            serde_json::json!({ "kind": "drawing-panel", "title": "Inspection table", "text": text })
+            serde_json::json!({ "kind": "drawing-panel", "title": "Inspection table", "text": text, "fields": [{ "label": "View:", "kind": "select", "value": shown }] })
         });
         let datums_body = if datums.is_empty() { info.into_any_element() } else { table(&datums, "it-d", cx) };
         let chars_body = if chars.is_empty() { chars_info.into_any_element() } else { table(&chars, "it-c", cx) };

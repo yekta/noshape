@@ -354,6 +354,7 @@ fn register_release_hooks() {
         open_version_window: |path, version, gpu, cx| files::open_version_window(path, version, gpu, cx).map(|(handle, ws)| (handle, ws.read(cx).doc.clone())),
         create_version: history_panel::open_create_version,
         request_export: workspace::request_export,
+        request_released_export: workspace::request_released_export,
     });
 }
 

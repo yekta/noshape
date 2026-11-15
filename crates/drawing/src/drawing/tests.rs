@@ -2394,6 +2394,8 @@ fn jogged_extension_lines_and_broken_dimensions() {
     let mut g = SheetGeometry::new(420.0, 297.0);
     g.add_annotations(&sheet, &env);
     assert_eq!((lines_of(&g, 1), lines_of(&g, 2)), (3, 2 * 2 + 1));
+    let value_x = |g: &SheetGeometry| g.texts.iter().find(|t| t.pick == 1).map(|t| t.pos[0]).expect("A's value");
+    let before = value_x(&g);
     // Add jog on A's first extension line: a diagonal at the middle, the
     // dimension line's end moves 5 mm out, two snap points.
     sheet.annotations[0].jogs[0] = Some(ExtJog::new(-5.0));
@@ -2404,6 +2406,8 @@ fn jogged_extension_lines_and_broken_dimensions() {
     assert!((x0 - 0.0).abs() < 1e-9 && (x1 + 5.0).abs() < 1e-9, "{:?}", jog.points);
     assert!((jog.points[1][1] + 15.0).abs() < 1e-9 && (jog.points[2][1] + 20.0).abs() < 1e-9, "45° jog from the middle: {:?}", jog.points);
     assert_eq!(g.grips.iter().filter(|gr| gr.pick == 1 && gr.kind == GripKind::Jog).count(), 2);
+    // The value stays where it was (live drw-dimension-add-jog).
+    assert!((value_x(&g) - before).abs() < 1e-9, "{} -> {}", before, value_x(&g));
 }
 
 /// Live asb 10-24 "template frames" (samples/tpl-ISO_A3.dxf,

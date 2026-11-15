@@ -2,7 +2,7 @@
  "name": "rel-rc-generate-pn",
  "about": "Company settings › Part numbering: Parts sequential (PRT-, 3 digits). Release…, then the Part number header's # Generate missing part numbers: Part 1 gets PRT-001",
  "area": "studios",
- "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on.",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on. Live's company sequence had issued PRT-001 before this take: its numbering starts at 2 here.",
  "recordable": true,
  "start": "doc-versions",
  "steps": [
@@ -42,7 +42,7 @@
      "FILE-"
     ],
     "min_length": 3,
-    "next": 1
+    "next": 2
    },
    "standard_content": {
     "sequential": false,

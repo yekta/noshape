@@ -2944,12 +2944,21 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
                     window.close_dialog(cx);
                     open_review(d1.clone(), &pkg2, window, cx);
                 }))
-                // Help: "An Export button that exports the entities involved in the release": the released version,
-                // read-only, then Export.
+                // Help: "An Export button that exports the entities involved in the release". A part: the Export
+                // modal over the workspace, "<studio> - <part number>", the part as released (live rel-rh-export);
+                // anything else: the released version, read-only, then Export.
                 .child({
                     let (d, mv, it) = (doc.clone(), version.as_ref().map(|v| v.microversion), item.clone());
+                    let released = version.as_ref().map(|v| v.id.to_string());
+                    let pn = part_number.clone();
                     os::secondary_button(SharedString::from(format!("rh-export-{k}")), "Export", cx).on_click(move |_, window, cx| {
                         window.close_dialog(cx);
+                        if let (Some(it), Some(v)) = (it.as_ref().filter(|it| it.part.is_some()), released.clone()) {
+                            let studio = d.read(cx).session.doc.tab(it.tab).map(|t| t.name.clone()).unwrap_or_default();
+                            let file = noshape_ops::export::export_base_name(&studio, Some(&pn));
+                            crate::release_hooks::request_released_export(it.tab, it.part.iter().cloned().collect(), v, file, window, cx);
+                            return;
+                        }
                         if let Some(mv) = mv {
                             d.update(cx, |doc, cx| match doc.session.view_microversion(Some(mv)) {
                                 Ok(()) => doc.reloaded(cx),
