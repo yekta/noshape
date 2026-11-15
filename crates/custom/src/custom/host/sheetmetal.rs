@@ -1550,7 +1550,14 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                     continue;
                 }
                 let (Some(da), Some(db)) = (free_end(fa, e, v, b.dir), free_end(fb, e, v, b.dir)) else { continue };
-                skew[i] = Some((ta, tb, v, da.cross(db).normalize_or_zero()));
+                // Free sides both square to the bend at different places share no plane (two flanges' corner, the
+                // plate pulled back by the second's bend, live sm-box: the bend ends with the nearer wall, the
+                // other wall runs on past it).
+                let n = da.cross(db).normalize_or_zero();
+                if n.cross(b.dir).length() < 1e-6 {
+                    continue;
+                }
+                skew[i] = Some((ta, tb, v, n));
                 if i == 0 {
                     t0 = ta.min(tb);
                 } else {

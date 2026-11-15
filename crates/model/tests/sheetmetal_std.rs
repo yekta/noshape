@@ -2384,6 +2384,33 @@ fn sheet_metal_entities_are_labelled_after_their_definition_entitys_feature() {
     let owner = |e: &Reference| r.context.sheet_metal.values().find_map(|d| d.label_owners.iter().find(|(x, _)| x == e).map(|(_, f)| *f));
     assert_eq!(owner(&face_at(&r, DVec3::new(30.0, 21.0, 2.0))), Some(model), "the plate's top");
     assert_eq!(owner(&face_at(&r, DVec3::new(62.0, 21.0, 14.5))), Some(flanges[1]), "Flange 2's outer wall");
-    // Flange 1's wall's corner vertex, away from Flange 2.
+    // Flange 1's wall's corner vertex, away from Flange 2. (The bend and the vertices where the flanges meet read
+    // Flange 1 in live, Sheet metal model 1 here: whether std's identity tracking follows an edge a boolean merges,
+    // REQUESTS 22:02.)
     assert_eq!(owner(&vertex_at(&r, DVec3::new(0.0, -2.0, 25.0))), Some(flanges[0]), "Flange 1's top corner");
+}
+
+/// Live (skasm-q1627, sm-box after Flange 2): two flanges added one after the other on adjacent edges. Flange 2's bend
+/// pulls the plate back to x 58, so Flange 1's bend ends there (cylinders 364.42 / 182.21 mm²) and Flange 1's wall runs
+/// on to x 60 over a 2 × 2 mm corner face at z 4: 23 faces.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_second_flange_beside_the_first_ends_its_bend_at_the_plate() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    for at in [DVec3::new(20.0, 0.0, 2.0), DVec3::new(60.0, 25.0, 2.0)] {
+        let r = s.ok();
+        let e = edge_at(&r, at);
+        s.add("sheetMetalFlange", |p| p.set("edges", ParamValue::Query(vec![e])));
+    }
+    let r = s.ok();
+    let faces = face_report(&r);
+    let has = |kind: &str, area: f64| faces.iter().any(|f| f.starts_with(kind) && f.split(' ').nth(1).and_then(|a| a.parse::<f64>().ok()).is_some_and(|a| (a - area).abs() < 0.01));
+    assert!(faces.len() == 23 && has("CYLINDER", 364.42) && has("CYLINDER", 182.21) && has("PLANE", 4.0), "{faces:#?}");
 }
