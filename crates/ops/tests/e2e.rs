@@ -2704,10 +2704,13 @@ fn a_new_frame_is_an_8020_1001() {
     assert_eq!((&p["sizes"], &p["profileSketch"]), (&json!([]), &json!("frame-library:8020/1001")), "{p}");
     let f = call(&mut ctx, "feature_add", json!({ "type": "frame", "params": { "selections": [line] } }));
     assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
-    // A 1" square less one T-slot and the bore, 200 mm long.
+    // Live's 1001 section (its Frame's end face, 329.364444 mm²), 200 mm long.
     let v = num(&call(&mut ctx, "query_parts", json!({}))["parts"][0]["volume"]);
-    let area = (1.0 - (0.256 * 0.087 + 0.584 * 0.236) - std::f64::consts::PI * 0.1025 * 0.1025) * 645.16;
-    assert!((v - area * 200.0).abs() < 1e-2, "volume {v} vs {}", area * 200.0);
+    assert!((v - 329.364444 * 200.0).abs() < 1e-2, "volume {v} vs {}", 329.364444 * 200.0);
+    // Its end face has four inner loops: End cap Internal refuses it, as live's (live2 18:44).
+    let end = call(&mut ctx, "query_entities", json!({ "kind": "faces", "near": [200, 0, 0], "limit": 1 }))["faces"][0]["id"].clone();
+    let cap = call(&mut ctx, "feature_add", json!({ "type": "endcap", "params": { "faces": [end], "profileType": "INTERNAL", "thickness": "5 mm" } }));
+    assert_eq!(cap["feature_status"]["message"], "Only frame segments with one internal profile can be capped.", "{cap}");
 }
 
 /// Add custom features (live 2213): a Feature Studio's feature at another document's version, listed by

@@ -7,7 +7,7 @@
 use super::frames_profiles::{self as fp, FrameProfile};
 use glam::DVec2;
 use noshape_kernel as k;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::LazyLock;
 
 /// `profileSketch` of a library profile.
@@ -46,7 +46,7 @@ const AISC_PROFILES: [&str; 14] = ["C-shape", "HP-shape", "L-angle", "M-shape", 
 
 /// One profile of the standards built from `frame_library_more.json` (8020, AS, Construction materials): how its
 /// section is drawn (`kind`), its default size, and each size's name with its dimensions in millimetres (8020's
-/// profiles have no Size: their one row is the profile's own dimensions).
+/// profiles have no Size and are live's sections, [`EXACT_8020`]).
 struct MoreProfile {
     name: String,
     kind: String,
@@ -69,6 +69,87 @@ static MORE: LazyLock<Vec<(String, MoreTypes)>> = LazyLock::new(|| {
         })
         .collect()
 });
+
+/// 8020's sections as live's Frames build them (live2 skasm-q1956: each end face's loops in the profile's own frame, mm):
+/// profile name -> loops, the outer first; a segment is ["L", a, b], ["A", a, mid, b] or ["C", centre, r] flattened.
+static EXACT_8020: LazyLock<HashMap<String, Vec<Vec<Vec<serde_json::Value>>>>> = LazyLock::new(|| {
+    #[derive(serde::Deserialize)]
+    struct Section {
+        loops: Vec<Vec<Vec<serde_json::Value>>>,
+    }
+    let raw: HashMap<String, HashMap<String, Section>> = serde_json::from_str(include_str!("frame_library_8020.json")).unwrap_or_default();
+    raw.into_values().flatten().map(|(name, s)| (name, s.loops)).collect()
+});
+
+/// An 8020 profile's exact section ([`EXACT_8020`]).
+fn exact_8020(profile: &str) -> Option<Result<FrameProfile, String>> {
+    let loops = EXACT_8020.get(profile)?;
+    let m = |v: &serde_json::Value| v.as_f64().unwrap_or(0.0) * 1e-3;
+    let p = |s: &[serde_json::Value], i: usize| DVec2::new(m(&s[i]), m(&s[i + 1]));
+    let mut built: Vec<Vec<k::Segment2d>> = Vec::new();
+    for l in loops {
+        let mut segs = Vec::new();
+        for s in l {
+            let seg = match (s.first().and_then(|k| k.as_str()), s.len()) {
+                (Some("L"), 5) => k::Segment2d::Line { a: p(s, 1), b: p(s, 3) },
+                (Some("A"), 7) => k::Segment2d::Arc3 { a: p(s, 1), mid: p(s, 3), b: p(s, 5) },
+                (Some("C"), 4) => k::Segment2d::Circle { center: p(s, 1), radius: m(&s[3]) },
+                _ => return Some(Err(format!("Bad section data for 8020 {profile}"))),
+            };
+            segs.push(seg);
+        }
+        built.push(segs);
+    }
+    let mut it = built.into_iter();
+    let outer = it.next()?;
+    let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
+    for s in &outer {
+        let pts = match *s {
+            k::Segment2d::Line { a, b } => vec![a, b],
+            k::Segment2d::Arc3 { a, mid, b } => arc3_extremes(a, mid, b),
+            k::Segment2d::Circle { center, radius } => vec![center - DVec2::splat(radius), center + DVec2::splat(radius)],
+            _ => Vec::new(),
+        };
+        for q in pts {
+            lo = lo.min(q);
+            hi = hi.max(q);
+        }
+    }
+    Some(Ok(FrameProfile { standard: String::new(), description: String::new(), outer, holes: it.collect(), min: lo, max: hi }))
+}
+
+/// The circle through an arc's ends `a`, `b` and a point `mid` on it: its centre, radius, and the arc from `a` as a
+/// signed sweep (positive counter-clockwise); None when the points are in line.
+fn arc3(a: DVec2, mid: DVec2, b: DVec2) -> Option<(DVec2, f64, f64)> {
+    let d = 2.0 * (a.x * (mid.y - b.y) + mid.x * (b.y - a.y) + b.x * (a.y - mid.y));
+    if d.abs() < 1e-30 {
+        return None;
+    }
+    let sq = |p: DVec2| p.length_squared();
+    let c = DVec2::new((sq(a) * (mid.y - b.y) + sq(mid) * (b.y - a.y) + sq(b) * (a.y - mid.y)) / d, (sq(a) * (b.x - mid.x) + sq(mid) * (a.x - b.x) + sq(b) * (mid.x - a.x)) / d);
+    let tau = std::f64::consts::TAU;
+    let ang = |p: DVec2| (p.y - c.y).atan2(p.x - c.x);
+    let (t0, tm, t1) = (ang(a), ang(mid), ang(b));
+    let ccw = (t1 - t0).rem_euclid(tau);
+    let sweep = if (tm - t0).rem_euclid(tau) < ccw { ccw } else { ccw - tau };
+    Some((c, a.distance(c), sweep))
+}
+
+/// The ends of an arc through three points and the points where it reaches furthest along x and y.
+fn arc3_extremes(a: DVec2, mid: DVec2, b: DVec2) -> Vec<DVec2> {
+    let Some((c, r, sweep)) = arc3(a, mid, b) else { return vec![a, b] };
+    let tau = std::f64::consts::TAU;
+    let t0 = (a.y - c.y).atan2(a.x - c.x);
+    let (start, sweep) = if sweep >= 0.0 { (t0, sweep) } else { (t0 + sweep, -sweep) };
+    let mut out = vec![a, b];
+    for q in 0..4 {
+        let t = q as f64 * std::f64::consts::FRAC_PI_2;
+        if (t - start).rem_euclid(tau) <= sweep {
+            out.push(c + DVec2::new(t.cos(), t.sin()) * r);
+        }
+    }
+    out
+}
 
 fn more_profile(standard: &str, profile: &str) -> Option<&'static MoreProfile> {
     MORE.iter().find(|(s, _)| s == standard)?.1.iter().flat_map(|(_, ps)| ps).find(|p| p.name == profile)
@@ -283,63 +364,6 @@ fn rounded_tube(w: f64, h: f64, t: f64) -> Result<FrameProfile, String> {
     tube_with_corners(w, h, t, 2.0 * t, t)
 }
 
-/// An 80/20 T-slotted extrusion (mm): `w` × `h` about the origin; on each face (bottom, right, top, left, walked
-/// counter-clockwise) a T-slot centred on each `unit` along it whose bit is set in that face's mask: the opening
-/// `open` wide through lips `lip` thick into a cavity `cavity` wide and `depth` deep from the face; a bore of
-/// diameter `bore` at each unit's centre; the top right corner square, rounded (`corner` 1: a quarter round's curved
-/// back of radius `size`) or cut at 45° (2: `size` along each side). 80/20's catalog dimensions; the cavity's sloped
-/// floor, the align-a-grooves and the Lite profiles' inner pockets are not drawn.
-fn tslot(w: f64, h: f64, unit: f64, [open, lip, cavity, depth, bore]: [f64; 5], masks: [u32; 4], (corner, size): (u32, f64)) -> Result<FrameProfile, String> {
-    if open >= cavity || lip >= depth || depth >= w.min(h) || cavity >= unit || size >= w.min(h) {
-        return Err("T-slot dimensions don't fit the profile".into());
-    }
-    let m = |v: f64| v * 1e-3;
-    let (hw, hh) = (w / 2.0, h / 2.0);
-    let r = if corner == 0 { 0.0 } else { size };
-    let faces = [((-hw, -hh), (1.0, 0.0), w), ((hw, -hh), (0.0, 1.0), h), ((hw, hh), (-1.0, 0.0), w), ((-hw, hh), (0.0, -1.0), h)];
-    let mut outer = Vec::new();
-    let mut last: Option<DVec2> = None;
-    let line_to = |q: (f64, f64), outer: &mut Vec<k::Segment2d>, last: &mut Option<DVec2>| {
-        let q = DVec2::new(m(q.0), m(q.1));
-        if let Some(a) = last.filter(|a| a.distance(q) > 1e-12) {
-            outer.push(k::Segment2d::Line { a, b: q });
-        }
-        *last = Some(q);
-    };
-    let first = (-hw, -hh);
-    for (i, (((x0, y0), (dx, dy), len), mask)) in faces.into_iter().zip(masks).enumerate() {
-        // Inward: the direction turned a quarter counter-clockwise.
-        let (nx, ny) = (-dy, dx);
-        let at = |s: f64, d: f64| (x0 + dx * s + nx * d, y0 + dy * s + ny * d);
-        if i == 2 && corner == 1 {
-            // The curved back: a quarter circle tangent to the right and top faces.
-            let c = DVec2::new(m(hw - r), m(hh - r));
-            outer.push(k::Segment2d::Arc { center: c, radius: m(r), start_angle: 0.0, end_angle: std::f64::consts::FRAC_PI_2 });
-            last = Some(DVec2::new(m(hw - r), m(hh)));
-        } else {
-            line_to(at(if i == 2 { r } else { 0.0 }, 0.0), &mut outer, &mut last);
-        }
-        let n = (len / unit).round().max(1.0) as u32;
-        for j in (0..n).filter(|j| mask & (1 << j) != 0) {
-            let c = (j as f64 + 0.5) * len / n as f64;
-            for q in [at(c - open / 2.0, 0.0), at(c - open / 2.0, lip), at(c - cavity / 2.0, lip), at(c - cavity / 2.0, depth), at(c + cavity / 2.0, depth), at(c + cavity / 2.0, lip), at(c + open / 2.0, lip), at(c + open / 2.0, 0.0)] {
-                line_to(q, &mut outer, &mut last);
-            }
-        }
-        if i == 1 && r > 0.0 {
-            line_to(at(len - r, 0.0), &mut outer, &mut last);
-        }
-    }
-    line_to(first, &mut outer, &mut last);
-    let (nx, ny) = ((w / unit).round().max(1.0) as u32, (h / unit).round().max(1.0) as u32);
-    let holes = (0..nx)
-        .flat_map(|i| (0..ny).map(move |j| (i, j)))
-        .filter(|_| bore > 0.0)
-        .map(|(i, j)| vec![k::Segment2d::Circle { center: DVec2::new(m(-hw + (i as f64 + 0.5) * w / nx as f64), m(-hh + (j as f64 + 0.5) * h / ny as f64)), radius: m(bore / 2.0) }])
-        .collect();
-    Ok(FrameProfile { standard: String::new(), description: String::new(), outer, holes, min: DVec2::new(m(-hw), m(-hh)), max: DVec2::new(m(hw), m(hh)) })
-}
-
 /// A profile of 8020, AS or Construction materials from its kind and its row's dimensions (mm).
 fn more_section(kind: &str, d: &[f64]) -> Result<FrameProfile, String> {
     match (kind, d) {
@@ -356,7 +380,6 @@ fn more_section(kind: &str, d: &[f64]) -> Result<FrameProfile, String> {
         ("channel", [h, b, t]) => fp::channel(*h, *b, *t, *t),
         ("channel", [h, b, tw, tf]) => fp::channel(*h, *b, *tw, *tf),
         ("ibeam", [h, b, tw, tf]) => fp::ibeam(*h, *b, *tw, *tf),
-        ("tslot", [w, h, unit, open, lip, cavity, depth, bore, mb, mr, mt, ml, corner, size]) => tslot(*w, *h, *unit, [*open, *lip, *cavity, *depth, *bore], [*mb as u32, *mr as u32, *mt as u32, *ml as u32], (*corner as u32, *size)),
         _ => Err(format!("No dimensions for a {kind} profile")),
     }
 }
@@ -372,6 +395,14 @@ pub fn profile(standard: &str, profile: &str, size: &str, rounded: bool) -> Resu
         return Ok(p);
     }
     if let Some(mp) = more_profile(standard, profile) {
+        if standard == "8020"
+            && let Some(p) = exact_8020(profile)
+        {
+            let mut p = p?;
+            p.standard = standard.to_string();
+            p.description = profile.to_string();
+            return Ok(p);
+        }
         let d = match mp.sizes.as_slice() {
             [(_, d)] if mp.default.is_empty() => d,
             rows => &rows.iter().find(|(n, _)| n == size).ok_or_else(bad)?.1,
@@ -434,6 +465,19 @@ pub fn preview_svg(p: &FrameProfile, width: f64, height: f64) -> String {
                     // Counter-clockwise in the profile is clockwise on the y-down page: sweep 0.
                     let r = radius * scale;
                     push(format!("A{r:.2},{r:.2} 0 {} 0 {:.2},{:.2}", u8::from(end - start_angle > std::f64::consts::PI), b.x, b.y));
+                }
+                k::Segment2d::Arc3 { a, mid, b } => {
+                    let (pa, pb) = (at(*a), at(*b));
+                    if first {
+                        push(format!("M{:.2},{:.2}", pa.x, pa.y));
+                    }
+                    match arc3(*a, *mid, *b) {
+                        Some((_, r, sweep)) => {
+                            let r = r * scale;
+                            push(format!("A{r:.2},{r:.2} 0 {} {} {:.2},{:.2}", u8::from(sweep.abs() > std::f64::consts::PI), u8::from(sweep < 0.0), pb.x, pb.y));
+                        }
+                        None => push(format!("L{:.2},{:.2}", pb.x, pb.y)),
+                    }
                 }
                 k::Segment2d::Circle { center, radius } => {
                     let (c, r) = (at(*center), radius * scale);
@@ -509,14 +553,24 @@ mod tests {
         assert!((area("Construction materials", "Lumber Inch", "2\" x 4\"") - 1.5 * 3.5 * 645.16).abs() < 1e-6);
         // 150 UB 14: d 150, bf 75, tf 7, tw 5 (no root radii).
         assert!((area("AS", "Universal beam", "150 UB 14") - (2.0 * 75.0 * 7.0 + 136.0 * 5.0)).abs() < 1e-6);
-        // 1001: a 1" square less one T-slot (0.256" through 0.087" lips into a 0.584" cavity 0.323" deep) and the
-        // 0.205" bore.
-        let slot = 0.256 * 0.087 + 0.584 * (0.323 - 0.087);
-        let expected = (1.0 - slot - std::f64::consts::PI * 0.1025 * 0.1025) * 645.16;
-        assert!((area("8020", "1001", "") - expected).abs() < 1e-6, "{} vs {expected}", area("8020", "1001", ""));
-        // 1012's curved back takes (1 − π/4)·0.75² off the square's corner.
-        let qr = area("8020", "1012", "") - area("8020", "1004", "");
-        assert!((qr + (1.0 - std::f64::consts::FRAC_PI_4) * 0.5625 * 645.16 - 0.0).abs() < 1.0, "{qr}");
+    }
+
+    /// Every 8020 section is live's Frame end face (live2 skasm-q1956): its area to live's six digits, its preview with
+    /// the arcs (1001: the four rounded corners, the slot lips and the grooves).
+    #[test]
+    fn sections_8020_are_lives() {
+        let raw: HashMap<String, HashMap<String, serde_json::Value>> = serde_json::from_str(include_str!("frame_library_8020.json")).unwrap();
+        let mut n = 0;
+        for (name, s) in raw.into_values().flatten() {
+            let live = s["area"].as_f64().unwrap();
+            let ours = profile("8020", &name, "", false).unwrap().face().unwrap().area().unwrap() * 1e6;
+            assert!((ours - live).abs() < 1e-5 * live, "{name}: {ours} vs live {live} mm²");
+            n += 1;
+        }
+        assert_eq!(n, 108);
+        let p = profile("8020", "1001", "", false).unwrap();
+        assert!(p.holes.len() == 4 && ((p.max - p.min) * 1e3 - DVec2::splat(25.4)).abs().max_element() < 1e-9, "{} holes, {:?}", p.holes.len(), p.max - p.min);
+        assert!(preview_svg(&p, 240.0, 136.0).matches('A').count() >= 8);
     }
 
     #[test]
