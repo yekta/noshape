@@ -1641,6 +1641,31 @@ fn a_derived_feature_takes_its_part_from_its_source_built_in_a_tab() {
     assert_eq!((p["parts"][0]["faces"].as_u64(), p["parts"][0]["edges"].as_u64()), (Some(8), Some(17)), "{p}");
 }
 
+/// A Derived picking its source's sketch (`qCreatedBy(<sketch>, BODY)`) brings it in, and a region live names as the
+/// Derived's is that sketch's (asm-keyboard-pattern studio 2bb133: Plane 2 offset from Derived 1's sketch region).
+#[test]
+fn a_derived_sketch_is_brought_in_and_its_regions_found() {
+    let (source, mut live, refs) = block_model();
+    live.last_mut().unwrap()["parts"][0]["partId"] = json!("JbD");
+    let derived = json!({ "btType": "BTMFeature-134", "featureType": "importDerived", "featureId": "FD1", "name": "Derived 1", "parameters": [
+        { "btType": "BTMParameterQueryList-148", "parameterId": "parts", "queries": [
+            { "btType": "BTMIndividualCreatedByQuery-137", "featureId": "FS1", "entityType": "BODY", "deterministicIds": ["JGD", "JGH"] },
+            { "btType": "BTMIndividualQuery-138", "deterministicIds": ["JbD"] }] },
+        { "btType": "BTMParameterDerived-864", "parameterId": "buildFunction", "namespace": "dother::vversion::e0c79ad99a48b2ad4f5e01a78::mmicro" }] });
+    let plane = json!({ "btType": "BTMFeature-134", "featureType": "cPlane", "featureId": "FP2", "name": "Plane 2", "parameters": [
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["KR"] }] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "cplaneType", "value": "OFFSET" },
+        { "btType": "BTMParameterQuantity-147", "parameterId": "offset", "expression": "5 mm" }] });
+    let doc = json!({ "features": [derived, plane], "derivedSources": { "0c79ad99a48b2ad4f5e01a78": { "doc": source, "live": live, "refs": refs } } });
+    let region = r#"{"index": 1, "id": "KR", "kind": "SKETCH_REGION", "point": [0.0303212, 0.02, 0.0], "measure": 0.00234973452, "sketchFeatureId": "FD1"}"#;
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("derived-sketch.noshape"), &doc, parse_refs(region)).unwrap();
+    let d = t.step(0);
+    assert_eq!(d.status.as_deref(), Some("Ok"), "{:?}", d.problems);
+    let p = t.step(1);
+    assert_eq!(p.status.as_deref(), Some("Ok"), "{:?} {:?}", p.message, p.problems);
+}
+
 /// A sketch constraint to model geometry live no longer finds (its external query empty): ours points at nothing
 /// too, so the sketch is live's WARNING "Some external references are missing." (clamp-guillem's Boceto 6,
 /// train-joe's Sketch 2), its geometry where it was.

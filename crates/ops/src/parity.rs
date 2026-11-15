@@ -149,6 +149,10 @@ pub struct Translator<'a> {
     /// read with evMateConnector: live 2632): sub-feature id → `{ origin_mm, x, z }`.
     connector_frames: Map<String, Value>,
     derived_built: HashMap<String, (String, HashMap<String, String>)>,
+    /// A Derived's sketches (live's feature id → our source sketches): live names their regions as the Derived's.
+    derived_sketches: HashMap<String, Vec<String>>,
+    /// Those sketches' source tabs, where ours reads their geometry.
+    sketch_tabs: HashMap<String, String>,
     first_move: Option<String>,
     /// Onshape Feature Studio element id → our Feature Studio tab id.
     studios: HashMap<String, String>,
@@ -396,7 +400,7 @@ impl<'a> Translator<'a> {
                 config_defaults.entry(k.to_string()).or_insert_with(|| v.to_string());
             }
         }
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -1025,7 +1029,8 @@ impl<'a> Translator<'a> {
         // The file: `foreignId`, else (an assembly corpus' studio) the blob element of `blobData`'s namespace
         // ("e<element>::m<microversion>").
         let blob = param("blobData")["namespace"].as_str().and_then(|n| n.strip_prefix('e')).and_then(|n| n.split("::").next()).map(str::to_string);
-        let id = param("foreignId")["foreignId"].as_str().map(str::to_string).or(blob).ok_or("no foreignId")?;
+        // (An empty `foreignId` is none: asm-keyboard-pattern studio 46fe1d's Import 1.)
+        let id = param("foreignId")["foreignId"].as_str().filter(|i| !i.is_empty()).map(str::to_string).or(blob).ok_or("no foreignId")?;
         let file = self.foreign.get(&id).cloned().ok_or_else(|| format!("its file {id} not fetched"))?;
         let path = file["path"].as_str().ok_or_else(|| format!("its file {id}: no path"))?;
         if !self.feature_ids.is_empty() {
@@ -1292,14 +1297,22 @@ impl<'a> Translator<'a> {
             // (qEverything(EntityType.BODY)'s ids start with the source's default bodies, its origin and planes, which
             // aren't parts: live 2340, c2-fan-blade-sweep's Derived 2.)
             let everything = q["queryString"].as_str().is_some_and(|s| s.contains("qEverything(EntityType.BODY)"));
+            // A sketch's bodies (`qCreatedBy(<sketch>, BODY)`): ours its sketch (asm-keyboard-pattern's Derived 1 brings
+            // in the source's Sketch 1, whose region Plane 2 offsets from).
+            if let Some(sketch) = q["featureId"].as_str().and_then(|s| parts.get(&format!("sketch:{s}"))) {
+                if !ours.contains(sketch) {
+                    ours.push(sketch.clone());
+                }
+                continue;
+            }
             for id in q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str) {
                 match parts.get(id) {
                     Some(p) => ours.push(p.clone()),
                     None if everything => {}
                     // A source of one part, fetched at another state than the Derived's pin (its part ids others):
                     // that part, once (asm-keyboard-pattern's Derived 1 names 8 ids, live brings in the one part).
-                    None if parts.len() == 1 => {
-                        let only = parts.values().next().cloned().unwrap_or_default();
+                    None if parts.keys().filter(|k| !k.starts_with("sketch:")).count() == 1 => {
+                        let only = parts.iter().find(|(k, _)| !k.starts_with("sketch:")).map(|(_, p)| p.clone()).unwrap_or_default();
                         if !ours.contains(&only) {
                             self.notes.push(format!("Derived: the source's part {id} taken as its only part"));
                             ours.push(only);
@@ -1308,6 +1321,12 @@ impl<'a> Translator<'a> {
                     None => return Err(format!("Derived: the source's part {id} not built")),
                 }
             }
+        }
+        // Its sketches (ours keeps their ids), their geometry read in the source's tab.
+        let sketches: Vec<String> = ours.iter().filter_map(|b| b.strip_prefix("body:")?.strip_suffix(&format!(".{}", u32::MAX)).map(str::to_string)).collect();
+        self.sketch_tabs.extend(sketches.iter().map(|s| (s.clone(), tab.clone())));
+        if let Some(oid) = f["featureId"].as_str().filter(|_| !sketches.is_empty()) {
+            self.derived_sketches.insert(oid.to_string(), sketches);
         }
         let mut params = Map::new();
         params.insert("partStudio".into(), json!(tab));
@@ -1371,6 +1390,12 @@ impl<'a> Translator<'a> {
                         parts.insert(id.to_string(), one);
                     }
                 }
+            }
+        }
+        // Its sketches, by live's feature id (`sketch:<id>`): ours as a Derived picks one, its sketch body.
+        for f in doc["features"].as_array().into_iter().flatten().filter(|f| f["featureType"] == "newSketch") {
+            if let Some(ours) = f["featureId"].as_str().and_then(|o| t.feature_ids.get(o)) {
+                parts.insert(format!("sketch:{}", f["featureId"].as_str().unwrap_or("")), format!("body:{ours}.{}", u32::MAX));
             }
         }
         problems.extend(t.notes.iter().map(|n| format!("its source: {n}")));
@@ -2354,7 +2379,11 @@ impl<'a> Translator<'a> {
         if let Some(g) = self.sketch_cache.get(id) {
             return (!g.is_null()).then(|| g.clone());
         }
-        let g = self.call("sketch_get", json!({ "sketch": id })).unwrap_or(Value::Null);
+        let args = match self.sketch_tabs.get(id) {
+            Some(tab) => json!({ "tab": tab, "sketch": id }),
+            None => json!({ "sketch": id }),
+        };
+        let g = self.call("sketch_get", args).unwrap_or(Value::Null);
         self.sketch_cache.insert(id.to_string(), g.clone());
         (!g.is_null()).then_some(g)
     }
@@ -4438,9 +4467,11 @@ impl<'a> Translator<'a> {
     /// is a label point, not the centroid live gives: area decides.)
     fn region_at(&mut self, p: [f64; 3], area: Option<f64>, sketch_of: Option<&str>) -> Result<String, String> {
         // Its own sketch when live's file names it, else every one of ours.
-        let sketches: Vec<String> = match sketch_of.and_then(|f| self.feature_ids.get(f)) {
-            Some(ours) => vec![ours.clone()],
-            None => self.feature_ids.values().cloned().collect(),
+        // (A Derived's: its source's sketches it brings in.)
+        let sketches: Vec<String> = match (sketch_of.and_then(|f| self.derived_sketches.get(f)), sketch_of.and_then(|f| self.feature_ids.get(f))) {
+            (Some(derived), _) => derived.clone(),
+            (None, Some(ours)) => vec![ours.clone()],
+            (None, None) => self.feature_ids.values().chain(self.derived_sketches.values().flatten()).cloned().collect(),
         };
         let mut best: Option<(f64, String)> = None;
         // (Ours, for the message: each region's area, mm².)
