@@ -32,7 +32,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## psui, 2026-11-13
-- [ ] P2 PROPERTIES-OUTSIDE-TAB-UNDO (store / psui; psui 2026-11-13 11:07 UTC) **A part's Properties Save is an Undo step in ours,
+- [x] (psui 2026-11-15 198c55049: undo / redo keep the current part metadata (`keep_part_metadata`), Save is no undo step in the app and ops unless it renames or changes the mass override; T1 `session::tests::undo_and_redo_keep_part_metadata_saved_outside_the_history`) P2 PROPERTIES-OUTSIDE-TAB-UNDO (store / psui; psui 2026-11-13 11:07 UTC) **A part's Properties Save is an Undo step in ours,
   not in live** (ui-parity parts-multi-properties step 7: live `undo.undo` false after Save, ours true; live's BOM edits
   are off the assembly's undo stack too, behaviours "Ctrl+Z → not undone"). Part properties live in the Part Studio tab
   (`PartStudio::part_properties`), and Undo / Redo restore whole-tab snapshots: saving them with
