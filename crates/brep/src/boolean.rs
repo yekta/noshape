@@ -2128,6 +2128,17 @@ impl Ctx<'_> {
                 parts = vec![(t0, End::Vertex(s.v[0]), ts, End::Point(seam)), (ts, End::Point(seam), t1, End::Vertex(s.v[1]))];
             }
         }
+        // (An ellipse likewise: an inclined pin's rim on a hole's wall, across the hole's seam (asm-bjr-config's vanity
+        // plate letters, "an ellipse across a cylinder's seam").)
+        if let (Path::Ellipse(el), Some(seam)) = (path.clone(), self.seam_at(f, &path))
+            && !el.open()
+            && t0 < t1
+        {
+            let ts = t0 + (el.param(seam) - t0).rem_euclid(TAU);
+            if ts < t1 && el.length(t0, ts) > self.tol && el.length(ts, t1) > self.tol {
+                parts = vec![(t0, End::Vertex(s.v[0]), ts, End::Point(seam)), (ts, End::Point(seam), t1, End::Vertex(s.v[1]))];
+            }
+        }
         let mut on_free = vec![None; parts.len()];
         // On a free-form face: its curve there, by projection (as the face's own edges' curves are used).
         if matches!(self.faces[f].s, Surf::Nurbs { .. }) {
@@ -5856,9 +5867,15 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             let (lo, hi) = r.outer.iter().flat_map(|&(sg, _)| lsegs[sg as usize].0).fold((DVec2::INFINITY, DVec2::NEG_INFINITY), |(lo, hi), w| (lo.min(pts[w as usize]), hi.max(pts[w as usize])));
             let small = (hi - lo).min_element() <= 8.0 * GREY * tol;
             if dist <= GREY * tol || small {
-                // (A thin piece: a point farther in.)
-                r.inside = deeper(&lsegs, &r, 64.0 * GREY * tol);
-                dist = cx.bound_distance(f, r.inside)?;
+                // (A thin piece: a point farther in. Kept where it was if that one is in the face's bound and the deeper
+                // one isn't: a 0.3 mm triangle under an 11 um tolerance, its region's curves off its bound by as much
+                // (st-5d8bc1's up-to wedges, "a face lost").)
+                let deep = deeper(&lsegs, &r, 64.0 * GREY * tol);
+                let bound = closed.get_or_init(|| cx.closed_bound(f)).as_deref().map_err(|e| *e)?;
+                if inside2(deep, bound) || !inside2(r.inside, bound) {
+                    r.inside = deep;
+                    dist = cx.bound_distance(f, r.inside)?;
+                }
             }
             // (Near an edge within its and the face's own tolerances too: a 31 um sliver of a Shell slab's face bounded
             // by 1e-7 edges, its middle 8 um in, is clearly in.)

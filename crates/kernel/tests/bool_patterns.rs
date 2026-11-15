@@ -2424,6 +2424,22 @@ fn a_thread_on_its_shafts_cylinder_fuses_into_one_solid() {
     assert!((v - 4896.29).abs() <= 0.2, "volume {v} mm³ against live's 4896.29");
 }
 
+/// asm-bjr-config st-5d8bc1's Extrude 55 (recorded, two of its 130 up-to letters fused into the vanity plate): a
+/// letter's rim, an ellipse on the plate's round hole, runs across the hole's seam; split there as a circle's is ("an
+/// ellipse across a cylinder's seam" before). OCCT's volume and counts.
+#[test]
+fn a_letters_ellipse_across_a_holes_seam_fused_as_occt() {
+    as_recorded("b4090756879b0e47");
+}
+
+/// The same plate with two up-to wedges far apart on its tilted plane and sketch plane (recorded): a wedge's 0.3 mm
+/// triangle under the plate's 11 um tolerance, its region's point moved deeper landed outside the face's bound ("a face
+/// lost"); kept where it was, in it. OCCT's volume and counts.
+#[test]
+fn a_tiny_wedge_face_under_a_tolerant_plate_fused_as_occt() {
+    as_recorded("aa98f49ccc3b40f2");
+}
+
 /// asm-hand-drill-pinslot's e53bba Extrude 9 (recorded, with Extrude 8's end merged into its band): the unify joins the
 /// r12.07 band and its end round onto one face, the end across the band's seam angle; OCCT's merge kept the end's arc as
 /// that face's seam, a closed edge along a circle (noshape's Boolean then declined the part, "a seam off a ruling", and
