@@ -1936,10 +1936,15 @@ impl PartStudioView {
         let (has_bold, has_italic) = SKETCH_FONTS.get(at).map_or((true, true), |f| (f.bold, f.italic));
         let mut row = h_flex().gap_1().child(
             crate::ui_script::mark(div().w(px(218.)).flex_none(), || "dropdown:Font".into()).child(
-                crate::os_ui::select_field("sk-text-font", SKETCH_FONTS.iter().map(|f| f.name.to_string()).collect(), at, move |i, _, cx| {
-                    if let Some(f) = SKETCH_FONTS.get(i) {
-                        view.update(cx, |this, cx| this.set_text_style(TextStyle::Font(f.name), cx));
-                    }
+                // Live (sketch-text-font-typed-ok): the text box keeps the keyboard through a pick.
+                crate::os_ui::select_field("sk-text-font", SKETCH_FONTS.iter().map(|f| f.name.to_string()).collect(), at, move |i, window, cx| {
+                    let Some(f) = SKETCH_FONTS.get(i) else { return };
+                    view.update(cx, |this, cx| {
+                        this.set_text_style(TextStyle::Font(f.name), cx);
+                        if let Some(text) = this.ui_ref().and_then(|u| u.opts.get("text.text").cloned()) {
+                            text.update(cx, |s, cx| s.focus(window, cx));
+                        }
+                    });
                 })
                 // Live: a flat select (white, a #d7d7d7 line under it, 26 px).
                 .h(px(26.))
@@ -2539,7 +2544,7 @@ impl PartStudioView {
                                 .items_center()
                                 .justify_center()
                                 .cursor(CursorStyle::Arrow)
-                                .child(crate::assets::icon("dialog-cancel", 24., cx))
+                                .child(crate::ui_script::wrap(crate::assets::icon("dialog-cancel", 24., cx).into_any_element(), || "button:cancel".into()))
                                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                                     this.sketch_cancel(cx);
                                     window.focus(&this.focus, cx);
