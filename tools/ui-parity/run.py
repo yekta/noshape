@@ -576,6 +576,27 @@ def placed_alike(a, b):
                 y["transform"] = ta
 
 
+def click_placed_readouts(a, b, mm_per_px):
+    """A measure readout (mm) of sketch points placed by free clicks: live's camera after Sketch on a plane sits at a
+    sub-pixel offset of its own, so the same pixel lands up to a pixel away in the model. Within one pixel (live's
+    mmPerPixel at that step) ours reads as live's; a whole-mm value on either side (snapped or typed) stays exact
+    (README "Comparison", lead 11-15)."""
+    ra = ((a or {}).get("measure") or {}).get("readout")
+    rb = ((b or {}).get("measure") or {}).get("readout")
+    if not (mm_per_px and isinstance(ra, list) and isinstance(rb, list)):
+        return
+    for x, y in zip(ra, rb):
+        if not (isinstance(x, dict) and isinstance(y, dict) and x.get("units") == "mm" == y.get("units")):
+            continue
+        try:
+            u, w = float(x.get("value")), float(y.get("value"))
+        except (TypeError, ValueError):
+            continue
+        free = all(abs(v - round(v)) > 0.0005 for v in (u, w))
+        if free and abs(u - w) <= mm_per_px:
+            y["value"] = x.get("value")
+
+
 def cloud_menu(a, b):
     """A menu that lost live's cloud-only rows ([`normalize_live`]): the row under a pointer that didn't move isn't
     compared (the shorter menu may fit where live's had to move under the pointer)."""
@@ -1051,7 +1072,9 @@ def compare(live, ours, whole_document=True):
             rest = False
         if rest:
             resting.add(f"step {s.get('step')}")
+    free_clicks = any(isinstance((st.get("do") or {}).get("on"), dict) and "sketch_point" in st["do"]["on"] for st in steps)
     for name, a, b, failed, t, step in pairs:
+        mm_per_px = (((a or {}).get("camera") or {}).get("mmPerPixel") if free_clicks else None)
         if failed:
             if first is None:
                 first = (name, ".step", "ok", f"failed: {failed}")
@@ -1335,6 +1358,7 @@ def compare(live, ours, whole_document=True):
         hole_callout_export_text(a, b)
         view_frame_late(a, b, step)
         placed_alike(a, b)
+        click_placed_readouts(a, b, mm_per_px)
         cloud_menu(a, b)
         menu_badges(a, b)
         d = first_difference(a, b)
