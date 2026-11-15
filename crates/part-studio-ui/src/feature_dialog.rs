@@ -906,8 +906,18 @@ impl FeatureDialog {
         if let Some(spec) = self.spec_for_path(&path)
             && let ParamKind::Array { item, .. } = &spec.kind
         {
+            let before = self.feature.params.array(spec.id).len();
             for r in refs {
                 self.toggle_driven_item(spec.id, item_slice(item), r);
+            }
+            // Filled to its "MaxNumberOfPicks" (bsurf.fs: 2), the next field takes the selection (live2 11-15:
+            // Boundary surface's second U pick makes V profiles active).
+            let now = self.feature.params.array(spec.id).len();
+            if now < before {
+                self.advance_disarmed = Some(path.clone());
+            }
+            if now > before && spec.max_picks.is_some_and(|n| now >= n) && self.advance_disarmed.as_deref() != Some(path.as_str()) {
+                self.advance_query_focus(&path);
             }
             self.changed(cx);
             cx.notify();

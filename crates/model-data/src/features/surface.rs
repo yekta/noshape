@@ -115,9 +115,11 @@ fn bsurf_profiles(id: &'static str, label: &'static str, ids: [&'static str; 5])
 pub fn boundary_surface() -> FeatureType {
     let mut p = vec![
         surface_operation_type(),
+        // bsurf.fs: "MaxNumberOfPicks" : 2 on each.
         bsurf_profiles("uProfilesArray", "U profiles", ["uProfileEntities", "uCondition", "uMagnitude", "uReference", "uDirection"])
-            .hints(Hints::INITIAL_FOCUS),
-        bsurf_profiles("vProfilesArray", "V profiles", ["vProfileEntities", "vCondition", "vMagnitude", "vReference", "vDirection"]),
+            .hints(Hints::INITIAL_FOCUS)
+            .max_picks(2),
+        bsurf_profiles("vProfilesArray", "V profiles", ["vProfileEntities", "vCondition", "vMagnitude", "vReference", "vDirection"]).max_picks(2),
         ParamSpec::bool("showIsocurves", "Show isocurves", false),
         ParamSpec::num("curveCount", "Count", ISO_GRID).visible(|v| v.bool("showIsocurves")),
     ];

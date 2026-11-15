@@ -873,6 +873,30 @@ fn a_blamed_empty_field_is_not_red_once_picked(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| dialog.read(cx).field_error("entities").is_none()), "picked: not red, before any regeneration");
 }
 
+/// Live (live2 11-15, boundary-surface-new-edit-reedit): Boundary surface's U profiles take two picks (bsurf.fs
+/// "MaxNumberOfPicks" : 2); the second makes V profiles the active field.
+#[gpui::test]
+fn boundary_surface_u_profiles_full_pass_the_selection_on(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "bsurf-advance");
+    let edges = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = &v.context.as_ref().expect("the part").bodies[0];
+        let top = b.shape.bounding_box(false).map(|bb| bb.max.z).unwrap_or(0.0);
+        let on_top: Vec<usize> = b.shape.edges().iter().enumerate().filter(|(_, e)| e.edge_info().is_ok_and(|i| (i.start.z - top).abs() < 1e-7 && (i.end.z - top).abs() < 1e-7)).map(|(i, _)| i).collect();
+        on_top.iter().map(|&i| Reference::Edge((*b.edges[i]).clone())).collect::<Vec<_>>()
+    });
+    assert!(edges.len() >= 2, "the block's top edges");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("boundarySurface", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Boundary surface dialog").dialog.clone());
+    let active = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).active_query.clone());
+    assert_eq!(active(cx).as_deref(), Some("uProfilesArray"));
+    cx.update(|cx| dialog.update(cx, |d, cx| { d.add_pick(edges[0].clone(), cx); }));
+    assert_eq!(active(cx).as_deref(), Some("uProfilesArray"), "one pick: U stays active");
+    cx.update(|cx| dialog.update(cx, |d, cx| { d.add_pick(edges[2.min(edges.len() - 1)].clone(), cx); }));
+    assert_eq!(active(cx).as_deref(), Some("vProfilesArray"), "two picks: V profiles active");
+}
+
 /// Live (ui-parity mirror-face-create-selection): a face picked in the open Create selection panel lights up the
 /// feature that made it in the list.
 #[gpui::test]

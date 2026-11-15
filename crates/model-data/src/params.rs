@@ -346,11 +346,18 @@ pub struct ParamSpec {
     /// FeatureScript "Column Name": the parameter's name in the
     /// configuration table when it differs from its label ("Second depth").
     pub column: &'static str,
+    /// A selection-driven array's "MaxNumberOfPicks": full, it passes the
+    /// selection on to the next field (Boundary surface's U / V profiles).
+    pub max_picks: Option<usize>,
 }
 
 impl ParamSpec {
     fn new(id: &'static str, label: &'static str, kind: ParamKind) -> Self {
-        Self { id, label, kind, hints: Hints::NONE, visible: None, description: "", item_template: None, column: "" }
+        Self { id, label, kind, hints: Hints::NONE, visible: None, description: "", item_template: None, column: "", max_picks: None }
+    }
+    pub fn max_picks(mut self, n: usize) -> Self {
+        self.max_picks = Some(n);
+        self
     }
     pub fn column(mut self, c: &'static str) -> Self {
         self.column = c;
