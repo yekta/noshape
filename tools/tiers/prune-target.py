@@ -27,6 +27,16 @@ for t in [a for a in sys.argv[1:] if a != '--dry' and not busy(a)]:
         if p.startswith('noshape'): pkg[h] = (p, d)
     groups = collections.defaultdict(dict)
     for f in os.scandir(deps):
+        # macOS keeps each codegen unit's object beside a debug build (unpacked debug info) and every rebuild adds
+        # new ones: 37 GB of a 42 GB target (11-15). They only feed backtraces' line numbers; a build writes them again.
+        if f.name.endswith('.o') and f.is_file():
+            st = f.stat()
+            if now - st.st_mtime >= AGE and now - st.st_atime >= AGE:
+                freed += st.st_size
+                if not dry:
+                    try: os.remove(f.path)
+                    except OSError: pass
+            continue
         m = re.fullmatch(r'(.+)-([0-9a-f]{16})(\.\w+)?', f.name)
         if not m or not f.is_file() or m.group(2) not in pkg or m.group(3) == '.d': continue
         kind = 'lib' if m.group(3) in ('.rlib', '.rmeta', '.so', '.dylib') else 'exe' if m.group(3) is None else None
@@ -42,4 +52,4 @@ for t in [a for a in sys.argv[1:] if a != '--dry' and not busy(a)]:
                 try: os.remove(p)
                 except OSError: pass
             shutil.rmtree(os.path.join(fp, pkg[h][1]), ignore_errors=True)
-print(f"prune-exes: {'would remove' if dry else 'removed'} {n} old builds of noshape crates, {freed/1e9:.1f} GB")
+print(f"prune-exes: {'would remove' if dry else 'removed'} {n} old builds of noshape crates and stale objects, {freed/1e9:.1f} GB")
