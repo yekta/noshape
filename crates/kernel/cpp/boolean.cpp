@@ -2521,14 +2521,21 @@ static double uv_area(const TopoDS_Face& f)
 
 static bool same_area(const TopoDS_Face& a, const TopoDS_Face& f)
 {
-  // Cylinders: r times the domain's area, to accept quickly (a tube's face with holes bounded by B-spline rims: 8 ms a
-  // face adaptively).
+  // Surfaces of revolution of one kind (cylinders, cones, tori): a face turned about the axis keeps its area, so equal
+  // parameter-domain areas accept quickly (a tube's face with holes bounded by B-spline rims: 8 ms a face adaptively;
+  // learning-center-michael's rounded holes' tori, 10 of Fillet 2's 90 ms).
   TopLoc_Location l0, l1;
-  if (!occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(a, l0)).IsNull() && !occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(f, l1)).IsNull())
+  const occ::handle<Geom_Surface> s0 = BRep_Tool::Surface(a, l0), s1 = BRep_Tool::Surface(f, l1);
+  auto kind = [](const occ::handle<Geom_Surface>& g) {
+    return !occ::down_cast<Geom_CylindricalSurface>(g).IsNull() ? 1 : !occ::down_cast<Geom_ConicalSurface>(g).IsNull() ? 2 : !occ::down_cast<Geom_ToroidalSurface>(g).IsNull() ? 3 : 0;
+  };
+  if (const int k = kind(s0); k != 0 && k == kind(s1))
   {
     const double d0 = std::abs(uv_area(a)), d1 = std::abs(uv_area(f));
-    // (Equal there: the same. Else measured: a move rebuilds some edges' curves a little, cf-straight-spline's shafts.)
-    if (std::isfinite(d0) && std::isfinite(d1) && std::abs(d1 - d0) <= 1e-9 * d0)
+    // (Within 1e-6, tighter than the measure's 1e-5 below: the Gauss rule isn't exact on approximated curves, a
+    // rounded hole's torus reads 5e-7 apart. Else measured: a move rebuilds some edges' curves a little,
+    // cf-straight-spline's shafts.)
+    if (std::isfinite(d0) && std::isfinite(d1) && std::abs(d1 - d0) <= 1e-6 * d0)
       return true;
   }
   // (Adaptively, to 1e-7: the fixed rule was 1e-3 off on a tube's face with holes bounded by joined B-spline rims.)
@@ -2912,9 +2919,10 @@ TopoDS_Shape rim_chain_seams(const TopoDS_Shape& s, HHist& hist)
       }
       W.Closed(true);
       B.Add(Ft[i], W);
-      ok = BRepCheck_Analyzer(Ft[i]).IsValid() && same_area(sd.face, Ft[i]);
+      ok = same_area(sd.face, Ft[i]);
     }
-    if (!ok || !BRepCheck_Analyzer(Fc).IsValid() || !same_area(cf, Fc))
+    // (The new faces checked in the solid, valid_around's.)
+    if (!ok || !same_area(cf, Fc))
       continue;
     occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
     rs->Replace(cf, Fc);
@@ -9637,7 +9645,12 @@ OpOut op_unify_whole(const OcShape& s)
 // The kernel's unify of a whole shape (op_unify's), for the kernel's own operations.
 TopoDS_Shape rim_chain_seams_joined(const TopoDS_Shape& s, HHist& hist)
 {
-  const TopoDS_Shape moved = rim_chain_seams(s, hist);
+  TopoDS_Shape moved;
+  {
+    const KernelTimer timer("seams.rim_chain");
+    moved = rim_chain_seams(s, hist);
+  }
+  const KernelTimer timer("seams.join");
   return moved.IsSame(s) ? s : join_loop_pieces(moved, hist);
 }
 
