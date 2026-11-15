@@ -1,6 +1,6 @@
 {
  "scenario": "rel-rh-export",
- "recorded": "2026-11-15T01:28:36.162Z",
+ "recorded": "2026-11-15T03:03:32.399Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -8,11 +8,11 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "50875064f4b1012a72848a3b",
-  "workspace": "f203aaf649911e29e4aa8e2c",
-  "element": "a5980f1b2dbbf26f8badcfcf",
+  "document": "a6edf24494fb4f59fc86f090",
+  "workspace": "cbb4f755079403b0cea67972",
+  "element": "ad8ed95c18c81c9f6479b794",
   "start": "doc-versions",
-  "startElement": "a5980f1b2dbbf26f8badcfcf",
+  "startElement": "ad8ed95c18c81c9f6479b794",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -289,7 +289,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 27316
+   "t": 26374
   },
   {
    "step": 2,
@@ -432,7 +432,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 31044
+   "t": 29527
   },
   {
    "step": 3,
@@ -610,7 +610,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 38363
+   "t": 36382
   },
   {
    "step": 4,
@@ -799,20 +799,20 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 41005
+   "t": 38600
   },
   {
    "step": 5,
    "do": {
     "do": "type",
-    "text": "PN-0124C"
+    "text": "PN-0302Z"
    },
    "ok": true,
    "state": {
     "focus": {
      "kind": "other",
      "tag": "input",
-     "text": "PN-0124C",
+     "text": "PN-0302Z",
      "selection": [
       8,
       8
@@ -836,7 +836,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0124C"
+       "value": "PN-0302Z"
       },
       {
        "label": "Release name *",
@@ -982,7 +982,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 44093
+   "t": 41238
   },
   {
    "step": 6,
@@ -1025,7 +1025,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0124C"
+       "value": "PN-0302Z"
       },
       {
        "label": "Release name *",
@@ -1171,7 +1171,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 46823
+   "t": 43422
   },
   {
    "step": 7,
@@ -1208,7 +1208,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0124C"
+       "value": "PN-0302Z"
       },
       {
        "label": "Release name *",
@@ -1354,7 +1354,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 49337
+   "t": 45466
   },
   {
    "step": 8,
@@ -1397,7 +1397,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0124C"
+       "value": "PN-0302Z"
       },
       {
        "label": "Release name *",
@@ -1543,7 +1543,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 52120
+   "t": 47671
   },
   {
    "step": 9,
@@ -1580,7 +1580,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0124C"
+       "value": "PN-0302Z"
       },
       {
        "label": "Release name *",
@@ -1726,7 +1726,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 55776
+   "t": 50904
   },
   {
    "step": 10,
@@ -1858,7 +1858,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 58733
+   "t": 53296
   },
   {
    "step": 11,
@@ -1985,7 +1985,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 80973
+   "t": 75102
   },
   {
    "step": 12,
@@ -2143,7 +2143,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 83906
+   "t": 77636
   },
   {
    "step": 13,
@@ -2170,7 +2170,7 @@
      "buttons": [
       "Close"
      ],
-     "text": "PN-0124C A Loopelf Loopelf R1 1:29 AM Today Version: R1 Document: live2 uip doc-versions 2026-11-15T01:28:02 Type: Part View release Export Obsolete revision Close"
+     "text": "PN-0302Z A Loopelf Loopelf R1 3:04 AM Today Version: R1 Document: live2 uip doc-versions 2026-11-15T03:02:58 Type: Part View release Export Obsolete revision Close"
     },
     "dialogs": [],
     "panels": null,
@@ -2284,7 +2284,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 87407
+   "t": 80712
   },
   {
    "step": 14,
@@ -2306,7 +2306,7 @@
      "buttons": [
       "Close"
      ],
-     "text": "PN-0124C A Loopelf Loopelf R1 1:29 AM Today Version: R1 Document: live2 uip doc-versions 2026-11-15T01:28:02 Type: Part View release Export Obsolete revision Close"
+     "text": "PN-0302Z A Loopelf Loopelf R1 3:04 AM Today Version: R1 Document: live2 uip doc-versions 2026-11-15T03:02:58 Type: Part View release Export Obsolete revision Close"
     },
     "dialogs": [],
     "panels": null,
@@ -2420,7 +2420,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 92598
+   "t": 85499
   },
   {
    "step": 15,
@@ -2443,7 +2443,43 @@
     "dialog": {
      "kind": "modal",
      "title": "Export",
-     "fields": [],
+     "fields": [
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "Part Studio 1 - PN-0302Z"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Download"
+      }
+     ],
      "buttons": [
       "Export",
       "Cancel"
@@ -2562,7 +2598,180 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 107415
+   "t": 99820
+  },
+  {
+   "step": 16,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 3000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "Part Studio 1 - PN-0302Z"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Download"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 104606
   }
  ]
 }

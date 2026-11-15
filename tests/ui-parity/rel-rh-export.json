@@ -36,7 +36,7 @@
   },
   {
    "do": "type",
-   "text": "PN-0124C"
+   "text": "PN-0302Z"
   },
   {
    "do": "click",
@@ -91,6 +91,11 @@
    "on": {
     "button": "Export"
    }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
   }
  ]
 }
