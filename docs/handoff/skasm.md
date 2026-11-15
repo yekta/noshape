@@ -1,5 +1,21 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-15 16:46 UTC): Offset of model edges landed; frame numbering; waiting on 3 live captures
+- 215050df (lead's decision): sketch Offset takes model edges / other sketches' curves (op `sketch_offset`, app
+  Offset tool, translator's externalMaster / externalSecond via link_sketch_offset): a hidden reference-only
+  projection is the source, the copies keep OffsetPair + Distance to it and follow the model (e2e
+  sketch_offset_of_model_edges_follows_the_model). An ellipse edge seen as a circle projects to a circle / arc
+  (features_b T1). Suite 16:10 (vibe6): constraints left to the solved geometry 99 -> 83 (external OFFSET 10 -> 0),
+  knife 33 -> 46/52; hats / dock userdocs ALL-SAME vs 0.4.52 (candidate CLI built on vibe6, copied to vibe5 with
+  scp -3). The suite's 4 Hole documents lost at 16:10 were studios' 8aea0c3c4 (fixed 253c08ee).
+- Face picks for Offset not built: REQUESTS 15:30 asks live (a face, chains, preselection, model change).
+- c66198ae (queued): frame members numbered in std frame.fs's sweep order from the first selected edge
+  (FramePath.stable / sweep_rank; body ids unchanged): psui's end-cap-* / gusset-rectangle-aligned rows.
+- psui's tab / bend-relief labels: ours keeps a rebuilt sheet metal face's earlier name (keep_names); live names the
+  plate's top "Face of Flange 1", its bottom "Sheet metal model 1", the miter vertex "Vertex of Flange 1" (ours
+  Flange 2). REQUESTS 16:27 asks live for every label at each rollback of sm-box.
+- Refs for ~30 dropped constraints in 16 documents: REQUESTS 14:58 (live).
+
 ## Resume here (2026-11-15 15:24 UTC): dropped constraints wait on live's refs; psui's sheet metal rows
 - Exchange: live imports model-plus's STEP / IGES as 58/151/94 since 6f5b151e (dx: "live imports ours" 43/48; the
   rest are dx's / deliberate). Corner-break (qa P0) after bool's plane pcurves: vibe6, 5 interleaved pairs, median
