@@ -1,5 +1,25 @@
 # Blends (agent "blend")
 
+## 11-15 02:25 UTC: mitretools landed; fsorder, leanf8, paramline gating; the round-edge split data
+
+Landed: mitretools 79fdec63d. Gating (units here, flags /root/blend-scratch/*.done):
+- blend4 `blend-fsorder` be588685f: tests + pair clean; asm rerun on vibe6 (the vibe5 one was SIGTERMed midway,
+  matching mitre's as far as it went). Land when it matches asm-mitre-new.log.
+- blend7 `blend-leanf8` cf74e2de7 (core's P1: knife Fillet 8 on their lean handle 6.8 -> 1.2 s, same 28570.66 mm³):
+  blend_direct declines at once when a tool's side is off a face of its edge; the rolling balls' feet on a B-spline
+  face by Newton from the last one (Support::Nurbs). Unit blend-leanf8-gates6 (after fsorder's asm): g++-13, tests,
+  pair vs blend9, asm. Tell core when it lands (they hold their lean loft till then).
+- blend10 `blend-paramline` c714c20b6: param_on_edge for a straight edge in closed form (tpd Fillet 1 85 -> 65 ms
+  Mac dev). Unit blend-paramline-gates5 (vibe5): tests, pair vs blend8. Then asm.
+- The round-edge split rule (lead): the model suite with a report (parked/knot-report-dbg.patch) finds only three
+  fillets with round edges on B-spline supports: knife Fillet 8 (8 C1-joint crossings with curvature breaks on the
+  lofted side; live's 6 vertices are 6 of them; 2 more at (118.56, ±1.80, 3.07), curvature -27 -> -190 1/m across,
+  where live doesn't split), impeller Fillet 1 and the flange round (no crossings). Asked live for the side surface's
+  knots (REQUESTS 02:22) to tell a narrower rule from a loft difference (core's).
+- Snap-hook spine skip: dead (measured: pairs with real sections touch the tube at gap 0 too, both reach -9 mm).
+- Knife Fillet 8 on main: the ring is one edge (core bf26f875), OCCT still gives 2 round faces, the balls decline at
+  the ring's tangent stretch (the ball's contact on the edge: a zero-length side); live one face.
+
 ## 11-14 21:24 UTC: knife Fillet 8 against live 3093; mitretools / fsorder gates clean, their asms running
 
 - mitretools (blend6 ec0b0f78a) and fsorder (blend4 be588685f): tests and pairs clean (870 = 870, no differences).
