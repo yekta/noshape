@@ -1397,12 +1397,16 @@ fn construct_paths(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(Value::array(paths))
 }
 
-/// `@approximateSpline`: a B-spline through each target's positions (with
-/// its start/end derivatives when both are given). Interpolation meets any
-/// tolerance; Onshape may return fewer control points.
+/// `@approximateSpline`: each target's positions approximated by a B-spline of `degree` with the fewest control points,
+/// up to `maxControlPoints`, within `tolerance` (an open target without end derivatives: a straight edge to degree 3
+/// is its 4-point cubic, as live; psui's edit-curve-approximate-planarize had 202). A closed target, one with end
+/// derivatives or without those settings: interpolated through its positions.
 fn approximate_spline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let def = a.get(1).cloned().unwrap_or_default();
     let periodic = def.get("isPeriodic").as_bool().unwrap_or(false);
+    let degree = def.get("degree").as_number().map(|d| d.round() as usize);
+    let tolerance = length_of(def.get("tolerance"));
+    let max_cps = def.get("maxControlPoints").as_number().map(|n| n.round() as usize);
     let mut out = Vec::new();
     for t in def.get("targets").as_array().iter().flat_map(|v| v.iter()) {
         let mut pts: Vec<DVec3> = t.get("positions").as_array().map(|v| v.iter().filter_map(vec3_of).collect()).unwrap_or_default();
@@ -1413,13 +1417,165 @@ fn approximate_spline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             (Some(s), Some(e)) if !periodic => vec![s, e],
             _ => Vec::new(),
         };
-        let curve = k::make_interpolated_spline(&pts, &tangents, periodic).ok().and_then(|s| s.edges().first()?.edge_bspline().ok());
+        let fitted = match (degree, tolerance, max_cps) {
+            (Some(p), Some(tol), Some(max)) if !periodic && tangents.is_empty() && p >= 1 => fewest_points_fit(&pts, p, max, tol),
+            _ => None,
+        };
+        let curve = fitted.or_else(|| k::make_interpolated_spline(&pts, &tangents, periodic).ok().and_then(|s| s.edges().first()?.edge_bspline().ok()));
         match curve {
             Some(c) => out.push(bspline_value(&c)),
             None => return Err(raise_error(i, "BAD_BSPLINECURVE_DEFINITION", None)),
         }
     }
     Ok(Value::array(out))
+}
+
+/// The least-squares fit of `pts` with the fewest control points (`degree` + 1 to `max`) whose distance from every
+/// point at its parameter is within `tol`; the `max` one when none is.
+fn fewest_points_fit(pts: &[DVec3], degree: usize, max: usize, tol: f64) -> Option<k::BSplineCurveData> {
+    let hi = max.min(pts.len());
+    if hi < degree + 1 {
+        return None;
+    }
+    let (mut lo, mut hi, mut best) = (degree + 1, hi, None);
+    // (The deviation falls as points are added: the fewest found by halving.)
+    while lo <= hi {
+        let n = (lo + hi) / 2;
+        let (curve, dev) = least_squares_bspline(pts, degree, n)?;
+        if dev <= tol {
+            best = Some(curve);
+            hi = n - 1;
+        } else {
+            lo = n + 1;
+        }
+    }
+    best.or_else(|| least_squares_bspline(pts, degree, max.min(pts.len())).map(|r| r.0))
+}
+
+/// The clamped B-spline of `degree` with `n` control points nearest `pts` in least squares, its ends on the first
+/// and last point (Piegl & Tiller A9.7: chord-length parameters, knots by averaging), with its largest distance from
+/// the points at their parameters.
+fn least_squares_bspline(pts: &[DVec3], degree: usize, n: usize) -> Option<(k::BSplineCurveData, f64)> {
+    let (m, p) = (pts.len().checked_sub(1)?, degree);
+    if n < p + 1 || n > m + 1 {
+        return None;
+    }
+    let total: f64 = pts.windows(2).map(|w| w[0].distance(w[1])).sum();
+    if total.is_nan() || total <= 0.0 {
+        return None;
+    }
+    let mut t = vec![0.0; m + 1];
+    let mut acc = 0.0;
+    for k in 1..=m {
+        acc += pts[k].distance(pts[k - 1]);
+        t[k] = acc / total;
+    }
+    t[m] = 1.0;
+    let mut u = vec![0.0; n + p + 1];
+    u[n..].fill(1.0);
+    let d = (m + 1) as f64 / (n - p) as f64;
+    for j in 1..n - p {
+        let jd = j as f64 * d;
+        let i = (jd.floor() as usize).clamp(1, m);
+        let a = jd - i as f64;
+        u[p + j] = (1.0 - a) * t[i - 1] + a * t[i];
+    }
+    // The nonzero basis functions at `x`: (first index, values) (Piegl & Tiller A2.2).
+    let basis = |x: f64| -> (usize, Vec<f64>) {
+        let span = if x >= u[n] { n - 1 } else { (p..n).rev().find(|&s| u[s] <= x).unwrap_or(p) };
+        let mut nb = vec![0.0; p + 1];
+        let (mut left, mut right) = (vec![0.0; p + 1], vec![0.0; p + 1]);
+        nb[0] = 1.0;
+        for j in 1..=p {
+            left[j] = x - u[span + 1 - j];
+            right[j] = u[span + j] - x;
+            let mut saved = 0.0;
+            for r in 0..j {
+                let den = right[r + 1] + left[j - r];
+                let tmp = if den.abs() > 0.0 { nb[r] / den } else { 0.0 };
+                nb[r] = saved + right[r + 1] * tmp;
+                saved = left[j - r] * tmp;
+            }
+            nb[j] = saved;
+        }
+        (span - p, nb)
+    };
+    let rows: Vec<(usize, Vec<f64>)> = t.iter().map(|&x| basis(x)).collect();
+    let mut poles = vec![DVec3::ZERO; n];
+    poles[0] = pts[0];
+    poles[n - 1] = pts[m];
+    let inner = n - 2;
+    if inner > 0 {
+        // Normal equations for poles 1 ..= n - 2.
+        let mut ata = vec![vec![0.0; inner]; inner];
+        let mut atr = vec![DVec3::ZERO; inner];
+        for k in 1..m {
+            let (first, nb) = &rows[k];
+            let mut r = pts[k];
+            for (o, v) in nb.iter().enumerate() {
+                let idx = first + o;
+                if idx == 0 {
+                    r -= pts[0] * *v;
+                } else if idx == n - 1 {
+                    r -= pts[m] * *v;
+                }
+            }
+            for (o1, v1) in nb.iter().enumerate() {
+                let i1 = first + o1;
+                if i1 == 0 || i1 == n - 1 {
+                    continue;
+                }
+                atr[i1 - 1] += r * *v1;
+                for (o2, v2) in nb.iter().enumerate() {
+                    let i2 = first + o2;
+                    if i2 != 0 && i2 != n - 1 {
+                        ata[i1 - 1][i2 - 1] += v1 * v2;
+                    }
+                }
+            }
+        }
+        // Gaussian elimination with partial pivoting.
+        for c in 0..inner {
+            let piv = (c..inner).max_by(|&a, &b| ata[a][c].abs().total_cmp(&ata[b][c].abs()))?;
+            if ata[piv][c].abs() < 1e-14 {
+                return None;
+            }
+            ata.swap(c, piv);
+            atr.swap(c, piv);
+            for r in c + 1..inner {
+                let f = ata[r][c] / ata[c][c];
+                if f == 0.0 {
+                    continue;
+                }
+                let pivot = ata[c].clone();
+                for (x, y) in ata[r][c..].iter_mut().zip(&pivot[c..]) {
+                    *x -= f * y;
+                }
+                let sub = atr[c] * f;
+                atr[r] -= sub;
+            }
+        }
+        for c in (0..inner).rev() {
+            let mut v = atr[c];
+            for (cc, x) in ata[c].iter().enumerate().skip(c + 1) {
+                v -= poles[cc + 1] * *x;
+            }
+            poles[c + 1] = v / ata[c][c];
+        }
+    }
+    let dev = rows.iter().zip(pts).map(|((first, nb), q)| (nb.iter().enumerate().map(|(o, v)| poles[first + o] * *v).sum::<DVec3>() - *q).length()).fold(0.0, f64::max);
+    let mut knots: Vec<f64> = Vec::new();
+    let mut mults: Vec<u32> = Vec::new();
+    for x in u {
+        match knots.last() {
+            Some(&k) if (x - k).abs() < 1e-12 => *mults.last_mut()? += 1,
+            _ => {
+                knots.push(x);
+                mults.push(1);
+            }
+        }
+    }
+    Some((k::BSplineCurveData { poles, weights: None, knots, mults, degree: degree as u32, periodic: false }, dev))
 }
 
 /// `@evMaxPathDeviation`: the largest distance between two paths (sampled
@@ -1529,6 +1685,25 @@ fn ev_mesh_points(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// @approximateSpline's fit: a straight edge sampled at 202 points, to degree 3, is the 4-point cubic of one span
+    /// (live's Edit curve, psui's edit-curve-approximate-planarize); a half circle of radius 20 mm within 0.01 mm
+    /// takes no more than the 15 control points allowed, every sample within the tolerance.
+    #[test]
+    fn approximate_spline_takes_the_fewest_control_points() {
+        let line: Vec<DVec3> = (0..202).map(|i| DVec3::new(0.005, 0.0, 0.02 * i as f64 / 201.0)).collect();
+        let c = fewest_points_fit(&line, 3, 15, 1e-5).expect("a fit");
+        assert_eq!((c.poles.len(), c.degree, c.knots.len()), (4, 3, 2), "{c:?}");
+        assert!((c.poles[0] - line[0]).length() < 1e-15 && (c.poles[3] - line[201]).length() < 1e-15);
+        let arc: Vec<DVec3> = (0..201).map(|i| {
+            let a = std::f64::consts::PI * i as f64 / 200.0;
+            DVec3::new(0.02 * a.cos(), 0.02 * a.sin(), 0.0)
+        }).collect();
+        let c = fewest_points_fit(&arc, 3, 15, 1e-5).expect("a fit");
+        assert!(c.poles.len() <= 15, "{}", c.poles.len());
+        let (fit, dev) = least_squares_bspline(&arc, 3, c.poles.len()).unwrap();
+        assert!(dev <= 1e-5 && fit == c, "{dev}");
+    }
 
     /// faces_cross gives up by work, not time: two faces meeting along a line inside both cross, and with too little
     /// work for their section they still count as crossing; the same with every core busy (the CPU's speed decided
