@@ -19,6 +19,13 @@ scratch /root/bool-scratch.
   "an ellipse on another face" (tools 1-65), "a non-manifold result" (98-130). Recording vibe6/vibe7
   ~/agents/bool-keep/m5d8rec2/cee9172049a1487c; probe_tool_subset (xprobe) bisects (PROBE_TOOLS, PROBE_OCCT=1 to record
   OCCT's).
+- impeller cap (11-15 04:4x): ours 1356.908 mm2 with OCCT's curves and with ours alike; live's JKK evArea 1356.9395
+  (q2484) while its Part 2 volume / 4 mm gives 1356.927: live's own measures disagree at this 1e-5 (q2484: its HIGH
+  volume over-integrates JKG by 1.06 mm2, its tessellation converges to ours, 45,277.97 mm3; edges within 0.64 um,
+  q2482). Loft input: ours -4.4e-6 volume, -2.2e-6 area against live (core's). Lead 11-15: the band at live's own
+  scatter, derived from its readings: LIVE_SCATTER (crates/ops/tests/parity.rs, PARITY-SUITES.md), 7.86e-5 from
+  Shell Gehäuse on. 12 -> 13 of 48: the first difference is now feature 13 "Flansch verbreitern" (moveFace), Part 2's
+  edges 12 line / 6 other against live's 8 / 10 (a real difference; the other 35 still follow from it).
 - Queue (lead 11-15 + core / bool2): impeller cap 1.3e-5 short of live (36 suite features, predates the Shell work);
   speed table: c2-bottle-split Shell 1 66 vs 3 ms, cf-snap-hook Shell 1 103 vs 6, impeller Boolean Flansch+Gehäuse 1008
   vs 154 (bool2: offset x plane sections_ahead, case 7519a27ac8f397d0), c2-helical-sweep Sweep 1 297 vs 28 (our decline

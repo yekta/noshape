@@ -68,6 +68,27 @@ const LIVE_VOLUME_ALLOWANCES: &[LiveReading] = &[
     LiveReading { doc: "c2-impeller-loft", from_feature: "Shell Gehäuse", part: "Part 1", volume_above: 5.05, area_below: 1.2, centroid: 0.01 },
 ];
 
+/// Live's own scatter in a document, derived from two of its readings of one quantity that disagree (PARITY-SUITES.md):
+/// from `from_feature` on, every part's volume and area may lie within `relative` of live's, either way, `relative` the
+/// largest of those readings' disagreements. Topology is still compared.
+struct LiveScatter {
+    doc: &'static str,
+    from_feature: &'static str,
+    /// Pairs of live's readings of the same quantity: (one, the other).
+    readings: &'static [(f64, f64)],
+}
+impl LiveScatter {
+    fn relative(&self) -> f64 {
+        self.readings.iter().map(|&(a, b)| (a - b).abs() / a.abs().max(b.abs())).fold(0.0, f64::max)
+    }
+}
+const LIVE_SCATTER: &[LiveScatter] = &[
+    // lead 11-15: the Shell's cap JKK, evArea 1,356.9395491570781 mm² (2484), against Part 2's volume over its 4 mm
+    // extrusion of that cap, 5,427.707922765784 / 4 mm²; the offset face JKG, evArea 13,509.219731117855 mm² against
+    // live's own tessellation of it converging to 13,508.158 (2484). Our edges lie within 0.64 µm of live's (2482).
+    LiveScatter { doc: "c2-impeller-loft", from_feature: "Shell Gehäuse", readings: &[(1356.939549157078, 5427.707922765784 / 4.0), (13509.219731117855, 13508.158)] },
+];
+
 /// Imported parts live's STEP importer refits, written next to their evidence (PARITY-SUITES.md): in `docs`, a part whose
 /// name starts with `prefix` is held within `volume` m³, `area` m² and `centroid` m of live's readings in every feature (the
 /// parts stay as imported), its edges' kinds not compared; its counts still are.
@@ -128,6 +149,22 @@ fn allow_live_readings(doc: &str, reached: &[&str], mut parts: Vec<PartState>) -
             parts.iter_mut().filter(|p| p.name == r.part).for_each(|p| p.line_or_other = true);
         }
     }
+    for r in LIVE_SCATTER {
+        if r.doc != doc || !reached.contains(&r.from_feature) {
+            continue;
+        }
+        let k = r.relative();
+        for p in parts.iter_mut() {
+            if let Some(v) = p.volume {
+                let [lo, hi] = p.volume_band.unwrap_or([v, v]);
+                p.volume_band = Some([lo.min(v - k * v.abs()), hi.max(v + k * v.abs())]);
+            }
+            if let Some(a) = p.area {
+                let [lo, hi] = p.area_band.unwrap_or([a, a]);
+                p.area_band = Some([lo.min(a - k * a.abs()), hi.max(a + k * a.abs())]);
+            }
+        }
+    }
     for r in LIVE_VOLUME_ALLOWANCES {
         if r.doc != doc || !reached.contains(&r.from_feature) {
             continue;
@@ -167,6 +204,18 @@ fn live_lines_as_other_count_with_others_from_their_feature_on() {
     assert!(!differences(&other_kind, &[part("Part 2", 12, 6, 1)]).is_empty(), "lines and others only");
 }
 
+/// c2-impeller-loft's scatter: the larger of live's two self-disagreements (7.86e-5, JKG's), both ways, every part.
+#[test]
+fn live_scatter_widens_every_part_both_ways() {
+    let k = LIVE_SCATTER[0].relative();
+    assert!((k - (13509.219731117855 - 13508.158) / 13509.219731117855).abs() < 1e-12, "{k}");
+    let part = |name: &str, v: f64| PartState { name: name.into(), faces: 8, edges: 18, vertices: 12, volume: Some(v * 1e-9), ..Default::default() };
+    let live = allow_live_readings("c2-impeller-loft", &["Shell Gehäuse", "Extrude Flansch"], vec![part("Part 2", 5427.707922765784)]);
+    assert!(differences(&live, &[part("Part 2", 5427.637657)]).is_empty(), "ours 1.3e-5 below");
+    assert!(!differences(&live, &[part("Part 2", 5427.0)]).is_empty(), "1.3e-4 below");
+    assert!(!differences(&allow_live_readings("c2-impeller-loft", &["Loft Gehäuse"], vec![part("Part 2", 5427.707922765784)]), &[part("Part 2", 5427.637657)]).is_empty(), "not before the Shell");
+}
+
 #[test]
 fn live_volume_allowances_widen_from_their_feature_on_upward() {
     let live = |v: f64| PartState { name: "Part 1".into(), faces: 40, edges: 90, vertices: 52, volume: Some(v * 1e-9), ..Default::default() };
@@ -174,7 +223,7 @@ fn live_volume_allowances_widen_from_their_feature_on_upward() {
     let at = |feature: &str| allow_live_readings("c2-impeller-loft", &["Loft Gehäuse", feature], vec![live(45272.919231)]);
     assert!(differences(&at("Shell Gehäuse"), &ours(45277.36, 40)).is_empty(), "within live's tessellation (2484)");
     assert!(!differences(&at("Shell Gehäuse"), &ours(45278.5, 40)).is_empty(), "past it");
-    assert!(!differences(&at("Shell Gehäuse"), &ours(45270.0, 40)).is_empty(), "below live's reading");
+    assert!(!differences(&at("Shell Gehäuse"), &ours(45269.0, 40)).is_empty(), "below live's reading past its scatter (LIVE_SCATTER: 3.56 mm³ here)");
     assert!(!differences(&at("Shell Gehäuse"), &ours(45277.36, 41)).is_empty(), "topology still compared");
     assert!(!differences(&at("Loft Gehäuse"), &ours(45277.36, 40)).is_empty(), "not before the named feature");
     assert!(differences(&allow_live_readings("c2-impeller-loft", &["Shell Gehäuse", "Extrude Flansch"], vec![live(45272.919231)]), &ours(45277.36, 40)).is_empty(), "and on after it");

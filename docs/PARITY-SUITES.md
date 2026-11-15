@@ -55,6 +55,14 @@ evVolume mis-integrates the 3 mm offset face JKG; its evArea (32,145.58 mm²) is
 them (5-7 µm). From that feature on (JKG stays in Part 1), Part 1 may lie up to 5.05 mm³ above live's volume, 1.2 mm² below its area and 10 µm from its
 centroid (`LIVE_VOLUME_ALLOWANCES`, crates/ops/tests/parity.rs); its topology and everything else is compared as usual.
 
+**Live's own scatter (lead 11-15).** The suite is never tighter than live's measurement of itself: where two of live's
+readings of one quantity disagree, the document's parts are compared within the larger relative disagreement, either
+way, from the feature those readings concern on (`LIVE_SCATTER`, crates/ops/tests/parity.rs, computed there from the
+readings). c2-impeller-loft from Shell Gehäuse: the cap JKK's evArea (1,356.9395 mm², REQUESTS 2484) against Part 2's
+volume over the 4 mm it is extruded (5,427.7079 / 4 = 1,356.9270 mm²): 9.2e-6; the offset face JKG's evArea (13,509.2197
+mm²) against live's own tessellation of it converging to 13,508.158 (2484): 7.86e-5. So 7.86e-5. Our inner edges lie
+within 0.64 µm of live's (2482); topology is compared as usual.
+
 **c2-gamma-imported / c2-wire-clip-imported: live's STEP importer refits the PEM FH4-M3 studs (qa, lead 11-12, core's
 reason in core.md 11-11).** Live scales each stud's groove torus by 0.995 (its face 4.277452 mm², the exact 4.158573) and reads
 24 near-straight B-spline serration edges as circles; ours imports the file exactly: 131.1503 mm³ / 203.1205 mm² against live's
