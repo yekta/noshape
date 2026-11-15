@@ -1258,8 +1258,10 @@ impl PartStudioView {
         }
         // In a feature dialog: what its active field picked (live
         // part-studio/440: Part 1 in Transform's field lights up Extrude 1;
-        // psui/m-03: not while another field is active).
-        let picked = self.edit.as_ref().map(|e| e.dialog.read(cx).active_refs());
+        // psui/m-03: not while another field is active). An open Create selection panel's picks instead (live
+        // mirror-face-create-selection: the boss's face lights up Extrude 2).
+        let cs_picks = self.ui.create_selection.as_ref().map(|c| c.seeds.clone());
+        let picked = cs_picks.or_else(|| self.edit.as_ref().map(|e| e.dialog.read(cx).active_refs()));
         // A part's creators as before the edited feature (live ui-parity boolean-subtract: Part 1 in Targets lights up
         // Extrude 1 only, not Extrude 2 whose cut the preview shows on it).
         let display = self.edit.as_ref().and(self.ui.preview_before.as_deref()).unwrap_or(&self.display);

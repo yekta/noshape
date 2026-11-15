@@ -822,6 +822,26 @@ fn the_create_selection_panel_opens_under_its_button(cx: &mut TestAppContext) {
     assert_eq!(panel_top + origin_y - button_top, 64.0, "64 px under the button");
 }
 
+/// Live (ui-parity mirror-face-create-selection): a face picked in the open Create selection panel lights up the
+/// feature that made it in the list.
+#[gpui::test]
+fn a_create_selection_pick_lights_up_its_feature(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "cs-related");
+    let maker = top.depends_on().expect("the face's feature");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("mirror", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Mirror dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("patternType", noshape_model::ParamValue::Enum("FACE".into()), cx)));
+    draw(cx, window);
+    cx.update(|cx| dialog.update(cx, |_, cx| cx.emit(crate::feature_dialog::DialogEvent::CreateSelection("faces".into()))));
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).ui.create_selection.is_some()), "the panel open");
+    assert!(!cx.update(|cx| view.read(cx).related_features(cx).contains(&maker)));
+    view.update(cx, |v, cx| v.cs_pick(&top, noshape_scene::builder::PickKind::Face, cx));
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).related_features(cx).contains(&maker)), "the picked face's feature lit");
+}
+
 /// Live (ui-parity extrude-remove-tab): Extrude opened on a part's face takes Add by itself, and that isn't an undo
 /// step (Undo off); a change after it is, and undoing it keeps Add.
 #[gpui::test]
