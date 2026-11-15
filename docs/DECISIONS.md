@@ -25,6 +25,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-15 A bool replay flag (1e-9 volume, history hash) from a more exact curve than OCCT's is accepted when the end-to-end
   check is identical (every suite document's topology and feature status, hats/dock SAME, corner-break 42 faces) and
   the volume is within live's band; any end-to-end difference parks it (rings-loft / knife Mirror 11-15).
+- 11-16 A vertex live leaves splitting one edge into two pieces of the same curve (no new geometry; e.g. impeller f24's
+  split 47 µm from a corner) is a known live difference when the faces match, the volume is within tolerance and no
+  later feature references it. Record it with its measurements in the suite's known-differences table.
 - 11-15 Edges live adds only inside a sub-micron near-tangent sliver (Parasolid's tolerance choices, e.g. impeller f15)
   are a known live difference when ours is the exact intersection and no later feature references them; chase
   them only if a later feature or a selection depends on them.
