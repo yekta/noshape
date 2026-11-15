@@ -1,40 +1,30 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-15 20:30 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
+Updated 2026-11-15 22:25 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
 only when a line here points there).
 
 ## In flight
-- Worktree /root/projects/noshape-wt/skasm (detached HEAD on main), not on main yet (landing 20:3x):
-  - "parity: a sketch constraint on model geometry that over-defines the sketch is taken back": live's 14:58 refs
-    (19:28) made exercise-chino's Sketch 3 (a slot's ends Coincident to a model line) and cf-spur-gear's Sketch 2
-    conflict; now 14/14 of those documents match to the end and their dropped constraints went 33 -> 25.
-  - "sketch Offset takes a model face" (live q-off, behaviours "Sketch Offset (O) on model edges"): op
-    `sketch_offset` takes `face:…` (its outer loop as one chain), the app's Offset tool takes a hovered face
-    (SketchEditor::offset_loop), out of the face by default (offset_out_of_face). e2e
-    sketch_offset_of_a_model_face_offsets_its_outer_loop. sketch_use gained outer_edge_refs (edge_refs unchanged).
-- Next: sheet metal "Face of … / Vertex of …" labels after live's rule (below).
+- Landing 22:2x: "a sheet metal face, edge or vertex is labelled after the feature that first made its definition
+  entity" (each custom feature's transient base in Context.fs_transient_bases; CtxState::transient_feature decodes an
+  association attributeId, "{ queryType : TRANSIENT , transientId : JAB }"; SheetMetalData.label_owners; the
+  part-studio-ui labeler reads it) and "a second flange beside the first ends the first's bend where the plate does"
+  (host sheetmetal.rs: no skew end when both free sides are square to the bend; sm-box now 23 faces as live; all 70
+  sheet metal T2 tests and the 8 sheet metal suite documents match). T2 tests in sheetmetal_std.rs.
+- Parked (patch /root/skasm-scratch/wip-8020.patch + /root/skasm-scratch/frame_library_8020.json): exact 8020 sections
+  from live2's skasm-q1956 (108 profiles, converter /root/skasm-scratch/bin/f8020.py -> frame_library_8020.json,
+  loader `exact_8020` in frame_library.rs; every listed size builds). Waits on arc midpoints (REQUESTS 21:46): 1001's
+  18 semicircles can't be oriented from ends / centre / length (332.015 vs live 329.364 mm²). Then: regenerate the
+  JSON with the midpoints, check every profile's area against live's (f8020.py prints AREA lines), update
+  frame_library tests (1001 area 329.364444), drop `tslot`, land.
 
 ## Waiting on others
-- live2 (REQUESTS 19:56): every 8020 10 Series section's end-face loops (live/skasm-q1956/). Ours is an
-  approximation (1001: ~520 mm² vs live 329.364; live has three closed 8-edge slot cavities + the bore = 5 loops, so
-  End cap Internal fails there with "Only frame segments with one internal profile can be capped."; ours has 2 loops
-  and builds). Rebuild frame_library.rs `tslot` from it.
-- psui (4d0a82b2-8fc7-43e6-b45d-bd8cb225741e): tab-new-edit-reedit is a pick difference, not naming: live's click at
-  (30, 35, 2) hit JrS = Flange 1's outer wall (30, -2, 14.5); ours the plate. Tell psui with the next report.
+- live2: arc midpoints (21:46); identity tracking through a sheet boolean (22:02: live labels bend 1 and the corner
+  vertices (60, -2, 4) / (60, 0, 4) after Flange 1, ours after Sheet metal model 1 because our tracking follows the
+  plate edge to the merged bend edge, so std's assignSMAttributesToNewOrSplitEntities keeps its old association).
+- psui (4d0a82b2-8fc7-43e6-b45d-bd8cb225741e): told 20:3x the tab row is a pick difference (live hit Flange 1's wall).
+- dx: cf-spur-gear's per-host Sketch 2 failure = the near-singular sketch 62893b1ed takes back (told 21:3x).
 - Not mine (handed): knife / impeller geometry (core); fan-blade Boolean 2, gamma / wire-clip Boolean 2, shaped-flange
   Booleans, surface-pattern sphere cuts (bool); setback fillet (blend); hex-bookcase mesh Uses (dx).
-
-## Sheet metal labels (live2 16:27 answer, live/skasm-q1627/)
-- Live's rule: a face / vertex reads "… of <the feature that FIRST created its sheet metal definition entity>" (not
-  the last to modify it). sm-box at (c): plate faces Sheet metal model 1, Flange 1's wall + bend 1 Flange 1, bend 2
-  Flange 2, the 4 mm² corner face at (59, -1, 4) Flange 1, vertices (60, -2, 4) / (60, 0, 4) Flange 1.
-- Ours: the corner face is named Flange 2 (fresh in Flange 2), and a vertex reads its faces' latest creator
-  (part-studio-ui part_studio/mod.rs labeler), which includes bend 2's cylinder, so "Vertex of Flange 2".
-- Plan (no persistent names change): every part entity carries its definition entity's SMAssociationAttribute,
-  whose attributeId is a transient id ("JAB": a base-26 count running on across the regeneration's features). Record
-  each custom feature's transient base in Context (host/mod.rs where transient_base is set), decode the attributeId to
-  the feature that handed it out, store entity name -> that feature on SheetMetalData (serde default), and have the
-  labeler use it for sheet metal faces, edges and vertices.
 
 ## Open questions (none blocking)
 - s236 (fuzz probes 11): live solves three linked quads at once; per-case placement rules don't converge. Decision
@@ -46,8 +36,10 @@ only when a line here points there).
   Flange 1 … Mirror 1): needs a contact rule, not an area check.
 
 ## Next, in order
-1. Sheet metal labels (plan above): psui's bend-relief-* (5 takes) and tab rows.
-2. 8020 sections from live2's 19:56 capture.
+1. The tracking answer (22:02): if Onshape's tracking drops a merged edge, make ours do the same (custom host query.rs
+   tracking), check the 8 sheet metal suite documents + T2s, and restore the corner-vertex asserts in
+   sheetmetal_std::sheet_metal_entities_are_labelled_after_their_definition_entitys_feature.
+2. 8020 sections when the midpoints land (above).
 3. Knife's own sketch rows: Sketch 17's Concentric is on a co-edge query whose edge is a spline (a near-circle,
    r 2.5) and whose face JiS is a cylinder about Y (the Front sketch's normal): live is concentric with the
    cylinder; ours rejects (needs a cylinder-axis reference). Sketch 12's 5 Uses (blade B-splines), Ic / Id; PIERCE
