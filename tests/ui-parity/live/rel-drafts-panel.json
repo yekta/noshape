@@ -1,6 +1,6 @@
 {
  "scenario": "rel-drafts-panel",
- "recorded": "2026-11-15T01:01:54.619Z",
+ "recorded": "2026-11-15T03:36:01.254Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -8,12 +8,12 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "5eaf7133e568fc097efad407",
-  "workspace": "cc332b4291cef5d4a9f45b5c",
-  "element": "60410cd454fe7d8542f68997",
+  "document": "7d45e67acbf5b305d58ded42",
+  "workspace": "269113b08525bdc0f073280c",
+  "element": "8a45a37ffe89e5af981991a2",
   "start": "doc-versions",
-  "startElement": "60410cd454fe7d8542f68997",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "8a45a37ffe89e5af981991a2",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -289,7 +289,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 28025
+   "t": 26513
   },
   {
    "step": 2,
@@ -432,7 +432,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 31912
+   "t": 29644
   },
   {
    "step": 3,
@@ -610,7 +610,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 39272
+   "t": 36452
   },
   {
    "step": 4,
@@ -799,23 +799,23 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 41850
+   "t": 38565
   },
   {
    "step": 5,
    "do": {
     "do": "type",
-    "text": "PN-0009"
+    "text": "PN-0335D"
    },
    "ok": true,
    "state": {
     "focus": {
      "kind": "other",
      "tag": "input",
-     "text": "PN-0009",
+     "text": "PN-0335D",
      "selection": [
-      7,
-      7
+      8,
+      8
      ],
      "all": false
     },
@@ -836,7 +836,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0009"
+       "value": "PN-0335D"
       },
       {
        "label": "Release name *",
@@ -982,7 +982,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 44720
+   "t": 41172
   },
   {
    "step": 6,
@@ -1025,7 +1025,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0009"
+       "value": "PN-0335D"
       },
       {
        "label": "Release name *",
@@ -1171,7 +1171,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 47309
+   "t": 43367
   },
   {
    "step": 7,
@@ -1208,7 +1208,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0009"
+       "value": "PN-0335D"
       },
       {
        "label": "Release name *",
@@ -1354,7 +1354,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 49782
+   "t": 45363
   },
   {
    "step": 8,
@@ -1397,7 +1397,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0009"
+       "value": "PN-0335D"
       },
       {
        "label": "Release name *",
@@ -1543,7 +1543,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 52447
+   "t": 47538
   },
   {
    "step": 9,
@@ -1580,7 +1580,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0009"
+       "value": "PN-0335D"
       },
       {
        "label": "Release name *",
@@ -1726,7 +1726,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 56046
+   "t": 50643
   },
   {
    "step": 10,
@@ -1858,7 +1858,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 60153
+   "t": 52871
   },
   {
    "step": 11,
@@ -1884,7 +1884,7 @@
      {
       "id": "release-drafts",
       "title": "Release drafts",
-      "text": "Release drafts / R1 / by Loopelf Loopelf 1:02 AM Today / Double click to open a draft"
+      "text": "Release drafts / R1 / by Loopelf Loopelf 3:36 AM Today / Double click to open a draft"
      }
     ],
     "list": null,
@@ -1997,7 +1997,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 63360
+   "t": 56923
   },
   {
    "step": 12,
@@ -2033,7 +2033,7 @@
      {
       "id": "release-drafts",
       "title": "Release drafts",
-      "text": "Release drafts / R1 / by Loopelf Loopelf 1:02 AM Today / Double click to open a draft"
+      "text": "Release drafts / R1 / by Loopelf Loopelf 3:36 AM Today / Double click to open a draft"
      }
     ],
     "list": null,
@@ -2146,7 +2146,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 66024
+   "t": 59216
   },
   {
    "step": 13,
@@ -2178,7 +2178,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0009"
+       "value": "PN-0335D"
       },
       {
        "label": "Release name *",
@@ -2218,7 +2218,7 @@
      {
       "id": "release-drafts",
       "title": "Release drafts",
-      "text": "Release drafts / R1 / by Loopelf Loopelf 1:02 AM Today / Double click to open a draft"
+      "text": "Release drafts / R1 / by Loopelf Loopelf 3:36 AM Today / Double click to open a draft"
      }
     ],
     "list": null,
@@ -2331,7 +2331,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 78272
+   "t": 71968
   },
   {
    "step": 14,
@@ -2368,7 +2368,7 @@
       {
        "label": "*",
        "kind": "input",
-       "value": "PN-0009"
+       "value": "PN-0335D"
       },
       {
        "label": "Release name *",
@@ -2408,7 +2408,7 @@
      {
       "id": "release-drafts",
       "title": "Release drafts",
-      "text": "Release drafts / R1 / by Loopelf Loopelf 1:02 AM Today / Double click to open a draft"
+      "text": "Release drafts / R1 / by Loopelf Loopelf 3:36 AM Today / Double click to open a draft"
      }
     ],
     "list": {
@@ -2529,7 +2529,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 80902
+   "t": 74119
   },
   {
    "step": 15,
@@ -2552,43 +2552,7 @@
     "dialog": {
      "kind": "modal",
      "title": "Delete release candidate draft?",
-     "fields": [
-      {
-       "label": null,
-       "kind": "input",
-       "value": ""
-      },
-      {
-       "label": "*",
-       "kind": "input",
-       "value": "A"
-      },
-      {
-       "label": "*",
-       "kind": "input",
-       "value": "PN-0009"
-      },
-      {
-       "label": "Release name *",
-       "kind": "input",
-       "value": "R1"
-      },
-      {
-       "label": "Release notes *",
-       "kind": "input",
-       "value": "First release"
-      },
-      {
-       "label": "Approvers",
-       "kind": "input",
-       "value": ""
-      },
-      {
-       "label": "Observers",
-       "kind": "input",
-       "value": ""
-      }
-     ],
+     "fields": [],
      "buttons": [
       "Delete",
       "Cancel"
@@ -2600,7 +2564,7 @@
      {
       "id": "release-drafts",
       "title": "Release drafts",
-      "text": "Release drafts / R1 / by Loopelf Loopelf 1:02 AM Today / Double click to open a draft"
+      "text": "Release drafts / R1 / by Loopelf Loopelf 3:36 AM Today / Double click to open a draft"
      }
     ],
     "list": null,
@@ -2713,7 +2677,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 84456
+   "t": 77143
   }
  ]
 }
