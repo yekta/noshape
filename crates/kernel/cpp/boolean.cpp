@@ -1495,6 +1495,9 @@ struct ChangeKey
   bool operator==(const ChangeKey& o) const { return old == o.old && made == o.made; }
 };
 
+// The surfaces share_mirrored_extrusions made this thread's last call for pieces of one spline.
+thread_local std::vector<occ::handle<Geom_Surface>> t_joined_pieces;
+
 std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, const std::vector<TopoDS_Shape>& image,
                                         const std::vector<FaceShare>& share, const TopoDS_Shape& out, double diag,
                                         std::optional<std::pair<ChangeKey, double>>* memo = nullptr)
@@ -1556,7 +1559,32 @@ std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, con
     if (*memo && (*memo)->first == key)
       return (*memo)->second;
   }
+  // Faces merged on a surface share_mirrored_extrusions made for pieces of one extruded spline: the volume is the same
+  // there, and their integrals would only add the rule's error (c2-impeller-loft's Boolean 1: 1.8e-12 m³, past 1e-9 of
+  // its box). (Not any surface: merges on others the check rejects are ones live doesn't make, cf-surface-pattern's
+  // Surface Pattern 3.)
+  auto one_surface = [](const TopoDS_Shape& f, const std::vector<TopoDS_Shape>& others) {
+    TopLoc_Location                 l;
+    const occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(f), l);
+    if (g.IsNull() || std::none_of(t_joined_pieces.begin(), t_joined_pieces.end(), [&](const occ::handle<Geom_Surface>& j) { return j == g; }))
+      return false;
+    for (const TopoDS_Shape& o : others)
+    {
+      TopLoc_Location lo;
+      if (BRep_Tool::Surface(TopoDS::Face(o), lo) == g && lo.IsEqual(l))
+        return true;
+    }
+    return false;
+  };
+  std::vector<TopoDS_Shape> before_left, after_left;
   for (const TopoDS_Shape& f : before)
+    if (!one_surface(f, after))
+      before_left.push_back(f);
+  for (const TopoDS_Shape& f : after)
+    if (!one_surface(f, before))
+      after_left.push_back(f);
+  after = std::move(after_left);
+  for (const TopoDS_Shape& f : before_left)
     after.push_back(f.Reversed());
   const double change = faces_volume(without_cancelling_planes(after, diag));
   if (memo != nullptr)
@@ -3669,6 +3697,7 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
 // isn't valid.
 TopoDS_Shape share_mirrored_extrusions(const TopoDS_Shape& s, HHist& hist)
 {
+  t_joined_pieces.clear();
   ShapeAncMap ef;
   unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
   occ::handle<BRepTools_ReShape>                         rs = new BRepTools_ReShape;
@@ -3695,68 +3724,148 @@ TopoDS_Shape share_mirrored_extrusions(const TopoDS_Shape& s, HHist& hist)
     const double k = ea->Direction().Dot(eb->Direction()) > 0 ? 1.0 : -1.0;
     double       u0, u1, v0, v1;
     BRepTools::UVBounds(b, u0, u1, v0, v1);
-    const double c = gp_Vec(ea->BasisCurve()->Value((u0 + u1) / 2), eb->BasisCurve()->Value((u0 + u1) / 2)).Dot(gp_Vec(ea->Direction()));
     Bnd_Box box;
     BRepBndLib::Add(b, box);
-    const double tol  = 1e-9 * std::max(1.0, std::sqrt(box.SquareExtent()));
-    bool         same = true;
-    for (int iu = 0; iu <= 8 && same; ++iu)
-      for (int iv = 0; iv <= 2 && same; ++iv)
+    const double tol = 1e-9 * std::max(1.0, std::sqrt(box.SquareExtent()));
+    // b's u on a's curve, u_a = sigma u_b + tau: the same (sigma 1, tau 0), or pieces of one curve meeting at an end
+    // of each, run the same way or the other (c2-impeller-loft's spline split between two extrudes, its mirror's
+    // piece reversed; live one face).
+    const occ::handle<Geom_Curve>& ca = ea->BasisCurve();
+    const double                   fa_ = ca->FirstParameter(), la_ = ca->LastParameter();
+    double                         sigma = 0, tau = 0, c = 0;
+    const std::array<std::pair<double, double>, 9> tries{{{1, 0}, {1, fa_ - u0}, {1, fa_ - u1}, {1, la_ - u0}, {1, la_ - u1}, {-1, fa_ + u0}, {-1, fa_ + u1}, {-1, la_ + u0}, {-1, la_ + u1}}};
+    for (const auto& [sg, tu] : tries)
+    {
+      const double cc = gp_Vec(ca->Value(tu + sg * (u0 + u1) / 2), eb->BasisCurve()->Value((u0 + u1) / 2)).Dot(gp_Vec(ea->Direction()));
+      bool         same = true;
+      for (int iu = 0; iu <= 8 && same; ++iu)
+        for (int iv = 0; iv <= 2 && same; ++iv)
+        {
+          const double u = u0 + (u1 - u0) * iu / 8, v = v0 + (v1 - v0) * iv / 2;
+          same = eb->Value(u, v).Distance(ea->Value(tu + sg * u, k * v + cc)) <= tol;
+        }
+      if (same)
       {
-        const double u = u0 + (u1 - u0) * iu / 8, v = v0 + (v1 - v0) * iv / 2;
-        same = eb->Value(u, v).Distance(ea->Value(u, k * v + c)) <= tol;
+        sigma = sg;
+        tau   = tu;
+        c     = cc;
+        break;
       }
+    }
     bool closed = false;
     for (TopExp_Explorer x(b, TopAbs_EDGE); x.More() && !closed; x.Next())
       closed = BRep_Tool::IsClosed(TopoDS::Edge(x.Current()), b);
-    if (!same || closed)
+    if (sigma == 0 || closed)
       continue;
-    gp_Trsf2d t;
-    if (k > 0)
-      t.SetTranslation(gp_Vec2d(0, c));
-    else
-      t.SetMirror(gp_Ax2d(gp_Pnt2d(0, c / 2), gp_Dir2d(1, 0)));
-    const occ::handle<Geom_Surface>& ga = raw_a;
-    // (In b's own frame: the reshape puts it where b's occurrence is.)
-    const TopLoc_Location            to_b = b.Location().Inverted();
-    TopoDS_Face                      F;
-    B.MakeFace(F, ga, to_b * la, BRep_Tool::Tolerance(b));
-    const TopoDS_Face bf = TopoDS::Face(b.Oriented(TopAbs_FORWARD));
-    bool              ok = true;
-    for (TopoDS_Iterator w(bf); w.More() && ok; w.Next())
+    // b's range on a's curve; past its ends (pieces of one curve, each the extruded face of its own): one surface on
+    // the two curves joined, both faces made again on it.
+    const double lo = std::min(tau + sigma * u0, tau + sigma * u1), hi = std::max(tau + sigma * u0, tau + sigma * u1);
+    const double pt = 1e-9 * std::max(1.0, la_ - fa_);
+    occ::handle<Geom_Surface> ga = raw_a;
+    const bool                inside = lo >= fa_ - pt && hi <= la_ + pt;
+    if (!inside)
     {
-      std::vector<TopoDS_Edge> es;
-      for (TopExp_Explorer x(w.Value(), TopAbs_EDGE); x.More(); x.Next())
+      const auto ba = occ::down_cast<Geom_BSplineCurve>(ca), bb = occ::down_cast<Geom_BSplineCurve>(eb->BasisCurve());
+      if (ba.IsNull() || bb.IsNull())
+        continue;
+      // b's curve as a piece of a's: reversed for sigma -1, its knots moved onto a's parameter, moved along the
+      // direction onto a's curve.
+      occ::handle<Geom_BSplineCurve> piece = occ::down_cast<Geom_BSplineCurve>(bb->Copy());
+      if (sigma < 0)
+        piece->Reverse();
+      const double d = sigma > 0 ? tau : tau - (bb->FirstParameter() + bb->LastParameter());
+      if (d != 0)
       {
-        const TopoDS_Edge e = TopoDS::Edge(x.Current());
-        double            f0, f1;
-        const auto        pc = BRep_Tool::CurveOnSurface(e, bf, f0, f1);
-        if (pc.IsNull())
-        {
-          ok = false;
-          break;
-        }
-        double g0, g1;
-        if (BRep_Tool::CurveOnSurface(e, ga, la, g0, g1).IsNull())
-        {
-          B.UpdateEdge(e, occ::down_cast<Geom2d_Curve>(pc->Transformed(t)), ga, la, BRep_Tool::Tolerance(e));
-          B.Range(e, ga, la, f0, f1);
-        }
-        const TopoDS_Edge here = TopoDS::Edge(e.Moved(to_b));
-        es.push_back(k > 0 ? here : TopoDS::Edge(here.Reversed()));
+        NCollection_Array1<double> knots(1, piece->NbKnots());
+        piece->Knots(knots);
+        for (int q = knots.Lower(); q <= knots.Upper(); ++q)
+          knots(q) += d;
+        piece->SetKnots(knots);
       }
-      if (k < 0)
-        std::reverse(es.begin(), es.end());
-      TopoDS_Wire W;
-      B.MakeWire(W);
-      for (const TopoDS_Edge& e : es)
-        B.Add(W, e);
-      W.Closed(BRep_Tool::IsClosed(W));
-      B.Add(F, W);
+      piece->Translate(gp_Vec(ea->Direction()) * -c);
+      occ::handle<Geom_BSplineCurve> joined;
+      if (std::abs(piece->LastParameter() - ba->FirstParameter()) <= pt && piece->EndPoint().Distance(ba->StartPoint()) <= tol)
+        joined = concat_shifted<Geom_BSplineCurve, gp_Pnt, NCollection_Array1<gp_Pnt>>(piece, ba);
+      else if (std::abs(ba->LastParameter() - piece->FirstParameter()) <= pt && ba->EndPoint().Distance(piece->StartPoint()) <= tol)
+        joined = concat_shifted<Geom_BSplineCurve, gp_Pnt, NCollection_Array1<gp_Pnt>>(ba, piece);
+      if (joined.IsNull())
+        continue;
+      // (Pieces of one spline join inside a span of it: the knot between them goes. Copies of a curve end to end (a
+      // pattern's arcs, cf-surface-pattern's Surface Pattern 3, live faces apart) keep it.)
+      int at = 0;
+      for (int q = 2; q < joined->NbKnots() && at == 0; ++q)
+        if (std::abs(joined->Knot(q) - (piece->LastParameter() <= ba->FirstParameter() + pt ? ba->FirstParameter() : ba->LastParameter())) <= pt)
+          at = q;
+      if (at == 0 || !joined->RemoveKnot(at, 0, tol))
+        continue;
+      ga = new Geom_SurfaceOfLinearExtrusion(joined, ea->Direction());
+      t_joined_pieces.push_back(ga);
     }
-    if (!ok)
+    // `f` made again on ga (where a is) with its curves mapped by t, turned over where t does.
+    auto remade = [&](const TopoDS_Face& f, const gp_Trsf2d& t, bool flip) -> TopoDS_Shape {
+      const TopLoc_Location to_f = f.Location().Inverted();
+      TopoDS_Face           F;
+      B.MakeFace(F, ga, to_f * la, BRep_Tool::Tolerance(f));
+      const TopoDS_Face ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+      for (TopoDS_Iterator w(ff); w.More(); w.Next())
+      {
+        std::vector<TopoDS_Edge> es;
+        for (TopExp_Explorer x(w.Value(), TopAbs_EDGE); x.More(); x.Next())
+        {
+          const TopoDS_Edge e = TopoDS::Edge(x.Current());
+          double            f0, f1;
+          const auto        pc = BRep_Tool::CurveOnSurface(e, ff, f0, f1);
+          if (pc.IsNull())
+            return TopoDS_Shape();
+          double g0, g1;
+          if (BRep_Tool::CurveOnSurface(e, ga, la, g0, g1).IsNull())
+          {
+            B.UpdateEdge(e, occ::down_cast<Geom2d_Curve>(pc->Transformed(t)), ga, la, BRep_Tool::Tolerance(e));
+            B.Range(e, ga, la, f0, f1);
+          }
+          const TopoDS_Edge here = TopoDS::Edge(e.Moved(to_f));
+          es.push_back(flip ? TopoDS::Edge(here.Reversed()) : here);
+        }
+        if (flip)
+          std::reverse(es.begin(), es.end());
+        TopoDS_Wire W;
+        B.MakeWire(W);
+        for (const TopoDS_Edge& e : es)
+          B.Add(W, e);
+        W.Closed(BRep_Tool::IsClosed(W));
+        B.Add(F, W);
+      }
+      return flip ? F.Reversed() : TopoDS_Shape(F);
+    };
+    const TopoDS_Shape fa = inside ? TopoDS_Shape() : remade(TopoDS::Face(a), gp_Trsf2d(), false);
+    if (!inside && fa.IsNull())
       continue;
-    rs->Replace(bf, k > 0 ? TopoDS_Shape(F) : F.Reversed());
+    // b's (u, v) to a's (sigma u + tau, k v + c).
+    gp_Trsf2d t;
+    if (sigma > 0 && k > 0)
+      t.SetTranslation(gp_Vec2d(tau, c));
+    else if (sigma > 0)
+    {
+      gp_Trsf2d m;
+      m.SetMirror(gp_Ax2d(gp_Pnt2d(0, c / 2), gp_Dir2d(1, 0)));
+      t.SetTranslation(gp_Vec2d(tau, 0));
+      t.Multiply(m);
+    }
+    else if (k < 0)
+      t.SetMirror(gp_Pnt2d(tau / 2, c / 2));
+    else
+    {
+      gp_Trsf2d m;
+      m.SetMirror(gp_Ax2d(gp_Pnt2d(tau / 2, 0), gp_Dir2d(0, 1)));
+      t.SetTranslation(gp_Vec2d(0, c));
+      t.Multiply(m);
+    }
+    const TopoDS_Shape fb = remade(TopoDS::Face(b), t, sigma * k < 0);
+    if (fb.IsNull())
+      continue;
+    if (!inside)
+      rs->Replace(TopoDS::Face(a.Oriented(TopAbs_FORWARD)), fa);
+    rs->Replace(TopoDS::Face(b.Oriented(TopAbs_FORWARD)), fb);
     moved.Add(a);
     moved.Add(b);
   }

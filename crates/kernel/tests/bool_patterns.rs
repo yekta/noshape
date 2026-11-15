@@ -2649,3 +2649,20 @@ fn mirrored_halves_sharing_a_circle_fuse_as_occt() {
     let v = r.volume().unwrap() * 1e9;
     assert!((v - 94_807.060968).abs() <= 1e-4, "volume {v} mm³, OCCT's 94,807.060968");
 }
+
+/// c2-impeller-loft's Boolean 1 (recorded a1af84e6): the stern tube's two 0.31 mm strips and Part 3's two sides are
+/// extruded from pieces of one sketch spline (and of its mirror), the tube one way and Part 3 the other. The unify after
+/// the fuse makes each strip one face with its side, as live's (q2985b: JdK / JdG): two faces extruded along x, not
+/// four.
+#[test]
+fn unify_merges_faces_extruded_from_pieces_of_one_spline() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "a1af84e65cf472ea").expect("the recorded case");
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("the fuse").shape;
+    let u = k::unify_same_domain(&r).expect("the unify").shape;
+    assert!(u.is_valid());
+    let along_x = |s: &k::Shape| s.faces().iter().filter(|f| matches!(f.face_surface(), Ok(k::Surface::Extrusion { direction }) if direction.x.abs() > 1.0 - 1e-9)).count();
+    assert_eq!(along_x(&r), 4);
+    assert_eq!(along_x(&u), 2);
+}
