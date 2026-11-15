@@ -640,6 +640,42 @@ bool unify_local_on()
 // ShapeUpgrade_UnifySameDomain could change anything. Linear in the shape;
 // unifying a shape it would leave unchanged costs seconds on large results
 // (a part with 1000 patterned ribs: 14 s). With a scope: only there.
+// Whether a B-spline surface's poles lie well off one plane, so the surface can't be planar (a planar one has all its
+// poles in its plane): OCCT's planarity check samples the surface (c2-hunting-knife's lofted faces, 12 ms a unify).
+bool poles_off_plane(const occ::handle<Geom_Surface>& g)
+{
+  const occ::handle<Geom_BSplineSurface> b = occ::down_cast<Geom_BSplineSurface>(g);
+  if (b.IsNull())
+    return false;
+  const NCollection_Array2<gp_Pnt>& p = b->Poles();
+  const gp_Pnt                      p0 = p(p.LowerRow(), p.LowerCol());
+  gp_Pnt                            p1 = p0;
+  for (int i = p.LowerRow(); i <= p.UpperRow(); ++i)
+    for (int j = p.LowerCol(); j <= p.UpperCol(); ++j)
+      if (p0.SquareDistance(p(i, j)) > p0.SquareDistance(p1))
+        p1 = p(i, j);
+  const gp_Vec a(p0, p1);
+  const double size = a.Magnitude();
+  if (size < 1e-9)
+    return false;
+  gp_Vec n;
+  for (int i = p.LowerRow(); i <= p.UpperRow(); ++i)
+    for (int j = p.LowerCol(); j <= p.UpperCol(); ++j)
+    {
+      const gp_Vec c = a.Crossed(gp_Vec(p0, p(i, j)));
+      if (c.SquareMagnitude() > n.SquareMagnitude())
+        n = c;
+    }
+  if (n.Magnitude() < 1e-3 * size * size)
+    return false;
+  n.Normalize();
+  for (int i = p.LowerRow(); i <= p.UpperRow(); ++i)
+    for (int j = p.LowerCol(); j <= p.UpperCol(); ++j)
+      if (std::abs(gp_Vec(p0, p(i, j)).Dot(n)) > std::max(1e-3 * size, 1e-4))
+        return true;
+  return false;
+}
+
 bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullptr)
 {
   const TopoDS_Shape& where = sc != nullptr ? TopoDS_Shape(sc->faces) : s;
@@ -658,7 +694,7 @@ bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullpt
   auto planar = [&](const occ::handle<Geom_Surface>& g) {
     if (const bool* known = planarity.Seek(g.get()))
       return *known;
-    const bool r = GeomLib_IsPlanarSurface(g, Precision::Confusion()).IsPlanar();
+    const bool r = !poles_off_plane(g) && GeomLib_IsPlanarSurface(g, Precision::Confusion()).IsPlanar();
     planarity.Bind(g.get(), r);
     return r;
   };
@@ -5554,7 +5590,8 @@ TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScop
   const TopoDS_Shape s = merge_planar(s0, hist, sc, &next);
   fail_if_cancelled();
   lap                  = std::make_unique<KernelTimer>("unify.candidates_again");
-  if (!same_domain_candidates(s, sc != nullptr ? &next : nullptr))
+  // (Not again on the same shape: c2-hunting-knife's Fillet 8, 15 ms.)
+  if (!(sc == nullptr && s.IsSame(s0)) && !same_domain_candidates(s, sc != nullptr ? &next : nullptr))
   {
     if (sc != nullptr)
       check_scoped_unify(s0, s);
