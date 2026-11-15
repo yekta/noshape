@@ -688,6 +688,9 @@ pub struct Context {
     /// The studio's part patterns' Add with a merge scope leaves the seeds apart
     /// ([`crate::partstudio::PartStudio::legacy_pattern_seeds`]).
     pub legacy_pattern_seeds: bool,
+    /// The studio's part patterns' Remove and Intersect leave the seeds as they are
+    /// ([`crate::partstudio::PartStudio::legacy_remove_seeds`]).
+    pub legacy_remove_seeds: bool,
     pub bodies: Bodies,
     pub sketches: Vec<Arc<SketchResult>>,
     /// Sketches a Derived feature brought in from its source: (the Derived
@@ -879,6 +882,7 @@ impl Context {
             legacy_plane_sketch_frames,
             legacy_edge_directions,
             legacy_pattern_seeds,
+            legacy_remove_seeds,
             bodies: _,
             sketches,
             derived_sketches,
@@ -921,6 +925,7 @@ impl Context {
             && *legacy_plane_sketch_frames == o.legacy_plane_sketch_frames
             && *legacy_edge_directions == o.legacy_edge_directions
             && *legacy_pattern_seeds == o.legacy_pattern_seeds
+            && *legacy_remove_seeds == o.legacy_remove_seeds
             && same_arcs(sketches, &o.sketches)
             && *derived_sketches == o.derived_sketches
             && *sketch_copies == o.sketch_copies

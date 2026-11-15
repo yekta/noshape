@@ -624,6 +624,19 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
         }
         s => s,
     };
+    // A Remove's or an Intersect's seeds too, used up with the copies (dx's 1dc32b Circular pattern 6: live's pocket
+    // where the seed was, Sketch 10 on its floor); not a Mirror's (std patternUtils: its seed only joins an Add); kept
+    // in studios saved before (ScopeRule 17).
+    let scope = if (op == "REMOVE" || op == "INTERSECT") && !ev.ctx.legacy_remove_seeds && verb(ev) == "pattern" {
+        let in_scope = |i: usize| scope.as_ref().is_some_and(|sc: &Vec<usize>| sc.contains(&i));
+        let seeds: Vec<Arc<Body>> = bodies.iter().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Solid && !in_scope(i)).map(|i| ev.ctx.bodies[i].clone()).collect();
+        let targets: Option<Vec<BodyId>> = scope.as_ref().map(|sc| sc.iter().map(|&i| ev.ctx.bodies[i].id.clone()).collect());
+        remove_bodies(ev, &seeds.iter().map(|b| b.id.clone()).collect::<Vec<_>>());
+        tools.extend(seeds.iter().map(|b| body_named(b)));
+        targets.map(|ts| ts.iter().filter_map(|id| index_of_body(ev, id)).collect())
+    } else {
+        scope
+    };
     // std (subfeatureToolsTargets): an Add with nothing in its merge scope unions the instances with the seed.
     let scope = if op == "ADD" && scope.is_none() { Some(bodies.iter().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Solid).collect()) } else { scope };
     ev.apply_operation(tools, &op, scope, BodyKind::Solid)

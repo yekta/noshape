@@ -3346,6 +3346,34 @@ fn feature_mirror_of_a_side_wall_pocket_lands_on_the_opposite_wall() {
     assert_eq!(b.count(noshape_kernel::ShapeType::Face), 10);
 }
 
+/// dx's 1dc32b Circular pattern 6 (live: a Remove pattern's seed part is gone, its own pocket in the part beside the
+/// copies', std subfeatureToolsTargets): a 40 × 20 × 10 block and a 4 × 4 × 10 pin standing in it, patterned 3 × 10 mm
+/// with Remove into the block: one part, 8000 − 3 × 160 mm³. Saved before (legacy_remove_seeds), the pin stays and only
+/// its two copies cut.
+#[test]
+fn part_pattern_remove_uses_its_seed_up_too() {
+    for legacy in [false, true] {
+        let mut t = T::new();
+        t.ps.legacy_remove_seeds = legacy;
+        let base = t.block(40.0, 20.0, 10.0);
+        let mut sk = noshape_sketch::Sketch::new();
+        let pts: Vec<_> = [(3.0, 8.0), (7.0, 8.0), (7.0, 12.0), (3.0, 12.0)].iter().map(|(a, b)| sk.add_point(DVec2::new(a * 1e-3, b * 1e-3))).collect();
+        for i in 0..4 {
+            sk.add_line_between(pts[i], pts[(i + 1) % 4]).unwrap();
+        }
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+        let pin = t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+        let part = |feature: FeatureId| Reference::Body(noshape_model::reference::BodyId { feature, index: 0 });
+        let p = t.add("linearPattern", &[("patternType", en("PART")), ("entities", q(vec![part(pin)])), ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])), ("distance", e("10 mm")), ("instanceCount", e("3")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(false)), ("booleanScope", q(vec![part(base)]))]);
+        let r = t.ok(p);
+        let solids: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap() * 1e9).collect();
+        let want = if legacy { vec![8000.0 - 2.0 * 160.0, 160.0] } else { vec![8000.0 - 3.0 * 160.0] };
+        assert!(solids.len() == want.len() && solids.iter().zip(&want).all(|(a, b)| (a - b).abs() < 1e-6), "legacy {legacy}: {solids:?}");
+    }
+}
+
 /// asm-scissor-lift's Mirror 6 (live: the base, both blocks and both mirrors one part of 483192 mm³): a part mirror with
 /// Add and a merge scope takes its seeds into the merge too (std subfeatureToolsTargets). A 40 × 20 × 5 base with two
 /// 5 × 5 × 5 blocks standing on it, mirrored across its middle: one part, 4000 + 4 × 125 mm³. Saved before
