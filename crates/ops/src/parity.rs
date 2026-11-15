@@ -4951,6 +4951,8 @@ impl<'a> Translator<'a> {
                 "CURVATURE" => "curvature",
                 // A point at an ellipse's axis end: inferred when ours was drawn there (kept), else on the ellipse.
                 "QUADRANT" => "quadrant",
+                // A point where model geometry or another sketch's curve crosses the sketch plane.
+                "PIERCE" => "pierce",
                 // Dimensions: `dimensions`.
                 "DISTANCE" | "LENGTH" | "DIAMETER" | "RADIUS" | "ANGLE" | "CENTERLINE_DIMENSION" | "MAJOR_DIAMETER" | "MINOR_DIAMETER" => continue,
                 "OFFSET" => {
@@ -4996,6 +4998,7 @@ impl<'a> Translator<'a> {
             let order: &[&str] = match ours {
                 "symmetric" => &["localFirst", "localSecond", "localMirror"],
                 "midpoint" => &["localFirst", "localEntity1", "localSecond", "localEntity2", "localMidpoint"],
+                "pierce" => &["localEntity"],
                 _ => &["localFirst", "localSecond"],
             };
             let mut entities: Vec<String> = Vec::new();

@@ -962,7 +962,7 @@ impl PartStudioView {
                         if matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_))
                             || matches!(&r, Reference::SketchEntity { sketch, .. } if Some(*sketch) != self.sketch.as_ref().map(|s| s.feature)) =>
                     {
-                        let pierce = t == Tool::Constraint(ConstraintTool::Pierce) && matches!(r, Reference::Edge(_));
+                        let pierce = t == Tool::Constraint(ConstraintTool::Pierce) && matches!(r, Reference::Edge(_) | Reference::SketchEntity { .. });
                         // Mirror: only the mirror line may be model geometry.
                         if t == Tool::Mirror && self.sketch.as_ref().is_some_and(|s| s.has_mirror_axis()) { None } else { self.external_entity(&r, pierce, true, cx) }
                     }

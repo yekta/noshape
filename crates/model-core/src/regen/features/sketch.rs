@@ -543,31 +543,44 @@ pub fn project_edge_any(edge: &noshape_kernel::Shape, frame: &crate::display::Pl
     resample(&pl, SECTION_SAMPLES).map(SectionCurve::Sampled)
 }
 
-/// Where an edge crosses the sketch plane (Pierce).
+/// Where an edge crosses the sketch plane (Pierce): bracketed on samples along the curve, then halved down on the curve
+/// itself (exact on an arc, not on a chord of its tessellation).
 pub fn pierce_point(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneFrame) -> Option<glam::DVec2> {
     use glam::DVec3;
-    let t = noshape_kernel::tessellate(edge, 1e-6, 0.02, false).ok()?;
-    if t.edges.is_empty() {
-        return None;
-    }
-    let pts: Vec<DVec3> = t.edge_polyline(0).iter().map(|v| DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64)).collect();
+    const SAMPLES: usize = 64;
+    let info = edge.edge_info().ok()?;
     let h = |p: DVec3| (p - frame.origin).dot(frame.normal);
+    let at = |t: f64| edge.point_at(t).ok();
+    let (t0, t1) = (info.first_param, info.last_param);
     let mut best: Option<(f64, DVec3)> = None;
-    for w in pts.windows(2) {
-        let (a, b) = (h(w[0]), h(w[1]));
-        if a * b <= 0.0 && (a - b).abs() > 1e-15 {
-            let p = w[0] + (w[1] - w[0]) * (a / (a - b));
-            return Some(frame.to_local(p));
+    let mut prev: Option<(f64, f64)> = None;
+    for i in 0..=SAMPLES {
+        let t = t0 + (t1 - t0) * i as f64 / SAMPLES as f64;
+        let p = at(t)?;
+        let v = h(p);
+        if best.is_none_or(|b| v.abs() < b.0) {
+            best = Some((v.abs(), p));
         }
-        let d = a.abs().min(b.abs());
-        if best.is_none_or(|bb| d < bb.0) {
-            best = Some((d, if a.abs() < b.abs() { w[0] } else { w[1] }));
+        if let Some((ta, va)) = prev
+            && va * v <= 0.0
+            && (va - v).abs() > 1e-15
+        {
+            let (mut lo, mut hi, mut vlo) = (ta, t, va);
+            for _ in 0..80 {
+                let m = 0.5 * (lo + hi);
+                let vm = h(at(m)?);
+                if vlo * vm <= 0.0 {
+                    hi = m;
+                } else {
+                    (lo, vlo) = (m, vm);
+                }
+            }
+            return Some(frame.to_local(at(0.5 * (lo + hi))?));
         }
+        prev = Some((t, v));
     }
     // Lines (straight edges) extended to the plane.
-    if let Ok(info) = edge.edge_info()
-        && let noshape_kernel::Curve::Line { .. } = info.curve
-    {
+    if let noshape_kernel::Curve::Line { .. } = info.curve {
         let d = info.end - info.start;
         let den = d.dot(frame.normal);
         if den.abs() > 1e-12 {

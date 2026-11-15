@@ -2713,6 +2713,35 @@ fn a_new_frame_is_an_8020_1001() {
     assert_eq!(cap["feature_status"]["message"], "Only frame segments with one internal profile can be capped.", "{cap}");
 }
 
+/// Pierce to another sketch's curve (c2-hunting-knife's Sketch 13: a point pierced by Sketch 12's line): the point goes
+/// where the curve crosses the sketch plane, not onto the curve's edge-on trace.
+#[test]
+fn a_point_pierces_another_sketchs_curve() {
+    let mut ctx = Ctx::new();
+    let s1 = new_sketch(&mut ctx, "pierce-sketch.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": s1, "tool": "line", "points": [[10, -20], [10, 20]] }));
+    let line = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "line").unwrap_or_else(|| panic!("{r}"))["id"].clone();
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }))["sketch"].as_str().unwrap().to_string();
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": [[3, 7]] }));
+    let pt = p["created"].as_array().unwrap().iter().find(|e| e["type"] == "point").unwrap_or_else(|| panic!("{p}"))["id"].clone();
+    call(&mut ctx, "sketch_constrain", json!({ "sketch": s2, "constraint": "pierce", "entities": [pt, line] }));
+    let at = |ctx: &mut Ctx, pt: &Value| {
+        let g = call(ctx, "sketch_get", json!({ "sketch": s2 }));
+        let e = g["entities"].as_array().unwrap().iter().find(|e| e["id"] == *pt).cloned().unwrap_or_else(|| panic!("{g}"));
+        [num(&e["at"][0]), num(&e["at"][1])]
+    };
+    let p0 = at(&mut ctx, &pt);
+    assert!((p0[0] - 10.0).abs() < 1e-9 && p0[1].abs() < 1e-9, "{p0:?}");
+    // An arc about (30, 5) of radius 10 crosses Front at x = 30 + √75 exactly (not on a chord of its tessellation).
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": s1, "tool": "three_point_arc", "points": [[30, -5], [30, 15], [40, 5]] }));
+    let arc = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "arc").unwrap_or_else(|| panic!("{r}"))["id"].clone();
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": [[35, 4]] }));
+    let pt = p["created"].as_array().unwrap().iter().find(|e| e["type"] == "point").unwrap_or_else(|| panic!("{p}"))["id"].clone();
+    call(&mut ctx, "sketch_constrain", json!({ "sketch": s2, "constraint": "pierce", "entities": [pt, arc] }));
+    let p1 = at(&mut ctx, &pt);
+    assert!((p1[0] - (30.0 + 75f64.sqrt())).abs() < 1e-9 && p1[1].abs() < 1e-9, "{p1:?}");
+}
+
 /// Add custom features (live 2213): a Feature Studio's feature at another document's version, listed by
 /// feature_types with `document` and `version`, works in a document without Feature Studios.
 #[test]
