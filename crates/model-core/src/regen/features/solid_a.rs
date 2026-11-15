@@ -633,22 +633,38 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
         // solid there); where that fails, the transformed sections as before. (Only at corners: along a smooth path
         // both are the same.)
         let mitred = k::SweepOptions { transition: k::SweepTransition::RightCorner, ..opts.clone() };
+        let solid_ok = |r: &k::OpResult| r.shape.count(ShapeType::Solid) > 0 && r.shape.is_valid();
+        // Where OCCT's sweeps fail or come out invalid: a closed polygon path swept piece by piece, mitred (a profile
+        // reaching the polygon's centre: asm-bjr-config's Sweep 1).
+        let pieces = || (!path_open && lock_faces.is_none() && opts.scale_end == 1.0 && opts.twist == 0.0).then(|| k::sweep_mitred_lines(&p.shape, &path).ok()).flatten().filter(solid_ok);
         let (res, valid) = match sweep(&p.shape, Some(&p.frame), &mitred) {
-            Ok(r) if r.shape.count(ShapeType::Solid) > 0 && r.shape.is_valid() => (r, true),
-            _ => {
-                let r = sweep(&p.shape, Some(&p.frame), &opts).map_err(|_| fe(SWEEP_FAILED))?;
-                let valid = r.shape.count(ShapeType::Solid) > 0 && r.shape.is_valid();
-                (r, valid)
-            }
+            Ok(r) if solid_ok(&r) => (r, true),
+            _ => match sweep(&p.shape, Some(&p.frame), &opts) {
+                Ok(r) if solid_ok(&r) => (r, true),
+                second => match pieces() {
+                    Some(r) => (r, true),
+                    None => {
+                        let r = second.map_err(|_| fe(SWEEP_FAILED))?;
+                        let valid = solid_ok(&r);
+                        (r, valid)
+                    }
+                },
+            },
         };
         if res.shape.count(ShapeType::Solid) == 0 {
             return err(SWEEP_FAILED);
         }
         // OCCT sweeps a profile round a bend tighter than the profile into a
-        // self-intersecting solid; Onshape refuses it.
-        if !valid || may_self_intersect(&p.shape, &path, &res.shape, opts.scale_end) && res.shape.self_intersects() {
-            return err(tight_bend_message(&p.shape, &path));
-        }
+        // self-intersecting solid; Onshape refuses it. (OCCT's mitred pieces overlapping where the profile reaches a
+        // polygon path's centre: built piece by piece.)
+        let res = if !valid || may_self_intersect(&p.shape, &path, &res.shape, opts.scale_end) && res.shape.self_intersects() {
+            match pieces() {
+                Some(r) => r,
+                None => return err(tight_bend_message(&p.shape, &path)),
+            }
+        } else {
+            res
+        };
         let names = sweep_names(ev, p, &res, true, true);
         tools.push(NamedShape::new(res.shape, names));
     }

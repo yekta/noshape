@@ -52,6 +52,28 @@ fn sweep_along_arc() {
     assert!(close(t.shape.volume().unwrap(), PI * 3.0 * 10.0, 1e-6));
 }
 
+/// asm-bjr-config's Sweep 1 (live: 14 faces, 300626.043 mm³): a profile from a hexagon's centre out to its top edge,
+/// swept round the hexagon, each segment's piece a wedge mitred on the corner planes, all six meeting at the centre
+/// (OCCT's pipe fails there: every corner's halving plane passes through the profile's edge on the axis).
+#[test]
+fn a_profile_from_a_polygons_centre_swept_round_it_mitres_as_live() {
+    let mm = 1e-3;
+    let z = 1.4 * mm;
+    let corners = [(94.685, 0.0), (47.343, 82.0), (-47.343, 82.0), (-94.685, 0.0), (-47.343, -82.0), (47.343, -82.0)];
+    let path = make_polyline(&corners.map(|(x, y)| DVec3::new(x * mm, y * mm, z)), true).unwrap();
+    let plane = Plane::new(DVec3::ZERO, DVec3::X, DVec3::Y);
+    let p = [(0.0, 3.0), (80.908, 3.0), (82.0, 0.0), (5.0, -28.026), (0.0, -28.026)].map(|(u, v)| DVec2::new(u * mm, v * mm));
+    let segs: Vec<_> = (0..p.len()).map(|i| Segment2d::Line { a: p[i], b: p[(i + 1) % p.len()] }).collect();
+    let prof = make_face_2d(&plane, &segs, &[]).unwrap();
+    let r = sweep_mitred_lines(&prof, &path).unwrap();
+    assert!(r.shape.is_valid() && r.shape.count(ShapeType::Solid) == 1);
+    assert_eq!(r.shape.faces().len(), 14);
+    let v = r.shape.volume().unwrap() / mm.powi(3);
+    assert!((v - 300626.043).abs() < 1e-4 * 300626.043, "{v} mm³");
+    let top = prof.edges().iter().position(|e| e.endpoints().unwrap().0.z.max(e.endpoints().unwrap().1.z) > 2.9 * mm && (e.endpoints().unwrap().0.z - e.endpoints().unwrap().1.z).abs() < 1e-12).unwrap();
+    assert_eq!(r.history.generated(0, ShapeType::Edge, top as u32).len(), 1, "the top: one face over the six pieces");
+}
+
 #[test]
 fn loft_rect_to_circle() {
     let r = rect_face(&Plane::xy(), 4.0, 4.0);

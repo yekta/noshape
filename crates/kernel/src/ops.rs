@@ -236,6 +236,13 @@ pub fn sweep_pipe(profile: &Shape, path: &Shape) -> Result<OpResult> {
     op(ffi::op_pipe(profile.raw(), path.raw()))
 }
 
+/// A planar profile face swept round a closed path of straight segments with mitred corners (a prism per segment cut
+/// at the planes halving its corners, fused): what OCCT's pipe can't build where the profile reaches the point every
+/// corner's halving plane meets (a polygon's centre). History as [`sweep`]'s side faces (args: profile, path).
+pub fn sweep_mitred_lines(profile: &Shape, path: &Shape) -> Result<OpResult> {
+    op(ffi::op_sweep_mitred_lines(profile.raw(), path.raw()))
+}
+
 // ---------------------------------------------------------------- loft
 
 /// Options for [`loft`].

@@ -1282,6 +1282,140 @@ OpOut op_divide_closed(const OcShape& s)
 
 // ---------------------------------------------------------------- sweep
 
+// A planar profile swept round a closed path of straight segments with mitred corners: a prism per segment, cut at
+// the planes halving its two corners, the pieces fused and their faces on one surface merged. For a profile OCCT's
+// pipe can't take round the corners: one reaching the polygon's centre, where every corner's halving plane meets
+// (asm-bjr-config's Sweep 1: a hexagonal cover swept from its centre to its rim; live 14 faces). History as the
+// sweep's: the profile's edges generate the side faces (args: profile, path).
+OpOut op_sweep_mitred_lines(const OcShape& profile, const OcShape& path)
+{
+  require_non_null(profile.shape, "profile");
+  require_non_null(path.shape, "sweep path");
+  ShapeIMap pfaces;
+  TopExp::MapShapes(profile.shape, TopAbs_FACE, pfaces);
+  if (pfaces.Extent() != 1)
+    fail_invalid("a mitred sweep takes one profile face");
+  const TopoDS_Face   face = TopoDS::Face(pfaces(1));
+  BRepAdaptor_Surface fs(face, false);
+  if (fs.GetType() != GeomAbs_Plane)
+    fail_op("a mitred sweep takes a planar profile");
+  const gp_Dir      np = fs.Plane().Axis().Direction();
+  const TopoDS_Wire sw = as_wire(path.shape, "sweep path");
+  if (!BRep_Tool::IsClosed(sw))
+    fail_op("a mitred sweep takes a closed path");
+  std::vector<gp_Pnt> pts;
+  for (BRepTools_WireExplorer x(sw); x.More(); x.Next())
+  {
+    if (BRepAdaptor_Curve(x.Current()).GetType() != GeomAbs_Line)
+      fail_op("a mitred sweep takes a path of straight segments");
+    pts.push_back(BRep_Tool::Pnt(x.CurrentVertex()));
+  }
+  const int n = (int)pts.size();
+  if (n < 3)
+    fail_op("a mitred sweep takes three segments or more");
+  // The path's plane (Newell's normal); every corner on it.
+  gp_XYZ nz(0, 0, 0);
+  for (int i = 0; i < n; ++i)
+    nz += pts[i].XYZ() ^ pts[(i + 1) % n].XYZ();
+  if (nz.Modulus() < 1e-12)
+    fail_op("a mitred sweep takes a planar path");
+  const gp_Dir        nrm(nz);
+  std::vector<gp_Dir> t(n);
+  std::vector<double> len(n);
+  double              span = 0;
+  for (int i = 0; i < n; ++i)
+  {
+    const gp_Vec v(pts[i], pts[(i + 1) % n]);
+    len[i] = v.Magnitude();
+    if (len[i] < Precision::Confusion() || std::abs(gp_Vec(pts[0], pts[i]).Dot(gp_Vec(nrm))) > 1e-7)
+      fail_op("a mitred sweep takes a planar path of segments");
+    t[i] = gp_Dir(v);
+    span = std::max(span, len[i]);
+  }
+  // The segment the profile stands on, square to it.
+  int    k   = -1;
+  gp_Pnt foot;
+  for (int i = 0; i < n && k < 0; ++i)
+  {
+    const double c = t[i].Dot(np);
+    if (std::abs(c) < 1 - 1e-9)
+      continue;
+    const double s = gp_Vec(pts[i], fs.Plane().Location()).Dot(gp_Vec(np)) / c;
+    if (s >= -1e-9 && s <= len[i] + 1e-9)
+    {
+      k    = i;
+      foot = pts[i].Translated(gp_Vec(t[i]) * s);
+    }
+  }
+  if (k < 0)
+    fail_op("the profile isn't square to the path");
+  Bnd_Box pb;
+  BRepBndLib::Add(face, pb, false);
+  const double size = std::sqrt(pb.SquareExtent()) + foot.Distance(gp_Pnt((pb.CornerMin().XYZ() + pb.CornerMax().XYZ()) / 2));
+  // Each corner's turn below 150 degrees (its halving plane within reach of the prisms).
+  for (int i = 0; i < n; ++i)
+    if (t[(i + n - 1) % n].Angle(t[i]) > 150.0 * M_PI / 180.0)
+      fail_op("a path corner too sharp for a mitred sweep");
+  const double ext = 4.0 * size;
+  const double big = 10.0 * (size + span);
+  // Everything on one side of the plane through `p` with normal `m` (a box `big` across).
+  auto beyond = [&](const gp_Pnt& p, const gp_Dir& m) {
+    const gp_Ax2 ax(p, m);
+    const gp_Pnt o = p.Translated(gp_Vec(ax.XDirection()) * (-big / 2) + gp_Vec(ax.YDirection()) * (-big / 2));
+    return BRepPrimAPI_MakeBox(gp_Ax2(o, m, ax.XDirection()), big, big, big).Shape();
+  };
+  std::vector<TopoDS_Shape>                                  pieces;
+  std::vector<std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>>> made;  // per piece: (profile edge, its side face)
+  ShapeIMap                                                  pedges;
+  TopExp::MapShapes(face, TopAbs_EDGE, pedges);
+  const gp_Ax3 from(foot, t[k], nrm);
+  for (int i = 0; i < n; ++i)
+  {
+    gp_Trsf place;
+    place.SetDisplacement(from, gp_Ax3(pts[i].Translated(gp_Vec(t[i]) * -ext), t[i], nrm));
+    BRepBuilderAPI_Transform copy(face, place, true);
+    BRepPrimAPI_MakePrism    prism(copy.Shape(), gp_Vec(t[i]) * (len[i] + 2 * ext), false, true);
+    if (!prism.IsDone())
+      fail_op("mitred sweep: a segment's prism failed");
+    const gp_Dir     ms(gp_Vec(t[(i + n - 1) % n]) + gp_Vec(t[i]));
+    const gp_Dir     me(gp_Vec(t[i]) + gp_Vec(t[(i + 1) % n]));
+    BRepAlgoAPI_Cut  cut;
+    cut.SetArguments(single(prism.Shape()));
+    cut.SetTools(to_list({beyond(pts[i], ms.Reversed()), beyond(pts[(i + 1) % n], me)}));
+    cut.Build();
+    if (cut.HasErrors())
+      fail_op("mitred sweep: a segment's mitre cut failed");
+    HHist ch = history_of({prism.Shape()}, cut);
+    std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> sides;
+    for (int e = 1; e <= pedges.Extent(); ++e)
+      for (const TopoDS_Shape& g : prism.Generated(copy.ModifiedShape(pedges(e))))
+        for (const TopoDS_Shape& img : images_vec(ch, g))
+          sides.emplace_back(pedges(e), img);
+    pieces.push_back(cut.Shape());
+    made.push_back(std::move(sides));
+  }
+  BRepAlgoAPI_Fuse fu;
+  fu.SetArguments(single(pieces[0]));
+  fu.SetTools(to_list(std::vector<TopoDS_Shape>(pieces.begin() + 1, pieces.end())));
+  fu.Build();
+  if (fu.HasErrors())
+    fail_op("mitred sweep: fusing the segments failed");
+  HHist fh = history_of(pieces, fu);
+  ShapeUpgrade_UnifySameDomain u(fu.Shape(), true, true, false);
+  u.Build();
+  const HHist         uh = u.History();
+  const TopoDS_Shape& r  = u.Shape();
+  HHist               h  = new BRepTools_History();
+  for (const auto& sides : made)
+    for (const auto& [e, f] : sides)
+      for (const TopoDS_Shape& a : images_vec(fh, f))
+        for (const TopoDS_Shape& b : images_vec(uh, a))
+          if (b.ShapeType() == TopAbs_FACE)
+            h->AddGenerated(e, b);
+  std::vector<TopoDS_Shape> args{profile.shape, sw};
+  return make_result(args, r, h.get());
+}
+
 OpOut op_pipe(const OcShape& profile, const OcShape& spine)
 {
   check_sweepable(profile.shape);
