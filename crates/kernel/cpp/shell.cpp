@@ -4140,6 +4140,66 @@ double distance_from_surface(const BRepAdaptor_Surface& s, const gp_XYZ& p)
   }
 }
 
+// A point's distance from the part of a cylinder's, cone's, sphere's or ring torus's surface within the parameter box
+// `uv` (u0, u1, v0, v1) its face lies in (never nearer the face): the angle round the axis nearest the point's within
+// the box (nearest whatever the height or the angle round the tube, the surface's radius there never negative), then
+// the nearest point of the generator's segment or the tube's arc there; -1 for another surface.
+double distance_from_patch(const BRepAdaptor_Surface& s, const double uv[4], const gp_XYZ& p)
+{
+  // (The angle from `a` to the range [lo, hi], by whole turns.)
+  auto off = [](double a, double lo, double hi) {
+    if (hi - lo >= 2 * M_PI)
+      return 0.0;
+    const double t = lo + std::fmod(std::fmod(a - lo, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+    return t <= hi ? 0.0 : std::min(t - hi, lo + 2 * M_PI - t);
+  };
+  if (s.GetType() == GeomAbs_Cylinder)
+  {
+    const gp_Cylinder& c = s.Cylinder();
+    const gp_Ax3&      ax = c.Position();
+    const gp_XYZ       d  = p - ax.Location().XYZ();
+    const double       x = d.Dot(ax.XDirection().XYZ()), y = d.Dot(ax.YDirection().XYZ()), z = d.Dot(ax.Direction().XYZ());
+    const double       rho = std::hypot(x, y), R = c.Radius(), du = off(std::atan2(y, x), uv[0], uv[1]);
+    const double       h = z - std::clamp(z, uv[2], uv[3]);
+    return std::sqrt(std::max(0.0, rho * rho + R * R - 2 * rho * R * std::cos(du)) + h * h);
+  }
+  if (s.GetType() == GeomAbs_Cone)
+  {
+    const gp_Cone& c  = s.Cone();
+    const gp_Ax3&  ax = c.Position();
+    const double   sa = std::sin(c.SemiAngle()), ca = std::cos(c.SemiAngle()), R0 = c.RefRadius();
+    if (!(R0 + uv[2] * sa >= 0) || !(R0 + uv[3] * sa >= 0))
+      return -1;
+    const gp_XYZ d = p - ax.Location().XYZ();
+    const double x = d.Dot(ax.XDirection().XYZ()), y = d.Dot(ax.YDirection().XYZ()), z = d.Dot(ax.Direction().XYZ());
+    const double rho = std::hypot(x, y), du = off(std::atan2(y, x), uv[0], uv[1]);
+    const double a = rho * std::cos(du), b = rho * std::sin(du);
+    // (The generator from v0 to v1 in the plane at that angle: (R0 + v sin, v cos), v its length along it.)
+    const double v = std::clamp((a - R0) * sa + z * ca, uv[2], uv[3]);
+    return std::hypot(b, std::hypot(a - (R0 + v * sa), z - v * ca));
+  }
+  if (s.GetType() == GeomAbs_Torus || s.GetType() == GeomAbs_Sphere)
+  {
+    // (A sphere: a torus of no major radius, its angle round the tube its latitude.)
+    const bool    torus = s.GetType() == GeomAbs_Torus;
+    const gp_Ax3  ax    = torus ? s.Torus().Position() : s.Sphere().Position();
+    const double  R = torus ? s.Torus().MajorRadius() : 0.0, r = torus ? s.Torus().MinorRadius() : s.Sphere().Radius();
+    if (!(R >= r) && torus)
+      return -1;
+    const gp_XYZ d = p - ax.Location().XYZ();
+    const double x = d.Dot(ax.XDirection().XYZ()), y = d.Dot(ax.YDirection().XYZ()), z = d.Dot(ax.Direction().XYZ());
+    const double rho = std::hypot(x, y), du = off(std::atan2(y, x), uv[0], uv[1]);
+    const double a = rho * std::cos(du), b = rho * std::sin(du);
+    double       in = 0;
+    if (std::hypot(a - R, z) > 0 && off(std::atan2(z, a - R), uv[2], uv[3]) == 0)
+      in = std::abs(std::hypot(a - R, z) - r);
+    else
+      in = std::min(std::hypot(a - R - r * std::cos(uv[2]), z - r * std::sin(uv[2])), std::hypot(a - R - r * std::cos(uv[3]), z - r * std::sin(uv[3])));
+    return std::hypot(b, in);
+  }
+  return -1;
+}
+
 // Whether a triangle of `set` (its tree built) comes within sqrt(r2) of p (true when unsure).
 bool mesh_within(BRepExtrema_TriangleSet& set, const BVH_Vec3d& p, double r2)
 {
@@ -4614,9 +4674,15 @@ private:
     }, serial_);
     // (A plane's, cylinder's, cone's, sphere's or torus's: first against its whole surface, exactly; apart when no point
     // comes within reach of it, no mesh needed.)
-    std::vector<BRepAdaptor_Surface> surface_of;
+    std::vector<BRepAdaptor_Surface>   surface_of;
+    std::vector<std::array<double, 4>> box_of;
     for (const int f : set_face)
+    {
       surface_of.emplace_back(faces[(size_t)f], false);
+      std::array<double, 4> b{};
+      BRepTools::UVBounds(faces[(size_t)f], b[0], b[1], b[2], b[3]);
+      box_of.push_back(b);
+    }
     const double exact_reach = apart_ + 0.5 * step + defl;
     OSD_Parallel::For(0, static_cast<int>(left.size()), [&](int j) {
       Left&                         l   = left[(size_t)j];
@@ -4625,8 +4691,11 @@ private:
         return;
       for (const BVH_Vec3d& p : pts)
       {
-        const double d = distance_from_surface(surface_of[(size_t)l.face], gp_XYZ(p.x(), p.y(), p.z()));
-        if (!(d > exact_reach))
+        const gp_XYZ P(p.x(), p.y(), p.z());
+        const double d = distance_from_surface(surface_of[(size_t)l.face], P);
+        // (Else from the part of it the face lies in: c2-bottle-split's Shell 1, its rounds' edges by the other rounds
+        // meshed at a twentieth of the wall, most of its check.)
+        if (!(d > exact_reach) && !(distance_from_patch(surface_of[(size_t)l.face], box_of[(size_t)l.face].data(), P) > exact_reach))
           return;
       }
       l.apart = true;
