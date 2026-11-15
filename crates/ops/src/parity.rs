@@ -7588,15 +7588,21 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     let by_second = !(point == "CENTER" && connector_origins.contains_key(key));
                     let edge = at_live.or_else(|| by_second.then(|| t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [second] })).ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("edge:")))).flatten());
                     trace(&format!("{name}: mate connector {}: {point} on face {face:?}, its second {second} edge {edge:?}", key.1));
-                    // (A centre on a curved face, a countersink's cone: the circle's own axis, as live; the normal there
-                    // leans, asm-infento-subs' Fastened 4 74° off.)
-                    let mut planar = |face: &str| {
-                        let faces = t.call("query_entities", json!({ "kind": "faces", "part": part.clone().unwrap_or_default(), "limit": 1000 })).ok();
-                        faces.and_then(|r| r["faces"].as_array()?.iter().find(|f| f["id"] == face).map(|f| f["surface"] == "plane")).unwrap_or(true)
+                    // (A centre takes the face's normal only on a plane across its circle; else the circle's own axis, as
+                    // live: a countersink's cone, or a face of ours not the hole's, asm-infento-subs' Fastened 4 74° off.)
+                    let mut across = |face: &str, edge: &str| {
+                        let mut of = |kind: &str| t.call("query_entities", json!({ "kind": kind, "part": part.clone().unwrap_or_default(), "limit": 1000 })).ok();
+                        let normal = of("faces").and_then(|r| r["faces"].as_array()?.iter().find(|f| f["id"] == face && f["surface"] == "plane").and_then(|f| f3(&f["normal"])));
+                        let axis = of("edges").and_then(|r| r["edges"].as_array()?.iter().find(|e| e["id"] == edge).and_then(|e| f3(&e["axis"])));
+                        match (normal, axis) {
+                            (Some(n), Some(a)) => glam::DVec3::from(n).normalize().dot(glam::DVec3::from(a).normalize()).abs() > 1.0 - 1e-6,
+                            (Some(_), None) => true,
+                            _ => false,
+                        }
                     };
                     match (edge, face) {
                         (Some(edge), Some(face)) => {
-                            if point == "MID_POINT" || planar(&face) {
+                            if point == "MID_POINT" || across(&face, &edge) {
                                 aligns.insert(key.clone(), face);
                             }
                             Ok(edge)
