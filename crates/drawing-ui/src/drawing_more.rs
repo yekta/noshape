@@ -66,9 +66,12 @@ impl DrawingEditor {
     // ------------------------------------------------------------ previews
 
     /// Closed profile through view points (spline or polygon) on the sheet.
-    pub fn profile_on_sheet(&self, view: ViewId, pts: &[[f64; 2]], spline: bool) -> Vec<[f64; 2]> {
+    pub fn profile_on_sheet(&self, view: ViewId, pts: &[[f64; 2]], spline: Option<noshape_model::drawing::cad_objects::SplineKnots>) -> Vec<[f64; 2]> {
         let Some(pl) = self.placement(view) else { return vec![] };
-        let pts = if spline { views::closed_spline(pts, 12) } else { pts.to_vec() };
+        let pts = match spline {
+            Some(knots) => views::closed_spline(pts, 12, knots),
+            None => pts.to_vec(),
+        };
         let mut out: Vec<[f64; 2]> = pts.iter().map(|p| pl.to_sheet(*p)).collect();
         if let Some(f) = out.first().copied() {
             out.push(f);
@@ -103,7 +106,12 @@ impl DrawingEditor {
         match &self.tool {
             Tool::BrokenOut { parent: Some(pid), points, .. } | Tool::CropPoly { parent: Some(pid), points, .. } if !points.is_empty() => {
                 let Some(pl) = self.placement(*pid) else { return };
-                let spline = matches!(self.tool, Tool::BrokenOut { .. } | Tool::CropPoly { spline: true, .. });
+                use noshape_model::drawing::cad_objects::SplineKnots;
+                let spline = match self.tool {
+                    Tool::BrokenOut { .. } => Some(SplineKnots::Centripetal),
+                    Tool::CropPoly { spline: true, .. } => Some(SplineKnots::ChordLength),
+                    _ => None,
+                };
                 let done = matches!(self.tool, Tool::BrokenOut { done: true, .. });
                 let mut pts = points.clone();
                 if !done {

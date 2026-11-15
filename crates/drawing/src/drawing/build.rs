@@ -2092,7 +2092,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     g.lines.push(Polyline2 { points: piece, style: LineStyle::Visible, closed: whole, pick });
                 }
                 if b.spline && pl.breaks().is_empty() && g.lines.len() == cad_mark.0 + 1 {
-                    let poles: Vec<[f64; 2]> = super::cad_objects::catmull_rom_poles(&b.profile).into_iter().map(|p| pl.to_sheet(p)).collect();
+                    let poles: Vec<[f64; 2]> = super::cad_objects::closed_spline_poles(&b.profile, super::cad_objects::SplineKnots::Centripetal).into_iter().map(|p| pl.to_sheet(p)).collect();
                     g.add_cad_spline(cad_mark.0, poles);
                 }
                 // Its depth point lost in an update: red (help V29; live's

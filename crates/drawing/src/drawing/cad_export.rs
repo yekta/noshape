@@ -1933,7 +1933,7 @@ mod tests {
     /// profile a SPLINE, an image an OLE2FRAME (Paintbrush Picture).
     #[test]
     fn tables_tolerances_splines_and_images_like_onshape() {
-        use crate::drawing::cad_objects::{CadMember, catmull_rom_poles};
+        use crate::drawing::cad_objects::{CadMember, closed_spline_poles};
         let mut g = SheetGeometry::new(279.4, 215.9);
         let m = g.mark();
         for y in [100.0, 92.0, 84.0] {
@@ -1950,9 +1950,9 @@ mod tests {
         g.cad_members.push(CadMember { lines: l..l + 1, texts: g.texts.len() - 1..g.texts.len(), fills: 0..0, obj: 1 });
         let profile = [[150.0, 50.0], [170.0, 50.0], [170.0, 70.0], [150.0, 70.0]];
         let m = g.mark();
-        g.lines.push(crate::drawing::sheet::Polyline2 { points: crate::drawing::views::closed_spline(&profile, 16), style: LineStyle::Visible, closed: true, pick: 0 });
+        g.lines.push(crate::drawing::sheet::Polyline2 { points: crate::drawing::views::closed_spline(&profile, 16, crate::drawing::cad_objects::SplineKnots::Centripetal), style: LineStyle::Visible, closed: true, pick: 0 });
         g.cad_since(m, CadLayer::SectionJogLines);
-        g.add_cad_spline(m.0, catmull_rom_poles(&profile));
+        g.add_cad_spline(m.0, closed_spline_poles(&profile, crate::drawing::cad_objects::SplineKnots::Centripetal));
         g.images.push(crate::drawing::sheet::GeomImage { pos: [200.0, 20.0], size: [4.0, 2.0], data_base64: "".into(), rgb: Some((2, 1, std::sync::Arc::new(vec![255, 0, 0, 0, 0, 255]))) });
         let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(to_dxf_version(&g, 1, DxfVersion::AC1032).unwrap())).unwrap().read().unwrap();
         let kinds: Vec<&str> = doc.entities().map(|e| e.as_entity().entity_type()).collect();

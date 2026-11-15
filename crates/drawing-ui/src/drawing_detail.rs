@@ -324,7 +324,7 @@ impl DrawingEditor {
         }
         pts.push(self.cursor);
         if d.shape == 2 && pts.len() >= 3 {
-            overlay.lines.push((views::closed_spline(&pts, 12), true));
+            overlay.lines.push((views::closed_spline(&pts, 12, noshape_model::drawing::cad_objects::SplineKnots::ChordLength), true));
         } else {
             overlay.lines.push((pts.clone(), true));
         }

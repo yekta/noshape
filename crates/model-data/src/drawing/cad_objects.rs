@@ -103,21 +103,83 @@ pub fn open_catmull_rom_poles(pts: &[[f64; 2]]) -> Vec<[f64; 2]> {
     out
 }
 
-/// The closed uniform Catmull-Rom curve through `pts` (`views::closed_spline`)
-/// as Bézier spans: `3n + 1` poles, the last the first.
-pub fn catmull_rom_poles(pts: &[[f64; 2]]) -> Vec<[f64; 2]> {
-    let n = pts.len();
+/// How a closed profile spline spaces its points' parameters (live2 11-15 traces): a crop's by the distance between
+/// them, a broken-out section's by its square root.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SplineKnots {
+    ChordLength,
+    Centripetal,
+}
+
+/// The closed smooth curve through `pts` as live's crop and broken-out profiles: the periodic C2 cubic interpolating
+/// them at `knots` parameters, as Bézier spans: `3n + 1` poles, the last the first (repeated points dropped; fewer
+/// than 3 distinct points are returned as they are).
+pub fn closed_spline_poles(pts: &[[f64; 2]], knots: SplineKnots) -> Vec<[f64; 2]> {
+    let dist = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+    let mut p: Vec<[f64; 2]> = Vec::with_capacity(pts.len());
+    for q in pts {
+        if p.last().is_none_or(|l| dist(*l, *q) > 1e-12) {
+            p.push(*q);
+        }
+    }
+    while p.len() > 1 && dist(p[0], p[p.len() - 1]) <= 1e-12 {
+        p.pop();
+    }
+    let n = p.len();
+    if n < 3 {
+        return p;
+    }
+    let h: Vec<f64> = (0..n).map(|i| dist(p[i], p[(i + 1) % n])).map(|d| if knots == SplineKnots::Centripetal { d.sqrt() } else { d }).collect();
+    // The second derivatives m: h[i-1] m[i-1] + 2 (h[i-1] + h[i]) m[i] + h[i] m[i+1] = 6 (slope[i] - slope[i-1]).
+    let mut a = vec![vec![0.0; n]; n];
+    for i in 0..n {
+        let j = (i + n - 1) % n;
+        a[i][j] += h[j];
+        a[i][i] += 2.0 * (h[j] + h[i]);
+        a[i][(i + 1) % n] += h[i];
+    }
+    let rhs = |c: usize| -> Vec<f64> { (0..n).map(|i| 6.0 * ((p[(i + 1) % n][c] - p[i][c]) / h[i] - (p[i][c] - p[(i + n - 1) % n][c]) / h[(i + n - 1) % n])).collect() };
+    let m = [solve_dense(a.clone(), rhs(0)), solve_dense(a, rhs(1))];
     let mut out = Vec::with_capacity(3 * n + 1);
     for i in 0..n {
-        let (p0, p1, p2, p3) = (pts[(i + n - 1) % n], pts[i], pts[(i + 1) % n], pts[(i + 2) % n]);
-        out.push(p1);
-        out.push([p1[0] + (p2[0] - p0[0]) / 6.0, p1[1] + (p2[1] - p0[1]) / 6.0]);
-        out.push([p2[0] - (p3[0] - p1[0]) / 6.0, p2[1] - (p3[1] - p1[1]) / 6.0]);
+        let (i1, hi) = ((i + 1) % n, h[i]);
+        // The span's end tangents (per unit parameter) times h / 3: its inner Bézier poles.
+        let d0 = |c: usize| (p[i1][c] - p[i][c]) / hi - hi * (2.0 * m[c][i] + m[c][i1]) / 6.0;
+        let d1 = |c: usize| (p[i1][c] - p[i][c]) / hi + hi * (m[c][i] + 2.0 * m[c][i1]) / 6.0;
+        out.push(p[i]);
+        out.push([p[i][0] + d0(0) * hi / 3.0, p[i][1] + d0(1) * hi / 3.0]);
+        out.push([p[i1][0] - d1(0) * hi / 3.0, p[i1][1] - d1(1) * hi / 3.0]);
     }
-    if let Some(p) = pts.first() {
-        out.push(*p);
-    }
+    out.push(p[0]);
     out
+}
+
+/// `a x = b` by Gaussian elimination with partial pivoting (a small dense system).
+fn solve_dense(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Vec<f64> {
+    let n = b.len();
+    for c in 0..n {
+        let r = (c..n).max_by(|x, y| a[*x][c].abs().total_cmp(&a[*y][c].abs())).unwrap_or(c);
+        a.swap(c, r);
+        b.swap(c, r);
+        if a[c][c] == 0.0 {
+            continue;
+        }
+        let (top, rest) = a.split_at_mut(c + 1);
+        let pivot = &top[c];
+        for (i, row) in rest.iter_mut().enumerate() {
+            let f = row[c] / pivot[c];
+            for (x, p) in row[c..].iter_mut().zip(&pivot[c..]) {
+                *x -= f * p;
+            }
+            b[c + 1 + i] -= f * b[c];
+        }
+    }
+    let mut x = vec![0.0; n];
+    for c in (0..n).rev() {
+        let s: f64 = (c + 1..n).map(|k| a[c][k] * x[k]).sum();
+        x[c] = if a[c][c] == 0.0 { 0.0 } else { (b[c] - s) / a[c][c] };
+    }
+    x
 }
 
 /// Lines, texts and fills of object `obj` (`SheetGeometry::cad_objects`;

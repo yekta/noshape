@@ -203,7 +203,7 @@ impl DrawingEditor {
                 overlay.dots.push((c, POINT));
             }
             Crop::Spline(pts) | Crop::Polygon(pts) => {
-                let spline = matches!(crop, Crop::Spline(_));
+                let spline = matches!(crop, Crop::Spline(_)).then_some(noshape_model::drawing::cad_objects::SplineKnots::ChordLength);
                 let mut closed = pts.clone();
                 closed.push(pts[0]);
                 overlay.tinted.push((self.profile_on_sheet(*view, &closed, spline), PROFILE, 2.0));

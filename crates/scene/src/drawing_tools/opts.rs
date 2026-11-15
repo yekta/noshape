@@ -274,7 +274,7 @@ pub fn detail_profile(shape: u8, pts: &[[f64; 2]]) -> Option<(Vec<[f64; 2]>, [f6
             let (a, b) = (pts[0], pts[1]);
             vec![a, [b[0], a[1]], b, [a[0], b[1]]]
         }
-        2 if pts.len() >= 3 => views::closed_spline(pts, 16),
+        2 if pts.len() >= 3 => views::closed_spline(pts, 16, noshape_model::drawing::cad_objects::SplineKnots::ChordLength),
         3 if pts.len() >= 3 => pts.to_vec(),
         _ => return None,
     };

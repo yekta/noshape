@@ -1196,22 +1196,20 @@ pub fn move_cut_point(points: &[[f64; 2]], i: usize, p: [f64; 2], keep_ortho: bo
     out
 }
 
-/// Closed uniform Catmull-Rom curve through `pts`, `per_segment` samples
-/// per span (fewer than 3 points are returned as they are).
-pub fn closed_spline(pts: &[[f64; 2]], per_segment: usize) -> Vec<[f64; 2]> {
-    let n = pts.len();
-    if n < 3 {
-        return pts.to_vec();
+/// Closed smooth curve through `pts` ([`super::cad_objects::closed_spline_poles`]), `per_segment` samples per span
+/// (fewer than 3 distinct points are returned as they are).
+pub fn closed_spline(pts: &[[f64; 2]], per_segment: usize, knots: super::cad_objects::SplineKnots) -> Vec<[f64; 2]> {
+    let poles = super::cad_objects::closed_spline_poles(pts, knots);
+    if poles.len() < 4 {
+        return poles;
     }
     let k = per_segment.max(1);
-    let mut out = Vec::with_capacity(n * k);
-    for i in 0..n {
-        let (p0, p1, p2, p3) = (pts[(i + n - 1) % n], pts[i], pts[(i + 1) % n], pts[(i + 2) % n]);
+    let mut out = Vec::with_capacity(poles.len() / 3 * k);
+    for b in poles.windows(4).step_by(3) {
         for s in 0..k {
             let t = s as f64 / k as f64;
-            let (t2, t3) = (t * t, t * t * t);
-            let f = |c: usize| 0.5 * (2.0 * p1[c] + (p2[c] - p0[c]) * t + (2.0 * p0[c] - 5.0 * p1[c] + 4.0 * p2[c] - p3[c]) * t2 + (3.0 * p1[c] - p0[c] - 3.0 * p2[c] + p3[c]) * t3);
-            out.push([f(0), f(1)]);
+            let w = [(1.0 - t).powi(3), 3.0 * t * (1.0 - t).powi(2), 3.0 * t * t * (1.0 - t), t * t * t];
+            out.push([(0..4).map(|j| w[j] * b[j][0]).sum(), (0..4).map(|j| w[j] * b[j][1]).sum()]);
         }
     }
     out
@@ -1219,7 +1217,7 @@ pub fn closed_spline(pts: &[[f64; 2]], per_segment: usize) -> Vec<[f64; 2]> {
 
 /// Outline polygon of a broken-out profile.
 pub fn broken_out_outline(b: &BrokenOut) -> Vec<[f64; 2]> {
-    if b.spline { closed_spline(&b.profile, 16) } else { b.profile.clone() }
+    if b.spline { closed_spline(&b.profile, 16, super::cad_objects::SplineKnots::Centripetal) } else { b.profile.clone() }
 }
 
 /// Polygonal crop boundaries as a polygon (circles: None).
@@ -1227,7 +1225,7 @@ pub fn crop_polygon(c: &Crop) -> Option<Vec<[f64; 2]>> {
     match c {
         Crop::Circle { .. } => None,
         Crop::Polygon(p) => Some(p.clone()),
-        Crop::Spline(p) => Some(closed_spline(p, 16)),
+        Crop::Spline(p) => Some(closed_spline(p, 16, super::cad_objects::SplineKnots::ChordLength)),
     }
 }
 
@@ -1591,7 +1589,7 @@ pub fn clip_to_crop(pts: &[[f64; 2]], crop: &Crop) -> Vec<Vec<[f64; 2]>> {
     match crop {
         Crop::Circle { center, radius } => clip_polyline_circle(pts, *center, *radius),
         Crop::Polygon(poly) => clip_polyline_polygon(pts, poly),
-        Crop::Spline(p) => clip_polyline_polygon(pts, &closed_spline(p, 16)),
+        Crop::Spline(p) => clip_polyline_polygon(pts, &closed_spline(p, 16, super::cad_objects::SplineKnots::ChordLength)),
     }
 }
 
@@ -3802,7 +3800,14 @@ mod tests {
         }
         let kept: Vec<_> = block.iter().flat_map(|e| clip_to_crop(&e.points, &snapped)).collect();
         assert_eq!(kept.len(), 2, "the bottom and top edges between the crossings: {kept:?}");
-        let inner = Crop::Spline(vec![[5.0, 2.0], [25.0, 2.0], [25.0, 8.0], [5.0, 8.0]]);
+        // Live's clicks inside the block: the curve dips past its long edges, crossing them near x 6.5 and 23.5 (live2
+        // 11-15: 6.54 / 23.42 at z 0, 6.63 / 23.72 at z 10): two arcs at the short sides.
+        let live = Crop::Spline(vec![[5.0, 2.0], [25.0, 2.0], [25.0, 8.0], [5.0, 8.0]]);
+        let ends = crop_boundary_in_material(&block, &live);
+        assert_eq!(ends.len(), 2, "{ends:?}");
+        let xs: Vec<f64> = ends.iter().flat_map(|a| [a[0][0], a[a.len() - 1][0]]).collect();
+        assert!(xs.iter().all(|x| (x - 6.6).abs() < 0.3 || (x - 23.4).abs() < 0.4), "{xs:?}");
+        let inner = Crop::Spline(vec![[16.0, 3.0], [24.0, 3.0], [24.0, 7.0], [16.0, 7.0]]);
         let whole = crop_boundary_in_material(&block, &inner);
         assert_eq!(whole.len(), 1, "{whole:?}");
         assert!(whole[0].len() > 40 && whole[0].first() == whole[0].last(), "the whole ring");

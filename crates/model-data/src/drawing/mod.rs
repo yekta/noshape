@@ -276,7 +276,7 @@ pub enum Crop {
     Circle { center: [f64; 2], radius: f64 },
     /// Closed polygon (e.g. a rectangle).
     Polygon(Vec<[f64; 2]>),
-    /// Closed smooth curve through the points (Catmull-Rom spline).
+    /// Closed smooth curve through the points (a periodic cubic at chord-length parameters).
     Spline(Vec<[f64; 2]>),
 }
 

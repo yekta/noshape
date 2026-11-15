@@ -1285,6 +1285,39 @@ fn cutting_line_ends_as_live() {
     }
 }
 
+/// Live's spline crop through (5, 2), (25, 2), (25, 8), (5, 8) mm, closed on the first (live2 crop-spline-trace, 11-15:
+/// a periodic cubic at chord-length parameters): it dips 4.5 mm past the long sides and bulges 0.7 mm past the short.
+#[test]
+fn a_spline_crop_is_a_periodic_chord_length_cubic() {
+    let pts = [[5.0, 2.0], [25.0, 2.0], [25.0, 8.0], [5.0, 8.0], [5.0, 2.0]];
+    let c = views::closed_spline(&pts, 64, crate::drawing::cad_objects::SplineKnots::ChordLength);
+    let (lo, hi) = c.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
+    let want = ([4.29, -2.55], [25.71, 12.55]);
+    assert!((0..2).all(|i| (lo[i] - want.0[i]).abs() < 0.02 && (hi[i] - want.1[i]).abs() < 0.02), "{lo:?} {hi:?}");
+    // The poles written to a DXF are the same curve.
+    let poles = crate::drawing::cad_objects::closed_spline_poles(&pts, crate::drawing::cad_objects::SplineKnots::ChordLength);
+    assert_eq!(poles.len(), 13);
+    assert!(poles.chunks(3).take(4).zip(&pts).all(|(b, p)| b[0] == *p));
+}
+
+/// Live's broken-out profile through (−15.12, 7.91), (14.88, 7.91), (14.88, 11.86), (−15.12, 11.86) mm (live2
+/// broken-out-spline dbg-bo2, 11-15: a periodic cubic at centripetal parameters, traced x −16.71..16.28, z 5.67..14.78):
+/// it bulges 1.4 mm past the short sides and 2.4 mm past the long; at chord-length parameters it would reach z 0.7..19.
+#[test]
+fn a_broken_out_spline_is_a_periodic_centripetal_cubic() {
+    use crate::drawing::cad_objects::SplineKnots;
+    let pts = [[-15.12, 7.91], [14.88, 7.91], [14.88, 11.86], [-15.12, 11.86]];
+    let extent = |knots| {
+        let c = views::closed_spline(&pts, 64, knots);
+        c.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]))
+    };
+    let (lo, hi) = extent(SplineKnots::Centripetal);
+    let want = ([-16.54, 5.48], [16.30, 14.29]);
+    assert!((0..2).all(|i| (lo[i] - want.0[i]).abs() < 0.02 && (hi[i] - want.1[i]).abs() < 0.02), "{lo:?} {hi:?}");
+    let (lo, hi) = extent(SplineKnots::ChordLength);
+    assert!(lo[1] < 1.0 && hi[1] > 18.9, "chord-length reaches far past: {lo:?} {hi:?}");
+}
+
 #[test]
 fn spline_and_polygon_crops() {
     let (doc, mut drawing) = demo();
@@ -1293,7 +1326,7 @@ fn spline_and_polygon_crops() {
     let pts = vec![[-0.03, -0.02], [0.0, -0.028], [0.03, -0.02], [0.03, 0.02], [-0.03, 0.02]];
     drawing.sheets[0].view_mut(ViewId(2)).unwrap().crop = Some(Crop::Spline(pts.clone()));
     let g = compute_view(&drawing, &drawing.sheets[0], ViewId(2), &sources, &cache, false);
-    let outline = views::closed_spline(&pts, 16);
+    let outline = views::closed_spline(&pts, 16, crate::drawing::cad_objects::SplineKnots::ChordLength);
     assert!(!g.edges.is_empty());
     for e in &g.edges {
         for p in &e.points {
