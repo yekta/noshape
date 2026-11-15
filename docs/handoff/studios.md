@@ -73,11 +73,9 @@ Open items:
 - drw-insert-view-top-1to1: live reads VIEW where five other Insert view takes read EDGE (the reader's pixels).
 - drw-hole-callout-palette steps 17-18: our callout's leader is lit inside Top's box after the palette closes; live
   reads []. Near the reader's 60 px threshold.
-- Hole callout text width: live's "3X ∅.197 THRU" is 29.6 mm at 0.12 in. Its DXF's style is Noto Sans and " THRU"
-  starts 0.6925 in after "3X ∅.197": Noto Sans with 0.12 in as the cap height (em = h / 0.714), not the em. Ours draws
-  every sheet text in the stroke font's widths (`font::text_width`; ⌀ isn't in `fill_supported`, and filled glyphs are
-  squeezed to the stroke widths), so this is all drawing text, not the callout: measure a note's and a dimension's
-  width against live before changing `font.rs`.
+- Hole callout text width: closed 11-15. Live's DXF style is Noto Sans at 0.12 in cap height; ours `font::text_width`
+  uses Noto's advances ("3X ⌀.197 THRU" 9.66 heights against live's ~9.7), and the callout's box centre is 0.4 mm
+  from live's in drw-hole-callout-palette (x 22.9 vs 22.5). The earlier "~7 heights" was em-based.
 - A view's on-screen placement (lead 11-15, low priority): the runner sized our window 1919x992 (live's viewport before
   10-31), live's has been 1919x1079 since, so our drawing canvas was 886 px tall against live's 973 (live2 block-drawing
   rects: canvas page (40, 76)-(1919, 1049), ANSI A sheet 378.5..1579.5 x 113.5..1041 = 4.30 px/mm; ours 3.87). ui_script
