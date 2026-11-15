@@ -5,7 +5,7 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
-## core state (11-15 07:35 UTC)
+## core state (11-15 07:22 UTC)
 - **P0 landed 608e3b40:** qa's rust-zero-solid-f197 Fillet 1 failed since 1ac08e247 (an extruded circle kept on the
   sketch circle's frame, trimmed to [a, a + 2π]: OCCT's fillet fails on it). The circle runs from 0 round the seam
   again; Helix › Circle on such an edge takes the sketch's x from the edge's name (`sketch_x_of_edge`, curves.rs).
