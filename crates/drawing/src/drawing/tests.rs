@@ -4218,15 +4218,16 @@ fn note_leaders_land_branch_and_lose_nodes() {
     ];
     let targets: Vec<[f64; 2]> = leaders.iter().map(|l| l.point).collect();
     let p = note_leader_paths(bbox, &leaders, &targets);
-    // Right side (target to the right), an 8 mm landing, the node, the target.
-    assert_eq!(p[0].points, vec![[31.0, 12.0], [39.0, 12.0], [45.0, 30.0], [60.0, 40.0]]);
-    assert_eq!((p[0].head, p[0].bend()), (2, [39.0, 12.0]));
+    // Right side (target to the right), 0.09 in out from the box (live), an 8 mm landing, the node, the target.
+    let (start, bend) = (30.0 + 0.09 * 25.4, 30.0 + 0.09 * 25.4 + 8.0);
+    assert_eq!(p[0].points, vec![[start, 12.0], [bend, 12.0], [45.0, 30.0], [60.0, 40.0]]);
+    assert_eq!((p[0].head, p[0].bend()), (2, [bend, 12.0]));
     // A branch off the bend, and one off the node.
-    assert_eq!(p[1].points, vec![[39.0, 12.0], [70.0, 0.0]]);
+    assert_eq!(p[1].points, vec![[bend, 12.0], [70.0, 0.0]]);
     assert_eq!(p[2].points, vec![[45.0, 30.0], [50.0, 60.0]]);
     // A fixed side wins over the nearer one.
     leaders[0].right = Some(false);
-    assert_eq!(note_leader_paths(bbox, &leaders, &targets)[0].points[0], [9.0, 12.0]);
+    assert_eq!(note_leader_paths(bbox, &leaders, &targets)[0].points[0], [10.0 - 0.09 * 25.4, 12.0]);
     // The node goes: its branch starts at the bend.
     remove_leader_node(&mut leaders, 0, 0);
     assert_eq!(leaders[2].start, LeaderStart::Bend(0));

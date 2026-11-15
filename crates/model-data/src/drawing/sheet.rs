@@ -3805,7 +3805,7 @@ impl LeaderPath {
 
 /// The paths of a note's leaders (live drw2 10-21 g): from the box `bbox`'s
 /// side (`Leader.right`, else the one nearer the target) through a
-/// horizontal landing (`Leader.landing`, 4 mm) to the bend, or from the
+/// horizontal landing (`Leader.landing`, 0.18 in) to the bend, or from the
 /// bend or a node of an earlier leader; then the nodes, then `targets[i]`.
 pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[f64; 2]]) -> Vec<LeaderPath> {
     use super::LeaderStart;
@@ -3818,9 +3818,12 @@ pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[
             LeaderStart::Bend(j) if j < i => vec![out[j].bend()],
             LeaderStart::Node(j, n) if j < i && n < leaders[j].nodes.len() => vec![leaders[j].nodes[n]],
             _ => {
+                // Live (5 samples, 11-15): 0.09 in out from the box on the target's side, 0.18 in long, at the
+                // middle of the text block.
                 let right = ld.right.unwrap_or(t[0] > (x0 + x1) / 2.0);
-                let start = if right { [x1 + 1.0, ym] } else { [x0 - 1.0, ym] };
-                let l = ld.landing.unwrap_or(4.0);
+                let gap = 0.09 * 25.4;
+                let start = if right { [x1 + gap, ym] } else { [x0 - gap, ym] };
+                let l = ld.landing.unwrap_or(0.18 * 25.4);
                 vec![start, [start[0] + if right { l } else { -l }, ym]]
             }
         };
@@ -3858,6 +3861,29 @@ mod tests {
         let r = title_block_rect(s).unwrap();
         let [_, y0, x1, _] = s.size.frame_rect();
         assert!((r[2] - x1).abs() < 1e-9 && (r[1] - y0).abs() < 1e-9 && (r[3] - r[1] - 4.953).abs() < 1e-9 && (r[2] - r[0] - 94.869).abs() < 1e-9, "{r:?}");
+    }
+
+    /// Live's note leader shoulder (dx/q-shoulder, 5 samples, 0.12 in text): 0.18 in long, starting 0.09 in out from
+    /// the text box on the target's side, at the middle of the text block (top − 0.06 in for one line, − 0.26 for
+    /// three: lines 5/3 of the height apart).
+    #[test]
+    fn note_leader_shoulder_as_live() {
+        use super::super::note::{layout, NoteStyle, NoteVAlign};
+        use super::super::Leader;
+        const IN: f64 = 25.4;
+        let h = 0.12 * IN;
+        let style = NoteStyle { valign: NoteVAlign::Top, ..Default::default() };
+        for (text, drop) in [("TEMP", 0.06), ("TEMP\nSECOND\nTHIRD", 0.26)] {
+            let l = layout(text, h, &style, [2.3639 * IN, 1.5821 * IN]);
+            let [x0, _, x1, top] = l.bbox;
+            for (target, side) in [([1.0 * IN, 0.5 * IN], x0 - 0.09 * IN), ([6.0 * IN, 0.5 * IN], x1 + 0.09 * IN)] {
+                let paths = note_leader_paths(l.bbox, &[Leader { point: target, ..Default::default() }], &[target]);
+                let p = &paths[0].points;
+                let bend = side + if target[0] < x0 { -0.18 * IN } else { 0.18 * IN };
+                assert!((p[0][0] - side).abs() < 1e-9 && (p[1][0] - bend).abs() < 1e-9 && p[2] == target, "{text:?}: {p:?}");
+                assert!((top - p[0][1] - drop * IN).abs() < 0.002 * IN && p[1][1] == p[0][1], "{text:?}: {} in under the top", (top - p[0][1]) / IN);
+            }
+        }
     }
 
     /// Help A20: a note whose leader ends on a view, and a callout anchored

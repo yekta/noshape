@@ -1153,7 +1153,7 @@ pub struct Leader {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nodes: Vec<[f64; 2]>,
     /// Notes: the horizontal landing from the note's side to the bend (mm;
-    /// None: 4). Live drw2 10-21 g: dragging the bend changes it.
+    /// None: 0.18 in, live). Live drw2 10-21 g: dragging the bend changes it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub landing: Option<f64>,
     /// Notes: the side the leader leaves (None: the nearer one).

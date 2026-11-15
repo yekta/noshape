@@ -431,7 +431,8 @@ pub fn layout(text: &str, h: f64, style: &NoteStyle, pos: [f64; 2]) -> NoteLayou
     }
     let text_w = lines.iter().map(|l| width_of(&l.0)).fold(0.0, f64::max);
     let box_w = style.width.unwrap_or(indent + text_w);
-    let pitch = h * 1.5 * style.line_spacing.max(0.5);
+    // Live's MTEXT at line spacing 1.0: 5/3 of the height per line (dx/q-shoulder: 0.2 in for 0.12 in text).
+    let pitch = h * 5.0 / 3.0 * style.line_spacing.max(0.5);
     let para_gap = h * 0.5;
     // Total height (first line: its cap height).
     let mut heights = Vec::new();
@@ -543,7 +544,7 @@ mod tests {
         // Wrapping and line spacing.
         let s = NoteStyle { width: Some(20.0), line_spacing: 2.0, ..Default::default() };
         let l = layout("WORD WORD WORD WORD", 3.5, &s, [0.0, 0.0]);
-        assert!(l.pieces.len() >= 2 && (l.pieces[0].pos[1] - l.pieces[1].pos[1] - 3.5 * 3.0).abs() < 1e-9);
+        assert!(l.pieces.len() >= 2 && (l.pieces[0].pos[1] - l.pieces[1].pos[1] - 3.5 * 5.0 / 3.0 * 2.0).abs() < 1e-9);
         assert_eq!(fractions("1/2 IN"), "\u{E000}1\u{E001}2\u{E002} IN");
         assert_eq!(fractions("3#4 X"), "\u{E004}3\u{E001}4\u{E002} X");
         assert_eq!(segments(&fractions("3#4 X")), [Seg::Diagonal { num: "3".into(), den: "4".into() }, Seg::Text(" X".into())]);
