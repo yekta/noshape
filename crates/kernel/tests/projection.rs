@@ -169,3 +169,22 @@ fn contains_point_agrees_with_the_projection() {
         }
     }
 }
+
+/// Straight lines projected along a direction onto a cylinder (c2-hunting-knife's Split 4 projects sketch lines onto
+/// its handle): the section of the plane through the line along the direction, within the line's reach. A line
+/// across the whole cylinder gives its circle, one ending inside it the arc it reaches, one reaching past its section
+/// or off it nothing.
+#[test]
+fn lines_projected_along_onto_a_cylinder() {
+    let r = 0.01;
+    let cyl = k::make_cylinder(&k::Plane::from_normal(DVec3::ZERO, DVec3::Z), r, 0.03, 2.0 * PI).unwrap();
+    let line = |x0: f64, x1: f64, z: f64| k::make_line(DVec3::new(x0, -0.02, z), DVec3::new(x1, -0.02, z)).unwrap();
+    let length = |s: &k::Shape| s.edges().iter().map(|e| e.edge_info().unwrap().length).sum::<f64>();
+    let whole = k::project_curves(&line(-0.02, 0.02, 0.01), &cyl, Some(DVec3::Y)).unwrap();
+    assert!((length(&whole) - 2.0 * PI * r).abs() < 1e-9, "circle {}", length(&whole));
+    assert!(whole.edges().iter().all(|e| e.vertices().iter().all(|v| (v.vertex_point().unwrap().z - 0.01).abs() < 1e-9)));
+    let part = k::project_curves(&line(-0.005, 0.02, 0.01), &cyl, Some(DVec3::Y)).unwrap();
+    assert!((length(&part) - 4.0 * PI / 3.0 * r).abs() < 1e-8, "arc {}", length(&part));
+    assert!(k::project_curves(&line(0.015, 0.02, 0.01), &cyl, Some(DVec3::Y)).is_err());
+    assert!(k::project_curves(&line(-0.02, 0.02, 0.04), &cyl, Some(DVec3::Y)).is_err());
+}

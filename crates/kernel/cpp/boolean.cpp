@@ -34,6 +34,8 @@
 #include <BOPAlgo_BuilderFace.hxx>
 #include <BOPTools_AlgoTools2D.hxx>
 #include <ShapeAnalysis_Curve.hxx>
+#include <ShapeAnalysis_FreeBounds.hxx>
+#include <NCollection_HSequence.hxx>
 
 #include <BOPAlgo_MakerVolume.hxx>
 #include <BRepAlgoAPI_Common.hxx>
@@ -11546,6 +11548,106 @@ static TopoDS_Shape exact_on_extrusion(const TopoDS_Shape& projected, const Topo
   return changed ? rs.Apply(projected) : projected;
 }
 
+namespace {
+// A straight edge projected along `d`: the target's section by the plane through it along `d` (parametrized as
+// BRepProj_Projection's sweep of it: X along the line, Y along `d`) where it lies within the line's reach, as
+// BRepProj's, whose sweep's edges then lie off the target (their tests against a B-spline face were most of
+// c2-hunting-knife's 160 ms a projection). Nothing where the plane or the line's reach misses the target's box (an
+// empty section); `false` where it doesn't apply.
+bool project_line_along(const TopoDS_Shape& item, const TopoDS_Shape& target, const gp_Dir& d, TopoDS_Shape& out)
+{
+  out.Nullify();
+  TopoDS_Edge e;
+  for (TopExp_Explorer x(item, TopAbs_EDGE); x.More(); x.Next())
+  {
+    if (!e.IsNull())
+      return false;
+    e = TopoDS::Edge(x.Current());
+  }
+  if (e.IsNull())
+    return false;
+  const BRepAdaptor_Curve c(e);
+  if (c.GetType() != GeomAbs_Line)
+    return false;
+  const gp_Dir t = c.Line().Direction();
+  if (t.IsParallel(d, 1e-9))
+    return false;
+  const gp_Pnt o = c.Value(c.FirstParameter());
+  const double s1 = gp_Vec(o, c.Value(c.LastParameter())).Dot(gp_Vec(t));
+  const gp_Dir n  = gp_Vec(t).Crossed(gp_Vec(d));
+  Bnd_Box      box;
+  BRepBndLib::Add(target, box);
+  if (box.IsVoid())
+    return false;
+  double x0, y0, z0, x1, y1, z1;
+  box.Get(x0, y0, z0, x1, y1, z1);
+  const double big = std::numeric_limits<double>::max();
+  double       along[2] = {big, -big}, off[2] = {big, -big};
+  for (int k = 0; k < 8; ++k)
+  {
+    const gp_Vec v(o, gp_Pnt((k & 1) ? x1 : x0, (k & 2) ? y1 : y0, (k & 4) ? z1 : z0));
+    along[0] = std::min(along[0], v.Dot(gp_Vec(t))), along[1] = std::max(along[1], v.Dot(gp_Vec(t)));
+    off[0] = std::min(off[0], v.Dot(gp_Vec(n))), off[1] = std::max(off[1], v.Dot(gp_Vec(n)));
+  }
+  const double lo = std::min(0.0, s1), hi = std::max(0.0, s1);
+  if (off[0] > 0 || off[1] < 0 || along[0] > hi || along[1] < lo)
+    return true;
+  // (Faces only, as BRepProj gives its section.)
+  TopoDS_Shape faces = target;
+  if (target.ShapeType() == TopAbs_COMPOUND)
+  {
+    BRep_Builder    b;
+    TopoDS_Compound f;
+    b.MakeCompound(f);
+    for (TopExp_Explorer x(target, TopAbs_FACE); x.More(); x.Next())
+      b.Add(f, x.Current());
+    faces = f;
+  }
+  else if (target.ShapeType() != TopAbs_FACE && target.ShapeType() != TopAbs_SHELL && target.ShapeType() != TopAbs_SOLID && target.ShapeType() != TopAbs_COMPSOLID)
+    return false;
+  BRepAlgoAPI_Section sec(faces, gp_Pln(gp_Ax3(o, n, t)), false);
+  sec.Approximation(true);
+  sec.ComputePCurveOn1(true);
+  sec.ComputePCurveOn2(true);
+  sec.Build();
+  if (!sec.IsDone())
+    return true;
+  // (The plane's section edges within the line's reach, the sweep's: all of them in it or out of it, else BRepProj's,
+  // whose sweep's ends cut them.)
+  occ::handle<NCollection_HSequence<TopoDS_Shape>> edges = new NCollection_HSequence<TopoDS_Shape>;
+  for (TopExp_Explorer x(sec.Shape(), TopAbs_EDGE); x.More(); x.Next())
+  {
+    Bnd_Box eb;
+    BRepBndLib::Add(x.Current(), eb);
+    double a0, b0, c0, a1, b1, c1;
+    eb.Get(a0, b0, c0, a1, b1, c1);
+    double reach[2] = {big, -big};
+    for (int k = 0; k < 8; ++k)
+    {
+      const double at = gp_Vec(o, gp_Pnt((k & 1) ? a1 : a0, (k & 2) ? b1 : b0, (k & 4) ? c1 : c0)).Dot(gp_Vec(t));
+      reach[0] = std::min(reach[0], at), reach[1] = std::max(reach[1], at);
+    }
+    if (reach[0] > hi || reach[1] < lo)
+      continue;
+    if (!(reach[0] > lo && reach[1] < hi))
+      return false;
+    edges->Append(x.Current());
+  }
+  if (edges->IsEmpty())
+    return true;
+  const occ::handle<NCollection_HSequence<TopoDS_Shape>> wires = ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edges, Precision::Confusion(), true);
+  if (wires.IsNull() || wires->IsEmpty())
+    return true;
+  BRep_Builder    b;
+  TopoDS_Compound w;
+  b.MakeCompound(w);
+  for (int i = 1; i <= wires->Length(); ++i)
+    b.Add(w, wires->Value(i));
+  out = w;
+  return true;
+}
+} // namespace
+
 std::unique_ptr<OcShape> project_along(const OcShape& curves, const OcShape& target, P3 dir)
 {
   require_non_null(curves.shape, "curves");
@@ -11562,12 +11664,17 @@ std::unique_ptr<OcShape> project_along(const OcShape& curves, const OcShape& tar
   if (items.empty())
     fail_invalid("nothing to project: the curves contain no edges");
   std::vector<TopoDS_Shape> results;
+  const bool occt_only = std::getenv("NOSHAPE_PROJECT_OCCT") != nullptr;
   for (const auto& c : items)
   {
-    BRepProj_Projection pr(c, target.shape, d);
-    if (!pr.IsDone())
-      continue;
-    TopoDS_Shape r = pr.Shape();
+    TopoDS_Shape r;
+    if (occt_only || !project_line_along(c, target.shape, d, r))
+    {
+      BRepProj_Projection pr(c, target.shape, d);
+      if (!pr.IsDone())
+        continue;
+      r = pr.Shape();
+    }
     if (!r.IsNull())
       results.push_back(exact_on_extrusion(r, target.shape));
   }
