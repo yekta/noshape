@@ -774,6 +774,17 @@ fn sketch_use_intersection_and_model_references() {
     let used = call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": ["origin"] }));
     let p = created(&used, "point");
     assert!(p.len() == 1 && p[0]["external"] == true && near(&p[0]["at"], 0.0, 0.0), "{used}");
+    // A boss's centre used (a circular edge's implicit centre): a point there, linked to it.
+    let s5 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top", "name": "Boss" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": s5, "tool": "circle", "points": [[3, 4], [5, 4]] }));
+    let disc = call(&mut ctx, "sketch_get", json!({ "sketch": s5 }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [disc], "depth": "15 mm", "operationType": "NEW" } }));
+    let rims = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "circle", "near": [3, 4, 15] }));
+    let rim = rims["edges"][0]["id"].as_str().unwrap().to_string();
+    let s6 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front", "name": "Centre" }))["sketch"].as_str().unwrap().to_string();
+    let used = call(&mut ctx, "sketch_use", json!({ "sketch": s6, "references": [format!("implicit:center:{rim}")] }));
+    let p = created(&used, "point");
+    assert!(p.len() == 1 && p[0]["external"] == true && near(&p[0]["at"], 3.0, 15.0), "{used}");
     // The Front plane crosses the top face along a line at Z = 10.
     let s3 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }))["sketch"].as_str().unwrap().to_string();
     let inter = call(&mut ctx, "sketch_intersection", json!({ "sketch": s3, "face": top }));

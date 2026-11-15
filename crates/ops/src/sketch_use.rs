@@ -7,7 +7,7 @@
 
 use glam::{DVec2, DVec3};
 use noshape_model::display::{PlaneFrame, StudioDisplay};
-use noshape_model::reference::Reference;
+use noshape_model::reference::{Inference, Reference};
 use noshape_model::regen::context::Context;
 use noshape_model::regen::features::sketch as sk_feat;
 use noshape_model::regen::measure::resolve_shapes;
@@ -39,6 +39,15 @@ impl Model<'_> {
     }
 
     /// Is the referenced face curved (not planar)?
+    /// The centre of circular edge `r` (model coordinates).
+    pub fn circle_center(&self, r: &Reference) -> Option<DVec3> {
+        let edge = self.shapes(r).into_iter().next()?;
+        match edge.edge_info().ok()?.curve {
+            noshape_kernel::Curve::Circle { center, .. } => Some(center),
+            _ => None,
+        }
+    }
+
     pub fn curved_face(&self, r: &Reference) -> bool {
         self.shapes(r).first().is_some_and(|f| !f.is_planar())
     }
@@ -119,7 +128,7 @@ impl Model<'_> {
 /// in an empty sketch.
 pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, cursor: DVec2, r: &Reference, pierce: bool, construction: bool) -> Option<EntityId> {
     let frame = model.frame;
-    let want_point = pierce || matches!(r, Reference::Vertex(_) | Reference::MeshPoint { .. } | Reference::Origin);
+    let want_point = pierce || matches!(r, Reference::Vertex(_) | Reference::MeshPoint { .. } | Reference::Origin | Reference::Implicit { .. });
     if let Some(id) = data.external_refs.iter().find(|(id, v)| *v == r && data.sketch.entity(EntityId(**id)).is_some_and(|e| (e.kind() == EntityKind::Point) == want_point)).map(|(id, _)| EntityId(*id)) {
         // Use on geometry a dimension already refers to makes it sketch geometry.
         if !construction && data.sketch.entity(id).is_some_and(|e| e.reference_only) {
@@ -135,6 +144,8 @@ pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, c
     }
     let made = if matches!(r, Reference::Origin) {
         Made::Point(frame.to_local(DVec3::ZERO))
+    } else if let Reference::Implicit { on, .. } = r {
+        Made::Point(frame.to_local(model.circle_center(on)?))
     } else if let Some(pl) = model.reference_plane(r).filter(|_| !matches!(r, Reference::Face(_)) || !model.curved_face(r)) {
         let (p, d) = sk_feat::plane_trace(&pl, frame)?;
         let half = (data.sketch.bbox().size().length() * 0.6).max(world_per_px * 150.0);
@@ -186,6 +197,8 @@ pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, c
 pub fn use_reference(data: &mut SketchData, model: Model, world_per_px: f64, cursor: DVec2, r: &Reference) -> bool {
     match r {
         Reference::Origin | Reference::Vertex(_) | Reference::MeshPoint { .. } | Reference::SketchEntity { .. } | Reference::Edge(_) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
+        // A circular edge's centre (live: a point Use on a hole's centre, bracket03-mattie's Sketch 2).
+        Reference::Implicit { on, inference: Inference::Center | Inference::CenterRim | Inference::CenterOutward } if matches!(**on, Reference::Edge(_)) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         Reference::Face(_) if model.curved_face(r) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         Reference::Face(_) => {
             let mut changed = false;

@@ -39,6 +39,16 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             let _ = sk.set_point(id, frame.to_local(glam::DVec3::ZERO));
             continue;
         }
+        // An implicit point used (a circular edge's centre).
+        if let crate::reference::Reference::Implicit { on, inference } = r {
+            match crate::regen::implicit::implicit_connector(ev, on, *inference) {
+                Some(c) => {
+                    let _ = sk.set_point(id, frame.to_local(c.origin));
+                }
+                None => missing += 1,
+            }
+            continue;
+        }
         // Projected model vertices (snapped to while sketching).
         if matches!(r, crate::reference::Reference::Vertex(_) | crate::reference::Reference::MeshPoint { .. }) {
             match ev.resolve_vertex_point(r) {

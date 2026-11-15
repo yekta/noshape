@@ -463,8 +463,8 @@ fn geometry_json(data: &SketchData, sketch: FeatureId, e: &noshape_sketch::Entit
         Geometry::Line { start, end } => json!({ "type": "line", "start": p(*start), "end": p(*end), "start_point": eid(*start), "end_point": eid(*end) }),
         Geometry::Circle { center, radius } => json!({ "type": "circle", "center": p(*center), "radius": r9(radius * k), "center_point": eid(*center) }),
         Geometry::Arc { center, start, end } => json!({ "type": "arc", "center": p(*center), "start": p(*start), "end": p(*end), "center_point": eid(*center), "start_point": eid(*start), "end_point": eid(*end) }),
-        Geometry::Ellipse { center, major, minor } => json!({ "type": "ellipse", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k) }),
-        Geometry::EllipticalArc { center, major, minor, start, end } => json!({ "type": "elliptical_arc", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k), "start_point": eid(*start), "end_point": eid(*end) }),
+        Geometry::Ellipse { center, major, minor } => json!({ "type": "ellipse", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k), "center_point": eid(*center) }),
+        Geometry::EllipticalArc { center, major, minor, start, end } => json!({ "type": "elliptical_arc", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k), "center_point": eid(*center), "start_point": eid(*start), "end_point": eid(*end) }),
         Geometry::BSpline { control, degree, knots, .. } => {
             let mut v = json!({ "type": "bspline", "degree": degree, "control_points": control.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": control.iter().map(|c| eid(*c)).collect::<Vec<_>>(), "knots": knots, "start_point": control.first().map(|c| eid(*c)), "end_point": control.last().map(|c| eid(*c)) });
             // A Bezier's control polygon: lines pole to pole that take constraints and dimensions.

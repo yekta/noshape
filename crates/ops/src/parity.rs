@@ -1415,7 +1415,13 @@ impl<'a> Translator<'a> {
         };
         let Ok(reply) = self.call("query_entities", json!({ "kind": kind, "near": mm(near), "limit": 6 })) else { return Some(u) };
         let tried = u.reference.clone();
-        let ids: Vec<String> = reply[kind].as_array().into_iter().flatten().filter_map(|e| e["id"].as_str().map(str::to_string)).filter(|r| *r != tried).collect();
+        let mut ids: Vec<String> = reply[kind].as_array().into_iter().flatten().filter_map(|e| e["id"].as_str().map(str::to_string)).filter(|r| *r != tried).collect();
+        // A point: also the centres of the circular edges nearby (bracket03-mattie's Sketch 2 uses holes' centres).
+        if kind == "vertices"
+            && let Ok(circles) = self.call("query_entities", json!({ "kind": "edges", "curve": "circle", "near": mm(near), "limit": 4 }))
+        {
+            ids.extend(circles["edges"].as_array().into_iter().flatten().filter_map(|e| e["id"].as_str().map(|id| format!("implicit:center:{id}"))));
+        }
         for r in ids {
             u.reference = r;
             match self.use_projected(oid, id, u, problems) {
@@ -1569,6 +1575,14 @@ impl<'a> Translator<'a> {
             for (k, end) in ["startDerivative", "endDerivative"].into_iter().enumerate() {
                 if let Some(tip) = c["handles"].get(k).and_then(Value::as_str) {
                     self.sketch_entities.entry((oid.clone(), format!("{eid}.{end}"))).or_insert_with(|| tip.to_string());
+                }
+            }
+        }
+        // A conic's start, control and end: live's `<id>.0.internal` … `<id>.2.internal`.
+        if c["type"] == "conic" {
+            for (n, key) in ["start_point", "control_point", "end_point"].into_iter().enumerate() {
+                if let Some(pid) = c[key].as_str() {
+                    self.sketch_entities.insert((oid.clone(), format!("{eid}.{n}.internal")), pid.to_string());
                 }
             }
         }
