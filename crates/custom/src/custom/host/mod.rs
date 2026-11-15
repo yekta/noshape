@@ -95,6 +95,8 @@ pub type FaceCreators = HashMap<usize, (Arc<TopoName>, Option<(u32, FsId)>)>;
 
 /// Something worked out from a body, by the body's address (the body held, so the address stays its own).
 pub type ByBody<T> = Mutex<HashMap<usize, (Arc<crate::regen::context::Body>, Arc<T>)>>;
+/// [`CtxState::region_faces`]: by (the sketch, the region's key), the sketch held and its region's face.
+pub type RegionFaces = Mutex<HashMap<(usize, Vec<u32>), (Arc<crate::regen::context::SketchResult>, Option<noshape_kernel::Shape>)>>;
 /// [`CtxState::created_cache`]: by (feature id, entity type), the answer and what it was worked out from.
 pub type CreatedCache = HashMap<(FsId, Option<query::EType>), (query::CreatedSeen, Vec<query::Ent>)>;
 
@@ -167,6 +169,8 @@ pub struct CtxState {
     pub on_face: Mutex<HashMap<(noshape_kernel::Shape, [i64; 3]), bool>>,
     /// Each sketch's region edges ([`query::QueryCx::region_pieces`]), by (sketch, its regions' address and count).
     pub region_pieces: Mutex<HashMap<(crate::reference::FeatureId, usize, usize), Arc<query::RegionPieces>>>,
+    /// Each sketch region's face ([`query::QueryCx::region_face`]), by (the sketch, the region's key), the sketch held.
+    pub region_faces: RegionFaces,
     /// Each sketch result's points that are only curves' ends ([`query::QueryCx::curve_ends`]), by (sketch, result).
     pub curve_ends: Mutex<HashMap<(crate::reference::FeatureId, usize), CurveEnds>>,
     /// The operation that made each construction plane (`ConstructionPlane` references; qCreatedBy).
@@ -328,6 +332,7 @@ impl FsContext {
                 pieces_on_old: Mutex::new(HashMap::new()),
                 on_face: Mutex::new(HashMap::new()),
                 region_pieces: Mutex::new(HashMap::new()),
+                region_faces: Mutex::new(HashMap::new()),
                 curve_ends: Mutex::new(HashMap::new()),
                 topo_cache: Mutex::new(HashMap::new()),
                 sub_boxes: Mutex::new(HashMap::new()),

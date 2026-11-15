@@ -636,13 +636,11 @@ impl<'a> QueryCx<'a> {
                 k::make_vertex(sk.frame.to_world(sk.sketch.point(if *end == 0 { a } else { b })?)).ok()
             }
             Ent::SketchRegion(s, key) => {
-                let sk = &ctx.sketches[*s];
-                let region = sk.regions.iter().find(|r| encode_region_key(&r.id) == *key)?;
-                crate::regen::eval::region_profile(sk, region, crate::reference::Source::Index(0)).ok().map(|p| p.shape)
+                let region = ctx.sketches[*s].regions.iter().find(|r| encode_region_key(&r.id) == *key)?;
+                self.region_face(*s, region)
             }
             Ent::SketchSheet(s) => {
-                let sk = &ctx.sketches[*s];
-                let faces: Vec<Shape> = sk.regions.iter().filter_map(|r| crate::regen::eval::region_profile(sk, r, crate::reference::Source::Index(0)).ok().map(|p| p.shape)).collect();
+                let faces: Vec<Shape> = ctx.sketches[*s].regions.iter().filter_map(|r| self.region_face(*s, r)).collect();
                 Some(Shape::compound(&faces))
             }
             Ent::SketchWire(s, id) => sketch_edge_shape(&ctx.sketches[*s], *id),
@@ -859,6 +857,23 @@ impl<'a> QueryCx<'a> {
         let p = Arc::new(RegionPieces::of(sk));
         self.st.region_pieces.lock().insert(key, p.clone());
         p
+    }
+
+    /// A sketch region's face, kept for the sketch itself (a Spur Gear's queries over its sketch's regions made
+    /// them again each time: 55 faces, 80 ms, cf-part-draft).
+    pub fn region_face(&self, s: usize, region: &noshape_sketch::regions::Region) -> Option<Shape> {
+        let sk = &self.st.ctx.sketches[s];
+        let key = (Arc::as_ptr(sk) as usize, encode_region_key(&region.id));
+        if let Some((_, f)) = self.st.region_faces.lock().get(&key) {
+            return f.clone();
+        }
+        let f = crate::regen::eval::region_profile(sk, region, crate::reference::Source::Index(0)).ok().map(|p| p.shape);
+        let mut cache = self.st.region_faces.lock();
+        if cache.len() >= 8192 {
+            cache.clear();
+        }
+        cache.insert(key, (sk.clone(), f.clone()));
+        f
     }
 
     /// A body's face, edge or vertex box (as [`Self::shape_box`]) without making its shape: each body's boxes of a
