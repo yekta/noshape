@@ -4020,6 +4020,42 @@ export const tiltedBlock = defineFeature(function(context is Context, id is Id, 
     }
 }
 
+/// opLoft takes curved faces as profiles (asm-isaac-ball's GearLab bevel gear lofts its teeth through filled 3D
+/// outlines): two arched sheets 20 × 10, the second 15 up, loft to their sheared prism, 20 × 10 × 15.
+#[test]
+fn op_loft_through_curved_faces() {
+    const SRC: &str = r#"
+annotation { "Feature Type Name" : "Curved face loft" }
+export const curvedFaceLoft = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        var faces = [];
+        var scratch = [];
+        for (var j = 0; j < 2; j += 1)
+        {
+            for (var k = 0; k < 2; k += 1)
+            {
+                opFitSpline(context, id + ("f" ~ j ~ k), { "points" : [vector(0, 10 * k, 15 * j) * millimeter, vector(10, 10 * k, 15 * j + 3) * millimeter, vector(20, 10 * k, 15 * j) * millimeter] });
+                scratch = append(scratch, qCreatedBy(id + ("f" ~ j ~ k), EntityType.BODY));
+            }
+            opLoft(context, id + ("s" ~ j), { "profileSubqueries" : [qCreatedBy(id + ("f" ~ j ~ 0), EntityType.EDGE), qCreatedBy(id + ("f" ~ j ~ 1), EntityType.EDGE)], "bodyType" : ToolBodyType.SURFACE });
+            faces = append(faces, qCreatedBy(id + ("s" ~ j), EntityType.FACE));
+            scratch = append(scratch, qCreatedBy(id + ("s" ~ j), EntityType.BODY));
+        }
+        opLoft(context, id + "l", { "profileSubqueries" : faces, "bodyType" : ToolBodyType.SOLID });
+        opDeleteBodies(context, id + "d", { "entities" : qUnion(scratch) });
+    });
+"#;
+    let fx = Fixture::new(&studio(SRC));
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&fx.ty("curvedFaceLoft"), &fx.units).unwrap());
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    assert_eq!(r.context.bodies.len(), 1);
+    let v = total_volume(&r) * 1e9;
+    assert!((v - 3000.0).abs() < 3000.0 * 1e-4, "{v} mm³");
+}
+
 /// Live 2336 / 2393: opChamfer's distance and angle (2 mm at 30°) lies on each edge's face left of its direction (a block's top front edge: the top; a cylinder's top rim: the cap, its bottom rim:
 /// the cylinder); Opposite direction swaps. The cap's area after it (mm²): r 18 is 1,017.876, r 18.8453 1,115.7219.
 #[test]

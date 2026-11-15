@@ -921,7 +921,36 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
             out.push(Section { shape: w.clone(), profile: Some(wire_profile(w, &edges, Source::Index(i as u32))) });
             continue;
         }
-        let mut profiles = ev.profiles_with(refs, false)?;
+        // A curved face as a profile (std's opLoft takes any face: GearLab's bevel gear lofts its teeth through filled
+        // 3D tooth outlines; ev.profiles takes planar faces only).
+        let curved = |r: &Reference| {
+            matches!(r, Reference::Face(_)) && {
+                let faces = ev.resolve_faces(std::slice::from_ref(r));
+                !faces.is_empty() && faces.iter().all(|&(bi, fi)| ev.face_shape(bi, fi).is_ok_and(|f| !f.is_planar()))
+            }
+        };
+        let flat: Vec<Reference> = refs.iter().filter(|r| !curved(r)).cloned().collect();
+        let mut profiles = ev.profiles_with(&flat, false)?;
+        for r in refs.iter().filter(|r| curved(r)) {
+            for (bi, fi) in ev.resolve_faces(std::slice::from_ref(r)) {
+                let b = &ev.ctx.bodies[bi];
+                let f = ev.face_shape(bi, fi)?;
+                let edge_sources = f.edges().iter().map(|e| b.shape.index_of(e, ShapeType::Edge).map(|k| Source::Topo(b.edges[k].clone())).unwrap_or(Source::Index(0))).collect();
+                let c = f.centroid()?;
+                let frame = match face_normal_near(&f, c) {
+                    Some((o, n)) => {
+                        let x = super::bshared::canonical_x(n.normalize());
+                        crate::display::PlaneFrame { origin: o, x, y: n.normalize().cross(x), normal: n.normalize() }
+                    }
+                    None => crate::display::PlaneFrame::TOP,
+                };
+                let key = match r {
+                    Reference::Face(n) => Source::Topo(std::sync::Arc::new(n.clone())),
+                    _ => Source::Index(i as u32),
+                };
+                profiles.push(Profile { shape: f, frame, edge_sources, key, from_face: true });
+            }
+        }
         // Sheet bodies with a single face.
         for r in refs {
             if let Reference::Body(id) = r

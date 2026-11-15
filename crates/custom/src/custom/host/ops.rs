@@ -1618,6 +1618,16 @@ fn op_loft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     run_op(i, &cx, &id, "LOFT_FAILED", |ev| {
         let mut shapes = Vec::new();
         for s in &sections {
+            // A curved face (GearLab's bevel gear lofts its teeth through filled 3D outlines): its outer wire; ev.profiles
+            // takes planar faces only.
+            let faces = ev.resolve_faces(s);
+            if s.iter().all(|r| matches!(r, Reference::Face(_))) && faces.len() == 1 {
+                let f = ev.face_shape(faces[0].0, faces[0].1)?;
+                if !f.is_planar() {
+                    shapes.push(f.wires().into_iter().next().ok_or_else(|| fe("Select a face with a boundary"))?);
+                    continue;
+                }
+            }
             if let Some(p) = ev.profiles(s)?.into_iter().next() {
                 shapes.push(p.shape.wires().into_iter().next().unwrap_or(p.shape));
             } else if let Some(pt) = s.first().and_then(|r| ev.resolve_vertex_point(r)) {

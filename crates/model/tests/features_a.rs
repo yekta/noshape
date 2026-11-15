@@ -242,6 +242,37 @@ fn loft_between_squares() {
     assert!(total_volume(&res.context) < expect, "a twisted loft is thinner in the middle");
 }
 
+/// std's opLoft takes curved faces as profiles (GearLab's bevel gear lofts its teeth through filled 3D outlines): two
+/// cylinder patches (R 20, ±30°, 10 high), one 15 mm along x of the other, loft to their sheared prism, 20 × 10 × 15.
+#[test]
+fn a_loft_through_two_curved_faces() {
+    let mut t = T::new();
+    let mut faces = Vec::new();
+    for dx in [0.0, 0.015] {
+        let (r, a) = (0.02, 30f64.to_radians());
+        let c = DVec2::new(dx, 0.0);
+        let mut sk = noshape_sketch::Sketch::new();
+        let arc = sk.add_arc(c, c + DVec2::new(a.cos(), -a.sin()) * r, c + DVec2::new(a.cos(), a.sin()) * r);
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![Reference::SketchEntity { sketch: s, entity: arc.0 }])), ("depth", e("10 mm"))]);
+        let res = t.ok();
+        let body = res.context.bodies.last().unwrap();
+        assert!(body.shape.faces()[0].face_plane().unwrap().is_none(), "a cylinder patch");
+        faces.push(Reference::Face((*body.faces[0]).clone()));
+    }
+    let item = |r: Reference| {
+        let mut v = ParamValues::default();
+        v.set("sheetProfileEntities", q(vec![r]));
+        v
+    };
+    t.add("loft", &[("sheetProfilesArray", ParamValue::Array(faces.into_iter().map(item).collect()))]);
+    let res = t.ok();
+    let solid = res.context.bodies.iter().find(|b| b.shape.volume().is_ok_and(|v| v > 0.0)).expect("a solid loft");
+    let v = solid.shape.volume().unwrap() * 1e9;
+    assert!(near(v, 3000.0, 1e-4), "volume {v} mm³");
+    assert_eq!(solid.shape.faces().len(), 6);
+}
+
 /// std Loft (loft.fs): a connection on edges sits at each edge's connectionEdgeParameters (std's editing logic puts a
 /// new pick at 0.5, its connection manipulator "connection,edge" moves it along the edge's tangent), and, as live
 /// 1810, adds no vertex, edge or face: between parallel edges the side face stays a plane (the frustum, 7000 mm³, 6
