@@ -4,7 +4,25 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-15 07:50 UTC; restart from here)
+## bool, now (11-15 10:55 UTC; restart from here)
+- Stage 3 landed (e576bf0f). Queued (gate a52cf8e74 clean, knurls 6-8 % faster than main): the volumes face by face on
+  all threads where a face is free-form (rings-loft 60 -> 20 ms), the kept faces meshed at once (first split 55 -> 48),
+  every made plane's pcurves stored (skasm: big faces' std queries 30-120 us each without), big planes' on all threads,
+  Shell's self-interference far test against a plane / cylinder / cone / sphere / torus's whole surface exactly before
+  meshing (c2-bottle-split's Shell 1 72 -> 46 ms, 80 of 99 pairs). rings-loft Shell 1 ~490 ms vibe7 (live 235).
+- Tried, no gain, dropped: cached exact point-face distances in on_wall (38 calls), the edge/edge far test (86 pairs
+  dropped, CPU the same: the cost is the 144 vertex-sharing pairs).
+- c2-hunting-knife Split 4 (qa): 7 project_along (BRepProj: OCCT section, ~160 ms each) then op_split of the knife by
+  4 closed rings at x = 16..19 mm, all on one closed non-periodic B-spline face, each ring's one vertex on its seam
+  (OCCT's splitter 2.2 s). Branch bool-split-edges-wip (f03310b0a): edges cut at crossings, their own section pcurves,
+  BRepFeat_SplitShape: 0.76 s but LocOpe makes the seam-closed rings holes (zero-area faces; the result check falls
+  back to OCCT). Needs our own 2D face split. Dumps vibe5 ~/agents/bool-keep/spl/hk/dump (split-41, project_along-34..40),
+  probes probe_split_dump / probe_project_dump (xprobe, scratch). c2-bottle-split's Split 1 is split.ours (~20 ms alone).
+- Queue (qa / lead 11-15): rings-loft Circular pattern 2 (boolean.rust.trimmed 0.94 s), cf-snap-hook Snap Hook Booleans
+  (165-185 ms each), c2-housing-draft Rotieren 1 / Boolesch 1 Booleans, c2-sm-louver Extrude 3/4, cf-lighten opShell 60
+  ms; blend's known sections entry point (recordings vibe5 ~/agents/blend-keep/known-sections); hunting-knife Split 4.
+
+## bool, earlier (11-15 07:50 UTC)
 - Shell stage 3 queued (gate ee76ed477 clean: 0 differences, every corpus + parity56; knurls not run, 31 GB host):
   8f6f29d17 (marched offset edges fitted to the offsets), a4123badb (up to 12 halvings: all 36 rings-loft edges
   marched), 0c155cd4f (newton_foot cuts a step past a bound short; bounded_foot holds a foot on the bound: the joins'
