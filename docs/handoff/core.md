@@ -5,6 +5,27 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-15 14:48 UTC)
+- **Landed:** dae03465 QUIT-ABORT-DOCK (`noshape_kernel::exit_now` from gpui's on_app_quit and the UI script's exits: no
+  exit() static destructors under evaluations still in the kernel; qa verified 10/10 on 80e16e42d), 6a6c7523 (Enclose's
+  volumes once), 3bfc17b1 (offset faces: a prism's sides moved by one distance offset from its cap's outline before
+  MakeOffset; Lighten 1's offsets ~45 -> 8 ms), af57e884 / 7caae3a6d (psui: Move boundary, Offset curve, fit spline
+  error fields). **Queued:** d7c674ad (@approximateSpline: least squares, fewest control points within tolerance; a
+  line 4, not 202), 0137a784 (a surface added onto faces already there leaves them; a sew is a solid only where it
+  encloses volume with no sheet left out; Move boundary's Up to without a Target marks it).
+- **1dc32b Draft 1 (lead: option a, 11-15 13:55):** OCCT's draft hangs in IntStart_SearchOnBoundaries.gxx's tangent
+  interval scan (nodes TolBoundary * 1000 apart: up to INT_MAX Values, no hook check). OCCT patch 0030 polls there
+  (branch core-occt30 in core-oc; libs for testing in vibe5 ~/agents/core-keep/occt-0030, GCC 15 x86-64,
+  IntPatch_TheSOnBounds_0 / Contap_TheSearch_0 swapped into TKGeomAlgo / TKHLR). With it the draft stops at the
+  budget (30 s) instead of the timer's jump (~600 s). op_draft gets a work bound (DRAFT_WORK) so the wedges run
+  deterministically; run_budgeted restores t_work after the timer's jump. To do: the bound from the suite's draft work
+  counts, g++-13, suite + bool's gate, hats/dock, then the wedge accuracy (-1300.66 vs live's -1306.54). Dumps vibe7
+  ~/agents/core-keep/draft-1dc (draft-73: 30 faces, draft-74: one window). After landing, /opt/occt and /root/occt
+  need the two libs (lead).
+- **1dc32b Fillet 3:** waits on Chamfer 3 (dx's translation, then blend's chamfer); dump vibe5
+  ~/agents/core-keep/fillet3-1dc.
+- **Open (psui):** Move boundary's Up to face / part / vertex geometry (only the Target errors so far).
+
 ## core state (11-15 09:34 UTC)
 - **Checked:** main 2f33878d8 vs v0.4.52 (qa's userdocs.py, vibe5, 700 copies deleted): rust-zero-solid-f197 x5, hat15,
   hat8, dock all SAME.
