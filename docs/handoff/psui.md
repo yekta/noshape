@@ -51,9 +51,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - live2 (REQUESTS): 13:57 does Chrome's own menu show on a right-clicked Depth (dialog-number-rclick-menu: ours opens
   the input's Cut / Copy / Paste, which takes live's dialog-closing Escape); 16:04 Boundary surface's selection drop
   after the second pick, 3 runs (boundary-surface-new-edit-reedit; every other dialog keeps its picks); 16:04
-  analysis-thickness ×3 retaken on Pro (ours has Thickness analysis; the free plan didn't); 17:2x the navbar's
-  workspace label while editing another document's part in context (context-create-version-update step 3: live null,
-  ours "Main").
+  analysis-thickness ×3 retaken on Pro (ours has Thickness analysis; the free plan didn't). Answered 17:38: the
+  in-context navbar shows "<source> Main" as ours (a recorder miss); context-create-version-update re-recorded and
+  queued by live2: rerun it once on main.
 - skasm: gusset-rectangle-aligned step 7 and end-cap-profile-internal step 5 (live titleState error, ours ok: their
   validation); tab / bend-relief owner labels ("Face of Flange 1" vs "Sheet metal model 1"; their REQUESTS 16:27);
   sketch Linear pattern without Equal + its construction direction line (after 58a0bd16, the circular one).
@@ -74,7 +74,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
    route the others (owners: core model/regen, skasm sketch solver / sheet metal / frames, blend fillets, asm assembly
    menus, studios drawings / documents / account, dx exchange).
 2. Rerun after the others' fixes land: boundary-surface-new-edit-reedit (core 658bef9d), the gussets and end-caps
-   (skasm), sketch pattern takes (skasm 58a0bd16 + linear), context-create-version-update (live2's answer).
+   (skasm), sketch pattern takes (skasm 58a0bd16 + linear), context-create-version-update (live2's retake).
 3. Older open items (11-06 to 11-08 "Next, in order" in the archive) were not re-verified this session; check them
    against the rerun before picking any up (e.g. S-TOOLBAR-OVER-TABS: the S toolbar over the tab bar; qa's 11-12
    sketch-constraint-refusals step 59, not in the psui take list).
