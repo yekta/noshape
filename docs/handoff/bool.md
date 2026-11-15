@@ -4,18 +4,27 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-15 21:46 UTC.
+Updated 11-15 22:57 UTC.
 
 ## In flight
-- Queued to land: deb41792 (snap hook stack: uv_of cache; torus_sections by v for drafted planes; revolved circle
-  arcs taken as their tori, spindle too; interpolated() early exit). Gate 8d7322fd7 clean (CHECK knurls only; replay 0
-  new, the housing case not flagged; suite 78 -> 78, 881/935); hats/dock 12/12 SAME.
-- Gating next: branch bool-shell-si 578353275 (on deb41792): Shell's self-interference pair filter tests an edge's
-  points against the face's own parameter patch of a cylinder / cone / sphere / ring torus (closed form: the nearest
-  angle round the axis in the box, then the generator's segment or the tube's arc) before meshing the face.
-  c2-bottle-split Shell 1 33 -> 18 ms; identical output on the bottle and rings-loft shell-9 dumps; kernel shell
-  tests pass. Then hats/dock (udoc-ab.sh: set its final `git switch` to the branch).
-- Gate for core: 3315dcd6d (core-shellcheck, worktree core-oc), chain-3315dcd6d.out; send core the verdict.
+- Landed: fd462b7a (snap hook stack) 11-15 21:23.
+- Gating: branch bool-shell-si 578353275 (Shell self-interference filter: an edge's points against the face's own
+  parameter patch of a cylinder / cone / sphere / ring torus, closed form, before meshing; c2-bottle-split Shell 1
+  33 -> 18 ms, identical output on the bottle and rings-loft shell-9). First gate run killed (rustc SIGTERM at 22:33,
+  vibe5 load 31): rerun unit bool-gate-578353275b. Hats/dock: udoc-ab.sh (its final switch set to bool-shell-si)
+  waiting for the slot. Rebase onto main at land (its base deb41792 landed as fd462b7a).
+- Core's 3315dcd6d gated clean for them (sent 22:30); they queued it.
+- c2-impeller-loft feature 15 "Boolean Flansch+Gehaeuse" (dx 11-15; mine): ours 19/53/36, live 19/56/39. Recorded
+  vibe5 ~/tmp/bool/imp/38073a30d2ffbc3e (fuse; inputs 6/16/12 + 8/18/12 = live's). Live's per-edge/vertex record:
+  ~/tmp/bool/ab/models/c2-impeller-loft/live.jsonl (feature 15: bodies[0].edges/vertices/faces). Ours before unify
+  20/57/40; the merge of the two z=0 planes (1356.9 + 3128.95 mm2) is live's too (its 4485.914 face). Missing in ours: at
+  3 places live's section on the flange's side walls (y = +-27) ends below z=0, (63.50,27,-0.35), (29.41,-27,-0.69),
+  (61.99,-27,-2.31), and a short second edge goes on to z=0; ours (edge offset x extrusion) runs to z=0 at x 63.86 /
+  30.08 / 64.34. The housing's inner top edge (offset -3 mm face x plane z=0, 243.27 mm) and the flange's top edge
+  (its extruded wall x its z=0 plane) are the same curve: the two walls meet along it (a touching, branched section
+  there). Probe: xprobe probe_case_unify (bool-hat copy) with PROBE_GONE=1, PROBE_AT=x,y,z (edges / faces near a point,
+  inputs too). OCCT's own fuse is wrong (16/47/36, volume 27 mm3 off). Our unify also joins 3 input arcs live keeps
+  (probe only; the feature's own counts keep them).
 
 ## Parked (branches / diffs, not landing as they are)
 - Plane x B-spline marcher + our own least-squares fit (branch bool-free-sections-wip: 71efdd87e, f6c77c748, ...):
