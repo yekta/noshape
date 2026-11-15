@@ -4,55 +4,58 @@ Area: crates/assembly, crates/assembly-ui, the assembly ops in crates/ops and th
 scenarios, the assembly parity suite (`parity_assemblies`) and the parity translator (crates/ops/src/parity.rs) for
 the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: docs/DECISIONS.md.
 
-## State (2026-11-15 19:41 UTC)
+## State (2026-11-15 20:52 UTC)
 
 ### In flight
-- Worktree /root/projects/noshape-wt/asm (detached on 93346d03 = landed fd98e8a6), on top:
-  - 60b13cba (not landed; **decision with the lead**, below): `regions_by_sum` takes the closest group of live's
-    sketch regions (a sliver live splits off).
-  - 70ae7e9b: in-context entities from live's `<element>.context.jsonl` (live, all assembly corpora: isaac-ball 21
-    studios, corexy 2, keyboard-pattern 2, scissor-lift 2, suspension 2). `context_bodies` imports each context body:
-    a planar sheet of one face as that face (`context_face`: edges chained into loops; lines, circles, arcs by `mid`,
-    splines / ellipses through live's 10 `points`), any other body (wires, curved or multi-face sheets) as its 3D
-    edges (`context_wire`); point bodies are skipped. A non-sketch feature's sub-feature maps to its first Import (an
-    Extrude of the face: 1b88ff's Extrude 3 / 4). An in-context sketch sits on live's planar face when there is one
-    (its edges split the sketch's regions as live's: with the 1 m square instead a2e4a2's Extrude 1 got 13 faces, not
-    12), else on the square on live's sketch frame, live's other bodies besides. Loaders: features["contextEntities"]
-    (studios/<element>.context.jsonl; a model dir's context.jsonl). Tests: T1
-    `parity::an_extrude_of_an_in_context_face_extrudes_lives_face`, unit `parity::tests::an_in_context_face_is_rebuilt_from_lives_edges`
-    (both pass on vibe6; Mac run going).
-  - One-model results (ops-s32): 1b88ff 6 -> 12/12 features (matches to the end); a2e4a2 7 -> 9/64 (first difference
-    now Extrude 5: 32/74/42 against live's 32/72/40, same faces, 2 extra edges); 3c5c58 unchanged 9/33 (Fillet 1 sent
-    to blend 19:2x with the repro m3c).
-- Runs: vibe7 isaac-ball s30 (finishing), then s29b (s29 on the new data, the A/B base) and s32, all through slot
-  (~/agents/asm-keep/s01/<build>/asm-isaac-ball.log). vibe6: model gate s30 (gate24/s30.log; for models s32 = s30:
-  no model has context data), then ctx32.sh: corexy / keyboard-pattern / scissor-lift / suspension, s29 vs s32
-  (~/agents/asm-keep/ctx/<build>/<corpus>.log).
+- Worktree /root/projects/noshape-wt/asm (detached on 93346d03 = landed fd98e8a6), on top (none landed):
+  - 60b13cba (**decision with the lead**): `regions_by_sum` takes the closest group of live's sketch regions.
+  - 70ae7e9b: in-context bodies from live's `<element>.context.jsonl` (`context_bodies`: a planar one-face sheet as its
+    face from chained edges; wires, curved or multi-face sheets as 3D edges; splines through live's 10 points; point
+    bodies skipped). A non-sketch feature's sub-feature maps to its first Import (1b88ff's Extrude 3 / 4 extrude it). An
+    in-context sketch sits on live's planar face when there is one (its edges split the regions as live's), else on
+    the 1 m square on live's sketch frame. 1b88ff 6 -> 12/12 features, a2e4a2 7 -> 9/64.
+  - 154e6c65: an assembly's Save view / Delete view is no undo step (psui's 11-12 FYI). UI test passes on the Mac.
+  - 08d6feee: a configured studio's refs.jsonl lines carry `configuration` (live 19:51, the nut's #12-24 / #10-32):
+    the suite keeps those of the configuration it builds the studio in (its first configured instance's) and inserts
+    instances by our part's body id (the nut's custDesc now names the part per size: by name 4 instances failed).
+  - 07f3351a: the suite scores BOM rows: live's bom.json (all 24 corpora, multi-level, root configuration) against
+    our structured `assembly_bom`, row by row (indent, name, quantity, part number, description, material; no
+    material = "- None -" as live's panel). Our default-named parts ("Part N") are renamed to live's names, and
+    subassembly tabs take live's assembly names (instances' name without " <n>"). config-assembly 9/12 rows: the
+    3 standard-content rows lack live's "Stainless Steel" (the suite inserts them from translated studios, without a
+    standard-content spec). keyboard-pattern 4/16 before the tab names.
+- Runs: vibe6 full assembly suite base29 (= main's code; ~/agents/asm-keep/full/base29.log), then ctx32.sh (scissor-lift
+  / suspension pairs). vibe7: isaac-ball s32 (s01/s32), then the full suite s37 (= all five commits; full/s37.log),
+  both through slot. isaac-ball on today's data: s29b 116/121 occurrences, 89/121 mates; s30 116/121, 85/122.
+- Model gate (s30, same base as s29): identical per model except cf-spur-gear and exercise-chino, which drop for s29
+  too since their refs.jsonl / refs-sk.jsonl were refetched at 19:28 (whose? asked the lead).
 
 ### Queued to land
-- Nothing. Landed today: 790ecad5, 36ebccbc, 163918c9 (config-assembly 13 -> 18/18 mates), fd98e8a6 (GearLab runs),
-  8ffdb51e (this file restructured).
+- Nothing. Landed today: 790ecad5, 36ebccbc, 163918c9, fd98e8a6, 8ffdb51e / 72805bc5 (this file).
 
 ### Decision with the lead
-- 60b13cba: isaac-ball 113 -> 116/121 occurrences but as-live mates 97/103 -> 89/121: a2e4a2's part now builds, its
-  later in-context sketches land off, so their mates fail and others overdefine. Model gate clean (s28 = s29 per
-  model). My recommendation: hold until a2e4a2's later sketches are right; s32 (with the context bodies) re-measures it.
+- 60b13cba: isaac-ball 113 -> 116/121 occurrences but as-live mates 97/103 -> 89/121 (old data). The full run base29
+  vs s37 shows it with the rest.
 
 ### Next, in order
-1. Read the isaac-ball s29b vs s32 and the four corpora's s29 vs s32; the model gate (base24/s29 vs s30, per model).
-2. Land 70ae7e9b (and 60b13cba if the lead says so, else rebase it out); update this file.
-3. a2e4a2's Extrude 5 (2 extra edges), then its later features; isaac-ball's mates on a2e4a2.
-4. isaac-ball 1e81ca / 90f78b (GearLab): core's curved-face loft queued 55e517e0; then the opFillet on the toothed
-   solid (blend's). 3c5c58 Fillet 1: blend.
-5. config-assembly 20e932 (optional; 25/25 occurrences, 18/18 mates): Revolve 1 / 2 "tools and targets do not
-   intersect": the studio is built at an instance's configuration, and Sketch 1 / 2's configured dimensions move the
-   geometry (0.92 / 0.80 mm), which the translator takes back; its setData / custDesc Feature Studios aren't fetched.
+1. Read full/base29 vs full/s37 per assembly (occurrences, mates; BOM rows for s37); land the five commits (or four,
+   per the lead on 60b13cba); a SCORE.md "Assemblies" row (the last is 11-08).
+2. BOM: standard content's material (insert standard-content instances as our catalogue's, or set live's material);
+   then the rows that differ most in the full run.
+3. a2e4a2's Extrude 5: 2 extra edges (ours splits a 0.451 mm arc at a vertex of JUm's edges and adds a 13 mm line);
+   live's JUm / Sketch 5 / Extrude 5 edges are in studios/a2e4a2….jum-sketch5.json (live 20:0x).
+4. isaac-ball 1e81ca / 90f78b (GearLab): core's loft 55e517e0, then the opFillet (blend's). 3c5c58 Fillet 1: blend has a
+   dump (vibe7 ~/tmp/blend/m3cd), third in their queue.
+5. config-assembly 20e932: Revolve 1 / 2 still "do not intersect" (configured dimensions taken back by the translator).
+6. live's mate messages (isaac-ball's 7 ERROR, infento's 23) when they land: compare messages, not only statuses.
 
 ### Others' items touching mine
 - dx keeps infento (1dc32b, 74d3d6) and bjr-config (5d8bc1). dx: derivedFrom + ORIGINAL_DEPENDENCY (top-level EDGE)
   queries resolve to faces / sketch regions in the translator; dx covered 1dc32b's Chamfer 4 / Fillet 5 with live's
   refs, not a general fix: tell dx before touching that path.
 - core: 1dc32b's Chamfer 3 (dx) brings back 14 infento occurrences; Hole 2 (2cc476fe) is core's.
+- blend (20:3x): 3c5c58 Fillet 1's input matches live; OCCT fails on the 14 edges together, the by-groups fallback splits
+  two rounds; third in blend's queue.
 - dx (19:3x): assembly studios take the Feature Studios in studios/<element>.fs their sources import (bjr-config
   5d8bc1); lands near my contextEntities loader lines in crates/ops/tests/parity.rs: whoever lands second rebases.
 - psui FYI (11-12): saving a named view is no Undo step in live; the assembly's `self.edit("Save view : …")`
