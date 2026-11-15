@@ -2952,6 +2952,25 @@ fn parity_assemblies() {
     println!("assemblies: {matching}/{docs} as live, occurrences {occurrences_matching}/{occurrences}, mates {mates_matching}/{mates}, BOM rows {bom_matching}/{bom_rows}");
 }
 
+/// A sketch inserted into an assembly (live's instance of type "Feature", asm-keyboard-pattern's "Sketch 1 <1>"): ours
+/// of that sketch, placed as live's occurrence.
+#[test]
+fn a_sketch_instance_is_inserted_as_lives() {
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] }] });
+    let asm = json!({ "rootAssembly": {
+        "instances": [{ "id": "IS", "name": "Sketch 1 <1>", "type": "Feature", "featureId": "FS1", "elementId": "E1" }],
+        "occurrences": [{ "path": ["IS"], "fixed": false, "transform": [1, 0, 0, 0.01, 0, 1, 0, 0, 0, 0, 1, 0.02, 0, 0, 0, 1] }] },
+        "features": { "features": [], "featureStates": {} } });
+    let mut ctx = Ctx::new();
+    let r = rebuild_assembly(&mut ctx, &scratch("sketch-instance.noshape"), &asm, &[("E1".into(), studio, json!([]))]);
+    assert!(r.untranslated.is_empty() && r.differences.is_empty(), "{r:?}");
+    assert_eq!((r.occurrences_matching, r.occurrences), (1, 1), "{r:?}");
+}
+
 /// An assembly rebuilt from live's definition: a cylinder's two instances,
 /// the first fixed, the second stacked on it by a Revolute (connectors at the
 /// centres of the top and bottom edges) and turned 30° after: placed, fixed

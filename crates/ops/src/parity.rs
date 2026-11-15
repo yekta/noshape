@@ -8251,6 +8251,16 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 }
             }
             trace(&format!("insert {}: {args}", i["name"]));
+            // A sketch inserted (live's type "Feature"): ours of its feature.
+            if i["type"] == "Feature" {
+                match i["featureId"].as_str().and_then(|f| studio_features.get(element)?.get(f)) {
+                    Some(sketch) => args["sketch"] = json!(sketch),
+                    None => {
+                        res.untranslated.push(format!("instance {}: sketch {} not in its Part Studio", i["name"], i["featureId"]));
+                        continue;
+                    }
+                }
+            }
             if i["type"] == "Part" {
                 let key = i["partId"].as_str().map(|p| (element.to_string(), p.to_string()));
                 match key.and_then(|k| part_bodies.get(&k).or_else(|| part_names.get(&k))) {
