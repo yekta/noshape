@@ -2275,7 +2275,8 @@ impl AssemblyView {
         let grid = rgb(0xaaaaaa);
         const WIDTHS: [f32; 6] = [140., 80., 80., 160., 180., 140.];
         let cell = |k: usize, readonly: bool| div().w(px(WIDTHS[k])).h_full().flex_none().flex().items_center().px(px(6.)).border_r_1().border_color(grid).when(readonly, |d| d.bg(rgb(0xf5f5f5))).when(!readonly, |d| d.bg(rgb(0xffffff)));
-        let header = h_flex().h(px(33.)).bg(rgb(0xeaeaea)).border_b_1().border_color(grid).children(
+        // Live 65: a 34 px header and 35 px rows, the lines included.
+        let header = h_flex().h(px(34.)).bg(rgb(0xeaeaea)).border_b_1().border_color(grid).children(
             ["Instance", "Source", "Symmetry", "Mirror action", "Mirror reference", "Placement type"]
                 .iter()
                 .enumerate()
@@ -2332,7 +2333,7 @@ impl AssemblyView {
             table = table.child(
                 h_flex()
                     .id(SharedString::from(format!("ms-row-{k}")))
-                    .h(px(33.))
+                    .h(px(35.))
                     .border_b_1()
                     .border_color(grid)
                     .text_size(px(13.33))
@@ -2344,9 +2345,9 @@ impl AssemblyView {
                             this.refresh_scene(false, cx);
                         }
                     }))
-                    .child(cell(0, true).justify_center().gap(px(4.)).child(crate::assets::icon("part", 16., cx)).child(inst.name.clone()))
+                    .child(cell(0, true).justify_center().gap(px(4.)).child(crate::assets::icon("part", 20., cx)).child(inst.name.clone()))
                     // Live: the source workspace ("Main").
-                    .child(cell(1, true).justify_center().gap(px(4.)).child(crate::assets::icon("legend-workspace", 14., cx)).child("Main"))
+                    .child(cell(1, true).justify_center().gap(px(4.)).child(crate::assets::icon("legend-workspace", 18., cx)).child("Main"))
                     // Live: the part's detected symmetry, "Symmetric" /
                     // "Non-symmetric" (behaviours "skb (10-23 15:30)" (2)).
                     .child({
@@ -2355,7 +2356,7 @@ impl AssemblyView {
                             .id(SharedString::from(format!("ms-sym-{k}")))
                             .justify_center()
                             .tooltip(crate::ui::tooltip(if sym { "Symmetric" } else { "Non-symmetric" }))
-                            .child(crate::assets::icon(if sym { "symmetric" } else { "asymmetric" }, 18., cx))
+                            .child(crate::assets::icon(if sym { "mirror-symmetric" } else { "asymmetric" }, 20., cx))
                     })
                     // Live 66: the select fills its cell.
                     .child(cell(3, false).px_0().child(div().size_full().child(action.size_full())))
@@ -2396,11 +2397,12 @@ impl AssemblyView {
                         .child(
                             div()
                                 .id("ms-close")
-                                .px(px(8.))
-                                .text_size(px(16.67))
-                                .text_color(rgb(0x999999))
+                                // Live 65: a thin 11 px grey X, its centre 13 px in from the right.
+                                .pr(px(2.))
+                                .flex()
+                                .items_center()
                                 .cursor_pointer()
-                                .child("×")
+                                .child(crate::ui::glyph("panel-close", 22., rgb(0x999999)))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     if let Some(p) = &mut this.pattern {
                                         p.strategy_open = false;
@@ -2419,7 +2421,7 @@ impl AssemblyView {
                         .child(
                             div()
                                 .id("ms-update")
-                                .h(px(33.))
+                                .h(px(34.))
                                 .px(px(12.))
                                 .flex()
                                 .items_center()
