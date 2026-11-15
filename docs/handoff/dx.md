@@ -5,6 +5,24 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 10:07 UTC: Part mirror + Edge point landed; 1dc32b 4 failing; custom-feature speed (std cold load)
+- Landed: Edge point on a sketch curve, evCollision same-side faces interfere (Part mirror boss-block Add, core/psui),
+  studio refs from `<element>.refs.jsonl` (ca3083c7); inspection bubble fill one outlined path (fa4acfdb).
+- 1dc32b (vibe6 save8, 08:25; live's RSCC / RlCN / RnCN in studios/1dc32b….refs.jsonl, live 3115): 4 not OK:
+  Fillet 2, Chamfer 3 (edges map; the chamfer fails), Draft 1, Fillet 12. Sent to core.
+- Speed (qa 11-15, P0; qa: std's cold compile counts): Snap Hook = bool's Rust Boolean, Fillet 6 = blend.direct,
+  Lighten's opShell bool, opOffsetFace + opEnclose (is_material_of's volumes) core. Mine:
+  - cfb10706d (gating): evEdgeConvexity from the face's use of the edge (no classifier): Lighten's 26 -> 8 ms.
+  - 494f6c784 (gating): std modules each in their own OnceLock slot; a release's parse shared across threads. The
+    CLI's first custom feature waited for std prewarm's whole release (extrude.fs) under the global lock. vibe6 load 7,
+    median of 5: cf-3d-spline 213 -> 49 ms, cf-mortise-and-tenon 164 -> 57 (live 43 / 43). Next if needed: a disk
+    cache of parsed std (AST serde; a new dependency) or a cheaper 336-style unpack (16 ms on the Mac: 7.5 MB prefix).
+  - Tools: NOSHAPE_KERNEL_PROFILE=1 (per feature), NOSHAPE_FS_PROFILE=fn (natives' ms); sudo perf works on vibe7.
+- Crop spline: live's is a periodic cubic at chord-length knots (live2 trace, in-material 22.84 vs 22.99 mm). Built on
+  branch dx-spline (4872f723c), not landed: our scenario's clicks snap onto the block's edges (studios' 9 px snap;
+  ours cross at x 5.3 / 25.3, live 6.5 / 23.4), and drw-broken-out-section moves match -> miss with it (asked live2
+  for a broken-out trace). Note leader shoulder: waits for live2's samples (0.09 in gap, 0.18 in long in the one).
+
 ## 11-15 07:18 UTC: exports 81 / 84 by count; spur gear bisected to blend; 1dc32b 15 -> 9 failing
 - Landed: hatch spacing (one region: diag / 9, several: / 13, spline control boxes), aux viewing line (W/2 + 3.63 mm,
   W/4 + 10.96 mm off, W the parent view's width), a Single centermark on an automatic one's hole is that mark, crop
