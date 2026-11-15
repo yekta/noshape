@@ -5,6 +5,19 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 14:41 UTC: drawing exports 84 / 84; revision table sizing; sheet metal 58 faces
+- Revision table as live2's feel/revtable: columns fixed in content text heights (11.044 / 15.068 / 11.24 / 7.649 h, at
+  least 1 in; other template columns from their text), rows 1.333 / 1.395 / 5/3 h + 2 x padding, text wraps in a
+  fixed column (room: width - one padding; bold "Revision description" fits at 0.12 in, "DATE APPROVED" wraps at
+  3.5 mm), the working "A*" row not drawn as pending (help image: only a release's pending row is blue with a
+  triangle). drw-revision-table 3/3: all 28 export takes 84 / 84 on vibe7 (the others from exp-1115r).
+- skasm's exact coplanar planes (6f5b151e): live imports Part 3 as 58/151/94 in STEP and IGES (live-ours-snap.json).
+  Once it lands, ask live to re-import main's 48 files into live-ours.json (the suite still reads the 03:41 imports).
+- Next: 1dc32b Chamfer 3 (core 14:3x: Fillet 3, asm's 14 infento occurrences, runs on an unchamfered Pedal; live's
+  Chamfer 3 takes the Pedal 100541.895 -> 87057.042 mm³; on main 'CAP_EDGE of FisZkH2thasvYdD_30: no entity of ours
+  matches'; with live's refs it maps and the chamfer fails: blend's if the chamfer itself). Fillet 3 dump: vibe5
+  ~/agents/core-keep/fillet3-1dc/fillet-58. Studios' view fit landed (69f67433): drw-broken-out-section matches anyway.
+
 ## 11-15 12:34 UTC: splines land; broken-out jog; note shoulder; exchange
 - Queued 2cb0c7d2 (dx-spline2's spline: crop chord-length, broken-out centripetal), 5ac58988 (broken-out jog lines
   only over material, pieces on the centripetal curve; compare.py measures a DXF spline along its curve), then the
