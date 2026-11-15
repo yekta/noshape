@@ -294,7 +294,9 @@ fn revision_data_with(kind: &TableKind, revisions: &[RevisionRow], template: Opt
     let caps = |s: String| if t.all_caps { s.to_uppercase() } else { s };
     let header: Vec<String> = t.columns.iter().enumerate().map(|(i, c)| headers.get(i).cloned().flatten().unwrap_or_else(|| caps(c.clone()))).collect();
     let rows: Vec<Vec<String>> = shown.iter().map(|r| t.columns.iter().map(|c| caps(RevisionTemplate::cell(c, r, &desc_of(r)))).collect()).collect();
-    let pending = shown.iter().enumerate().filter(|(_, r)| r.pending).map(|(i, _)| i).collect();
+    // Blue with a triangle: a revision pending in a release, not the unreleased working one (help
+    // drawings__revision-table-pending: "A△" blue, "A*" plain).
+    let pending = shown.iter().enumerate().filter(|(_, r)| r.pending && !std::ptr::eq(**r, &working)).map(|(i, _)| i).collect();
     let width_factors = t.columns.iter().map(|c| REVISION_COLUMN_WIDTHS.iter().find(|(n, _)| n == c).map(|(_, k)| *k)).collect();
     TableData { title: Some(title.clone().unwrap_or_else(|| REVISION_TITLE.into())), header: Some(header), rows, pending, padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), width_factors, row_factors: Some(REVISION_ROWS), ..Default::default() }
 }
@@ -1424,7 +1426,7 @@ mod tests {
         assert_eq!(d.rows.iter().map(|r| r[0].as_str()).collect::<Vec<_>>(), vec!["A", "B", "C*"]);
         // Nothing released yet: the first revision, unreleased.
         let d0 = table_data(&Drawing::default(), &t, None, None, None, &[], &|s| s.to_string());
-        assert_eq!((d0.rows, d0.pending), (vec![vec!["A*".to_string(), String::new(), "-".into(), "-".into()]], vec![0]));
+        assert_eq!((d0.rows, d0.pending), (vec![vec!["A*".to_string(), String::new(), "-".into(), "-".into()]], vec![]));
         assert_eq!((d.rows[1][1].as_str(), d.pending.as_slice()), ("Hole moved", &[2][..]));
         // Two visible rows, newest at the top.
         if let TableKind::Revision { visible_rows, newest_top, .. } = &mut t.kind {
