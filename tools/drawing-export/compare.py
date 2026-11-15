@@ -99,6 +99,16 @@ def spline_curve(e, per_span=64):
     return [at(u0 + (u1 - u0) * i / n) for i in range(n + 1)]
 
 
+def ocs_to_sheet(normal, elevation):
+    """A vertex (x, y, …) in the OCS of extrusion `normal` (DXF's arbitrary axis rule) to its WCS (x, y)."""
+    n = [c / math.sqrt(sum(c * c for c in normal)) for c in normal]
+    cross = lambda a, b: (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+    unit = lambda a: [c / math.sqrt(sum(c * c for c in a)) for c in a]
+    ax = unit(cross((0, 1, 0), n) if abs(n[0]) < 1 / 64 and abs(n[1]) < 1 / 64 else cross((0, 0, 1), n))
+    ay = unit(cross(n, ax))
+    return lambda p: tuple(p[0] * ax[c] + p[1] * ay[c] + elevation * n[c] for c in range(2))
+
+
 def entity_length(e):
     t = e["type"]
     if t == "LINE":
@@ -121,6 +131,12 @@ def entity_length(e):
         v = e.get("_verts", [])
         closed = int(num(e, "70")) & 1
         pairs = list(zip(v, v[1:] + (v[:1] if closed else [])))
+        normal = (num(e, "210"), num(e, "220"), num(e, "230", default=1.0))
+        if abs(normal[0]) > 1e-9 or abs(normal[1]) > 1e-9:
+            # In a tilted OCS (live's note leaders): its length on the sheet, the vertices taken to WCS and seen from
+            # above (bulges as chords).
+            on_sheet = ocs_to_sheet(normal, num(e, "30"))
+            return sum(math.dist(on_sheet(a), on_sheet(b)) for a, b in pairs)
         total = 0.0
         for (x0, y0, bulge), (x1, y1, _) in pairs:
             chord = math.dist((x0, y0), (x1, y1))
