@@ -380,6 +380,9 @@ pub struct AdvancedSearch {
     extra: Vec<(&'static str, Entity<InputState>, bool)>,
     results_from: usize,
     results_at: usize,
+    /// The select fields' own focus (Type, State, Add criteria, Results from, Results at): a click focuses its field
+    /// and the keyboard is back on it when its list closes (live docs-adv-state-list: Esc leaves the field focused).
+    selects: [FocusHandle; 5],
     _subs: Vec<Subscription>,
 }
 
@@ -402,7 +405,8 @@ impl AdvancedSearch {
                 })
             })
             .into();
-        Self { types: Vec::new(), name, description, part_number, revision, state: None, extra: Vec::new(), results_from: 0, results_at: 0, _subs }
+        let selects = std::array::from_fn(|_| cx.focus_handle());
+        Self { types: Vec::new(), name, description, part_number, revision, state: None, extra: Vec::new(), results_from: 0, results_at: 0, selects, _subs }
     }
 
     pub(crate) fn query(&self, cx: &App) -> Query {
@@ -471,9 +475,15 @@ impl Render for AdvancedSearch {
             let b = a.get();
             point(b.left(), b.bottom())
         };
+        let selects = self.selects.clone();
         let select = |id: &'static str, text: String, placeholder: bool, anchor: &Rc<Cell<Bounds<Pixels>>>| {
             let probe = anchor.clone();
+            let focus = selects[anchors.iter().position(|a| Rc::ptr_eq(a, anchor)).unwrap_or(0)].clone();
+            let take = focus.clone();
             field_box(id)
+                .debug_selector(move || id.into())
+                .track_focus(&focus)
+                .on_mouse_down(MouseButton::Left, move |_, window, cx| window.focus(&take, cx))
                 .relative()
                 .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                 .pl(px(8.))
@@ -614,6 +624,39 @@ mod tests {
     use super::{hits, state_facts, DocFacts, Query, TabContent};
     use noshape_model::document::Document;
     use noshape_model::partstudio::{PartProperties, PartStudio};
+
+    /// Live docs-adv-state-list / docs-adv-type-list: a click on a select field opens its list with the field focused,
+    /// and Esc closes the list leaving the keyboard on the field.
+    #[gpui_kit::test]
+    fn esc_on_a_select_fields_list_leaves_the_field_focused(cx: &mut gpui_kit::TestAppContext) {
+        use gpui_kit::{AppContext as _, Bounds, Modifiers, Point, WindowBounds, WindowOptions, px, size};
+        cx.update(gpui_kit::init);
+        let (window, view) = cx.update(|cx| {
+            let bounds = Bounds { origin: Point::default(), size: size(px(800.), px(600.)) };
+            let mut view = None;
+            let (w, _) = crate::os_menu::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+                let v = cx.new(|cx| super::AdvancedSearch::new(window, cx));
+                view = Some(v.clone());
+                v
+            })
+            .unwrap();
+            (w, view.unwrap())
+        });
+        cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+        for (field, i) in [("adv-state", 1), ("adv-type", 0)] {
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            let b = vcx.debug_bounds(field).unwrap_or_else(|| panic!("no {field}"));
+            vcx.simulate_click(b.center(), Modifiers::default());
+            vcx.run_until_parked();
+            assert!(cx.update(|cx| crate::os_menu::is_open(cx)), "{field}: its list opens");
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_keystrokes("escape");
+            vcx.run_until_parked();
+            assert!(!cx.update(|cx| crate::os_menu::is_open(cx)), "{field}: Esc closes the list");
+            let focused = cx.update_window(window, |_, w, cx| view.read(cx).selects[i].is_focused(w)).unwrap();
+            assert!(focused, "{field}: the field keeps the keyboard");
+        }
+    }
 
     /// A document with two workspaces and a version: its tabs are found.
     #[test]

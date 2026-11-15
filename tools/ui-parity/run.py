@@ -590,6 +590,17 @@ def panel_fields_unread(a, b, recorded):
         db["fields"] = []
 
 
+def select_unread(a, b, step):
+    """A field's drop-down list where live's recorder read neither the panel nor a list (the documents page's Advanced
+    search before 11-15: docs-adv-state-list, docs-adv-type-list read null throughout; a native select's list isn't in
+    its page): ours' list isn't compared."""
+    on = (step or {}).get("on")
+    if (step or {}).get("do") != "click" or not (isinstance(on, dict) and isinstance(on.get("field"), str)):
+        return
+    if isinstance(a, dict) and isinstance(b, dict) and a.get("list") is None and a.get("dialog") is None and b.get("dialog") is None and b.get("list") is not None:
+        b["list"] = None
+
+
 def texts_late(a, b, later):
     """Annotation texts live's drawing data takes up to two steps late (`later`: its next states' texts; a palette's
     edit is written ~0.6 s after the Esc that closes it, live drw-hole-callout-palette): where ours differs, live's next
@@ -1290,6 +1301,7 @@ def compare(live, ours, whole_document=True):
         old_dimension_pick(a, b, str(live.get("recorded") or ""))
         recorder_form(b, live)
         panel_fields_unread(a, b, str(live.get("recorded") or ""))
+        select_unread(a, b, step)
         hole_callout_export_text(a, b)
         view_frame_late(a, b, step)
         placed_alike(a, b)

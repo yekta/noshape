@@ -404,6 +404,8 @@ impl DrawingEditor {
         // reads none: live drw-hole-callout-palette, live2 drw-dimension-dblclick-precision.)
         if let Some(b) = self.built.as_ref().filter(|_| matches!(self.tool, Tool::Select | Tool::RevisionCallout { .. }) && self.panel.is_none() && self.hatch_dlg.is_none() && self.palette.is_none()) {
             let thin = |id: u64| sheet.annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. } | AnnotationKind::CircleCenterline { .. }));
+            // A selected hole callout is orange only behind its text (live q-escsel: its leader stays black).
+            let callout_lines = self.hole_callout_selection_picks();
             let lit = |pick: u32| {
                 let Some(p) = b.picks.get(pick as usize) else { return false };
                 self.selection.iter().any(|s| match (s, p) {
@@ -427,7 +429,7 @@ impl DrawingEditor {
                 let Some(pl) = self.placement(v.id) else { continue };
                 let inside = |p: [f64; 2]| p[0] >= pl.min[0] && p[0] <= pl.max[0] && p[1] >= pl.min[1] && p[1] <= pl.max[1];
                 let mut px = 0.0;
-                for l in b.geometry.lines.iter().filter(|l| lit(l.pick) || selected_view(l.pick, v.id)) {
+                for l in b.geometry.lines.iter().filter(|l| (lit(l.pick) && !callout_lines.contains(&l.pick)) || selected_view(l.pick, v.id)) {
                     for w in l.points.windows(2) {
                         if inside([(w[0][0] + w[1][0]) / 2.0, (w[0][1] + w[1][1]) / 2.0]) {
                             px += (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]) * self.zoom;

@@ -156,4 +156,48 @@ impl DrawingEditor {
             scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().unpickable().layer(22));
         }
     }
+
+    /// The selected hole callouts' picks, which don't take the selection colour: live draws a selected callout with
+    /// an orange box behind its text and its leader black, its holes light blue (live q-escsel,
+    /// drw-hole-callout-palette after Esc; the holes: `push_related_highlights`).
+    pub fn hole_callout_selection_picks(&self) -> Vec<u32> {
+        let sheet = self.current_sheet();
+        self.selection
+            .iter()
+            .filter(|s| matches!(s, Sel::Annotation(id) if sheet.annotations.iter().any(|a| a.id == *id && matches!(a.kind, AnnotationKind::HoleCallout { .. }))))
+            .flat_map(|s| self.picks_of(*s))
+            .collect()
+    }
+
+    /// [`Self::hole_callout_selection_picks`]' look: one orange box around each callout's text.
+    pub fn push_hole_callout_selection(&self, scene: &mut Scene) {
+        use noshape_render::{Drawable, Instance, MeshData};
+        let Some(b) = &self.built else { return };
+        let sheet = self.current_sheet();
+        let mut boxes = MeshData::default();
+        for s in &self.selection {
+            let Sel::Annotation(id) = s else { continue };
+            if !sheet.annotations.iter().any(|a| a.id == *id && matches!(a.kind, AnnotationKind::HoleCallout { .. })) {
+                continue;
+            }
+            let picks = self.picks_of(*s);
+            let corners: Vec<[f64; 2]> = b.geometry.texts.iter().filter(|t| picks.contains(&t.pick) && !t.text.trim().is_empty()).flat_map(font::text_box).collect();
+            if corners.is_empty() {
+                continue;
+            }
+            let (x0, y0) = corners.iter().fold((f64::INFINITY, f64::INFINITY), |m, p| (m.0.min(p[0]), m.1.min(p[1])));
+            let (x1, y1) = corners.iter().fold((f64::NEG_INFINITY, f64::NEG_INFINITY), |m, p| (m.0.max(p[0]), m.1.max(p[1])));
+            let base = boxes.positions.len() as u32;
+            for p in [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] {
+                boxes.positions.push([p[0] as f32, p[1] as f32, -0.5]);
+                boxes.normals.push([0.0, 0.0, 1.0]);
+                boxes.pick_ids.push(0);
+            }
+            boxes.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+        }
+        if !boxes.indices.is_empty() {
+            let mesh = self.gpu.uploader().upload_mesh(&boxes);
+            scene.instances.push(Instance::new(Drawable::Mesh(mesh)).with_color(crate::theme::lin(0xcc925c)).unlit().unpickable().layer(-4));
+        }
+    }
 }

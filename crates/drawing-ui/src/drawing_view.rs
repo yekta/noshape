@@ -1587,7 +1587,7 @@ impl DrawingEditor {
             scene.states = vec![0; b.picks.len()];
             // A selected view label has its own look (push_label_highlights),
             // and so does a selected datum (push_datum_selection).
-            let datums = self.datum_selection_picks();
+            let datums: Vec<u32> = self.datum_selection_picks().into_iter().chain(self.hole_callout_selection_picks()).collect();
             for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).filter(|s| !matches!(s, Sel::ViewLabel(_))) {
                 for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p)) {
                     scene.add_flag(p, state::SELECTED);
@@ -1620,6 +1620,7 @@ impl DrawingEditor {
             self.push_replicate_overlay(&mut scene);
             self.push_label_highlights(&mut scene);
             self.push_datum_selection(&mut scene);
+            self.push_hole_callout_selection(&mut scene);
             self.push_aux_states(&mut scene);
         }
         scene
