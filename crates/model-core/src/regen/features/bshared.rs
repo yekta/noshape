@@ -230,9 +230,17 @@ pub fn surface_result(ev: &mut EvalCtx, tool: NamedShape) -> FResult<()> {
         return ev.apply_operation(vec![tool], "NEW", None, BodyKind::Surface);
     }
     let mut shapes: Vec<Shape> = targets.iter().map(|&i| ev.ctx.bodies[i].shape.clone()).collect();
+    // A patch lying on faces already there joins them as they are (live: a Boundary surface between two opposite
+    // edges of a plane surface leaves that surface alone).
+    let target_faces: Vec<Shape> = shapes.iter().flat_map(|s| s.faces()).collect();
+    let tool_faces = tool.shape.faces();
+    if !tool_faces.is_empty() && tool_faces.iter().all(|f| target_faces.iter().any(|g| face_duplicates(f, g))) {
+        return Ok(());
+    }
     shapes.push(tool.shape.clone());
+    // A closed sew is a solid only where it encloses volume and leaves no sheet out.
     let res = match k::sew(&shapes, 1e-6, true) {
-        Ok(r) if r.shape.count(ShapeType::Solid) > 0 => r,
+        Ok(r) if encloses_all(&r.shape) => r,
         _ => k::sew(&shapes, 1e-6, false)?,
     };
     let mut args: Vec<ShapeNames> = targets.iter().map(|&i| ev.ctx.bodies[i].shape_names()).collect();
@@ -252,6 +260,38 @@ pub fn surface_result(ev: &mut EvalCtx, tool: NamedShape) -> FResult<()> {
         ev.ctx.bodies.insert(at, Arc::new(body));
     }
     Ok(())
+}
+
+/// Whether face `f` lies on face `g` all over: the same area, and its points on `g`.
+fn face_duplicates(f: &Shape, g: &Shape) -> bool {
+    let (Ok(a), Ok(b)) = (f.area(), g.area()) else { return false };
+    if (a - b).abs() > 1e-7 * a.max(b) {
+        return false;
+    }
+    let Ok([u0, u1, v0, v1]) = f.uv_bounds() else { return false };
+    let mut seen = 0;
+    for i in 1..4 {
+        for j in 1..4 {
+            let (u, v) = (u0 + (u1 - u0) * i as f64 / 4.0, v0 + (v1 - v0) * j as f64 / 4.0);
+            if !f.contains_uv(u, v, 1e-9).unwrap_or(false) {
+                continue;
+            }
+            let Ok(p) = f.point_at_uv(u, v) else { return false };
+            if !g.contains_point(p, 1e-7).unwrap_or(false) {
+                return false;
+            }
+            seen += 1;
+        }
+    }
+    seen > 0
+}
+
+/// Whether a sew's result is solids enclosing volume, with every face in one.
+fn encloses_all(shape: &Shape) -> bool {
+    let solids = shape.solids();
+    !solids.is_empty()
+        && solids.iter().all(|s| s.volume().map(|v| v.abs() > 1e-15).unwrap_or(false))
+        && solids.iter().map(|s| s.faces().len()).sum::<usize>() == shape.faces().len()
 }
 
 /// A unit vector perpendicular to `z`, aligned with world X when possible

@@ -354,6 +354,19 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(&["entities"], "Select a surface or boundary edges to move.");
     }
     if !ev.is("endCondition", "BLIND") {
+        // std's extend.fs: the Target first (Up to part/surface asks for one only with an offset).
+        let target = if ev.is("endCondition", "UP_TO_FACE") {
+            Some("targetFace")
+        } else if ev.is("endCondition", "UP_TO_VERTEX") {
+            Some("targetVertex")
+        } else if ev.bool("hasOffset") {
+            Some("targetPart")
+        } else {
+            None
+        };
+        if let Some(t) = target.filter(|t| ev.query(t).is_empty()) {
+            return crate::regen::eval::err_at(&[t], crate::regen::custom_features::error_text("EXTEND_SHEET_BODY_NO_TARGET"));
+        }
         return err("Move boundary currently supports only the Blind end condition");
     }
     let d = ev.length("extendDistance")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 };

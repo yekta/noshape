@@ -1661,6 +1661,54 @@ fn fill_on_an_open_box_knits_a_solid() {
 }
 
 
+/// psui's boundary-surface-new-edit-reedit (ui-parity start "surfaces"): a Boundary surface between two opposite edges
+/// of a plane surface lies on it; with Add (Merge with all) live's parts stay one surface there and the plane crossing
+/// it, no part (ours sewed the two coincident sheets into a solid and took the crossing sheet with it).
+#[test]
+fn a_boundary_surface_on_a_surface_already_there_adds_nothing() {
+    let mut s = Studio::new();
+    let mut a = noshape_sketch::Sketch::new();
+    let la = a.add_line(DVec2::new(-0.02, 0.01), DVec2::new(0.02, 0.01)).0;
+    let sa = s.sketch(Reference::Plane(DatumPlane::Front), a);
+    s.add("extrude", move |p| {
+        p.set("bodyType", ParamValue::Enum("SURFACE".into()));
+        p.set("surfaceEntities", ParamValue::Query(vec![Reference::SketchEntity { sketch: sa, entity: la }]));
+        p.set("depth", expr("40 mm"));
+        p.set("symmetric", ParamValue::Bool(true));
+    });
+    let mut b = noshape_sketch::Sketch::new();
+    let lb = b.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.0, 0.02)).0;
+    let sb = s.sketch(Reference::Plane(DatumPlane::Right), b);
+    s.add("extrude", move |p| {
+        p.set("bodyType", ParamValue::Enum("SURFACE".into()));
+        p.set("surfaceEntities", ParamValue::Query(vec![Reference::SketchEntity { sketch: sb, entity: lb }]));
+        p.set("depth", expr("120 mm"));
+        p.set("symmetric", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let side = |x: f64| {
+        let i = b.shape.edges().iter().position(|e| { let (p, q) = e.endpoints().unwrap(); near(p.x, x, 1e-9) && near(q.x, x, 1e-9) }).expect("edge");
+        Reference::Edge((*b.edges[i]).clone())
+    };
+    let (e0, e1) = (side(0.02), side(-0.02));
+    s.add("boundarySurface", move |p| {
+        let row = |e: Reference| {
+            let mut v = ParamValues::default();
+            v.set("uProfileEntities", ParamValue::Query(vec![e]));
+            v.set("uCondition", ParamValue::Enum("DEFAULT".into()));
+            v
+        };
+        p.set("uProfilesArray", ParamValue::Array(vec![row(e0), row(e1)]));
+        p.set("surfaceOperationType", ParamValue::Enum("ADD".into()));
+        p.set("defaultSurfaceScope", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let kinds: Vec<BodyKind> = r.context.bodies.iter().map(|b| b.kind).collect();
+    assert_eq!(kinds, vec![BodyKind::Surface, BodyKind::Surface]);
+    assert!(near(surface_area(&r, 0), 1600e-6, 1e-10), "area {} mm²", surface_area(&r, 0) * 1e6);
+}
+
 /// Mutual trim's keep-side flips as std's (audit-part-studio M11; mutualTrim.fs createManipulators): a Front fill
 /// crossing one on a plane at x 20 mm meets it along x 20, y 0: both arrows at that line's middle (z 15 mm), the
 /// first across it in the Front surface (along X), the second in the other (along Y); std's change function turns a
@@ -1780,5 +1828,32 @@ fn move_boundary_with_nothing_selected_marks_its_selection_with_any_end_conditio
         let st = r.display.features.last().unwrap();
         assert_eq!(st.status, FeatureStatus::Error, "{cond}");
         assert_eq!(st.faulty, vec!["entities".to_string()], "{cond}: {:?}", st.message);
+    }
+}
+
+/// psui's move-boundary-up-to-face / -vertex: with a surface picked, an Up to end condition without its Target marks
+/// that field (std's EXTEND_SHEET_BODY_NO_TARGET); Up to part/surface asks for one only with an offset.
+#[test]
+fn move_boundary_up_to_without_a_target_marks_the_target() {
+    for (cond, offset, want) in [("UP_TO_FACE", false, Some("targetFace")), ("UP_TO_VERTEX", false, Some("targetVertex")), ("UP_TO_BODY", true, Some("targetPart")), ("UP_TO_BODY", false, None)] {
+        let mut s = Studio::new();
+        let mut a = noshape_sketch::Sketch::new();
+        let la = a.add_line(DVec2::new(-0.02, 0.01), DVec2::new(0.02, 0.01)).0;
+        let sa = s.sketch(Reference::Plane(DatumPlane::Front), a);
+        let ex = s.add("extrude", move |p| {
+            p.set("bodyType", ParamValue::Enum("SURFACE".into()));
+            p.set("surfaceEntities", ParamValue::Query(vec![Reference::SketchEntity { sketch: sa, entity: la }]));
+            p.set("depth", expr("40 mm"));
+        });
+        s.add("extendSurface", move |p| {
+            p.set("entities", ParamValue::Query(vec![Reference::Body(BodyId { feature: ex, index: 0 })]));
+            p.set("endCondition", ParamValue::Enum(cond.into()));
+            p.set("hasOffset", ParamValue::Bool(offset));
+        });
+        let r = s.regen();
+        let st = r.display.features.last().unwrap();
+        assert_eq!(st.status, FeatureStatus::Error, "{cond}");
+        let want: Vec<String> = want.into_iter().map(String::from).collect();
+        assert_eq!(st.faulty, want, "{cond} offset {offset}: {:?}", st.message);
     }
 }
