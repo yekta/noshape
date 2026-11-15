@@ -212,15 +212,23 @@ double rough_volume_of(const TopoDS_Shape& s)
 }
 
 // rough_volume_of with its closed shells' faces integrated on threads of their own, from one origin (as OCCT's, the
-// vertices' mean): an offset loft's wall, 56 ms on one.
+// vertices' mean), where one is free-form: an offset loft's wall, 56 ms on one. (Planes, cylinders, cones, spheres
+// and tori alone on one: quick, and a loaded machine's pool took longer to wake, c2-bottle-split's 3 -> 6-11 ms.)
 double rough_volume_by_faces(const TopoDS_Shape& s)
 {
   std::vector<TopoDS_Face> fs;
+  bool                     free_form = false;
   for (TopExp_Explorer x(s, TopAbs_SHELL); x.More(); x.Next())
     if (BRep_Tool::IsClosed(x.Current()))
       for (TopExp_Explorer y(x.Current(), TopAbs_FACE); y.More(); y.Next())
         if (y.Current().Orientation() == TopAbs_FORWARD || y.Current().Orientation() == TopAbs_REVERSED)
+        {
           fs.push_back(TopoDS::Face(y.Current()));
+          const GeomAbs_SurfaceType k = BRepAdaptor_Surface(fs.back(), false).GetType();
+          free_form = free_form || !(k == GeomAbs_Plane || k == GeomAbs_Cylinder || k == GeomAbs_Cone || k == GeomAbs_Sphere || k == GeomAbs_Torus);
+        }
+  if (!free_form)
+    return rough_volume_of(s);
   gp_XYZ c(0, 0, 0);
   int    n = 0;
   for (TopExp_Explorer x(s, TopAbs_VERTEX); x.More(); x.Next(), ++n)
@@ -3964,6 +3972,38 @@ occ::handle<BRepExtrema_TriangleSet> triangle_set(const TopoDS_Face& meshed)
   return set;
 }
 
+// A point's distance from a plane's, cylinder's, cone's (both nappes), sphere's or torus's whole surface (none
+// nearer the face): -1 for another surface.
+double distance_from_surface(const BRepAdaptor_Surface& s, const gp_XYZ& p)
+{
+  switch (s.GetType())
+  {
+    case GeomAbs_Plane:
+      return s.Plane().Distance(gp_Pnt(p));
+    case GeomAbs_Cylinder:
+      return std::abs(gp_Lin(s.Cylinder().Axis()).Distance(gp_Pnt(p)) - s.Cylinder().Radius());
+    case GeomAbs_Sphere:
+      return std::abs((p - s.Sphere().Location().XYZ()).Modulus() - s.Sphere().Radius());
+    case GeomAbs_Cone:
+    {
+      const gp_Cone& c = s.Cone();
+      const gp_XYZ   d = p - c.Location().XYZ();
+      const double   z = d.Dot(c.Axis().Direction().XYZ()), rho = (d - c.Axis().Direction().XYZ() * z).Modulus();
+      const double   t = std::tan(c.SemiAngle()), k = std::cos(c.SemiAngle());
+      return std::min(std::abs(rho - c.RefRadius() - z * t), std::abs(rho + c.RefRadius() + z * t)) * k;
+    }
+    case GeomAbs_Torus:
+    {
+      const gp_Torus& c = s.Torus();
+      const gp_XYZ    d = p - c.Location().XYZ();
+      const double    z = d.Dot(c.Axis().Direction().XYZ()), rho = (d - c.Axis().Direction().XYZ() * z).Modulus();
+      return std::abs(std::hypot(rho - c.MajorRadius(), z) - c.MinorRadius());
+    }
+    default:
+      return -1;
+  }
+}
+
 // Whether a triangle of `set` (its tree built) comes within sqrt(r2) of p (true when unsure).
 bool mesh_within(BRepExtrema_TriangleSet& set, const BVH_Vec3d& p, double r2)
 {
@@ -4436,15 +4476,46 @@ private:
         out.clear();
       }
     }, serial_);
-    std::vector<occ::handle<BRepExtrema_TriangleSet>> sets(set_face.size());
-    // (Only the faces left in pairs meshed.)
-    std::vector<TopoDS_Face> used;
+    // (A plane's, cylinder's, cone's, sphere's or torus's: first against its whole surface, exactly; apart when no point
+    // comes within reach of it, no mesh needed.)
+    std::vector<BRepAdaptor_Surface> surface_of;
     for (const int f : set_face)
-      used.push_back(faces[(size_t)f]);
-    const std::vector<TopoDS_Face> meshed = meshed_copies(used);
-    if (meshed.empty())
+      surface_of.emplace_back(faces[(size_t)f], false);
+    const double exact_reach = apart_ + 0.5 * step + defl;
+    OSD_Parallel::For(0, static_cast<int>(left.size()), [&](int j) {
+      Left&                         l   = left[(size_t)j];
+      const std::vector<BVH_Vec3d>& pts = points[(size_t)l.shape];
+      if (pts.empty())
+        return;
+      for (const BVH_Vec3d& p : pts)
+      {
+        const double d = distance_from_surface(surface_of[(size_t)l.face], gp_XYZ(p.x(), p.y(), p.z()));
+        if (!(d > exact_reach))
+          return;
+      }
+      l.apart = true;
+    }, serial_);
+    // (Only the faces of the pairs still open meshed.)
+    std::vector<char> needed(set_face.size(), 0);
+    for (const Left& l : left)
+      if (!l.apart)
+        needed[(size_t)l.face] = 1;
+    std::vector<TopoDS_Face> used;
+    std::vector<int>         mesh_at(set_face.size(), -1);
+    for (size_t f = 0; f < set_face.size(); ++f)
+      if (needed[f])
+      {
+        mesh_at[f] = static_cast<int>(used.size());
+        used.push_back(faces[(size_t)set_face[f]]);
+      }
+    std::vector<occ::handle<BRepExtrema_TriangleSet>> sets(set_face.size());
+    const std::vector<TopoDS_Face>                    meshed = used.empty() ? std::vector<TopoDS_Face>() : meshed_copies(used);
+    if (!used.empty() && meshed.empty())
       return;
-    OSD_Parallel::For(0, static_cast<int>(set_face.size()), [&](int j) { sets[(size_t)j] = triangle_set(meshed[(size_t)j]); }, serial_);
+    OSD_Parallel::For(0, static_cast<int>(set_face.size()), [&](int j) {
+      if (mesh_at[(size_t)j] >= 0)
+        sets[(size_t)j] = triangle_set(meshed[(size_t)mesh_at[(size_t)j]]);
+    }, serial_);
     // (A point stands for its chord within half a step, the chord for the edge within its deflection; the mesh lies
     // within its own, half a tenth, of the face: taken twice.)
     const double r2 = std::pow(apart_ + 0.5 * step + defl + 2 * 0.5 * apart_, 2);
@@ -4452,7 +4523,7 @@ private:
       Left&                                       l   = left[(size_t)j];
       const occ::handle<BRepExtrema_TriangleSet>& set = sets[(size_t)l.face];
       const std::vector<BVH_Vec3d>&               pts = points[(size_t)l.shape];
-      if (set.IsNull() || pts.empty())
+      if (l.apart || set.IsNull() || pts.empty())
         return;
       for (const BVH_Vec3d& p : pts)
         if (mesh_within(*set, p, r2))
