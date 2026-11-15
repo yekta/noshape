@@ -894,7 +894,7 @@ impl PartStudioView {
                     mass_override: v.mass_override.as_deref().and_then(crate::properties_dialog::parse_mass),
                 };
                 doc.update(cx, |d, cx| {
-                    d.edit_studio(tab, &noshape_ops::studio::properties_description(&v.name), cx, |ps| noshape_ops::studio::set_part_properties(ps, &body, &values, &kept));
+                    d.edit_studio_not_undoable(tab, &noshape_ops::studio::properties_description(&v.name), cx, |ps| noshape_ops::studio::set_part_properties(ps, &body, &values, &kept));
                 });
                 view.update(cx, |this, cx| this.refresh_scene(true, cx));
             },
@@ -967,7 +967,7 @@ impl PartStudioView {
                     .collect();
                 let desc = noshape_ops::studio::properties_description(&format!("{} parts", edits.len()));
                 doc.update(cx, |d, cx| {
-                    d.edit_studio(tab, &desc, cx, |ps| {
+                    d.edit_studio_not_undoable(tab, &desc, cx, |ps| {
                         for (body, values) in &edits {
                             let configured: Vec<&str> = FIELDS.into_iter().filter(|f| noshape_model::configured_properties::configured_value(ps, body, f, &config).is_some()).collect();
                             noshape_ops::studio::set_part_properties(ps, body, values, &configured);

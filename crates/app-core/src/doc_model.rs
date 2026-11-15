@@ -162,6 +162,16 @@ impl DocModel {
 
     /// Edit a Part Studio and commit the change as one microversion.
     pub fn edit_studio<R>(&mut self, tab: TabId, description: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut PartStudio) -> R) -> Option<R> {
+        self.edit_studio_as(tab, description, true, cx, f)
+    }
+
+    /// [`Self::edit_studio`] that Undo doesn't take back: part metadata (live parts-multi-properties: Properties'
+    /// Save leaves Undo off).
+    pub fn edit_studio_not_undoable<R>(&mut self, tab: TabId, description: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut PartStudio) -> R) -> Option<R> {
+        self.edit_studio_as(tab, description, false, cx, f)
+    }
+
+    fn edit_studio_as<R>(&mut self, tab: TabId, description: &str, undoable: bool, cx: &mut Context<Self>, f: impl FnOnce(&mut PartStudio) -> R) -> Option<R> {
         self.flush_pending(cx);
         if self.session.read_only() {
             cx.emit(DocEvent::Error("This is a read-only view of history. Return to the workspace to edit.".into()));
@@ -176,7 +186,8 @@ impl DocModel {
         let mut tabs = vec![tab];
         tabs.extend(noshape_model::assembly::follow_part_names(&mut self.session.doc, tab));
         let desc = format!("{tab_name} :: {description}");
-        if let Err(e) = self.session.commit(&tabs, false, &desc) {
+        let done = if undoable { self.session.commit(&tabs, false, &desc) } else { self.session.commit_not_undoable(&tabs, &desc) };
+        if let Err(e) = done {
             cx.emit(DocEvent::Error(format!("Could not save change: {e:#}")));
         }
         for t in tabs {

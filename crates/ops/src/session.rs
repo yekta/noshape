@@ -386,6 +386,12 @@ impl Session {
         self.commit_tabs(tabs, settings, description, Undo::Yes)
     }
 
+    /// [`Self::commit`] that Undo doesn't take back (live parts-multi-properties: a part's properties saved, Undo
+    /// stays off).
+    pub fn commit_not_undoable(&mut self, tabs: &[TabId], description: &str) -> Result<MicroversionId> {
+        self.commit_tabs(tabs, false, description, Undo::No)
+    }
+
     /// The edit that produced `after` was made in tab `origin`, which it didn't change (an inserted Variable Studio's
     /// table edited in a Part Studio's panel): Undo takes it back there, not in the tabs it changed (live
     /// vs-ps-inserted-edit).

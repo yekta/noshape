@@ -1599,7 +1599,8 @@ impl FeatureDialog {
                 // text stays selected); the next Enter commits the feature.
                 // Shift+Enter with typed text only applies it too (live ui-parity shortcut-plane-shift-enter).
                 if this.apply_on_enter(&path_s, state, window, cx) {
-                    this.applied_typed = true;
+                    // (A value that doesn't parse changes nothing: no undo step, live number-field-invalid.)
+                    this.applied_typed = !this.parse_errors.contains_key(&path_s);
                     this.flush_typed(cx);
                 } else if *shift {
                     cx.emit(DialogEvent::Accept { repeat: true });

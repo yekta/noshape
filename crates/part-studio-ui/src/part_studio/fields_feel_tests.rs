@@ -99,14 +99,15 @@ fn rows() -> Vec<Row> {
             cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
             expect(depth(cx, window, &view), "(10+5) mm".to_string(), "Depth refocused")
         } },
-        Row { id: "invalid: on Enter, kept, ✓ off", live: "'abc' + Enter: the field pink (invalid), the text kept, the title red, ✓ disabled", gap: false, check: |cx| {
+        Row { id: "invalid: on Enter, kept, ✓ off", live: "'abc' + Enter: the field pink (invalid), the text kept, the title red, ✓ disabled, nothing to undo (number-field-invalid)", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "fl-invalid");
             type_in(cx, window, &dialog, "depth", "abc", &["enter"]);
             wait_until(cx, window, |cx| !view.read(cx).ui_busy());
             let f = field(cx, window, &view, "Depth").ok_or("no Depth")?;
             let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
             let d = &state["dialog"];
-            expect((f.0.as_str(), f.1.as_str(), d["titleState"].as_str(), d["ok"].as_str()), ("abc", "error", Some("error"), Some("disabled")), "(text, field, title, ✓)")
+            let undo = state["undo"]["undo"].as_bool();
+            expect((f.0.as_str(), f.1.as_str(), d["titleState"].as_str(), d["ok"].as_str(), undo), ("abc", "error", Some("error"), Some("disabled"), Some(false)), "(text, field, title, ✓, undo)")
         } },
         Row { id: "negative length: accepted", live: "'-5' in Depth: '-5 mm', not red (the extrude goes the other way)", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "fl-negative");
