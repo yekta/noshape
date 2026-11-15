@@ -4,21 +4,38 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-15 14:40 UTC; restart from here)
-- Landing (gate 95a4684be clean: every corpus + parity56 at 0 differences, model suite 80/98 as main; knurls not run,
-  31 GB host): the Shell speed stack below (aa381fc3's land failed once on planar_mesh's notched plate, not seen in 3
-  reruns), plane x torus sections on our own (69d6d1577; the plane's box a tenth wider, as OCCT's against a quadric:
-  95a4684be), face areas by their boundary's line integral where the area element is a function of one parameter
-  (c57af4c85: cf-snap-hook's qLargest areas 854 -> 146 ms; its Snap Hooks were areas, not Booleans).
-- Gating next (branch bool-split-faces, worktree bool-split): f5baf22c6, a solid split by edges lying on its faces on
-  our own (rings cut at the face boundary, the faces made again by OCCT's BuilderFace): c2-hunting-knife Split 4's
-  op_split 2.1 s -> 30 ms, the same faces, edges and history as OCCT's. Then (not committed yet): a straight line
-  projected along a direction as the target's section by its plane, kept where it lies within the line's reach
-  (BRepProj's sweep's edges against the B-spline handle were most of 160 ms a projection: now ~15-20 ms; 7 per Split 4).
-- c2-bottle-split Split 1: ~12 ms a run in release (brep ~7.6 for both halves); the 79 ms was a cold or debug number.
-- blend's known sections (parked, /root/blend-scratch/parked/knownsec-wip.patch): barely any pair is a tangent contact;
-  the lever is transverse plane x rational B-spline and quadric x quadric pairs at 8-10 ms each in occt_ahead, and
-  tool x tool pairs (blend's per-pair numbers in its 11-15 message; debug patch zz-ahead-dbg.patch).
+## bool, now (11-15 15:18 UTC; restart from here)
+- Landed 482828c2 (gate 95a4684be clean): Shell speed stack, plane x torus sections, face areas by boundary integrals.
+- Gating (branch bool-split-faces, worktree bool-split, gate 2ce70dbe0 on vibe5): 2f4944739 a solid split by edges on
+  its faces on our own (c2-hunting-knife Split 4's split 1.6 s -> 26 ms at working scale 1000, OCCT's faces, edges and
+  history exactly; its f5baf22c6 gate clean); 69718931b a straight line projected along a direction as the target's
+  section by its plane where that lies within the line's reach (160 -> 20 ms a ring, empty ones 200 -> 75 / 0.1 ms;
+  the same curves to 0.1 nm); 2ce70dbe0 each face's exact box once a Boolean (tpd's cut 481 -> 115 ms CPU of boxes;
+  rebased onto main's OcShape exact-box cache, both kept). Land on a clean gate.
+- Measured (ops binary, vibe5 under load): c2-rings-loft 1880 vs live 1557 (Shell 1 518, Circular pattern 1 512: its
+  51-tool cut 0.58 s ours vs OCCT 5.7 s, 39 % of its CPU OCCT's IntPatch_ImpPrm marching plane / cylinder x the loft's
+  rational B-splines, 18 % our rays against free-form faces; 51 prism_until splits 254 ms, all up to one cylinder face,
+  OCCT's Splitter). Circular pattern 2 175 ms (was 0.94 s). c2-sm-louver 4.0 s vs live 5.0; c2-housing-draft 126 vs
+  105; cf-lighten 158 vs 114 (Lighten 1 spread: offsets 33, shell 27, volumes 18). c2-tpd-fillet-variable 149 vs 44
+  (sections ahead 96: plane x B-spline transverse 35 pairs 197 ms CPU, B-spline x B-spline 5 pairs 72);
+  learning-center-michael 363 vs 96 (cylinder x torus perpendicular 28 pairs 186 ms CPU; parallel ones finding
+  nothing 16 pairs 68 ms: their whole surfaces overlap, only the trimmed faces miss).
+- Our own plane x B-spline sections (branch bool-free-sections-wip, 8ab876f30, not landed): the plane's distance on
+  a knot-aware grid (refined to 8 and 16 cells a span where 4 leave room for zeros), crossings joined cell by cell,
+  each chain interpolated through points Newton brings onto the plane. Results as before on rings-loft's 51-tool cut,
+  tpd's fillet cut and rings-loft's fuse; 0.5-1 ms a pair at 9 x 9. But best of five: rings-loft's cut 556 -> 516 ms,
+  tpd's 116 -> 189: on tpd's 41 x 9 rounds interpolated() needs up to 1024 points for its 1e-8 in the B-spline's
+  parameters (one pair 22 ms, then declined to OCCT). With that tolerance scaled by the surface's derivatives
+  (WIP 2nd commit) a pair is 0.3-2.4 ms and tpd's volume is OCCT-path's exactly, but tpd's cut stays slower (best of
+  five 224 vs 165 ms): the interpolated curves carry a span a point, and the Boolean's work on a curve grows with its
+  spans (OCCT approximates a few high-degree pieces). A least-squares fit (WIP 3rd commit: GeomAPI_PointsToBSpline,
+  degree 3-8 to 1e-7) is slower still (vibe6, best of five: tpd 1010 vs 430 ms, rings-loft 3750 vs 3070): the fitting
+  costs more than the marching saves. Ideas left: fit once per chain with few knots placed by curvature (our own
+  least squares, fixed degree), or hand the exact point function to the Boolean's NURBS side without a fit at all.
+  Parked; worth it only if the downstream cost of a curve with few spans is met. Cylinders taken the same way left
+  rings-loft's cut non-manifold (not grazing: normals > 2.6 deg apart): planes only until found.
+- c2-bottle-split Split 1: ~12 ms a run in release (brep ~7.6 for both halves); the 79 ms was cold or debug.
+- blend's known sections parked (/root/blend-scratch/parked/knownsec-wip.patch): few pairs are tangent contacts.
 
 ## bool, earlier (11-15 10:55 UTC)
 - Stage 3 landed (e576bf0f). Queued (gate a52cf8e74 clean, knurls 6-8 % faster than main): the volumes face by face on
