@@ -5,6 +5,21 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-15 01:24 UTC)
+- **Landed 149e2906:** offset curve down a cylinder / cone (psui's offset-curve-* scenarios).
+- **Queued 3c55a04e** (dx's 1dc32b Extrude 49): a part pattern's Remove / Intersect takes its
+  solid seeds as tools too and uses them up (std subfeatureToolsTargets; not Mirror's), behind ScopeRule 17
+  (`legacy_remove_seeds`). T1 kernel_robustness::part_pattern_remove_uses_its_seed_up_too.
+- **Knife speed (8.1 s, live 0.4 s):** the handle's lofted side has 988 × 27 poles (live 66 × 8) since 0147815a's
+  rows doubling to `tol`. Branch core-lean (e43f051f4, patch vibe5 ~/agents/core-keep/knife-lean/): doubling only to
+  half the sewing tolerance gives 256 rows; Loft 1 210 -> 94 ms, Extrude 8 / 9 ~430 -> 72, Revolve 1 522 -> 101, Split
+  4 2340 -> 482, Extrude 10 661 -> 104, **but Fillet 8 1.7 -> 6.4 s** (OCCT's fillet rejected, blend.direct runs);
+  knot thinning to 170 rows did the same. blend found it (direct build cut the round against its own support; their cf74e2de7 gating): Fillet 8 1.2 s with it. Land core-lean once blend's lands. Split 4 alone: project_along
+  (BRepProj, ~140 ms a curve on the B-spline side) and the general splitter's edge-face intersections; split_on's 2D
+  split comes out invalid there.
+- **Knife feature 24:** live's own lines disagree (16-23 LINE / 9304.54 mm³, 24 OTHER / 9306.25 with no geometry
+  change between): REQUESTS.md 00:45 asks live to refetch 15-24 in one session.
+
 ## core state (11-15 00:17 UTC)
 - **Landed:** 6cc9571a (pattern tracer), 420a998d (prism_until dump / replay), bf26f875 (knife ring: a Revolve
   feature's full turn starts half round from its profile, the guided loft's seam back at guide 0; blend told).
