@@ -340,6 +340,18 @@ The suite's per-feature kernel profiles count its own measuring (props_surface v
 Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **11-15 10:21 UTC (landed 897b690f: the 08:30 stack), more speed rows; gate49 queued (dd20c8d4a, 943e3c90d):**
+  - c2-housing-draft (qa: Bohrung 1 unify 62 ms, Rotieren 1's 24): the first unify of each result tried three other
+    face orders (unify_in's reordered retries) after usd_kept_volume had found the same merge rejected in every start;
+    now skipped then (t_usd_order_moot), the pairs still marked stuck: 81 / 119 -> 22 ms (dd20c8d4a).
+  - c2-impeller-loft after chamfer 26 builds: Extrude impellerraum (31) and Boolean 3 (34) declined "a closed edge":
+    a circle round from its one vertex 1.2e-7 of a turn short. Now a whole turn where the shortfall is within the
+    vertex's tolerance (943e3c90d): 1.49 -> 0.5 s, 0.47 -> 0.1 s, OCCT's counts, volumes 1.4e-8 apart (GProp's own
+    variance bound there 3.5e-10 m³, 270x that).
+  - Left: chamfer 26's own cut (f37371b8, OCCT 0.9 s) declines "a piece's point on another solid's face": the run-on
+    tail lies along the strip's tolerant B-spline face (8.5 µm). Delete face 2 (core's OCCT defeaturing) is 17-26 s on
+    the chamfered body (was 4-7 s); told core and the lead (decision needed). Recordings vibe6
+    ~/agents/bool2-keep/imp-new; CLIs cli-old / cli-new and ~/tmp/bool2/ab_docs.sh (old vs new alternating, regen_ms).
 - **11-15 08:30 UTC, speed rows (qa / lead) and the gate's grooves; stack 65a2dc4e2..bfb5b2910 gating on vibe5:**
   - Gate45 failed two knurl tests (grooves_crossing_just_above_the_end / _37_um_): the segmented volume check in
     merge_cylinder_groups (742a166f5) merged pieces OCCT's GProp keeps apart. Now opt-in (c8319d982): only
