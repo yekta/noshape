@@ -3671,6 +3671,117 @@ static bool resting_on_plane(const TopoDS_Face& fa, const TopoDS_Face& fb, std::
   return true;
 }
 
+// Two spheres off each other's axes meet in a circle across the line through their centres: that circle, exact, its
+// curves on the two spheres projected (OCCT's IntTools_FaceFace walked each such pair for 2-4 ms: cf-surface-pattern's
+// stamp cuts, 609 sphere pairs a cut). None where they're apart; false where they're concentric or touch (OCCT's).
+static bool sphere_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+{
+  TopLoc_Location                                  la, lb;
+  const occ::handle<Geom_SphericalSurface>         sa = occ::down_cast<Geom_SphericalSurface>(BRep_Tool::Surface(fa, la));
+  const occ::handle<Geom_SphericalSurface>         sb = occ::down_cast<Geom_SphericalSurface>(BRep_Tool::Surface(fb, lb));
+  if (sa.IsNull() || sb.IsNull())
+    return false;
+  const gp_Sphere A = sa->Sphere().Transformed(la.Transformation()), B = sb->Sphere().Transformed(lb.Transformation());
+  const gp_Vec    w(A.Location(), B.Location());
+  const double    d = w.Magnitude(), ra = A.Radius(), rb = B.Radius();
+  const double    tol = Precision::Confusion();
+  if (d <= tol)
+    return false;
+  if (d > ra + rb + tol || d < std::abs(ra - rb) - tol)
+    return true;
+  if (d > ra + rb - tol || d < std::abs(ra - rb) + tol)
+    return false;
+  const double s   = (d * d + ra * ra - rb * rb) / (2 * d);
+  const double rho = std::sqrt(std::max(0.0, ra * ra - s * s));
+  const gp_Dir n(w);
+  const occ::handle<Geom_Circle> circ = new Geom_Circle(gp_Ax2(A.Location().Translated(gp_Vec(n) * s), n), rho);
+  // (OCCT's sections are its faces' parameter boxes': the circle's latitudes clear of a face's are no section there;
+  // where they come within `band` of its bounds, or the face isn't a whole turn round, OCCT's.)
+  const gp_Pnt c0   = circ->Location();
+  const double band = 100 * tol;
+  auto         inside = [&](const TopoDS_Face& f, const gp_Sphere& S) -> int {
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    if (u1 - u0 < 2 * M_PI - 1e-9)
+      return -1;
+    const gp_Dir z    = S.Position().Direction();
+    const double hc   = gp_Vec(S.Location(), c0).Dot(gp_Vec(z));
+    const double nz   = gp_Vec(n).Dot(gp_Vec(z));
+    const double half = rho * std::sqrt(std::max(0.0, 1 - nz * nz));
+    const double r    = S.Radius();
+    const double lo = std::asin(std::clamp((hc - half) / r, -1.0, 1.0)), hi = std::asin(std::clamp((hc + half) / r, -1.0, 1.0));
+    const double g = band / r;
+    if (hi < v0 - g || lo > v1 + g)
+      return 0;
+    if (std::abs(lo - v0) <= g || std::abs(hi - v0) <= g || std::abs(lo - v1) <= g || std::abs(hi - v1) <= g)
+      return -1;
+    return 1;
+  };
+  const int ia = inside(fa, A), ib = inside(fb, B);
+  if (ia < 0 || ib < 0)
+    return false;
+  if (ia == 0 || ib == 0)
+    return true;
+  // (Cut where it crosses either sphere's seam, as OCCT's: each piece's curves on the spheres within their parameter
+  // boxes. Within `band` of a seam's plane without crossing it, OCCT's: the Boolean takes such a pass as touching the
+  // face's edge (cf-surface-pattern's stamps: 2.3 um).)
+  std::vector<double> cuts;
+  const gp_Dir        e1 = circ->Position().XDirection(), e2 = circ->Position().YDirection();
+  for (const gp_Sphere* S : {&A, &B})
+  {
+    const gp_Vec x(S->Position().XDirection()), y(S->Position().YDirection()), oc(S->Location(), c0);
+    const double a = oc.Dot(y), b = rho * gp_Vec(e1).Dot(y), c = rho * gp_Vec(e2).Dot(y), R = std::hypot(b, c);
+    if (std::abs(std::abs(a) - R) <= band)
+      return false;
+    if (std::abs(a) > R)
+      continue;
+    const double phi = std::atan2(c, b), w = std::acos(-a / R);
+    for (const double t : {phi + w, phi - w})
+    {
+      const double xt = oc.Dot(x) + rho * (std::cos(t) * gp_Vec(e1).Dot(x) + std::sin(t) * gp_Vec(e2).Dot(x));
+      if (xt <= tol)
+        continue;
+      cuts.push_back(std::fmod(std::fmod(t, 2 * M_PI) + 2 * M_PI, 2 * M_PI));
+    }
+  }
+  std::sort(cuts.begin(), cuts.end());
+  for (size_t k = 1; k < cuts.size(); ++k)
+    if (cuts[k] - cuts[k - 1] <= 1e-9)
+      return false;
+  if (cuts.size() > 1 && cuts.front() + 2 * M_PI - cuts.back() <= 1e-9)
+    return false;
+  std::vector<std::pair<double, double>> arcs;
+  for (size_t k = 0; k < cuts.size(); ++k)
+    arcs.emplace_back(cuts[k], k + 1 < cuts.size() ? cuts[k + 1] : cuts[0] + 2 * M_PI);
+  if (arcs.empty())
+    arcs.emplace_back(0, 2 * M_PI);
+  // (Each sphere's curve in its own frame, the piece brought back by its face's location, moved a turn so its middle
+  // is in the face's parameters.)
+  double reached = 1e-7;
+  auto   on      = [&](const occ::handle<Geom_SphericalSurface>& S, const TopLoc_Location& L, const TopoDS_Face& f, double t0, double t1) -> occ::handle<Geom2d_Curve> {
+    const occ::handle<Geom_Curve> c = L.IsIdentity() ? occ::handle<Geom_Curve>(circ) : occ::down_cast<Geom_Curve>(circ->Transformed(L.Transformation().Inverted()));
+    double                        t = 1e-7;
+    occ::handle<Geom2d_Curve>     r = GeomProjLib::Curve2d(c, t0, t1, S, t);
+    if (r.IsNull())
+      return r;
+    reached = std::max(reached, t);
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    const double u = r->Value(0.5 * (t0 + t1)).X();
+    r->Translate(gp_Vec2d(2 * M_PI * std::floor((u0 - u) / (2 * M_PI) + 1), 0));
+    return r;
+  };
+  for (const auto& [t0, t1] : arcs)
+  {
+    const occ::handle<Geom2d_Curve> ca = on(sa, la, fa, t0, t1), cb = on(sb, lb, fb, t0, t1);
+    if (ca.IsNull() || cb.IsNull())
+      return false;
+    const occ::handle<Geom_Curve> arc = cuts.empty() ? occ::handle<Geom_Curve>(circ) : occ::handle<Geom_Curve>(new Geom_TrimmedCurve(circ, t0, t1));
+    out.emplace_back(arc, ca, cb, reached, reached);
+  }
+  return true;
+}
+
 // noshape's own sections of faces `fa` and `fb`, as OCCT's IntTools_Curve gives them (the curve, its curves on `fa` and
 // `fb` in their own parameters (the same parameter), its tolerance): an extrusion against a plane across its
 // direction (the profile moved there), a cylinder along it or another extrusion along it (rulings where the profiles
@@ -3682,6 +3793,10 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
     return false;
   if (coaxial_sections(fa, fb, out))
     return true;
+  out.clear();
+  if (sphere_sections(fa, fb, out))
+    return true;
+  out.clear();
   if (plane_tube_sections(fa, fb, out))
     return true;
   const std::optional<Extruded> xa = extruded(fa), xb = extruded(fb);

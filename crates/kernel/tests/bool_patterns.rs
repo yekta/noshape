@@ -2707,3 +2707,36 @@ fn unify_merges_faces_extruded_from_pieces_of_one_spline() {
     assert_eq!(along_x(&r), 4);
     assert_eq!(along_x(&u), 2);
 }
+
+/// Two balls cut from a ball, their centres off its axis and each other's (cf-surface-pattern's stamps: 609 sphere
+/// pairs a cut, each OCCT's marching 2-4 ms): each section the circle of the two spheres, cut at either's seam, taken
+/// by ours; OCCT's faces, edges, vertices and volume, the ball's less the two lenses. One circle rounds a tool's pole
+/// (it crosses that sphere's seam once: one piece, a turn from there).
+#[test]
+fn balls_cut_from_a_ball_off_its_axis() {
+    let _ = k::set_working_scale(1000.0);
+    let mm = 1e-3;
+    let frame = k::Plane::new(DVec3::ZERO, DVec3::new(0.3, 0.2, 1.0).normalize(), DVec3::new(1.0, 0.0, -0.3).normalize());
+    let ball = k::make_sphere(&frame, 10.0 * mm, TAU).unwrap();
+    let tools: Vec<(DVec3, f64)> = vec![(DVec3::new(12.0, 3.0, 1.0) * mm, 8.0 * mm), (DVec3::new(-9.0, -4.0, 5.0) * mm, 6.0 * mm)];
+    let shapes: Vec<k::Shape> = tools.iter().map(|&(o, r)| k::make_sphere(&z_frame(o), r, TAU).unwrap()).collect();
+    let opts = k::BooleanOptions::default();
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&ball), &shapes, &opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&ball), &shapes, &opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid());
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), counts(&o.shape));
+    let (ra, pi) = (10.0 * mm, std::f64::consts::PI);
+    let lens = |d: f64, rb: f64| pi * (ra + rb - d).powi(2) * (d * d + 2.0 * d * rb - 3.0 * rb * rb + 2.0 * d * ra + 6.0 * ra * rb - 3.0 * ra * ra) / (12.0 * d);
+    let want = 4.0 / 3.0 * pi * ra.powi(3) - tools.iter().map(|&(o, rb)| lens(o.length(), rb)).sum::<f64>();
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-9 * w, "volume {v} against OCCT's {w}");
+    // (GProp's integration over the spheres' pieces: 8.5e-9 off both ways.)
+    assert!((v - want).abs() <= 2e-8 * want, "volume {v}, the ball less the lenses {want}");
+}
