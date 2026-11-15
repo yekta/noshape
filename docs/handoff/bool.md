@@ -374,6 +374,37 @@ The suite's per-feature kernel profiles count its own measuring (props_surface v
 Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **11-15 12:13 UTC (landed 7eedbae5: the 10:21 stack), helical decline fixed, valve rows; gate54 on vibe5 (bb02343ea,
+  708fba52d):**
+  - c2-helical-sweep's new cut 9b68aa2b on ours again (bb02343ea): 290 ms in OCCT -> 48-60, OCCT's 13/47/36, valid,
+    volume 1.2e-9 apart. Three things: (1) the thread cutter's two flank sections ended where they cross the bar's rim
+    2.2 µm apart (the cylinder's section and the top plane's), each a new vertex of 0 tolerance: now a section's
+    End::Point takes another new vertex within its tolerance lying on the same edge, merged (end_on_edge); (2) its
+    seam crossings were OCCT's curve's points, 0.3-1.7 µm off the cylinder, past the seam's 2e-7 reach, so the seam
+    wasn't split there: the existing "on an edge lying on the other face" rule (a vertex on the edge reaching the
+    curve's end) now takes the face's seam too; (3) the made cylinder faces' curves then span 2π + 1e-4 rad (OCCT's
+    curve on the face ends off the seam by its own error): to_body's "more than a turn" allows the edges' tolerance
+    over the radius.
+  - c2-valve-config's Circular pattern 1 (d561e545, one cut by 7 tools, ours one at a time since they meet below the
+    part): each step BRepCheck'd the whole result; past the first only the made faces and the shells now
+    (RustTargetChecked, made_valid; 708fba52d): its checks 50-75 -> 13-22 ms of ~230-320. Left there: OCCT's cone x
+    cone sections, 8-10 ms a step (7 steps); the copies' sections could be shared (moved, as within one Boolean) but
+    each step is its own Boolean; all 7 at once declines "a non-manifold result" (pieces of the last two copies
+    unclassified where the copies meet), even with the tools clipped to the part's box first (6 ms for all 7).
+  - c2-valve-config's Extrude 3 (e5811c1b, 80-85 ms): 59 ms is OCCT's sections ahead, 23 pairs of the body's revolved
+    B-spline profile (axis z) x the tool's B-spline extrusion (along -y), ~33 ms CPU each, all OCCT's walk (our
+    refinement 0). Would need our own revolution x extrusion section. Not started.
+  - c2-impeller-loft's Extrude 4 fuse (f10ce62e) now ~200 ms, 115 of it OCCT's sections ahead; OCCT's per-pair
+    IntTools_TopolTool sampling of the same B-spline face could only be shared by an OCCT patch (not started).
+  - Chamfer 26's cut (f37371b8, OCCT 0.9 s; ours 70-140 ms to the decline): the piece is the run-on chamfer tool's
+    end cap, a whole plane face 0.3 mm long (an arc and a B-spline edge, no section splits it) standing across the
+    corner of the body's strip face (B-spline, face 3) and the face the arc was drawn on: the arc lies on that face and
+    9-12 um outside the strip, the B-spline edge on the strip and 9-12 um inside the other, the point 8.5 um off the
+    strip, all inside the Boolean's 16.5 um. OCCT's result has no such face (Out). Signs mix, so tangent_side can't
+    say. Tried: ray parity at a thousandth of the tolerance for such a wedge piece gives Out (as OCCT), then the
+    result is non-manifold: the tool's arc (on the drawn-from face) and its B-spline edge (on the strip) are each
+    used once, neither face split along them; OCCT's result looks like the arc, the B-spline edge and the faces'
+    common edge (all within 12 um) taken as one. Reverted; needs that common block.
 - **11-15 10:21 UTC (landed 897b690f: the 08:30 stack), more speed rows; gate49 queued (dd20c8d4a, 943e3c90d):**
   - c2-housing-draft (qa: Bohrung 1 unify 62 ms, Rotieren 1's 24): the first unify of each result tried three other
     face orders (unify_in's reordered retries) after usd_kept_volume had found the same merge rejected in every start;
@@ -396,7 +427,7 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     the recorded 2e082aa1 14/34/22; likely core's 608e3b402, helices / circles starting at the sketch's x) and ours
     declines "two edges leave a vertex in one direction" (arrange.rs; an older binary too): a 2.1 µm section piece
     along a B-spline face's iso boundary at v 63.5 mm, from the same point as that edge, not split into it. OCCT
-    then takes the cut (~290 ms against ours ~80). Next for bool2. Recording vibe6 ~/agents/bool2-keep/hel-new.
+    then takes the cut (~290 ms against ours ~80). Fixed 12:13 (above). Recording vibe5/vibe6 ~/agents/bool2-keep/hel-new.
   - Left: chamfer 26's own cut (f37371b8, OCCT 0.9 s) declines "a piece's point on another solid's face": the run-on
     tail lies along the strip's tolerant B-spline face (8.5 µm). Delete face 2 (core's OCCT defeaturing) is 17-26 s on
     the chamfered body (was 4-7 s); told core and the lead (decision needed). Recordings vibe6
