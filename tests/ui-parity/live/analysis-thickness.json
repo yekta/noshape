@@ -1,18 +1,23 @@
 {
  "scenario": "analysis-thickness",
- "recorded": "2026-11-06T14:16:42.106Z",
+ "recorded": "2026-11-15T19:26:28.145Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.4 c2684ac9"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "db6d75b369a4e821a290bc13",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "c6a9a80033f08c719719eae2",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -20,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -59,7 +65,34 @@
   "message": null,
   "tooltip": null,
   "sketch": null,
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -73,7 +106,7 @@
    "ok": true,
    "at": [
     1864,
-    947
+    1034
    ],
    "state": {
     "focus": {
@@ -81,6 +114,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -93,6 +127,7 @@
       "Reflection analysis…",
       "Curvature color map",
       "Draft analysis…",
+      "Thickness analysis…",
       "Flatten surfaces…"
      ],
      "highlighted": null,
@@ -136,9 +171,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 25717
+   "t": 30515
   },
   {
    "step": 2,
@@ -148,86 +210,32 @@
      "menu": "Thickness analysis…"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Thickness analysis…\"}",
-   "state": {
-    "focus": {
-     "kind": "none"
-    },
-    "dialog": null,
-    "dialogs": [],
-    "list": {
-     "kind": "context-menu",
-     "rows": [
-      "Curve/surface analysis…",
-      "Deviation analysis…",
-      "Connection analysis…",
-      "Dihedral analysis…",
-      "Interference detection…",
-      "Zebra stripes…",
-      "Reflection analysis…",
-      "Curvature color map",
-      "Draft analysis…",
-      "Flatten surfaces…"
-     ],
-     "highlighted": null,
-     "disabled": []
-    },
-    "selection": {
-     "count": 0,
-     "items": []
-    },
-    "features": {
-     "rows": [
-      {
-       "name": "Sketch 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
-      },
-      {
-       "name": "Extrude 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      }
-     ],
-     "rollbackAfter": "Extrude 1"
-    },
-    "parts": [
-     "Part 1"
-    ],
-    "partsHeading": "Parts (1)",
-    "undo": {
-     "undo": false,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": null,
-    "drawing": null
-   },
-   "t": 27428
-  },
-  {
-   "step": 3,
-   "do": {
-    "do": "key",
-    "key": "Escape"
-   },
    "ok": true,
+   "at": [
+    1801,
+    985
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "panel",
+     "title": "Thickness analysis",
+     "text": [
+      "Parts to analyze"
+     ],
+     "fields": []
+    },
     "dialogs": [],
+    "panels": [
+     {
+      "id": "thickness-analysis-dialog",
+      "title": "Thickness analysis",
+      "text": "Thickness analysis / Parts to analyze",
+      "inputs": []
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -267,9 +275,128 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 30700
+   "t": 33550
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     1800,
+     985
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 36990
   }
  ]
 }

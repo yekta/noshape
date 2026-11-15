@@ -1,18 +1,23 @@
 {
  "scenario": "analysis-thickness-edit",
- "recorded": "2026-11-07T00:07:31.144Z",
+ "recorded": "2026-11-15T19:27:11.127Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "98fc3e5f48a419a239e95a99",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "1fbe934cab75e7c33247fc9e",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -20,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -59,7 +65,34 @@
   "message": null,
   "tooltip": null,
   "sketch": null,
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -73,7 +106,7 @@
    "ok": true,
    "at": [
     1864,
-    947
+    1034
    ],
    "state": {
     "focus": {
@@ -81,6 +114,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -93,6 +127,7 @@
       "Reflection analysis…",
       "Curvature color map",
       "Draft analysis…",
+      "Thickness analysis…",
       "Flatten surfaces…"
      ],
      "highlighted": null,
@@ -136,9 +171,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 47623
+   "t": 30550
   },
   {
    "step": 2,
@@ -148,31 +210,33 @@
      "menu": "Thickness analysis…"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Thickness analysis…\"}",
+   "ok": true,
+   "at": [
+    1801,
+    985
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
-    "dialog": null,
-    "dialogs": [],
-    "list": {
-     "kind": "context-menu",
-     "rows": [
-      "Curve/surface analysis…",
-      "Deviation analysis…",
-      "Connection analysis…",
-      "Dihedral analysis…",
-      "Interference detection…",
-      "Zebra stripes…",
-      "Reflection analysis…",
-      "Curvature color map",
-      "Draft analysis…",
-      "Flatten surfaces…"
+    "dialog": {
+     "kind": "panel",
+     "title": "Thickness analysis",
+     "text": [
+      "Parts to analyze"
      ],
-     "highlighted": null,
-     "disabled": []
+     "fields": []
     },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "thickness-analysis-dialog",
+      "title": "Thickness analysis",
+      "text": "Thickness analysis / Parts to analyze",
+      "inputs": []
+     }
+    ],
+    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -211,9 +275,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 49444
+   "t": 33605
   },
   {
    "step": 3,
@@ -222,29 +313,22 @@
     "key": "Enter"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1800,
+     985
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
-    "list": {
-     "kind": "context-menu",
-     "rows": [
-      "Curve/surface analysis…",
-      "Deviation analysis…",
-      "Connection analysis…",
-      "Dihedral analysis…",
-      "Interference detection…",
-      "Zebra stripes…",
-      "Reflection analysis…",
-      "Curvature color map",
-      "Draft analysis…",
-      "Flatten surfaces…"
-     ],
-     "highlighted": null,
-     "disabled": []
-    },
+    "panels": null,
+    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -283,9 +367,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 51229
+   "t": 35479
   },
   {
    "step": 4,
@@ -298,7 +409,7 @@
    "ok": true,
    "at": [
     1864,
-    947
+    1034
    ],
    "state": {
     "focus": {
@@ -306,7 +417,26 @@
     },
     "dialog": null,
     "dialogs": [],
-    "list": null,
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Curve/surface analysis…",
+      "Deviation analysis…",
+      "Connection analysis…",
+      "Dihedral analysis…",
+      "Interference detection…",
+      "Zebra stripes…",
+      "Reflection analysis…",
+      "Curvature color map",
+      "Draft analysis…",
+      "Edit thickness analysis…",
+      "Turn thickness analysis off",
+      "Flatten surfaces…"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -345,9 +475,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 54352
+   "t": 37684
   },
   {
    "step": 5,
@@ -357,14 +514,32 @@
      "menu": "Edit thickness analysis"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Edit thickness analysis\"}",
+   "ok": true,
+   "at": [
+    1795,
+    963
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "panel",
+     "title": "Thickness analysis",
+     "text": [
+      "Parts to analyze"
+     ],
+     "fields": []
+    },
     "dialogs": [],
+    "panels": [
+     {
+      "id": "thickness-analysis-dialog",
+      "title": "Thickness analysis",
+      "text": "Thickness analysis / Parts to analyze",
+      "inputs": []
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -404,9 +579,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 56186
+   "t": 40696
   },
   {
    "step": 6,
@@ -415,12 +617,21 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1794,
+     963
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -460,9 +671,36 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 59449
+   "t": 44047
   }
  ]
 }
