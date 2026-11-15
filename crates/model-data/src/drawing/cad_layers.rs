@@ -282,6 +282,23 @@ pub struct HatchRegion {
 
 /// Closed loops from a soup of boundary segments (ends within `tol`); None
 /// when a chain doesn't close.
+/// A loop split where it comes back to a point it passed (two regions touching there, as an aligned section's legs
+/// at their fold): one loop each, those under three points dropped.
+pub fn split_at_touches(lp: &[[f64; 2]], tol: f64) -> Vec<Vec<[f64; 2]>> {
+    let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]) < tol;
+    let mut out = Vec::new();
+    let mut stack: Vec<[f64; 2]> = Vec::new();
+    for p in lp {
+        match stack.iter().position(|q| near(*q, *p)) {
+            Some(j) => out.push(stack.split_off(j + 1).into_iter().chain([stack[j]]).collect::<Vec<_>>()),
+            None => stack.push(*p),
+        }
+    }
+    out.push(stack);
+    out.retain(|l| l.len() >= 3);
+    out
+}
+
 pub fn chain_loops(segs: &[[[f64; 2]; 2]], tol: f64) -> Option<Vec<Vec<[f64; 2]>>> {
     let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]) < tol;
     let mut left: Vec<[[f64; 2]; 2]> = segs.iter().copied().filter(|s| !near(s[0], s[1])).collect();

@@ -1625,6 +1625,16 @@ mod tests {
         assert_eq!(loops, [1, 2]);
     }
 
+    /// An aligned section's legs meet at the fold: chained, their cut is one loop through the fold twice; split,
+    /// it is a region per leg (live drw-aligned-section-cut-only.dxf: two HATCH entities of four edges).
+    #[test]
+    fn legs_touching_at_the_fold_are_two_regions() {
+        let lp = [[0.0, 10.0], [0.0, 0.0], [5.0, 0.0], [5.0, 10.0], [12.0, 10.0], [12.0, 0.0], [5.0, 0.0], [5.0, 10.0]];
+        let split = crate::drawing::cad_layers::split_at_touches(&lp, 1e-6);
+        assert_eq!(split, [vec![[5.0, 10.0], [12.0, 10.0], [12.0, 0.0], [5.0, 0.0]], vec![[0.0, 10.0], [0.0, 0.0], [5.0, 0.0], [5.0, 10.0]]]);
+        assert_eq!(crate::drawing::cad_layers::split_at_touches(&lp[..4], 1e-6), [lp[..4].to_vec()]);
+    }
+
     fn sample() -> SheetGeometry {
         let sheet = Sheet::default();
         let (w, h) = sheet.size.size_mm();

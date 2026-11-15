@@ -1970,6 +1970,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         }
                         // An uncut, unbroken section: the boundary for the HATCH entity.
                         if whole && let Some(loops) = super::cad_layers::chain_loops(&segs, 1e-6) {
+                            let loops = loops.iter().flat_map(|l| super::cad_layers::split_at_touches(l, 1e-6)).collect();
                             g.hatches.push(super::cad_layers::HatchRegion { loops, spacing, lines: hatch_l0..g.lines.len() });
                         }
                     }
@@ -2488,9 +2489,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 if let (Some(ppl), Some(cut)) = (place(*parent), views::section_cut(sheet, v.id)) {
                     let pick = picks.id(PickTarget::SectionLine(v.id));
                     let mut pts: Vec<[f64; 2]> = cut.points.iter().map(|p| ppl.to_sheet(*p)).collect();
-                    // Both end legs run 0.25 in past the view's geometry (live
-                    // qa4-r5-s11.dxf, drw2-k: exactly 6.35 mm / 0.25 in); a
-                    // partial section's line stays as placed.
+                    // Both end legs run 0.25 in past the view's farthest corner along them (live qa4-r5-s11.dxf,
+                    // drw2-k: exactly 6.35 mm / 0.25 in; a slanted leg, drw-aligned-section-cut-only.dxf); a partial
+                    // section's line stays as placed.
                     let n = pts.len();
                     for (e, i) in [(0, 1), (n - 1, n - 2)].into_iter().filter(|_| !cut.partial) {
                         let d = [pts[e][0] - pts[i][0], pts[e][1] - pts[i][1]];
@@ -2499,13 +2500,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             continue;
                         }
                         let u = [d[0] / l, d[1] / l];
-                        // Where the leg's line leaves the view's bounds.
-                        let exit = (0..2)
-                            .filter(|&k| u[k].abs() > 1e-12)
-                            .map(|k| ((if u[k] > 0.0 { ppl.max[k] } else { ppl.min[k] }) - pts[i][k]) / u[k])
-                            .fold(f64::INFINITY, f64::min);
-                        if exit.is_finite() && exit > 0.0 {
-                            let t = exit + CUT_OVERSHOOT;
+                        let reach = [[ppl.min[0], ppl.min[1]], [ppl.max[0], ppl.min[1]], [ppl.max[0], ppl.max[1]], [ppl.min[0], ppl.max[1]]]
+                            .iter()
+                            .map(|c| (c[0] - pts[i][0]) * u[0] + (c[1] - pts[i][1]) * u[1])
+                            .fold(f64::NEG_INFINITY, f64::max);
+                        if reach > 0.0 {
+                            let t = reach + CUT_OVERSHOOT;
                             pts[e] = [pts[i][0] + u[0] * t, pts[i][1] + u[1] * t];
                         }
                     }
@@ -2515,8 +2515,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     let cut_line = g.lines.len();
                     g.lines.push(Polyline2 { points: pts.clone(), style: LineStyle::Section, closed: false, pick });
                     pen_lines(&mut g, cut_line..cut_line + 1, &vtab.section_line);
-                    // Thick strokes at the jogs.
-                    for k in 1..pts.len().saturating_sub(1) {
+                    // Thick strokes at the jogs; an aligned section's bend has none (live asbas-9, its PDF and DXF).
+                    let jogs = if matches!(v.kind, ViewKind::AlignedSection { .. }) { 0 } else { pts.len().saturating_sub(1) };
+                    for k in 1..jogs {
                         let c = pts[k];
                         for nb in [pts[k - 1], pts[k + 1]] {
                             let d = [nb[0] - c[0], nb[1] - c[1]];

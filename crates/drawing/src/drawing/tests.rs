@@ -453,6 +453,17 @@ fn jogged_and_aligned_sections() {
     assert!(!g.edges.is_empty() && !g.section_segments.is_empty());
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert!(texts(&built).iter().any(|t| t == "SECTION C - C"));
+    // Its slanted leg runs 0.25 in past the view's farthest corner along it, and the bend has no thick strokes
+    // (live drw-aligned-section-cut-only.dxf).
+    let cp = pick_of(&built, PickTarget::SectionLine(id));
+    let line = built.geometry.lines.iter().find(|l| l.pick == cp && l.style == sheet::LineStyle::Section).unwrap();
+    let ppl = built.placements.iter().find(|p| p.id == ViewId(2)).unwrap();
+    let (m, end) = (line.points[1], line.points[2]);
+    let u = [(end[0] - m[0]) / (end[0] - m[0]).hypot(end[1] - m[1]), (end[1] - m[1]) / (end[0] - m[0]).hypot(end[1] - m[1])];
+    let reach = [[ppl.min[0], ppl.min[1]], [ppl.max[0], ppl.min[1]], [ppl.max[0], ppl.max[1]], [ppl.min[0], ppl.max[1]]].iter().map(|c| (c[0] - m[0]) * u[0] + (c[1] - m[1]) * u[1]).fold(f64::MIN, f64::max);
+    assert!(u[0].abs() > 0.1 && u[1].abs() > 0.1, "{u:?}");
+    assert!(((end[0] - m[0]).hypot(end[1] - m[1]) - (reach + 6.35)).abs() < 1e-9);
+    assert!(!built.geometry.lines.iter().any(|l| l.pick == cp && l.style == sheet::LineStyle::Border));
 
     // Off the holes the two legs meet in one flat cut face: no line where they fold (live drw-aligned-section-edit).
     let id = drawing.sheets[0].next_view_id();
