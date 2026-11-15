@@ -1655,3 +1655,28 @@ fn two_step_solids_boolean_probe() {
         }
     }
 }
+
+/// Live (behaviours S4): a shell keeps concave edges sharp. A 60 × 40 × 20 block with a 40 × 20 × 12 pocket whose floor
+/// edges are filleted R2, shelled 1 and 2 mm with its bottom removed: the walls are the block's less (the block t in,
+/// open below, less the pocket grown by t with its floor edges R 2 + t), 29 faces (SHELL-SLOW: ~1.4 s in slabs, with
+/// rounded corners at the pocket's vertical edges, 41 faces).
+#[test]
+fn a_pocketed_block_shells_with_sharp_concave_corners_as_live() {
+    let b = make_box_corners(DVec3::ZERO, DVec3::new(60.0, 40.0, 20.0)).unwrap();
+    let pocket = make_box_corners(DVec3::new(10.0, 10.0, 8.0), DVec3::new(50.0, 30.0, 21.0)).unwrap();
+    let s = cut(&b, &pocket).unwrap().shape;
+    let floor = |s: &Shape, z: f64| -> Vec<Shape> { s.edges().into_iter().filter(|e| e.endpoints().is_ok_and(|(p, q)| (p.z - z).abs() < 1e-9 && (q.z - z).abs() < 1e-9)).collect() };
+    let s = fillet(&s, &floor(&s, 8.0), 2.0).unwrap().shape;
+    let bottom: Vec<Shape> = s.faces().into_iter().filter(|f| f.centroid().unwrap().z.abs() < 1e-9).collect();
+    for t in [1.0, 2.0] {
+        let r = shell_solid(&s, &bottom, t, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+        let inner = make_box_corners(DVec3::new(t, t, -1.0), DVec3::new(60.0 - t, 40.0 - t, 20.0 - t)).unwrap();
+        let g = make_box_corners(DVec3::new(10.0 - t, 10.0 - t, 8.0 - t), DVec3::new(50.0 + t, 30.0 + t, 30.0)).unwrap();
+        let g = fillet(&g, &floor(&g, 8.0 - t), 2.0 + t).unwrap().shape;
+        let want = cut(&s, &cut(&inner, &g).unwrap().shape).unwrap().shape;
+        let (v, w) = (r.volume().unwrap(), want.volume().unwrap());
+        assert!(r.is_valid(), "t {t}");
+        assert_eq!(r.faces().len(), 29, "t {t}");
+        assert!((v - w).abs() < 1e-9 * w, "t {t}: {v} vs {w} mm³");
+    }
+}

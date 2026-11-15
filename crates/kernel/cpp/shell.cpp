@@ -883,8 +883,10 @@ std::vector<gp_Pnt> clip_at_axis(const std::vector<gp_Pnt>& in, const gp_Pnt& c,
 // is tangent: Onshape's wall strips). OCCT's offset changes the topology
 // there (live G50: a chamfer next to fillets under a removed top face makes
 // one flat rim triangle in Onshape; BRepOffset gives two sloped faces).
+// `grown` (with `grown_sources`): a convex solid's region grown by -t (t < 0: its faces offset out, extended until
+// they meet), returned instead of the walls (a pocket's, below).
 bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t, double sign,
-                Built& out)
+                Built& out, TopoDS_Shape* grown = nullptr, SourceMap* grown_sources = nullptr)
 {
   const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
   auto       no  = [&](const char* why) {
@@ -902,7 +904,8 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
     rm.Add(f);
   }
   // Convex: no concave edge (a seam, a hole's, has one face and isn't
-  // analysed).
+  // analysed); else a convex block less convex pockets (below).
+  bool concave = false;
   try
   {
     BRepOffset_Analyse                        an(solid, 0.01);
@@ -922,7 +925,7 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
             const gp_Pnt      m = ec.Value(0.5 * (ec.FirstParameter() + ec.LastParameter()));
             std::fprintf(stderr, "regions: edge type %d (curve %d) at %g %g %g\n", (int)iv.Type(), (int)ec.GetType(), m.X(), m.Y(), m.Z());
           }
-          return no("a concave edge");
+          concave = true;
         }
     }
   }
@@ -932,7 +935,7 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   }
   Bnd_Box bb;
   BRepBndLib::Add(solid, bb, false);
-  const double margin = 2 * t + 1e-3 * std::sqrt(bb.SquareExtent());
+  const double margin = 2 * std::abs(t) + 1e-3 * std::sqrt(bb.SquareExtent());
   bb.Enlarge(margin);
   double x0, y0, z0, x1, y1, z1;
   bb.Get(x0, y0, z0, x1, y1, z1);
@@ -1008,12 +1011,119 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   std::vector<std::pair<TopoDS_Face, gp_Cone>>     cones;
   std::vector<TopoDS_Shape>                        tubes;
   SourceMap                                        tube_sources;
+  // Concave edges: the part as a convex block (its supporting planes' polytope) less pockets (the block less the
+  // part, each piece convex, of planes and cylinders, clear of the removed faces). The block's faces make the cavity
+  // as a convex part's; each pocket grown by t (its faces offset out, extended until they meet) is added to the wall
+  // as a hole's tube is (SHELL-SLOW: a pocket with floor fillets took ~1.4 s in slabs). A piece that is a hole (one
+  // cylinder all round) is left to the hole's tube below.
+  ShapeIMap pocket_faces;
+  if (concave)
+  try
+  {
+    const KernelTimer                      timer("regions.pockets");
+    std::vector<std::pair<gp_Pnt, gp_Dir>> hs;
+    std::vector<gp_Pnt>                    verts;
+    for (TopExp_Explorer x(solid, TopAbs_VERTEX); x.More(); x.Next())
+      verts.push_back(BRep_Tool::Pnt(TopoDS::Vertex(x.Current())));
+    const double tol = 1e-7 * std::sqrt(bb.SquareExtent());
+    for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
+    {
+      const TopoDS_Face&  f = TopoDS::Face(e.Current());
+      BRepAdaptor_Surface a(f, false);
+      if (a.GetType() != GeomAbs_Plane)
+        continue;
+      gp_Dir n = a.Plane().Axis().Direction();
+      if (!a.Plane().Position().Direct())
+        n.Reverse();
+      if (f.Orientation() == TopAbs_REVERSED)
+        n.Reverse();
+      const gp_Pnt o = a.Plane().Location();
+      if (std::all_of(verts.begin(), verts.end(), [&](const gp_Pnt& v) { return gp_Vec(o, v).Dot(gp_Vec(n)) <= tol; }))
+        hs.emplace_back(o, n);
+    }
+    for (const gp_Dir& d : {gp_Dir(1, 0, 0), gp_Dir(-1, 0, 0), gp_Dir(0, 1, 0), gp_Dir(0, -1, 0), gp_Dir(0, 0, 1), gp_Dir(0, 0, -1)})
+      hs.emplace_back(gp_Pnt(d.X() > 0 ? x1 : x0, d.Y() > 0 ? y1 : y0, d.Z() > 0 ? z1 : z0), d);
+    std::vector<TopoDS_Shape> pf;
+    const TopoDS_Shape        block = polytope(hs, big, pf);
+    if (block.IsNull() || solid_count(block) != 1)
+      return no("a concave edge (no block)");
+    BRepAlgoAPI_Cut pc;
+    build_stoppable(pc, block, solid);
+    if (pc.HasErrors() || !pc.IsDone())
+      return no("a concave edge (the block's cut failed)");
+    ShapeIMap pieces_faces;
+    TopExp::MapShapes(pc.Shape(), TopAbs_FACE, pieces_faces);
+    // Each piece face from a face of the part: that face.
+    NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> from;
+    for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
+    {
+      ShapeList imgs = images_of(pc.History(), e.Current());
+      if (imgs.IsEmpty())
+        imgs.Append(e.Current());
+      for (ShapeList::Iterator it(imgs); it.More(); it.Next())
+        if (pieces_faces.Contains(it.Value()))
+          from.Bind(it.Value(), e.Current());
+    }
+    for (TopExp_Explorer ps(pc.Shape(), TopAbs_SOLID); ps.More(); ps.Next())
+    {
+      const TopoDS_Shape& piece = ps.Current();
+      std::vector<TopoDS_Shape> own;
+      for (TopExp_Explorer e(piece, TopAbs_FACE); e.More(); e.Next())
+        if (from.IsBound(e.Current()))
+          own.push_back(from.Find(e.Current()));
+      bool hole = own.size() == 1 && BRepAdaptor_Surface(TopoDS::Face(own[0]), false).GetType() == GeomAbs_Cylinder;
+      if (hole)
+        continue;
+      for (TopExp_Explorer e(piece, TopAbs_FACE); e.More(); e.Next())
+      {
+        const GeomAbs_SurfaceType k = BRepAdaptor_Surface(TopoDS::Face(e.Current()), false).GetType();
+        if (k != GeomAbs_Plane && k != GeomAbs_Cylinder)
+          return no("a concave edge (a pocket face isn't a plane or cylinder)");
+      }
+      BRepOffset_Analyse pa(piece, 0.01);
+      TopTools_IndexedDataMapOfShapeListOfShape pef;
+      TopExp::MapShapesAndUniqueAncestors(piece, TopAbs_EDGE, TopAbs_FACE, pef);
+      for (int i = 1; i <= pef.Extent(); ++i)
+        if (pef(i).Extent() == 2)
+          for (const BRepOffset_Interval& iv : pa.Type(TopoDS::Edge(pef.FindKey(i))))
+            if (iv.Type() != ChFiDS_Convex && iv.Type() != ChFiDS_Tangential)
+              return no("a concave edge (a pocket isn't convex)");
+      Bnd_Box pbx;
+      BRepBndLib::Add(piece, pbx, false);
+      pbx.Enlarge(tol);
+      for (const TopoDS_Shape& f : removed)
+      {
+        Bnd_Box fbx;
+        BRepBndLib::Add(f, fbx, false);
+        if (!fbx.IsOut(pbx))
+          return no("a concave edge (a pocket meets a removed face)");
+      }
+      Built        unused;
+      TopoDS_Shape g;
+      SourceMap    gs;
+      if (!by_regions(piece, {}, -t, sign, unused, &g, &gs) || solid_count(g) != 1)
+        return no("a concave edge (a pocket's offset failed)");
+      for (TopExp_Explorer e(piece, TopAbs_FACE); e.More(); e.Next())
+        if (from.IsBound(e.Current()))
+          pocket_faces.Add(from.Find(e.Current()));
+      for (SourceMap::Iterator it(gs); it.More(); it.Next())
+        if (from.IsBound(it.Value().face))
+          tube_sources.Bind(it.Key(), Source{from.Find(it.Value().face), (uint8_t)REL_GENERATED});
+      tubes.push_back(g);
+    }
+    if (pocket_faces.IsEmpty())
+      return no("a concave edge (no pocket)");
+  }
+  catch (const Standard_Failure&)
+  {
+    return no("a concave edge (a pocket threw)");
+  }
   std::vector<std::pair<gp_Pnt, gp_Dir>>           halfspaces;
   std::vector<TopoDS_Shape>                        halfspace_faces;
   for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
   {
     const TopoDS_Face& f = TopoDS::Face(e.Current());
-    if (rm.Contains(f))
+    if (rm.Contains(f) || pocket_faces.Contains(f))
       continue;
     BRepAdaptor_Surface a(f, false);
     if (a.GetType() == GeomAbs_Cylinder)
@@ -1191,7 +1301,8 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
     // radius: its offset vanishes and the whole sector goes). Out to just past
     // the face: beyond it the sector is outside the part (a reach of `big`
     // cut across the whole cavity, ~30 ms a fillet).
-    const double L  = r + t;
+    // (Grown, t < 0: from r - t on out.)
+    const double L  = t > 0 ? r + t : r - 2 * t;
     auto         at = [&](double u, double rad, double v) { return ElSLib::Value(u, v, gp_Cylinder(ax, rad)); };
     auto         v_cyl = [&](const gp_Pnt& q) { double qu, qv; ElSLib::Parameters(cyl, q, qu, qv); return qv; };
     const double va = v0 - run_on(f, v_cyl, v0), vb = v1 + run_on(f, v_cyl, v1), um = 0.5 * (u0 + u1),
@@ -1269,6 +1380,13 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
       src.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
     if (!cut_by(region, src))
       return no("a boolean failed");
+  }
+  if (grown != nullptr)
+  {
+    *grown = cavity;
+    if (grown_sources != nullptr)
+      *grown_sources = sources;
+    return true;
   }
   std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("regions.final_cut");
   BRepAlgoAPI_Cut c;
