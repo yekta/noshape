@@ -5,6 +5,25 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 01:45 UTC: drawing exports 61 -> 68 / 84; 1dc32b Extrude 49 is core's pattern Remove
+- Landed: cap names in the translator (cb2b6b259), broken-out jog splines + one HATCH per region (f84e3d41), aligned
+  section line / hatches (0ad9b324), aux arrows (14c7de41), hole table untitled + BOM sizing (b60f38a9). Queued 66222a0b:
+  inspection bubble on INSPECTION_CALLOUT over its value (fill = SOLID HATCH, `CadObject::SolidDisk`), dimension lines
+  base to base on paper only (`SheetGeometry::arrow_insets`, trimmed in `export::prepare`: on screen they still reach
+  the tips, so a saved datum's `t` on the line keeps its place), tight ANSI angular: arrows outside with tails.
+- Exports (run: /root/dx-scratch/exprun.sh <out> <scenarios...>, vibe5; list in exp-list.txt): 68 / 84. Left:
+  - waits on live (REQUESTS 11-15): hatch spacing with several regions (aligned PDF), aux line length / offset,
+    revision table widths + header row, centermark on a hole with an automatic one (drawing UI = studios').
+  - note leader: live's shoulder 0.22 in under the note's top (middle of a 0.44 in box?), ours at the text's middle.
+  - inspection PDF: live strokes 0.12 pt 132.7 vs ours 61.2 (bubble outline? unverified).
+  - ordinate PDF 49.9 vs 46.3; break lines 1.26 vs 1.19; crop-spline polylines; callout hexagon 0.12 strokes;
+    bom-table extra VISIBLE circle; DIMENSION flags lack 32 (not scored).
+- infento 1dc32b (fresh run vibe6 ~/tmp/dx/sk16-st-1dc32b.log, save16): Extrude 39 / 40 OK. Extrude 49 fails because
+  Circular pattern 6 (PART, Remove) keeps its seed: std's tools are seed + copies (boolean.fs subfeatureToolsTargets),
+  so live cuts Part 19 out of Part 16 and Sketch 10 sits on that pocket floor (COPY of Extrude 47's end cap, +X).
+  Core told 01:2x (pattern.rs part_pattern; Mirror excepted). After it lands: rerun st1dc7.sh. Still failing there:
+  Extrude 48 missing region, Extrude 34 / 79, Transform 15 / 16.
+
 ## 11-14 22:44 UTC: landed band / inspection / broken-out; infento 1dc32b handed on in pieces
 - Landed: exchange read-back band (ed89c2e4; 47/48, the hose's ring split left), inspection bubble radius (1cfe9234),
   broken-out only in later projected views (420a998d). TICKETS PS-INEXACT-INTERSECTION-EDGES filed (P3 core / bool).
