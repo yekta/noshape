@@ -243,14 +243,18 @@ pub fn ops() -> Vec<Op> {
 /// a Standard without Units picks the Units tab that shows it; a Standard,
 /// Units or Style change copies the visible Standard's values into the
 /// fields not given.
-fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> bool) {
+fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> bool) -> Result<(), OpError> {
     use noshape_model::features::hole_tables as ht;
     use noshape_model::params::ParamValue;
-    // A size the caller gives is theirs, a schema default's value too (5 mm): not replaced by the Standard's size
-    // (the hole then reads as one whose values were set; Onshape's "Parameters have been overridden. Check input."
-    // where they differ from a size also given).
+    // A size the caller gives is theirs, a schema default's value too (5 mm): not replaced by the Standard's (it then
+    // reads as one whose values were set, with Onshape's "Parameters have been overridden. Check input." where it
+    // differs from the Standard's), unless the caller also gives the Standard's size or tableSynced=true: then the
+    // Standard's values are the hole's, and a size given that differs from them is refused (lead 11-15).
     const DIMS: [&str; 6] = ["holeDiameterV3", "tapDrillDiameterV3", "cBoreDiameterV3", "cBoreDepthV3", "cSinkDiameterV3", "cSinkAngleV3"];
-    if !set(ht::TABLE_SYNCED_PARAM) && DIMS.iter().any(|k| set(k)) {
+    const SIZES: [&str; 4] = ["ansiHoleTableEx", "ansiHoleTable", "isoHoleTableEx", "isoHoleTable"];
+    let given: Vec<&str> = DIMS.iter().copied().filter(|k| set(k)).collect();
+    let table_wins = SIZES.iter().any(|k| set(k)) || (set(ht::TABLE_SYNCED_PARAM) && feature.params.bool(ht::TABLE_SYNCED_PARAM));
+    if !given.is_empty() && !table_wins {
         feature.params.set(ht::TABLE_SYNCED_PARAM, ParamValue::Bool(true));
     }
     // A Standard given without Units: the tab that shows it.
@@ -263,7 +267,7 @@ fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> boo
     }
     // Its default size when none is chosen (an ISO M6 tapped hole drills
     // 5 mm, not the new hole's 1/4 in).
-    if ["ansiHoleTableEx", "ansiHoleTable", "isoHoleTableEx", "isoHoleTable", "unitsSystem", "styleV2"].iter().any(|k| set(k)) {
+    if SIZES.iter().chain(&["unitsSystem", "styleV2"]).any(|k| set(k)) || table_wins {
         let mut v = feature.params.clone();
         let (pid, table) = ht::hole_table_param(&v);
         // Every level chosen, as the dialog's dropdowns leave it (a path
@@ -274,15 +278,30 @@ fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> boo
             v.set(pid, ParamValue::Lookup(path.clone()));
             feature.params.set(pid, ParamValue::Lookup(path));
         }
-        let applied = if set(pid) { ht::apply_table_to_params(&mut v) } else { ht::sync_hole_standard(&mut v) };
-        if applied {
-            for (k, val) in v.0 {
-                if !set(&k) {
-                    feature.params.set(&k, val);
-                }
+        let applied = if set(pid) || table_wins { ht::apply_table_to_params(&mut v) } else { ht::sync_hole_standard(&mut v) };
+        if !applied {
+            return Ok(());
+        }
+        let value = |p: Option<&ParamValue>| match p {
+            Some(ParamValue::Expr(e)) => noshape_units::evaluate(&e.text, &noshape_units::EmptyScope).ok().map(|q| q.value),
+            _ => None,
+        };
+        for k in given.iter().filter(|_| table_wins) {
+            let (mine, table) = (value(feature.params.get(k)), value(v.get(k)));
+            if let (Some(a), Some(b)) = (mine, table)
+                && (a - b).abs() > 1e-9 + b.abs() * 1e-9
+            {
+                let size = v.lookup(pid).join(" ");
+                return Err(OpError::param(&format!("params.{k}"), &format!("differs from the size {size}'s; give one or the other. Parameters have been overridden. Check input.")));
+            }
+        }
+        for (k, val) in v.0 {
+            if !set(&k) || (table_wins && DIMS.contains(&k.as_str())) {
+                feature.params.set(&k, val);
             }
         }
     }
+    Ok(())
 }
 
 /// What the feature's dialog decides on its own for a new feature, for the
@@ -306,7 +325,7 @@ fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, fe
         any
     };
     if feature.type_id == "hole" {
-        hole_standard(feature, &set);
+        hole_standard(feature, &set)?;
         let ps = doc::studio(od.doc(), tab)?;
         if let Some(defaults) = ps.new_feature(&feature.type_id, &units) {
             let linked = noshape_model::features::hole_tables::link_tapped_depths(&defaults.params, &feature.params, &units);
@@ -662,10 +681,13 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         let mut params = derived_source(od.doc(), ty.id, params.clone())?;
         in_feature_connectors(&mut feature, &mut params, &units, od.doc())?;
+        let before = feature.params.clone();
         values::apply(&ty.params, &mut feature.params, &params, &units, od.doc()).map_err(|e| e.under("params"))?;
         feature.drop_unused_sub_features();
         if feature.type_id == "hole" {
-            hole_standard(&mut feature, &|k| params.contains_key(k));
+            // An edit's values: the ones it changes (feature_get's own values passed back change nothing).
+            let edited = feature.params.clone();
+            hole_standard(&mut feature, &|k| params.contains_key(k) && edited.get(k) != before.get(k))?;
         }
         ignored = values::ignored_params(&ty.params, &feature.params, &params);
     }

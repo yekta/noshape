@@ -934,8 +934,9 @@ fn a_workspace_branches_from_a_version() {
 }
 
 /// A Hole's size given through the API is used as given, the schema default's 5 mm too (lead 11-15: not replaced by
-/// the Standard's 1/4). Where it differs from the Standard's size (the default 1/4, or one given) the Hole says
-/// Onshape's "Parameters have been overridden. Check input." (live's REST-built holes say it too) and keeps it.
+/// the Standard's 1/4), with Onshape's "Parameters have been overridden. Check input." where it differs from the
+/// Standard's (live's REST-built holes say it too). Given with a Standard's size or tableSynced=true, the Standard's
+/// values are the hole's: a size that differs from them is refused in those words, one that agrees is taken.
 #[test]
 fn a_hole_size_given_is_used_as_given() {
     let mut ctx = Ctx::new();
@@ -954,9 +955,16 @@ fn a_hole_size_given_is_used_as_given() {
     let h1 = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": [pts[0]], "holeDiameterV3": "5 mm", "endStyleV2": "THROUGH" } }));
     assert_eq!(h1["feature_status"]["message"], "Parameters have been overridden. Check input.", "{h1}");
     assert!((radius_at(&mut ctx, 15.0) - 2.5).abs() < 1e-3, "5 mm kept: {}", radius_at(&mut ctx, 15.0));
-    let h2 = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": [pts[1]], "ansiHoleTableEx": ["Drilled", "1/4 (0.25)"], "holeDiameterV3": "5 mm", "endStyleV2": "THROUGH" } }));
-    assert_eq!(h2["feature_status"]["message"], "Parameters have been overridden. Check input.", "{h2}");
-    assert!((radius_at(&mut ctx, 45.0) - 2.5).abs() < 1e-3, "5 mm over the 1/4 size: {}", radius_at(&mut ctx, 45.0));
+    for with in [json!({ "ansiHoleTableEx": ["Drilled", "1/4 (0.25)"] }), json!({ "tableSynced": true })] {
+        let mut params = json!({ "locations": [pts[1]], "holeDiameterV3": "5 mm", "endStyleV2": "THROUGH" });
+        params.as_object_mut().unwrap().extend(with.as_object().unwrap().clone());
+        let e = try_call(&mut ctx, "feature_add", json!({ "type": "hole", "params": params })).expect_err("5 mm against the 1/4 size");
+        assert_eq!(e.param.as_deref(), Some("params.holeDiameterV3"), "{with}: {}", e.to_json());
+        assert!(e.message.contains("1/4 (0.25)") && e.message.ends_with("Parameters have been overridden. Check input."), "{with}: {}", e.message);
+    }
+    let h2 = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": [pts[1]], "ansiHoleTableEx": ["Drilled", "1/4 (0.25)"], "holeDiameterV3": "0.25 in", "endStyleV2": "THROUGH" } }));
+    assert_eq!(h2["feature_status"]["status"], "Ok", "the size's own diameter: {h2}");
+    assert!((radius_at(&mut ctx, 45.0) - 3.175).abs() < 1e-3, "1/4 in: {}", radius_at(&mut ctx, 45.0));
 }
 
 /// Revision history's Export (live rel-rh-export): a Part Studio's parts as they are in a version, the workspace
@@ -1395,7 +1403,11 @@ fn hole_standard_sets_the_table_sizes() {
     call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M8"] } }));
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Hole 1" }));
     assert_eq!(g["params"]["holeDiameterV3"], "6.8 mm", "{g}");
-    call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M6"], "holeDiameterV3": "5.2 mm" } }));
+    // A size with a diameter of its own: refused (lead 11-15); the diameter alone is the caller's.
+    let e = try_call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M6"], "holeDiameterV3": "5.2 mm" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("params.holeDiameterV3"), "{e:?}");
+    call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M6"] } }));
+    call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "holeDiameterV3": "5.2 mm" } }));
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Hole 1" }));
     assert_eq!(g["params"]["holeDiameterV3"], "5.2 mm", "{g}");
     // The legacy `style` (hidden, ignored) points to `styleV2` (qa API-HOLE-STYLE);
