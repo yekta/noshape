@@ -7655,10 +7655,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             continue;
         }
         let features = values(&asm["subAssemblyFeatures"][e]["features"]);
-        // Its tab named as live's assembly (its instances' name without " <n>": the BOM's row), unless taken.
-        let live_name = std::iter::once(root).chain(values(&asm["subAssemblies"])).flat_map(|a| values(&a["instances"])).find(|i| i["type"] == "Assembly" && i["elementId"] == e).and_then(|i| i["name"].as_str()).map(|n| n.rsplit_once(" <").map_or(n, |(base, _)| base).to_string());
-        let tab = live_name.filter(|n| !n.is_empty() && levels.iter().all(|l| l.tab != *n)).unwrap_or_else(|| format!("Sub {}", &e[..e.len().min(6)]));
-        levels.push(Level { element: e.to_string(), instances: values(&sub["instances"]), features, defs: values(&sub["features"]), tab });
+        levels.push(Level { element: e.to_string(), instances: values(&sub["instances"]), features, defs: values(&sub["features"]), tab: format!("Sub {}", &e[..e.len().min(6)]) });
     }
     // Each level's instances and their elements (its Part Studio, or its subassembly), by (level, instance id): an id is
     // only its assembly's (asm-suspension's Upper and Lower Control Arm share six, from two Part Studios).
@@ -8587,13 +8584,23 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
         }
     }
-    compare_bom(&mut placer, asm, &mut res);
+    // Our subassembly tabs by live's assembly names (its instances' name without " <n>": the BOM's row).
+    let sub_names: HashMap<String, String> = levels
+        .iter()
+        .skip(1)
+        .filter_map(|l| {
+            let i = levels.iter().flat_map(|x| x.instances.iter()).find(|i| i["type"] == "Assembly" && i["elementId"] == l.element.as_str())?;
+            let n = i["name"].as_str()?;
+            Some((l.tab.clone(), n.rsplit_once(" <").map_or(n, |(base, _)| base).to_string()))
+        })
+        .collect();
+    compare_bom(&mut placer, asm, &sub_names, &mut res);
     res
 }
 
 /// Our structured BOM of the top-level assembly against live's multi-level one (`liveBom`, the corpus' bom.json),
-/// row by row in order.
-fn compare_bom(placer: &mut Translator, asm: &Value, res: &mut AssemblyResult) {
+/// row by row in order (a row of one of our subassembly tabs under live's assembly name, `sub_names`).
+fn compare_bom(placer: &mut Translator, asm: &Value, sub_names: &HashMap<String, String>, res: &mut AssemblyResult) {
     let Some(live) = asm["liveBom"]["root"]["bom"]["bomTable"]["items"].as_array() else { return };
     res.bom_rows = live.len();
     let columns = ["Item", "Quantity", "Name", "Part number", "Description", "Material"];
@@ -8608,19 +8615,51 @@ fn compare_bom(placer: &mut Translator, asm: &Value, res: &mut AssemblyResult) {
     // (No material: live's API gives "", its BOM panel "- None -", as ours.)
     let material = |v: &Value| Some(text(v)).filter(|t| !t.is_empty()).unwrap_or_else(|| "- None -".into());
     // (A subassembly's row: no material in either; ours leaves the cell empty.)
+    let name = |o: &Value| sub_names.get(&text(&o["name"])).cloned().unwrap_or_else(|| text(&o["name"]));
+    type Row = (u64, String, f64, String, String, String);
+    let live_rows: Vec<Row> = live.iter().map(|l| (l["itemSource"]["indentLevel"].as_u64().unwrap_or(0), text(&l["name"]), l["quantity"].as_f64().unwrap_or(0.0), text(&l["partNumber"]), text(&l["description"]), material(&l["material"]["displayName"]))).collect();
+    let our_rows: Vec<Row> = ours.iter().map(|o| (o["depth"].as_u64().unwrap_or(0), name(o), o["quantity"].as_f64().unwrap_or(0.0), text(&o["cells"]["Part number"]), text(&o["cells"]["Description"]), material(&o["cells"]["Material"]))).collect();
+    // Each row with the name of the row it sits under (the nearest one above it with a smaller indent).
+    let keyed = |rows: &[Row]| -> Vec<(String, Row)> {
+        let mut stack: Vec<(u64, String)> = Vec::new();
+        rows.iter()
+            .map(|r| {
+                while stack.last().is_some_and(|(d, _)| *d >= r.0) {
+                    stack.pop();
+                }
+                let parent = stack.last().map(|(_, n)| n.clone()).unwrap_or_default();
+                stack.push((r.0, r.1.clone()));
+                (parent, r.clone())
+            })
+            .collect()
+    };
+    // A live row is as live when ours has a row with the same fields under the same parent (each of ours used once);
+    // the order is reported apart.
+    let mut left = keyed(&our_rows);
+    let mut order = Vec::new();
     let mut shown = 0;
-    for (i, l) in live.iter().enumerate() {
-        let want = (l["itemSource"]["indentLevel"].as_u64().unwrap_or(0), text(&l["name"]), l["quantity"].as_f64().unwrap_or(0.0), text(&l["partNumber"]), text(&l["description"]), material(&l["material"]["displayName"]));
-        let got = ours.get(i).map(|o| (o["depth"].as_u64().unwrap_or(0), text(&o["name"]), o["quantity"].as_f64().unwrap_or(0.0), text(&o["cells"]["Part number"]), text(&o["cells"]["Description"]), material(&o["cells"]["Material"])));
-        if got.as_ref() == Some(&want) {
-            res.bom_matching += 1;
-        } else if shown < 3 {
-            shown += 1;
-            res.differences.push(format!("BOM row {}: ours {got:?}, live {want:?}", i + 1));
+    for (i, row) in keyed(&live_rows).into_iter().enumerate() {
+        match left.iter().position(|r| *r == row) {
+            Some(j) => {
+                res.bom_matching += 1;
+                order.push(our_rows.iter().position(|r| *r == row.1).unwrap_or(j));
+                left.remove(j);
+            }
+            None if shown < 3 => {
+                shown += 1;
+                res.differences.push(format!("BOM row {} (under {:?}): live {:?}, not in ours", i + 1, row.0, row.1));
+            }
+            None => {}
         }
+    }
+    for (parent, r) in left.iter().take(3) {
+        res.differences.push(format!("BOM: ours has {r:?} under {parent:?}, live doesn't"));
     }
     if ours.len() != live.len() {
         res.differences.push(format!("BOM: {} rows, live {}", ours.len(), live.len()));
+    }
+    if order.windows(2).any(|w| w[0] > w[1]) {
+        res.differences.push("BOM: the matching rows in another order than live's".into());
     }
 }
 

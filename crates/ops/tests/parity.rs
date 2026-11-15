@@ -2967,7 +2967,7 @@ fn an_assembly_is_rebuilt_as_lives() {
     with_bom["liveBom"] = bom(3);
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-bom3.noshape"), &with_bom, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
     assert_eq!((r.bom_matching, r.bom_rows), (0, 1), "{r:?}");
-    assert!(r.differences.iter().any(|d| d.starts_with("BOM row 1:")), "{r:?}");
+    assert!(r.differences.iter().any(|d| d.starts_with("BOM row 1 ")), "{r:?}");
     // A place the Revolute doesn't allow: freed there, ours solves it back
     // onto the mate, 10 mm.
     let mut off = asm.clone();
