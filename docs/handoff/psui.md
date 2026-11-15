@@ -268,6 +268,15 @@ flips are marked. Routed: move-boundary, edit-curve, offset-curve, fit-spline to
 gusset to skasm; face-blend to blend (fixed); docs-account to studios (live2 retakes); context-create-version-update
 re-taken by live2 (d2dcdb37). Left: dialog-number-rclick-menu (recorder), part-properties (managed workflows),
 boundary-surface, sketch sub-pixel readouts, analysis-thickness (live account), face-rclick-export-dxf (dx).
+**11-15 15:39:** the sketch Text dialog now as live's 3 takes (40 / 40): its text box reads as a field and keeps the
+keyboard through a Font pick, a click under the text puts the caret at its end, ✓ selects nothing, a corner placed on a
+point gets its Coincident, and the state lists a text as one "other" entity (its box's own constraints but Horizontal
+hidden, as live's model). Properties: Reset all goes by the saved values (typing alone doesn't enable it); its
+checkboxes / Unit of measure named (4 / 4 part-properties). plane-line-angle, ruled-surface-extended-cubic,
+offset-surface-new-edit-reedit were 55ea6c02's blamed-field case (match). gusset-new-edit-reedit primed with live's
+remembered 20 / 10 mm (skasm). Asked live2 (REQUESTS 13:57): does Chrome's own menu show on a right-clicked Depth
+(dialog-number-rclick-menu: ours opens the input's Cut / Copy / Paste, which takes live's dialog-closing Escape).
+asm took context-create-version-update's Where used… row (38bfccbf).
 **11-14 18:16 (viewport speed, Linux numbers):** vibe7 (load ~16), release, llvmpipe, 60 samples, mode-700 copies
 deleted after. Pointer / click to the frame with its highlight or selection, p50: dock hover 370 ms, pick 620; hat15
 hover 381-856, pick 1074: llvmpipe drawing the models. To its submission p50 0.4-1.9 ms; the maxima (69-985 ms, one
