@@ -1903,6 +1903,14 @@ static bool analytic_only(const TopoDS_Shape& s)
   return true;
 }
 
+double faces_volume_precise(const std::vector<TopoDS_Shape>& fs, const gp_XYZ& o)
+{
+  double v = 0;
+  for (const TopoDS_Shape& f : fs)
+    v += face_moments(TopoDS::Face(f), true, o)[0];
+  return v;
+}
+
 GProp_GProps volume_props(const TopoDS_Shape& s)
 {
   TopoDS_Compound          rest;

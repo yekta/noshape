@@ -447,6 +447,9 @@ std::vector<XtPart> read_native_parts(const std::string& path, int config = -1);
 std::vector<XtPart> read_rhino_parts(const std::string& path);
 
 // Volume properties that survive OCCT's integrator weaknesses (see common.cpp).
+// The faces' share of a volume (the divergence theorem's integral over them, about `o`), by volume_props's segmented
+// integrals (OCCT's GProp is loose on faces bounded by B-spline curves: c2-impeller-loft's chamfer 26, mm³ off).
+double faces_volume_precise(const std::vector<TopoDS_Shape>& fs, const gp_XYZ& o);
 GProp_GProps volume_props(const TopoDS_Shape& s);
 TopoDS_Shape band_seam_at(const TopoDS_Shape& s, const TopoDS_Face& face, double alpha, occ::handle<BRepTools_History>& hist);
 // boolean.cpp: a progress indicator stopping an OCCT build at the thread's
