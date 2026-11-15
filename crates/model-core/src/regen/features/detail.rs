@@ -1129,6 +1129,9 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
                 }
                 match quick.then(|| k::chamfer_checked(&body.shape, &shapes, spec, &reference)) {
                     Some(Ok(r)) => r,
+                    // A plane face's rim whose sides run along its normal (c2-impeller-loft's Chamfer Stevenrohr
+                    // Halterung: a tube's end, two of its edges 0.31 mm splines OCCT's chamfer fails on): as a cut.
+                    _ if matches!(super::blend_section::rim_chamfer_cut(ev, bi, &edges, spec, &reference), Ok(true)) => continue,
                     _ => return Err(chamfer_failed(e)),
                 }
             }

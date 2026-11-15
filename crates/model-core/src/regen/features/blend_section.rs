@@ -2569,6 +2569,58 @@ pub fn planar_chamfer_cut(ev: &mut EvalCtx, bi: usize, edges: &[usize], d: f64) 
     Ok(true)
 }
 
+/// An Offset chamfer of `edges` on one plane face whose sides run straight along its normal (a tube's end): the part
+/// less [`k::rim_chamfer::prism_rim_chamfer`]'s tool, each chamfer face named for its edge. `spec`'s first distance
+/// on the `reference` faces (the plane face or the sides). False where it doesn't apply or doesn't come out one valid
+/// solid.
+pub fn rim_chamfer_cut(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: k::ChamferSpec, reference: &[Shape]) -> FResult<bool> {
+    use super::sheetmetal_util::{body_named, bool_named};
+    let body = ev.ctx.bodies[bi].clone();
+    let shape = &body.shape;
+    let ef = shape.edge_faces()?;
+    let faces = shape.faces();
+    let Some(&first) = edges.first() else { return Ok(false) };
+    let mut common = ef.get(first).cloned().unwrap_or_default();
+    for &x in edges {
+        let fs = ef.get(x).cloned().unwrap_or_default();
+        common.retain(|f| fs.contains(f));
+    }
+    let [pf] = common[..] else { return Ok(false) };
+    // (Down the sides d, in along the plane e.)
+    let on_plane = reference.iter().any(|r| r.is_same(&faces[pf as usize]));
+    let (d, e) = match spec {
+        k::ChamferSpec::Equal(d) => (d, d),
+        k::ChamferSpec::TwoDistances(a, b) if on_plane => (b, a),
+        k::ChamferSpec::TwoDistances(a, b) => (a, b),
+        k::ChamferSpec::DistanceAngle(a, t) if on_plane => (a * t.tan(), a),
+        k::ChamferSpec::DistanceAngle(a, t) => (a, a * t.tan()),
+    };
+    let Some(rc) = k::rim_chamfer::prism_rim_chamfer(shape, edges, d, e)? else { return Ok(false) };
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let generated = Arc::new(TopoName::face(ev.feature, Role::Generated(body.edges[first].clone())));
+    let names: Vec<Name> = rc
+        .tool
+        .faces()
+        .iter()
+        .map(|f| match rc.on_chamfer.iter().position(|p| f.contains_point(*p, scale * 1e-7).unwrap_or(false)) {
+            Some(i) => Arc::new(TopoName::face(ev.feature, Role::Blend(body.edges[edges[i]].clone()))),
+            None => generated.clone(),
+        })
+        .collect();
+    let (cut, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &[NamedShape::new(rc.tool, names)])?;
+    if cut.count(ShapeType::Solid) != 1 {
+        return Ok(false);
+    }
+    let cut = NamedShape::new(cut, names);
+    let un = k::unify_same_domain(&cut.shape)?;
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+        return Ok(false);
+    }
+    let names = ev.name_result(&[&cut.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
+    Ok(true)
+}
+
 pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], sizes: &[f64], kind: RimBlend) -> FResult<()> {
     use super::sheetmetal_util::{body_named, bool_named};
     let body = ev.ctx.bodies[bi].clone();

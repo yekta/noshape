@@ -236,6 +236,37 @@ fn a_lofts_added_vertices_stay_for_good() {
     assert_eq!(arcs(&u, 0.0325), 4);
 }
 
+/// c2-impeller-loft's Chamfer Stevenrohr Halterung (its part at feature 26): an Offset chamfer, 3.5 mm down the stern
+/// tube's side at 20°, of the tube end's arc and two 0.31 mm spline edges meeting it at 8.9°, which OCCT's chamfer
+/// can't build, as a cut by rim_chamfer's tool. The strips' chamfers run on along their spline to Part 3's cylinder, as
+/// live's (q2985c): the mitres at (5, ±2.59, -41.7795) mm, the run-on ends at (5, ±0.6138, -43.4532), 120.04 mm³ off
+/// (ours 119.67: the run-on's spline taken on past its end).
+#[test]
+fn a_tube_ends_offset_chamfer_runs_on_to_the_face_beyond_as_live() {
+    let _ = set_working_scale(1000.0);
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend/impeller-chamfer26.bin");
+    let s = Shape::from_bin_bytes(&std::fs::read(path).unwrap()).unwrap();
+    // The end's arc and two strips: on x 5 at both ends, 53.6106 and 0.3117 mm long.
+    let edges: Vec<usize> = (0..s.count(ShapeType::Edge))
+        .filter(|&i| {
+            let info = s.sub_shape(ShapeType::Edge, i).unwrap().edge_info().unwrap();
+            let on_end = (info.start.x - 0.005).abs() < 1e-9 && (info.end.x - 0.005).abs() < 1e-9 && !info.closed;
+            on_end && [53.6106, 0.3117].iter().any(|l| (info.length * 1e3 - l).abs() < 1e-3)
+        })
+        .collect();
+    assert_eq!(edges.len(), 3);
+    let d = 0.0035;
+    let rc = rim_chamfer::prism_rim_chamfer(&s, &edges, d, d * 20f64.to_radians().tan()).unwrap().expect("the chamfer's tool");
+    let cut = boolean(BooleanOp::Cut, std::slice::from_ref(&s), &[rc.tool], &BooleanOptions::default()).unwrap().shape;
+    assert!(cut.is_valid() && cut.count(ShapeType::Solid) == 1);
+    let off = (s.volume().unwrap() - cut.volume().unwrap()) * 1e9;
+    assert!((off - 120.04).abs() < 0.5, "{off} mm³ off, live 120.04");
+    for (y, z) in [(2.59, -41.7795), (-2.59, -41.7795), (0.6138, -43.4532), (-0.6138, -43.4532)] {
+        let at = DVec3::new(5.0, y, z) * 1e-3;
+        assert!(cut.vertices().iter().any(|v| v.vertex_point().is_ok_and(|p| p.distance(at) < 5e-6)), "no vertex near (5, {y}, {z}) mm");
+    }
+}
+
 /// The impeller's Loft Gehäuse, a unit `mm` long: its sketches' circle (in two arcs) to the flange's D, Normal to
 /// profile at the circle.
 fn impeller_loft(mm: f64) -> Shape {
