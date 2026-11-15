@@ -4928,6 +4928,7 @@ impl<'a> Translator<'a> {
             let mut entities: Vec<String> = Vec::new();
             let mut external = false;
             let mut unmapped = false;
+            let mut linked = false;
             // Each slot local or model geometry (`externalEntity1` where `localEntity1` would be: a midpoint between
             // two model vertices, cf-sheet-metal-hem's derived Sketch 3 centring its circle), in the slots' order.
             let param = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned();
@@ -4969,6 +4970,7 @@ impl<'a> Translator<'a> {
                 if let Some(e) = local.and_then(|l| self.model_at(oid, l)) {
                     entities.push(e);
                     external = false;
+                    linked = true;
                 }
             }
             if external {
@@ -5010,7 +5012,15 @@ impl<'a> Translator<'a> {
             let ours = if ours == "quadrant" { "coincident" } else { ours };
             // A point mirrored onto itself (ours merged the pair: a point on the mirror line) lies on the line.
             let (ours, entities) = if ours == "symmetric" && entities.len() == 3 && entities[0] == entities[1] { ("coincident", vec![entities[0].clone(), entities[2].clone()]) } else { (ours, entities) };
-            let made = !entities.is_empty() && self.call("sketch_constrain", json!({ "sketch": id, "constraint": ours, "entities": entities })).is_ok();
+            let reply = if entities.is_empty() { None } else { self.call("sketch_constrain", json!({ "sketch": id, "constraint": ours, "entities": entities })).ok() };
+            // One linked by where live solved it that over-defines the sketch (c2-hex-bookcase-derived's clip: a
+            // polygon's corners on a mesh's nodes, a hair off live's): taken back.
+            if linked && reply.as_ref().is_some_and(|r| r["status"].as_str().is_some_and(|t| t.starts_with("over defined"))) {
+                let _ = self.call("history_undo", json!({}));
+                *missed.entry(format!("{ty} to external geometry")).or_default() += 1;
+                continue;
+            }
+            let made = reply.is_some();
             self.sketch_edits += usize::from(made);
             if made {
                 self.check_moved(id, || format!("{ty} on {}", c["parameters"].as_array().into_iter().flatten().filter_map(|p| p["value"].as_str()).collect::<Vec<_>>().join(", ")));
