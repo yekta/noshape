@@ -330,6 +330,8 @@ struct GFace {
     uvbox: [f64; 4],
     pcurves: PCurves,
     grid: std::sync::OnceLock<Vec<(DVec2, DVec3)>>,
+    /// Points' parameters found so far ([`Self::uv_of`]: most are asked for again).
+    uvs: std::sync::Mutex<HashMap<[u64; 3], DVec2>>,
     patches: std::sync::OnceLock<free::Patches>,
     /// A Bézier face's surface in pieces, each its control points (holding it).
     hulls: std::sync::OnceLock<Option<Vec<free::Hull>>>,
@@ -362,9 +364,17 @@ impl GFace {
     /// A point's parameters on a NURBS face's surface (from the nearest of its samples).
     fn uv_of(&self, p: DVec3) -> DVec2 {
         let Some(ns) = &self.ns else { return DVec2::ZERO };
+        let key = [p.x.to_bits(), p.y.to_bits(), p.z.to_bits()];
+        if let Some(uv) = self.uvs.lock().ok().and_then(|m| m.get(&key).copied()) {
+            return uv;
+        }
         let grid = self.grid.get_or_init(|| free::samples(ns, self.uvbox));
         let seed = grid.iter().min_by(|a, b| (a.1 - p).length_squared().total_cmp(&(b.1 - p).length_squared())).map_or(DVec2::ZERO, |x| x.0);
-        ns.param_of(p, seed, self.uvbox).0
+        let uv = ns.param_of(p, seed, self.uvbox).0;
+        if let Ok(mut m) = self.uvs.lock() {
+            m.insert(key, uv);
+        }
+        uv
     }
 
     fn to3(&self, q: DVec2) -> DVec3 {
@@ -4478,7 +4488,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
                 None => s,
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, loop_lens, bound: Default::default(), bound_spans: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), bez: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
+            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, loop_lens, bound: Default::default(), bound_spans: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), uvs: Default::default(), patches: Default::default(), hulls: Default::default(), bez: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();

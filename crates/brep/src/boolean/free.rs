@@ -1067,7 +1067,7 @@ mod tests {
     #[test]
     fn hulls_off_a_cylinder_face() {
         let s = Surf::Cyl { o: DVec3::ZERO, a: DVec3::Z, x: DVec3::X, y: DVec3::Y, r: 1.0, r0: 1.0, k: 0.0, flip: false, th0: 0.0, full: false };
-        let g = GFace { arg: 0, index: 0, t: 0.0, solid: 0, s, edges: Vec::new(), loop_lens: Vec::new(), bound: Default::default(), bound_spans: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::new(0.0, 0.0, 0.0), hi: DVec3::new(1.0, 1.0, 1.0), ns: None, uvbox: [0.0; 4], pcurves: HashMap::default(), grid: Default::default(), patches: Default::default(), hulls: Default::default(), bez: Default::default(), inner: Vec::new() };
+        let g = GFace { arg: 0, index: 0, t: 0.0, solid: 0, s, edges: Vec::new(), loop_lens: Vec::new(), bound: Default::default(), bound_spans: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::new(0.0, 0.0, 0.0), hi: DVec3::new(1.0, 1.0, 1.0), ns: None, uvbox: [0.0; 4], pcurves: HashMap::default(), grid: Default::default(), uvs: Default::default(), patches: Default::default(), hulls: Default::default(), bez: Default::default(), inner: Vec::new() };
         let flat = Some((DVec2::new(0.0, 0.0), DVec2::new(1.0, 1.0)));
         let near = |r: f64, th: f64, z: f64| [-0.01, 0.01].into_iter().flat_map(|d| [DVec3::new(r * (th + d).cos(), r * (th + d).sin(), z + d), DVec3::new((r + d) * th.cos(), (r + d) * th.sin(), z)]).collect::<Vec<_>>();
         let off = |pts: Vec<DVec3>| off_surface(&pts, &g, flat, 0.005);
