@@ -1,18 +1,19 @@
 {
  "scenario": "shortcut-shift-c",
- "recorded": "2026-11-04T01:01:48.853Z",
+ "recorded": "2026-11-15T13:08:17.885Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.0 backfilled"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.1"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "8d8f855fc924a606138306ca",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "5ee7062f3db5ec84a81aa8ab",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -20,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -58,7 +60,35 @@
   },
   "message": null,
   "tooltip": null,
-  "sketch": null
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -80,6 +110,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -118,9 +149,37 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 21914
+   "t": 30382
   },
   {
    "step": 2,
@@ -129,12 +188,159 @@
     "key": "shift+c"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1560,
+     960
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "panel",
+     "title": "Curve/surface analysis",
+     "text": [
+      "Edges and faces to analyze",
+      "[x] Curvature combs",
+      "Curvature combs",
+      "[x] Show U curves",
+      "Show U curves",
+      "U curves",
+      "8",
+      "[x] Show V curves",
+      "Show V curves",
+      "V curves",
+      "8",
+      "[ ] Sketch inflection points",
+      "Sketch inflection points",
+      "[x] Minimum radius",
+      "Minimum radius",
+      "[ ] Extend across face",
+      "Extend across face",
+      "[ ] Control point grids",
+      "Control point grids",
+      "[ ] Knot points",
+      "Knot points",
+      "[x] Details",
+      "Details",
+      "Comb size"
+     ],
+     "fields": [
+      {
+       "label": "Curvature combs",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Show U curves",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "U curves",
+       "kind": "input",
+       "value": "8"
+      },
+      {
+       "label": "Show V curves",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "V curves",
+       "kind": "input",
+       "value": "8"
+      },
+      {
+       "label": "Sketch inflection points",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Minimum radius",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Extend across face",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Control point grids",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Knot points",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Details",
+       "kind": "checkbox",
+       "value": true
+      }
+     ]
+    },
     "dialogs": [],
+    "panels": [
+     {
+      "id": "edge-curvature-view",
+      "title": "Curve/surface analysis",
+      "text": "Curve/surface analysis / Edges and faces to analyze / Curvature combs / Show U curves / U curves / Show V curves / V curves / Sketch inflection points / Minimum radius / Extend across face / Control point grids / Knot points / Details / Comb size",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": "8"
+       },
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": "8"
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": true
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": true
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -173,9 +379,37 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 23762
+   "t": 32376
   }
  ]
 }
