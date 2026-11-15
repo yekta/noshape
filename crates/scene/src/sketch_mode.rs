@@ -6767,14 +6767,8 @@ pub fn link_circular_pattern(data: &mut SketchData, instances: &[Vec<EntityId>],
     }
     for (g, angle) in instances[1..].iter().zip(&angles) {
         for (seed, inst) in seeds.iter().zip(g) {
-            match sk.kind(*seed) {
-                Some(EntityKind::Circle) => {
-                    let _ = sk.add_constraint(ConstraintKind::Equal { a: *seed, b: *inst });
-                }
-                Some(EntityKind::Ellipse | EntityKind::EllipticalArc) => {
-                    let _ = sk.add_constraint(ConstraintKind::CircularPatternLink { seed: *seed, inst: *inst, center, angle: *angle });
-                }
-                _ => {}
+            if matches!(sk.kind(*seed), Some(EntityKind::Circle | EntityKind::Ellipse | EntityKind::EllipticalArc)) {
+                let _ = sk.add_constraint(ConstraintKind::CircularPatternLink { seed: *seed, inst: *inst, center, angle: *angle });
             }
         }
     }

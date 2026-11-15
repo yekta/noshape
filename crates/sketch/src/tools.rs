@@ -873,12 +873,8 @@ impl Sketch {
                     self.add_c(&mut res, ConstraintKind::CircularPatternLink { seed, inst, center, angle: step * k as f64 });
                 }
                 for (seed, inst) in entities {
-                    match self.kind(seed) {
-                        Some(EntityKind::Circle) => self.add_c(&mut res, ConstraintKind::Equal { a: seed, b: inst }),
-                        Some(EntityKind::Ellipse | EntityKind::EllipticalArc) => {
-                            self.add_c(&mut res, ConstraintKind::CircularPatternLink { seed, inst, center, angle: step * k as f64 });
-                        }
-                        _ => {}
+                    if matches!(self.kind(seed), Some(EntityKind::Circle | EntityKind::Ellipse | EntityKind::EllipticalArc)) {
+                        self.add_c(&mut res, ConstraintKind::CircularPatternLink { seed, inst, center, angle: step * k as f64 });
                     }
                 }
                 if k == 1 {

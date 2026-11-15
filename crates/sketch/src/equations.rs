@@ -1929,7 +1929,10 @@ impl<'a, L: Lookup> Builder<'a, L> {
             }
             K::CircularPatternLink { seed, inst, center, angle } => {
                 let (sin, cos) = angle.sin_cos();
-                if self.sk.kind(*seed) == Some(EntityKind::Point) {
+                if self.sk.kind(*seed) == Some(EntityKind::Circle) {
+                    let (rs, ri) = (self.radius(*seed)?, self.radius(*inst)?);
+                    self.lin(Lin::new().rad(1.0, &ri).rad(-1.0, &rs));
+                } else if self.sk.kind(*seed) == Some(EntityKind::Point) {
                     let (s, i, c) = (self.pt(*seed)?, self.pt(*inst)?, self.pt(*center)?);
                     // i = c + R(s - c). Keep the center as an unknown so it
                     // can be dragged along with the constrained instances.

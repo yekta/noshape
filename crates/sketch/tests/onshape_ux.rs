@@ -362,12 +362,15 @@ fn circular_pattern_follows_seed_edits_and_center_drag() {
     check(&sk);
 }
 
+/// The pattern alone keeps the copies' sizes: no Equal (live ui-parity sketch-circular-pattern-click-commit: one
+/// CIRCULAR_PATTERN, no EQUAL).
 #[test]
 fn circular_pattern_keeps_circle_and_ellipse_sizes_linked() {
     let mut sk = Sketch::new();
     let circle = sk.add_circle(v(2.0, 0.0), 0.5);
     let ellipse = sk.add_ellipse(v(0.0, 3.0), v(1.0, 0.2), 0.4);
     let groups = sk.circular_pattern_linked_groups(&[circle, ellipse], DVec2::ZERO, 3, std::f64::consts::PI).unwrap();
+    assert!(!sk.constraints().any(|c| matches!(c.kind, ConstraintKind::Equal { .. })));
     let radius = sk.add_constraint(ConstraintKind::Radius { curve: circle, value: 0.5 }).unwrap();
     let major = sk.add_constraint(ConstraintKind::EllipseRadius { ellipse, major: true, value: v(1.0, 0.2).length() }).unwrap();
     assert!(sk.solve().is_solved());
