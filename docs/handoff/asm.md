@@ -8,7 +8,23 @@ Worktree /root/projects/noshape-wt/asm (main, detached), target dir /root/target
 rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 `tools/ui-parity/run.py --app /root/target-asm/debug/noshape --display :105 <names>`.
 
-## Now (asm, 2026-11-14 15:40 UTC)
+## Now (asm, 2026-11-15 01:50 UTC)
+- Landed since 15:40: the MID_POINT translator fix, the screen-constant triad, Derived mirror copies named
+  "<part>-Mirrored <n>", the ring menu's View normal to over a face (live re-recorded rotate-90 / -180 / anti-align
+  with the camera; all four triad takes match), conflict attribution by loops (a mate hanging off the conflicting
+  loop stays OK; infento 156 -> 157/196), the Mirror dialog against live's capture feel/mirror 62-70 (instance pick,
+  no triad in pattern dialogs, red empty plane, ✓ once touched, rows bold / badged / full width, strategy table
+  solid with flat selects, row hover lights the instance, collapsed after commit), a quick drag keeps its move.
+- In my worktree, being checked (asm-* rerun on vibe6): a press on a part drags it before its hover arrived (the
+  viewport's pick at the press, else the assembly's ray probe: asm-drag-free-part, 2/2 with asm-drag-fixed-part).
+- infento-subs (main a9a0ba8d6, traced): 158/167 occurrences, 156/196 mates (157 with the loops rule). The flange dx
+  saw is placed as live. Left: studio 1dc32b translation (dx: Transform 12 chain; core 9a33ee9b fixes Extrude 51 /
+  Large pully, Sub dfc972's pulley 1272 mm off), the f0eedd frame connectors (MtAjACL, Mq9evRh at x ±3).
+- asm-* 211/214 before the drag change: asm-cylindrical-limits is live's crashed take (Target crashed at step 8).
+- Scenario screenshots for a dialog: a scenario ending in a long wait plus xdotool from a script on vibe6
+  (~/agents/asm-keep/mir/run.sh, drive.sh); the UI script's watchdog stops a run at 180 s.
+
+## Earlier (asm, 2026-11-14 15:40 UTC)
 - Landed since 13:01: composite instances' mate connectors resolve on their members (infento 74 -> 104/195 mates on
   the new corpus), assembly_mate `simulation_faces`, the suite compares studio statuses with live's, Parallel limits
   x / y / z / rz (live2), Replicate's scope step (field named by scope, active, Undo, ✓), mate connector Realign /

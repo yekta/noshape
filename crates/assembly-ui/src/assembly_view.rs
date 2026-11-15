@@ -1027,6 +1027,8 @@ impl AssemblyView {
         let prio = built.picks.priority_fn();
         self.built = Some(built);
         self.viewport.update(cx, |vp, _| vp.pick_priority = prio);
+        // (The press capture's pick bound and model follow the scene.)
+        self.update_capture(cx);
         self.refresh_scene(geometry_changed, cx);
     }
 
@@ -2660,7 +2662,14 @@ impl AssemblyView {
         // from empty space moves the selection (no box).
         let selection_drag = free && !self.explode_edit && self.hover.is_none() && self.manip_hover.is_none() && self.hover_overlay.is_none() && !self.selected.is_empty();
         let capture = snapping || selection_drag || matches!(self.hover_overlay, Some(OverlayPick::Section(_))) || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
-        self.viewport.update(cx, |vp, _| vp.tool_captures_left = capture);
+        // A press on a part drags it before its hover arrived too (asm-drag-free-part).
+        let below = (free && !self.explode_edit && self.snap.is_none()).then(|| self.built.as_ref().map(assembly_scene::overlay_base)).flatten();
+        let probe = below.map(|_| self.capture_probe());
+        self.viewport.update(cx, |vp, _| {
+            vp.tool_captures_left = capture;
+            vp.capture_picks_below = below;
+            vp.capture_probe = probe;
+        });
     }
 
     /// Connector chosen by a click in pick mode.
@@ -3076,7 +3085,11 @@ impl AssemblyView {
                 }
                 // What is under the press, also before the pick buffer's hover caught up (a press right after the
                 // pointer got there: asm-drag-free-part).
-                let under = self.hover.clone().or_else(|| self.raycast(*position, &[], cx));
+                let under = self.hover.clone().or_else(|| self.pick(self.viewport.read(cx).pick_under_pointer().flatten())).or_else(|| self.raycast(*position, &[], cx));
+                // (Its click, when it doesn't drag, is on that too.)
+                if self.hover.is_none() {
+                    self.hover = under.clone();
+                }
                 if under.is_none() && !self.selected.is_empty() && !self.explode_edit {
                     self.start_selection_drag(*position, cx);
                     return;

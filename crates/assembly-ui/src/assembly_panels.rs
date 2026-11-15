@@ -3688,6 +3688,12 @@ impl AssemblyView {
         best.map(|b| b.1)
     }
 
+    /// [`model_hit`] over this view's shown occurrences, for the viewport's press (`capture_probe`).
+    pub(super) fn capture_probe(&self) -> std::rc::Rc<dyn Fn(DVec3, DVec3) -> bool> {
+        let (result, isolate) = (self.result.clone(), self.isolate.clone());
+        std::rc::Rc::new(move |o, d| model_hit(&result, isolate.as_ref(), o, d))
+    }
+
     // ------------------------------------------------------------ triad manipulator
 
     /// Snap frame for the manipulator center near the cursor: assembly and
@@ -5109,6 +5115,22 @@ fn pattern_icon(icon: &'static str, error: bool, cx: &App) -> AnyElement {
         .child(svg().path(icon_path(icon)).size_3p5().text_color(p().text_muted))
         .when(error, |d| d.child(div().absolute().right(px(-4.)).bottom(px(-4.)).child(crate::assets::icon(&icon_path("error"), 10., cx))))
         .into_any_element()
+}
+
+/// Whether the ray (origin `o`, direction `d`, world) meets a shown solid or surface of `result` (within `isolate`).
+fn model_hit(result: &AssemblyResult, isolate: Option<&noshape_model::assembly::OccurrenceSet>, o: DVec3, d: DVec3) -> bool {
+    result.occurrences.iter().filter(|occ| !occ.hidden && matches!(occ.kind, BodyKind::Solid | BodyKind::Surface)).filter(|occ| isolate.is_none_or(|s| noshape_model::assembly::occurrence_in(s, &occ.path))).any(|occ| {
+        if let Some((lo, hi)) = occ.world_bounds()
+            && !ray_hits_box(o, d, lo - DVec3::splat(1e-6), hi + DVec3::splat(1e-6))
+        {
+            return false;
+        }
+        let inv = occ.transform.inverse();
+        let (lo, ld) = (inv.transform_point3(o), inv.transform_vector3(d));
+        let m = &occ.mesh;
+        let pos = |i: u32| m.positions.get(i as usize).map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).unwrap_or_default();
+        m.indices.as_chunks::<3>().0.iter().any(|t| ray_triangle(lo, ld, pos(t[0]), pos(t[1]), pos(t[2])).is_some())
+    })
 }
 
 pub(super) fn mirror_pending(s: &PatternSession) -> bool {

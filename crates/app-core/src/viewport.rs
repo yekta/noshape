@@ -374,6 +374,12 @@ pub struct Viewport {
     hover: Option<u32>,
     /// When true, left-drag goes to the active tool instead of box select.
     pub tool_captures_left: bool,
+    /// A left press on a pick id under this (the model's own geometry) goes to the tool too, read from the pick
+    /// buffer at the press: before a hover event marked it (a press right after the pointer got there).
+    pub capture_picks_below: Option<u32>,
+    /// Where the pick buffer has nothing read under the press yet: whether the press ray (origin, direction) meets
+    /// the model.
+    pub capture_probe: Option<std::rc::Rc<dyn Fn(DVec3, DVec3) -> bool>>,
     /// Keep picking what is under the cursor (`ViewportEvent::Hover`)
     /// during a tool drag (the section view's base snaps to it).
     pub tool_hover: bool,
@@ -673,6 +679,8 @@ impl Viewport {
             cursor_platform: true,
             hover: None,
             tool_captures_left: false,
+            capture_picks_below: None,
+            capture_probe: None,
             tool_hover: false,
             zoom_window: false,
             orbit_pivot_fn: None,
@@ -1144,6 +1152,19 @@ impl Viewport {
     /// yet: a jump out of the picked rectangle, a scene rebuilt since).
     pub fn pick_under_pointer(&self) -> Option<Option<u32>> {
         self.pick_at(self.last_pos)
+    }
+
+    /// [`Self::capture_picks_below`]: the model's geometry under `local` in the last pick buffer.
+    fn press_on_capture_pick(&self, local: DVec2) -> bool {
+        let Some(below) = self.capture_picks_below else { return false };
+        match self.pick_at(local) {
+            Some(Some(id)) => id < below && noshape_render::section_cap_of_pick(id).is_none(),
+            Some(None) => false,
+            None => self.capture_probe.as_ref().is_some_and(|hit| {
+                let (o, d) = self.ray(local);
+                hit(o, d)
+            }),
+        }
     }
 
     fn pick_at(&self, local: DVec2) -> Option<Option<u32>> {
@@ -2191,7 +2212,7 @@ impl Viewport {
             }
         }
         match e.button {
-            MouseButton::Left if self.tool_captures_left || self.manipulator_at(p) => {
+            MouseButton::Left if self.tool_captures_left || self.manipulator_at(p) || self.press_on_capture_pick(p) => {
                 self.drag = Drag::Tool;
                 cx.emit(ViewportEvent::ToolDown { position: p, modifiers: e.modifiers, click_count: e.click_count });
             }

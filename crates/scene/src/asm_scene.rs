@@ -629,7 +629,8 @@ pub enum MateGlyphState {
 /// Overlay pick ids of mate indicators start here (after any number of connectors).
 const MATE_PICK_BASE: u32 = 1 << 20;
 
-fn overlay_base(built: &AsmBuilt) -> u32 {
+/// The first overlay pick id: the scene's own geometry picks lie under it.
+pub fn overlay_base(built: &AsmBuilt) -> u32 {
     built.picks.len() as u32 + 1
 }
 
