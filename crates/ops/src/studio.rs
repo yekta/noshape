@@ -298,6 +298,15 @@ pub fn properties_description(name: &str) -> String {
     format!("Properties : {name}")
 }
 
+/// Whether a part's Properties Save is an Undo step: its metadata isn't in live's feature history
+/// (parts-multi-properties: Save leaves Undo off), its name and mass override are (a rename, Mass properties' ✓).
+/// `shown` is the name the part shows; a configured Name isn't written.
+pub fn properties_save_is_undo_step(ps: &PartStudio, body: &BodyId, v: &PartPropertyValues, shown: &str, configured: &[&str]) -> bool {
+    let p = ps.part_properties.get(body);
+    let renamed = !configured.contains(&"Name") && v.name != p.and_then(|p| p.name.as_deref()).unwrap_or(shown);
+    renamed || v.mass_override != p.and_then(|p| p.mass_override)
+}
+
 /// Properties › Save: the part's values. Fields configured for the active
 /// configuration (`configured`, by their label: "Name", "Description",
 /// "Part number", "Revision", "Vendor", "Project", "Product line", "Title

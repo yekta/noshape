@@ -4,7 +4,8 @@
 //! through `noshape-store`.
 
 use anyhow::{Context as _, Result};
-use noshape_model::document::{Document, DocumentSettings, META_BLOB, Tab, TabId};
+use noshape_model::document::{Document, DocumentSettings, META_BLOB, Tab, TabContent, TabId};
+use noshape_model::partstudio::PartStudio;
 use noshape_store::{BranchId, Document as Store, MicroversionId, UndoStack, VersionId};
 use std::path::{Path, PathBuf};
 
@@ -40,7 +41,8 @@ fn without_fields(blob: &[u8], fields: &[&str]) -> Option<serde_json::Value> {
 /// What undo/redo writes back for blob `name` (`restored`), given the
 /// current document: tab operations can't be undone, so tabs keep their
 /// current names, deleted tabs stay deleted and the tab bar keeps its
-/// order and folders.
+/// order and folders. A Part Studio's parts keep their current metadata
+/// (Properties: not in live's feature history, parts-multi-properties).
 fn keep_tab_bar(doc: &Document, name: &str, restored: Option<Vec<u8>>) -> Option<Vec<u8>> {
     let bytes = restored?;
     if name == META_BLOB {
@@ -59,11 +61,36 @@ fn keep_tab_bar(doc: &Document, name: &str, restored: Option<Vec<u8>>) -> Option
     }
     let now = doc.tabs.iter().find(|t| Document::blob_name(t.id) == name)?;
     let Ok(mut tab) = serde_json::from_slice::<Tab>(&bytes) else { return Some(bytes) };
-    if tab.name == now.name {
+    let mut changed = tab.name != now.name;
+    tab.name = now.name.clone();
+    if let (TabContent::PartStudio(ps), TabContent::PartStudio(cur)) = (&mut tab.content, &now.content) {
+        changed |= keep_part_metadata(ps, cur);
+    }
+    if !changed {
         return Some(bytes);
     }
-    tab.name = now.name.clone();
     Some(serde_json::to_vec(&tab).unwrap_or(bytes))
+}
+
+/// `restored`'s parts take `now`'s metadata (description, part number, revision, the other Properties fields); their
+/// name, appearance, material and mass override stay restored. Whether anything changed.
+fn keep_part_metadata(restored: &mut PartStudio, now: &PartStudio) -> bool {
+    let bodies: std::collections::BTreeSet<_> = restored.part_properties.keys().chain(now.part_properties.keys()).cloned().collect();
+    let mut changed = false;
+    for body in bodies {
+        let cur = now.part_properties.get(&body).cloned().unwrap_or_default();
+        let old = restored.part_properties.get(&body).cloned().unwrap_or_default();
+        if (&old.description, &old.part_number, &old.revision, &old.meta) == (&cur.description, &cur.part_number, &cur.revision, &cur.meta) {
+            continue;
+        }
+        let p = restored.part_properties.entry(body).or_default();
+        p.description = cur.description;
+        p.part_number = cur.part_number;
+        p.revision = cur.revision;
+        p.meta = cur.meta;
+        changed = true;
+    }
+    changed
 }
 
 /// Store meta key of a protected workspace (`workspace_protected:<branch>`).
@@ -200,7 +227,6 @@ impl Session {
     /// edit, named so the history says why), so the document opens and the
     /// feature can be edited or deleted. Markers of other documents stay.
     pub fn recover_crashed_features(&mut self, dir: &Path) -> Vec<String> {
-        use noshape_model::document::TabContent;
         let mut notes = Vec::new();
         let me = marker_key(&self.path);
         let markers = noshape_model::regen::crash_guard::markers(dir);
@@ -810,6 +836,57 @@ fn three_way_tab(name: &str, base: Option<&[u8]>, ours: Option<&[u8]>, theirs: O
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live (parts-multi-properties): a part's metadata saved without an undo step stays through Undo and Redo of the
+    /// feature edits before it (PROPERTIES-OUTSIDE-TAB-UNDO: they came back empty); its name follows the history.
+    #[test]
+    fn undo_and_redo_keep_part_metadata_saved_outside_the_history() {
+        use noshape_model::reference::BodyId;
+        let dir = std::env::temp_dir().join(format!("noshape-session-meta-undo-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("m.noshape");
+        let _ = std::fs::remove_file(&path);
+        let doc = Document::new();
+        let units = doc.settings.units;
+        let tab_id = doc.tabs.iter().find(|t| matches!(t.content, TabContent::PartStudio(_))).expect("a Part Studio").id;
+        let mut s = Session::create(&path, doc).unwrap();
+        fn studio(c: &mut TabContent) -> &mut PartStudio {
+            let TabContent::PartStudio(ps) = c else { unreachable!() };
+            ps
+        }
+        s.edit_tab(tab_id, "Add feature", |c| {
+            let ps = studio(c);
+            let f = ps.new_feature("extrude", &units).expect("extrude");
+            ps.features.push(f);
+        })
+        .unwrap();
+        let body = BodyId { feature: s.doc.tab(tab_id).and_then(|t| match &t.content { TabContent::PartStudio(ps) => ps.features.first().map(|f| f.id), _ => None }).unwrap(), index: 0 };
+        s.edit_tab(tab_id, "Rename part", |c| studio(c).part_properties.entry(body.clone()).or_default().name = Some("Bracket".into())).unwrap();
+        s.edit_tab_not_undoable(tab_id, "Properties", |c| {
+            let p = studio(c).part_properties.entry(body.clone()).or_default();
+            p.description = Some("D".into());
+            p.part_number = Some("PN-1".into());
+            p.meta.vendor = Some("V".into());
+        })
+        .unwrap();
+        let read = |s: &Session| {
+            let Some(TabContent::PartStudio(ps)) = s.doc.tab(tab_id).map(|t| &t.content) else { unreachable!() };
+            let p = ps.part_properties.get(&body).cloned().unwrap_or_default();
+            (ps.features.len(), p.name, p.description, p.part_number, p.meta.vendor)
+        };
+        let kept = (Some("D".to_string()), Some("PN-1".to_string()), Some("V".to_string()));
+        assert!(s.undo().unwrap());
+        let (n, name, d, pn, v) = read(&s);
+        assert_eq!((n, name), (1, None), "the rename undone");
+        assert_eq!((d, pn, v), kept.clone(), "the metadata kept");
+        assert!(s.undo().unwrap());
+        assert_eq!(read(&s).0, 0, "the feature undone");
+        assert!(s.redo().unwrap() && s.redo().unwrap());
+        let (n, name, d, pn, v) = read(&s);
+        assert_eq!((n, name.as_deref()), (1, Some("Bracket")), "both redone");
+        assert_eq!((d, pn, v), kept, "the metadata still kept");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     /// Live (21:00, ver-merge-both-edited-merge): an edit, then a merge of a branch's new feature; Undo takes back
     /// the edit and keeps the merged feature, then Undo is off and Redo on; Redo puts the edit back, the feature kept.

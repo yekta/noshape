@@ -124,6 +124,18 @@ pub(crate) fn edit_studio<R>(od: &mut OpenDoc, tab: TabId, description: &str, f:
     Ok(r)
 }
 
+/// [`edit_studio`] that Undo doesn't take back (a part's metadata, [`crate::studio::properties_save_is_undo_step`]).
+pub(crate) fn edit_studio_not_undoable<R>(od: &mut OpenDoc, tab: TabId, description: &str, f: impl FnOnce(&mut PartStudio) -> Result<R, OpError>) -> Result<R, OpError> {
+    let mut copy = doc::studio(od.doc(), tab)?.clone();
+    let r = f(&mut copy)?;
+    od.session.edit_tab_not_undoable(tab, description, |c| {
+        if let TabContent::PartStudio(ps) = c {
+            *ps = copy;
+        }
+    })?;
+    Ok(r)
+}
+
 /// Regenerate a Part Studio and report every feature's state, the parts
 /// and the failures (what the feature list and parts list show).
 pub(crate) fn regen_report(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {

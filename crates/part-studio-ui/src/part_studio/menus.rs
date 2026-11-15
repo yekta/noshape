@@ -883,6 +883,7 @@ impl PartStudioView {
             return;
         }
         let kept = configured.clone();
+        let shown = spec.values.name.clone();
         crate::properties_dialog::open_part_properties_configured(
             spec,
             crate::properties_dialog::PartExtras { mass, reset_to: Some(reset_to), configured },
@@ -897,7 +898,13 @@ impl PartStudioView {
                     mass_override: v.mass_override.as_deref().and_then(crate::properties_dialog::parse_mass),
                 };
                 doc.update(cx, |d, cx| {
-                    d.edit_studio_not_undoable(tab, &noshape_ops::studio::properties_description(&v.name), cx, |ps| noshape_ops::studio::set_part_properties(ps, &body, &values, &kept));
+                    let desc = noshape_ops::studio::properties_description(&v.name);
+                    let save = |ps: &mut noshape_model::partstudio::PartStudio| noshape_ops::studio::set_part_properties(ps, &body, &values, &kept);
+                    if d.studio(tab).is_none_or(|ps| noshape_ops::studio::properties_save_is_undo_step(ps, &body, &values, &shown, &kept)) {
+                        d.edit_studio(tab, &desc, cx, save);
+                    } else {
+                        d.edit_studio_not_undoable(tab, &desc, cx, save);
+                    }
                 });
                 view.update(cx, |this, cx| this.refresh_scene(true, cx));
             },
@@ -949,12 +956,13 @@ impl PartStudioView {
         let (display, gpu, parts) = (self.display.clone(), self.gpu.clone(), bodies.clone());
         let thumbs = cx.background_spawn(async move { crate::tab_thumbnail::part_thumbnails(&display, &parts, &gpu).await });
         let (doc, view, tab, config) = (self.doc.clone(), cx.entity(), self.tab, self.config_values.clone());
+        let shown = names.clone();
         crate::properties_dialog::open_parts_properties(
             spec,
             crate::properties_dialog::PartsProperties { names, values, reset_to, thumbs },
             move |written, _, cx| {
                 const FIELDS: [&str; 10] = ["Name", "Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3"];
-                let edits: Vec<(BodyId, noshape_ops::studio::PartPropertyValues)> = written
+                let edits: Vec<(BodyId, noshape_ops::studio::PartPropertyValues, String)> = written
                     .into_iter()
                     .filter_map(|(i, v)| {
                         let values = noshape_ops::studio::PartPropertyValues {
@@ -965,17 +973,26 @@ impl PartStudioView {
                             meta: v.meta.clone(),
                             mass_override: v.mass_override.as_deref().and_then(crate::properties_dialog::parse_mass),
                         };
-                        Some((bodies.get(i)?.clone(), values))
+                        Some((bodies.get(i)?.clone(), values, shown.get(i)?.clone()))
                     })
                     .collect();
                 let desc = noshape_ops::studio::properties_description(&format!("{} parts", edits.len()));
+                let configured = |ps: &noshape_model::partstudio::PartStudio, body: &BodyId| -> Vec<&'static str> {
+                    FIELDS.into_iter().filter(|f| noshape_model::configured_properties::configured_value(ps, body, f, &config).is_some()).collect()
+                };
                 doc.update(cx, |d, cx| {
-                    d.edit_studio_not_undoable(tab, &desc, cx, |ps| {
-                        for (body, values) in &edits {
-                            let configured: Vec<&str> = FIELDS.into_iter().filter(|f| noshape_model::configured_properties::configured_value(ps, body, f, &config).is_some()).collect();
-                            noshape_ops::studio::set_part_properties(ps, body, values, &configured);
+                    let undo_step = d.studio(tab).is_none_or(|ps| edits.iter().any(|(body, values, name)| noshape_ops::studio::properties_save_is_undo_step(ps, body, values, name, &configured(ps, body))));
+                    let save = |ps: &mut noshape_model::partstudio::PartStudio| {
+                        for (body, values, _) in &edits {
+                            let kept = configured(ps, body);
+                            noshape_ops::studio::set_part_properties(ps, body, values, &kept);
                         }
-                    });
+                    };
+                    if undo_step {
+                        d.edit_studio(tab, &desc, cx, save);
+                    } else {
+                        d.edit_studio_not_undoable(tab, &desc, cx, save);
+                    }
                 });
                 view.update(cx, |this, cx| this.refresh_scene(true, cx));
             },

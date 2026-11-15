@@ -1,6 +1,6 @@
 //! Parts list: rename a part, set its properties (the Properties dialog).
 
-use super::{doc_field, edit_studio, s, studio_target, tab_field};
+use super::{doc_field, edit_studio, edit_studio_not_undoable, s, studio_target, tab_field};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, refs, studio};
@@ -172,12 +172,13 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // Each part's values as its dialog opens (configured fields shown as configured), the given fields on top.
     const FIELDS: [&str; 10] = ["Name", "Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3"];
     let mut edits = Vec::new();
+    let mut undo_step = false;
     for body in &bodies {
         let shown = r.display.bodies.iter().find(|b| b.id == *body).map(|b| b.name.clone()).ok_or_else(|| OpError::param(if a.get("parts").is_some() { "parts" } else { "part" }, "no such part in the Part Studio"))?;
         let p = ps.part_properties.get(body).cloned().unwrap_or_default();
         let configured: Vec<&str> = FIELDS.into_iter().filter(|f| noshape_model::configured_properties::configured_value(ps, body, f, &config).is_some()).collect();
         let mut v = studio::PartPropertyValues {
-            name: p.name.clone().unwrap_or(shown),
+            name: p.name.clone().unwrap_or_else(|| shown.clone()),
             description: p.description.clone().unwrap_or_default(),
             part_number: p.part_number.clone().unwrap_or_default(),
             revision: p.revision.clone().unwrap_or_default(),
@@ -198,6 +199,7 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             Some(serde_json::Value::Null) => v.mass_override = None,
             Some(x) => v.mass_override = Some(x.as_f64().filter(|m| *m > 0.0).ok_or_else(|| OpError::param("mass_override", "a mass in kg greater than zero, or null"))?),
         }
+        undo_step |= studio::properties_save_is_undo_step(ps, body, &v, &shown, &configured);
         edits.push((body.clone(), v, configured));
     }
     // In a version (history_view): its own properties take the edit; Name, Part number, Revision, State, Material, Not
@@ -220,12 +222,13 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         [(_, v, _)] => studio::properties_description(&v.name),
         _ => studio::properties_description(&format!("{} parts", edits.len())),
     };
-    edit_studio(od, tab, &desc, |ps| {
+    let save = |ps: &mut noshape_model::partstudio::PartStudio| {
         for (body, v, configured) in &edits {
             studio::set_part_properties(ps, body, v, configured);
         }
         Ok(())
-    })?;
+    };
+    if undo_step { edit_studio(od, tab, &desc, save)? } else { edit_studio_not_undoable(od, tab, &desc, save)? };
     let out: Vec<serde_json::Value> = edits
         .iter()
         .map(|(body, v, configured)| {
