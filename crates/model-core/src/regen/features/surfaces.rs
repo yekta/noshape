@@ -367,9 +367,24 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
         if let Some(t) = target.filter(|t| ev.query(t).is_empty()) {
             return crate::regen::eval::err_at(&[t], crate::regen::custom_features::error_text("EXTEND_SHEET_BODY_NO_TARGET"));
         }
-        return err("Move boundary currently supports only the Blind end condition");
     }
-    let d = ev.length("extendDistance")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 };
+    // Up to a vertex or a plane: std's target plane (through the vertex, normal to the first edge's move direction; a
+    // face's own plane), moved by the offset along its normal.
+    let offset = if ev.bool("hasOffset") { ev.length("offset")? * if ev.bool("offsetOppositeDirection") { -1.0 } else { 1.0 } } else { 0.0 };
+    let target: Option<UpTo> = if ev.is("endCondition", "UP_TO_VERTEX") {
+        let r = ev.query("targetVertex")[0].clone();
+        let p = ev.resolve_vertex_point(&r).ok_or_else(|| FeatureError::at(&["targetVertex"], crate::regen::custom_features::error_text("EXTEND_TO_VERTEX_FAILED")))?;
+        Some(UpTo { point: p, normal: None, offset, failed: "EXTEND_TO_VERTEX_FAILED" })
+    } else if ev.is("endCondition", "UP_TO_FACE") {
+        let r = ev.query("targetFace")[0].clone();
+        let pl = ev.resolve_plane(&r).ok_or_else(|| FeatureError::new("Move boundary currently supports planar target faces only"))?;
+        Some(UpTo { point: pl.origin, normal: Some(pl.normal.normalize()), offset, failed: "EXTEND_TO_FACE_FAILED" })
+    } else if !ev.is("endCondition", "BLIND") {
+        return err("Move boundary currently supports Blind, Up to face and Up to vertex only");
+    } else {
+        None
+    };
+    let d = if target.is_some() { 0.0 } else { ev.length("extendDistance")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 } };
     for bi in bodies {
         let b = ev.ctx.bodies[bi].clone();
         if b.kind != BodyKind::Surface {
@@ -388,8 +403,15 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
         // only that edge moves, 1000 mm²): the picked straight edges move out
         // in the plane, their neighbours run on to meet them.
         let some = !whole.contains(&bi) && picked.get(&bi).is_some_and(|es| es.len() < outer.edges().len());
+        if target.is_some() && !some {
+            return err("Move boundary currently supports Up to face and Up to vertex on picked straight edges only");
+        }
         let (new_face, from) = if some {
             let chosen: Vec<Shape> = picked[&bi].iter().filter_map(|&ei| b.shape.sub_shape(ShapeType::Edge, ei).ok()).collect();
+            let d = match &target {
+                Some(t) => t.distance(face, &outer, &chosen)?.ok_or_else(|| FeatureError::new(crate::regen::custom_features::error_text(t.failed)))?,
+                None => d,
+            };
             let (f, from) = move_polygon_edges(face, &outer, &chosen, d, ev.bool("maintainCurvature"))?.ok_or_else(|| FeatureError::new("Move boundary currently supports straight edges of planar surfaces only"))?;
             (f, Some(from))
         } else {
@@ -405,6 +427,54 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
         ev.ctx.bodies[bi] = Arc::new(body);
     }
     Ok(())
+}
+
+/// Move boundary's target for Up to vertex / face: a plane through `point`, normal to `normal` (None: the first picked
+/// edge's move direction, std's for a vertex), moved `offset` along it.
+struct UpTo {
+    point: DVec3,
+    normal: Option<DVec3>,
+    offset: f64,
+    failed: &'static str,
+}
+
+impl UpTo {
+    /// How far the picked straight edges of a planar face move out in its plane to lie on the target plane: one
+    /// distance for all, each parallel to the plane. None where an edge isn't straight, crosses the plane at an angle,
+    /// or the edges would move by different distances.
+    fn distance(&self, face: &Shape, outer: &Shape, chosen: &[Shape]) -> FResult<Option<f64>> {
+        let Some(pl) = face.face_plane()? else { return Ok(None) };
+        let n = pl.normal.normalize();
+        let ends: Vec<(DVec3, DVec3)> = outer.edges().iter().map(|e| e.endpoints()).collect::<Result<_, _>>()?;
+        if ends.is_empty() {
+            return Ok(None);
+        }
+        let centre = ends.iter().map(|(a, b)| *a + *b).sum::<DVec3>() / (2.0 * ends.len() as f64);
+        let mut found: Option<f64> = None;
+        let mut normal = self.normal;
+        for e in chosen {
+            if !matches!(e.edge_info()?.curve, k::Curve::Line { .. }) {
+                return Ok(None);
+            }
+            let (a, b) = e.endpoints()?;
+            let t = (b - a).normalize();
+            let mut out = t.cross(n).normalize();
+            if (a - centre).dot(out) < 0.0 {
+                out = -out;
+            }
+            let m = *normal.get_or_insert(out);
+            let along = out.dot(m);
+            if t.dot(m).abs() > 1e-9 || along.abs() < 1e-9 {
+                return Ok(None);
+            }
+            let d = (self.point + m * self.offset - a).dot(m) / along;
+            match found {
+                Some(f) if (f - d).abs() > 1e-9 => return Ok(None),
+                _ => found = Some(d),
+            }
+        }
+        Ok(found)
+    }
 }
 
 /// A boundary edge of a planar face, in the boundary's direction.

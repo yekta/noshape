@@ -1831,6 +1831,49 @@ fn move_boundary_with_nothing_selected_marks_its_selection_with_any_end_conditio
     }
 }
 
+/// Move boundary Up to vertex / Up to face (ui-parity start "surfaces"): the plane surface z 10 (x, y -20..20) with its
+/// x 20 edge picked runs out to the box beside it (x 30..50): to its corner, to its x 30 face, and to the corner with a
+/// 5 mm offset along the move (std's target plane through the vertex, normal to the edge's move).
+#[test]
+fn move_boundary_up_to_a_vertex_or_a_face_moves_the_edge_onto_its_plane() {
+    for (cond, offset, want_mm2) in [("UP_TO_VERTEX", 0.0, 2000.0), ("UP_TO_FACE", 0.0, 2000.0), ("UP_TO_VERTEX", 5.0, 2200.0)] {
+        let mut s = Studio::new();
+        let mut a = noshape_sketch::Sketch::new();
+        let la = a.add_line(DVec2::new(-0.02, 0.01), DVec2::new(0.02, 0.01)).0;
+        let sa = s.sketch(Reference::Plane(DatumPlane::Front), a);
+        let surf = s.add("extrude", move |p| {
+            p.set("bodyType", ParamValue::Enum("SURFACE".into()));
+            p.set("surfaceEntities", ParamValue::Query(vec![Reference::SketchEntity { sketch: sa, entity: la }]));
+            p.set("depth", expr("40 mm"));
+            p.set("symmetric", ParamValue::Bool(true));
+        });
+        let mut b = noshape_sketch::Sketch::new();
+        rect(&mut b, 0.03, -0.01, 0.02, 0.02);
+        let sb = s.sketch(Reference::Plane(DatumPlane::Top), b);
+        s.extrude_largest(sb, "5 mm");
+        let r = s.ok();
+        let sheet = r.context.bodies.iter().find(|b| b.id.feature == surf).unwrap();
+        let ei = sheet.shape.edges().iter().position(|e| { let (p, q) = e.endpoints().unwrap(); near(p.x, 0.02, 1e-9) && near(q.x, 0.02, 1e-9) }).unwrap();
+        let edge = Reference::Edge((*sheet.edges[ei]).clone());
+        let boxb = r.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).unwrap();
+        let vi = boxb.shape.vertices().iter().position(|v| (v.vertex_point().unwrap() - DVec3::new(0.03, -0.01, 0.0)).length() < 1e-9).unwrap();
+        let vertex = Reference::Vertex((*boxb.vertices[vi]).clone());
+        let fi = boxb.shape.faces().iter().position(|f| near(f.centroid().unwrap().x, 0.03, 1e-9)).unwrap();
+        let face = Reference::Face((*boxb.faces[fi]).clone());
+        s.add("extendSurface", move |p| {
+            p.set("entities", ParamValue::Query(vec![edge]));
+            p.set("endCondition", ParamValue::Enum(cond.into()));
+            p.set("targetVertex", ParamValue::Query(vec![vertex]));
+            p.set("targetFace", ParamValue::Query(vec![face]));
+            p.set("hasOffset", ParamValue::Bool(offset != 0.0));
+            p.set("offset", expr(&format!("{offset} mm")));
+        });
+        let r = s.ok();
+        let sheet = r.context.bodies.iter().position(|b| b.id.feature == surf).unwrap();
+        assert!(near(surface_area(&r, sheet), want_mm2 * 1e-6, 1e-10), "{cond} offset {offset}: {} mm²", surface_area(&r, sheet) * 1e6);
+    }
+}
+
 /// psui's move-boundary-up-to-face / -vertex: with a surface picked, an Up to end condition without its Target marks
 /// that field (std's EXTEND_SHEET_BODY_NO_TARGET); Up to part/surface asks for one only with an offset.
 #[test]
