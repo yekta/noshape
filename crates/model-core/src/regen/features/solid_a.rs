@@ -1559,10 +1559,13 @@ pub(crate) fn feature_version(text: &str) -> Option<u32> {
     digits.parse().ok()
 }
 
-/// Whether `region` is `part`'s material: the same volume, and a point just inside it inside `part`.
-fn is_material_of(region: &Shape, part: &Shape) -> bool {
-    let vol = |s: &Shape| k::volume_properties(s).map(|p| p.mass).unwrap_or(f64::NAN);
-    let (vr, vp) = (vol(region), vol(part));
+fn volume_of(s: &Shape) -> f64 {
+    k::volume_properties(s).map(|p| p.mass).unwrap_or(f64::NAN)
+}
+
+/// Whether `region` (of volume `vr`) is `part`'s material (`vp`): the same volume, and a point just inside it inside
+/// `part`.
+fn is_material_of((region, vr): (&Shape, f64), (part, vp): (&Shape, f64)) -> bool {
     let off = (vr - vp).abs();
     if off.is_nan() || off > 1e-6 * vp.abs() {
         return false;
@@ -1626,10 +1629,14 @@ pub fn enclose(ev: &mut EvalCtx) -> FResult<()> {
     }
     // A region that is a selected part's own material isn't enclosed again: a hollowed part encloses its cavity (live:
     // cf-lighten's Lighten, which encloses its shelled tools to get their insides).
-    let parts: Vec<&Shape> = shapes.iter().filter(|s| s.count(ShapeType::Solid) > 0).collect();
+    // (Each volume once, not per region and part: cf-lighten's Lighten.)
+    let parts: Vec<(&Shape, f64)> = shapes.iter().filter(|s| s.count(ShapeType::Solid) > 0).map(|s| (s, volume_of(s))).collect();
     let mut solids = res.shape.solids();
     if !parts.is_empty() {
-        let empty: Vec<Shape> = solids.iter().filter(|r| !parts.iter().any(|s| is_material_of(r, s))).cloned().collect();
+        let empty: Vec<Shape> = solids.iter().filter(|r| {
+            let vr = volume_of(r);
+            !parts.iter().any(|&p| is_material_of((r, vr), p))
+        }).cloned().collect();
         if !empty.is_empty() && empty.len() < solids.len() {
             solids = empty;
             let kept = if solids.len() == 1 { solids[0].clone() } else { Shape::compound(&solids) };
