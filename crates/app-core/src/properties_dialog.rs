@@ -978,8 +978,10 @@ fn check_row(id: impl Into<ElementId>, text: impl Into<SharedString>, on: bool) 
 fn check_row_mixed(id: impl Into<ElementId>, text: impl Into<SharedString>, on: bool, mixed: bool) -> Stateful<Div> {
     let on = on || mixed;
     let text: SharedString = text.into();
+    let name = text.clone();
     h_flex()
         .id(id)
+        .map(|d| crate::ui_script::mark(d, || format!("checkbox:{name}")))
         .h(px(21.))
         .gap(px(6.))
         .cursor_pointer()
@@ -1167,15 +1169,18 @@ impl Render for MetaForm {
             ))
             .child(group(
                 label("Unit of measure", false),
-                crate::os_ui::select_field("meta-unit", UNITS_OF_MEASURE.iter().map(|s| s.to_string()).collect(), unit_ix, {
-                    let v = view.clone();
-                    move |i, _, cx| {
-                        v.update(cx, |this, cx| {
-                            this.unit = Some(UNITS_OF_MEASURE[i].to_string());
-                            this.changed(cx);
-                        })
-                    }
-                })
+                crate::ui_script::mark(
+                    div().child(crate::os_ui::select_field("meta-unit", UNITS_OF_MEASURE.iter().map(|s| s.to_string()).collect(), unit_ix, {
+                        let v = view.clone();
+                        move |i, _, cx| {
+                            v.update(cx, |this, cx| {
+                                this.unit = Some(UNITS_OF_MEASURE[i].to_string());
+                                this.changed(cx);
+                            })
+                        }
+                    })),
+                    || "dropdown:Unit of measure".into(),
+                )
                 .into_any_element(),
             ));
         // Parts (with their material) and assemblies (a computed mass, no
