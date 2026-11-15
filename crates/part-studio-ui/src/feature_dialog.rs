@@ -632,7 +632,9 @@ impl FeatureDialog {
         // trades Profiles for the wire profiles' Profiles; the keyboard stays off it).
         let label = |q: &Option<String>| q.as_deref().and_then(|q| self.spec_for_path(q)).map(|s| s.label);
         let twin = active.is_some() && label(&active) == label(&self.active_query);
-        if takes && !twin && self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str())) {
+        // (A field shown before takes it too when the active one went away: live routing-curve-multiple-csv, CSV file
+        // hides Vertices and Curve reference gets the keyboard.)
+        if takes && !twin && self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str()) || before_gone) {
             self.focus_dialog_pending = true;
             // (A tab that brings the field up doesn't leave the keyboard outside: live extrude-surface-tab.)
             self.keyboard_left = false;
