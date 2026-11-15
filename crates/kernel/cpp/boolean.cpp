@@ -1893,6 +1893,10 @@ TopoDS_Shape recut_arc_seams(const TopoDS_Shape& s, HHist& hist)
   return out;
 }
 
+// Whether a usd_kept_volume on this thread since unify_in reset it found the faces' order doesn't change USD's
+// rejected merge (the same one three times running).
+thread_local bool t_usd_order_moot = false;
+
 TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
 {
   // The volume of `s` only when the check needs it (one integral of every face: 14 s of the knurl's unify):
@@ -2040,7 +2044,10 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
       const bool same = change && last_reject && last_reject->first == nf && std::abs(last_reject->second - *change) <= 1e-12 * bv;
       repeats         = same ? repeats + 1 : 1;
       if (repeats >= 3)
+      {
+        t_usd_order_moot = true;
         break;
+      }
       last_reject = change ? std::optional<std::pair<int, double>>({nf, *change}) : std::nullopt;
       continue;
     }
@@ -5479,7 +5486,11 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
   };
   const bool   may    = cylinder_faces_apart(s0);
   const HHist  before = may ? copy(hist) : HHist();
+  t_usd_order_moot    = false;
   TopoDS_Shape r      = unify_seams_in(s0, hist, sc, clean);
+  // (Where USD's merge was rejected the same in every start, other orders give the same: c2-housing-draft's Bohrung 1
+  // and Rotieren 1, three futile tries each, 50-90 ms.)
+  const bool order_moot = t_usd_order_moot;
   // (Not for an invalid input (c2-sm-louver's fuse): a reordered try is kept only valid, and it gives none, after
   // three more passes.)
   std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> apart = may && !r.IsSame(s0) ? faces_apart(r, true) : std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>>();
@@ -5489,7 +5500,9 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
   static const bool retry_all = std::getenv("NOSHAPE_UNIFY_RETRY_ALL") != nullptr;
   if (!retry_all)
     apart.erase(std::remove_if(apart.begin(), apart.end(), [](const std::pair<TopoDS_Shape, TopoDS_Shape>& p) { return wraps_past_a_turn(TopoDS::Face(p.first), TopoDS::Face(p.second)); }), apart.end());
-  if (!apart.empty() && !stuck_pairs().all_known(apart) && BRepCheck_Analyzer(s0).IsValid())
+  if (!apart.empty() && order_moot)
+    stuck_pairs().add(apart);
+  else if (!apart.empty() && !stuck_pairs().all_known(apart) && BRepCheck_Analyzer(s0).IsValid())
   {
     const KernelTimer timer("unify.reordered");
     GProp_GProps      v0;
