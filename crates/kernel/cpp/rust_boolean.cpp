@@ -554,7 +554,11 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       return "an edge without vertices";
     // (A closed B-spline: the whole of a closed curve, one vertex where it starts.)
     const bool closed_bs = !bsc.IsNull() && bsc->IsClosed() && std::abs(f - bsc->FirstParameter()) < 1e-12 && std::abs(l - bsc->LastParameter()) < 1e-12;
-    if (v1.IsSame(v2) && !closed_bs && ((circ.IsNull() && ell.IsNull()) || std::abs(l - f - 2 * M_PI) > 1e-9))
+    // (A circle or ellipse round from its one vertex: a whole turn, or short of one by less than the vertex's tolerance
+    // along it (c2-impeller-loft's after its chamfer 26: 1.2e-7 of a turn short).)
+    const double radius    = !circ.IsNull() ? circ->Radius() : !ell.IsNull() ? ell->MajorRadius() : 0;
+    const bool   whole_turn = std::abs(l - f - 2 * M_PI) <= 1e-9 || radius * std::abs(l - f - 2 * M_PI) <= BRep_Tool::Tolerance(v1);
+    if (v1.IsSame(v2) && !closed_bs && ((circ.IsNull() && ell.IsNull()) || !whole_turn))
       return "a closed edge";
     b.ellipse_minor.push_back(ell.IsNull() ? 0 : ell->MinorRadius());
     if (!bsc.IsNull())
