@@ -681,7 +681,9 @@ fn merged_blends(res: &k::OpResult) -> Option<k::OpResult> {
     let blend: Vec<bool> = (0..faces.len())
         .map(|i| res.history.records.iter().any(|r| r.relation == k::Relation::Generated && r.output_kind == k::ShapeType::Face && r.output_index as usize == i))
         .collect();
-    if blend.iter().filter(|b| **b).count() < 2 {
+    let blends: Vec<usize> = (0..faces.len()).filter(|&i| blend[i]).collect();
+    // (Not the whole part's unify where no two blend faces could merge: c2-hunting-knife's Fillet 8, 270 of its 500 ms.)
+    if blends.len() < 2 || !res.shape.faces_may_share_surface(&blends).unwrap_or(true) {
         return None;
     }
     let un = k::unify_same_domain(&res.shape).ok()?;

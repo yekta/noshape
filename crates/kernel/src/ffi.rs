@@ -492,6 +492,7 @@ pub(crate) mod ffi {
         fn index_of(s: &OcShape, sub: &OcShape, kind: u8) -> Result<i64>;
         fn ancestor_map(s: &OcShape, kind: u8, ancestor_kind: u8) -> Result<Csr>;
         fn adjacent_faces(s: &OcShape, face_index: u32) -> Result<Vec<u32>>;
+        fn faces_may_share_surface(s: &OcShape, faces: &[u32]) -> Result<bool>;
         fn shown_topology(s: &OcShape) -> Result<Vec<u8>>;
         fn edge_joins(s: &OcShape) -> Result<Vec<u32>>;
         fn face_joins(s: &OcShape) -> Result<Vec<u32>>;

@@ -57,6 +57,7 @@ extern "C" char etext;
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <Precision.hxx>
 #include <BRepBndLib.hxx>
+#include <gp_Lin.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_WireExplorer.hxx>
@@ -1335,6 +1336,56 @@ rust::Vec<uint32_t> adjacent_faces(const OcShape& s, uint32_t face_index)
   for (uint32_t v : res)
     out.push_back(v);
   return out;
+}
+
+// Whether two of `faces` (indices) that share an edge could lie on one surface: the same surface, or planes, cylinders,
+// cones, spheres or tori that coincide (within 1e-6 of the part's size), i.e. whether a unify could merge two of them.
+bool faces_may_share_surface(const OcShape& s, rust::Slice<const uint32_t> faces)
+{
+  const ShapeIMap& fm = s.map(TopAbs_FACE);
+  ShapeIMap        mine;
+  for (const uint32_t i : faces)
+    if (i < static_cast<uint32_t>(fm.Extent()))
+      mine.Add(fm(static_cast<int>(i) + 1));
+  if (mine.Extent() < 2)
+    return false;
+  Bnd_Box box;
+  BRepBndLib::Add(s.shape, box);
+  const double tol = box.IsVoid() ? 1e-9 : 1e-6 * std::sqrt(box.SquareExtent());
+  auto same = [tol](const TopoDS_Face& a, const TopoDS_Face& b) {
+    TopLoc_Location la, lb;
+    if (BRep_Tool::Surface(a, la) == BRep_Tool::Surface(b, lb) && la.IsEqual(lb))
+      return true;
+    const BRepAdaptor_Surface sa(a, false), sb(b, false);
+    if (sa.GetType() != sb.GetType())
+      return false;
+    auto axes = [tol](const gp_Ax1& x, const gp_Ax1& y) { return x.IsParallel(y, 1e-6) && gp_Lin(x).Distance(y.Location()) < tol; };
+    switch (sa.GetType())
+    {
+      case GeomAbs_Plane:
+        return sa.Plane().Axis().IsParallel(sb.Plane().Axis(), 1e-6) && sa.Plane().Distance(sb.Plane().Location()) < tol;
+      case GeomAbs_Cylinder:
+        return std::abs(sa.Cylinder().Radius() - sb.Cylinder().Radius()) < tol && axes(sa.Cylinder().Axis(), sb.Cylinder().Axis());
+      case GeomAbs_Cone:
+        return std::abs(sa.Cone().SemiAngle() - sb.Cone().SemiAngle()) < 1e-6 && sa.Cone().Apex().Distance(sb.Cone().Apex()) < tol && axes(sa.Cone().Axis(), sb.Cone().Axis());
+      case GeomAbs_Sphere:
+        return std::abs(sa.Sphere().Radius() - sb.Sphere().Radius()) < tol && sa.Sphere().Location().Distance(sb.Sphere().Location()) < tol;
+      case GeomAbs_Torus:
+        return std::abs(sa.Torus().MajorRadius() - sb.Torus().MajorRadius()) < tol && std::abs(sa.Torus().MinorRadius() - sb.Torus().MinorRadius()) < tol
+               && sa.Torus().Location().Distance(sb.Torus().Location()) < tol && sa.Torus().Axis().IsParallel(sb.Torus().Axis(), 1e-6);
+      default:
+        return false;
+    }
+  };
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const ShapeList& fs = ef(i);
+    if (fs.Extent() == 2 && mine.Contains(fs.First()) && mine.Contains(fs.Last()) && same(TopoDS::Face(fs.First()), TopoDS::Face(fs.Last())))
+      return true;
+  }
+  return false;
 }
 
 std::unique_ptr<OcShapeList> children(const OcShape& s)

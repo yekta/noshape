@@ -321,6 +321,13 @@ impl Shape {
     }
 
     /// Faces sharing at least one edge with face `face_index`.
+    /// Whether two of `faces` sharing an edge could lie on one surface (the same surface, or coinciding planes,
+    /// cylinders, cones, spheres or tori): whether a unify could merge two of them.
+    pub fn faces_may_share_surface(&self, faces: &[usize]) -> Result<bool> {
+        let faces: Vec<u32> = faces.iter().filter_map(|&f| u32::try_from(f).ok()).collect();
+        ck(ffi::faces_may_share_surface(self.raw(), &faces))
+    }
+
     pub fn adjacent_faces(&self, face_index: usize) -> Result<Vec<usize>> {
         let i = u32::try_from(face_index).map_err(|_| KernelError::invalid("index out of range"))?;
         Ok(ck(ffi::adjacent_faces(self.raw(), i))?
