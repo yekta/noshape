@@ -509,16 +509,20 @@ impl DrawingEditor {
         })
     }
 
-    /// The open menu or list: a menu of the window's (a document tab's), else a list a control noted; not a context
-    /// menu of the drawing's own, which is in live's drawing iframe where its recorder can't read it (live
-    /// drw-note-delete, drw-view-properties: list null, focus other).
+    /// The open menu or list: a menu of the window's (a document tab's), else a list a control noted. A context menu
+    /// of the drawing's own is in live's drawing iframe, which its recorder reads from 2026-11-15 on (live2
+    /// drw-surface-finish-flip: "RmbMenu") and not before (live drw-note-delete, drw-view-properties: list null):
+    /// marked `drawing` for the runner, as the panels' dropdowns.
     fn ui_list(&self, cx: &App) -> Option<Value> {
         // The Reference manager's open Version graph (noted as a list by `render_ref_manager`).
         if self.ref_manager.as_ref().is_some_and(|m| m.picking.is_some()) && noshape_app_core::os_menu::is_open(cx) {
             return noshape_app_core::ui_script::open_list();
         }
         if self.frame_menu.as_ref().is_some_and(|m| noshape_app_core::os_menu::is_open_menu(m, cx)) {
-            return None;
+            return noshape_app_core::os_menu::ui_state(cx).map(|mut l| {
+                l["drawing"] = serde_json::json!(true);
+                l
+            });
         }
         // A dropdown of a panel over the drawing (Drawing properties' selects, the Inspection table's ⋯): live's are
         // in the drawing's iframe, which its recorder reads from 2026-11-15.1 on (live drw-hole-table-cell-format) and

@@ -2354,7 +2354,19 @@ impl DrawingEditor {
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
             t.paste_as_table(cx);
         }));
-        out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
+        // Standing on an edge without a leader: Flip (to the edge's other side) where a free or led one has Add
+        // leader (live2 drw-surface-finish-flip retake 11-15: Edit… · Flip · Copy · Paste as table · Move to).
+        if matches!(&a.kind, AnnotationKind::SurfaceFinish { on: Some(_), leaders, .. } if leaders.is_empty()) {
+            out.insert(1, MenuEntry::item("Flip", move |t, _, cx| {
+                t.edit_sheet("Flip", cx, |s| {
+                    if let Some(AnnotationKind::SurfaceFinish { on: Some(on), .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
+                        on.3 = !on.3;
+                    }
+                })
+            }));
+        } else {
+            out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
+        }
         out.push(Self::move_to_entry(a));
         out.extend([
             MenuEntry::Separator,

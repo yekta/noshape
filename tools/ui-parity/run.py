@@ -487,6 +487,20 @@ def normalize_live(state):
             if isinstance(f, dict) and f.get("label") == "Value" and isinstance(f.get("value"), str):
                 f["value"] = re.sub(r"∅ ?", "⌀", f["value"])
     lst = (state or {}).get("list")
+    # Live's recorder from 2026-11-15.2 reads a drawing's context menu (its "RmbMenu", live2 drw-surface-finish-flip)
+    # with the separators as "" rows and a check flag a row; ours leaves separators out and has no checks there.
+    if isinstance(lst, dict) and lst.get("name") == "RmbMenu":
+        rows = lst.get("rows") or []
+        keep = [i for i, r in enumerate(rows) if r != ""]
+        hl = lst.get("highlighted")
+        lst["highlighted"] = keep.index(hl) if isinstance(hl, int) and hl in keep else None
+        for k in ("checked", "disabled"):
+            if isinstance(lst.get(k), list) and len(lst[k]) == len(rows):
+                lst[k] = [lst[k][i] for i in keep]
+        lst["rows"] = [rows[i] for i in keep]
+        if not any(lst.get("checked") or []):
+            lst.pop("checked", None)
+        lst.pop("name", None)
     # Live's recorder from 2026-11-15.1 gives a menu's disabled rows as one flag per row (live
     # drw-hole-table-cell-format), before as the rows' indices (ours); the view cube's menus were always flags, on both
     # sides (camera-menu-*).
@@ -599,6 +613,19 @@ def select_unread(a, b, step):
         return
     if isinstance(a, dict) and isinstance(b, dict) and a.get("list") is None and a.get("dialog") is None and b.get("dialog") is None and b.get("list") is not None:
         b["list"] = None
+
+
+def document_loading(a, b):
+    """A document live's recorder read before its page had loaded (docs-doc-menu-versions-and-history: Versions and
+    history from the documents page, read at once: no workspace, no tabs, no features yet), where ours has it open:
+    the document's state isn't compared that step."""
+    if not (isinstance(a, dict) and isinstance(b, dict)):
+        return
+    da, db = a.get("document"), b.get("document")
+    if isinstance(da, dict) and da.get("workspace") is None and da.get("tabs") == [] and isinstance(db, dict) and db.get("workspace"):
+        for k in ("document", "features", "parts", "partsHeading"):
+            if k in a:
+                b[k] = a[k]
 
 
 def texts_late(a, b, later):
@@ -1302,6 +1329,7 @@ def compare(live, ours, whole_document=True):
         recorder_form(b, live)
         panel_fields_unread(a, b, str(live.get("recorded") or ""))
         select_unread(a, b, step)
+        document_loading(a, b)
         hole_callout_export_text(a, b)
         view_frame_late(a, b, step)
         placed_alike(a, b)

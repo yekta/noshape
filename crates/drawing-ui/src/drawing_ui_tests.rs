@@ -834,6 +834,7 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         run("drawing_datum", json!({ "drawing": dw, "anchor": a, "position": [a[0], a[1] - 15.0], "label": "A" }));
         run("drawing_gdt", json!({ "drawing": dw, "position": [60, 60], "rows": [{ "symbol": "position", "tolerance": "⌀0.1", "datums": ["A"] }] }));
         run("drawing_surface_finish", json!({ "drawing": dw, "position": [60, 80], "value": "Ra 1.6" }));
+        run("drawing_surface_finish", json!({ "drawing": dw, "position": b, "value": "Ra 3.2" }));
         run("drawing_weld", json!({ "drawing": dw, "target": b, "position": [b[0] + 20.0, b[1] + 25.0], "spec": { "arrow": { "symbol": "fillet", "size": "5" } } }));
         run("drawing_edge_condition", json!({ "drawing": dw, "target": mid, "position": [mid[0] - 20.0, mid[1] + 20.0], "rows": [{ "sign": "+", "value": 0.3 }] }));
         run("drawing_ordinate", json!({ "drawing": dw, "origin": a, "side": [a[0], a[1] - 10.0], "points": [b] }));
@@ -858,6 +859,7 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         let b = e.built.as_ref().expect("built");
         let sheet = e.current_sheet();
         let kind = |id: u64| sheet.annotations.iter().find(|a| a.id == id).map(|a| format!("{:?}", a.kind).split([' ', '(', '{']).next().unwrap_or("").to_string()).unwrap_or_default();
+        let on_edge = |id: u64| sheet.annotations.iter().any(|a| a.id == id && matches!(&a.kind, noshape_model::drawing::AnnotationKind::SurfaceFinish { on: Some(_), leaders, .. } if leaders.is_empty()));
         let mut out: Vec<(String, u32, [f64; 2])> = Vec::new();
         let mut seen = std::collections::HashSet::new();
         for (pick, t) in b.picks.iter().enumerate() {
@@ -868,6 +870,7 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
                     "Datum" => "datum".into(),
                     "DatumTarget" => "datum-target".into(),
                     "Gdt" => "gdt".into(),
+                    "SurfaceFinish" if on_edge(*id) => "surface-finish-on-edge".into(),
                     "SurfaceFinish" => "surface-finish".into(),
                     "Weld" => "weld".into(),
                     "EdgeCondition" => "edge-condition".into(),
@@ -955,6 +958,8 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         ("ordinate", with_tail(&["Add to ordinate dimension group", "Edit...", "Paste as table", "Unbreak dimension"])),
         ("revision-table", with_tail(&["Revision table properties...", "Paste as table", "Move to ▸", "Bring to front", "Send to back"])),
         ("surface-finish", with_tail(&["Edit...", "Copy", "Paste as table", "Add leader", "Move to ▸"])),
+        // On an edge, no leader (live2 drw-surface-finish-flip 11-15): Flip where the free one has Add leader.
+        ("surface-finish-on-edge", with_tail(&["Edit...", "Flip", "Copy", "Paste as table", "Move to ▸"])),
         ("weld", with_tail(&["Edit...", "Flip", "Copy", "Paste as table", "Move to ▸"])),
         // Live2's second pass (11-15).
         ("general-table", with_tail(&["Table properties...", "Copy", "Paste as table", "Move to ▸", "Bring to front", "Send to back", "Move to sheet..."])),
