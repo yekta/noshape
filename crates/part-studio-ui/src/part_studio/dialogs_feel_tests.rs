@@ -355,6 +355,31 @@ fn rows() -> Vec<Row> {
             let after_two = cx.update(|cx| view.read(cx).ui.material_panel.is_some());
             expect((rows, active, after_one, after_two), (38, Some(0), Some(false), false), "rows for 'steel', the active row, the list after one Esc (panel open), the panel after two")
         } },
+        Row { id: "Material / a pick keeps the keyboard in the search", live: "material-search-acetal-ok, material-library-pick-abs-cancel: after Enter (or a click) on a row the list closes, the search input keeps the keyboard, its text empty; typing opens the list again", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-material-pick");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let b = v.display.bodies.first().map(|b| b.id.clone()).unwrap();
+                v.open_material_panel(vec![b], w, cx);
+            }))
+            .unwrap();
+            draw(cx, window);
+            let at = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("mat-picker").ok_or("no picker")?.center();
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at, Modifiers::default());
+            draw(cx, window);
+            keys(cx, window, &["a", "c", "e", "t", "a", "l", "enter"]);
+            draw(cx, window);
+            let state = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| {
+                let m = view.read(cx).ui.material_panel.as_ref().unwrap();
+                let s = m.search.read(cx);
+                (m.picked_name(), m.is_list_open(), s.focus_handle(cx).is_focused(w), s.value().to_string())
+            })
+            .unwrap();
+            let picked = state(cx);
+            keys(cx, window, &["s"]);
+            draw(cx, window);
+            let typed = state(cx).1;
+            expect((picked, typed), ((Some("Acetal (Delrin)".to_string()), false, true, String::new()), true), "(the material, the list open, the search focused, its text) after Enter; the list after typing")
+        } },
         Row { id: "Properties / no field has the keyboard on opening", live: "no field focused; typing does nothing until a field is clicked", gap: false, check: |cx| {
             let (window, view) = block(cx, "dlg-props");
             cx.update_window(window, |_, w, cx| {

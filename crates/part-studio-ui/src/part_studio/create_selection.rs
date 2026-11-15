@@ -425,8 +425,7 @@ impl PartStudioView {
                 this.cs_update(cx);
             }));
         let enabled = n > 0;
-        let add = div()
-            .id("cs-add")
+        let add = crate::ui_script::mark(div().id("cs-add"), || "button:Add selection".into())
             .w(px(135.))
             .h(px(27.))
             .flex()

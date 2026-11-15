@@ -147,7 +147,10 @@ impl PartStudioView {
         if let Some(m) = &mut self.ui.material_panel {
             m.picked = e;
             m.list_open = false;
-            m.search.update(cx, |s, cx| s.focus(window, cx));
+            m.search.update(cx, |s, cx| {
+                s.set_value("", window, cx);
+                s.focus(window, cx);
+            });
         }
         cx.notify();
     }
@@ -158,6 +161,7 @@ impl PartStudioView {
             if matches!(ev, InputEvent::Change) {
                 if let Some(m) = &mut this.ui.material_panel {
                     m.active = 0;
+                    m.list_open |= !m.search.read(cx).value().is_empty();
                 }
                 cx.notify();
             }
@@ -239,7 +243,8 @@ impl PartStudioView {
             }
         }
         // (On the Custom tab too: live material-custom-tab-cancel.)
-        let assigned = (m.picked.is_none() && !m.list_open).then_some("No material assigned");
+        // The open list only covers it (live material-search-acetal-ok: still in the page).
+        let assigned = m.picked.is_none().then_some("No material assigned");
         let mut state = json!({ "kind": "material", "title": "Material", "tabs": tabs, "fields": fields, "assigned": assigned });
         if m.list_open && !m.custom {
             let choices: Vec<serde_json::Value> = self
@@ -429,6 +434,9 @@ impl PartStudioView {
                         .child(div().flex_1().truncate().text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).child(picked.as_ref().map(|e| e.name.clone()).unwrap_or_else(|| "- None -".into())))
                         // Live (assign-material-01): Onshape's 8 x 4 select caret, as in os_select.
                         .child(crate::ui::glyph("drawing-tool-caret", 12., pal.text))
+                        // Closed, the search stays in the tree, unseen, keeping the keyboard after a pick (live
+                        // material-library-pick-abs-cancel: a field, its text empty); typing opens the list.
+                        .child(div().absolute().size_0().overflow_hidden().child(Input::new(&search).appearance(false)))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let rows = this.material_rows(cx);
                             if let Some(m) = &mut this.ui.material_panel {
