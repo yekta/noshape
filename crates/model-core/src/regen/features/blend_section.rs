@@ -760,6 +760,18 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             .collect(),
         false => Vec::new(),
     };
+    // A chamfer's chord feet on each free-form face, by chain distance: the next station's projection starts at the
+    // nearest (c2-hunting-knife's Chamfer 1: 195 projections of a point off the face, 35 ms).
+    let feet: std::sync::Mutex<std::collections::HashMap<u32, Vec<(f64, DVec2)>>> = Default::default();
+    let chord_foot = |fi: u32, face: &Shape, a: DVec3, s: f64| -> FResult<DVec3> {
+        let near = feet.lock().unwrap_or_else(|e| e.into_inner()).get(&fi).and_then(|v| v.iter().min_by(|x, y| (x.0 - s).abs().total_cmp(&(y.0 - s).abs())).map(|x| x.1));
+        let pr = match near {
+            Some(uv) => face.project_point_near(a, uv)?,
+            None => face.project_point(a)?,
+        };
+        feet.lock().unwrap_or_else(|e| e.into_inner()).entry(fi).or_default().push((s, DVec2::new(pr.u, pr.v)));
+        Ok(pr.point)
+    };
     let station = |s: f64| -> FResult<(DVec3, Frame, bool, DVec3)> {
         let mut acc = 0.0;
         let last = chain.len() - 1;
@@ -815,7 +827,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     for (i, face) in ff.iter().enumerate().filter(|(_, f)| !f.is_planar()) {
                         let mut a = p + fr.u[i] * spec.r1;
                         for _ in 0..2 {
-                            let v = face.project_point(a)?.point - p;
+                            let v = chord_foot(fs[i], face, a, s)? - p;
                             let v = v - tangent * v.dot(tangent);
                             a = p + v.normalize() * spec.r1;
                         }

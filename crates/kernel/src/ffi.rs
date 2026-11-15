@@ -519,6 +519,7 @@ pub(crate) mod ffi {
         fn face_normal_at_uv(face: &OcShape, u: f64, v: f64) -> Result<P3>;
         fn face_point_at_uv(face: &OcShape, u: f64, v: f64) -> Result<P3>;
         fn face_project_point(face: &OcShape, p: P3) -> Result<ProjPoint>;
+        fn face_project_point_near(face: &OcShape, p: P3, u0: f64, v0: f64) -> Result<ProjPoint>;
         /// Whether `p` lies on the bounded face within `tol`.
         fn face_contains_point(face: &OcShape, p: P3, tol: f64) -> Result<bool>;
         fn face_contains_uv(face: &OcShape, u: f64, v: f64, tol: f64) -> Result<bool>;

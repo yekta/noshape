@@ -1016,6 +1016,64 @@ ProjPoint face_project_point(const OcShape& fs, P3 p)
   return r;
 }
 
+// The foot of `p` on a face by Newton's method from (u0, v0), a foot nearby (a chamfer's chords station by station):
+// where it lands inside the face, the nearest point there; else the face's projection.
+ProjPoint face_project_point_near(const OcShape& fs, P3 p, double u0, double v0)
+{
+  const TopoDS_Face& f = as_face(fs.shape, "shape");
+  // (The face's adaptor and classifier kept for the next station: building them was most of a call.)
+  struct Face
+  {
+    TopoDS_Face                              face;
+    std::unique_ptr<BRepAdaptor_Surface>     surf;
+    std::unique_ptr<BRepTopAdaptor_FClass2d> cls;
+  };
+  thread_local std::vector<std::unique_ptr<Face>> faces;
+  Face*                                           fc = nullptr;
+  for (size_t i = 0; i < faces.size() && fc == nullptr; ++i)
+    if (faces[i]->face.IsEqual(f))
+    {
+      std::rotate(faces.begin(), faces.begin() + i, faces.begin() + i + 1);
+      fc = faces.front().get();
+    }
+  if (fc == nullptr)
+  {
+    auto n  = std::make_unique<Face>();
+    n->face = f;
+    n->surf = std::make_unique<BRepAdaptor_Surface>(f, true);
+    n->cls  = std::make_unique<BRepTopAdaptor_FClass2d>(f, BRep_Tool::Tolerance(f));
+    faces.insert(faces.begin(), std::move(n));
+    if (faces.size() > 4)
+      faces.pop_back();
+    fc = faces.front().get();
+  }
+  Extrema_GenLocateExtPS loc(*fc->surf, 1e-12, 1e-12);
+  loc.Perform(to_pnt(p), u0, v0, true);
+  if (loc.IsDone())
+  {
+    double u, v;
+    loc.Point().Parameter(u, v);
+    // (A foot: the offset along the normal, not a point where Newton's method stalled.)
+    gp_Pnt       q;
+    gp_Vec       du, dv;
+    fc->surf->D1(u, v, q, du, dv);
+    const gp_Vec off(q, to_pnt(p));
+    const double d = off.Magnitude();
+    const double side = 1e-9 + 1e-6 * d;
+    const bool   foot = std::abs(off.Dot(du)) <= side * du.Magnitude() && std::abs(off.Dot(dv)) <= side * dv.Magnitude();
+    if (foot && fc->cls->Perform(gp_Pnt2d(u, v)) == TopAbs_IN)
+    {
+      ProjPoint r{};
+      r.point    = from_pnt(loc.Point().Value());
+      r.distance = std::sqrt(loc.SquareDistance());
+      r.u        = u;
+      r.v        = v;
+      return r;
+    }
+  }
+  return face_project_point(fs, p);
+}
+
 // Point, first u derivative and outward normal (face orientation) at each (u, v) of `uvs`: 9 values a parameter, one
 // adaptor for all (a Displacement map asks 262,144 tangent planes of one face).
 rust::Vec<double> face_frames_at_uvs(const OcShape& fs, rust::Slice<const double> uvs)

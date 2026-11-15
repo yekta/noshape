@@ -855,6 +855,7 @@ BSplineSurfF             face_bspline(const OcShape& face);
 P3    face_normal_at_uv(const OcShape& face, double u, double v);
 P3    face_point_at_uv(const OcShape& face, double u, double v);
 ProjPoint                face_project_point(const OcShape& face, P3 p);
+ProjPoint                face_project_point_near(const OcShape& face, P3 p, double u0, double v0);
 bool                     face_contains_point(const OcShape& face, P3 p, double tol);
 bool                     face_contains_uv(const OcShape& face, double u, double v, double tol);
 rust::Vec<double>        face_uv_bounds(const OcShape& face);

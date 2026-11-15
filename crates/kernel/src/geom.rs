@@ -324,6 +324,13 @@ impl Shape {
         Ok(FaceProjection { point: v3(r.point), u: r.u, v: r.v, distance: r.distance })
     }
 
+    /// [`Shape::project_point`] by Newton's method from the parameters `uv` of a foot nearby, where that lands inside
+    /// the face.
+    pub fn project_point_near(&self, p: DVec3, uv: DVec2) -> Result<FaceProjection> {
+        let r = ck(ffi::face_project_point_near(self.raw(), p3(p), uv.x, uv.y))?;
+        Ok(FaceProjection { point: v3(r.point), u: r.u, v: r.v, distance: r.distance })
+    }
+
     /// Point, first u derivative and outward normal (the face's orientation) at each surface parameter (u, v), in one
     /// call.
     pub fn frames_at_uvs(&self, uvs: &[DVec2]) -> Result<Vec<[DVec3; 3]>> {
