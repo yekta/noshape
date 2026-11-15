@@ -28,6 +28,22 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-15 18:03 UTC: live2's Feature Studio retakes, coverage
+
+- live2's 8252c646 retakes (vibe6): fs-tb-redo matches. fs-ed-error-squiggle differs only at step 7 (hover on
+  uipUnknown: live 2 fs-notice-* elements, ours 1 marked line): asked live2 whether the 2nd is the hover popup or a
+  lagging gutter mark (line 1). fs-ps-custom-feature-error: after Commit with `uip(` live's Part Studio doesn't
+  regenerate at all (every row `not-computed`, Parts (0), the feature's name without its "uF" icon text, its tooltip
+  the name only); ours regenerates Sketch 1 and Extrude 1 and fails the custom feature with the compile error.
+  Decision asked of the lead (parity vs "not its failures").
+- fs-ac-fn-std-list's tie: neither the import tree's pre- nor post-order puts tool.fs before
+  booleanoperationtype.gen.fs; live2 asked for fs-ac-tie-{operationt,op,dir,bound,bodyt} (/root/studios-scratch/
+  ac_ties.py, ac_cand.py find the ties).
+- Versions coverage 167/167: the universe's chains named "Revision history" and "Search items" where live's labels
+  are "Revision history…" and "Search", and Release management's "Edit". The release gap list below (11-11) is stale:
+  Submit already makes the version, the approval workflow and most release ops exist (release_approve, _reject,
+  _drafts, _obsolete, _settings…).
+
 ### 2026-11-15 17:24 UTC: the API Hole rule (P0 fixed), live2's selection answers, my areas' run
 
 Where to work: ui-parity on vibe6 again (lead 11-15 16:50: vibe7 loaded; ≤2 apps while psui runs there), builds and
