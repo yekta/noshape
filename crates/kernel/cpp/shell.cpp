@@ -3072,7 +3072,7 @@ bool newton_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& 
   S->Bounds(U0, U1, V0, V1);
   const bool uper = S->IsUPeriodic(), vper = S->IsVPeriodic();
   double     u = uv.X(), v = uv.Y();
-  for (int it = 0; it < 24; ++it)
+  for (int it = 0; it < 40; ++it)
   {
     gp_Pnt Q;
     gp_Vec Su, Sv, Suu, Svv, Suv;
@@ -3089,19 +3089,102 @@ bool newton_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& 
       if (!(det > 0))
         return false;
     }
-    const double u0 = u, v0 = v;
-    u -= (j22 * f1 - j12 * f2) / det;
-    v -= (j11 * f2 - j12 * f1) / det;
-    // (Past a bound the surface ends at: OCCT's projection, which takes the bounds its own way.)
-    if ((!uper && (u < U0 || u > U1)) || (!vper && (v < V0 || v > V1)))
+    // (A step past a bound the surface ends at is cut to half the way there: a foot inside is found from a start far
+    // off. From the bound itself, outward: none; OCCT's projection then, which takes the bounds its own way.)
+    const double du = -(j22 * f1 - j12 * f2) / det, dv = -(j11 * f2 - j12 * f1) / det;
+    double       t  = 1;
+    auto         cut = [&](double x, double dx, double lo, double hi) {
+      const double b = x + dx < lo ? lo : x + dx > hi ? hi : x + dx;
+      if (b == x + dx)
+        return true;
+      if (std::abs(b - x) < 1e-9 * (hi - lo))
+        return false;
+      t = std::min(t, 0.5 * (b - x) / dx);
+      return true;
+    };
+    if ((!uper && !cut(u, du, U0, U1)) || (!vper && !cut(v, dv, V0, V1)))
       return false;
-    if (std::abs(u - u0) * Su.Magnitude() + std::abs(v - v0) * Sv.Magnitude() < 1e-13)
+    u += t * du;
+    v += t * dv;
+    if (t == 1 && std::abs(du) * Su.Magnitude() + std::abs(dv) * Sv.Magnitude() < 1e-13)
     {
       uv = gp_Pnt2d(u, v);
       return true;
     }
   }
   return false;
+}
+
+// The foot of P on `S` held to its bounds, near uv: newton_foot, else where it would leave the surface, the foot on
+// that bound (Newton along it, the other parameter held), where the distance grows inward from it (a point past the
+// surface's end: an edge joining a face past its bound, c2-rings-loft's Shell 1).
+bool bounded_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& uv)
+{
+  if (newton_foot(S, P, uv))
+    return true;
+  double U0, U1, V0, V1;
+  S->Bounds(U0, U1, V0, V1);
+  const bool uper = S->IsUPeriodic(), vper = S->IsVPeriodic();
+  // (Held at the bound in `fixed` (0: u, 1: v) at `at`.)
+  auto along = [&](int fixed, double at, gp_Pnt2d& out) {
+    const double lo = fixed == 0 ? V0 : U0, hi = fixed == 0 ? V1 : U1;
+    const bool   per = fixed == 0 ? vper : uper;
+    double       w = fixed == 0 ? uv.Y() : uv.X();
+    if (!per)
+      w = std::clamp(w, lo, hi);
+    for (int it = 0; it < 40; ++it)
+    {
+      const double u = fixed == 0 ? at : w, v = fixed == 0 ? w : at;
+      gp_Pnt       Q;
+      gp_Vec       Su, Sv, Suu, Svv, Suv;
+      S->D2(u, v, Q, Su, Sv, Suu, Svv, Suv);
+      const gp_Vec r(P, Q.XYZ());
+      const gp_Vec& Sw = fixed == 0 ? Sv : Su;
+      const gp_Vec& Sww = fixed == 0 ? Svv : Suu;
+      double        j = Sw.Dot(Sw) + r.Dot(Sww);
+      if (!(j > 0))
+        j = Sw.Dot(Sw);
+      if (!(j > 0))
+        return false;
+      const double dw = -r.Dot(Sw) / j;
+      const double w1 = per ? w + dw : std::clamp(w + dw, lo, hi);
+      if (std::abs(w1 - w) * Sw.Magnitude() < 1e-13)
+      {
+        // (A minimum held by the bound: the distance grows into the surface, or the point is on it, to a nanometre.)
+        const gp_Vec& Sf = fixed == 0 ? Su : Sv;
+        const double  inward = at == (fixed == 0 ? U0 : V0) ? 1 : -1;
+        if (r.Magnitude() > 1e-9 && inward * r.Dot(Sf) < -1e-12 * r.Magnitude() * Sf.Magnitude())
+          return false;
+        out = fixed == 0 ? gp_Pnt2d(at, w1) : gp_Pnt2d(w1, at);
+        return true;
+      }
+      w = w1;
+    }
+    return false;
+  };
+  // (Of the bounds the start lies on, the nearer foot.)
+  double   best = 1e300;
+  gp_Pnt2d got;
+  for (int fixed = 0; fixed < 2; ++fixed)
+  {
+    if (fixed == 0 ? uper : vper)
+      continue;
+    const double lo = fixed == 0 ? U0 : V0, hi = fixed == 0 ? U1 : V1, at = fixed == 0 ? uv.X() : uv.Y();
+    for (const double b : {lo, hi})
+    {
+      if (std::abs(at - b) > 1e-6 * (hi - lo))
+        continue;
+      gp_Pnt2d q;
+      if (!along(fixed, b, q))
+        continue;
+      if (const double d = S->Value(q.X(), q.Y()).XYZ().Subtracted(P).Modulus(); d < best)
+        best = d, got = q;
+    }
+  }
+  if (!(best < 1e300))
+    return false;
+  uv = got;
+  return true;
 }
 
 // A free-form face's surface's foot of x: Newton from the last foot, or from the nearest point of a grid over the face's
@@ -8606,7 +8689,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
           {
             const double w = j0 + (j1 - j0) * k / n;
             gp_Pnt2d q = k == 0 ? h1->Value(r1 ? p1 : p0) : uvj(k);
-            if (k > 0 && !quad::newton_foot(Sj, c3->Value(w).XYZ(), q))
+            if (k > 0 && !quad::bounded_foot(Sj, c3->Value(w).XYZ(), q))
               q = saj->NextValueOfUV(uvj(k), c3->Value(w), 1e3 * tol);
             // (Continuous through a period.)
             if (k > 0 && Sj->IsUPeriodic())
