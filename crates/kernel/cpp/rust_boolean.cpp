@@ -2350,6 +2350,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     // (An ellipse's and a free-form section's always: its tolerance goes by them, below.)
     if (!round && !free_form)
     {
+      std::vector<size_t> plain;
       for (uint32_t k = b.loop_uses[b.face_loops[i]]; k < b.loop_uses[b.face_loops[i + 1]]; ++k)
       {
         const uint32_t ek = b.uses[k] / 2;
@@ -2364,8 +2365,12 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
             return why;
         }
         else if (r.edge_origin[3 * ek] != 0)
-          BRepLib::BuildPCurveForEdgeOnPlane(es[ek], f);
+          plain.push_back(ek);
       }
+      // (A big plane's on all threads: each edge once, its own, the plane only read; a knurl's faces hold thousands.)
+      std::sort(plain.begin(), plain.end());
+      plain.erase(std::unique(plain.begin(), plain.end()), plain.end());
+      OSD_Parallel::For(0, static_cast<int>(plain.size()), [&](int k) { BRepLib::BuildPCurveForEdgeOnPlane(es[plain[(size_t)k]], f); }, plain.size() < 256);
     }
     fs[i] = rev ? TopoDS::Face(f.Reversed()) : f;
   }
