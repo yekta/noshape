@@ -2449,8 +2449,16 @@ impl SketchEditor {
                             self.selection.push(e);
                         }
                     }
-                    // Clicking white space accepts the pattern / transform (Onshape).
-                    None if !self.selection.is_empty() => return self.apply_pattern(data),
+                    // Clicking white space accepts the pattern / transform (Onshape); a pattern's tool ends there
+                    // (live sketch-linear-pattern-click-commit, sketch-circular-pattern-click-commit: tool none).
+                    None if !self.selection.is_empty() => {
+                        let out = self.apply_pattern(data);
+                        if out.changed && self.tool != Tool::Transform {
+                            self.set_tool(Tool::Select);
+                            self.selection.clear();
+                        }
+                        return out;
+                    }
                     None => {}
                 }
                 EditOutcome::redraw()
@@ -8355,6 +8363,23 @@ mod tests {
         assert_eq!(ed.tool, Tool::Select);
         assert_eq!(count(&d, EntityKind::Arc), 4);
         assert!(!d.sketch.entity(other).unwrap().construction);
+    }
+
+    /// Live (sketch-linear-pattern-click-commit, sketch-circular-pattern-click-commit): a click in white space accepts
+    /// the pattern and ends the tool, nothing left selected.
+    #[test]
+    fn a_pattern_accepted_in_white_space_ends_the_tool() {
+        for tool in [Tool::LinearPattern, Tool::CircularPattern] {
+            let (mut ed, mut d) = editor(tool);
+            let line = d.sketch.add_line(v(0.01, 0.01), v(0.02, 0.01));
+            ed.selection.push(line);
+            ed.pattern_center = v(0.0, 0.0);
+            let before = d.sketch.entities().count();
+            click(&mut ed, &mut d, v(0.2, 0.2));
+            assert!(d.sketch.entities().count() > before, "{tool:?}: the pattern added its instances");
+            assert_eq!(ed.tool, Tool::Select, "{tool:?}: the tool ended");
+            assert!(ed.selection.is_empty(), "{tool:?}: nothing selected");
+        }
     }
 
     #[test]
