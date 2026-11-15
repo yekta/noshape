@@ -1279,6 +1279,8 @@ pub struct ViewEdge {
     /// A sketch's line (Drawing properties › Construction geometry › Part
     /// Studio sketches).
     pub sketch: SketchEdge,
+    /// A crop's profile drawn where it runs through material: written as a POLYLINE (live drw-crop-spline.dxf).
+    pub profile: bool,
 }
 
 /// What kind of sketch line a view edge is.
@@ -2367,7 +2369,7 @@ pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sour
             for e in b.shape.edges() {
                 let pts: Vec<[f64; 2]> = sample_edge(&e, 48).into_iter().map(|p| frame.project(p)).collect();
                 if pts.len() >= 2 {
-                    g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None, sketch: SketchEdge::Solid });
+                    g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None, sketch: SketchEdge::Solid, profile: false });
                 }
             }
         }
@@ -2471,11 +2473,11 @@ fn apply_crop(g: &mut ViewGeometry, crop: &Crop) {
     let boundary = crop_boundary_in_material(&edges, crop);
     for e in &edges {
         for piece in clip_to_crop(&e.points, crop) {
-            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model: e.model, sketch: e.sketch });
+            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model: e.model, sketch: e.sketch, profile: e.profile });
         }
     }
     // The profile is drawn where it runs through material (live drw-crop-spline, live2 crop-snap-reach: any profile).
-    g.edges.extend(boundary.into_iter().map(|points| ViewEdge { points, visible: true, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None }));
+    g.edges.extend(boundary.into_iter().map(|points| ViewEdge { points, visible: true, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None, profile: true }));
     let poly = crop_polygon(crop);
     let inside = |p: [f64; 2]| match (crop, &poly) {
         (Crop::Circle { center, radius }, _) => (p[0] - center[0]).powi(2) + (p[1] - center[1]).powi(2) <= radius * radius * (1.0 + 1e-9),
@@ -2874,6 +2876,7 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
             class: pe.class,
             model,
             sketch: SketchEdge::None,
+            profile: false,
         });
     }
     // Snap points: vertices (on the kept side of a section) and centers of
@@ -3559,7 +3562,7 @@ fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: 
                     (g.model_edges.len() - 1) as u32
                 })
             });
-            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model, sketch: e.sketch });
+            g.edges.push(ViewEdge { points: piece, visible: e.visible, class: e.class, model, sketch: e.sketch, profile: e.profile });
         }
     }
     let inside = |p: [f64; 2]| match poly {
@@ -3693,7 +3696,7 @@ fn flat_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &ViewF
         for w in pts.windows(2) {
             g.snaps.push(Snap { p: w[0], kind: SnapKind::Vertex, point: None });
         }
-        g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None, sketch: SketchEdge::None });
+        g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Outline, model: None, sketch: SketchEdge::None, profile: false });
     }
     for f in &flat.forms {
         for l in f.loops.iter().filter(|l| l.len() >= 2) {
@@ -3762,7 +3765,7 @@ fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame:
             if let Some(c) = color {
                 g.sketch_colors.push((g.edges.len(), c));
             }
-            g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None, sketch });
+            g.edges.push(ViewEdge { points: pts, visible: true, class: noshape_kernel::EdgeClass::Sharp, model: None, sketch, profile: false });
         }
     }
     let (mut lo, mut hi) = ([f64::MAX; 2], [f64::MIN; 2]);
@@ -3788,7 +3791,7 @@ mod tests {
     /// inside the block is drawn whole.
     #[test]
     fn a_crop_profile_is_drawn_where_it_crosses_material() {
-        let edge = |a: [f64; 2], b: [f64; 2]| ViewEdge { points: vec![a, b], visible: true, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None };
+        let edge = |a: [f64; 2], b: [f64; 2]| ViewEdge { points: vec![a, b], visible: true, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None, profile: false };
         let block = vec![edge([0.0, 0.0], [40.0, 0.0]), edge([40.0, 0.0], [40.0, 10.0]), edge([40.0, 10.0], [0.0, 10.0]), edge([0.0, 10.0], [0.0, 0.0])];
         assert!(inside_material(&block, [20.0, 5.0]) && !inside_material(&block, [20.0, 12.0]));
         let snapped = Crop::Spline(vec![[5.0, 0.0], [25.0, 0.0], [25.0, 10.0], [5.0, 10.0]]);

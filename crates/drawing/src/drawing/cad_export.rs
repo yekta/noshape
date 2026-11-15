@@ -743,8 +743,9 @@ impl Sheet<'_> {
         // A free-form model edge stays a spline though it looks like an
         // ellipse (live 1857: a fillet's B-spline edges are SPLINEs).
         let free = l.points.len() > 2 && self.g.freeform_lines.binary_search(&li).is_ok();
+        let poly = l.points.len() > 2 && self.g.polyline_lines.binary_search(&li).is_ok();
         // Live writes a detail view's border as its closed polyline, not a CIRCLE.
-        let fitted = !free && self.g.cad_line_layer(li) != CadLayer::DetailViewBorder;
+        let fitted = !free && !poly && self.g.cad_line_layer(li) != CadLayer::DetailViewBorder;
         let mut e = match if fitted { fit_curve(&l.points, l.closed, FIT_TOL) } else { None } {
             Some(FitCurve::Circle { center, radius }) => EntityType::Circle(Circle::from_center_radius(p3(center), radius * k)),
             Some(FitCurve::Arc { center, radius, start, end }) => {
@@ -758,6 +759,7 @@ impl Sheet<'_> {
                 EntityType::Ellipse(e)
             }
             None if l.points.len() == 2 && !l.closed => EntityType::Line(Line::from_points(p3(l.points[0]), p3(l.points[1]))),
+            None if poly => EntityType::Polyline2D(self.polyline(&l.points, l.closed, true)),
             // A model edge of another curve: a cubic SPLINE (live 1857's
             // VISIBLE / TANGENT_LINES) through the projected points.
             None if MODEL_EDGES.contains(&self.g.cad_line_layer(li)) => {
@@ -1648,6 +1650,24 @@ mod tests {
         let split = crate::drawing::cad_layers::split_at_touches(&lp, 1e-6);
         assert_eq!(split, [vec![[5.0, 10.0], [12.0, 10.0], [12.0, 0.0], [5.0, 0.0]], vec![[0.0, 10.0], [0.0, 0.0], [5.0, 0.0], [5.0, 10.0]]]);
         assert_eq!(crate::drawing::cad_layers::split_at_touches(&lp[..4], 1e-6), [lp[..4].to_vec()]);
+    }
+
+    /// Live drw-crop-spline.dxf: a crop's profile through material is a VISIBLE POLYLINE; the same points as a model
+    /// edge are a SPLINE.
+    #[test]
+    fn a_crop_profile_is_written_as_a_polyline() {
+        let arc: Vec<[f64; 2]> = (0..12).map(|i| { let t = i as f64 * 0.1; [60.0 + 10.0 * t.cos(), 60.0 + 10.0 * t.sin()] }).collect();
+        let mut g = sample();
+        let (a, b) = (g.lines.len(), g.lines.len() + 1);
+        for _ in 0..2 {
+            g.lines.push(crate::drawing::sheet::Polyline2 { points: arc.clone(), style: LineStyle::Visible, closed: false, pick: 0 });
+        }
+        g.polyline_lines = vec![a];
+        let doc = cad_document(&g, 4, DxfVersion::AC1032).unwrap();
+        let on_visible = |kind: fn(&EntityType) -> bool| doc.entities().filter(|e| e.common().layer == "Visible" && kind(e)).count();
+        assert_eq!(on_visible(|e| matches!(e, EntityType::Polyline2D(_))), 1);
+        assert_eq!(on_visible(|e| matches!(e, EntityType::Spline(_))), 1);
+        let _ = b;
     }
 
     fn sample() -> SheetGeometry {

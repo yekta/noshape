@@ -153,6 +153,10 @@ pub struct SheetGeometry {
     /// Lines of model edges whose curve is free-form (no line, circle or
     /// ellipse): CAD files write them as splines, whatever shape they make.
     pub freeform_lines: Vec<usize>,
+    /// Lines a CAD file writes as they are, a POLYLINE (a crop's profile through material, live drw-crop-spline.dxf),
+    /// sorted.
+    #[serde(default)]
+    pub polyline_lines: Vec<usize>,
     /// Template format lines (sorted): the screen runs them on half their
     /// pen width past their ends so corners stay closed; exports keep
     /// live's exact ends.

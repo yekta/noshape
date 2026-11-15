@@ -1862,6 +1862,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     if e.model.and_then(|m| geo.model_edges.get(m as usize)).is_some_and(|me| me.freeform) {
                         g.freeform_lines.extend(l0..g.lines.len());
                     }
+                    if e.profile {
+                        g.polyline_lines.extend(l0..g.lines.len());
+                    }
                     if v.editing_edges && (marked || !e.visible) {
                         let lines = l0..g.lines.len();
                         if marked {
@@ -3048,6 +3051,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // Looked up by binary search on export.
     g.freeform_lines.sort_unstable();
     g.freeform_lines.dedup();
+    g.polyline_lines.sort_unstable();
+    g.polyline_lines.dedup();
     BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, lost, tables: table_layouts, title_rect, title_cells }
 }
 
