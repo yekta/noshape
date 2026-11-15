@@ -1,8 +1,8 @@
 {
  "name": "rel-rh-open-version",
- "about": "After releasing Part 1: Revision history, then the row's version name R1: the released version opens, view only",
+ "about": "After releasing Part 1: Revision history, then the row's Version: R1 ↗ (opens the released version, view only)",
  "area": "studios",
- "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on.",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on. Recorded by live 11-15 (company-owned doc-versions, workflows on).",
  "recordable": true,
  "start": "doc-versions",
  "config_files": {
@@ -24,6 +24,11 @@
    }
   },
   {
+   "do": "wait",
+   "until": "ms",
+   "ms": 5000
+  },
+  {
    "do": "click",
    "on": {
     "field": "Part number:Part 1"
@@ -31,7 +36,7 @@
   },
   {
    "do": "type",
-   "text": "PN-0001"
+   "text": "PN-0200H"
   },
   {
    "do": "click",
@@ -46,8 +51,23 @@
   {
    "do": "click",
    "on": {
+    "field": "Release notes"
+   }
+  },
+  {
+   "do": "type",
+   "text": "First release"
+  },
+  {
+   "do": "click",
+   "on": {
     "button": "Release"
    }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 20000
   },
   {
    "do": "rclick",
@@ -62,10 +82,20 @@
    }
   },
   {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
+  },
+  {
    "do": "click",
    "on": {
     "history_row": "R1"
    }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
   }
  ]
 }

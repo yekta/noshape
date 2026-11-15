@@ -38,6 +38,13 @@
   "externalThread": {
    "length:Millimeter": {
     "threadDepth": "5 mm"
+   },
+   "": {
+    "branchOfStandard": [
+     "ANSI",
+     "3/8",
+     "16 tpi"
+    ]
    }
   }
  }

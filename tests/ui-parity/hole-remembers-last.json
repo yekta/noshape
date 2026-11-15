@@ -129,5 +129,31 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "hole": {
+   "": {
+    "unitsSystem": "INCH",
+    "styleV2": "SIMPLE",
+    "ansiHoleTableEx": [
+     "Drilled",
+     "1/4 (0.25)"
+    ],
+    "ansiHoleTable": [
+     "Drilled",
+     "1/4 (0.25)"
+    ],
+    "isoHoleTableEx": [
+     "Tapped",
+     "Straight tap",
+     "M6",
+     "0.75 mm (Fine)",
+     "None"
+    ]
+   },
+   "length:Millimeter": {
+    "tappedDepthV3": "10 mm"
+   }
+  }
+ }
 }

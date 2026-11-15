@@ -19,6 +19,11 @@
    }
   },
   {
+   "do": "wait",
+   "until": "ms",
+   "ms": 5000
+  },
+  {
    "do": "click",
    "on": {
     "button": "Generate missing part numbers"

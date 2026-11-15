@@ -2,7 +2,7 @@
  "name": "rel-rc-edit-props",
  "about": "Release…, then Part 1's Edit properties: its Properties (Part number, Revision, State…) with Apply / Go back",
  "area": "studios",
- "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on.",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on. Recorded by live 11-15 (company-owned doc-versions, workflows on).",
  "recordable": true,
  "start": "doc-versions",
  "config_files": {
@@ -22,6 +22,11 @@
    "on": {
     "menu": "Release…"
    }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 5000
   },
   {
    "do": "click",

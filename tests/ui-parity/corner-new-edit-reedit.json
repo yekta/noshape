@@ -100,5 +100,12 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "sheetMetalCorner": {
+   "length:Millimeter": {
+    "squareReliefWidth": "0.005*m"
+   }
+  }
+ }
 }

@@ -1,8 +1,8 @@
 {
  "name": "rel-rc-release",
- "about": "Release… with part number PN-0001 and release name R1, Release: a version R1 made, Part 1 released at A; Versions and history shows it with the release icon",
+ "about": "Release… with part number PN-0011 and release name R1, Release: a version R1 made, Part 1 released at A; Versions and history shows it with the release icon",
  "area": "studios",
- "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on.",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on. Recorded by live 11-15 (company-owned doc-versions, workflows on).",
  "recordable": true,
  "start": "doc-versions",
  "config_files": {
@@ -24,6 +24,11 @@
    }
   },
   {
+   "do": "wait",
+   "until": "ms",
+   "ms": 5000
+  },
+  {
    "do": "click",
    "on": {
     "field": "Part number:Part 1"
@@ -31,7 +36,7 @@
   },
   {
    "do": "type",
-   "text": "PN-0001"
+   "text": "PN-0011"
   },
   {
    "do": "click",
@@ -46,8 +51,23 @@
   {
    "do": "click",
    "on": {
+    "field": "Release notes"
+   }
+  },
+  {
+   "do": "type",
+   "text": "First release"
+  },
+  {
+   "do": "click",
+   "on": {
     "button": "Release"
    }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 20000
   },
   {
    "do": "click",

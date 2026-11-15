@@ -1,8 +1,8 @@
 {
  "name": "rel-rc-filter",
- "about": "Release…, search 'Part', then the type filter: Parts on, Clear",
+ "about": "Release…, then 'Part' typed in the items' Search box (live shows the type filter's funnel only when the list holds more than one item type: none here)",
  "area": "studios",
- "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on.",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on. Recorded by live 11-15 (company-owned doc-versions, workflows on).",
  "recordable": true,
  "start": "doc-versions",
  "config_files": {
@@ -24,9 +24,14 @@
    }
   },
   {
+   "do": "wait",
+   "until": "ms",
+   "ms": 5000
+  },
+  {
    "do": "click",
    "on": {
-    "field": "Search items"
+    "field": "Search"
    }
   },
   {
@@ -34,22 +39,9 @@
    "text": "Part"
   },
   {
-   "do": "click",
-   "on": {
-    "button": "Filter"
-   }
-  },
-  {
-   "do": "click",
-   "on": {
-    "button": "Filter:part"
-   }
-  },
-  {
-   "do": "click",
-   "on": {
-    "button": "Clear"
-   }
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
   }
  ]
 }
