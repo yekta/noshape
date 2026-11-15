@@ -64,6 +64,45 @@ impl DrawingEditor {
         Some(out)
     }
 
+    /// A radius's menu in live's order (live2 drw-dimension-foreshorten 11-15): Edit... · Paste as table · Foreshorten
+    /// (its value inside the arc) · Unbreak dimension | Clear selection · Zoom to fit · Delete; foreshortened: Paste
+    /// as table · Remove foreshorten · Unbreak dimension | the same. (Add comment is a cloud feature.)
+    pub fn radial_entries(&self, id: u64) -> Option<Vec<MenuEntry>> {
+        let a = self.resolved_annotation(id)?;
+        let mut out = Vec::new();
+        match a.kind {
+            AnnotationKind::RadialDimension { view, diameter: false, .. } => {
+                let a2 = a.clone();
+                out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
+                out.push(MenuEntry::item("Paste as table", |t, _, cx| t.paste_as_table(cx)));
+                if self.placement(view).is_some_and(|pl| noshape_scene::drawing_tools::annotation_edit::text_inside_arc(&a, &pl)) {
+                    out.push(MenuEntry::item("Foreshorten", move |t, _, cx| {
+                        t.set_tool(Tool::Foreshorten { id }, cx);
+                        t.update_preview(cx);
+                    }));
+                }
+            }
+            AnnotationKind::ForeshortenedRadial { view, .. } => {
+                out.push(MenuEntry::item("Paste as table", |t, _, cx| t.paste_as_table(cx)));
+                out.push(MenuEntry::item("Remove foreshorten", move |t, _, cx| {
+                    let Some(pl) = t.placement(view) else { return };
+                    t.edit_sheet("Remove foreshorten", cx, |s| {
+                        if let Some(x) = s.annotations.iter_mut().find(|x| x.id == id) {
+                            noshape_scene::drawing_tools::annotation_edit::remove_foreshorten(x, &pl);
+                        }
+                    })
+                }));
+            }
+            _ => return None,
+        }
+        let unbroken = a.unbroken;
+        out.push(MenuEntry::item(if unbroken { "Break dimension" } else { "Unbreak dimension" }, move |t, _, cx| {
+            t.edit_sheet(if unbroken { "Break dimension" } else { "Unbreak dimension" }, cx, |s| s.annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.unbroken = !unbroken))
+        }));
+        out.extend(Self::selection_tail());
+        Some(out)
+    }
+
     /// An ordinate dimension's menu (live behaviours.md "Ordinate dimensions"; live2 2185: no Reset ordinate on a
     /// placed group): Add to ordinate dimension group · Edit... · Paste · Paste as table · Unbreak dimension | Clear
     /// selection · Zoom to fit · Delete. (Add comment is a cloud feature.)

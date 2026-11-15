@@ -9,24 +9,17 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-15 20:10 UTC.
+Updated 2026-11-15 20:45 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-- The 20:10 batch (one commit):
-  - Feature Studio completion: live's completer score (one per matched letter among the first 32, −1 off the
-    name's start, −1 per extra run), ties in live's list order (ace_order.txt, live2 feel/fs-ac-ties), constants
-    listed, only what common.fs re-exports. The kind column has two more letters in a list short enough to show
-    without a scrollbar (8 rows or fewer).
-  - Notices: the squiggle's tooltip counts.
-  - ANSI angular value on its arc, the arc broken around it.
-  - ISO A4 Zoom to fit fills the frame.
-  - 3 point angular reads EDGE from its first point to after Esc.
-  - Checked on vibe5 20:05: drw-dimension-*, fs-ac-*, fs-ed-error-squiggle and the 3 earlier not-run takes all
-    match except drw-dimension-foreshorten (next item 1).
+- Foreshorten (20:40): the radial's menus in live's order (no Show as diameter; the foreshortened one without
+  Edit...), the value where it was through Foreshorten / Remove foreshorten (`remove_foreshorten` rebuilds the knee
+  from its place; agent API description + e2e), a radius stays selected after Esc and after Remove foreshorten.
+  drw-dimension-radius and the drawing menu takes match; drw-dimension-foreshorten matches but for the value's x.
 
 ## Waiting on others
 - live2 (asked 19:58): retakes with screenshots for drw-insert-view-top-1to1, drw-hole-callout-palette,
@@ -52,15 +45,10 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncomm
   the code before taking an item from it.
 
 ## Next, in order
-1. drw-dimension-foreshorten (live2's 11-15 retake, recorder 2026-11-15.3; screenshots
-   live/feel/dim-retakes-1115/):
-   - the radial's menu in live's order: Edit..., Paste as table, Foreshorten, Unbreak dimension | Clear selection,
-     Zoom to fit, Delete; no "Show as diameter" (not in live's)
-   - foreshortened: Paste as table, Remove foreshorten, Unbreak dimension | the tail (no Edit...)
-   - Foreshorten and Remove foreshorten leave the value where it was (live 83.5, 160.8 throughout; ours moves it,
-     and Remove puts it at 109.7)
-   - the dropped value's centre is 2.6 mm right of the hole's centre in live (ours on it)
-   - live reads the radial selected after Esc (its value is lit inside Top's box)
+1. drw-dimension-foreshorten's value x: live's text centre sits right of the hole's centre (recorder 83.5 vs the
+   hole's 80.9; live2's step-8 screenshot shows "R.197" from 51 to 95 px around the centre line at 67 px, vertically
+   centred, i.e. +1.4 mm). Ours is centred on the hole. Find live's rule (ask live2 for a shot at step 3 with the
+   pointer away, and the DXF).
 2. Rerun the takes live2 retakes (list above) as they land.
 3. Refresh docs/parity/drawing-matrix.md (last 11-15 14:30: 949 of 1868 live items compared and matching).
 4. interaction-feel.md's remaining "?" rows in Drawings / Documents / Assembly (ask live2 for the missing captures).
@@ -72,6 +60,9 @@ Builds and crate tests on the Mac:
 - `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo test -p <crate> --lib <filter> > log 2>&1`, then grep the log for
   `^test |panicked|test result|^error|  left|  right`. Never pipe into `head`: the kernel's and vendor's warnings
   fill it.
+- The Mac target (~/agents/studios/target there) must stay under 20 GB (lead 11-15: the Mac folder's cap is 180 GB).
+  tools/tiers/prune-target.py reads /proc and fails on macOS, so between builds delete target/debug/deps
+  (`ssh mac 'rm -rf ~/agents/studios/target/debug/deps'`) once `du -sh` passes ~15 GB.
 
 App build on vibe6:
 ```

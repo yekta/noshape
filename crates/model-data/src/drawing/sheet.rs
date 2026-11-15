@@ -2397,6 +2397,12 @@ impl SheetGeometry {
                     if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 - 1e-9 {
                         ang += std::f64::consts::PI;
                     }
+                    // A value dropped inside the arc stays where the radius drew it, centred on the circle (live2
+                    // drw-dimension-foreshorten 11-15: the same place before, during and after); else on the leader.
+                    if !self.style.iso && (a.position[0] - c[0]).hypot(a.position[1] - c[1]) < r {
+                        self.dim_label(c, 0.0, 0.5, true, &t, dh, pick);
+                        continue;
+                    }
                     let on = [tip[0] - dir[0] * s_text.max(tw / 2.0), tip[1] - dir[1] * s_text.max(tw / 2.0)];
                     let up = [-ang.sin(), ang.cos()];
                     self.dim_label([on[0] + up[0] * 1.2, on[1] + up[1] * 1.2], ang, 0.5, false, &t, dh, pick);

@@ -209,15 +209,13 @@ pub fn text_inside_arc(a: &Annotation, pl: &ViewPlacement) -> bool {
     (a.position[0] - c[0]).hypot(a.position[1] - c[1]) < pl.len_to_sheet(radius)
 }
 
-/// Remove foreshorten: a radius dimension again, its straight leader back, its text on it where the jogged leader
-/// ended (live: "it ends up further along the leader … near where the jog's endpoint was").
+/// Remove foreshorten: a radius dimension again, its value where it was (live2 drw-dimension-foreshorten 11-15: 83.5,
+/// 160.8 before, during and after), its knee from that place (inside the arc: the dropped-inside form again).
 pub fn remove_foreshorten(a: &mut Annotation, pl: &ViewPlacement) -> bool {
-    let AnnotationKind::ForeshortenedRadial { view, center, radius, angle, jog } = a.kind else { return false };
-    // (The angle is the sheet's, as the dimension draws it.)
-    let (c, f, d) = (pl.to_sheet(center), pl.to_sheet(jog), [angle.cos(), angle.sin()]);
-    let t = (f[0] - c[0]) * d[0] + (f[1] - c[1]) * d[1];
-    a.position = [c[0] + d[0] * t, c[1] + d[1] * t];
-    a.kind = AnnotationKind::RadialDimension { view, center, radius, diameter: false, angle, dim_line: false, knee: None };
+    let AnnotationKind::ForeshortenedRadial { view, center, radius, angle, .. } = a.kind else { return false };
+    let c = pl.to_sheet(center);
+    let knee = (a.position[0] - c[0]).hypot(a.position[1] - c[1]) - pl.len_to_sheet(radius);
+    a.kind = AnnotationKind::RadialDimension { view, center, radius, diameter: false, angle, dim_line: false, knee: Some(knee) };
     true
 }
 

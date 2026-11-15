@@ -305,17 +305,17 @@ impl DrawingEditor {
     }
 
     /// What the tool made that Esc leaves selected (live 2442: a sketch point turns orange at Esc; a center point
-    /// circle drawn (drw-crop-existing-profile), a maximum / minimum dimension (drw-max-min-dimension) and a line to
-    /// line angular one (live2 selection-after-esc on drw-dimension-angular: its handles orange with the pointer away)
-    /// and a 3 point angular one (live2 drw-dimension-3-point-angular 11-15)
-    /// placed too; not the other dimensions (drw-dimension-diameter, -line-to-line, -point-to-point read none).
+    /// circle drawn (drw-crop-existing-profile), a maximum / minimum dimension (drw-max-min-dimension), a line to line
+    /// angular one (live2 selection-after-esc on drw-dimension-angular: its handles orange with the pointer away), a
+    /// 3 point angular one and a radius (live2's 11-15 retakes of drw-dimension-3-point-angular, -foreshorten) placed
+    /// too; not the other dimensions (drw-dimension-diameter, -line-to-line, -point-to-point read none).
     pub(crate) fn made_by_tool(&self) -> Vec<Sel> {
         let sheet = self.drawing_sheet();
         let (entities, annotations) = self.tool_start;
         match self.tool {
             Tool::Sketch { tool: dt::SkTool::SplinePoint | dt::SkTool::Trim, .. } => Vec::new(),
             Tool::Sketch { .. } => sheet.sketch.sketch.entities().map(|e| e.id.0).filter(|&id| id > entities).map(Sel::Sketch).collect(),
-            Tool::Dimension { kind: DimTool::MaxMin | DimTool::Angle | DimTool::Angle3, .. } => sheet.annotations.iter().filter(|a| a.id > annotations).map(|a| Sel::Annotation(a.id)).collect(),
+            Tool::Dimension { kind: DimTool::MaxMin | DimTool::Angle | DimTool::Angle3 | DimTool::Radius, .. } => sheet.annotations.iter().filter(|a| a.id > annotations).map(|a| Sel::Annotation(a.id)).collect(),
             _ => Vec::new(),
         }
     }
@@ -2419,7 +2419,7 @@ impl DrawingEditor {
             Some(Sel::ViewLabel(id)) => out = self.label_entries(id, cx),
             Some(Sel::Annotation(id)) => {
                 // Linear dimensions: Onshape's own menu.
-                if let Some(entries) = self.dimension_entries(id).or_else(|| self.ordinate_entries(id, cx)) {
+                if let Some(entries) = self.dimension_entries(id).or_else(|| self.radial_entries(id)).or_else(|| self.ordinate_entries(id, cx)) {
                     return entries;
                 }
                 // Centermarks (live drawing/487): Paste as table, Align

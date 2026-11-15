@@ -5992,9 +5992,9 @@ fn drawing_annotation_menu_edits() {
     assert_eq!(last(&mut ctx), "Remove foreshorten");
     let a = ann(&mut ctx, &rad);
     assert_eq!(a["kind"], "RadialDimension");
-    // The text on the straight leader, level with where the jog ended.
+    // The value where it was placed, inside the arc again (live2 drw-dimension-foreshorten 11-15).
     let at = [num(&a["position"][0]), num(&a["position"][1])];
-    assert!((at[0] - jog[0]).abs() < 0.5, "{at:?} {jog:?}");
+    assert!((at[0] - (cx + r * 0.4)).abs() < 0.5 && (at[1] - cy).abs() < 0.5, "{at:?}");
 
     // Stacked callouts need a BOM table.
     let co = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": quarter(h0), "position": [40, 250] }))["annotation"].clone();
