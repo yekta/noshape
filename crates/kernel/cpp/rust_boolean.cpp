@@ -2849,7 +2849,7 @@ bool interpolated(const std::function<bool(double, gp_Pnt&, gp_Pnt2d&, gp_Pnt2d&
     if (!f3.IsDone() || !fa.IsDone() || !fb.IsDone())
       return false;
     double err = 0;
-    for (int k = 0; k < n; ++k)
+    for (int k = 0; k < n && err <= 1e-8; ++k)
     {
       const double t = t0 + (t1 - t0) * (k + 0.5) / n;
       gp_Pnt       x;
