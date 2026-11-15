@@ -111,6 +111,8 @@ pub struct Translator<'a> {
     frames: HashMap<String, [[f64; 3]; 3]>,
     /// Live's sketch bodies (`sketchBodies`' sketches), for an in-context sketch's frame.
     sketch_bodies: Vec<Value>,
+    /// Live's in-context entities (`contextEntities`, `<element>.context.jsonl` lines).
+    context_entities: Vec<Value>,
     /// Free sketch points (Onshape sketch id, ours), in drawing order.
     sketch_points: Vec<(String, String)>,
     /// Onshape sketch curves by (sketch feature id, entity id), sampled as
@@ -385,7 +387,7 @@ impl<'a> Translator<'a> {
                 config_defaults.entry(k.to_string()).or_insert_with(|| v.to_string());
             }
         }
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -841,20 +843,32 @@ impl<'a> Translator<'a> {
             }
             step.problems.extend(problems.into_iter().map(|p| format!("its in-feature {}: {p}", sub["featureType"].as_str().unwrap_or("?"))));
         }
-        // A sketch on an in-context face (Onshape's frozen copy of the assembly's geometry; its blob isn't fetched):
-        // a face on live's sketch frame imported in its place (asm-isaac-ball's 35 sketches).
-        if f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")) {
-            let in_context = |s: &&Value| s["featureType"] == "importForeign" && s["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "isInContext" && p["value"] == true);
-            for sub in f["subFeatures"].as_array().into_iter().flatten().filter(in_context) {
-                match self.in_context_face(f["featureId"].as_str().unwrap_or("")) {
-                    Ok(id) => {
-                        if let Some(oid) = sub["featureId"].as_str() {
-                            self.feature_ids.insert(oid.to_string(), id.clone());
-                        }
-                        self.context_helpers.push(id);
+        // An in-context entity (Onshape's frozen copy of the assembly's geometry; its blob isn't fetched): live's bodies
+        // rebuilt from their faces and edges (`context.jsonl`: an Extrude of one extrudes it, asm-isaac-ball 1b88ff's
+        // Extrude 3; a sketch's constraints to them find them).
+        let sketch = f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch"));
+        let in_context = |s: &&Value| s["featureType"] == "importForeign" && s["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "isInContext" && p["value"] == true);
+        for oid in f["subFeatures"].as_array().into_iter().flatten().filter(in_context).filter_map(|s| s["featureId"].as_str()) {
+            // A sketch's plane: live's planar face (its edges split the sketch's regions, as live's), else a face on
+            // live's sketch frame, live's other bodies besides it.
+            let made = match self.context_bodies(oid) {
+                Ok((ids, false)) if sketch => self.in_context_face(f["featureId"].as_str().unwrap_or("")).map(|plane| [vec![plane], ids].concat()),
+                Err(e) if sketch => {
+                    if self.context_entities.iter().any(|l| l["subFeature"] == oid) {
+                        step.problems.push(format!("its in-context entity: {e}"));
                     }
-                    Err(e) => step.problems.push(format!("its in-context entity: {e}")),
+                    self.in_context_face(f["featureId"].as_str().unwrap_or("")).map(|plane| vec![plane])
                 }
+                other => other.map(|(ids, _)| ids),
+            };
+            match made {
+                Ok(ids) => {
+                    if let Some(first) = ids.first() {
+                        self.feature_ids.insert(oid.to_string(), first.clone());
+                    }
+                    self.context_helpers.extend(ids);
+                }
+                Err(e) => step.problems.push(format!("its in-context entity: {e}")),
             }
         }
         let made = if f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")) {
@@ -917,6 +931,48 @@ impl<'a> Translator<'a> {
         let brep = String::from_utf8(face.to_brep_bytes().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
         let r = self.call("feature_add", json!({ "type": "importForeign", "name": "In context entity", "params": { "blobData": brep, "isInContext": true } }))?;
         r["feature"].as_str().map(str::to_string).ok_or_else(|| "feature_add gave no id".into())
+    }
+
+    /// In-context sub-feature `sub`'s bodies as live evaluated them (`context_entities`), each imported: a planar sheet
+    /// of one face as that face (its edges chained into loops in its plane, the largest its outer one), any other
+    /// body as its edges. The Import with a face first (the one its "created by" queries take; with whether there is
+    /// one), then the others.
+    fn context_bodies(&mut self, sub: &str) -> Result<(Vec<String>, bool), String> {
+        let lines: Vec<Value> = self.context_entities.iter().filter(|l| l["subFeature"] == sub).cloned().collect();
+        if lines.is_empty() {
+            return Err("live's geometry of it wasn't fetched (<element>.context.jsonl)".into());
+        }
+        let mut bodies: Vec<&str> = Vec::new();
+        for b in lines.iter().filter_map(|l| l["body"].as_str()) {
+            if !bodies.contains(&b) {
+                bodies.push(b);
+            }
+        }
+        let mut shapes: Vec<(bool, noshape_kernel::Shape)> = Vec::new();
+        let mut problems: Vec<String> = Vec::new();
+        for body in bodies {
+            let of: Vec<&Value> = lines.iter().filter(|l| l["body"] == body).collect();
+            let edges: Vec<&Value> = of.iter().copied().filter(|l| l["kind"] == "EDGE").collect();
+            let faces: Vec<&Value> = of.iter().copied().filter(|l| l["kind"] == "FACE").collect();
+            let planar = matches!(faces.as_slice(), [f] if f["surfaceType"] == "PLANE");
+            let made = if planar { context_face(faces[0], &edges).map(|f| (true, f)) } else { Err(String::new()) };
+            match made.or_else(|_| context_wire(&edges).map(|w| (false, w))) {
+                Ok(shape) => shapes.push(shape),
+                Err(e) => problems.push(format!("body {body}: {e}")),
+            }
+        }
+        if shapes.is_empty() {
+            return Err(problems.join("; "));
+        }
+        shapes.sort_by_key(|(face, _)| !face);
+        let has_face = shapes[0].0;
+        let mut ids = Vec::new();
+        for (_, shape) in shapes {
+            let brep = String::from_utf8(shape.to_brep_bytes().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+            let r = self.call("feature_add", json!({ "type": "importForeign", "name": "In context entity", "params": { "blobData": brep, "isInContext": true } }))?;
+            ids.push(r["feature"].as_str().map(str::to_string).ok_or("feature_add gave no id")?);
+        }
+        Ok((ids, has_face))
     }
 
     /// After the last feature: the in-context entities' stand-ins deleted (Onshape's are no parts).
@@ -6094,6 +6150,112 @@ fn arc_span(e: &Value) -> Option<(f64, f64)> {
     Some((a, if b < a { b + tau * ((a - b) / tau).ceil() } else { b }))
 }
 
+/// Live's planar in-context face (a context.jsonl FACE line) from its `edges`' lines: chained into loops in its plane,
+/// the largest the outer one.
+fn context_face(face: &Value, edges: &[&Value]) -> Result<noshape_kernel::Shape, String> {
+    use glam::{DVec2, DVec3};
+    use noshape_kernel as k;
+    let v3 = |v: &Value| f3(v).map(DVec3::from);
+    let (Some(o), Some(n), Some(x)) = (v3(&face["origin"]), v3(&face["normal"]), v3(&face["xAxis"])) else { return Err(format!("face {}: no plane", face["id"])) };
+    let y = n.cross(x);
+    let local = |p: DVec3| DVec2::new((p - o).dot(x), (p - o).dot(y));
+    let mut loops: Vec<Vec<k::Segment2d>> = Vec::new();
+    // Open edges as (start, end, the segment from start to end).
+    let mut open: Vec<(DVec2, DVec2, k::Segment2d)> = Vec::new();
+    for e in edges {
+        let (Some(a), Some(b)) = (v3(&e["start"]).map(local), v3(&e["end"]).map(local)) else { return Err(format!("edge {}: no ends", e["id"])) };
+        let closed = (a - b).length() < 1e-9;
+        let seg = match e["curveType"].as_str() {
+            Some("LINE") => k::Segment2d::Line { a, b },
+            Some("CIRCLE") if closed => {
+                let (Some(c), Some(r)) = (v3(&e["center"]), e["radius"].as_f64()) else { return Err(format!("edge {}: no center", e["id"])) };
+                k::Segment2d::Circle { center: local(c), radius: r }
+            }
+            Some("CIRCLE") => k::Segment2d::Arc3 { a, mid: v3(&e["mid"]).map(local).ok_or_else(|| format!("edge {}: an arc without its midpoint", e["id"]))?, b },
+            // A spline's or ellipse's points along it (live's 10), through which ours is interpolated.
+            Some("SPLINE" | "ELLIPSE") => k::Segment2d::Interpolated { points: context_points(e, closed)?.into_iter().map(local).collect(), periodic: closed },
+            other => return Err(format!("edge {}: a {} edge isn't rebuilt", e["id"], other.unwrap_or("?"))),
+        };
+        if closed { loops.push(vec![seg]) } else { open.push((a, b, seg)) }
+    }
+    let reversed = |s: k::Segment2d| match s {
+        k::Segment2d::Line { a, b } => k::Segment2d::Line { a: b, b: a },
+        k::Segment2d::Arc3 { a, mid, b } => k::Segment2d::Arc3 { a: b, mid, b: a },
+        k::Segment2d::Interpolated { mut points, periodic } => {
+            points.reverse();
+            k::Segment2d::Interpolated { points, periodic }
+        }
+        s => s,
+    };
+    while let Some((a, mut end, first)) = open.pop() {
+        let mut chain = vec![first];
+        while (end - a).length() > 1e-7 {
+            let i = open.iter().position(|(p, q, _)| (*p - end).length() < 1e-7 || (*q - end).length() < 1e-7).ok_or_else(|| format!("face {}: its edges don't close", face["id"]))?;
+            let (p, q, seg) = open.swap_remove(i);
+            let forward = (p - end).length() < 1e-7;
+            chain.push(if forward { seg } else { reversed(seg) });
+            end = if forward { q } else { p };
+        }
+        loops.push(chain);
+    }
+    // Twice the area each loop encloses (its curves by their chords).
+    let area = |l: &Vec<k::Segment2d>| {
+        let chord = |p: &[DVec2]| p.windows(2).map(|w| w[0].perp_dot(w[1])).sum::<f64>();
+        l.iter()
+            .map(|s| match s {
+                k::Segment2d::Line { a, b } | k::Segment2d::Arc3 { a, b, .. } => a.perp_dot(*b),
+                k::Segment2d::Circle { radius, .. } => 2.0 * std::f64::consts::PI * radius * radius,
+                k::Segment2d::Interpolated { points, periodic } => chord(points) + if *periodic { points.last().zip(points.first()).map_or(0.0, |(z, a)| z.perp_dot(*a)) } else { 0.0 },
+                _ => 0.0,
+            })
+            .sum::<f64>()
+            .abs()
+    };
+    loops.sort_by(|a, b| area(b).total_cmp(&area(a)));
+    let Some((outer, holes)) = loops.split_first() else { return Err(format!("face {}: no edges", face["id"])) };
+    k::make_face_2d(&k::Plane::new(o, n, x), outer, holes).map_err(|e| e.to_string())
+}
+
+/// Live's in-context edges (context.jsonl EDGE lines) as one compound of 3D edges.
+fn context_wire(edges: &[&Value]) -> Result<noshape_kernel::Shape, String> {
+    use glam::DVec3;
+    use noshape_kernel as k;
+    let v3 = |v: &Value| f3(v).map(DVec3::from);
+    let mut made = Vec::new();
+    for e in edges {
+        let (Some(a), Some(b)) = (v3(&e["start"]), v3(&e["end"])) else { return Err(format!("edge {}: no ends", e["id"])) };
+        let closed = (a - b).length() < 1e-9;
+        let edge = match e["curveType"].as_str() {
+            Some("LINE") => k::make_line(a, b),
+            Some("CIRCLE") if closed => {
+                let (Some(c), Some(axis), Some(r)) = (v3(&e["center"]), v3(&e["axis"]), e["radius"].as_f64()) else { return Err(format!("edge {}: no center", e["id"])) };
+                k::make_circle(c, axis, r)
+            }
+            Some("CIRCLE") => k::make_arc_3pts(a, v3(&e["mid"]).ok_or_else(|| format!("edge {}: an arc without its midpoint", e["id"]))?, b),
+            Some("SPLINE" | "ELLIPSE") => k::make_interpolated_spline(&context_points(e, closed)?, &[], closed),
+            other => return Err(format!("edge {}: a {} edge isn't rebuilt", e["id"], other.unwrap_or("?"))),
+        };
+        made.push(edge.map_err(|err| format!("edge {}: {err}", e["id"]))?);
+    }
+    if made.is_empty() {
+        return Err("no edges".into());
+    }
+    Ok(k::Shape::compound(&made))
+}
+
+/// A context.jsonl spline's `points` (a closed one's repeated end dropped).
+fn context_points(e: &Value, closed: bool) -> Result<Vec<glam::DVec3>, String> {
+    let mut points: Vec<glam::DVec3> = e["points"].as_array().into_iter().flatten().filter_map(|q| f3(q).map(glam::DVec3::from)).collect();
+    points.dedup_by(|q, p| (*q - *p).length() < 1e-9);
+    if closed && points.len() > 1 && (points[points.len() - 1] - points[0]).length() < 1e-9 {
+        points.pop();
+    }
+    if points.len() < 3 {
+        return Err(format!("edge {}: a spline without its points", e["id"]));
+    }
+    Ok(points)
+}
+
 /// A sketch's frame ([origin, x, y]) from where its curves' ends and points (`sketch`'s entities, in its own coordinates)
 /// lie in live's sketch bodies (`bodies`: `{ "bodies": [{ "vertices": [{ "point" }] }] }`): the plane through those points,
 /// turned and moved in it (or mirrored) so every one of the sketch's points lands on one of live's. `None` when they
@@ -8497,6 +8659,30 @@ mod tests {
         assert!(connector_params(&mc(json!([p("realign", json!(true)), axis, p("flipPrimary", json!(true))]))).is_none(), "realigned");
     }
 
+    /// Live's in-context face from its context.jsonl lines, its edges in any order and sense: a line, a half circle by
+    /// its midpoint, a spline by its points, and a circle inside: the hole. Its edges alone are five 3D edges.
+    #[test]
+    fn an_in_context_face_is_rebuilt_from_lives_edges() {
+        let edge = |kind: &str, a: [f64; 2], b: [f64; 2], more: Value| {
+            let mut e = json!({ "kind": "EDGE", "curveType": kind, "start": [a[0], a[1], 0.01], "end": [b[0], b[1], 0.01] });
+            e.as_object_mut().unwrap().extend(more.as_object().cloned().unwrap_or_default());
+            e
+        };
+        let spline: Vec<[f64; 3]> = (0..=4).map(|i| [0.0, 0.005 * i as f64, 0.01]).collect();
+        let edges = [
+            edge("LINE", [0.02, 0.02], [0.0, 0.02], json!({})),
+            edge("LINE", [0.0, 0.0], [0.02, 0.0], json!({})),
+            edge("SPLINE", [0.0, 0.0], [0.0, 0.02], json!({ "points": spline })),
+            edge("CIRCLE", [0.014, 0.01], [0.014, 0.01], json!({ "center": [0.01, 0.01, 0.01], "axis": [0.0, 0.0, 1.0], "radius": 0.004 })),
+            edge("CIRCLE", [0.02, 0.0], [0.02, 0.02], json!({ "mid": [0.03, 0.01, 0.01] })),
+        ];
+        let face = json!({ "kind": "FACE", "surfaceType": "PLANE", "origin": [0.0, 0.0, 0.01], "normal": [0.0, 0.0, 1.0], "xAxis": [1.0, 0.0, 0.0] });
+        let refs: Vec<&Value> = edges.iter().collect();
+        let pi = std::f64::consts::PI;
+        let area = context_face(&face, &refs).unwrap().area().unwrap();
+        assert!((area - (0.02 * 0.02 + pi * 0.01 * 0.01 / 2.0 - pi * 0.004 * 0.004)).abs() < 1e-9, "{area}");
+        assert_eq!(context_wire(&refs).unwrap().count(noshape_kernel::ShapeType::Edge), 5);
+    }
 
     /// An in-context sketch's frame (live's fetch has none) from its curves' ends in live's sketch bodies: an L-shaped
     /// profile and a construction line (not in the bodies) on a plane through (100, -50, 200) mm whose x is world z and

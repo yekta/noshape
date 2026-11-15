@@ -513,6 +513,9 @@ pub(crate) fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
     if let Some(sk) = sketches.and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
         features["sketchBodies"] = sk;
     }
+    if let Ok(t) = std::fs::read_to_string(dir.join("context.jsonl")) {
+        features["contextEntities"] = t.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).collect();
+    }
     // Import features' files: imports/<foreign id>.json names the file beside it (`file`, or `path` in live's later
     // layout, the id then its own name).
     for e in std::fs::read_dir(dir.join("imports")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")) {
@@ -2845,6 +2848,10 @@ fn parity_assemblies() {
             if let Some(sk) = read(&dir.join("studios").join(format!("{element}.sketches.json"))) {
                 features["sketchBodies"] = sk;
             }
+            // Its features' own in-context entities (live 19:20: `<element>.context.jsonl`).
+            if let Ok(t) = std::fs::read_to_string(dir.join("studios").join(format!("{element}.context.jsonl"))) {
+                features["contextEntities"] = t.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).collect();
+            }
             // Live's frames of its in-feature mate connectors (live 2632: `{ "connectors": { sub id: frame } }`).
             if let Some(c) = read(&dir.join("studios").join(format!("{element}.connectors.json"))) {
                 features["connectorFrames"] = c["connectors"].clone();
@@ -3761,4 +3768,37 @@ fn cancel_latency_probe() {
     for (ms, what) in worst.iter().take(15) {
         println!("WORST {ms:.0} ms: {what}");
     }
+}
+
+/// An Extrude of a face of the assembly's (its in-context sub-feature, asm-isaac-ball 1b88ff's Extrude 3): live's
+/// face rebuilt from its edges (`<element>.context.jsonl`), extruded as live.
+#[test]
+fn an_extrude_of_an_in_context_face_extrudes_lives_face() {
+    let q = |id: &str, v: Value| json!({ "btType": "BTMParameterQuantity-147", "parameterId": id, "expression": v });
+    let extrude = json!({ "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE", "name": "Extrude 1", "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "operationType", "enumName": "NewBodyOperationType", "value": "NEW" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "deterministicIds": ["JPC"], "queryString": "", "entityType": "FACE", "featureId": "FSUB" }] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "enumName": "BoundingType", "value": "BLIND" },
+        q("depth", json!("9 mm"))],
+        "subFeatures": [{ "btType": "BTMFeature-134", "featureType": "importForeign", "featureId": "FSUB", "parameters": [{ "btType": "BTMParameterBoolean-144", "parameterId": "isInContext", "value": true }] }] });
+    let base = json!({ "subFeature": "FSUB", "body": "JPD" });
+    let line = |id: &str, a: [f64; 3], b: [f64; 3]| { let mut l = base.clone(); l["id"] = json!(id); l["kind"] = json!("EDGE"); l["curveType"] = json!("LINE"); l["start"] = json!(a); l["end"] = json!(b); l };
+    let mut face = base.clone();
+    face["kind"] = json!("FACE");
+    face["surfaceType"] = json!("PLANE");
+    face["id"] = json!("JPC");
+    face["origin"] = json!([0.006, 0.004, 0.01]);
+    face["normal"] = json!([0.0, 0.0, 1.0]);
+    face["xAxis"] = json!([1.0, 0.0, 0.0]);
+    let (a, b, c, d) = ([0.0, 0.0, 0.01], [0.012, 0.0, 0.01], [0.012, 0.008, 0.01], [0.0, 0.008, 0.01]);
+    let features = json!({ "features": [extrude], "contextEntities": [face, line("JPB", a, b), line("JPN", d, a), line("JPJ", c, d), line("JPF", b, c)] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("in-context-extrude.noshape"), &features, Default::default()).unwrap();
+    let s = t.step(0);
+    assert!(s.ours.is_some() && s.problems.is_empty(), "{:?}", s.problems);
+    t.finish();
+    let p = t.call("query_parts", json!({})).unwrap();
+    let parts = p["parts"].as_array().cloned().unwrap_or_default();
+    assert_eq!(parts.len(), 1, "{p}");
+    assert!((parts[0]["volume"].as_f64().unwrap() - 12.0 * 8.0 * 9.0).abs() < 1e-3, "{p}");
 }
