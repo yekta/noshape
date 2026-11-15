@@ -1720,7 +1720,14 @@ fn ours(c: &mut Case) -> Value {
         None => "?",
     };
     let curves: BTreeMap<String, &str> = c.curves.iter().map(|(n, id, _)| (n.clone(), state(rep.entity_states.get(id)))).collect();
-    let points = ours_points(c);
+    let mut points = json!(ours_points(c));
+    // A fit spline's interpolation points by live's name (REST /sketches), its ends included.
+    for (n, e, _) in &c.curves {
+        if let Some(Geometry::FitSpline { points: fit, .. }) = c.sk.entity(*e).map(|x| x.geometry.clone()) {
+            let at = |id: EntityId| c.sk.point(id).map(|p| p / MM).map(|p| json!([(p.x * 1e6).round() / 1e6, (p.y * 1e6).round() / 1e6]));
+            points[format!("{n}.interpolationPoints")] = json!(fit.iter().filter_map(|p| at(*p)).collect::<Vec<_>>());
+        }
+    }
     let radii: BTreeMap<String, f64> = c.curves.iter().filter_map(|(n, id, k)| match (k, c.sk.entity(*id).map(|e| e.geometry.clone())) {
         (Kind::Circle, Some(Geometry::Circle { radius, .. })) => Some((n.clone(), (radius / MM * 1e6).round() / 1e6)),
         _ => None,
@@ -2161,6 +2168,14 @@ fn differences(case: &Value, live: &Value) -> Vec<String> {
     };
     if let Some(pts) = live["points"].as_object() {
         for (n, p) in pts {
+            // A list of points (a spline's interpolation points): each.
+            if let Some(list) = p.as_array().filter(|l| l.first().is_some_and(Value::is_array)) {
+                let mine = ours["points"][n].as_array();
+                if !mine.is_some_and(|m| m.len() == list.len() && m.iter().zip(list).all(|(a, b)| close(a, b))) {
+                    out.push(format!("{n}: ours {} live {p}", ours["points"][n]));
+                }
+                continue;
+            }
             if !close(&ours["points"][n], p) {
                 out.push(format!("{n}: ours {} live {p}", ours["points"][n]));
             }
