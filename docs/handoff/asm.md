@@ -4,7 +4,7 @@ Area: crates/assembly, crates/assembly-ui, the assembly ops in crates/ops and th
 scenarios, the assembly parity suite (`parity_assemblies`) and the parity translator (crates/ops/src/parity.rs) for
 the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: docs/DECISIONS.md.
 
-## State (2026-11-15 21:37 UTC)
+## State (2026-11-15 22:27 UTC)
 
 ### In flight
 - Worktree /root/projects/noshape-wt/asm (detached on 93346d03 = landed fd98e8a6), on top (none landed):
@@ -26,8 +26,13 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
     config-assembly 12/12 rows.
   - (latest) mate-messages.json (live / live2): a mate live leaves in ERROR with red (unresolved) connectors that ours
     solves counts as live and is listed as "live defect" (DECISIONS 11-15; isaac-ball's 7).
-- Runs: vibe6 full assembly suite base29 (= main's code; ~/agents/asm-keep/full/base29.log, 11/24 done at 21:36), then
-  ctx32.sh. vibe7 full suite s41 (= all commits; full/s41.log), queued behind qa's ui-parity shards. Both via slot.
+- Runs: base29 (main's code) full suite done on today's data: 1596/1711 occurrences, 609/656 mates (vibe6
+  ~/agents/asm-keep/full/base29.sum; earlyoom killed the first run at scissor-lift, 8.4 GB RSS: the last five reran
+  alone, base29b.log). s41 (all my commits) full suite running on vibe6 (full/s41.log, SLOT_MIN_GB=12; vibe7's slot
+  was held by qa's ui-parity shards). Then compare per assembly, land, SCORE row.
+- Naming our subassembly tabs as live's (s37/s38) broke keyboard-pattern's studio 2bb133 (Plane 1 "Point-Plane
+  requires a point and a plane", then its sketches): tab names reach studio translation somewhere. Reverted (s39);
+  not chased.
 - Model gate (s30, same base as s29): identical per model except cf-spur-gear and exercise-chino, which drop for s29
   too since their refs were refetched at 19:28 (asked the lead whose).
 - Captures: live keeps isaac-ball (done) and infento-subs mate messages; live2 takes every other corpus with error or
