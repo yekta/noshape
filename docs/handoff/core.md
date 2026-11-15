@@ -1,17 +1,12 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-15 19:25 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-15 19:50 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
-- **core-rmx, branch core-rayspeed** (2 commits on 8252c6466, not landed):
-  - f1f212d03 a Hole's rays skip parts whose box they miss and cross a composite part's solids one by one, not by a
-    line Common (asm-infento-subs 1dc32b: Holes 1-7 71.7 -> 3.0 s, document 133 -> 76 s, no status change; vibe6 CLI).
-  - ae8b7f751 a loft takes curved faces as profiles: the FS host's `op_loft` (crates/custom host/ops.rs) takes a
-    non-planar face's outer wire; the Loft feature (`loft_sections`, solid_a.rs) frames it at its centroid normal
-    (std loft.fs allows any face). T1s features_a::a_loft_through_two_curved_faces,
-    custom_features::op_loft_through_curved_faces. For asm-isaac-ball's GearLab (90f78b / 1e81ca).
-  - Gate: suite pair on vibe6 (~/tmp/core/g run-rbase / run-rloft). If SAME-PER-DOC: land.sh, tell asm.
+- **Queued 55e517e0** (core-rmx, branch core-rayspeed; vibe6 pair SAME-PER-DOC, speed lines loaded-host noise):
+  a Hole's rays skip parts whose box they miss and cross a composite part's solids one by one (1dc32b Holes 1-7 71.7
+  -> 3.0 s); a loft takes curved faces as profiles (FS host `op_loft` and the Loft feature; GearLab 90f78b). asm told.
 - **core-oc, branch core-shellcheck** (220142955, not landed): Shell by regions checks its result's volume with
   `rough_volume_by_faces` (as the smooth path), not two exact integrals (c2-rings-loft Shell 2: check 65 -> 9 ms a
   call; same result). Gates on vibe7: g++-13 build, kernel/model `shell` tests, suite pair hbase / hshell. Then land.
@@ -37,7 +32,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-1. Land core-rayspeed and core-shellcheck (above) after their pairs.
+1. Land core-shellcheck (above) after its pair; check 55e517e0 landed.
 2. qa's speed list (P0), what is mine: c2-valve-config Extrude 3 `prism_until.split` 131 ms (a logo up to one revolved
    dome face: OCCT's splitter; a projection-built extrude would be a big change for ~100 ms); c2-rings-loft Shell 2
    `regions.tubes` 55-65 ms (Common of the solid with the hole tubes + fuse) and prism_until (~35 ms a call up to a
