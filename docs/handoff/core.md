@@ -5,6 +5,22 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-15 00:17 UTC)
+- **Landed:** 6cc9571a (pattern tracer), 420a998d (prism_until dump / replay), bf26f875 (knife ring: a Revolve
+  feature's full turn starts half round from its profile, the guided loft's seam back at guide 0; blend told).
+- **e53bba is bool's** (the slit re-cut after USD, queued behind Shell stage 2; the occt_glued guard c108ebca9). The
+  band-end patch to re-test after it: ~/agents/core-keep/e53bba-band-end.patch.
+- **Gating a474aade3** (branch core-1dc, dx's 1dc32b "Large pully", asm's Extrude 51): a region's hole loop can run
+  out along a line to another hole and back (a quad's side run on to a circle). merge joined the line's return piece
+  with the quad's side, so split_slits (outer loop only) never saw it and OCCT's wire builder refused the loop. Now:
+  no join where the loop passes twice, holes cut at slits too, a circle's halves in a cut piece one edge. T1
+  kernel_robustness::a_region_with_holes_joined_by_a_side_run_on_extrudes. Repro vibe5 ~/tmp/core/1dc.
+- **Queued 2c2b67e0:** offset curve on a cylinder (psui's offset-curve-* scenarios: circles round a cylinder's or
+  cone's axis moved along its generator; Euclidean at least the edge's radius fails as live; a closed edge on a plane
+  offset as a periodic spline).
+- **Infento Extrude 39 / 40 aren't ours:** a document translated before dx's cb2b6b259 had their profile and up-to
+  caps swapped (CapStart for live's end cap after Transform 11's move); dx's translator now maps them.
+
 ## core state (11-14 22:04 UTC)
 - **Pattern tracing (lead's ask, queued abf209d3):** `NOSHAPE_PATTERN_TRACE=1` (docs/PARITY-SUITES.md §1): each
   pattern's path, every instance's tool and what it alone adds, the parts before / after, and under the suite runners
