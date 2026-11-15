@@ -5,6 +5,20 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 12:34 UTC: splines land; broken-out jog; note shoulder; exchange
+- Queued 2cb0c7d2 (dx-spline2's spline: crop chord-length, broken-out centripetal), 5ac58988 (broken-out jog lines
+  only over material, pieces on the centripetal curve; compare.py measures a DXF spline along its curve), then the
+  note shoulder (0.18 in long, 0.09 in out, mid text block; note line pitch 5/3 h, was 1.5: live's MTEXT 46 heights).
+  On vibe7 with studios' reach fix: crop-spline / broken-out / detail 9/9 files. The broken-out gap was not the
+  clicks (studios: ours 2-3 px off live's on screen, low priority on their list; lead's ±1 px band not needed): our
+  PDF drew the cut's walls over the hole (57 pt), and live's outline is split at the hole crossings (its control
+  polygon shorter: 2.37 / 2.47 in, curves 2.2415 / 2.2455). Landed da0faf8d: a custom feature live has suppressed
+  isn't "failed to run" (cf-surface-pattern SP1; custom-failing documents 1 -> 0).
+- Exports 82 / 84 with all of it (vibe7 ~/tmp/dx/exp-1115r, /root/dx-scratch/exp-1115r; compare.py also measures a
+  tilted-OCS POLYLINE on the sheet: live's note leader). Left: drw-revision-table PDF / DXF (widths, header row).
+- Exchange: live imported skasm's exact-edge sheet metal files (live-ours-sk.json): STEP / IGES still 61 faces (live
+  58), so not the edges; told skasm. STL row = our mesher (live's REST rule at 18:35, dx/q1137/summary.txt).
+
 ## 11-15 11:52 UTC: in flight
 - Branch dx-spline2 (6bc12e944, tests pass, not landed): crop spline chord-length, broken-out centripetal (live2 traces
   11-15; `SplineKnots` in cad_objects, `closed_spline(pts, n, knots)`). Waits on studios' profile-tool snap reach (7 px
