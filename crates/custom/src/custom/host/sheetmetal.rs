@@ -2520,6 +2520,17 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         links.extend(vertices.iter().enumerate().filter_map(|(v, d)| Some((Reference::Vertex((*part.vertices.get(v)?.clone()).clone()), def_ref(d)?))));
         // All read before any is added (each addition drops the attributes' index).
         let assoc: Vec<Vec<Value>> = links.iter().map(|(_, from)| associations(&st, from)).collect();
+        // Each entity's label: the feature whose transient id its definition entity's association carries (the one
+        // that first made it, live skasm-q1627).
+        let owners: Vec<(Reference, FeatureId)> = links
+            .iter()
+            .zip(&assoc)
+            .filter(|((to, _), _)| !matches!(to, Reference::Body(_)))
+            .filter_map(|((to, _), attrs)| Some((to.clone(), attrs.iter().find_map(|a| st.transient_feature(&a.get("attributeId").as_str()?))?)))
+            .collect();
+        if let Some(d) = st.ctx.sheet_metal.get_mut(&part_id) {
+            Arc::make_mut(d).label_owners = owners;
+        }
         for ((to, _), attrs) in links.into_iter().zip(assoc) {
             for attr in attrs {
                 st.push_attribute(to.clone(), Value::map_from([("attribute", attr)]));

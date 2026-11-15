@@ -1845,6 +1845,8 @@ impl PartStudioView {
                     .collect()
             })
             .unwrap_or_default();
+        // A sheet metal part's faces, edges and vertices read the feature that first made their definition entity.
+        let sm_owners: std::collections::HashMap<Reference, FeatureId> = self.context.as_ref().map(|c| c.sheet_metal.values().flat_map(|d| d.label_owners.iter().cloned()).collect()).unwrap_or_default();
         Arc::new(move |r: &Reference| {
             let owner = |id: Option<FeatureId>| match id {
                 Some(i) if names.iter().any(|(x, _)| *x == i) || noshape_model::in_context::context_of(i).is_some() => Some(i),
@@ -1861,6 +1863,14 @@ impl PartStudioView {
             };
             if let Some((_, n)) = renamed.iter().find(|(x, _)| x == r) {
                 return n.clone();
+            }
+            if let Some(f) = sm_owners.get(r).and_then(|f| owner(Some(*f))) {
+                let kind = match r {
+                    Reference::Face(_) => "Face",
+                    Reference::Edge(_) => "Edge",
+                    _ => "Vertex",
+                };
+                return format!("{kind} of {}", fname(f));
             }
             match r {
                 Reference::Origin => "Origin".into(),

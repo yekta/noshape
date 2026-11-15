@@ -361,6 +361,10 @@ pub struct SheetMetalData {
     pub rips: Vec<Rip>,
     /// Form outlines and relief cutouts shown in the flat pattern.
     pub marks: Vec<FlatMark>,
+    /// The feature a face, edge or vertex of the part is labelled after ("Face of Flange 1"): the one that first made
+    /// its definition entity (live skasm-q1627: not the last to change it). From the entity's association attribute.
+    #[serde(default)]
+    pub label_owners: Vec<(crate::reference::Reference, FeatureId)>,
 }
 
 /// A sheet metal model's joints over all its parts: the Sheet metal table
@@ -449,6 +453,7 @@ impl SheetMetalData {
             bends: Vec::new(),
             rips: Vec::new(),
             marks: Vec::new(),
+            label_owners: Vec::new(),
         }
     }
 
