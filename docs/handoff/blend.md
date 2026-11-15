@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-15 20:16 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-15 22:58 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -9,47 +9,44 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## In flight
 
-- Landing (queued 20:15, 53737869, 5 commits on main): chamferair, balljump, chordnear (kernel
-  `Shape::project_point_near`: OCCT's local extremum kept only inside the face with the offset along the normal),
-  ballnear, unifycand (unify candidates once on an unchanged shape; B-spline poles off one plane skip OCCT's planarity
-  sampling). Gates: pairs clean (882 = 882), asm of the whole stack identical on all 24 (asm-chord-new.log), g++-13
-  ok. Mac release: knife 46/52 both, regen 1576 -> 1192 ms (Chamfer 1 167 -> 121, core's lean-handle Fillet 8 541 ->
-  175). After it lands: tell core (Fillet 8); delete the blend4 / blend6 targets on vibe6.
-- infento 1dc32b Chamfer 3 (dx/core): live 3169 answered (live2): Distance 1 goes on the SIDE face at both edges,
-  merged mirror or not. Branch `blend-ch3` (on main; checked out in blend10): a2074e738's geometry (rim_chamfer_cut by
-  shared face, `prism_rim_chamfer_on`, a lone circle's corners mode; 87,057.03 mm3 with live's sides, live 87,057.04)
-  + face_order_in ranking a Copy face as the face it copies + T1 features_c::two_offsets_on_a_mirrored_body_go_as_on_
-  its_source_as_live (passes, but also without the ranking change: the rectangle doesn't hit the case). Running the
-  studio with a ZZ_D1 print of each edge's face keys (Mac, sg/st1dc) to see why the mirrored arc ranks its cap first;
-  then the fix, a T1 that fails before it, a pair on vibe5 (slot). Then tell dx and core; recheck Fillet 3 (core's
-  dump vibe5 ~/agents/core-keep/fillet3-1dc/fillet-58).
+- Landed b106b424 (20:33): chamferair, balljump, chordnear, ballnear, unifycand. Core told; vibe6 gate targets gone.
+- Dock tab B scale-first (lead 22:25: try it; land only if identical end to end: every suite document's topology and
+  status, hats / dock, qa's 47 tickets, corner-break's 42 faces, all 24 assemblies; else keep the double build and
+  park the diff). Branch `blend-scalefirst` 18b585d5b (on main; blend6 has it): op_fillet's `short_step_beside` (an
+  edge left out, under r / 4 long, at a rounded edge's vertex) skips the as-is build in scaled_blend (identical where
+  the as-is round wouldn't have been kept; not at working scale 1). ZZ_SF_LOG=1 keeps the old flow and prints
+  "zz sf <what> predicted P kept K" per fillet: running the model suite so on vibe6 (unit blend-sf-log6, log
+  sf-log.log, flag sf-log.done). Any "predicted 1 kept 1" = a result change: narrow the predictor or park. Then the
+  dock in log mode (CLI from blend6 on vibe6, a mode-700 copy, deleted after), then the full check above.
+  Dock numbers: Mac release, tab B 518 ms; Rib Dip R 1 as-is 36 + scaled 23 ms, Rib Dip R Dizi 35 + 35; quiet vibe5:
+  ~220 of 1257 ms thrown away.
 
 ## Open questions / waiting
 
-- The user's dock, tab "B - Cakil Tasi" (qa P0 speed; quiet vibe5: regen 1257 ms, fillets ~590): Rib Dip R 1 168 ms,
-  Rib Dip R Dizi 135, Rib Round Dizi 127 each build OCCT's as-is fillet (121 / 59 / 40 ms), which passes the checks;
-  then my DOCK-FILLET rule (far-off corners whose loose vertices overlap: features.cpp scaled_blend) throws it away and
-  builds at the working scale (34 / 63 / 41): ~220 ms thrown away. A parallel scaled build was considered and dropped
-  (crash guards, budget jumps and blend flags are thread-local). Next: sample the as-is build (why 3.5x the scaled
-  one) on a mode-700 copy (vibe5 ~/lead-private/dock.noshape; copies in ~/tmp/blend, deleted after).
-- isaac-ball studio 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63; 860 ms vs 16): 14 edges R 4.5. OCCT's as-is and
-  scaled builds fail; by_groups (579 ms) + past_end_faces build it. The input matches live face for face. Face diff
-  (CLI query_entities after a rollback vs live.jsonl boxes): two vertical rounds (x -413 / -370) come in two faces each,
-  split at z 30.68 (live one each, 129.69 / 127.18 mm2), and Extrude 3's plane stays one 834.32 mm2 face where live's
-  round across it leaves 618.32 + 216.00. Next: why OCCT fails on the 14 edges together (dump vibe7
-  ~/tmp/blend/m3cd/fillet-5.brep/.txt; repro ~/agents/asm-keep/m3c with asm-keep/bin/ops-s30, which reads its
-  context.jsonl: my Mac build can't yet).
-- Boolean sections (bool's): the knife's remaining Chamfer 1 58 ms / Fillet 2 17 ms are OCCT on pairs that touch
-  within the knife's ~21 um tolerances (a disjointness test proves 4 of 96; parked hulls-wip.patch). bool's plane x
-  B-spline marcher (71efdd87e) withdrawn (knife Mirror 1 regression).
-- cf-snap-hook (dx): Mac release Fillet 6 26 ms (live 8), Fillet 3 14 (7), the document 243 vs live 274; dx's vibe7
-  numbers were ~5x. Fillet 6's direct build 15 ms (sections 5.5: cone x torus, axes parallel 50-230 mm apart). Low.
+- infento 1dc32b Chamfer 3: live 3169 says Distance 1 on the side at both arcs. Our class rule (G30: first side,
+  start cap, end cap, other sides) puts it on the start cap: the R65 arc's side isn't its loop's first side by any
+  entity order we have (ours: entity 28 in a loop with 10, 11, 17, 24, 31, 33; live's sketch order: the arc 11th, the
+  loop has the rectangle's left/right sides 3 / 4 and lines 7-10 before it). One arc's side is a Mirror copy, the
+  other's cap is. Asked live (REQUESTS 22:43) for qAdjacent / qOwnedByBody / qCreatedBy face orders at bar 100.
+  Branch `blend-ch3` (main + a2074e738 geometry + a Copy face ranked as its source + first side of the face's own loop
+  + T1 two_offsets_on_a_mirrored_body... that passes either way; commit e960186b6 has ZZ_D1 debug). Not landable yet.
+- isaac-ball 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63): all 14 edges are lines between planes, R 4.5, and
+  face 21 (Extrude 3's plane) is 9 mm tall between edges 73 + 80 (x -370) and 76 + 77 (x -413): full rounds across a
+  strip of a bigger face. OCCT builds each edge and each such pair (radius shrunk to 4.4999955: two quarter cylinders
+  9e-9 m apart, a sliver of face 21 left between), but not all 14 (fails; by_groups 579 ms + past_end_faces).
+  merge_full_rounds only joins rounds that share an edge (a consumed whole face, live W1). Live: one half cylinder
+  R 4.5 (127.18 / 129.69 mm2) and face 21 split in two (618.32 + 216.00). Needs: the sliver removed (face split, halves
+  merged), and the 14-edge build. Probe: parked/zz_probe_m3c.rs (kernel test reading the dump; dump vibe6
+  ~/tmp/blend/m3c-fillet.brep, edges 52 54 56 63 65 67 73 76 77 80 85 87 92 96, R 0.0045).
+- Boolean sections (bool's): the knife's Chamfer 1 58 ms / Fillet 2 17 ms are OCCT on pairs that touch within the
+  knife's ~21 um tolerances (a disjointness test proves 4 of 96; parked hulls-wip.patch).
+- cf-snap-hook (dx): Mac release Fillet 6 26 ms (live 8), Fillet 3 14 (7); the document 243 vs live 274. Low.
 
 ## Next, in order
 
-1. Chamfer 3 (above), then land it.
-2. The dock's thrown-away as-is builds (above).
-3. isaac-ball 3c5c58 Fillet 1 (above).
+1. Dock scale-first (in flight).
+2. Chamfer 3 when live answers.
+3. isaac-ball 3c5c58 Fillet 1: the full round across a strip (above).
 4. cf-spur-gear's opFillet blend 65-120 ms (dx); GearLab 90f78b opFillet "Failed to fillet selections." after core's
    opLoft fix (asm; no dump yet).
 5. Knife Fillet 2 (100 ms, live 10): OCCT's split of the run-on tool by the extended walls 25 ms (the grind wall 17 of
