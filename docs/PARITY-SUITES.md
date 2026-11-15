@@ -78,6 +78,16 @@ ours 12 / 6, the same volume. A user never sees the difference: live's evCurveDe
 edge a Line (live core/q-moveface). So from a feature named in `LIVE_LINES_AS_OTHER` (crates/ops/tests/parity.rs) on, that
 part's lines and others are compared as one count; its other edge kinds, its counts and everything else as usual.
 
+**Edges inside a near-tangent sliver (bool, lead 11-15, DECISIONS).** Where two faces cross at a tiny angle, Parasolid
+may bound the crossing by extra short edges through the sliver between them, within its tolerance. c2-impeller-loft's
+Boolean Flansch+Gehaeuse: the housing's 3 mm offset wall crosses the flange's wall, the plane y = +-27 (within 0.1 um),
+at ~0.01 rad along a 45 degree line that meets their shared top curve at x 63.86 mm; live ends that line at x 63.50 /
+29.41 / 61.99 and goes on by 3 short OTHER edges (KO5B 0.346 mm, KOFC 0.688, KOJC 2.307) where the walls lie 0.04-1.7
+um apart. Ours is the exact intersection; no later feature references those edges or their vertices (Fillet
+Ansaugflansch zum Gehaeuse fillets the z = -4 junction edges next to them; live keeps all three to the end). So from a
+feature named in `LIVE_SLIVER_EDGES` (crates/ops/tests/parity.rs) on, that part's live counts are taken less those
+edges (as OTHER) and their vertices; everything else is compared as usual.
+
 ## 2. Interaction suite: the same steps in live and in noshape
 
 **Scenarios (qa, live).** `tests/ui-parity/<name>.json`: short scripts of what a user does: keys, typed text, clicks

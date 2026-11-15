@@ -119,11 +119,33 @@ const LIVE_LINES_AS_OTHER: &[LiveLineAsOther] = &[
     // of the moved faces OTHER (12 line / 6 other, live 8 / 10), the volume equal; live's evCurveDefinition and Measure
     // still call such an edge a Line (live core/q-moveface): only the fetch's polyline rule reads it OTHER.
     LiveLineAsOther { doc: "c2-impeller-loft", from_feature: "Flansch verbreitern", part: "Part 2" },
+    // bool 11-15: Boolean Flansch+Gehäuse fuses Part 2 into Part 1; the moved faces' straight edges (x 82.418 mm,
+    // y +-40, 4 mm) stay OTHER in live's Part 1.
+    LiveLineAsOther { doc: "c2-impeller-loft", from_feature: "Boolean Flansch+Gehäuse", part: "Part 1" },
+];
+
+/// Edges live adds inside a near-tangent sliver, within Parasolid's tolerance (PARITY-SUITES.md "Edges inside a
+/// near-tangent sliver"; DECISIONS 11-15): from `from_feature` on, `part`'s live counts less `edges` OTHER edges and
+/// `vertices` vertices; everything else compared as usual.
+struct LiveSliverEdges {
+    doc: &'static str,
+    from_feature: &'static str,
+    part: &'static str,
+    edges: u64,
+    vertices: u64,
+}
+const LIVE_SLIVER_EDGES: &[LiveSliverEdges] = &[
+    // bool 11-15: the housing's offset wall crosses the flange's wall (y = +-27) at ~0.01 rad; live ends that crossing
+    // at x 63.50 / 29.41 / 61.99 mm and goes on by KO5B, KOFC, KOJC (0.346, 0.688, 2.307 mm) where the walls lie 0.04-1.7
+    // um apart; ours, the exact intersection, meets the shared top curve at x 63.86. Referenced by no later feature;
+    // live keeps them to the end.
+    LiveSliverEdges { doc: "c2-impeller-loft", from_feature: "Boolean Flansch+Gehäuse", part: "Part 1", edges: 3, vertices: 3 },
 ];
 
 /// Live's parts after a feature, `reached` the names of the features up to it: its bands widened where
 /// [`LIVE_VOLUME_ALLOWANCES`] names a feature reached, the importer's refit parts ([`LIVE_IMPORT_REFITS`]) held to their
-/// tolerances, and lines counted with others where [`LIVE_LINES_AS_OTHER`] names a feature reached.
+/// tolerances, lines counted with others where [`LIVE_LINES_AS_OTHER`] names a feature reached, and sliver edges taken
+/// off its counts where [`LIVE_SLIVER_EDGES`] does.
 fn allow_live_readings(doc: &str, reached: &[&str], mut parts: Vec<PartState>) -> Vec<PartState> {
     for r in LIVE_IMPORT_REFITS {
         if !r.docs.contains(&doc) {
@@ -142,6 +164,18 @@ fn allow_live_readings(doc: &str, reached: &[&str], mut parts: Vec<PartState>) -
                 p.centroid_band = Some([c.map(|x| x - centroid), c.map(|x| x + centroid)]);
             }
             p.edge_types = None;
+        }
+    }
+    for r in LIVE_SLIVER_EDGES {
+        if r.doc != doc || !reached.contains(&r.from_feature) {
+            continue;
+        }
+        for p in parts.iter_mut().filter(|p| p.name == r.part) {
+            p.edges = p.edges.saturating_sub(r.edges);
+            p.vertices = p.vertices.saturating_sub(r.vertices);
+            if let Some(n) = p.edge_types.as_mut().and_then(|m| m.get_mut("other")) {
+                *n = n.saturating_sub(r.edges as usize);
+            }
         }
     }
     for r in LIVE_LINES_AS_OTHER {
@@ -202,6 +236,19 @@ fn live_lines_as_other_count_with_others_from_their_feature_on() {
     other_kind[0].edge_types = kinds(8, 9, 1);
     other_kind[0].edges = 19;
     assert!(!differences(&other_kind, &[part("Part 2", 12, 6, 1)]).is_empty(), "lines and others only");
+}
+
+/// c2-impeller-loft's Part 1 from Boolean Flansch+Gehäuse on: live's 3 sliver edges (OTHER) and their vertices taken off
+/// its counts; not before that feature, nor in another part.
+#[test]
+fn live_sliver_edges_come_off_lives_counts_from_their_feature_on() {
+    let kinds = |line: usize, other: usize| Some([("line", line), ("other", other)].into_iter().map(|(k, n)| (k.to_string(), n)).collect());
+    let part = |name: &str, edges: u64, vertices: u64, other: usize| PartState { name: name.into(), faces: 19, edges, vertices, edge_types: kinds(10, other), ..Default::default() };
+    let live = |name: &str, reached: &[&str]| allow_live_readings("c2-impeller-loft", reached, vec![part(name, 56, 39, 46)]);
+    let after = ["Flansch (vorne) verbreitern", "Boolean Flansch+Gehäuse"];
+    assert!(differences(&live("Part 1", &after), &[part("Part 1", 53, 36, 43)]).is_empty());
+    assert!(!differences(&live("Part 1", &after[..1]), &[part("Part 1", 53, 36, 43)]).is_empty(), "not before the feature");
+    assert!(!differences(&live("Part 2", &after), &[part("Part 2", 53, 36, 43)]).is_empty(), "only the named part");
 }
 
 /// c2-impeller-loft's scatter: the larger of live's two self-disagreements (7.86e-5, JKG's), both ways, every part.
