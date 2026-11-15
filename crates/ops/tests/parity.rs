@@ -614,6 +614,10 @@ fn exchange_round_trip() {
         let expected = |format: &str, ours: bool| -> Option<Vec<PartState>> {
             let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], format == "STL"))?;
             match &xt {
+                // (Live's import of ours: held to the model; where live's own import is off it, as close as that, a
+                // quarter more (live reads its own 32-tooth gear's STEP 9.7 mm³ over its model, ours 10.7; its IGES of
+                // either the same); where live fails its own file (the wave spring's STEP), the model's.)
+                Some(x) if format != "STL" && ours => Some(held_to_model(own, x, 1.25, true)),
                 Some(x) if format != "STL" && (volume(&own) - volume(x)).abs() > 1e-3 * volume(x).abs() => {
                     println!("{name}: live's own {format} import is off ({:.3} mm³, its Parasolid's {:.3}): compared with the Parasolid's", volume(&own) * 1e9, volume(x) * 1e9);
                     Some(x.clone())
@@ -830,6 +834,20 @@ fn a_mesh_area_off_the_model_is_held_to_it() {
     assert!((lo..=hi).contains(&3.29748e-7), "ours, nearer the model than live's own STL");
     assert!(!(lo..=hi).contains(&3.26e-7), "off the model by more than twice live's own");
     assert_eq!(held[0].volume, Some(7.7646e-12), "the volume within live's band stays live's");
+}
+
+/// Live reads its own 32-tooth gear's STEP 0.2 % over its model (4771.70 mm³ for 4761.97): its import of ours (4772.71)
+/// is held to the model within a quarter more than that, one twice as far off is not; one live fails is held to the
+/// model.
+#[test]
+fn live_reading_its_own_step_off_holds_ours_as_close() {
+    let part = |volume: f64| PartState { name: "Spur gear (32 teeth)".into(), faces: 262, edges: 780, vertices: 520, volume: Some(volume * 1e-9), volume_band: Some([volume * 1e-9 - 1e-14, volume * 1e-9 + 1e-14]), ..Default::default() };
+    let held = held_to_model(vec![part(4771.704)], &[part(4761.972)], 1.25, false);
+    assert!(differences(&held, &[part(4772.713)]).is_empty(), "{:?}", differences(&held, &[part(4772.713)]));
+    assert!(!differences(&held, &[part(4781.5)]).is_empty());
+    // Live's failure on its own file (the wave spring's STEP read 7559 mm³ for 916.5): ours held to the model.
+    let held = held_to_model(vec![part(7559.004)], &[part(916.533)], 1.25, true);
+    assert!(differences(&held, &[part(916.722)]).is_empty());
 }
 
 /// A part live reads off its model is held to the model, as close as live's own import of the file.
