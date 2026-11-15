@@ -2424,6 +2424,31 @@ fn a_thread_on_its_shafts_cylinder_fuses_into_one_solid() {
     assert!((v - 4896.29).abs() <= 0.2, "volume {v} mm³ against live's 4896.29");
 }
 
+/// asm-hand-drill-pinslot's e53bba Extrude 9 (recorded, with Extrude 8's end merged into its band): the unify joins the
+/// r12.07 band and its end round onto one face, the end across the band's seam angle; OCCT's merge kept the end's arc as
+/// that face's seam, a closed edge along a circle (noshape's Boolean then declined the part, "a seam off a ruling", and
+/// OCCT's next fuse came out invalid). The seam moves to a plain stretch of the band: no arc used twice, valid, 202 faces.
+#[test]
+fn a_band_merged_round_onto_its_end_has_a_straight_seam() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "057b2c9828530384").expect("the recorded case");
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("the fuse").shape;
+    let u = k::unify_same_domain(&r).expect("the unify").shape;
+    assert!(u.is_valid());
+    assert_eq!(u.faces().len(), 202);
+    let b = k::brep_body(&u).expect("a body of ours");
+    for (fi, f) in b.faces.iter().enumerate() {
+        let mut uses = std::collections::HashMap::new();
+        for x in f.loops.iter().flatten() {
+            *uses.entry(x.edge).or_insert(0) += 1;
+        }
+        for (&e, &n) in &uses {
+            assert!(n < 2 || matches!(b.edges[e as usize].curve, noshape_brep::Curve::Line), "face {fi} uses curved edge {e} twice");
+        }
+    }
+}
+
 /// asm-hand-drill-pinslot's e53bba Extrude 11 (recorded): an up-to extrude's tool ending on the part's own cylinder, 3 of
 /// its 14 mm³ inside the part. OCCT's plain fuse is invalid there, and its glue for touching shapes added the whole
 /// tool (2780.97 mm³ for 2777.99; the volumes add up): that fallback is only taken where the tool's points are on or
