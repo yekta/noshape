@@ -8,6 +8,14 @@
   themselves, nothing to add). The solver takes Symmetric between two splines (BSpline / FitSpline / Conic, pointwise).
   Impeller's Stefevenrohr Führung: its spline MIRROR (was "1 MIRROR rejected") now translates; still 1.9 µm.
 - psui runs live's 10 sketch-mirror-* takes when they land and sends me sketch-side rows that differ. Next: P2 fuzz.
+- Lead 23:5x: live's takes (behaviours "Mirror ui-parity takes") show no batch: box mirrors nothing, a preselection
+  makes one copy, mod+z undoes the last copy: all the tool's flow (psui). Nothing else sketch-side.
+- Fuzz (00:00): 768 of 830 (was 766): s222 / s1057 fixed: after a group solve, a neighbour the solve moved that still
+  fits where it was goes back (a second outline tied only by Parallel / Perpendicular stays exactly; T1
+  live_fuzz::a_neighbour_that_still_fits_stays_put). Error sum 2561.82 -> 2561.66 mm, no case worse, probes unchanged.
+- s228 (7 mm, open): a free slot's new radius (Equal arcs): live keeps l1 (the bottom, Parallel to a tilted rectangle
+  that turns to it) and moves the top; ours keeps the arcs' centres. The dimensioned slots s320 / s377 / s408 / s422 /
+  s492 (H on l1, centre Distance) keep the top instead (they match): needs a probe, no rule to guess yet.
 
 ## Resume here (2026-11-14 20:07 UTC): sketch differences in the model suite (lead: after the jog)
 - Jog at its reduced angle: fixed (the unfold goes through two rolled bends that meet; flat 100 mm, no overlap);
