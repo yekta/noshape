@@ -1,5 +1,19 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-15 08:20 UTC): speed P0 c2-sm-corner-break (qa); probes 11 parked on branch probes11-wip
+- qa (speed P0): c2-sm-corner-break 2444 ms vs live 1972 on v0.4.48 (before baf11b6ad, in 0.4.52). Sheet metal runs
+  through std's FeatureScript; NOSHAPE_KERNEL_PROFILE=cpu (vibe6 blocks perf) puts 80-90 % of each sheet metal
+  feature in the kernel: Rust Booleans (bool) and face queries on the Boolean's planes at 30-120 us a call (their
+  pcurves not stored on faces with > 64 edge uses, so OCCT re-projects every edge per call). Queued ca80d670d: point /
+  normal at uv and find_plane use unrestricted adaptors (40 -> 0.7 us, -0.25 s CPU, results identical). bool gates
+  pcurves on every made plane (~10:00). Then re-measure on vibe7 against live and tell qa. A/B by process CPU
+  (`/usr/bin/time`) while hosts are loaded; wall is noise at load 30. Model copy: vibe6 ~/tmp/skasm/cb.
+- Probes 11 (branch probes11-wip, not landed): r226-k14 was "over defined" (a constructive placement collapsed l2;
+  solve_with now drops a placement that collapses a line) and matches live within 3 um (live drifts its anchor
+  2.6 um); place_quad takes Angles (to a settled outside line, round the loop) and Equal (first takes the
+  second's length), and leaves a Distance to unplaced outside geometry. r226-k3 60 -> 14 mm, but r226-k9 / k15 worse:
+  `shift_loops_for_distances` tilts the l2 loop (live only translates it). Fuzz not yet run on it.
+
 ## Resume here (2026-11-15 05:37 UTC): live fuzz probes 20 (s228) 11/11; P0 hats fixed
 - P0 (lead 05:00): the hats' "Seat lip 45° chamfer" warning came from 74bbe81ba (sampled projections' samples on the
   edge): Riser legs / Seat lip project the Mac mini's rounded corners as 13-point fits; on the edge they made the
