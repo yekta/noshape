@@ -1077,49 +1077,54 @@ static bool torus_box(const TopoDS_Face& f, Bnd_Box& box)
 // many pairs: hat8's union boxed its grip faces 1300 times, 18 % of it), on any thread.
 struct ExactBoxes
 {
-  std::mutex                                                          m;
-  NCollection_DataMap<TopoDS_Shape, Bnd_Box, TopTools_ShapeMapHasher> boxes;
-  // The Boolean's arguments as shapes (the boxes kept on the one a face is of too), or none.
-  const std::vector<const OcShape*>*                                  srcs = nullptr;
-  Bnd_Box                                                             of(const TopoDS_Face& f)
+  // (Each face's once: the threads sectioning pairs ahead asked for one face at once and each worked it out, a
+  // B-spline face's optimal box a swarm search of 40-70 ms: tpd's fillet cut 481 ms of them, 115 once each.)
+  struct Entry
   {
+    std::once_flag once;
+    Bnd_Box        box;
+  };
+  std::mutex                                                                          m;
+  NCollection_DataMap<TopoDS_Shape, std::shared_ptr<Entry>, TopTools_ShapeMapHasher> boxes;
+  // The Boolean's arguments as shapes (the boxes kept on the one a face is of too), or none.
+  const std::vector<const OcShape*>* srcs = nullptr;
+  Bnd_Box                            of(const TopoDS_Face& f)
+  {
+    std::shared_ptr<Entry> e;
     {
       const std::lock_guard<std::mutex> lock(m);
-      if (const Bnd_Box* b = boxes.Seek(f))
-        return *b;
+      if (const std::shared_ptr<Entry>* x = boxes.Seek(f))
+        e = *x;
+      else
+        e = *boxes.Bound(f, std::make_shared<Entry>());
     }
-    const OcShape* owner = nullptr;
-    if (srcs != nullptr)
-      for (const OcShape* x : *srcs)
-        if (x != nullptr && x->map(TopAbs_FACE).Contains(f))
-        {
-          owner = x;
-          break;
-        }
-    Bnd_Box b;
-    bool    known = false;
-    if (owner != nullptr)
-    {
-      const std::lock_guard<std::mutex> lock(owner->myExactLock);
-      if (const Bnd_Box* k = owner->myExactBoxes.Seek(f))
-      {
-        b     = *k;
-        known = true;
-      }
-    }
-    if (!known)
-    {
-      if (!torus_box(f, b))
-        BRepBndLib::AddOptimal(f, b, false, false);
+    std::call_once(e->once, [&] {
+      const OcShape* owner = nullptr;
+      if (srcs != nullptr)
+        for (const OcShape* x : *srcs)
+          if (x != nullptr && x->map(TopAbs_FACE).Contains(f))
+          {
+            owner = x;
+            break;
+          }
       if (owner != nullptr)
       {
         const std::lock_guard<std::mutex> lock(owner->myExactLock);
-        owner->myExactBoxes.Bind(f, b);
+        if (const Bnd_Box* k = owner->myExactBoxes.Seek(f))
+        {
+          e->box = *k;
+          return;
+        }
       }
-    }
-    const std::lock_guard<std::mutex> lock(m);
-    boxes.Bind(f, b);
-    return b;
+      if (!torus_box(f, e->box))
+        BRepBndLib::AddOptimal(f, e->box, false, false);
+      if (owner != nullptr)
+      {
+        const std::lock_guard<std::mutex> lock(owner->myExactLock);
+        owner->myExactBoxes.Bind(f, e->box);
+      }
+    });
+    return e->box;
   }
 };
 
