@@ -5,6 +5,21 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 18:47 UTC: custom-feature query speed; STL rule; 1dc32b Draft 1 matches; 5d8bc1 after core's Sweep 1
+- Landed a2212ff2: qContainsPoint tests a body face / edge / vertex's kept box before BRepExtrema (cf-part-draft's Spur
+  Gear: 15,203 distances to its 760 edges gone, 452 -> 236 ms, live 227; 15 qContainsPoint models same). Queued with
+  this entry: each sketch region's face kept for the sketch in the custom host (Spur Gear makes 55 -> 28; all 47 cf
+  models same). Left in Spur Gear: opFillet's blend 65-120 ms (blend's) and model-core's own 28 region profiles.
+- STL (live 3138, dx/q1137/summary.json): REST's default is 5° on every part alone, no chord cap (cylinders r 0.05..100,
+  sphere, r 0.5 fillet: 72 rim points, 18 across); only a tiny one in a large export goes coarser (r 0.05 in a 520 mm
+  studio: 17 points). The exchange suite's STL args (5°, chord 100) are that rule. Unexplained: live's 20-tooth gear's
+  Ø10 keyway bore at 15° (23 points over 330°, ours 67): no size rule fits (a lone r 5 cylinder gets 5°), maybe a
+  per-body facet budget. STL rows (gear, radijator, sheet metal plus) parked there.
+- 1dc32b Draft 1 matches live on the save22 input (core: -1306.543 mm³, live -1306.54); Fillet 3 waits on blend's
+  Chamfer 3. 5d8bc1: core's Sweep 1 queued 72248180 (PlateCover 300626.043 mm³, 14 faces as live). Shell 1's saved
+  params (parts plate_pcb, a 13789.8 mm² face) came from a translation while Sweep 1 failed; live's lines give the
+  face RkB2 (PlateCover's z 3 mm top, 22676 mm²) and part RkBD by geometry: retranslate (st5d8.sh) once it lands.
+
 ## 11-15 17:52 UTC: studio refs' boxes are live's loose ones; infento 74d3d6 to core's Extrude 4
 - Live (dx/q-box): studios/<element>.refs.jsonl boxes are evBox3d tight=false (Multi angle joint tight +-20, loose
   -20.2605..20.2665; tyre +-169 / +-171.7748); only lines with "tight" in `source` (the 56-348 refetch) are tight.
