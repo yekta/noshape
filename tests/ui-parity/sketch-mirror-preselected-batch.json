@@ -151,5 +151,11 @@
    "do": "key",
    "key": "Escape"
   }
+ ],
+ "live_defects": [
+  {
+   "from_step": 20,
+   "why": "Onshape drops the first click after a box select in a sketch (plain or Shift, even after a 600 ms hover): live2 feel/mirror-preselected, 3 runs 2026-11-15 07:49 UTC. A lost click, not copied (lead 11-15); the steps after it follow from it."
+  }
  ]
 }

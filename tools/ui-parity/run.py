@@ -1218,16 +1218,23 @@ def main():
         except (OSError, ValueError) as e:
             print(f"{name}: {e}")
             continue
-        start = json.loads((scen_dir / f"{name}.json").read_text()).get("start")
+        scenario = json.loads((scen_dir / f"{name}.json").read_text())
+        start = scenario.get("start")
         whole = isinstance(start, str) and any(k in STARTS.get(start, {}) for k in ("tabs", "page"))
-        m, n, first = compare(forget_old_query_states(json.loads(live.read_text())), ours, whole)
+        live_rec = forget_old_query_states(json.loads(live.read_text()))
+        # A live defect (README "live_defects"): live's states from that step on aren't compared.
+        cut = min((d["from_step"] for d in scenario.get("live_defects") or []), default=None)
+        if cut is not None:
+            live_rec["steps"] = [s for s in live_rec.get("steps", []) if s.get("step", 0) < cut]
+        note = f", live defect from step {cut} not compared" if cut is not None else ""
+        m, n, first = compare(live_rec, ours, whole)
         steps_ok, steps_all = steps_ok + m, steps_all + n
         if first is None:
             score += 1
-            print(f"{name}: match ({n} states)")
+            print(f"{name}: match ({n} states{note})")
         else:
             where, path, a, b = first
-            print(f"{name}: {where} differs at {path}: live {json.dumps(a, ensure_ascii=False)} / ours {json.dumps(b, ensure_ascii=False)} ({m}/{n} states)")
+            print(f"{name}: {where} differs at {path}: live {json.dumps(a, ensure_ascii=False)} / ours {json.dumps(b, ensure_ascii=False)} ({m}/{n} states{note})")
     print(f"score: {score}/{len(names)} scenarios, {steps_ok}/{steps_all} states")
     if CAUSES:
         print("differences by key (states, live / ours example):")

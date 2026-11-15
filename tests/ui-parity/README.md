@@ -92,6 +92,13 @@ as the app's own config files, written into the run's config directory before it
 
 (`export_solid.json`: crates/ops `SolidExportPrefs`; a version is its index in the format's list, 24 = Parasolid 25.0.)
 
+### live_defects (psui, 11-15)
+
+A live shortcoming we don't copy (a lost input, a failure we can do the work for; the lead decides) ends the
+comparison: live's states from `from_step` on aren't compared, and the result line says so. Name the repro in `why`:
+
+    "live_defects": [{"from_step": 20, "why": "Onshape drops the first click after a box select … (live2, 3 runs)"}]
+
 ### steps
 - `{"do": "click" | "dblclick" | "rclick" | "hover", "on": TARGET}`; `hover` waits `ms` (default 1500); a click may
   carry `"mods": "shift" | "mod" | "alt"`, held during the click.
