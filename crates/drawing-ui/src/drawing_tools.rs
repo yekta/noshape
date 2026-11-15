@@ -2165,6 +2165,42 @@ impl DrawingEditor {
                         })
                     })
                     .collect();
+                // With something else selected the field joins it: the rows both have, the field's Add leader, Move to
+                // ▸ only with notes (live2 rmb-probe 11-15: a datum, note, dimension or view selected).
+                if !self.selection.is_empty() {
+                    let sheet = self.current_sheet();
+                    let kind = |s: &Sel| match s {
+                        Sel::Annotation(id) => sheet.annotations.iter().find(|a| a.id == *id).map(|a| &a.kind),
+                        _ => None,
+                    };
+                    let dims = self.selection.iter().any(|s| kind(s).is_some_and(|k| k.is_dimension()));
+                    let notes = self.selection.iter().all(|s| matches!(kind(s), Some(AnnotationKind::Note { .. })));
+                    let mut out = vec![crate::drawing_props::paste_always()];
+                    if !dims {
+                        out.push(MenuEntry::item("Copy", |t, _, cx| t.copy_entities(cx)));
+                    }
+                    out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+                        t.paste_as_table(cx);
+                    }));
+                    out.push(MenuEntry::item("Add leader", move |t, _, cx| {
+                        if let Some(id) = t.with_field_note(&k5, "Edit note", cx, |_, _| {}) {
+                            t.note_add_leader(id, cx);
+                        }
+                    }));
+                    if notes {
+                        out.push(MenuEntry::Submenu("Move to".into(), layers));
+                    }
+                    out.extend([
+                        MenuEntry::Separator,
+                        MenuEntry::item("Clear selection", |t, _, cx| {
+                            t.selection.clear();
+                            t.redraw(cx);
+                        }),
+                        MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
+                        MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)),
+                    ]);
+                    return out;
+                }
                 vec![
                     MenuEntry::item("Edit note...", move |t, w, cx| t.open_title_field(key.clone(), w, cx)),
                     MenuEntry::item("Explode note", move |t, _, cx| {

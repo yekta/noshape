@@ -1045,6 +1045,20 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         e.context_menu_entries(None, cx)
     }));
     assert_eq!(flat(&rows), ["Paste", "Copy", "Paste as table", "——", "Clear selection", "Zoom to fit", "Delete"]);
+    // A title block field right-clicked with the note selected: the field joins it, their rows (live2 rmb-probe).
+    let (pick, at) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        let pick = b.picks.iter().position(|t| matches!(t, PickTarget::TitleField(_))).expect("a title field") as u32;
+        let x = b.geometry.texts.iter().find(|x| x.pick == pick).expect("its text");
+        (pick, [x.pos[0] + 0.5, x.pos[1] + x.height / 2.0])
+    });
+    let rows = cx.update(|cx| editor.update(cx, |e, cx| {
+        e.cursor = at;
+        e.hover = Some(pick);
+        e.context_menu_entries(Some(pick), cx)
+    }));
+    assert_eq!(flat(&rows), ["Paste", "Copy", "Paste as table", "Add leader", "Move to ▸", "——", "Clear selection", "Zoom to fit", "Delete"]);
 }
 
 /// Live (dx/q-centermark): a Single centermark clicked on a hole that has an automatic mark lasts only with ✓; Esc
