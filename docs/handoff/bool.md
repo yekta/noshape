@@ -70,6 +70,19 @@ scratch /root/bool-scratch.
   piece (-0.54..-2.5 mm at y -12) and keeps that arc as the merged face's seam (closed, two pcurves, not a ruling):
   ours then declines "a seam off a ruling", OCCT's fuse goes invalid. Next: after USD, re-cut such a face along a
   ruling (the arc gone), as Parasolid has no seam.
+  - 11-15 01:0x, traced (usd_kept_volume makes it; every wire order alike; rejecting such attempts gave 206 faces in
+    4.9 s, reverted): the merged face is the band v 0..1 mm, its seam a line at u 0.0449, the bottom boundary running
+    from u 0.0449 past a turn to 6.4918, the end piece a bump below v 0 between u 6.0746 and 6.4918 (0.2086 + 2 pi),
+    across the band's seam angle; arc E (u 0.0449..0.2086 at v 0) is the bump's top at one turn and the band's bottom
+    at the other (closed, two pcurves). Plan: move the seam to a plain stretch of the band (u in 0.2086..0.8386, an arc
+    at v 0 below, an arc at v 1 above): split those two arcs there (in the neighbours too, BRepTools_ReShape), a new
+    seam line with both pcurves, E and the old seam line then inside the face, dropped; the wire rebuilt from u_s to
+    u_s + 2 pi. Check with probe_slit_faces on vibe6 ~/agents/bool-keep/e53/057b2c9828530384.
+- Shell stage 2 (7380071ce, gate 00:49): the self-interference check walks offset edges along free-form faces they
+  touch at a vertex (foot by Gauss-Newton in the face's parameters, from the vertex's place), dropping clear pairs
+  before OCCT's EF: rings-loft's check 176 -> 111 ms, the Shell 815 -> 746 ms (vibe6, same run); kernel tests 434 pass.
+- skasm 11-15 00:05: 48 of the suite's 77 failing features start in bool's: c2-impeller-loft 36 (feature 12's cap
+  1356.909 vs live 1356.927 mm2, Part 2 5427.638 vs 5427.708), fan-blade 5, gamma/wire-clip 2+2, cf-surface-pattern 3.
 - Then c2-fan-blade-sweep's Boolean 2 offset: the bolt's picked faces 9,10,11,13,16-21,23 (flanks 10, 11 B-spline;
   flank 12 unpicked), so a Shell wall from the picked faces would leave rims where live extends the neighbours.
 
