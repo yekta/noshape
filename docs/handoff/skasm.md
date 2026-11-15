@@ -1,5 +1,15 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-15 12:53 UTC): PS-INEXACT-INTERSECTION-EDGES (dx) done on our side; dropped constraints next
+- a5b52aae: export rebuilds plane / plane, plane / spline-extrusion (and its offset) edges exact (`exact_edges`,
+  io.cpp). 6f5b151e (queued): adjacent planar faces on one plane up to rounding (vertices within 1 um of the other's
+  plane) are put on one exact plane (`snap_coplanar`): model-plus had 3 pairs off by up to 5 nm / 7.5e-5 rad, and
+  live's importer merges faces only on bit-equal planes (61 vs 58). Exchange suite unchanged (48 / 39 / 47); all 12
+  coplanar pairs exact (/root/skasm-scratch/bin/stepadj.py). Files for live's re-import: vibe7
+  ~/agents/skasm-keep/exch-mp/ours-snap.*; dx asked. STL row is dx's (mesher).
+- Translator (a5b52aae): default plane / origin ids (JDC / JCC / JEC / IB) before refs lines; SILHOUETTED curves used
+  from their face. PIERCE tried and reverted (knife Sketch 13 moved 11.8 mm).
+
 ## Resume here (2026-11-15 10:40 UTC): dropped sketch constraints (lead); corner-break re-measure when bool lands
 - Speed P0 c2-sm-corner-break (qa): qa's 2444 ms was v0.4.48 (before baf11b6ad). 4e33cb8d (with 1427fe4db): a face's
   point / normal at uv and find_plane use unrestricted adaptors (40 -> 0.7 us a call on the Boolean's planes, whose
