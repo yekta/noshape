@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-15 20:31 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-15 23:48 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -38,24 +38,29 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
 
-- Lead P1 (the user's Mac): Extrude Depth "#" / "asin" list pushed the rows below 2 px down. Cause: popups hung
-  from a zero-height box in the field's flex column, which still takes the column's gap. Fix: `ui::popup_anchor()`
-  (absolute, at the parent's bottom) for var_complete, os_select, create_selection, Create variable, the sketch
-  dimension's list; fields matrix row "autocomplete: the open list moves nothing" (row bounds, `row-<param>`
-  debug selectors). Corners: live2 asked (11-15 20:20) for the menu's radius / padding and the highlighted row's
-  inset / radius; match once it answers. The feature list's folder-name prompt keeps its in-flow anchor (no gap there).
-- full1115e done: 995 / 1021 (morning 972). Misses in /root/psui-scratch/full1115e-miss.txt. The 7 new since the
-  morning were load flakes (all match on rerun, new7, 20:50). boundary-surface now fails only at step 4 `.message`
-  (live's "Boolean resulted in no geometry change…"): sent to core.
-- qa P0 (dock tab B 7-10 s): not run yet. Likely the document thumbnail's own full regeneration of B next to the
-  view's (Thumbnailer `decide` returns Regenerate before the view has registered `pending`). Repro: tabab.sh via
-  rb.sh on vibe6 with a mode-700 dock copy (scp -3 from vibe5 ~/lead-private/dock.noshape to
-  /home/ngyekta/tmp/psui/priv); the script deletes it at the end.
-- Mac target over 20 GB: prune with tools/tiers/prune-target.py between builds (lead 11-15).
+- qa P0 (dock tab B first open 7-10 s): cause found and fixed (f8e38653, queued with this handoff): the tab's hover
+  card (app tab_thumbs.rs) regenerated B in full with fine meshes beside the view's own opening (the pointer rests on
+  the tab before the click). Now it takes the open view's display, else regenerates with coarse meshes, stopped by any
+  view regeneration of the document (`start_thumbnail::picture_job_started`). A/B on vibe6, 3 alternating pairs, load
+  3-9 (candidates): tabToB settle base 6240 / 5568 / 6486 ms, fix 3535 / 5777 / 3650. Left: B's preview regeneration
+  (2.2-2.6 s, 75 features) and the refine (Part 1's 285k-triangle fine mesh, 0.3 s idle, up to 2 s under load) before
+  "settled"; the coarse model shows at the preview. Repro: tabab.sh / tabab-ab.sh (scratch) via rb.sh on vibe6 with a
+  mode-700 dock copy (scp -3 from vibe5 ~/lead-private/dock.noshape to /home/ngyekta/tmp/psui/priv; the scripts' EXIT
+  trap deletes it). Gotchas: start Xvfb by PID (a pgrep -f pattern matches the script's own command line); a file put
+  back by rb.sh's rsync keeps its older mtime, so touch it or cargo keeps the stale build.
+- end-cap-profile-circle step 3: ours keeps the Faces field focused after the face click until the regeneration;
+  live drops focus at the click (Mirror's Faces drops it at the click in both). Not found yet: next, a logged run.
+- tab-new-edit-reedit: live's click at (30, 35, 2) lands ~1.1 px (0.3 mm at 0.275 mm/px) on Flange 1's wall; ours on
+  the plate's top. Decision asked of the lead: known (sub-pixel camera) or retarget the click onto the wall live hit.
+- live (b89af730) asked 11-15 23:10 for the feel rows without live numbers (snaps, Measure midpoint window, Fields
+  wheel / Tab / New variable, list insertion line, Feedback, tooltip fade, view cube reach): fold its
+  live/feel/<area>-gaps.json into the matrices when it answers.
 
 ## Queued to land
 
-- b43ce2d0 (20:19 UTC): bsurf two picks + advance, number field no right-click menu, thumbnail perf notes, handoff.
+- f8e38653 hover card fix, 4195ec4d prune-target objects, this handoff (23:48).
+- Landed 11-15: c5b7e380 (dropdown P1: lists out of the flow, live's corners; fields matrix 11 / 11), acdf09d2.
+- Mac target 42 -> 14 GB (lead 11-15): prune-target.py now runs on macOS and removes stale codegen-unit objects.
 
 ## Waiting on others
 
@@ -77,8 +82,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Next, in order
 
-1. The P1 corners (live2's numbers), land; then qa's P0 (tabab); then the tab pick
-   (skasm's note); end-cap-profile-circle step 3 focus (old, mine?).
+1. end-cap-profile-circle focus (logged run); the tab pick per the lead's answer; fold live's feel numbers in.
 2. Rerun after the others' fixes land: boundary-surface-new-edit-reedit (core 658bef9d), the gussets and end-caps
    (skasm), sketch pattern takes (skasm 58a0bd16 + linear), context-create-version-update (live2's retake).
 3. Older open items (11-06 to 11-08 "Next, in order" in the archive) were not re-verified this session; check them
