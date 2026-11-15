@@ -1,6 +1,6 @@
 {
  "scenario": "drw-revision-table-delete",
- "recorded": "2026-11-15T02:44:03.281Z",
+ "recorded": "2026-11-15T07:31:08.869Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -8,12 +8,12 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "69ead40a322357c9cc5bfaeb",
-  "workspace": "4b118f43cc5458a09527443b",
-  "element": "f339cf64f0220dffb14b8181",
+  "document": "e6abbeedec379ecbb4262784",
+  "workspace": "6574fb1bd7df956846d067c7",
+  "element": "7e9a114726f12b1f3d304be7",
   "start": "block-drawing",
-  "startElement": "f339cf64f0220dffb14b8181",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "7e9a114726f12b1f3d304be7",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -306,7 +306,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 204607
+   "t": 203935
   },
   {
    "step": 2,
@@ -483,7 +483,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 229531
+   "t": 228577
   },
   {
    "step": 3,
@@ -611,7 +611,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 255417
+   "t": 254446
   },
   {
    "step": 4,
@@ -731,7 +731,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 280428
+   "t": 279787
   },
   {
    "step": 5,
@@ -858,7 +858,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 306731
+   "t": 306011
   },
   {
    "step": 6,
@@ -991,7 +991,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 332909
+   "t": 330979
   },
   {
    "step": 7,
@@ -1085,12 +1085,7 @@
       }
      ],
      "annotations": [],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Top"
-      }
-     ]
+     "selection": []
     },
     "document": {
      "workspace": "Main",
@@ -1121,7 +1116,127 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 360513
+   "t": 356222
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    },
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part 1 Drawing 1",
+       "kind": "drawing",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 381239
   }
  ]
 }

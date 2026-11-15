@@ -49,6 +49,11 @@
       "on": {
         "menu": "Delete"
       }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
     }
   ]
 }
