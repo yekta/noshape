@@ -163,9 +163,17 @@ const STD_PREFIX: &str = "onshape/std/";
 
 // ---------------------------------------------------------------- standard library
 
-type StdCache = HashMap<(u32, String), Arc<CompiledModule>>;
+type Built = Result<Arc<CompiledModule>, Vec<CompileError>>;
 
-static STD_CACHE: LazyLock<Mutex<StdCache>> = LazyLock::new(Default::default);
+/// Each module's slot, built once by whoever asks first: a build waits only for the modules it shares with another
+/// thread's, not for a whole release (the CLI's first custom feature waited 0.27 s on std's prewarm building
+/// extrude.fs before it could load release 355).
+static STD_CACHE: LazyLock<Mutex<HashMap<(u32, String), Slot>>> = LazyLock::new(Default::default);
+
+type Slot = Arc<std::sync::OnceLock<Built>>;
+
+/// The releases asked for so far, and the parse running for each (while its first build runs).
+static STD_PARSES: LazyLock<Mutex<HashMap<u32, std::sync::Weak<Pending>>>> = LazyLock::new(Default::default);
 
 /// A standard library module (`"geometry.fs"`) of the embedded release,
 /// compiled once.
@@ -176,27 +184,50 @@ pub fn std_module(name: &str) -> Result<Arc<CompiledModule>, Vec<CompileError>> 
 /// A standard library module as an import pinned to `version` gets it
 /// (see [`crate::std_version_for`]).
 pub fn std_module_at(version: u32, name: &str) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
-    let mut cache = STD_CACHE.lock();
     let version = crate::std_version_for(version);
-    if let Some(m) = cache.get(&(version, name.to_string())) {
-        return Ok(m.clone());
-    }
-    if cache.keys().any(|(v, _)| *v == version) {
-        return load_std(version, name, &mut cache, None);
+    let slot = std_slot(version, name);
+    if let Some(m) = slot.get() {
+        return m.clone();
     }
     // The release's first module: its modules parsed on every core meanwhile (largest first), each taken by the
-    // build as it comes to it (parsed here when no core has started it yet); built in import order as before
-    // (parsing was half of the first custom feature's 300 ms, std's hole tables alone 2 MB).
-    let pending = Pending::new(version);
+    // build that comes to it first (parsed there when no core has started it yet); built in import order (parsing
+    // was half of the first custom feature's 300 ms, std's hole tables alone 2 MB). Builds on other threads take from
+    // the same parse while it runs.
+    // (An older release unpacked first, outside the lock: ~16 ms.)
+    let _ = crate::std_files(version);
+    let started = {
+        let mut parses = STD_PARSES.lock();
+        match parses.get(&version) {
+            Some(running) => Err(running.upgrade()),
+            None => {
+                let p = Arc::new(Pending::new(version));
+                parses.insert(version, Arc::downgrade(&p));
+                Ok(p)
+            }
+        }
+    };
+    let pending = match started {
+        Ok(p) => p,
+        Err(running) => return built_std(version, name, running.as_deref()),
+    };
     let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).clamp(1, 16) - 1;
     std::thread::scope(|s| {
         for _ in 0..threads {
             s.spawn(|| pending.work());
         }
-        let r = load_std(version, name, &mut cache, Some(&pending));
+        let r = built_std(version, name, Some(&pending));
         pending.stop();
         r
     })
+}
+
+fn std_slot(version: u32, name: &str) -> Slot {
+    STD_CACHE.lock().entry((version, name.to_string())).or_default().clone()
+}
+
+/// Module `name` of release `version`, built once (its slot's).
+fn built_std(version: u32, name: &str, pending: Option<&Pending>) -> Built {
+    std_slot(version, name).get_or_init(|| load_std(version, name, pending)).clone()
 }
 
 /// A release's modules being parsed: each claimed once, by a worker or by the build that needs it first.
@@ -204,6 +235,7 @@ struct Pending {
     files: Vec<(&'static str, &'static str)>,
     index: HashMap<&'static str, usize>,
     claimed: Vec<std::sync::atomic::AtomicBool>,
+    stopped: std::sync::atomic::AtomicBool,
     done: Mutex<HashMap<&'static str, Result<ast::Module, crate::parser::ParseError>>>,
     ready: parking_lot::Condvar,
 }
@@ -214,7 +246,7 @@ impl Pending {
         files.sort_by_key(|(_, src)| std::cmp::Reverse(src.len()));
         let index = files.iter().enumerate().map(|(i, (n, _))| (*n, i)).collect();
         let claimed = files.iter().map(|_| std::sync::atomic::AtomicBool::new(false)).collect();
-        Pending { files, index, claimed, done: Mutex::new(HashMap::new()), ready: parking_lot::Condvar::new() }
+        Pending { files, index, claimed, stopped: Default::default(), done: Mutex::new(HashMap::new()), ready: parking_lot::Condvar::new() }
     }
     fn claim(&self, i: usize) -> bool {
         !self.claimed[i].swap(true, std::sync::atomic::Ordering::AcqRel)
@@ -222,6 +254,9 @@ impl Pending {
     /// A worker: every unclaimed module parsed, largest first.
     fn work(&self) {
         for (i, (name, src)) in self.files.iter().enumerate() {
+            if self.stopped.load(std::sync::atomic::Ordering::Acquire) {
+                return;
+            }
             if self.claim(i) {
                 let r = crate::parser::parse(src);
                 self.done.lock().insert(name, r);
@@ -229,11 +264,9 @@ impl Pending {
             }
         }
     }
-    /// The workers stop taking modules (the build has all it needs).
+    /// The workers stop taking modules (the first build has all it needs; a later one parses what it takes itself).
     fn stop(&self) {
-        for c in &self.claimed {
-            c.store(true, std::sync::atomic::Ordering::Release);
-        }
+        self.stopped.store(true, std::sync::atomic::Ordering::Release);
     }
     /// Module `name`'s tree: parsed here if nobody has started it, else waited for.
     fn take(&self, name: &str) -> Option<Result<ast::Module, crate::parser::ParseError>> {
@@ -256,10 +289,7 @@ fn import_version(version: &str) -> u32 {
     version.split('.').next().and_then(|v| v.parse().ok()).unwrap_or(crate::STD_VERSION)
 }
 
-fn load_std(version: u32, name: &str, cache: &mut StdCache, pending: Option<&Pending>) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
-    if let Some(m) = cache.get(&(version, name.to_string())) {
-        return Ok(m.clone());
-    }
+fn load_std(version: u32, name: &str, pending: Option<&Pending>) -> Built {
     let path: Arc<str> = format!("{STD_PREFIX}{name}").into();
     if let Err(message) = crate::std_files(version) {
         return Err(vec![CompileError { module: path, pos: Pos::default(), message, parse: false, level: Level::Error }]);
@@ -280,14 +310,12 @@ fn load_std(version: u32, name: &str, cache: &mut StdCache, pending: Option<&Pen
             // names math.fs at 3008: two math.fs would clash); one it doesn't have, the release the import names.
             let v = if crate::std_source_at(version, n).is_some() { version } else { crate::std_version_for(import_version(v)) };
             // (Another release's module: parsed on its own, the pending parse is this release's.)
-            imports.push(Some(load_std(v, n, cache, pending.filter(|_| v == version))?));
+            imports.push(Some(built_std(v, n, pending.filter(|_| v == version))?));
         } else {
             imports.push(None);
         }
     }
-    let m = Arc::new(build_module(path, ast, imports)?);
-    cache.insert((version, name.to_string()), m.clone());
-    Ok(m)
+    Ok(Arc::new(build_module(path, ast, imports)?))
 }
 
 /// A parse error's notices: the error, then (an initializer's function argument held it) Onshape's "Error in
@@ -1284,4 +1312,22 @@ impl Cx<'_> {
 /// Look up a native by name (for tests and the host).
 pub fn native_fn(name: &str) -> Option<NativeFn> {
     native(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Two threads asking for modules of one release at once (std's prewarm and a custom feature's first build): each
+    /// module is built once, and both get it.
+    #[test]
+    fn a_release_built_on_two_threads_at_once_is_built_once() {
+        let (a, b) = std::thread::scope(|s| {
+            let a = s.spawn(|| std_module_at(369, "geometry.fs"));
+            let b = s.spawn(|| std_module_at(369, "query.fs"));
+            (a.join().map_err(|_| "panicked"), b.join().map_err(|_| "panicked"))
+        });
+        let (Ok(Ok(_)), Ok(Ok(q))) = (a, b) else { panic!("both build") };
+        assert!(Arc::ptr_eq(&q, &std_module_at(369, "query.fs").unwrap()));
+    }
 }
