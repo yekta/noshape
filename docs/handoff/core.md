@@ -5,6 +5,24 @@ qa's ticket document rust-zero-solid-f197 (vibe5 ~/qa/tickets): Fillet 1 Ok in v
 92d89cc2f (the rounds remover); Fillet 2's missing selections 2 -> 1. Compare: `userdocs.py` in /root/qa-scratch/bin, or the two
 CLIs' `feature list` on copies.
 
+## core state (11-15 09:34 UTC)
+- **Checked:** main 2f33878d8 vs v0.4.52 (qa's userdocs.py, vibe5, 700 copies deleted): rust-zero-solid-f197 x5, hat15,
+  hat8, dock all SAME.
+- **Landed** ca3083c7 (hole on a bore already there). **Queued** d4c60505 (lean guided loft; blend's leanf8 in; vibe7 pair
+  882/947 = 882/947, knife 12.4 -> 6.6 s in the same run) and 780e5851 (draft wedges take a fillet band a hole notches by
+  its angle range; T1 blend::draft_wedges_take_a_notched_fillet_band fails on main; vibe5 suite = base; replay_one
+  replays defeature dumps).
+- **1dc32b Draft 1:** 10 of its 30 draftFaces had no live geometry (one pulley window drafted, not five): live refetched
+  them (and Fillet 3's) 11-15 ~09:00; rerun pending. On the one-window input OCCT's draft never ends (608 s at a 400 s
+  budget); the spent budget then stops the wedge fallback too (regen/mod.rs with_budget_scope), which takes 0.95 s.
+  If the five-window draft still runs into it: make OCCT's draft fail fast there (dump vibe7 ~/agents/core-keep/draft-1dc).
+- **qa's speed list (P0):** rings-loft, housing-draft, valve, helical sweep: bool's Booleans / unify (profiles sent to
+  qa). sm-louver Linear pattern 2 = live (1558 / 1553 ms); its Extrude 3 / 4 are sheet metal Booleans. c2-impeller-loft
+  differs from live from feature 12: Move face 1 / Delete face 2 are OCCT defeaturing, 3-11 s a call on 34-face parts with
+  offset surfaces (live 26 / 12 ms); Move face 1 removes the 29.5 mm chamber bore (blend_radius takes a cylinder tangent
+  to two faces for a fillet). 0.4.48 -> main: Delete face 2 4.2 -> 7.7 s, its input 1.0 -> 2.5 MB (upstream geometry,
+  not the loft); Fillet Stevenrohr zum Halter 2 ms -> 4.5 s then failing (told blend).
+
 ## core state (11-15 07:22 UTC)
 - **P0 landed 608e3b40:** qa's rust-zero-solid-f197 Fillet 1 failed since 1ac08e247 (an extruded circle kept on the
   sketch circle's frame, trimmed to [a, a + 2π]: OCCT's fillet fails on it). The circle runs from 0 round the seam
