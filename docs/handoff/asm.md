@@ -4,31 +4,34 @@ Area: crates/assembly, crates/assembly-ui, the assembly ops in crates/ops and th
 scenarios, the assembly parity suite (`parity_assemblies`) and the parity translator (crates/ops/src/parity.rs) for
 the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: docs/DECISIONS.md.
 
-## State (2026-11-15 20:52 UTC)
+## State (2026-11-15 21:37 UTC)
 
 ### In flight
 - Worktree /root/projects/noshape-wt/asm (detached on 93346d03 = landed fd98e8a6), on top (none landed):
   - 60b13cba (**decision with the lead**): `regions_by_sum` takes the closest group of live's sketch regions.
   - 70ae7e9b: in-context bodies from live's `<element>.context.jsonl` (`context_bodies`: a planar one-face sheet as its
-    face from chained edges; wires, curved or multi-face sheets as 3D edges; splines through live's 10 points; point
-    bodies skipped). A non-sketch feature's sub-feature maps to its first Import (1b88ff's Extrude 3 / 4 extrude it). An
-    in-context sketch sits on live's planar face when there is one (its edges split the regions as live's), else on
-    the 1 m square on live's sketch frame. 1b88ff 6 -> 12/12 features, a2e4a2 7 -> 9/64.
-  - 154e6c65: an assembly's Save view / Delete view is no undo step (psui's 11-12 FYI). UI test passes on the Mac.
-  - 08d6feee: a configured studio's refs.jsonl lines carry `configuration` (live 19:51, the nut's #12-24 / #10-32):
-    the suite keeps those of the configuration it builds the studio in (its first configured instance's) and inserts
-    instances by our part's body id (the nut's custDesc now names the part per size: by name 4 instances failed).
-  - 07f3351a: the suite scores BOM rows: live's bom.json (all 24 corpora, multi-level, root configuration) against
-    our structured `assembly_bom`, row by row (indent, name, quantity, part number, description, material; no
-    material = "- None -" as live's panel). Our default-named parts ("Part N") are renamed to live's names, and
-    subassembly tabs take live's assembly names (instances' name without " <n>"). config-assembly 9/12 rows: the
-    3 standard-content rows lack live's "Stainless Steel" (the suite inserts them from translated studios, without a
-    standard-content spec). keyboard-pattern 4/16 before the tab names.
-- Runs: vibe6 full assembly suite base29 (= main's code; ~/agents/asm-keep/full/base29.log), then ctx32.sh (scissor-lift
-  / suspension pairs). vibe7: isaac-ball s32 (s01/s32), then the full suite s37 (= all five commits; full/s37.log),
-  both through slot. isaac-ball on today's data: s29b 116/121 occurrences, 89/121 mates; s30 116/121, 85/122.
+    face from chained edges; wires, curved or multi-face sheets as 3D edges; splines through live's 10 points). A
+    non-sketch feature's sub-feature maps to its first Import (1b88ff's Extrude 3 / 4). An in-context sketch sits on
+    live's planar face when there is one (its edges split the regions as live's), else on the 1 m square. 1b88ff 6 ->
+    12/12 features, a2e4a2 7 -> 9/64; isaac-ball on today's data 116/121, 89/121 -> 90/122 mates.
+  - 154e6c65: an assembly's Save view / Delete view is no undo step (psui's FYI). UI test passes on the Mac.
+  - 08d6feee: configured refs.jsonl lines (`configuration`, live 19:51): those of the studio's build configuration;
+    instances inserted by our part's body id (the nut's custDesc names the part per size).
+  - 07f3351a + 0c676223 + fd230597: BOM scoring. live's bom.json (all 24 corpora) against our structured
+    `assembly_bom`: each live row matched with an unused row of ours by parent row and fields (indent, name, quantity,
+    part number, description, material; no material = "- None -" as live's panel); order reported apart. Our
+    default-named parts ("Part N") renamed to live's names; standard content parts get our catalogue's material;
+    our subassembly rows ("Sub <eid>") compared under live's assembly names. Naming the subassembly *tabs* as live's
+    broke keyboard-pattern's studios (19 -> 8/25 occurrences, reason not found yet): only the comparison maps them.
+    config-assembly 12/12 rows.
+  - (latest) mate-messages.json (live / live2): a mate live leaves in ERROR with red (unresolved) connectors that ours
+    solves counts as live and is listed as "live defect" (DECISIONS 11-15; isaac-ball's 7).
+- Runs: vibe6 full assembly suite base29 (= main's code; ~/agents/asm-keep/full/base29.log, 11/24 done at 21:36), then
+  ctx32.sh. vibe7 full suite s41 (= all commits; full/s41.log), queued behind qa's ui-parity shards. Both via slot.
 - Model gate (s30, same base as s29): identical per model except cf-spur-gear and exercise-chino, which drop for s29
-  too since their refs.jsonl / refs-sk.jsonl were refetched at 19:28 (whose? asked the lead).
+  too since their refs were refetched at 19:28 (asked the lead whose).
+- Captures: live keeps isaac-ball (done) and infento-subs mate messages; live2 takes every other corpus with error or
+  warning mates (from ~22:30). Live has no message text for these mates: `redFields` and the dialog lines only.
 
 ### Queued to land
 - Nothing. Landed today: 790ecad5, 36ebccbc, 163918c9, fd98e8a6, 8ffdb51e / 72805bc5 (this file).
@@ -38,8 +41,8 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   vs s37 shows it with the rest.
 
 ### Next, in order
-1. Read full/base29 vs full/s37 per assembly (occurrences, mates; BOM rows for s37); land the five commits (or four,
-   per the lead on 60b13cba); a SCORE.md "Assemblies" row (the last is 11-08).
+1. Read full/base29 vs full/s41 per assembly (occurrences, mates; BOM rows for s41); land the commits (60b13cba per the
+   lead); a SCORE.md "Assemblies" row (the last is 11-08).
 2. BOM: standard content's material (insert standard-content instances as our catalogue's, or set live's material);
    then the rows that differ most in the full run.
 3. a2e4a2's Extrude 5: 2 extra edges (ours splits a 0.451 mm arc at a vertex of JUm's edges and adds a 13 mm line);
