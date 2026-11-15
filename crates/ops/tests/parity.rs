@@ -2772,12 +2772,17 @@ fn parity_assemblies() {
     dirs.sort();
     let read = |p: &Path| std::fs::read_to_string(p).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok());
     let (mut docs, mut matching, mut mates, mut mates_matching, mut occurrences, mut occurrences_matching) = (0, 0, 0, 0, 0, 0);
+    let (mut bom_rows, mut bom_matching) = (0, 0);
     for dir in dirs {
         let name = dir.file_name().unwrap().to_string_lossy().to_string();
-        let Some(asm) = read(&dir.join("assembly.json")) else {
+        let Some(mut asm) = read(&dir.join("assembly.json")) else {
             println!("{name}: unreadable assembly.json");
             continue;
         };
+        // Live's multi-level BOM (live 11-15 19:49: GET …/bom?indented=true&multiLevel=true).
+        if let Some(bom) = read(&dir.join("bom.json")) {
+            asm["liveBom"] = bom;
+        }
         // Studios no instance uses whose sketch a Frame elsewhere takes as its profile: built too, with no parts.
         let profile_sources: std::collections::HashSet<String> = std::fs::read_dir(dir.join("studios"))
             .into_iter()
@@ -2902,7 +2907,9 @@ fn parity_assemblies() {
         mates_matching += r.mates_matching;
         occurrences += r.occurrences;
         occurrences_matching += r.occurrences_matching;
-        println!("{name}: {}/{} occurrences placed as live, {}/{} mates as live", r.occurrences_matching, r.occurrences, r.mates_matching, r.mates);
+        bom_rows += r.bom_rows;
+        bom_matching += r.bom_matching;
+        println!("{name}: {}/{} occurrences placed as live, {}/{} mates as live, {}/{} BOM rows as live", r.occurrences_matching, r.occurrences, r.mates_matching, r.mates, r.bom_matching, r.bom_rows);
         for d in &r.differences {
             println!("  difference: {d}");
         }
@@ -2910,7 +2917,7 @@ fn parity_assemblies() {
             println!("  untranslated: {u}");
         }
     }
-    println!("assemblies: {matching}/{docs} as live, occurrences {occurrences_matching}/{occurrences}, mates {mates_matching}/{mates}");
+    println!("assemblies: {matching}/{docs} as live, occurrences {occurrences_matching}/{occurrences}, mates {mates_matching}/{mates}, BOM rows {bom_matching}/{bom_rows}");
 }
 
 /// An assembly rebuilt from live's definition: a cylinder's two instances,
@@ -2951,6 +2958,16 @@ fn an_assembly_is_rebuilt_as_lives() {
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly.noshape"), &asm, &[("E1".into(), studio, parts)]);
     assert!(r.untranslated.is_empty() && r.differences.is_empty(), "{r:?}");
     assert_eq!((r.occurrences_matching, r.occurrences, r.mates_matching, r.mates), (2, 2, 1, 1));
+    // Live's multi-level BOM: one row, the cylinder twice; another quantity is a difference.
+    let bom = |quantity: u32| json!({ "root": { "bom": { "bomTable": { "items": [{ "itemSource": { "indentLevel": 0 }, "name": "Part 1", "quantity": quantity, "partNumber": "", "description": "", "material": { "displayName": "" } }] } } } });
+    let mut with_bom = asm.clone();
+    with_bom["liveBom"] = bom(2);
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-bom.noshape"), &with_bom, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert_eq!((r.bom_matching, r.bom_rows), (1, 1), "{r:?}");
+    with_bom["liveBom"] = bom(3);
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-bom3.noshape"), &with_bom, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert_eq!((r.bom_matching, r.bom_rows), (0, 1), "{r:?}");
+    assert!(r.differences.iter().any(|d| d.starts_with("BOM row 1:")), "{r:?}");
     // A place the Revolute doesn't allow: freed there, ours solves it back
     // onto the mate, 10 mm.
     let mut off = asm.clone();

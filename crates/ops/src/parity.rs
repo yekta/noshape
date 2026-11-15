@@ -7215,6 +7215,10 @@ pub struct AssemblyResult {
     pub occurrences_matching: usize,
     pub mates: usize,
     pub mates_matching: usize,
+    /// Live's BOM rows (its multi-level BOM, `bom.json`) and those ours has as live (in order: indent, name,
+    /// quantity, part number, description, material).
+    pub bom_rows: usize,
+    pub bom_matching: usize,
     /// Differences, first one first.
     pub differences: Vec<String>,
     /// What wasn't translated, with the reason.
@@ -7651,7 +7655,10 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             continue;
         }
         let features = values(&asm["subAssemblyFeatures"][e]["features"]);
-        levels.push(Level { element: e.to_string(), instances: values(&sub["instances"]), features, defs: values(&sub["features"]), tab: format!("Sub {}", &e[..e.len().min(6)]) });
+        // Its tab named as live's assembly (its instances' name without " <n>": the BOM's row), unless taken.
+        let live_name = std::iter::once(root).chain(values(&asm["subAssemblies"])).flat_map(|a| values(&a["instances"])).find(|i| i["type"] == "Assembly" && i["elementId"] == e).and_then(|i| i["name"].as_str()).map(|n| n.rsplit_once(" <").map_or(n, |(base, _)| base).to_string());
+        let tab = live_name.filter(|n| !n.is_empty() && levels.iter().all(|l| l.tab != *n)).unwrap_or_else(|| format!("Sub {}", &e[..e.len().min(6)]));
+        levels.push(Level { element: e.to_string(), instances: values(&sub["instances"]), features, defs: values(&sub["features"]), tab });
     }
     // Each level's instances and their elements (its Part Studio, or its subassembly), by (level, instance id): an id is
     // only its assembly's (asm-suspension's Upper and Lower Control Arm share six, from two Part Studios).
@@ -7954,10 +7961,18 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 chosen[ix] = Some(ours);
             }
         }
+        // (Our part named as live's where ours still has its default name: a name is the part's, not a feature's; a
+        // part a feature names, as the nut's custDesc per size, keeps it.)
+        let default_name = |n: &str| n.strip_prefix("Part ").is_some_and(|k| k.parse::<u32>().is_ok());
         for (p, ours) in listed.iter().zip(chosen) {
             if let (Some(pid), Some(ours)) = (p["partId"].as_str(), ours) {
                 if let Some((.., id)) = solids.iter().find(|(n, _, id)| *n == ours || *id == ours) {
                     part_bodies.insert((element.clone(), pid.to_string()), id.clone());
+                    if let Some(live) = p["name"].as_str().filter(|l| default_name(&ours) && *l != ours && !l.is_empty())
+                        && let Err(e) = t.call("part_rename", json!({ "tab": t.tab, "part": id, "name": live }))
+                    {
+                        res.untranslated.push(format!("{element}: part {pid} not renamed \"{live}\": {e}"));
+                    }
                 }
                 part_names.insert((element.clone(), pid.to_string()), ours);
             }
@@ -8565,7 +8580,41 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
         }
     }
+    compare_bom(&mut placer, asm, &mut res);
     res
+}
+
+/// Our structured BOM of the top-level assembly against live's multi-level one (`liveBom`, the corpus' bom.json),
+/// row by row in order.
+fn compare_bom(placer: &mut Translator, asm: &Value, res: &mut AssemblyResult) {
+    let Some(live) = asm["liveBom"]["root"]["bom"]["bomTable"]["items"].as_array() else { return };
+    res.bom_rows = live.len();
+    let columns = ["Item", "Quantity", "Name", "Part number", "Description", "Material"];
+    let ours = match placer.call("assembly_bom", json!({ "tab": "Assembly 1", "type": "structured", "columns": columns, "show_excluded": false, "show_top_level": false })) {
+        Ok(r) => r["rows"].as_array().cloned().unwrap_or_default(),
+        Err(e) => {
+            res.untranslated.push(format!("BOM: {e}"));
+            return;
+        }
+    };
+    let text = |v: &Value| v.as_str().map(str::to_string).unwrap_or_else(|| if v.is_null() { String::new() } else { v.to_string() });
+    // (No material: live's API gives "", its BOM panel "- None -", as ours.)
+    let material = |v: &Value| Some(text(v)).filter(|t| !t.is_empty()).unwrap_or_else(|| "- None -".into());
+    // (A subassembly's row: no material in either; ours leaves the cell empty.)
+    let mut shown = 0;
+    for (i, l) in live.iter().enumerate() {
+        let want = (l["itemSource"]["indentLevel"].as_u64().unwrap_or(0), text(&l["name"]), l["quantity"].as_f64().unwrap_or(0.0), text(&l["partNumber"]), text(&l["description"]), material(&l["material"]["displayName"]));
+        let got = ours.get(i).map(|o| (o["depth"].as_u64().unwrap_or(0), text(&o["name"]), o["quantity"].as_f64().unwrap_or(0.0), text(&o["cells"]["Part number"]), text(&o["cells"]["Description"]), material(&o["cells"]["Material"])));
+        if got.as_ref() == Some(&want) {
+            res.bom_matching += 1;
+        } else if shown < 3 {
+            shown += 1;
+            res.differences.push(format!("BOM row {}: ours {got:?}, live {want:?}", i + 1));
+        }
+    }
+    if ours.len() != live.len() {
+        res.differences.push(format!("BOM: {} rows, live {}", ours.len(), live.len()));
+    }
 }
 
 /// A sketch pattern instance id the sketch doesn't list (`<seed>.<group>.<i>.<k>`, `.center` for its centre): the
