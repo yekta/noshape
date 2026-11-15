@@ -352,6 +352,9 @@ pub fn hole() -> FeatureType {
         hidden(ParamSpec::enum_("holeVersion", "Hole version", &[("LEGACY", "Legacy"), ("V3", "V3")]).default_enum("V3")),
         hidden(ParamSpec::query("initEntities", "Initial entities", QueryFilter::SKETCH_POINT | QueryFilter::MATE_CONNECTOR)),
         hidden(ParamSpec::text("featureName", "Feature name template", "")),
+        // The FeatureScript version a hole was made at (Onshape's asVersion; empty: today's): before V1900 a
+        // counterbore as deep as the hole is allowed.
+        hidden(ParamSpec::text("asVersion", "Version", "")),
         hidden(ParamSpec::enum_("threadStandard", "Thread standard", &[("UNSET", "Unset"), ("ANSI", "ANSI"), ("ISO", "ISO")])),
         hidden(ParamSpec::bool("hasClearance", "Has clearance", false)),
         hidden(ParamSpec::bool("showTappedDepth", "Tapped details", false)),

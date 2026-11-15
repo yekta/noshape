@@ -980,6 +980,25 @@ fn hole_feature_records_holes_for_callouts() {
     assert!(!h.matches_circle(top, 0.004, 1e-6));
 }
 
+/// std hole.fs: a counterbore as deep as the hole is too deep from V1900_EQUAL_HOLE_CBORE_FIX; a hole made before
+/// (asm-infento-subs' 1dc32b Hole 2, asVersion V1472, 9 mm and 9 mm) builds, as in live.
+#[test]
+fn a_counterbore_as_deep_as_its_hole_builds_in_a_hole_made_before_v1900() {
+    for (version, builds) in [("", false), ("V1472_FILL_VERTEX_MATCHING", true)] {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.1, 0.05, "25 mm");
+        let pl = t.top_plane("25 mm");
+        let mut sk = noshape_sketch::Sketch::new();
+        let p1 = sk.add_point(DVec2::new(0.03, 0.02));
+        let s = t.sketch(Reference::FeaturePlane(pl), sk);
+        let locs = q(vec![Reference::SketchEntity { sketch: s, entity: p1.0 }]);
+        let h = t.add("hole", &[("locations", locs), ("unitsSystem", en("METRIC")), ("styleV2", en("C_BORE")), ("endStyleV2", en("BLIND")), ("holeDiameterV3", e("6 mm")), ("holeDepthV3", e("9 mm")), ("cBoreDiameterV3", e("11 mm")), ("cBoreDepthV3", e("9 mm")), ("asVersion", ParamValue::Text(version.into()))]);
+        let res = t.regen();
+        let st = res.display.features.iter().find(|x| x.id == h).unwrap();
+        assert_eq!(st.status == FeatureStatus::Ok, builds, "{version:?}: {:?} {:?}", st.status, st.message);
+    }
+}
+
 #[test]
 fn cancelled_regeneration_is_discarded_and_superseded_one_is_reused() {
     use noshape_model::regen::RegenCancel;

@@ -1554,7 +1554,7 @@ fn thicken_names(ev: &EvalCtx, inp: &ThickenInput, out: &Shape, tmax: f64) -> Ve
 const LOFT_START_RULE_VERSION: u32 = 414;
 
 /// The version number of Onshape's asVersion text ("V255_HOLE_FEATURE_FIX_ERROR_DISPLAY": 255).
-fn feature_version(text: &str) -> Option<u32> {
+pub(crate) fn feature_version(text: &str) -> Option<u32> {
     let digits: String = text.strip_prefix('V')?.chars().take_while(char::is_ascii_digit).collect();
     digits.parse().ok()
 }

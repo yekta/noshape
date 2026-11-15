@@ -185,9 +185,12 @@ fn hole_dims(ev: &EvalCtx) -> FResult<HoleDims> {
     if cbore.is_some_and(|(cd, _)| cd <= diameter) {
         return crate::regen::eval::err_at(&["holeDiameterV3", "cBoreDiameterV3"], "The counterbore diameter must be larger than the hole diameter.");
     }
+    // std hole.fs: as deep as the hole is too deep from V1900_EQUAL_HOLE_CBORE_FIX (asm-infento-subs' 1dc32b Hole 2, V1472,
+    // builds in live).
+    let equal_ok = super::solid_a::feature_version(ev.params.text("asVersion")).is_some_and(|v| v < 1900);
     if let Some((_, cdepth)) = cbore
         && ev.is("endStyleV2", "BLIND")
-        && cdepth >= len("holeDepthV3")?
+        && if equal_ok { cdepth > len("holeDepthV3")? + 1e-8 } else { cdepth >= len("holeDepthV3")? - 1e-8 }
     {
         return crate::regen::eval::err_at(&["holeDepthV3", "cBoreDepthV3"], "The counterbore depth must be smaller than the hole depth.");
     }
