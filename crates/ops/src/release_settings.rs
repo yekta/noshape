@@ -72,7 +72,7 @@ pub const ACCESS: [&str; 3] = [
 
 /// "Enter display names for Release & Obsoletion management properties":
 /// the fields it renames, in order.
-pub const DISPLAY_NAME_FIELDS: [&str; 4] = ["Release name", "Release notes", "Obsoletion names", "Obsoletion notes"];
+pub const DISPLAY_NAME_FIELDS: [&str; 4] = ["Release name", "Release notes", "Obsoletion name", "Obsoletion notes"];
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ReleaseSettings {

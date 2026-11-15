@@ -4607,7 +4607,6 @@ impl PartStudioView {
         // its menu still has Revision history…, live2 feel/release/part-menu-after-release.png).
         let log = crate::part_studio_hooks::release_log(self.doc.read(cx));
         let part_number = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty()).or_else(|| log.part_number_released(self.tab, Some(&b.id)));
-        let has_revisions = part_number.as_ref().is_some_and(|pn| !log.revisions(pn).is_empty());
         let part_icon = match b.kind {
             _ if b.composite.is_some() => "composite-part",
             // Onshape's svg-icon-part-mesh (live G27).
@@ -4821,7 +4820,10 @@ impl PartStudioView {
                             crate::part_studio_hooks::open_release_candidate(this.doc.clone(), items, w, cx);
                         }
                     }))));
-                if has_revisions && noshape_ops::release_settings::managed_workflows() && let Some(pn) = part_number.clone() {
+                // Live (Professional, rel-rc-dialog): a part's menu has Revision history… after Release… whenever
+                // managed workflows are on, released or not.
+                if !others && noshape_ops::release_settings::managed_workflows() {
+                    let pn = part_number.clone().unwrap_or_default();
                     m = m.item(item("Revision history…", Box::new(move |this, w, cx| crate::part_studio_hooks::open_revision_history(this.doc.clone(), pn.clone(), w, cx))));
                 }
                 m = m

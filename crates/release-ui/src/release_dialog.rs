@@ -139,6 +139,8 @@ pub struct AddItemsDialog {
     requested: std::collections::HashSet<String>,
     /// The Other documents tab is active.
     other: bool,
+    /// The candidate's items: not offered again (live rel-rc-add-items lists Part 2, not Part 1 already in it).
+    existing: Vec<ReleaseItem>,
     /// Items come from a version (of this or another document).
     source: Option<add_source::Source>,
     browse: add_source::Browse,
@@ -151,17 +153,17 @@ type AddFn = std::rc::Rc<dyn Fn(Vec<ReleaseItem>, &mut Window, &mut App)>;
 
 const ADD_KINDS: [(&str, &str); 5] = [("Part Studios", "Search Part Studios"), ("Assemblies", "Search Assemblies"), ("Files", "Search Files"), ("Drawings", "Search Drawings"), ("Variable Studios", "Search Variable Studios")];
 
-pub fn open_add_items(doc: Entity<DocModel>, on_add: impl Fn(Vec<ReleaseItem>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
-    open_add_dialog(doc, false, on_add, window, cx);
+pub fn open_add_items(doc: Entity<DocModel>, existing: Vec<ReleaseItem>, on_add: impl Fn(Vec<ReleaseItem>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    open_add_dialog(doc, false, existing, on_add, window, cx);
 }
 
 /// "Add Items to Obsolete candidate" (Help: Viewing revision history and
 /// obsoleting parts, step 5): the released revisions that can be obsoleted.
-pub fn open_add_obsolete_items(doc: Entity<DocModel>, on_add: impl Fn(Vec<ReleaseItem>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
-    open_add_dialog(doc, true, on_add, window, cx);
+pub fn open_add_obsolete_items(doc: Entity<DocModel>, existing: Vec<ReleaseItem>, on_add: impl Fn(Vec<ReleaseItem>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    open_add_dialog(doc, true, existing, on_add, window, cx);
 }
 
-fn open_add_dialog(doc: Entity<DocModel>, obsolete: bool, on_add: impl Fn(Vec<ReleaseItem>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+fn open_add_dialog(doc: Entity<DocModel>, obsolete: bool, existing: Vec<ReleaseItem>, on_add: impl Fn(Vec<ReleaseItem>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
     let view = cx.new(|cx| {
         let search = cx.new(|cx| InputState::new(window, cx).placeholder(ADD_KINDS[0].1));
         let sub = cx.subscribe(&search, |_: &mut AddItemsDialog, _, ev: &InputEvent, cx| {
@@ -171,7 +173,7 @@ fn open_add_dialog(doc: Entity<DocModel>, obsolete: bool, on_add: impl Fn(Vec<Re
         });
         let url = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search or paste URL"));
         let browse = add_source::Browse { filter: None, query: None, docs: None, url };
-        AddItemsDialog { doc, kind: 0, search, expanded: Vec::new(), picked: Vec::new(), pending: Default::default(), configs: Default::default(), text_inputs: Default::default(), config_menu: None, obsolete, on_add: std::rc::Rc::new(on_add), thumbs: Default::default(), requested: Default::default(), other: false, source: None, browse, error: None, _sub: sub }
+        AddItemsDialog { doc, kind: 0, search, expanded: Vec::new(), picked: Vec::new(), pending: Default::default(), configs: Default::default(), text_inputs: Default::default(), config_menu: None, obsolete, on_add: std::rc::Rc::new(on_add), thumbs: Default::default(), requested: Default::default(), other: false, existing, source: None, browse, error: None, _sub: sub }
     });
     window.open_dialog(cx, move |dialog, _, _| release_modal(dialog).w(px(860.)).child(view.clone()));
 }
@@ -430,6 +432,30 @@ impl Render for AddItemsDialog {
         if self.source.is_some() || self.other {
             entries = self.source_entries(self.kind, &matches, cx);
         }
+        let taken = |it: &ReleaseItem| self.existing.iter().any(|e| e.same_object(it));
+        entries.retain_mut(|e| match e {
+            Entry::Studio(_, _, parts, _) => {
+                parts.retain(|p| !taken(p));
+                true
+            }
+            Entry::Tab(it, _) => !taken(it),
+        });
+        // As live's recorder reads it (rel-rc-add-items): the document's name as its title, the type tabs, the search
+        // box and the rows (a Part Studio, its parts under it).
+        crate::ui_script::note_dialog(|| {
+            let mut fields = vec![serde_json::json!({ "label": ADD_KINDS[self.kind].1, "kind": "string", "text": self.search.read(cx).value().to_string() })];
+            for e in &entries {
+                match e {
+                    Entry::Studio(_, name, parts, _) => {
+                        fields.push(serde_json::json!({ "label": name, "kind": "boolean", "checked": false, "child": false }));
+                        fields.extend(parts.iter().map(|p| serde_json::json!({ "label": p.name, "kind": "boolean", "checked": self.picked.iter().any(|x| x.same_object(p)), "child": true })));
+                    }
+                    Entry::Tab(it, _) => fields.push(serde_json::json!({ "label": it.name, "kind": "boolean", "checked": self.picked.iter().any(|x| x.same_object(it)), "child": false })),
+                }
+            }
+            let tabs: Vec<serde_json::Value> = ADD_KINDS.iter().enumerate().map(|(i, (l, _))| serde_json::json!({ "label": l, "selected": i == self.kind })).collect();
+            serde_json::json!({ "title": doc_name, "kind": "feature", "tabs": tabs, "fields": fields, "error": null, "ok": null })
+        });
         // A version without items of the type (live assembly/612: "No Part
         // Studios available.").
         let none_available = (self.source.is_some() && entries.is_empty()).then(|| {
@@ -1738,14 +1764,16 @@ impl Render for ReleaseDialog {
                         })))
                         .child(small("rel-add-items", "plus", "Add to Release…", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let me = cx.entity();
-                            open_add_items(this.doc.clone(), move |items, window, cx| me.update(cx, |this, cx| this.add_items(items, window, cx)), window, cx);
+                            let existing = this.items(cx);
+                            open_add_items(this.doc.clone(), existing, move |items, window, cx| me.update(cx, |this, cx| this.add_items(items, window, cx)), window, cx);
                         })))
                     })
                     // Obsolete candidate: "Add to Obsolete candidate" (Help step 5).
                     .when(self.mode == Mode::Obsolete, |d| {
                         d.child(small("rel-add-obsolete", "plus", "Add to Obsoletion…", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let me = cx.entity();
-                            open_add_obsolete_items(this.doc.clone(), move |items, window, cx| me.update(cx, |this, cx| this.add_items(items, window, cx)), window, cx);
+                            let existing = this.items(cx);
+                            open_add_obsolete_items(this.doc.clone(), existing, move |items, window, cx| me.update(cx, |this, cx| this.add_items(items, window, cx)), window, cx);
                         })))
                     }),
             )
@@ -2173,7 +2201,7 @@ impl Render for ReleaseDialog {
                     .when(self.mode != Mode::Review, |d| d.child(
                         h_flex()
                             .gap(px(4.))
-                            .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(30.)).flex().items_center().border_1().rounded(px(3.)).border_color(if name_empty { red } else { gpui_kit::rgb(0xcccccc) }).map(|d| crate::ui_script::mark(d, || "field:Release name".into())).child(Input::new(&self.name).appearance(false).small().disabled(read_only))))
+                            .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(30.)).flex().items_center().border_1().rounded(px(3.)).border_color(if name_empty { red } else { gpui_kit::rgb(0xcccccc) }).map(|d| { let l = name_label.clone(); crate::ui_script::mark(d, move || format!("field:{l}")) }).child(Input::new(&self.name).appearance(false).small().disabled(read_only))))
                             // Numbering schemes › Release names: "Generate next
                             // release name" (not for obsoletions).
                             .when(self.seq_names && self.mode == Mode::Release, |d| {
@@ -2191,8 +2219,8 @@ impl Render for ReleaseDialog {
                                 )
                             }),
                     ))
-                    .child(div().when(self.mode != Mode::Review, |d| d.pt(px(6.))).child(label(notes_label, notes_required && self.mode != Mode::Review, notes_required && notes_empty && self.mode == Mode::Release)))
-                    .child(div().map(|d| crate::ui_script::mark(d, || "field:Release notes".into())).child(Textarea::new(&self.notes).disabled(read_only)))
+                    .child(div().when(self.mode != Mode::Review, |d| d.pt(px(6.))).child(label(notes_label.clone(), notes_required && self.mode != Mode::Review, notes_required && notes_empty && self.mode == Mode::Release)))
+                    .child(div().map(|d| { let l = notes_label.clone(); crate::ui_script::mark(d, move || format!("field:{l}")) }).child(Textarea::new(&self.notes).disabled(read_only)))
                     // A review's Comment (required while Pending) and its "(comment history)".
                     .when(self.mode == Mode::Review, |d| {
                         let required = self.candidate == Some(noshape_model::release::CandidateState::Pending);
@@ -2276,6 +2304,13 @@ impl Render for ReleaseDialog {
             })));
             if let Some(draft) = self.draft.clone() {
                 let open = self.draft_menu;
+                // The ▴ list as live's recorder reads it (rel-drafts-panel); dropped again once it closes.
+                let rows = serde_json::json!({ "kind": "context-menu", "rows": ["Save draft", "Delete draft"], "highlighted": null, "disabled": [] });
+                if open {
+                    crate::ui_script::note_list(Some(rows));
+                } else if crate::ui_script::open_list().as_ref() == Some(&rows) {
+                    crate::ui_script::note_list(None);
+                }
                 left = left.child(
                     div()
                         .relative()
@@ -2448,15 +2483,51 @@ impl Render for ReleaseDialog {
             _ => None,
         };
         let title = self.title(cx);
-        // The ui-parity state's `dialog`: the title, a field per item (its revision and part number), the release name.
+        // The ui-parity state's `dialog`, as live's recorder reads it (live rel-* takes): the item search, each row's
+        // revision ("*" while editable, "⟶" under review) and part number, the name and notes, Comment under review,
+        // Approvers, Observers, an obsoletion's re-releasable box; the buttons.
         crate::ui_script::note_dialog(|| {
-            let mut fields: Vec<serde_json::Value> = self
-                .rows
-                .iter()
-                .map(|r| serde_json::json!({ "label": r.item.name, "kind": "item", "revision": r.revision.read(cx).value().to_string(), "part_number": r.part_number.read(cx).value().to_string() }))
-                .collect();
-            fields.push(serde_json::json!({ "label": "Release name", "kind": "input", "value": self.name.read(cx).value().to_string() }));
-            serde_json::json!({ "kind": "modal", "title": title, "fields": fields })
+            let input = |label: Option<&str>, value: String| serde_json::json!({ "label": label, "kind": "input", "value": value });
+            let mut fields = vec![input(None, self.search.read(cx).value().to_string())];
+            let obsoletion = self.mode == Mode::Obsolete || self.package.as_ref().is_some_and(|p| p.kind == PackageKind::Obsoletion);
+            let buttons: Vec<&str> = if let Some((_, form)) = &self.props_view {
+                fields.extend(form.read(cx).embedded_fields(cx));
+                vec!["Undo", "Redo", "Apply", "Go back"]
+            } else {
+                for r in &self.rows {
+                    let (rev, pn) = match self.mode {
+                        Mode::Release => (Some("*"), Some("*")),
+                        Mode::Review => (Some("⟶"), None),
+                        Mode::Obsolete => (None, None),
+                    };
+                    fields.push(input(rev, r.revision.read(cx).value().to_string()));
+                    fields.push(input(pn, r.part_number.read(cx).value().to_string()));
+                }
+                // (The company's display names for the fields, Release management.)
+                let notes_text = self.notes.read(cx).value().to_string();
+                let star = |l: &str, on: bool| if on { format!("{l} *") } else { l.to_string() };
+                if self.mode == Mode::Review {
+                    let notes = if obsoletion { settings.display_name(3) } else { notes_label.to_string() };
+                    fields.push(input(Some(notes.as_str()), notes_text));
+                    fields.push(input(Some("Comment"), self.comment_input.read(cx).value().to_string()));
+                } else {
+                    fields.push(input(Some(star(&name_label, true).as_str()), self.name.read(cx).value().to_string()));
+                    fields.push(input(Some(star(&notes_label, notes_required).as_str()), notes_text));
+                }
+                fields.push(input(Some("Approvers"), String::new()));
+                fields.push(input(Some("Observers"), String::new()));
+                if obsoletion {
+                    fields.push(serde_json::json!({ "label": "Mark revision as re-releasable", "kind": "checkbox", "value": self.re_releasable }));
+                }
+                match self.mode {
+                    Mode::Release if self.draft.is_some() => vec!["Undo", "Redo", "Save draft", "Toggle Dropdown", "Apply", "Submit", "Release", "Close"],
+                    Mode::Release => vec!["Undo", "Redo", "Save draft", "Apply", "Submit", "Release", "Close"],
+                    Mode::Obsolete => vec!["Undo", "Redo", "Apply", "Submit", "Obsolete", "Close"],
+                    Mode::Review if !obsoletion && self.doc.read(cx).session.viewing.is_none() => vec!["Undo", "Redo", "Apply", "Clone", "Close"],
+                    Mode::Review => vec!["Undo", "Redo", "Apply", "Close"],
+                }
+            };
+            serde_json::json!({ "kind": "modal", "title": title, "fields": fields, "buttons": buttons })
         });
         let workflow = self.render_workflow(window, cx);
         v_flex()
@@ -2595,6 +2666,8 @@ fn confirm_delete_draft(doc: Entity<DocModel>, name: String, window: &mut Window
         let (doc, n) = (doc.clone(), name.clone());
         let text = format!("This will permanently delete {name} and cannot be undone.");
         let bold = 27..27 + name.len();
+        // (Over the draft's dialog, which draws after it: pinned, the frame's state.)
+        crate::ui_script::note_dialog_pinned(|| serde_json::json!({ "kind": "modal", "title": "Delete release candidate draft?", "fields": [], "buttons": ["Delete", "Cancel"] }));
         os::modal(dialog, "Delete release candidate draft?", 600.)
             .child(os::modal_body().child(div().text_size(px(14.)).text_color(p().text).child(StyledText::new(text).with_highlights([(bold, FontWeight::BOLD.into())]))))
             .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Delete"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
@@ -2900,9 +2973,9 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
                         let item = item.clone();
                         d.child(div().id(SharedString::from(format!("rh-obs-{k}"))).px(px(12.)).py(px(6.)).rounded(px(3.)).cursor_pointer().text_size(px(14.)).text_color(gpui_kit::rgb_static(0xffffff)).bg(gpui_kit::rgb(0xbd3039)).child("Obsolete revision").map(|d| crate::ui_script::mark(d, || "button:Obsolete revision".into())).on_click(move |_, window, cx| {
                             window.close_dialog(cx);
+                            // (Its Obsoletion name starts empty, required: live rel-obsolete.)
                             if let Some(it) = item.clone() {
-                                let name = format!("Obsolete {} {}", it.part_number, it.revision);
-                                open(d2.clone(), Mode::Obsolete, vec![it], name, String::new(), window, cx);
+                                open(d2.clone(), Mode::Obsolete, vec![it], String::new(), String::new(), window, cx);
                             }
                         }))
                     }

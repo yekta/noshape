@@ -7148,10 +7148,11 @@ fn release_parts_and_revision_history() {
     let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1", "notes": "first", "part_numbers": { "Part 1": "PRT-0001" } }));
     assert_eq!(r["items"][0]["revision"], "A", "{r}");
     assert_eq!(r["items"][0]["part_number"], "PRT-0001", "{r}");
-    // The release's part number, revision and state are the version's; the workspace keeps its own, empty (live2
-    // 11_studios_abc (c)).
+    // Released from the workspace: its part number stays there too, its revision and state are the version's (live
+    // rel-props-after-release: the workspace part reads PN, no revision, In progress).
     let parts = call(&mut ctx, "query_parts", json!({}));
-    assert_eq!(parts["parts"][0]["part_number"].as_str().unwrap_or(""), "", "{parts}");
+    let p = &parts["parts"][0];
+    assert_eq!((p["part_number"].as_str(), p["revision"].as_str().unwrap_or(""), p["state"].as_str().unwrap_or("In progress")), (Some("PRT-0001"), "", "In progress"), "{parts}");
     let h = call(&mut ctx, "history_list", json!({ "limit": 3 }));
     assert!(h["versions"].as_array().unwrap().iter().any(|v| v["name"] == "R1"), "{h}");
     call(&mut ctx, "history_view", json!({ "to": "R1" }));

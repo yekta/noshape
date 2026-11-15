@@ -358,11 +358,51 @@ fn make_version(session: &mut Session, mut pkg: Package, state: &str) -> anyhow:
             if kind == PackageKind::Release {
                 let mv = session.store.version(v)?.microversion;
                 write_release_props(session, mv, &pkg, state)?;
+                // A release from the workspace keeps its part numbers there too, after its version (its revision and
+                // state only in the release; live rel-props-after-release: the workspace's Properties then read the
+                // part number, no revision, In progress; Revert unchanged items finds the part changed since, as
+                // live's rel-rc-revert). One from inside a version leaves the workspace as it was (11_studios_abc).
+                write_workspace_part_numbers(session, &pkg)?;
             }
             v.to_string()
         }
     });
     Ok(pkg)
+}
+
+/// The release's part numbers on its items in the workspace (one edit, only when one changes).
+fn write_workspace_part_numbers(session: &mut Session, pkg: &Package) -> anyhow::Result<()> {
+    let ours: Vec<&ReleaseItem> = pkg.items.iter().filter(|i| i.document.is_none() && !i.part_number.trim().is_empty()).collect();
+    let changes = |doc: &noshape_model::document::Document| {
+        ours.iter().any(|i| match doc.tab(i.tab).map(|t| &t.content) {
+            Some(TabContent::PartStudio(ps)) => i.part.as_ref().is_some_and(|b| ps.part_properties.get(b).and_then(|p| p.part_number.as_deref()) != Some(i.part_number.as_str())),
+            Some(TabContent::Assembly(a)) => a.properties.part_number.as_deref() != Some(i.part_number.as_str()),
+            Some(TabContent::Drawing(d)) => d.meta.number != i.part_number,
+            _ => false,
+        })
+    };
+    if changes(&session.doc) {
+        // (Not an undoable step: live's Undo stays off after a release, rel-rc-release.)
+        session.edit_document_not_undoable(&format!("Release : {}", pkg.name), |doc| {
+            for i in &ours {
+                match doc.tab_mut(i.tab).map(|t| &mut t.content) {
+                    Some(TabContent::PartStudio(ps)) => {
+                        if let Some(b) = &i.part {
+                            ps.part_properties.entry(b.clone()).or_default().part_number = Some(i.part_number.clone());
+                        }
+                    }
+                    Some(TabContent::Assembly(a)) => a.properties.part_number = Some(i.part_number.clone()),
+                    Some(TabContent::Drawing(d)) => d.meta.number = i.part_number.clone(),
+                    _ => {}
+                }
+            }
+        })?;
+    }
+    // (A Variable Studio's or a file's part number is the tab's own, kept in the document's metadata.)
+    for i in ours.iter().filter(|i| !matches!(session.doc.tab(i.tab).map(|t| &t.content), Some(TabContent::PartStudio(_) | TabContent::Assembly(_) | TabContent::Drawing(_)))) {
+        session.store.set_meta(&format!("tab_part_number:{}", i.tab.0), Some(i.part_number.as_bytes()))?;
+    }
+    Ok(())
 }
 
 /// The release's values on its items in version state `mv`: part number, revision and `state`; a drawing's releaser

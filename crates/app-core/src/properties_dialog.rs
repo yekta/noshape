@@ -420,6 +420,26 @@ impl MetaForm {
         }
     }
 
+    /// The fields as live's recorder reads this form inside the Release candidate dialog's Edit properties view
+    /// (live rel-rc-edit-props): Name *, Description, the category's typeahead (labelled by its kind, empty), Vendor,
+    /// Project, Product line, Material, Titles, Exclude from all BOMs, Unit of measure, Override and Mass.
+    pub fn embedded_fields(&self, cx: &App) -> Vec<serde_json::Value> {
+        let text = |st: &Entity<InputState>| st.read(cx).value().to_string();
+        let input = |label: &str, value: String| serde_json::json!({ "label": label, "kind": "input", "value": value });
+        let kind = self.spec_category.strip_prefix("Onshape ").unwrap_or(self.spec_category);
+        let mut out = vec![input("Name *", text(&self.name)), input("Description", self.description.read(cx).value().to_string()), input(kind, String::new())];
+        out.extend([input("Vendor", text(&self.vendor)), input("Project", text(&self.project)), input("Product line", text(&self.product_line))]);
+        if let Some(m) = &self.material {
+            out.push(input("Material", m.clone()));
+        }
+        out.extend([input("Title 1", text(&self.titles[0])), input("Title 2", text(&self.titles[1])), input("Title 3", text(&self.titles[2]))]);
+        out.push(serde_json::json!({ "label": "Exclude from all BOMs", "kind": "checkbox", "value": self.exclude_from_bom }));
+        out.push(serde_json::json!({ "label": "Unit of measure", "kind": "select", "value": self.unit.clone().unwrap_or_else(|| DEFAULT_UNIT.to_string()) }));
+        out.push(serde_json::json!({ "label": "Override", "kind": "checkbox", "value": self.mass_on }));
+        out.push(input("Mass", if self.mass_on { text(&self.mass) } else { String::new() }));
+        out
+    }
+
     /// The form's current values.
     pub fn values(&self, cx: &App) -> MetaValues {
         let t = |s: &Entity<InputState>| s.read(cx).value().trim().to_string();
@@ -1039,7 +1059,10 @@ impl Render for MetaForm {
         let sourced = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio" | "Onshape Drawing");
         let titled = kind != "Onshape Feature Studio";
         let item = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio" | "Onshape File" | "Onshape Drawing");
-        self.note_ui_state(numbered, sourced, titled, item, cx);
+        // (Inside another dialog that dialog reports the state: the Release candidate's Edit properties view.)
+        if self.embedded.is_none() {
+            self.note_ui_state(numbered, sourced, titled, item, cx);
+        }
         let mut form = v_flex()
             .w_full()
             .gap(px(15.))

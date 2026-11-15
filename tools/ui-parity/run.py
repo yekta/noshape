@@ -369,6 +369,12 @@ def normalize_live(state):
         o = [x for x in f[:2] if isinstance(x, dict) and x.get("label") == "Override"]
         if len(o) == 2 and o[0].get("kind") == "checkbox" and o[1].get("kind") == "input":
             f = f[2:] + [dict(o[0], label="Mass Override")]
+        # From 2026-11-15 (rel-props-after-release): the category row labelled by its kind ("Part", empty), the Mass
+        # group last as an Override checkbox and a "Mass" field.
+        if len(f) > 1 and isinstance(f[1], dict) and f[1].get("label") in ("Part", "Assembly", "Drawing", "Part Studio", "Variable Studio", "Feature Studio", "File") and f[1].get("value") == "":
+            f[1] = dict(f[1], label="Category")
+        if len(f) >= 2 and isinstance(f[-2], dict) and isinstance(f[-1], dict) and f[-2].get("label") == "Override" and f[-2].get("kind") == "checkbox" and f[-1].get("label") == "Mass":
+            f = f[:-2] + [dict(f[-2], label="Mass Override")]
         d["fields"] = f
         for k in ("buttons", "disabledButtons"):
             if isinstance(d.get(k), list):
@@ -390,6 +396,10 @@ def normalize_live(state):
                     cmp[k] = cmp[k].replace(" :: Add feature : ", " :: Insert feature : ")
     # A studios run's document is "live2 uip <start> <time>" in live, "<start>" in ours (the navbar's rename field).
     focus = (state or {}).get("focus")
+    # A dialog titled after live's document copy ("live2 uip doc-versions <time>": the release's Add items picker).
+    dd = (state or {}).get("dialog")
+    if isinstance(dd, dict) and isinstance(dd.get("title"), str):
+        dd["title"] = re.sub(r"^live2? uip (\S+) \d{4}-\d\d-\d\dT[\d:]+$", r"\1", dd["title"])
     if isinstance(focus, dict) and isinstance(focus.get("text"), str) and re.match(r"^live2 uip \S+ \d{4}-\d\d-\d\dT[\d:]+", focus["text"]):
         n = len(focus["text"])
         focus["text"] = re.sub(r"^live2 uip (\S+) \d{4}-\d\d-\d\dT[\d:]+", r"\1", focus["text"])
@@ -790,6 +800,11 @@ def compare(live, ours, whole_document=True):
         nxt, do = steps[i + 1].get("do") or {}, s.get("do") or {}
         if isinstance(nxt, dict) and nxt.get("do") == "wait" and isinstance(do.get("on"), dict) and "menu" in do["on"] and settled(s.get("state")) == settled(prev):
             loading.add(s.get("step"))
+        # A dialog live still prepares, its fields to come ("Preparing Release candidate…", rel-*): ours, ready at once,
+        # is compared after the wait (parity is the result, not live's slowness).
+        dlg = (s.get("state") or {}).get("dialog")
+        if isinstance(nxt, dict) and nxt.get("do") == "wait" and isinstance(dlg, dict) and dlg.get("fields") == [] and "Preparing " in str(dlg.get("text") or ""):
+            loading.add(s.get("step"))
     for s in steps:
         if s.get("step") in loading:
             continue
@@ -807,6 +822,12 @@ def compare(live, ours, whole_document=True):
     start_name = scenario_start(live.get("scenario")) if isinstance(live.get("scenario"), str) else None
     free_plan = str(live.get("recorded") or "9") < LIVE_PROFESSIONAL_FROM
     picker_read = str(live.get("recorded") or "9") >= PICKER_READ_SINCE
+    # Each step's next live message, for toasts live shows a step late.
+    late_message = {}
+    for i, st in enumerate(steps[:-1]):
+        m = (steps[i + 1].get("state") or {}).get("message")
+        if isinstance(m, str):
+            late_message[f"step {st.get('step')}"] = re.sub(r" × Close$", "", m)
     # The pointer rests where a menu item was clicked until a step moves it (a wait or a key doesn't).
     resting, rest = set(), False
     for s in steps:
@@ -1088,6 +1109,10 @@ def compare(live, ours, whole_document=True):
             b["dialog"], b["focus"] = a["dialog"], a.get("focus")
         drawn_sizes(a, b)
         sheets_ref_hover_after_menu(a, b, name in resting)
+        # A toast live shows only by its next step (its server's answer: "R1 release candidate is saved in your release
+        # drafts." after Save draft, rel-drafts-panel), ours at once: not a difference.
+        if isinstance(a, dict) and isinstance(b, dict) and a.get("message") is None and b.get("message") and late_message.get(name) == b.get("message"):
+            a["message"] = b["message"]
         old_dimension_pick(a, b, str(live.get("recorded") or ""))
         placed_alike(a, b)
         cloud_menu(a, b)

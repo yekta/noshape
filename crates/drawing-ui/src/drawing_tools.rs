@@ -2299,25 +2299,14 @@ impl DrawingEditor {
         MenuEntry::Submenu("Move to".into(), items)
     }
 
-    /// A surface finish symbol (live behaviours A45): on an edge Edit... ·
-    /// Flip · Paste · Copy · Paste as table · Move to ▸; free Paste · Copy ·
-    /// Paste as table · Move to ▸; then Clear selection · Zoom to fit ·
-    /// Delete. No Add leader (qa DWG-SURFACE-FINISH-MENU).
+    /// A surface finish symbol, free or on an edge (live2 dom/context-menus-drawing-2.txt, 11-15): Edit... · (Paste
+    /// while drawing content is copied) · Copy · Paste as table · Add leader · Move to ▸ | Clear selection · Zoom to
+    /// fit · Delete.
     fn surface_finish_entries(&self, a: &Annotation, cx: &App) -> Vec<MenuEntry> {
         let id = a.id;
-        let on_edge = matches!(a.kind, AnnotationKind::SurfaceFinish { on: Some(_), .. });
         let mut out = Vec::new();
-        if on_edge {
-            let a2 = a.clone();
-            out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
-            out.push(MenuEntry::item("Flip", move |t, _, cx| {
-                t.edit_sheet("Flip", cx, |s| {
-                    if let Some(AnnotationKind::SurfaceFinish { on: Some(o), .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                        o.3 = !o.3;
-                    }
-                })
-            }));
-        }
+        let a2 = a.clone();
+        out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx)));
         out.push(crate::drawing_props::paste_always());
         out.push(MenuEntry::item("Copy", move |t, _, cx| {
             if !t.selection.contains(&Sel::Annotation(id)) {
@@ -2328,6 +2317,7 @@ impl DrawingEditor {
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
             t.paste_as_table(cx);
         }));
+        out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
         out.push(Self::move_to_entry(a));
         out.extend([
             MenuEntry::Separator,
@@ -2474,24 +2464,29 @@ impl DrawingEditor {
                     let edit = own.remove(0);
                     return self.live_order_entries(a, edit, own, false, cx);
                 }
-                // Weld symbols (live request 1736): Edit... · Copy · Paste ·
-                // Paste as table · Add leader | Clear selection · Zoom to fit ·
-                // Delete (Copy before Paste, unlike the other annotations; no
-                // Move to, no Remove leaders).
+                // Weld symbols, always on an entity (live2 dom/context-menus-drawing-2.txt, 11-15): Edit... · Flip ·
+                // (Paste while drawing content is copied) · Copy · Paste as table · Move to ▸ | Clear selection · Zoom
+                // to fit · Delete.
                 if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::Weld { .. })) {
                     let mut out = vec![MenuEntry::item("Edit...", move |t, w, cx| t.open_weld_edit(id, w, cx))];
+                    out.push(MenuEntry::item("Flip", move |t, _, cx| {
+                        t.edit_sheet("Flip", cx, |s| {
+                            if let Some(AnnotationKind::Weld { spec, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
+                                spec.flip = !spec.flip;
+                            }
+                        })
+                    }));
+                    out.push(crate::drawing_props::paste_always());
                     out.push(MenuEntry::item("Copy", move |t, _, cx| {
                         if !t.selection.contains(&Sel::Annotation(id)) {
                             t.selection = vec![Sel::Annotation(id)];
                         }
                         t.copy_entities(cx);
                     }));
-                    out.push(crate::drawing_props::paste_always());
                     out.push(MenuEntry::item("Paste as table", |t, _, cx| {
                         t.paste_as_table(cx);
                     }));
-                    out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
-                    let _ = a;
+                    out.push(Self::move_to_entry(a));
                     out.extend(Self::selection_tail());
                     return out;
                 }

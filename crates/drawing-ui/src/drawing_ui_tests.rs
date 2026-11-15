@@ -825,8 +825,27 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         ("edge-condition", with_tail(&["Edit...", "Copy", "Paste as table", "Add leader", "Remove leaders", "Move to ▸"])),
         ("ordinate", with_tail(&["Add to ordinate dimension group", "Edit...", "Paste as table", "Unbreak dimension"])),
         ("revision-table", with_tail(&["Revision table properties...", "Paste as table", "Move to ▸", "Bring to front", "Send to back"])),
+        ("surface-finish", with_tail(&["Edit...", "Copy", "Paste as table", "Add leader", "Move to ▸"])),
+        ("weld", with_tail(&["Edit...", "Flip", "Copy", "Paste as table", "Move to ▸"])),
     ];
     for (entity, rows) in live {
         assert_eq!(dump.get(entity), Some(&json!(rows)), "{entity}'s menu");
     }
+    // With a note copied every menu gains Paste (live2: after ctrl+c on a note): the note's after Explode note.
+    let note = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Note { .. })).map(|a| a.id)).expect("a note");
+    let (pick, at) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        let pick = b.picks.iter().position(|t| matches!(t, PickTarget::Annotation(id) if *id == note)).expect("the note's pick") as u32;
+        let x = b.geometry.texts.iter().find(|x| x.pick == pick).expect("its text");
+        (pick, [x.pos[0] + 1.0, x.pos[1] + x.height / 2.0])
+    });
+    let rows = cx.update(|cx| editor.update(cx, |e, cx| {
+        e.selection = vec![noshape_scene::drawing_tools::Sel::Annotation(note)];
+        e.copy_entities(cx);
+        e.cursor = at;
+        e.hover = Some(pick);
+        e.context_menu_entries(Some(pick), cx)
+    }));
+    assert_eq!(&flat(&rows)[..4], ["Edit note...", "Explode note", "Paste", "Copy"]);
 }
