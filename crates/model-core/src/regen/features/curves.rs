@@ -900,10 +900,10 @@ pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
         let Some(&fi) = pick else { return crate::regen::eval::err_at(&["edges"], "Offset only works on non-curve edges.") };
         b.shape.sub_shape(ShapeType::Face, fi as usize)?
     };
-    if face.face_plane()?.is_none() {
-        return err("Offset curve currently supports planar faces only");
-    }
-    let Some(pl) = face.face_plane()? else { return err("Offset curve currently supports planar faces only") };
+    let Some(pl) = face.face_plane()? else {
+        let new_edges = offset_parallels(&face, &edges, d, ev.is("offsetType", "EUCLIDEAN"))?;
+        return finish_offset(ev, &face, new_edges, extend, split);
+    };
     let n = pl.unit_normal();
     let chain = order_chain(&edges, 1e-6)?;
     let round = ev.is("gapFill", "ROUND");
@@ -914,9 +914,17 @@ pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
         let linear = matches!(c.0.edge_curve()?, k::Curve::Line { .. });
         bases.push((if linear { vec![pts[0], pts[pts.len() - 1]] } else { pts }, linear));
     }
+    // (A closed edge's points wrap round: its ends' neighbours are each other's (live 2538: the pin's top edge 2 mm in
+    // is a Ø6 circle).)
+    let closed = |pts: &[DVec3]| pts.len() > 2 && (pts[0] - pts[pts.len() - 1]).length() < 1e-9;
     let offset_pts = |pts: &[DVec3], dist: f64| -> Vec<DVec3> {
         let m = pts.len();
-        (0..m).map(|i| pts[i] + n.cross((pts[(i + 1).min(m - 1)] - pts[i.saturating_sub(1)]).normalize_or(DVec3::X)) * dist).collect()
+        let (prev, next) = if closed(pts) { (pts[m - 2], pts[1]) } else { (pts[0], pts[m - 1]) };
+        (0..m).map(|i| {
+            let a = if i == 0 { prev } else { pts[i - 1] };
+            let b = if i + 1 == m { next } else { pts[i + 1] };
+            pts[i] + n.cross((b - a).normalize_or(DVec3::X)) * dist
+        }).collect()
     };
     // Side: the offset of the first edge's middle must lie on the face.
     let on_face = |dist: f64| -> f64 {
@@ -944,7 +952,13 @@ pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
                 new_edges.push(k::make_line(pe, pts[0])?);
             }
         }
-        new_edges.push(if *linear { k::make_line(pts[0], pts[pts.len() - 1])? } else { k::make_interpolated_spline(&pts, &[], false)? });
+        new_edges.push(if *linear {
+            k::make_line(pts[0], pts[pts.len() - 1])?
+        } else if closed(base) {
+            k::make_interpolated_spline(&pts[..pts.len() - 1], &[], true)?
+        } else {
+            k::make_interpolated_spline(&pts, &[], false)?
+        });
         prev_end = Some((pts[pts.len() - 1], base[base.len() - 1]));
     }
     // The offset as far as it lies on the face (live: a side leaning in stops it there).
@@ -974,15 +988,67 @@ pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
             new_edges = fwd;
         }
     }
+    finish_offset(ev, &face, new_edges, extend, split)
+}
+
+/// The offset's scope: extended to the face's boundary, imprinted on it, trimmed.
+fn finish_offset(ev: &mut EvalCtx, face: &Shape, mut new_edges: Vec<Shape>, extend: bool, split: bool) -> FResult<()> {
     if extend {
-        extend_to_face_boundary(&mut new_edges, &face, ev.model_extent())?;
+        extend_to_face_boundary(&mut new_edges, face, ev.model_extent())?;
     }
     if split {
-        return split_by_offset(ev, &face, &new_edges);
+        return split_by_offset(ev, face, &new_edges);
     }
     let wire = k::make_wire(&new_edges)?;
     let wire = if extend && ev.bool("trim") { trim_offset(ev, &wire, &new_edges)? } else { wire };
     add_wire_bodies(ev, vec![wire])
+}
+
+/// Circles around a cylinder's or cone's axis offset on its face (live 2538, start pin: the top edge 2 mm down the
+/// side is the circle at z 28): each point moved along the face's generator, the same for a geodesic and a Euclidean
+/// distance. A Euclidean offset as far as the edge's radius fails in live (its tube about the edge folds onto itself).
+fn offset_parallels(face: &Shape, edges: &[Shape], d: f64, euclidean: bool) -> FResult<Vec<Shape>> {
+    const FAILED: &str = "Could not compute offset with given parameters.";
+    let unsupported = || err("Offset curve supports planar faces, and circles around a cylinder's or cone's axis");
+    let (axis, apex) = match face.face_surface()? {
+        k::Surface::Cylinder { axis, .. } => (axis.normalize(), None),
+        k::Surface::Cone { axis, apex, .. } => (axis.normalize(), Some(apex)),
+        _ => return unsupported(),
+    };
+    let generator = |p: DVec3| apex.map_or(axis, |a: DVec3| (p - a).normalize_or(axis));
+    let mut moved: Vec<(Vec<DVec3>, bool)> = Vec::new();
+    for e in edges {
+        let k::Curve::Circle { axis: ca, radius, .. } = e.edge_curve()? else { return unsupported() };
+        if ca.normalize().cross(axis).length() > 1e-9 {
+            return unsupported();
+        }
+        if euclidean && d >= radius - 1e-9 {
+            return err(FAILED);
+        }
+        let info = e.edge_info()?;
+        let pts: Vec<DVec3> = [0.0, 0.5, 1.0].iter().map(|t| e.point_at(info.first_param + (info.last_param - info.first_param) * t)).collect::<Result<_, _>>()?;
+        let closed = (pts[0] - pts[2]).length() < 1e-9;
+        moved.push((pts, closed));
+    }
+    let at = |pts: &[DVec3], s: f64| -> Vec<DVec3> { pts.iter().map(|&p| p + generator(p) * s).collect() };
+    let off_face = |s: f64| -> f64 {
+        let q = at(&moved[0].0, s)[1];
+        k::make_vertex(q).and_then(|v| k::distance(face, &v)).map(|x| x.distance).unwrap_or(f64::INFINITY)
+    };
+    let tol = 1e-7 * d.max(1e-3);
+    let s = [d, -d].into_iter().map(|s| (off_face(s), s)).filter(|(g, _)| *g < tol).map(|(_, s)| s).next();
+    let Some(s) = s else { return err(FAILED) };
+    moved.iter().map(|(pts, closed)| {
+        let q = at(pts, s);
+        let shape = if *closed {
+            let center = q[1] - (q[1] - q[0]) * 0.5;
+            let r = (q[1] - center).length();
+            k::make_circle(center, axis, r)
+        } else {
+            k::make_arc_3pts(q[0], q[1], q[2])
+        };
+        shape.map_err(|e| FeatureError::new(format!("{FAILED} ({e})")))
+    }).collect()
 }
 
 /// Offset, extend and split (live 1813): the offset's edges imprinted on the face's body, no wire body.

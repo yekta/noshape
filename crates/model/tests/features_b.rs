@@ -1116,6 +1116,51 @@ fn offset_curve_extends_to_the_face_boundary() {
     }
 }
 
+/// Offset curve on start pin (live 2538, psui's offset-curve scenarios): a Ø10 × 30 pin's top edge, no targets.
+/// Geodesic 2 mm runs down the side (the circle at z 28), 25 mm too (z 5), Flip onto the top face (Ø6 at z 30);
+/// Euclidean 25 mm fails in live; Offset, extend and split cuts the side in two.
+#[test]
+fn offset_curve_runs_down_a_cylinder() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, 0.005);
+    let id = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.extrude_largest(id, "30 mm");
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let e = b.shape.edges().iter().position(|e| e.bounding_box(true).is_ok_and(|bb| near(bb.min.z, 0.03, 1e-9) && near(bb.max.z, 0.03, 1e-9))).unwrap();
+    let edge = Reference::Edge((*b.edges[e]).clone());
+    let add = |s: &mut Studio, d: &'static str, flip: bool, euclidean: bool, scope: &'static str| {
+        let edge = edge.clone();
+        s.add("offsetCurveOnFace", move |p| {
+            p.set("edges", ParamValue::Query(vec![edge]));
+            p.set("distance", expr(d));
+            p.set("oppositeDirection", ParamValue::Bool(flip));
+            p.set("offsetType", ParamValue::Enum(if euclidean { "EUCLIDEAN" } else { "GEODESIC" }.into()));
+            p.set("scope", ParamValue::Enum(scope.into()));
+        })
+    };
+    for (d, flip, z, len) in [("2 mm", false, 0.028, 0.0314159), ("25 mm", false, 0.005, 0.0314159), ("2 mm", true, 0.03, 0.0188496)] {
+        let f = add(&mut s, d, flip, false, "OFFSET");
+        let r = s.ok();
+        let w = r.context.bodies.iter().position(|b| b.id.feature == f).expect("the offset");
+        let c = r.context.bodies[w].shape.bounding_box(true).unwrap().center();
+        assert!(near(c.z, z, 1e-7) && c.truncate().length() < 1e-7 && near(wire_length(&r, w), len, 1e-6), "{d} {flip}: {c:?} {}", wire_length(&r, w));
+        s.ps.features.retain(|x| x.id != f);
+    }
+    let f = add(&mut s, "25 mm", false, true, "OFFSET");
+    let r = s.regen();
+    let st = r.display.features.iter().find(|x| x.id == f).unwrap();
+    assert!(st.status == FeatureStatus::Error && st.message.as_deref() == Some("Could not compute offset with given parameters."), "{:?} {:?}", st.status, st.message);
+    s.ps.features.retain(|x| x.id != f);
+    let f = add(&mut s, "25 mm", false, false, "OFFSET_EXTEND_AND_SPLIT");
+    let r = s.ok();
+    assert!(!r.context.bodies.iter().any(|b| b.id.feature == f) && r.context.bodies.len() == 1);
+    let mut sides: Vec<f64> = r.context.bodies[0].shape.faces().iter().filter(|x| x.face_plane().is_ok_and(|p| p.is_none())).map(|x| x.area().unwrap() * 1e6).collect();
+    sides.sort_by(f64::total_cmp);
+    assert!(sides.len() == 2 && near(sides[0], std::f64::consts::PI * 10.0 * 5.0, 1e-4) && near(sides[1], std::f64::consts::PI * 10.0 * 25.0, 1e-4), "{sides:?}");
+}
+
 #[test]
 fn offset_curve_move_boundary_mutual_trim() {
     let mut s = block();
