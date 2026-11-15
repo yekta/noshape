@@ -5,7 +5,7 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
-## 11-15 12:00 UTC: in flight
+## 11-15 11:52 UTC: in flight
 - Branch dx-spline2 (6bc12e944, tests pass, not landed): crop spline chord-length, broken-out centripetal (live2 traces
   11-15; `SplineKnots` in cad_objects, `closed_spline(pts, n, knots)`). Waits on studios' profile-tool snap reach (7 px
   inside, their next batch): our scenario clicks snap onto the block's edges (crop crosses 5.3 / 25.3 for live's 6.5 /
