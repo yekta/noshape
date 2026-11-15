@@ -2324,14 +2324,14 @@ impl DrawingEditor {
 
     pub(crate) fn move_to_entry(a: &Annotation) -> MenuEntry {
         let (id, cur) = (a.id, a.layer);
-        let layers = SheetLayer::FORMAT.iter().copied().chain((!cur.is_drawing()).then_some(SheetLayer::Drawing));
+        let layers = SheetLayer::FORMAT.iter().copied().chain([SheetLayer::Drawing]);
         let items = layers
-            .filter(|l| *l != cur)
             .map(|l| {
                 MenuEntry::item(l.name(), move |t, _, cx| {
                     let ids: Vec<u64> = t.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { Some(*x) } else { None }).chain([id]).collect();
                     t.edit_sheet("Move to", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.layer = l));
                 })
+                .disabled(l == cur)
             })
             .collect();
         MenuEntry::Submenu("Move to".into(), items)
@@ -2694,6 +2694,10 @@ impl DrawingEditor {
                     t.redraw(cx);
                 }));
                 out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
+                // An annotation selected: Delete too (live2 drw-datum-copy-paste s6).
+                if self.selection.iter().any(|s| matches!(s, Sel::Annotation(_))) {
+                    out.push(MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)));
+                }
             }
             None => {
                 // Onshape's empty-sheet menu (live drawing/290): [Paste,]

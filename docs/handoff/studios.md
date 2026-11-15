@@ -9,34 +9,40 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-15 21:45 UTC.
+Updated 2026-11-15 22:46 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-- Foreshorten (20:40): the radial's menus in live's order (no Show as diameter; the foreshortened one without
-  Edit...), the value where it was through Foreshorten / Remove foreshorten (`remove_foreshorten` rebuilds the knee
-  from its place; agent API description + e2e), a radius stays selected after Esc and after Remove foreshorten.
-  drw-dimension-radius and the drawing menu takes match; drw-dimension-foreshorten matches but for the value's x.
+- 53ff8e254: an auxiliary view's own label 3.1 mm under it, as a section's.
+- b13ba80df, live2's 11-15 retakes (drawing-ui tests pass on the Mac):
+  - the Note panel and the dimension palette report in the 11-15 reader's form (`{kind: "cell-format" | "palette",
+    fields, old}`; the runner takes `old` for older takes); the palette's untyped value follows a precision picked
+  - Paste from a menu lands at the pointer where Paste was clicked
+  - Move to ▸ lists every layer, the annotation's own greyed; Send to back is greyed only with nothing else on the
+    sheet
+  - the empty sheet's menu with an annotation selected ends with Delete (drw-datum-copy-paste s6)
+  - a datum target's picked anchor reads EDGE of its view; "Insert custom table of <source> ..."; run.py maps live's
+    "start … Copy n" row names
+- Checked on vibe6 (20 takes: the 15 new-reader drawing takes + 5 old-form ones) before the palette precision, Move
+  to and Delete fixes: 11 match, the rest are listed below. The full drawing run waits for a free slot.
 
 ## Waiting on others
-- live2's 10 retakes (queued 21:35, current reader; shots /root/onshape-research/live/uip/<name>-<step>.png). Their
-  answers, to act on when they are on main:
-  - drw-centermark / -align: now wait 2 s after Escape. The automatic mark exists from step 1, the DXF has one mark,
-    no Single mark survives (as dx's capture, our 60c111a68). Live's annotation reader flickers 0 / 1 on this mark.
-  - drw-insert-view-top-1to1 s7: VIEW Top again: the placed view stays selected (ours EDGE).
-  - drw-note-move-to-title-block s8, drw-view-align-horizontally s4: what's lit after the menu closes is the Front
-    view's edge under the pointer; in view-align, Right (whose menu was used) stays lit too.
-  - drw-datum-target-hide-dim s3: EDGE Front.
-  - drw-auxiliary-view-no-indicator: the note's y is 100.5 again (ours 98.0): ours to fix.
-  - drw-datum-copy-paste: the paste lands at the pointer where Paste was clicked + (3.0, 5.7) mm in both runs.
-  - The "(in)" panel in drw-dimension-dblclick-precision / -tolerance-symmetrical is the dimension palette (the old
-    reader saw only its Units select); a sheet click keeps it open (the halo).
+- live2 (22:40 asked): drw-datum-copy-paste s6's Add leader on a datum (what it does; which rows a note, a dimension, a
+  view get there) and why s7's Paste row was 5 mm above the pointer (menu flipped or shifted to fit). Ours pastes
+  at y 41.0 against live's 50.8 because our menu opens below the pointer.
+- live2: a projected view's "View orientation" submenu (drw-view-align-horizontally).
 - live: drw-hole-callout-palette retake.
+- live2's 11-15 retakes, as answered:
+  - drw-centermark / -align: live's reader flickers 0 / 1 on the automatic mark: a known mismatch.
+  - drw-insert-view-top-1to1 s7 (VIEW Top), drw-note-move-to-title-block s8, drw-view-align-horizontally s4: what
+    the 11-15 reader lights after a menu closes (the edge under the pointer); ours differs, left as reader artefacts.
 
 ## Open (no owner action possible yet)
+- Full run of my areas (vibe5, 11-15 ~22:00, before the batch in flight): 992 of 1004 takes match. Besides the
+  takes above: asm-cylindrical-limits (old).
 - drw-insert-view-top-1to1: live reads VIEW where five other Insert view takes read EDGE (the reader's pixels).
 - drw-hole-callout-palette steps 17-18: our callout's leader is lit inside Top's box after the palette closes; live
   reads []. Near the reader's 60 px threshold.
@@ -54,13 +60,12 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncomm
   the code before taking an item from it.
 
 ## Next, in order
-1. In the worktree, testing: a radius's value dropped inside its hole sits halfway from the centre to the circle's
-   0° point (live2 feel/foreshorten-s3: the DXF's MTEXT middle centre at centre + r/2 in x). Then land, rerun
-   drw-dimension-foreshorten on vibe5 after the full run there.
-2. Rerun the takes live2 retakes (list above) as they land.
-3. Refresh docs/parity/drawing-matrix.md (last 11-15 14:30: 949 of 1868 live items compared and matching).
-4. interaction-feel.md's remaining "?" rows in Drawings / Documents / Assembly (ask live2 for the missing captures).
-5. A full run of my areas' takes (655 non-drawing, about 290 drawing) on vibe5 to catch regressions since 15:05.
+1. Land the batch above when the sample run is clean; rerun all drawing takes on vibe5 or vibe6 when a slot frees.
+2. drw-datum-copy-paste: Add leader and the menu's placement, from live2's answer.
+3. View orientation on a projected view's menu, from live2's answer.
+4. Refresh docs/parity/drawing-matrix.md (last 11-15 14:30: 949 of 1868 live items compared and matching).
+5. interaction-feel.md's remaining "?" rows in Drawings / Documents / Assembly (ask live2 for the missing captures).
+6. A full run of the 655 non-drawing takes of my areas to catch regressions since 15:05.
 
 ## How to run
 

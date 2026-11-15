@@ -84,6 +84,9 @@ pub struct PaletteDlg {
     at: Option<[f32; 2]>,
     /// A click went into it: from then on its halo keeps it open (live2 dim-palette-halo).
     touched: bool,
+    /// The value box's text at a new precision, set on the next render (live2 drw-dimension-dblclick-precision: an
+    /// untyped value follows the precision picked, 1.575 -> 1.6).
+    retext: Option<String>,
     pub orig: Annotation,
     /// The edited annotation; on a hole callout its format's precision /
     /// tolerance are the selected value's (`hole_sel`), the hole Ø's kept in
@@ -236,7 +239,7 @@ impl DrawingEditor {
         let diam = (a.format.precision, a.format.tolerance.clone());
         let multi = !others.is_empty();
         let committed = if crate::ui_script::active() { self.ui_annotations().into_iter().map(|(id, _, t)| (id, t)).collect() } else { Vec::new() };
-        self.palette = Some(PaletteDlg { id, committed, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, at: None, touched: false, orig: a.clone(), base: a.clone(), cur: a, hole_sel: HoleValue::Diameter, diam, others, varies, _subs: subs });
+        self.palette = Some(PaletteDlg { id, committed, hole, above, prefix, value, suffix, below, tol_a, tol_b, target: 1, tol, at: None, touched: false, retext: None, orig: a.clone(), base: a.clone(), cur: a, hole_sel: HoleValue::Diameter, diam, others, varies, _subs: subs });
         // Several: what the palette shows as opened is the base the edits are
         // measured from.
         if multi {
@@ -254,10 +257,7 @@ impl DrawingEditor {
         let u = self.palette.as_ref().map(|d| noshape_model::drawing::format::length_units(&self.drawing, &d.cur.format));
         // The measured value: a typed one different from it overrides (an
         // existing override stays while other fields change).
-        let measured = self.palette.as_ref().map(|d| {
-            let rotation = d.orig.kind.view().and_then(|v| self.placement(v)).map(|p| p.rotation).unwrap_or(0.0);
-            d.orig.kind.measured(rotation).map(|m| noshape_model::drawing::format::format_len(&self.drawing, &noshape_model::drawing::DimFormat { show_units: false, value: None, ..d.orig.format.clone() }, m)).unwrap_or_default()
-        });
+        let measured = self.palette.as_ref().map(|d| self.palette_measured(d));
         let Some(d) = &mut self.palette else { return };
         let Some(u) = u else { return };
         let val = |st: &Entity<InputState>| st.read(cx).value().to_string();
@@ -269,7 +269,7 @@ impl DrawingEditor {
         f.suffix = val(&d.suffix);
         noshape_ops::drawing::set_tolerance(f, d.tol, m(&d.tol_a).unwrap_or(0.0), m(&d.tol_b).unwrap_or(0.0));
         // A typed value overrides the dimension's text (D39).
-        let typed = val(&d.value);
+        let typed = d.retext.clone().unwrap_or_else(|| val(&d.value));
         if typed == VARIES {
             self.palette_preview(cx);
             return;
@@ -315,12 +315,29 @@ impl DrawingEditor {
         self.palette_from_inputs(cx);
     }
 
+    /// The dimension's measured value as its value box shows it at the palette's current format.
+    fn palette_measured(&self, d: &PaletteDlg) -> String {
+        let rotation = d.orig.kind.view().and_then(|v| self.placement(v)).map(|p| p.rotation).unwrap_or(0.0);
+        let fmt = noshape_model::drawing::DimFormat { show_units: false, value: None, ..d.cur.format.clone() };
+        d.orig.kind.measured(rotation).map(|m| noshape_model::drawing::format::format_len(&self.drawing, &fmt, m)).unwrap_or_default()
+    }
+
     /// Change the edited annotation (dropdowns, toggles) and preview it.
     /// A pick in one of its lists or toggles: made at once, so Esc closing the palette keeps it (live: a precision
     /// picked stays after Esc, behaviours "Dimension palette opened by double-click", drw-hole-callout-palette).
-    fn edit_palette(&mut self, f: impl FnOnce(&mut PaletteDlg), cx: &mut Context<Self>) {
+    pub(crate) fn edit_palette(&mut self, f: impl FnOnce(&mut PaletteDlg), cx: &mut Context<Self>) {
+        let before = self.palette.as_ref().map(|d| self.palette_measured(d));
         if let Some(d) = &mut self.palette {
             f(d);
+        }
+        if let Some(d) = &self.palette
+            && !d.hole
+            && before.as_deref() == Some(d.retext.clone().unwrap_or_else(|| d.value.read(cx).value().to_string()).as_str())
+        {
+            let after = self.palette_measured(d);
+            if let Some(d) = &mut self.palette {
+                d.retext = Some(after);
+            }
         }
         self.palette_from_inputs(cx);
         self.commit_palette(cx);
@@ -415,6 +432,9 @@ impl DrawingEditor {
     }
 
     pub fn render_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if let Some((st, t)) = self.palette.as_mut().and_then(|d| Some((d.value.clone(), d.retext.take()?))) {
+            st.update(cx, |s, cx| s.set_value(t, window, cx));
+        }
         let d = self.palette.as_ref()?;
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
@@ -438,10 +458,27 @@ impl DrawingEditor {
         };
         // Live's recorder reads the dimension palette's one text, its unit (live2 drw-dimension-edit: "(in)"), then an
         // open drop-down's rows (live2 drw-dimension-dblclick-precision: "(in)", "0", "0.1", …).
+        // Since 2026-11-15.1 it reads the palette's fields, the value as "Quantity" (live2 drw-dimension-dblclick-precision
+        // 11-15); the runner takes `old` for older takes.
         if !hole && crate::ui_script::active() {
             let rows: Vec<serde_json::Value> = crate::os_menu::ui_state(cx).and_then(|l| l["rows"].as_array().cloned()).unwrap_or_default();
             let text: Vec<serde_json::Value> = std::iter::once(serde_json::json!(unit_label)).chain(rows).collect();
-            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": unit_label, "text": text }));
+            let value = |st: &Entity<InputState>| st.read(cx).value().to_string();
+            let fields = serde_json::json!([
+                { "label": "Text above", "kind": "input", "value": value(&d.above) },
+                { "label": "Prefix", "kind": "input", "value": value(&d.prefix) },
+                { "label": "Quantity", "kind": "combo", "value": value(&d.value) },
+                { "label": "Value", "kind": "text", "value": null },
+                { "label": "Units", "kind": "select", "value": unit_label },
+                { "label": "Suffix", "kind": "input", "value": value(&d.suffix) },
+                { "label": "Text below", "kind": "input", "value": value(&d.below) },
+            ]);
+            crate::ui_script::note_dialog(|| serde_json::json!({
+                "kind": "palette",
+                "title": "Dimension palette",
+                "fields": fields,
+                "old": { "kind": "drawing-panel", "title": unit_label, "text": text },
+            }));
         }
         // A focused box: live's 1 px rgba(82,168,236,.8) border with an 8 px
         // rgba(82,168,236,.6) glow (dom/drawing-dimension-edit-dialog.txt).

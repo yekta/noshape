@@ -359,6 +359,9 @@ impl DrawingEditor {
                     }
                 }
             }
+            // A datum target's anchor picked on a view: its edge lit until the target is placed (live2
+            // drw-datum-target-hide-dim 11-15, step 3).
+            Tool::DatumTarget { anchor: Some(PickedPoint { view, .. }) } if *view != noshape_model::drawing::SHEET_VIEW => selection.push(("EDGE".into(), self.ui_view_name(*view))),
             // A datum's edge until it is placed (drw-datum).
             Tool::Datum { anchor: Some(_) } if let Some((v, _)) = self.datum_at => selection.push(("EDGE".into(), self.ui_view_name(v))),
             // The edge the last symbol was placed on (drw-surface-finish).

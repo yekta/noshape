@@ -224,23 +224,26 @@ impl DrawingEditor {
         if a.ann_group.is_some() {
             out.push(MenuEntry::item("Remove from grouped annotation", move |t, _, cx| t.edit_sheet("Remove from grouped annotation", cx, |s| ae::group_annotations(s, &[id], false))));
         }
-        // Move to ▸ a format layer (or back to the drawing).
+        // Move to ▸ a format layer or the drawing, its own layer greyed (live2 drw-note-move-to-title-block).
         let cur = a.layer;
-        let layers = noshape_model::drawing::SheetLayer::FORMAT.iter().copied().chain((!cur.is_drawing()).then_some(noshape_model::drawing::SheetLayer::Drawing));
+        let layers = noshape_model::drawing::SheetLayer::FORMAT.iter().copied().chain([noshape_model::drawing::SheetLayer::Drawing]);
         let items = layers
-            .filter(|l| *l != cur)
             .map(|l| {
                 MenuEntry::item(l.name(), move |t, _, cx| {
                     let ids: Vec<u64> = t.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { Some(*x) } else { None }).chain([id]).collect();
                     t.edit_sheet("Move to", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.layer = l));
                 })
+                .disabled(l == cur)
             })
             .collect();
         out.push(MenuEntry::Submenu("Move to".into(), items));
-        // The annotation list is the draw order: front = last.
-        let list = &self.current_sheet().annotations;
+        // The annotation list is the draw order: front = last. Behind the first are the sheet's views, tables and
+        // images (live2 drw-note-move-to-title-block: a lone note with views offers Send to back).
+        let sheet = self.current_sheet();
+        let list = &sheet.annotations;
         let at = list.iter().position(|x| x.id == id);
-        let (front, back) = (at == Some(list.len().saturating_sub(1)), at == Some(0));
+        let alone = sheet.views.is_empty() && sheet.tables.is_empty() && sheet.images.is_empty();
+        let (front, back) = (at == Some(list.len().saturating_sub(1)), at == Some(0) && alone);
         out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_annotation(id, true, cx)).disabled(front));
         out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_annotation(id, false, cx)).disabled(back));
         out.push(MenuEntry::Separator);

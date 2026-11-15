@@ -311,14 +311,14 @@ impl DrawingEditor {
                 t.edit_sheet("Remove section", cx, |s| noshape_scene::drawing_tools::remove_broken_out(s, pl.as_ref(), id, index));
             }));
         }
-        // Live (drawing context menu): "Insert custom table of Part Studio 1…";
-        // assemblies: "Insert BOM for Assembly 1 ..." (live drawing/1108).
+        // Live (drawing context menu): "Insert custom table of Part Studio 1 ..." (a space before the dots, live2
+        // drw-view-align-horizontally's menu); assemblies: "Insert BOM for Assembly 1 ..." (live drawing/1108).
         if let Some(root) = views::root_view(sheet, id).and_then(|r| sheet.view(r))
             && let ViewKind::Base { source, .. } = &root.kind
             && let Some(t) = self.doc.read(cx).session.doc.tab(*source)
         {
             match t.content {
-                noshape_model::TabContent::PartStudio(_) => out.push(MenuEntry::item(format!("Insert custom table of {}...", t.name), move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Custom, view: Some(id), origin: None }, cx))),
+                noshape_model::TabContent::PartStudio(_) => out.push(MenuEntry::item(format!("Insert custom table of {} ...", t.name), move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Custom, view: Some(id), origin: None }, cx))),
                 noshape_model::TabContent::Assembly(_) => out.push(MenuEntry::item(format!("Insert BOM for {} ...", t.name), move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Bom, view: Some(id), origin: None }, cx))),
                 _ => {}
             }

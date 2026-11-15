@@ -284,9 +284,8 @@ impl DrawingEditor {
         let layers: Vec<MenuEntry> = SheetLayer::FORMAT
             .iter()
             .copied()
-            .chain((!cur.is_drawing()).then_some(SheetLayer::Drawing))
-            .filter(|l| *l != cur)
-            .map(|l| MenuEntry::item(l.name(), move |t, _, cx| t.edit_table(id, "Move to", cx, |t| t.layer = l)))
+            .chain([SheetLayer::Drawing])
+            .map(|l| MenuEntry::item(l.name(), move |t, _, cx| t.edit_table(id, "Move to", cx, |t| t.layer = l)).disabled(l == cur))
             .collect();
         out.push(MenuEntry::Submenu("Move to".into(), layers));
         // The table list is the stacking order. Live drawing/289, live2 REQUESTS 11-14 00:48: greyed only with no

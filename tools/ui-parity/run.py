@@ -1261,6 +1261,12 @@ def compare(live, ours, whole_document=True):
                 dr["tab"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)? ", "Part Studio 1 ", dr["tab"])
                 # A tab name live's lane document already had gets " (1)" (live2 drw-detail-view).
                 dr["tab"] = re.sub(r" \(\d+\)$", "", dr["tab"])
+        # A view's menu names its source as the dialogs do ("Insert custom table of start block Copy 1 ...", "Switch to
+        # start block Copy 1": live2 drw-view-align-horizontally).
+        for side in (a, b):
+            lst = side.get("list")
+            if isinstance(lst, dict) and isinstance(lst.get("rows"), list):
+                lst["rows"] = [re.sub(r"\bstart (?!asm\b)[\w-]+( Copy \d+)?(?= \.\.\.$|$)", "Part Studio 1", r) if isinstance(r, str) else r for r in lst["rows"]]
         # Live's pixel reader lists what is drawn selected in its own scan order ([Top, Detail] for a detail view and its
         # boundary in the parent, drw-view-rotate-*): compared as a set.
         for side in (a, b):

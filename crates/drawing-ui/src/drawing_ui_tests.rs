@@ -376,6 +376,31 @@ fn the_dimension_palette_stays_open_on_enter_and_closes_on_a_click_away(cx: &mut
     assert!(cx.update(|cx| editor.read(cx).palette.is_none()), "Esc closes it");
 }
 
+/// Live2 drw-dimension-dblclick-precision: the palette's untyped value follows a precision picked (1.575 -> 1.6;
+/// here 40,00 -> 40,0000),
+/// and isn't made an override by it.
+#[gpui::test]
+fn the_dimension_palettes_value_follows_a_precision_picked(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "palette-precision");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::LinearDimension { .. })).map(|a| a.id)).expect("a linear dimension");
+    // (Trailing zeros shown: a whole value reads its precision.)
+    cx.update(|cx| editor.update(cx, |e, _| e.drawing.props.trailing_zeros = true));
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_dim_palette(id, w, cx))).unwrap();
+    draw(cx, window);
+    let shown = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).palette.as_ref().map(|d| d.value.read(cx).value().to_string())).expect("the palette");
+    let before = shown(cx);
+    cx.update(|cx| editor.update(cx, |e, cx| e.edit_palette(|d| d.cur.format.precision = Some(4), cx)));
+    draw(cx, window);
+    let after = shown(cx);
+    assert!(after != before && after.rsplit([',', '.']).next().map(str::len) == Some(4), "{before} at 0.0001: {after}");
+    let over = cx.update(|cx| editor.read(cx).palette.as_ref().map(|d| d.cur.kind.clone()));
+    assert!(matches!(over, Some(noshape_model::drawing::AnnotationKind::LinearDimension { override_text: None, .. })), "no override: {over:?}");
+}
+
 /// Live2 dim-palette-halo: a transparent halo (40 px left, 20 right, 30 above and below) around the dimension palette
 /// closes a palette not yet clicked into, and keeps it open once it has been (a click into Prefix, a Precision pick).
 #[gpui_kit::test]
@@ -997,6 +1022,29 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         e.context_menu_entries(Some(pick), cx)
     }));
     assert_eq!(&flat(&rows)[..4], ["Edit note...", "Explode note", "Paste", "Copy"]);
+    // Move to ▸ lists every layer, the note's own greyed; with views behind it Send to back is never greyed (live2
+    // drw-note-move-to-title-block).
+    let state = |label: &str| rows.iter().find_map(|e| match e {
+        MenuEntry::Item { label: l, disabled, .. } if l.as_ref() == label => Some(*disabled),
+        _ => None,
+    });
+    assert_eq!(state("Send to back"), Some(false));
+    assert!(cx.update(|cx| !editor.read(cx).current_sheet().views.is_empty()));
+    let layers: Vec<(String, bool)> = rows.iter().find_map(|e| match e {
+        MenuEntry::Submenu(l, items) if l.as_ref() == "Move to" => Some(items.iter().filter_map(|i| match i {
+            MenuEntry::Item { label, disabled, .. } => Some((label.to_string(), *disabled)),
+            _ => None,
+        }).collect()),
+        _ => None,
+    }).expect("Move to ▸");
+    assert_eq!(layers, [("Border frame".into(), false), ("Border zones".into(), false), ("Title block".into(), false), ("Drawing".into(), true)]);
+    // The empty sheet with an annotation selected ends with Delete (live2 drw-datum-copy-paste s6).
+    let rows = cx.update(|cx| editor.update(cx, |e, cx| {
+        e.cursor = [5.0, 5.0];
+        e.hover = None;
+        e.context_menu_entries(None, cx)
+    }));
+    assert_eq!(flat(&rows), ["Paste", "Copy", "Paste as table", "——", "Clear selection", "Zoom to fit", "Delete"]);
 }
 
 /// Live (dx/q-centermark): a Single centermark clicked on a hole that has an automatic mark lasts only with ✓; Esc

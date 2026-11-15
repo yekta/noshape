@@ -200,9 +200,8 @@ impl DrawingEditor {
         let layers: Vec<MenuEntry> = noshape_model::drawing::SheetLayer::FORMAT
             .iter()
             .copied()
-            .chain((!cur.is_drawing()).then_some(noshape_model::drawing::SheetLayer::Drawing))
-            .filter(|l| *l != cur)
-            .map(|l| MenuEntry::item(l.name(), move |t, _, cx| t.edit_table(id, "Move to", cx, |t| t.layer = l)))
+            .chain([noshape_model::drawing::SheetLayer::Drawing])
+            .map(|l| MenuEntry::item(l.name(), move |t, _, cx| t.edit_table(id, "Move to", cx, |t| t.layer = l)).disabled(l == cur))
             .collect();
         out.push(MenuEntry::Submenu("Move to".into(), layers));
         let alone = sheet.tables.len() == 1 && sheet.annotations.is_empty() && sheet.images.is_empty();

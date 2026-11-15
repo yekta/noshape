@@ -256,6 +256,7 @@ impl DrawingEditor {
             })));
         }
         let font_names: Vec<String> = fonts.iter().flatten().map(|e| e.0.clone()).collect();
+        let font_value = font_label.clone();
         let field = |w: f32| div().w(px(w)).h(px(24.)).bg(crate::theme::light().panel).border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(2.));
         let font_box = field(238.)
             .id("note-font")
@@ -447,7 +448,41 @@ impl DrawingEditor {
                 text.extend(sizes_names(4));
             }
             text.truncate(30);
-            serde_json::json!({ "kind": "drawing-panel", "title": "Note", "text": text })
+            let old = serde_json::json!({ "kind": "drawing-panel", "title": "Note", "text": text });
+            if cell {
+                return old;
+            }
+            // Live's recorder since 2026-11-15.1 reads its controls (live2 drw-note-move-to-title-block 11-15); the
+            // runner takes `old`, the panel's texts, for older takes.
+            let toggle = |label: &str, on: bool, enabled: bool| serde_json::json!({ "label": label, "kind": "toggle", "value": on, "enabled": enabled });
+            let menu = |label: &str, enabled: bool| serde_json::json!({ "label": label, "kind": "menu-button", "enabled": enabled });
+            serde_json::json!({
+                "kind": "cell-format",
+                "title": "Note",
+                "fields": [
+                    { "label": "Font", "kind": "select", "value": font_value },
+                    { "label": "Text height", "kind": "combo", "value": height.read(cx).value().to_string() },
+                    toggle("Bold", bold, !shx),
+                    toggle("Italic", italic, !shx),
+                    toggle("Underline", st.underline, true),
+                    toggle("Strikethrough", st.strikethrough, true),
+                    menu("Line spacing", true),
+                    menu("Horizontal alignment", true),
+                    menu("List", true),
+                    menu("Vertical alignment", true),
+                    menu("Note order", true),
+                    menu("Insert symbol", true),
+                    menu("Insert drawing property", true),
+                    menu("Insert sheet reference property", true),
+                    menu("Text format", tf_on),
+                    menu("Date time format", is_date),
+                    // (Live's reader takes the Flag notes checkbox for a second Text height, its value "on".)
+                    { "label": "Text height", "kind": "combo", "value": "on" },
+                    { "label": "Border shape", "kind": "select", "value": shape_label.clone() },
+                    { "label": "Border size", "kind": "select", "value": format!("{} Character{}", st.flag_chars, if st.flag_chars > 1 { "s" } else { "" }) },
+                ],
+                "old": old,
+            })
         });
         let sizes: Vec<Entry> = (1..=4u8).map(|n| entry(&format!("{n} Character{}", if n > 1 { "s" } else { "" }), None, st.flag_chars == n, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_chars = n))).collect();
         fn sizes_names(n: u8) -> Vec<String> {

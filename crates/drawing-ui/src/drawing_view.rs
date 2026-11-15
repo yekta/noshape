@@ -186,9 +186,15 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
                 // Live keeps the selection through these (drw-view-zoom-to-fit, -copy-paste, drw-callout-group-view,
                 // -remove-from-group, drw-view-hide-auto-centermarks, drw-dimension-foreshorten 11-15).
                 let keeps = matches!(label.as_ref(), "Copy" | "Paste" | "Zoom to fit" | "Group" | "Remove from group" | "Hide auto centermarks" | "Show all" | "Remove foreshorten");
+                let paste = label.as_ref() == "Paste";
                 let handler: crate::os_ui::ClickHandler = Rc::new(move |_, window, cx| {
                     let act = act.clone();
                     ed.update(cx, |t, cx| {
+                        // Paste lands at the pointer where Paste was clicked, not where the menu opened (live2
+                        // drw-datum-copy-paste: both runs at that pointer + the copy's offset).
+                        if paste {
+                            t.cursor = t.to_sheet(t.local(window.mouse_position()));
+                        }
                         act(t, window, cx);
                         // Live: a menu action that opens nothing leaves nothing selected (a view's Send to back, Show
                         // hidden lines; View properties keeps its view until it closes).

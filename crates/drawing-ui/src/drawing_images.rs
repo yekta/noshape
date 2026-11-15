@@ -225,12 +225,12 @@ impl DrawingEditor {
         let layers: Vec<MenuEntry> = SheetLayer::FORMAT
             .iter()
             .copied()
-            .chain((!cur.is_drawing()).then_some(SheetLayer::Drawing))
-            .filter(|l| *l != cur)
+            .chain([SheetLayer::Drawing])
             .map(|l| {
                 MenuEntry::item(l.name(), move |t, _, cx| {
                     t.edit_sheet("Move to", cx, |s| s.images.iter_mut().filter(|i| i.id == id).for_each(|i| i.layer = l));
                 })
+                .disabled(l == cur)
             })
             .collect();
         out.push(MenuEntry::Submenu("Move to".into(), layers));
