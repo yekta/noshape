@@ -41,7 +41,7 @@ fn write(recording: &Value) {
 fn fail(msg: &str) -> ! {
     eprintln!("UI-SCRIPT FAIL: {msg}");
     write(&json!({ "scenario": scenario_path().file_stem().map(|s| s.to_string_lossy().to_string()), "error": msg }));
-    std::process::exit(2);
+    noshape_kernel::exit_now(2);
 }
 
 /// The start document of the scenario, built in a scratch file (before the window opens).
@@ -434,7 +434,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
     std::thread::spawn(|| {
         std::thread::sleep(WATCHDOG);
         eprintln!("UI-SCRIPT FAIL: not done after {}s", WATCHDOG.as_secs());
-        std::process::exit(3);
+        noshape_kernel::exit_now(3);
     });
     // Live's page (Chrome's viewport on its runner): the same toolbar groups and dialog places; a scenario's own width
     // and theme as live's runner sets them (live 2466).
@@ -852,7 +852,7 @@ pub fn start_page(cx: &mut App) {
     std::thread::spawn(|| {
         std::thread::sleep(WATCHDOG);
         eprintln!("UI-SCRIPT FAIL: not done after {}s", WATCHDOG.as_secs());
-        std::process::exit(3);
+        noshape_kernel::exit_now(3);
     });
     cx.spawn(async move |cx| {
         let sleep = async |cx: &mut AsyncApp, ms: u64| cx.background_executor().timer(Duration::from_millis(ms)).await;

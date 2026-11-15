@@ -587,6 +587,13 @@ fn main() {
             ui_script::start_page(cx);
         }
         agent_setup::first_launch(cx);
+        // Quitting ends the process once the windows are gone (gpui awaits this after closing them), before the exit
+        // handlers: a tab's or an assembly's evaluation still in the kernel would run on its state torn down under it
+        // (qa's QUIT-ABORT-DOCK: heap corruption on the dock after tab switches).
+        cx.on_app_quit(|_| async {
+            noshape_kernel::exit_now(0);
+        })
+        .detach();
         let g2 = gpu.clone();
         cx.on_action(move |_: &actions::NewDocument, cx| {
             let _ = &g2;

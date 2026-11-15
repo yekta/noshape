@@ -2677,6 +2677,18 @@ void set_kernel_profile(bool on)
   g_kernel_profile.store(on ? 1 : 0);
 }
 
+void exit_now(int32_t code)
+{
+  if (kernel_profile_on())
+  {
+    KernelProfile&              p = kernel_profile();
+    std::lock_guard<std::mutex> g(p.lock);
+    p.print("");
+  }
+  std::fflush(nullptr);
+  std::_Exit(code);
+}
+
 void kernel_profile_note(rust::Str name, double ms)
 {
   if (kernel_profile_on())

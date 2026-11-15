@@ -1174,3 +1174,32 @@ fn a_line_projected_onto_an_extruded_cubic_gives_the_cubic() {
         assert!(g.distance(*w) < 1e-9, "{g} against {w}");
     }
 }
+
+/// `exit_now` ends the process with its code while another thread is still in the kernel (Booleans in a loop), its
+/// stdout written: the app's quit (qa's QUIT-ABORT-DOCK, where exit()'s static destructors ran under such a thread).
+/// The test runs itself as the child.
+#[test]
+fn exit_now_ends_the_process_while_a_thread_is_in_the_kernel() {
+    if std::env::var_os("NOSHAPE_EXIT_NOW_CHILD").is_some() {
+        std::thread::spawn(|| {
+            loop {
+                let a = make_box_corners(DVec3::ZERO, DVec3::ONE).unwrap();
+                let b = make_box_corners(DVec3::splat(0.5), DVec3::splat(1.5)).unwrap();
+                let _ = boolean(BooleanOp::Fuse, &[a], &[b], &BooleanOptions::default());
+            }
+        });
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        print!("child about to exit");
+        exit_now(7);
+    }
+    // (The test's name in the merged test binary: its module path past the crate's.)
+    let module = module_path!().split_once("::").map_or(module_path!(), |m| m.1);
+    let name = format!("{module}::exit_now_ends_the_process_while_a_thread_is_in_the_kernel");
+    let out = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", name.as_str(), "--nocapture", "--test-threads=1"])
+        .env("NOSHAPE_EXIT_NOW_CHILD", "1")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(7), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("child about to exit"));
+}

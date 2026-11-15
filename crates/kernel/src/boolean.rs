@@ -292,6 +292,16 @@ pub fn set_kernel_profile(on: bool) {
     ffi::set_kernel_profile(on)
 }
 
+/// Ends the process with `code` at once, without the exit handlers and static destructors: threads still in the
+/// kernel (a tab's or an assembly's regeneration, a mesh) would run on its state torn down under them, a heap
+/// corruption (qa's QUIT-ABORT-DOCK). Stdout and the kernel profile are flushed first.
+pub fn exit_now(code: i32) -> ! {
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+    ffi::exit_now(code);
+    unreachable!("exit_now returned")
+}
+
 /// Run `f` with `flag` as this thread's boolean cancel flag: once it is set,
 /// a running [`boolean`] stops inside OCCT or noshape's Boolean and fails
 /// with "cancelled", as do the budgeted ops (blends, shells) and OCCT's math
