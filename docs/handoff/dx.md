@@ -5,6 +5,18 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 15:23 UTC: exchange 43 / 48; 1dc32b Chamfer 3 to blend
+- Live re-imported all 48 files exported from main at 14:51 (blend's f7125520d, skasm's a5b52aae4 / 6f5b151e1; the
+  03:41 files in /root/parity/exchange/<doc>/bak-0341, live's old imports live-ours.json.bak-1115b): live imports
+  ours 39 -> 43/48 (vibe7 ~/tmp/dx/exch-1115f.log). Left: hose x_t (deliberate split rings), the STL rows (sheet metal
+  plus, spur gear Part 2, radijator: our mesher, live's REST rule at 18:35 in dx/q1137/summary.txt), 65-tooth STEP
+  area (left, lead). The 20-tooth gear: live's native 9678.316 mm³ / 4879.488 mm², ours 9678.68 / 4879.59 (blend);
+  live's x_t import of its own reads 9680.85.
+- 1dc32b Chamfer 3 translates on main with live's refs (2 R65 arcs, 51.32 mm, on the Pedal = live's RfCD 100541.895
+  mm³) and fails in the chamfer: TWO_OFFSETS 23 / 10 mm, the 23 mm the Pedal's whole thickness (live keeps 24 faces,
+  87057.042 mm³). Blend has it (repro vibe7 ~/agents/dx-keep/repro-ch3/); Fillet 3 rechecked after. Run: vibe6
+  ~/tmp/dx/st1dc12.sh (binary ~/agents/dx-keep/ops-main, main 14:45).
+
 ## 11-15 14:41 UTC: drawing exports 84 / 84; revision table sizing; sheet metal 58 faces
 - Revision table as live2's feel/revtable: columns fixed in content text heights (11.044 / 15.068 / 11.24 / 7.649 h, at
   least 1 in; other template columns from their text), rows 1.333 / 1.395 / 5/3 h + 2 x padding, text wraps in a
