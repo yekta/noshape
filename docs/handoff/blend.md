@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-15 22:58 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-15 23:19 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -23,21 +23,23 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## Open questions / waiting
 
-- infento 1dc32b Chamfer 3: live 3169 says Distance 1 on the side at both arcs. Our class rule (G30: first side,
-  start cap, end cap, other sides) puts it on the start cap: the R65 arc's side isn't its loop's first side by any
-  entity order we have (ours: entity 28 in a loop with 10, 11, 17, 24, 31, 33; live's sketch order: the arc 11th, the
-  loop has the rectangle's left/right sides 3 / 4 and lines 7-10 before it). One arc's side is a Mirror copy, the
-  other's cap is. Asked live (REQUESTS 22:43) for qAdjacent / qOwnedByBody / qCreatedBy face orders at bar 100.
-  Branch `blend-ch3` (main + a2074e738 geometry + a Copy face ranked as its source + first side of the face's own loop
-  + T1 two_offsets_on_a_mirrored_body... that passes either way; commit e960186b6 has ZZ_D1 debug). Not landable yet.
-- isaac-ball 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63): all 14 edges are lines between planes, R 4.5, and
-  face 21 (Extrude 3's plane) is 9 mm tall between edges 73 + 80 (x -370) and 76 + 77 (x -413): full rounds across a
-  strip of a bigger face. OCCT builds each edge and each such pair (radius shrunk to 4.4999955: two quarter cylinders
-  9e-9 m apart, a sliver of face 21 left between), but not all 14 (fails; by_groups 579 ms + past_end_faces).
-  merge_full_rounds only joins rounds that share an edge (a consumed whole face, live W1). Live: one half cylinder
-  R 4.5 (127.18 / 129.69 mm2) and face 21 split in two (618.32 + 216.00). Needs: the sliver removed (face split, halves
-  merged), and the 14-edge build. Probe: parked/zz_probe_m3c.rs (kernel test reading the dump; dump vibe6
-  ~/tmp/blend/m3c-fillet.brep, edges 52 54 56 63 65 67 73 76 77 80 85 87 92 96, R 0.0045).
+- infento 1dc32b Chamfer 3: live 3169 says Distance 1 on the cylinder at both arcs; live answered REQUESTS 22:43 (23:14,
+  live/blend/q-ch3order/out.json): the arcs' faces carry Extrude 39 / Extrude 40 ids (Rm.. / Ro..), i.e. the ADD
+  extrudes (each extrudes a Pedal face, RkC6 / RkC+, up to a face) merged their own side (the cylinder) and end cap
+  (the plane) into Extrude 38's / Transform 12's faces. Neither qAdjacent, qOwnedByBody nor qCreatedBy order explains
+  it (the two arcs, congruent under Transform 12's rotation, give opposite orders). Working idea: rank a face by the
+  latest feature among its name and its merge aliases (name_unified's), then that feature's class (cylinder = side).
+  Branch `blend-ch3` (+ `Bodies::aliases_of`, ZZ_D1 alias print, uncommitted in blend4): running 1dc32b on vibe6
+  (log ch3-alias.log) to see the aliases. Not landable yet.
+- isaac-ball 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63): 14 line edges between planes, R 4.5; face 21 is
+  9 mm tall between 73 + 80 and 76 + 77: full rounds across a strip of a bigger face (live: one half cylinder each,
+  face 21 split 618.32 + 216.00). Cause: checked_blend's hair-smaller retry is valid with a 9e-9 m neck left in face
+  21, and without_necks ran only when invalid at part scale. Branch `blend-necks` 97f669374 (blend4): always cut a
+  neck where that is valid at part scale. Probe (kernel test zz_probe_m3c, dump vibe6 ~/tmp/blend/m3c-fillet.brep):
+  73 + 80 now one half cylinder (127.2345 mm2, face 21 split); 76 + 77's 1e-5 retry cut is valid at working scale but
+  not at part scale (a plane piece UnorientableShape / NoCurveOnSurface after the scale back; ShapeFix or cutting at
+  the part's scale fixes it), so it falls to by_groups: one exact R 4.5 face (129.7389, live 129.69) but 250 ms. All
+  14 together: 43 faces, the merge not reached. Next: cut at the part's own scale; then all 14; pairs.
 - Boolean sections (bool's): the knife's Chamfer 1 58 ms / Fillet 2 17 ms are OCCT on pairs that touch within the
   knife's ~21 um tolerances (a disjointness test proves 4 of 96; parked hulls-wip.patch).
 - cf-snap-hook (dx): Mac release Fillet 6 26 ms (live 8), Fillet 3 14 (7); the document 243 vs live 274. Low.
