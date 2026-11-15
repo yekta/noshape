@@ -231,6 +231,18 @@ beside the mate connector button 43 px (1 px taller). Dialog fields, tabs, label
 pixel. The Create selection panel opens 4 px right of the dialog, 64 px under its button's top (live 3096; live
 loses the 4 px after a drag in the same session: not copied). Open: the type list's search caret (live shows none in
 its shot; caret blink?), Part mirror's preview body colour, Face mirror's built preview (52b).
+**11-15 02:19 (full interaction suite 11-14 22:10, 1939/2042; psui 60 misses):** fixed since: sketch Mirror as live's
+12 takes (a preselection's line is the axis and the rest mirrored at once, the tool stays on; a click on the axis
+deselects it, Escape leaves it unselected; a model edge's reference line lights its feature), a circle's radius point
+snaps tangent (2.5 px: live 1.85 snapped, 3 didn't), a rejected feature row takes the keyboard off the field, Esc on a
+number field's menu, Loft's Surface twin swap, Cut list's Overrides on reopen, a dropdown hiding the active field hands
+the keyboard to the next selection field (routing-curve-multiple-csv), Enter on an unparsable value / part Properties
+aren't undo steps, the Datum / Curve-surface / Flatten panels recorded, the state no longer double-counts a mirrored
+line pair, run.py reads live's loading Material panel. Others' or waiting: offset-curve-* (core, landed 149e2906),
+part order / vertex names (core), jog angles (core), edit-curve approximation, analysis-thickness (live's account), the
+sub-pixel readouts; live's seeds for hole-remembers-last, corner-new-edit-reedit, external-thread-split-face and the
+shift-d re-record (45a713c0). Open: context-create-version-update (live lists Part 1 only in context; ours Part 1 and
+Part 2), boundary-surface-new-edit-reedit's selection (live's own state odd), part-properties-* (managed workflows).
 **11-14 18:16 (viewport speed, Linux numbers):** vibe7 (load ~16), release, llvmpipe, 60 samples, mode-700 copies
 deleted after. Pointer / click to the frame with its highlight or selection, p50: dock hover 370 ms, pick 620; hat15
 hover 381-856, pick 1074: llvmpipe drawing the models. To its submission p50 0.4-1.9 ms; the maxima (69-985 ms, one
