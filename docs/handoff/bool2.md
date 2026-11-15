@@ -1,21 +1,30 @@
-# bool2: current state (11-15 20:22 UTC)
+# bool2: current state (11-15 22:59 UTC)
 
 Second agent on noshape's own Boolean (crates/brep, crates/kernel/cpp/rust_boolean.cpp, boolean.cpp's unify). A case
 is taken only where it equals OCCT (or live, with a capture); results identical end to end (docs/DECISIONS.md 11-14).
 History: docs/handoff/archive/bool2.md. Rulings: docs/DECISIONS.md.
 
 ## In flight
-- Nothing gating or queued. Worktree /root/projects/noshape-wt/bool2 (branch bool2-chamfer), scratch /root/bool2-scratch.
-- Uncommitted on purpose: crates/kernel/tests/all.rs registers the scratch probes (`mod sampler; mod xprobe;`, copy in
-  /root/bool2-scratch/all-with-probe.rs), crates/kernel/tests/{xprobe,sampler}.rs (untracked), scratch-docs/ (qa's
-  saved docs for Mac timing). Take all.rs back out (`git checkout crates/kernel/tests/all.rs`) before land.sh, put it
-  back after.
-- WIP in boolean.cpp (merge_cylinder_groups, DBG_TURN prints): next item 1.
+- gate57 (systemd unit bool2-gate57, vibe5, /root/bool2-scratch/gate57.out) on 68c1942bd: merge_cylinder_groups
+  rejects a group whose boundary meets the seam's line between vb and vt (a vertex on it within its tolerance, or an
+  edge's sampled 3D curve passing the seam's angle) before projecting (c2-helical-sweep Sweep 1's unify 71-77 -> 23-26
+  ms, same-binary A/B on vibe5; never fired in the kernel tests). Land on a clean verdict (all.rs out first).
+- OCCT patch 0031 prototype (/root/bool2-scratch/0031-topoltool-bspline-samples-grid.patch): Adaptor3d_TopolTool::
+  BSplSamplePnts evaluates its grid once (it re-evaluated the same points in its deflection passes, rebuilding the
+  B-spline cache: 42 % of c2-impeller-loft Extrude 4's Boolean f10ce62e by samples). Values identical (a parameter's
+  span doesn't depend on the cached one). Private OCCT on vibe5 ~/tmp/bool2/occt-p (/opt/occt with the patched object
+  ar'd into libTKG3d.a), A/B binaries ../target vs ~/tmp/bool2/target-occt31. Next: A/B times, then the gate with it
+  (needs the lead: hosts' /opt/occt rebuilt, CI's cache key changes).
+- Worktree /root/projects/noshape-wt/bool2 (branch bool2-chamfer), scratch /root/bool2-scratch. Uncommitted on
+  purpose: crates/kernel/tests/all.rs registers the scratch probes (`mod sampler; mod xprobe;`, copy in
+  /root/bool2-scratch/all-with-probe.rs), crates/kernel/tests/{xprobe,sampler}.rs, scratch-docs/ (qa's docs, the valve
+  recording). Take all.rs out (`git checkout crates/kernel/tests/all.rs`) before land.sh, put it back after.
+- Section diagnostics patch: /root/bool2-scratch/valve-ahead-dbg.patch (DBG_AHEAD: each OCCT pair's time and curves;
+  DBG_CLIP: cone x cone with the bigger face clipped).
 - qa's dock P0 (tab "B - Cakil Tasi", Puck Huni 941 ms on v0.4.52): already fixed on main by bool's 7ac4debfa +
-  b27a78c40 (Puck Huni 146-250 ms on vibe5 under load, no unify.reordered). Tab B's top-10 list sent to qa 11-15.
-- Valve pattern recording: vibe5 ~/agents/bool2-keep/rec-valve (52970b93111ac42b = Circular pattern 1's cut by 7),
-  copy in scratch-docs/rec-valve; the doc in ~/agents/bool2-keep/valve-doc. Profile script:
-  vibe5 ~/tmp/bool2/dock-prof.sh <cli> <tag> (mode-700 copy, deleted after; copy in /root/bool2-scratch/bin).
+  b27a78c40 (Puck Huni 146-250 ms on vibe5 under load). Tab B's top-10 sent to qa 11-15. Profile script: vibe5
+  ~/tmp/bool2/dock-prof.sh <cli> <tag> (mode-700 copy, deleted after; copy in /root/bool2-scratch/bin).
+- Recordings: valve vibe5 ~/agents/bool2-keep/rec-valve (52970b93111ac42b = Circular pattern 1), doc in valve-doc.
 
 ## Landed today (11-15)
 - 897b690f, 7eedbae5: chamfer fallback, sphere sections, trimmed conversion, unify order, near-whole circle, exact
@@ -37,25 +46,18 @@ History: docs/handoff/archive/bool2.md. Rulings: docs/DECISIONS.md.
 - c2-valve-config 267 ms (live 175): Circular pattern 1 140, Extrude 3 55, Extrude 2 46.
 
 ## Next items, in order
-1. Helical Sweep 1's unify: merge_cylinder_groups(any_frame) finds one group of 8 cylinder faces (two closed chains,
-   one turn each), projects its boundary (GeomProjLib, 16.5 of 17.5 ms) and BRepCheck rejects the face:
-   SelfIntersectingWire. Reusing the faces' own pcurves (/root/bool2-scratch/own-curve.patch, 74 -> 52 ms) is out:
-   they differ from the projection by up to 1e-5 and broke features::a_tube_ends_offset_chamfer... (unify invalid).
-   Now: reject before projecting where a boundary edge passes the seam's angle between vb and vt (crosses_seam,
-   sampled 3D curves). Verify it fires only where the face was rejected anyway (DBG run over the corpora), then gate.
-2. Helical Sweep 1's Boolean: OCCT's sections ahead 22 of 34 ms (Mac).
-3. Valve Circular pattern 1 (one cut by 7 copies, ours one tool at a time since they meet below the part): OCCT's cone
-   x cone sections ~8-10 ms a step; share the copies' sections across steps (as moved_pair does within one Boolean).
-   All 7 at once declines "a non-manifold result" (last two copies' pieces unclassified), clipped tools too.
-4. Valve Extrude 3 (e5811c1b): 23 pairs revolved B-spline profile (axis z) x B-spline extrusion (along -y) in OCCT's
-   walk, ~33 ms CPU each: needs our own revolution x extrusion section.
-5. Impeller chamfer 26's cut (f37371b8, OCCT 0.9 s): the run-on tool's end cap, a 0.3 mm lens between the strip and
-   the face its arc lies on, all within 12 um. Ray parity at tol/1000 classifies it Out (as OCCT) but then the arc and
-   the B-spline edge are each used once: needs the three edges taken as one common block.
-6. Impeller Extrude 4 (f10ce62e, ~200 ms): 115 ms OCCT sections; per-pair IntTools_TopolTool sampling of one B-spline
-   face (an OCCT patch would share it).
-7. Sphere x B-spline (cf-surface-pattern d6500b16, 2.2 s): Rust part 1.4 s spread over 2D curve sampling of refitted
-   sections (128 spans each); 33-point refits didn't measurably help.
+1. OCCT patch 0031 (above): A/B, gate, decision to the lead.
+2. Valve Circular pattern 1: per step 2 cone x cone OCCT pairs (the part's small cone patches at the 2 m tool cone's
+   apex), 6-18 ms each (one 45 ms outlier); over 7 steps 200 pairs, 290 ms CPU, 9 with curves. Clipping the tool face
+   to the patch's box doesn't help (apex: all angles; 6-9 ms). The empty ones (5 cone x cone 75 ms, 21 revolution x
+   cone 41 ms, 161 extrusion x cone 53 ms) would need an exact apart test. Parked.
+3. Helical Sweep 1's Boolean: 6 OCCT pairs, cylinder x the sweep's B-spline (10 ms each, 10 helix curves) and plane
+   x B-spline (3-5 ms): exact curves, bool's plane x B-spline area. Parked.
+4. Valve Extrude 3 (e5811c1b): 23 pairs revolved B-spline profile x B-spline extrusion in OCCT's walk, ~33 ms CPU
+   each: our own revolution x extrusion section (not started).
+5. Impeller chamfer 26's cut (f37371b8, OCCT 0.9 s): the run-on tool's end-cap lens; needs the arc, the B-spline edge
+   and the strip's edge taken as one common block.
+6. Sphere x B-spline (cf-surface-pattern d6500b16, 2.2 s): Rust part 1.4 s in 2D curve sampling of refitted sections.
 
 ## How to run
 - Builds, crate tests, probes: vibe5 (DECISIONS e23d34587): `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh bash -c 'export
