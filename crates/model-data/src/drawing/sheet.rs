@@ -98,6 +98,11 @@ pub struct Fill2 {
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SheetGeometry {
+    /// Dimension lines whose ends lie under closed arrowheads (line, start, end inset; mm): on paper they run from
+    /// arrow base to arrow base (live drw-inspection-item.dxf / .pdf: the 1.575's line starts 0.18 in in from each
+    /// tip); on screen to the tips, where a datum on the line keeps its place.
+    #[serde(default)]
+    pub arrow_insets: Vec<(usize, f64, f64)>,
     /// Each annotation's fills (annotation id, fill range): a dangling
     /// one's arrowheads and triangles turn red with it.
     pub annotation_fills: Vec<(u64, std::ops::Range<usize>)>,
@@ -1349,7 +1354,8 @@ impl SheetGeometry {
         let n = if style.chars == 0 { text.chars().count() } else { style.chars as usize };
         let r = h * (n as f64 + 1.0) / 2.0;
         let (rx, ry) = if round { (r, r) } else { (rx, ry) };
-        let c = [at[0] - rx - 0.8, at[1]];
+        // Over the value: the border's bottom-left at its text's top-left (live drw-inspection-item.dxf, within 0.2 mm).
+        let c = [at[0] + rx, at[1] + ry];
         let (bx, by) = (rx, ry);
         let outlines = callout_outlines(shape.border(), c, bx, by);
         if style.solid
@@ -1362,6 +1368,9 @@ impl SheetGeometry {
             }
             let fill = ColorSpan { lines: 0..0, texts: 0..0, fills: m.2..self.fills.len(), rgb: style.fill_color.unwrap_or(INSPECTION_FILL) };
             self.colors.push(fill);
+            if shape == S::Circle {
+                self.add_cad_solid_disk(m.2..self.fills.len(), c, rx);
+            }
         }
         let border = self.lines.len();
         for (points, closed) in outlines {
@@ -1378,6 +1387,7 @@ impl SheetGeometry {
         if let Some(rgb) = style.text_color {
             self.color_since(mt, rgb);
         }
+        self.cad_since(m, super::cad_layers::CadLayer::InspectionCallout);
     }
 
     /// Render the sheet's annotations (dimensions, notes, centermarks...).
@@ -1643,17 +1653,28 @@ impl SheetGeometry {
                     if a1 < a0 {
                         a1 += std::f64::consts::TAU;
                     }
-                    let n = 24;
-                    let pts: Vec<[f64; 2]> = (0..=n)
-                        .map(|i| {
-                            let t = a0 + (a1 - a0) * i as f64 / n as f64;
-                            [v[0] + radius * t.cos(), v[1] + radius * t.sin()]
-                        })
-                        .collect();
-                    self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+                    let arc = |g: &mut Self, from: f64, to: f64, n: usize| {
+                        let points = (0..=n).map(|i| from + (to - from) * i as f64 / n as f64).map(|t| [v[0] + radius * t.cos(), v[1] + radius * t.sin()]).collect();
+                        g.lines.push(Polyline2 { points, style: LineStyle::Thin, closed: false, pick });
+                    };
+                    // ANSI, the value inline: one that doesn't fit between the arrows sends them outside, pointing in,
+                    // each with a tail as long as itself, and no arc between them (live drw-dimension-angular.dxf:
+                    // 120.0° on a 0.32 in arc; as a linear dimension's, asbdt-2).
+                    let (h, a_len) = (self.style.dim_text, self.style.dim_arrow);
+                    let gap = self.dim_label_width(&env.text(a, a1 - a0, true, ""), h) / 2.0 + 0.65 * h;
+                    let squeezed = !self.style.iso && !self.flip_arrows && text_angle.is_none() && 2.0 * gap + 2.0 * a_len > (a1 - a0) * radius;
+                    if !squeezed {
+                        arc(self, a0, a1, 24);
+                    }
                     let e0 = [v[0] + radius * a0.cos(), v[1] + radius * a0.sin()];
                     let e1 = [v[0] + radius * a1.cos(), v[1] + radius * a1.sin()];
-                    if self.flip_arrows {
+                    if squeezed {
+                        let e = a_len / radius.max(1e-9);
+                        arc(self, a0 - 2.0 * e, a0 - e, 6);
+                        arc(self, a1 + e, a1 + 2.0 * e, 6);
+                        self.arrow(e0, [-a0.sin(), a0.cos()], 3.0);
+                        self.arrow(e1, [a1.sin(), -a1.cos()], 3.0);
+                    } else if self.flip_arrows {
                         // Flipped: arrows outside the arc ends pointing in, the arc runs on.
                         let ext = (self.style.dim_arrow + 3.0) / radius.max(1e-9);
                         for (from, to) in [(a0 - ext, a0), (a1, a1 + ext)] {
@@ -3215,8 +3236,14 @@ impl SheetGeometry {
             self.arrow(dp, d, 3.0);
             self.arrow(dq, [-d[0], -d[1]], 3.0);
         } else {
+            let closed = matches!(self.style.dim_arrow_type, ArrowType::Filled | ArrowType::Unfilled) && dl > 2.0 * a_len;
+            let at = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-9;
             for seg in broken([dp, dq]) {
                 for piece in cut_polyline(&seg, &cuts, half) {
+                    let ends = (piece.first().is_some_and(|p| at(*p, dp)), piece.last().is_some_and(|p| at(*p, dq)));
+                    if closed && (ends.0 || ends.1) {
+                        self.arrow_insets.push((self.lines.len(), if ends.0 { a_len } else { 0.0 }, if ends.1 { a_len } else { 0.0 }));
+                    }
                     self.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick });
                 }
             }
@@ -3916,6 +3943,22 @@ mod tests {
         let mut g = SheetGeometry::new(100.0, 100.0);
         g.inspection_bubble([50.0, 50.0], 3, &style(false, Some([10, 20, 30]), Some([1, 2, 3])), 1);
         assert!(g.fills.is_empty() && g.text_color(0) == Some([10, 20, 30]));
+    }
+
+    /// Live drw-inspection-item.dxf: the bubble sits over the value, its circle's bottom-left at the given corner, on
+    /// INSPECTION_CALLOUT with its fill one solid disk (a HATCH).
+    #[test]
+    fn inspection_bubble_over_the_value_on_its_layer() {
+        use super::super::cad_layers::CadLayer;
+        use super::super::cad_objects::CadObject;
+        let style = InspectionStyle { shape: super::super::InspectionShape::Circle, text_height: 2.032, border: 1.2, chars: 2, color: None, solid: true, font: None, text_color: None, fill_color: None };
+        let mut g = SheetGeometry::new(300.0, 300.0);
+        g.inspection_bubble([100.0, 50.0], 1, &style, 1);
+        let r = 2.032 * 1.5;
+        assert!((g.texts[0].pos[0] - (100.0 + r)).abs() < 1e-9 && (g.texts[0].pos[1] - (50.0 + r)).abs() < 1e-9, "{:?}", g.texts[0].pos);
+        assert!((0..g.lines.len()).all(|i| g.cad_line_layer(i) == CadLayer::InspectionCallout));
+        assert!((0..g.fills.len()).all(|i| g.cad_fill_layer(i) == CadLayer::InspectionCallout));
+        assert!(matches!(g.cad_objects.as_slice(), [CadObject::SolidDisk { r: rr, .. }] if (rr - r).abs() < 1e-9));
     }
 
     /// Live 3094 (text 0.08 in): a circle bubble's radius is 0.08 / 0.12 / 0.16 / 0.20 / 0.24 in for 1-5 characters,

@@ -82,6 +82,9 @@ pub enum CadObject {
     Table { corner: [f64; 2], widths: Vec<f64>, heights: Vec<f64>, cells: Vec<Vec<String>>, rows: Vec<&'static str>, aligned: bool, lineweight: Option<f64> },
     /// A cubic spline as a chain of Bézier spans (`3n + 1` poles, sheet mm), closed or open: SPLINE.
     Spline { poles: Vec<[f64; 2]>, closed: bool },
+    /// A solid-filled circle (an inspection bubble's fill, live drw-inspection-item.dxf): a SOLID HATCH bounded by
+    /// the circle, in its fills' colour.
+    SolidDisk { center: [f64; 2], r: f64 },
 }
 
 /// The open Catmull-Rom curve through `pts` as Bézier spans: `3n + 1` poles from the first point to the last.
@@ -139,6 +142,13 @@ impl SheetGeometry {
         for &i in lines {
             self.cad_members.push(CadMember { lines: i..i + 1, texts: 0..0, fills: 0..0, obj });
         }
+    }
+
+    /// Fills `fills` written as one solid HATCH of the circle at `center`, radius `r`.
+    pub fn add_cad_solid_disk(&mut self, fills: std::ops::Range<usize>, center: [f64; 2], r: f64) {
+        let obj = self.cad_objects.len();
+        self.cad_objects.push(CadObject::SolidDisk { center, r });
+        self.cad_members.push(CadMember { lines: 0..0, texts: 0..0, fills, obj });
     }
 
     pub fn add_cad_spline(&mut self, line: usize, poles: Vec<[f64; 2]>) {

@@ -72,6 +72,17 @@ fn kind_runs<T: PartialEq + Clone, S>(v: [&[Option<T>]; 3], mk: impl Fn([std::op
     out
 }
 
+/// A two-point line's ends moved in by `a` and `b` (mm), as long as some of it is left.
+fn inset_ends(pts: &mut [[f64; 2]], a: f64, b: f64) {
+    let [p, q] = pts else { return };
+    let l = (q[0] - p[0]).hypot(q[1] - p[1]);
+    if l <= a + b {
+        return;
+    }
+    let u = [(q[0] - p[0]) / l, (q[1] - p[1]) / l];
+    (*p, *q) = ([p[0] + u[0] * a, p[1] + u[1] * a], [q[0] - u[0] * b, q[1] - u[1] * b]);
+}
+
 /// The geometry an export writes, after [`ExportOptions`].
 pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     let tone = |c: Option<[u8; 3]>| -> Option<[u8; 3]> {
@@ -86,6 +97,11 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         }
     };
     let mut out = g.clone();
+    for &(li, a, b) in &g.arrow_insets {
+        if let Some(l) = out.lines.get_mut(li) {
+            inset_ends(&mut l.points, a, b);
+        }
+    }
     out.colors.clear();
     out.backdrops = g.backdrops.iter().filter_map(|(p, c)| tone(Some(*c)).map(|c| (p.clone(), c))).collect();
     let mut lc: Vec<Option<[u8; 3]>> = (0..g.lines.len()).map(|i| tone(g.line_color(i))).collect();
@@ -1204,6 +1220,22 @@ pub fn zip_store(files: &[(String, Vec<u8>)]) -> Vec<u8> {
 mod tests {
     use super::*;
     use crate::drawing::{DimOrientation, Sheet};
+
+    /// Live drw-inspection-item.pdf / .dxf: on paper a dimension's line runs between its arrows' bases; the sheet
+    /// keeps it to the tips.
+    #[test]
+    fn dimension_lines_run_between_the_arrow_bases_on_paper() {
+        let mut g = SheetGeometry::new(420.0, 297.0);
+        g.linear_dimension([50.0, 100.0], [110.0, 100.0], -20.0, DimOrientation::Horizontal, "60", 1);
+        let a = g.style.dim_arrow;
+        let span = |g: &SheetGeometry| {
+            let xs: Vec<f64> = g.lines.iter().filter(|l| l.points.len() == 2 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9 && (l.points[0][0] - l.points[1][0]).abs() > 1e-6).flat_map(|l| [l.points[0][0], l.points[1][0]]).collect();
+            (xs.iter().cloned().fold(f64::MAX, f64::min), xs.iter().cloned().fold(f64::MIN, f64::max))
+        };
+        assert_eq!(span(&g), (50.0, 110.0));
+        let (lo, hi) = span(&prepare(&g, &ExportOptions::default()));
+        assert!((lo - (50.0 + a)).abs() < 1e-9 && (hi - (110.0 - a)).abs() < 1e-9, "{lo} {hi}");
+    }
 
     fn sample() -> SheetGeometry {
         let sheet = Sheet::default();

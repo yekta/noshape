@@ -21,7 +21,7 @@ use acadrust::entities::{Ole2Frame, OleFrameEnvelope, OleObjectType};
 use acadrust::xdata::{ExtendedDataRecord, XDataValue};
 use super::sheet::{Anchor, GeomImage, SheetGeometry};
 use acadrust::entities::Solid;
-use acadrust::entities::hatch::{BoundaryEdge, BoundaryPath, Hatch, HatchPattern, HatchPatternLine, HatchPatternType, LineEdge};
+use acadrust::entities::hatch::{BoundaryEdge, BoundaryPath, CircularArcEdge, Hatch, HatchPattern, HatchPatternLine, HatchPatternType, LineEdge};
 use acadrust::entities::mtext::AttachmentPoint;
 use acadrust::tables::linetype::LineTypeElement;
 use acadrust::{Arc, BlockRecord, Spline, CadDocument, Circle, Color, DimStyle, DwgWriter, DxfVersion, DxfWriter, Ellipse, EntityType, Handle, Layer, Line, LineType, LineWeight, MText, Point, TextStyle, Vector2, Vector3};
@@ -103,7 +103,7 @@ pub(crate) fn pdf_dashes(g: &SheetGeometry, li: usize) -> Option<Vec<f64>> {
 /// The layer table's order (live drw2-k-dxf2018, asbu-aux: 0, Defpoints,
 /// then these as used; the sheet-metal and virtual sharp layers, absent
 /// from the drawing samples, last).
-pub(crate) const LAYER_ORDER: [CadLayer; 25] = [
+pub(crate) const LAYER_ORDER: [CadLayer; 26] = [
     CadLayer::Visible,
     CadLayer::TangentLines,
     CadLayer::ViewHatches,
@@ -117,6 +117,7 @@ pub(crate) const LAYER_ORDER: [CadLayer; 25] = [
     CadLayer::Tables,
     CadLayer::AnnotationText,
     CadLayer::AnnotationLines,
+    CadLayer::InspectionCallout,
     CadLayer::SectionCuttingLine,
     CadLayer::Centermarks,
     CadLayer::OriginIndicators,
@@ -800,6 +801,19 @@ impl Sheet<'_> {
     }
 
     /// Fill `fi` as SOLID triangles.
+    /// A filled circle as live writes it: a SOLID HATCH bounded by one full-circle edge, in fill `fi`'s layer and colour.
+    fn solid_disk(&self, doc: &mut CadDocument, center: [f64; 2], r: f64, fi: usize, owner: Owner) -> Result<(), String> {
+        let mut e = Hatch::solid();
+        let mut path = BoundaryPath::new();
+        let c = self.p2(center);
+        path.add_edge(BoundaryEdge::CircularArc(CircularArcEdge { center: c, radius: r * self.k, start_angle: 0.0, end_angle: std::f64::consts::TAU, counter_clockwise: true }));
+        e.paths.push(path);
+        e.seed_points.push(c);
+        e.common.layer = self.g.cad_fill_layer(fi).name(self.upper).into();
+        e.common.color = color(self.g.fill_color(fi));
+        put(doc, EntityType::Hatch(Box::new(e)), owner).map(|_| ())
+    }
+
     fn fill(&self, doc: &mut CadDocument, fi: usize, owner: Owner, dim: bool) -> Result<(), String> {
         let f = &self.g.fills[fi];
         if f.points.len() < 3 {
@@ -1242,6 +1256,7 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
             CadObject::Tolerance { at, rows, height } => sh.tolerance(doc, *at, rows, *height, owner)?,
             CadObject::Symbol { at } => sh.symbol(doc, *at, &t, owner)?,
             CadObject::Spline { poles, closed } => sh.spline(doc, poles, *closed, l[0], owner)?,
+            CadObject::SolidDisk { center, r } => sh.solid_disk(doc, *center, *r, f[0], owner)?,
             CadObject::Table { corner, widths, heights, cells, rows, aligned, lineweight } => sh.table(doc, (*corner, widths, heights, cells, rows, *aligned, *lineweight), (&l, &t, &f), owner)?,
         }
     }
