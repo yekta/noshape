@@ -628,10 +628,11 @@ impl FeatureDialog {
                 Some((true, false)) => !before_gone || picks_geometry,
                 _ => before_gone,
             };
-        // A field the edit swapped for its same-named twin isn't one it brought up (live loft-surface-thin-tabs: Surface
-        // trades Profiles for the wire profiles' Profiles; the keyboard stays off it).
+        // From a tab, a field the edit swapped for its same-named twin isn't one it brought up (live
+        // loft-surface-thin-tabs: Surface trades Profiles for the wire profiles' Profiles; the keyboard stays off it);
+        // from a dropdown the twin takes it (live delete-part-ignore-composite: Entities to delete focused).
         let label = |q: &Option<String>| q.as_deref().and_then(|q| self.spec_for_path(q)).map(|s| s.label);
-        let twin = active.is_some() && label(&active) == label(&self.active_query);
+        let twin = kind == Some((true, true)) && active.is_some() && label(&active) == label(&self.active_query);
         // (A field shown before takes it too when the active one went away: live routing-curve-multiple-csv, CSV file
         // hides Vertices and Curve reference gets the keyboard.)
         if takes && !twin && self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str()) || before_gone) {

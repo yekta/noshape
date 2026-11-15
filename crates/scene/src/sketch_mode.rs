@@ -2997,8 +2997,9 @@ impl SketchEditor {
     fn mirror_entities(&mut self, data: &mut SketchData, ids: &[EntityId]) -> EditOutcome {
         let Some(axis) = self.mirror_axis else { return EditOutcome::none() };
         match data.sketch.mirror(ids, axis) {
-            Ok(r) => {
-                self.finish_create(data, &r.created);
+            Ok(_) => {
+                // A copy is what its source is, construction mode or not (live sketch-mirror-construction-line).
+                data.sketch.solve();
                 // Live (ui-parity sketch-mirror-tool): nothing stays selected, the prompt stays.
                 self.selection.clear();
                 self.message = Some(MIRROR_ENTITIES_PROMPT.into());
@@ -4318,7 +4319,13 @@ impl SketchEditor {
                 if (hi - lo).length() > px * 3.0 {
                     // Left to right: window (entirely inside); right to left: crossing.
                     let crossing = b.x < a.x;
+                    // A curve's own points (its ends, a circle's centre) come with it, not as picks of their own (live
+                    // sketch-mirror-preselected-batch: a line and a circle boxed, 2 selected); a lone point is one.
+                    let owned: std::collections::HashSet<EntityId> = data.sketch.entities().filter(|e| e.kind() != EntityKind::Point).flat_map(|e| e.point_refs()).collect();
                     for e in data.sketch.entities() {
+                        if owned.contains(&e.id) {
+                            continue;
+                        }
                         let Some(pts) = self.screen_outline(&data.sketch, e.id) else { continue };
                         let inside = pts.iter().all(|q| q.x >= lo.x && q.y >= lo.y && q.x <= hi.x && q.y <= hi.y);
                         let hit = inside || (crossing && crosses_box(&pts, lo, hi));
@@ -5277,7 +5284,8 @@ impl SketchEditor {
     /// mode, or a selection of construction curves only.
     pub fn construction_shown(&self, sk: &Sketch) -> bool {
         // (A handle line selected shows it too: live's ui-parity sketch-spline-handle-arm.)
-        let curves: Vec<EntityId> = self.selection.iter().copied().filter(|id| !is_point(sk, *id)).collect();
+        // (A model edge's reference line isn't: live sketch-mirror-model-edge, the edge as the mirror line, Mirror shown.)
+        let curves: Vec<EntityId> = self.selection.iter().copied().filter(|id| !is_point(sk, *id) && sk.entity(*id).is_some_and(|e| !e.external)).collect();
         self.construction || (!curves.is_empty() && curves.iter().all(|id| sk.entity(*id).is_some_and(|e| e.construction)))
     }
 
@@ -10651,6 +10659,27 @@ mod tests {
         assert!(tangent(3.0), "1.85 px off: tangent");
         let tangent_r = 5.0 / 2f64.sqrt();
         assert!(!tangent(tangent_r - 3.0 * 0.275365), "3 px off: not");
+    }
+
+    /// Live (sketch-mirror-preselected-batch): a left-to-right box over a line and a circle selects the two, not their
+    /// own points; (sketch-mirror-construction-line) a copy mirrored in construction mode is what its source is.
+    #[test]
+    fn a_box_selects_curves_without_their_points_and_mirror_copies_keep_their_kind() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(v(0.01, 0.0), v(0.015, 0.01));
+        let c = d.sketch.add_circle(v(0.02, 0.02), 0.003);
+        drag(&mut ed, &mut d, v(0.003, -0.003), v(0.027, 0.026));
+        let mut sel = ed.selection.clone();
+        sel.sort();
+        assert_eq!(sel, vec![l, c]);
+        let axis = d.sketch.add_line(v(0.0, -0.01), v(0.0, 0.03));
+        ed.selection.clear();
+        ed.construction = true;
+        ed.set_tool(Tool::Mirror);
+        click(&mut ed, &mut d, v(0.0, 0.025));
+        click(&mut ed, &mut d, v(0.0125, 0.005));
+        let copy = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line && e.id != l && e.id != axis).map(|e| e.id).next().expect("the copy");
+        assert!(!d.sketch.entity(copy).unwrap().construction, "the copy isn't construction");
     }
 
     /// Live (sketch-mirror-construction-line, -escape-after-line): a click on the mirror line again deselects it (it

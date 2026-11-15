@@ -5981,6 +5981,9 @@ impl PartStudioView {
                 // A dialog field that can't take it: nothing is picked, and the field loses the keyboard (live
                 // mirror-face-pick-feature-in-list, mirror-part-entities-mate-connector: nothing focused after).
                 if this.active_field_filter(cx).is_some() {
+                    if let Some(e) = &this.edit {
+                        e.dialog.update(cx, |d, _| d.keyboard_left = true);
+                    }
                     window.focus(&this.ui.list_focus, cx);
                     cx.notify();
                     return;
@@ -7156,6 +7159,10 @@ impl Render for PartStudioView {
                 }
                 if this.edit.is_some() {
                     this.draft_undo(false, window, cx);
+                    // Live (sketch-mirror-undo-midway): undo inside Mirror takes the last copy back and ends the tool.
+                    if let Some(ed) = this.sketch.as_mut().filter(|ed| ed.tool == crate::sketch_mode::Tool::Mirror) {
+                        ed.set_tool(crate::sketch_mode::Tool::Select);
+                    }
                 } else {
                     cx.propagate();
                 }
