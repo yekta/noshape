@@ -296,6 +296,36 @@ The suite's per-feature kernel profiles count its own measuring (props_surface v
 Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **11-15 01:55 UTC (from 11-14 23:35), c2-impeller-loft from feature 12 (lead's item; core has no WIP there):**
+  - Feature 12 "Extrude Flansch": our flange's geometry is live's at its points; the 0.07 mm³ is live's
+    integration (core's handoff reached the same).
+  - Feature 15's missing vertices: JJM / JJU are the points Loft Gehäuse's vertex matching split the circle's long
+    arc at (its 278.6° arc in thirds; addGuides is off, the loft is unguided). Live keeps them for good; our unifies
+    joined the arcs (one side face, one end face). Fix (landing with the next): the loft marks those edges kept_ends;
+    OwnCopy (the Shell's copy) and every op's result history carry kept marks. They now last to feature 30. The other
+    three (KOMB / JOY / KOQB) are the flange wall's near-tangent sections with the housing (2.3 µm apart):
+    ill-conditioned, left.
+  - Feature 24's Part 3 (5/9/6, live 5/10/7): live's 0.047 mm piece is an up-to-surface artefact; left.
+  - Feature 25 Boolean 1 (32 faces, live 30; live q2985b): the stern tube's two 0.3117 mm strips are extrusions of
+    pieces of the sketch spline whose rest is Part 3's side; live merges each into that side (JdK / JdG). Fix
+    (landed with it): share_mirrored_extrusions takes pieces meeting end to end either way along the
+    curve whose join loses its knot (pattern copies keep theirs), one surface on the joined spline; usd_kept_volume
+    takes merges on those surfaces as unchanged (its fixed-rule integrals put them at 1.8e-12 m³; exempting every
+    same-surface merge took cf-surface-pattern 129 -> 116 faces, so only these). Now 30/79/50 (live 30/83/54); every
+    edge around the strips is live's; the rest is the near-tangent y +-27 set and Extrude 4's 0.047 mm piece.
+  - Gates 39 / 40 CHECK (landed so): cf-surface-pattern's Surface Pattern 3 (already differing) 129/384/257 ->
+    129/383/256: two arcs at (-56.155, -44.024, 11.192) mm joined; live has neither form there.
+  - Next: feature 26 Chamfer Stevenrohr Halterung fails in ours (OCCT's chamfer of the tube's end: the arc and the
+    two 0.3117 mm strips' edges, 3.5 mm at 20°; either strip edge alone fails, the arc alone builds invalid).
+    Reproducer vibe6 ~/agents/bool2-keep/imp-chamfer26 (edges 16 19 81, faces 2 3 28; xprobe probe_chamfer_dump).
+  - Boolean Flansch+Gehäuse 0.7-0.9 s alone (live 154 ms): OCCT's sections ahead, mostly the shell's offset faces
+    against the flange's planes (40-160 ms each; offset surfaces have no FreeSurface, so free::apart can't rule a
+    pair out) and the near-tangent wall pair (305 ms). Per-pair timing patch: /root/bool2-scratch/dbg-ahead.patch.
+  - Move face 1 (5-6.5 s, live 26 ms) and Delete face 2 (3-4 s, live 12 ms) are OCCT's Defeaturing on a part that
+    already differs (Extrude impellerraum 35 faces, live 59; its sketch is the x = 0 face of a part whose fillets
+    26-29 fail): their time follows the upstream.
+  - Saved documents: a regeneration in a fresh process recomputes the marks; nothing stores them (bodies aren't
+    cached on disk), so a reopened document is the same.
 - **11-14 19:5x UTC, the marcher revived and measured (branch bool2-march2, pushed: 0434839f4), not landed:**
   plane x B-spline only, OCCT's section where the march finds none or a curve is closed or doesn't end on a face's
   boundary. On rings-loft's cut 3c0b53fe's 187 pairs outside the Boolean: 4.3x OCCT's time, OCCT's curves on ours
