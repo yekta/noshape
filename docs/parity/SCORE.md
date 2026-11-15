@@ -150,6 +150,17 @@ mirror-face-type (a live DOM detail).
 
 ## Speed window (qa, 02:00–04:00 UTC; vibe7 from 2026-11-13, a new baseline; docs/parity/INDEX.md "Scoring changes")
 
+### Nightly, vibe7 02:00 (qa-w7-nightly, every night; the newest release's Linux CLI)
+
+Each night's row is added by the unit: model suite documents faster than live (median of 3 regen_ms against live's), the sum
+of our medians (live 41.1 s), and the user documents' cold open (median of 3; the hats' Mac mini hat tab, the dock's 8 tabs), as
+11-14's like-for-like run below. Load is vibe7's during the model timings.
+
+| night (UTC) | release CLI | load | models faster than live, of 84 | sum of ours | hat8 cold | hat15 cold | hat15b cold | dock cold | dock reopen |
+|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-14 | v0.4.48 | 2.3–3.4 | **52** | 54.7 s | 5.12 s | 5.17 s | 5.25 s | 17.73 s | 4.02 s |
+| 2026-11-15 | – | – | not run (the one-night unit had ended) | | | | | | |
+
 2026-11-13, vibe7 load 0.1–1.9, nothing else running; v0.4.46 (e06b09c83) and main's head (91a90caf) built there, run back to back.
 
 | user document, tab | cold open v0.4.46 | cold open head | reopen v0.4.46 | reopen head |
