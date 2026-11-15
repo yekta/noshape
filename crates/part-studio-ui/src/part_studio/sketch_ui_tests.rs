@@ -1408,7 +1408,8 @@ fn a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach(cx: &
 #[gpui::test]
 fn an_open_under_defined_sketch_has_the_rows_badge(cx: &mut TestAppContext) {
     let (window, view) = line_then_dimension_tool(cx, "open-underdefined");
-    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // The open sketch's state once regenerated (`ui_busy` stays on here: `pending` isn't cleared).
+    wait_until(cx, window, |cx| view.read(cx).sketch.as_ref().is_some_and(|s| view.read(cx).display.feature_state(s.feature).is_some_and(|f| f.underdefined)));
     let under = |cx: &mut TestAppContext| cx.update(|cx| {
         let v = view.read(cx);
         let id = v.sketch.as_ref().unwrap().feature;
