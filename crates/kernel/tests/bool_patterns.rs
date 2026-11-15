@@ -2760,3 +2760,34 @@ fn balls_cut_from_a_ball_off_its_axis() {
     // (GProp's integration over the spheres' pieces: 8.5e-9 off both ways.)
     assert!((v - want).abs() <= 2e-8 * want, "volume {v}, the ball less the lenses {want}");
 }
+
+/// The top of a ring (a torus, 27 / 14.5 mm, above z 4 mm: a round's tube without its equators, as
+/// learning-center-michael's) cut by a box whose side runs along its axis off it, and by a ball on its outer equator:
+/// noshape's Boolean (each section exact point by point round the axis), valid and as OCCT's.
+#[test]
+fn a_rings_top_cut_along_its_axis_and_by_a_ball_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let torus = k::make_torus(&z_frame(DVec3::ZERO), 0.027, 0.0145, TAU).unwrap();
+    let slab = k::make_box_corners(DVec3::new(-0.05, -0.05, 0.004), DVec3::new(0.05, 0.05, 0.02)).unwrap();
+    let ring = k::boolean(k::BooleanOp::Common, std::slice::from_ref(&torus), std::slice::from_ref(&slab), &k::BooleanOptions::default()).expect("the ring's top").shape;
+    let tools = [
+        k::make_box_corners(DVec3::new(-0.05, 0.0205, -0.02), DVec3::new(0.05, 0.06, 0.03)).unwrap(),
+        k::make_sphere(&z_frame(DVec3::new(0.0, 0.0415, 0.0)), 0.01, TAU).unwrap(),
+    ];
+    for tool in &tools {
+        let run = |rust: bool| {
+            k::set_rust_boolean(Some(rust));
+            let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&ring), std::slice::from_ref(tool), &k::BooleanOptions::default()).expect("the cut");
+            let path = k::last_boolean_path();
+            k::set_rust_boolean(None);
+            (r.shape, path)
+        };
+        let ((ours, path), (occt, _)) = (run(true), run(false));
+        assert_eq!(path, "rust", "{}", k::last_rust_decline());
+        assert!(ours.is_valid() && occt.is_valid(), "valid");
+        assert_eq!(ours.count(k::ShapeType::Face), occt.count(k::ShapeType::Face), "faces");
+        assert_eq!(ours.count(k::ShapeType::Edge), occt.count(k::ShapeType::Edge), "edges");
+        let (v, w) = (ours.volume().unwrap(), occt.volume().unwrap());
+        assert!((v - w).abs() <= 1e-6 * w, "volume {v} vs OCCT's {w}");
+    }
+}

@@ -3224,53 +3224,92 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
   return true;
 }
 
-// A plane against a torus face (c2-rings-loft's ring against its patterned prongs: ~300 plane / torus pairs of OCCT's
-// marching): round the axis at angle u the plane meets the tube's circle where A + B cos v + C sin v = 0, two branches
-// v = phi +- acos(-A / rho), exact point by point; each run of a branch within both faces' boxes (OCCT's: the plane's a
-// tenth wider) interpolated. A run ends where the plane crosses a side of the face (found exactly) or leaves the plane
-// face's box (bisected). False
-// where the branches meet inside the face (the plane all but tangent to the tube), or the plane is across the axis or
-// holds it (its sections circles: OCCT's then).
-bool plane_torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+// A plane or a sphere against a torus face (c2-rings-loft's ring against its patterned prongs: ~300 plane / torus pairs
+// of OCCT's marching; learning-center-michael's rounds against planes along their axes and balls): round the axis at
+// angle u the other surface meets the tube's circle where A + B cos v + C sin v = 0 (A = a0 + a1 c, B = b0 + b1 c, C
+// = c0 for c = cos(u - psi)), two branches v = phi +- acos(-A / rho), exact point by point; each run of a branch
+// within both faces' boxes (OCCT's: a plane's a tenth wider) interpolated. A run ends where the other surface crosses
+// a side of the face (found exactly) or leaves the other face's box (bisected). False where the branches meet inside
+// the face (all but tangent to the tube), or a plane is across the axis or holds it or a sphere's centre is on it
+// (the sections circles: OCCT's then).
+bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
 {
-  const occ::handle<Geom_Plane> pa = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fa)), pb = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(fb));
-  if (pa.IsNull() == pb.IsNull())
+  auto bare = [](const TopoDS_Face& face) {
+    occ::handle<Geom_Surface> b = BRep_Tool::Surface(face);
+    while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(b))
+      b = t->BasisSurface();
+    return b;
+  };
+  const occ::handle<Geom_Surface> sa = bare(fa), sb = bare(fb);
+  const bool                      t_a = !occ::down_cast<Geom_ToroidalSurface>(sa).IsNull(), t_b = !occ::down_cast<Geom_ToroidalSurface>(sb).IsNull();
+  if (t_a == t_b)
     return false;
-  const bool         p_first = !pa.IsNull();
-  const TopoDS_Face& f       = p_first ? fb : fa;
-  occ::handle<Geom_Surface> base_s = BRep_Tool::Surface(f);
-  while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(base_s))
-    base_s = t->BasisSurface();
-  const occ::handle<Geom_ToroidalSurface> ts = occ::down_cast<Geom_ToroidalSurface>(base_s);
-  if (ts.IsNull())
+  const bool                               p_first = t_b;
+  const occ::handle<Geom_Plane>            pl      = occ::down_cast<Geom_Plane>(p_first ? sa : sb);
+  const occ::handle<Geom_SphericalSurface> sp      = occ::down_cast<Geom_SphericalSurface>(p_first ? sa : sb);
+  if (pl.IsNull() && sp.IsNull())
     return false;
+  const TopoDS_Face&                      f  = p_first ? fb : fa;
+  const occ::handle<Geom_ToroidalSurface> ts = occ::down_cast<Geom_ToroidalSurface>(p_first ? sb : sa);
   const gp_Torus T  = ts->Torus();
   const gp_Ax3   ax = T.Position();
   const double   R = T.MajorRadius(), r = T.MinorRadius();
-  const gp_Pln   P = (p_first ? pa : pb)->Pln();
-  const gp_XYZ   n = P.Axis().Direction().XYZ();
-  const double   d = n.Dot(P.Location().XYZ());
-  const double   nx = n.Dot(ax.XDirection().XYZ()), ny = n.Dot(ax.YDirection().XYZ()), nz = n.Dot(ax.Direction().XYZ());
-  const double   h = std::hypot(nx, ny), psi = std::atan2(ny, nx), base = n.Dot(ax.Location().XYZ()) - d;
-  if (h < 1e-9 || std::abs(nz) < 1e-9 || !(r > 0) || !(R > r))
+  if (!(r > 0) || !(R > r))
     return false;
+  const gp_Pln    P  = pl.IsNull() ? gp_Pln() : pl->Pln();
+  const gp_Sphere Sp = sp.IsNull() ? gp_Sphere() : sp->Sphere();
+  double          a0 = 0, a1 = 0, b0 = 0, b1 = 0, c0 = 0, psi = 0;
+  if (!pl.IsNull())
+  {
+    // (n . x = d at the tube's point: base + R h c + (r h c) cos v + (r nz) sin v.)
+    const gp_XYZ n  = P.Axis().Direction().XYZ();
+    const double nx = n.Dot(ax.XDirection().XYZ()), ny = n.Dot(ax.YDirection().XYZ()), nz = n.Dot(ax.Direction().XYZ());
+    const double h = std::hypot(nx, ny), base = n.Dot(ax.Location().XYZ()) - n.Dot(P.Location().XYZ());
+    if (h < 1e-9 || (std::abs(nz) < 1e-9 && std::abs(base) < 1e-9 * R))
+      return false;
+    psi = std::atan2(ny, nx), a0 = base, a1 = R * h, b1 = r * h, c0 = r * nz;
+  }
+  else
+  {
+    // (|x - S|^2 = rho^2 at the tube's point, D the torus's centre less the sphere's: |D|^2 + R^2 + r^2 - rho^2 +
+    // 2 R hD c + 2 r (R + hD c) cos v + 2 r Dz sin v.)
+    const gp_XYZ D  = ax.Location().XYZ() - Sp.Location().XYZ();
+    const double dx = D.Dot(ax.XDirection().XYZ()), dy = D.Dot(ax.YDirection().XYZ()), dz = D.Dot(ax.Direction().XYZ());
+    const double hd = std::hypot(dx, dy), rho = Sp.Radius();
+    if (hd < 1e-9 * R || !(rho > 0))
+      return false;
+    psi = std::atan2(dy, dx), a0 = D.SquareModulus() + R * R + r * r - rho * rho, a1 = 2 * R * hd, b0 = 2 * r * R, b1 = 2 * r * hd, c0 = 2 * r * dz;
+  }
   double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
   BRepTools::UVBounds(f, u0, u1, v0, v1);
   if (!(u1 > u0) || !(v1 > v0) || v1 - v0 > 2 * M_PI + 1e-9 || u1 - u0 > 2 * M_PI + 1e-9)
     return false;
-  // (The plane face's box widened a tenth each way, as OCCT's against a quadric (CorrectPlaneBoundaries); the torus
-  // face's as it is.)
+  // (A plane face's box widened a tenth each way, as OCCT's against a quadric (CorrectPlaneBoundaries), a sphere
+  // face's by twice its edges' tolerance; the torus face's as it is.)
   double pu0 = 0, pu1 = 0, pv0 = 0, pv1 = 0;
   BRepTools::UVBounds(p_first ? fa : fb, pu0, pu1, pv0, pv1);
+  if (!pl.IsNull())
   {
     const double du = 0.1 * (pu1 - pu0), dv = 0.1 * (pv1 - pv0);
     pu0 -= du, pu1 += du, pv0 -= dv, pv1 += dv;
   }
+  else
+  {
+    const double e = 2 * BRep_Tool::MaxTolerance(p_first ? fa : fb, TopAbs_EDGE) / Sp.Radius();
+    pu0 -= e, pu1 += e, pv0 -= e, pv1 += e;
+  }
   const double pe = 1e-9 * std::max(pu1 - pu0, pv1 - pv0), ve = 1e-12;
   // A + B cos v + C sin v at u; the branch's v (branch -1 or +1), false where the circle misses the plane.
   auto abc = [&](double u, double& A, double& B, double& C) {
-    const double c = h * std::cos(u - psi);
-    A = base + R * c, B = r * c, C = r * nz;
+    const double c = std::cos(u - psi);
+    A = a0 + a1 * c, B = b0 + b1 * c, C = c0;
+  };
+  // (The point's parameters on the other surface, a sphere's angle by whole turns into its face's box.)
+  auto params_on = [&](const gp_Pnt& x, double& pu, double& pv) {
+    if (!pl.IsNull())
+      return ElSLib::Parameters(P, x, pu, pv);
+    ElSLib::Parameters(Sp, x, pu, pv);
+    pu += 2 * M_PI * std::ceil((pu0 - pu) / (2 * M_PI));
   };
   // (v as the face's range has it, the turn nearest `to` where two do (a whole tube's seam).)
   auto wrap = [&](double v, double to) {
@@ -3292,7 +3331,7 @@ bool plane_torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vec
   auto point = [&](double u, double v) { return ElSLib::TorusValue(u, v, ax, R, r); };
   auto on_plane = [&](const gp_Pnt& x) {
     double pu = 0, pv = 0;
-    ElSLib::Parameters(P, x, pu, pv);
+    params_on(x, pu, pv);
     return pu >= pu0 - pe && pu <= pu1 + pe && pv >= pv0 - pe && pv <= pv1 + pe;
   };
   auto in_range = [&](int k, double u) {
@@ -3312,10 +3351,10 @@ bool plane_torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vec
           cuts.push_back(u);
   };
   for (const double vs : {v0, v1})
-    add_cos(-(base + r * std::sin(vs) * nz) / ((R + r * std::cos(vs)) * h));
+    add_cos(-(a0 + b0 * std::cos(vs) + c0 * std::sin(vs)) / (a1 + b1 * std::cos(vs)));
   {
-    // ((base + R h c)^2 = (r h c)^2 + (r nz)^2 in c = cos(u - psi).)
-    const double qa = (R * R - r * r) * h * h, qb = 2 * base * R * h, qc = base * base - r * r * nz * nz;
+    // ((a0 + a1 c)^2 = (b0 + b1 c)^2 + c0^2 in c = cos(u - psi).)
+    const double qa = a1 * a1 - b1 * b1, qb = 2 * (a0 * a1 - b0 * b1), qc = a0 * a0 - b0 * b0 - c0 * c0;
     const double disc = qb * qb - 4 * qa * qc;
     if (disc >= 0)
       for (const double sg : {-1.0, 1.0})
@@ -3384,7 +3423,7 @@ bool plane_torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vec
           return false;
         x         = point(u, v);
         double pu = 0, pv = 0;
-        ElSLib::Parameters(P, x, pu, pv);
+        params_on(x, pu, pv);
         const gp_Pnt2d on_t(u, v), on_p(pu, pv);
         g = p_first ? on_p : on_t;
         c = p_first ? on_t : on_p;
@@ -4041,7 +4080,7 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
   if (plane_tube_sections(fa, fb, out))
     return true;
   out.clear();
-  if (plane_torus_sections(fa, fb, out))
+  if (torus_sections(fa, fb, out))
     return true;
   const std::optional<Extruded> xa = extruded(fa), xb = extruded(fb);
   // A cone and a surface generated along its axis: that surface lifted onto it.
