@@ -5,6 +5,22 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 03:24 UTC: drawing exports 73 / 84 on main; mesh points; 1dc32b Extrude 49-51 build
+- Landed since 01:45: ordinate leaders from the Geometry gap; ANSI break lines 0.1 in past; leader arrowheads at the
+  set size (were size^2/3); coincident view edges written once on paper (`drop_coincident_edges` in export::prepare);
+  `Reference::MeshPoint` (`meshpoint:F….i:x,y,z` nm; query_entities lists a mesh part's nodes, sketch Use takes them;
+  skasm links hex-bookcase's 25 Uses with it).
+- Exports 73 / 84 (exp-1115n). The 11 left: live answers pending (aligned PDF hatch spacing, aux line length,
+  revision table widths, centermark on an auto-centermarked hole), studios (crop-spline: the Crop tool's click path
+  leaves Front empty; ops' drawing_crop_view is fine), note leader shoulder (one sample), inspection PDF (live strokes a
+  0.158 in-radius path at 0.12 pt we don't have; unexplained).
+- 1dc32b on main (vibe6 save17, sk17 log): Extrude 49 / 50 / 51 OK after core's seed fix; 15 not OK. Core takes
+  Circular pattern 7 (maybe its regression), Extrude 48, Hole 2, Draft 1, fillets. Mine: Extrude 34 / 79, Chamfer 3,
+  Transforms 16 / 17 / 23 / 24 / 28 / 46, Mirror 4: live.jsonl 56-348 have no data, asked live (REQUESTS 03:14).
+- Custom-feature speed (core / qa): not FS interpretation. Snap Hook = bool's Boolean + core's prism_until; Lighten =
+  shell / offset / model-core volume checks (vibe6 ~/tmp/dx/cfprof.log). Nothing of mine worth it yet.
+- Agent ids: skasm a09d30a7-95db-42d1-8f2d-946c6fb8f232 (asm 28d8f565 is a different thread).
+
 ## 11-15 01:45 UTC: drawing exports 61 -> 68 / 84; 1dc32b Extrude 49 is core's pattern Remove
 - Landed: cap names in the translator (cb2b6b259), broken-out jog splines + one HATCH per region (f84e3d41), aligned
   section line / hatches (0ad9b324), aux arrows (14c7de41), hole table untitled + BOM sizing (b60f38a9). Queued 66222a0b:
