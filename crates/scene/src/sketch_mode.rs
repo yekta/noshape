@@ -3731,7 +3731,8 @@ impl SketchEditor {
                 }
                 self.pending_text = None;
                 self.set_tool(Tool::Select);
-                self.selection = data.texts.iter().find(|t| t.id == id).map(|t| t.box_lines.iter().map(|l| EntityId(*l)).collect()).unwrap_or_default();
+                // Live (sketch-text-font-typed-ok): nothing is selected after ✓.
+                self.selection.clear();
                 data.sketch.solve();
                 EditOutcome::changed()
             }
@@ -9645,6 +9646,7 @@ mod tests {
         assert_eq!(d.texts.len(), 1);
         assert!(d.texts[0].mirror_horizontal);
         assert_eq!(ed.tool, Tool::Select);
+        assert!(ed.selection.is_empty(), "nothing selected after ✓ (live sketch-text-font-typed-ok)");
         // Double-clicking the text reopens it in the dialog (live Onshape).
         let line = EntityId(d.texts[0].box_lines[0]);
         let at = d.sketch.curve(line).unwrap().point(0.5);
