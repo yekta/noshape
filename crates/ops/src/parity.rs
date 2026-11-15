@@ -8549,7 +8549,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     let states = &asm["features"]["featureStates"];
     for (id, name) in &mate_names {
         res.mates += 1;
-        let live_ok = states[id.as_str()]["featureStatus"].as_str().unwrap_or("OK") == "OK";
+        // Live's status: its latest reading (mate-messages.json, live 11-15: infento's Fastened 8 is OK there, ERROR in
+        // the older fetch), else the fetch's featureStates.
+        let latest = &asm["liveMateMessages"][id.as_str()];
+        let live_status = latest["liveStatusNow"].as_str().or(latest["status"].as_str()).or(states[id.as_str()]["featureStatus"].as_str()).unwrap_or("OK");
+        let live_ok = live_status == "OK";
         let Some(m) = after["mates"].as_array().into_iter().flatten().find(|m| m["name"] == name.as_str()) else { continue };
         // A suppressed one: as live if ours is suppressed too.
         if root["features"].as_array().into_iter().flatten().any(|f| f["id"] == id.as_str() && f["suppressed"] == true) {
@@ -8574,7 +8578,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             res.live_defects.push(format!("{name}: live ERROR ({why}), ours solves it"));
         } else {
             let ends = mate_ends_off(&mut *placer.ctx, root, name).map(|e| format!("; {e}")).unwrap_or_default();
-            res.differences.push(format!("{name}: {}, live {}{ends}", if ok { "OK".to_string() } else { format!("error ({})", m["message"].as_str().unwrap_or("")) }, states[id.as_str()]["featureStatus"].as_str().unwrap_or("?")));
+            res.differences.push(format!("{name}: {}, live {}{ends}", if ok { "OK".to_string() } else { format!("error ({})", m["message"].as_str().unwrap_or("")) }, live_status));
         }
     }
     // Inside the subassemblies (not scored, their mates' placements are the occurrences'): ours that fail where
