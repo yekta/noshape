@@ -3474,6 +3474,55 @@ export const notch = defineFeature(function(context is Context, id is Id, defini
     assert_eq!(custom::run::output_of(fid).unwrap().output, "created 10, on the block 10\nconcave 2, faces created 3\nvertices 8, the tool's faces 0, the block's 7\n");
 }
 
+/// evEdgeConvexity on every edge of a block with rounded corners, a pocket, a boss and a through hole: its outer edges,
+/// the rounds' ends, the pocket's rim and the boss' top convex; the pocket's walls and floor and the boss' foot concave;
+/// the rounds' sides smooth (cf-lighten's Lighten picks its shelled tools' edges so).
+#[test]
+fn edge_convexity_of_a_pocketed_block() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Kinds" }
+export const kinds = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        fCuboid(context, id + "a", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(100, 60, 20) * millimeter });
+        const block = qCreatedBy(id + "a", EntityType.BODY);
+        var corners = [];
+        for (var c in [[0, 0], [100, 0], [100, 60], [0, 60]])
+            corners = append(corners, qContainsPoint(qOwnedByBody(block, EntityType.EDGE), vector(c[0], c[1], 10) * millimeter));
+        opFillet(context, id + "round", { "entities" : qUnion(corners), "radius" : 5 * millimeter });
+        fCuboid(context, id + "p", { "corner1" : vector(20, 20, 10) * millimeter, "corner2" : vector(40, 40, 21) * millimeter });
+        opBoolean(context, id + "pocket", { "tools" : qCreatedBy(id + "p", EntityType.BODY), "targets" : block, "operationType" : BooleanOperationType.SUBTRACTION });
+        fCylinder(context, id + "b", { "bottomCenter" : vector(70, 30, 20) * millimeter, "topCenter" : vector(70, 30, 35) * millimeter, "radius" : 10 * millimeter });
+        opBoolean(context, id + "boss", { "tools" : qUnion([block, qCreatedBy(id + "b", EntityType.BODY)]), "operationType" : BooleanOperationType.UNION });
+        fCylinder(context, id + "h", { "bottomCenter" : vector(88, 12, -1) * millimeter, "topCenter" : vector(88, 12, 21) * millimeter, "radius" : 4 * millimeter });
+        opBoolean(context, id + "hole", { "tools" : qCreatedBy(id + "h", EntityType.BODY), "targets" : block, "operationType" : BooleanOperationType.SUBTRACTION });
+        var counts = {};
+        for (var e in evaluateQuery(context, qOwnedByBody(block, EntityType.EDGE)))
+        {
+            const k = try silent(evEdgeConvexity(context, { "edge" : e }));
+            const key = k == undefined ? "none" : toString(k);
+            counts[key] = (counts[key] == undefined ? 0 : counts[key]) + 1;
+        }
+        println(counts);
+    });
+"#,
+    );
+    let mut doc = Document::new();
+    let fs = doc.add_tab("Feature Studio 1", TabContent::FeatureStudio(FeatureStudio::new(&src)));
+    let scripts = DocumentScripts::from_document(&doc);
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&custom::type_id(fs, "kinds"), &units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions { custom_features: Some(scripts), ..Default::default() });
+    assert_ok(&r);
+    assert_eq!(custom::run::output_of(fid).unwrap().output, "{ CONCAVE : 9 , CONVEX : 23 , SMOOTH : 8 }\n");
+}
+
 /// FS-ANYTHING-PARAM (dx's FeatureScript corpus, cf-parameter-pattern): an `isAnything` parameter in an array item,
 /// kept as live keeps it (a quantity's expression, "[15,20,25]"), reaches the feature as the array it evaluates to.
 #[test]

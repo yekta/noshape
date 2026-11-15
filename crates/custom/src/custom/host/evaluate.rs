@@ -741,6 +741,7 @@ pub(super) fn convexity(q: &QueryCx, e: &Ent) -> Option<&'static str> {
     let elementary = |f: &k::Shape| matches!(f.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. }));
     let steady = matches!(edge.edge_curve(), Ok(k::Curve::Line { .. } | k::Curve::Circle { .. })) && elementary(&fa) && elementary(&fb);
     let samples: &[f64] = if steady { &[0.5] } else { &[0.2, 0.5, 0.8] };
+    let use_in_b = fb.edge_orientation_in(&edge).ok();
     let mut kinds = Vec::new();
     for &t in samples {
         let p = edge.point_at(info.first_param + (info.last_param - info.first_param) * t).ok()?;
@@ -749,15 +750,21 @@ pub(super) fn convexity(q: &QueryCx, e: &Ent) -> Option<&'static str> {
             kinds.push("SMOOTH");
             continue;
         }
-        // Direction into face b from the edge, tangent to b: across the edge, the side a small step stays on b
-        // (the face classifier: projecting a point off a rolled wall takes ~2.5 ms); else towards b's middle.
-        let tangent = edge.tangent_at(info.first_param + (info.last_param - info.first_param) * t).ok();
+        // Direction into face b from the edge, tangent to b: a face's material lies left of its edges as it uses
+        // them, seen from outside (its normal × the curve's direction as b uses it; no classifier: cf-lighten's 140
+        // edges); else the side a small step stays on b (projecting a point off a rolled wall takes ~2.5 ms); else
+        // towards b's middle.
+        let tangent = edge.derivatives_at(info.first_param + (info.last_param - info.first_param) * t).ok().map(|d| d[1]);
         let across = tangent.map(|d| nb.cross(d).normalize_or_zero()).filter(|a| a.length() > 0.5);
         let stays = |v: DVec3| fb.contains_point(p + v * 1e-5, 1e-6).ok();
-        let into_b = match across.map(|a| (a, stays(a), stays(-a))) {
-            Some((a, Some(true), Some(false))) => a,
-            Some((a, Some(false), Some(true))) => -a,
-            _ => (fb.project_point(p + (fb.centroid().ok()? - p) * 1e-3).ok()?.point - p).normalize_or_zero(),
+        let into_b = match (across, use_in_b) {
+            (Some(a), Some(k::Orientation::Forward)) => a,
+            (Some(a), Some(k::Orientation::Reversed)) => -a,
+            _ => match across.map(|a| (a, stays(a), stays(-a))) {
+                Some((a, Some(true), Some(false))) => a,
+                Some((a, Some(false), Some(true))) => -a,
+                _ => (fb.project_point(p + (fb.centroid().ok()? - p) * 1e-3).ok()?.point - p).normalize_or_zero(),
+            },
         };
         kinds.push(if into_b.dot(na) < 0.0 { "CONVEX" } else { "CONCAVE" });
     }
