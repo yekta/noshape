@@ -29,6 +29,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   are a known live difference when ours is the exact intersection and no later feature references them; chase
   them only if a later feature or a selection depends on them.
 - 11-15 OCCT loops must poll the break hook and have a deterministic work bound (patch 0030); never a wall clock.
+- 11-15 OCCT patches (0030, 0031, …) land when results are identical end to end, the patch is in patches/occt/ and builds
+  with g++-13 and Apple clang; the owner stages built libs (x86-64 on vibe5, arm64 on the Mac) and the lead installs
+  them on every host, with backups, before the land.
 - 11-15 Draft 1 (1dc32b): OCCT patch + wedge fallback, not wedges-first.
 - 11-15 Parsed-std disk cache parked: at most 2 ms gain for 15 MB and more code. Keep it simple.
 - 11-15 Speed claims: relative A/B in one run on any host; absolute numbers only from the 02:00 vibe7 window or a quiet
