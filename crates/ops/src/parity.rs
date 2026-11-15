@@ -7360,6 +7360,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let studio = &studio;
         // Live's per-feature geometry (the studio's `live` lines, `<element>.live.jsonl`) for its id-only queries.
         let mut refs = studio["live"].as_array().map(|lines| refs_from_bodies(lines)).unwrap_or_default();
+        // Live's evaluated references (`<element>.refs.jsonl`, as a model's refs.jsonl) win over them.
+        refs.extend(parse_refs(studio["refs"].as_str().unwrap_or_default()));
         // Its sketches' bodies at the final state (live 2267, `<element>.sketches.json`): their regions, edges and
         // points, under live's own lines.
         let features = studio["features"].as_array().map(Vec::as_slice).unwrap_or_default();

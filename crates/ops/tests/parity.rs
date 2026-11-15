@@ -2399,6 +2399,9 @@ fn parity_assemblies() {
             if !live.is_empty() {
                 features["live"] = Value::Array(live.clone());
             }
+            if let Ok(refs) = std::fs::read_to_string(dir.join("studios").join(format!("{element}.refs.jsonl"))) {
+                features["refs"] = json!(refs);
+            }
             // Its sketches' bodies at the final state (live 2267).
             if let Some(sk) = read(&dir.join("studios").join(format!("{element}.sketches.json"))) {
                 features["sketchBodies"] = sk;
