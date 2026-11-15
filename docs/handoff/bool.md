@@ -4,7 +4,23 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-15 04:00 UTC; restart from here)
+## bool, now (11-15 07:50 UTC; restart from here)
+- Shell stage 3 queued (gate ee76ed477 clean: 0 differences, every corpus + parity56; knurls not run, 31 GB host):
+  8f6f29d17 (marched offset edges fitted to the offsets), a4123badb (up to 12 halvings: all 36 rings-loft edges
+  marched), 0c155cd4f (newton_foot cuts a step past a bound short; bounded_foot holds a foot on the bound: the joins'
+  feet), ee76ed477 (the self-interference check on the wall's shells, not its solid: boxing a solid classified a point,
+  20 -> 1 ms; only the faces left in pairs meshed).
+- rings-loft Shell 1 ~555 ms on vibe7 (live 235; 700 before): repair ~215 (traces ~70, split ~55, crossings ~19, joins
+  ~18), self-interference ~110 (OCCT's EE on 230 B-spline edge pairs, 69 EF, 20 VE left after the filters; mesh ~25),
+  volumes ~60, check ~35, thin ~35, edges ~30, corners ~26. Next commit (/root/bool-scratch/vol.diff, not yet gated):
+  rough_volume_by_faces, the wall's and part's faces integrated in parallel from one origin (BRepGProp_Vinert), the
+  same digits, volumes 60 -> 20 ms.
+- impeller feature 13 is core's (live: a moveFace offset edge stays a Line; suite LIVE_LINES_AS_OTHER); the 0.1 mm3
+  13 inherits from feature 12 is bool2's.
+- Tools: /root/bool-scratch/kfs.sh <name> [runs] builds bool-hat's tree on vibe7 into bool-keep/bin/kern-<name> and
+  runs rings-loft Shell 1 (rl/shell-9); gcc13.sh <file.cpp> is the g++-13 syntax check on vibe5.
+
+## bool, earlier (11-15 04:00 UTC)
 - Landed: Shell stage 1 (af629bc6), the glued-fuse guard (c10dbd61), Shell stage 2 (59239698). Queued after its gate:
   d1d038643 (recut_arc_seams: after usd_kept_volume a cylinder face merged round onto itself along an arc gets its seam
   on a plain stretch; e53bba's Extrude 9 202 faces, no arc seam, test a_band_merged_round_onto_its_end_has_a_straight_
