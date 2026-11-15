@@ -5,7 +5,7 @@
 //! when they pick model geometry. The Part Studio's sketch mode and the agent
 //! API both call these.
 
-use glam::DVec2;
+use glam::{DVec2, DVec3};
 use noshape_model::display::{PlaneFrame, StudioDisplay};
 use noshape_model::reference::Reference;
 use noshape_model::regen::context::Context;
@@ -119,7 +119,7 @@ impl Model<'_> {
 /// in an empty sketch.
 pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, cursor: DVec2, r: &Reference, pierce: bool, construction: bool) -> Option<EntityId> {
     let frame = model.frame;
-    let want_point = pierce || matches!(r, Reference::Vertex(_) | Reference::MeshPoint { .. });
+    let want_point = pierce || matches!(r, Reference::Vertex(_) | Reference::MeshPoint { .. } | Reference::Origin);
     if let Some(id) = data.external_refs.iter().find(|(id, v)| *v == r && data.sketch.entity(EntityId(**id)).is_some_and(|e| (e.kind() == EntityKind::Point) == want_point)).map(|(id, _)| EntityId(*id)) {
         // Use on geometry a dimension already refers to makes it sketch geometry.
         if !construction && data.sketch.entity(id).is_some_and(|e| e.reference_only) {
@@ -133,7 +133,9 @@ pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, c
         Point(DVec2),
         Curves(Vec<sk_feat::SectionCurve>),
     }
-    let made = if let Some(pl) = model.reference_plane(r).filter(|_| !matches!(r, Reference::Face(_)) || !model.curved_face(r)) {
+    let made = if matches!(r, Reference::Origin) {
+        Made::Point(frame.to_local(DVec3::ZERO))
+    } else if let Some(pl) = model.reference_plane(r).filter(|_| !matches!(r, Reference::Face(_)) || !model.curved_face(r)) {
         let (p, d) = sk_feat::plane_trace(&pl, frame)?;
         let half = (data.sketch.bbox().size().length() * 0.6).max(world_per_px * 150.0);
         let c = p + d * (cursor - p).dot(d);
@@ -183,7 +185,7 @@ pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, c
 /// edges. Returns whether anything was added.
 pub fn use_reference(data: &mut SketchData, model: Model, world_per_px: f64, cursor: DVec2, r: &Reference) -> bool {
     match r {
-        Reference::Vertex(_) | Reference::MeshPoint { .. } | Reference::SketchEntity { .. } | Reference::Edge(_) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
+        Reference::Origin | Reference::Vertex(_) | Reference::MeshPoint { .. } | Reference::SketchEntity { .. } | Reference::Edge(_) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         Reference::Face(_) if model.curved_face(r) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         Reference::Face(_) => {
             let mut changed = false;

@@ -1402,6 +1402,34 @@ impl<'a> Translator<'a> {
         Err(Box::new(u))
     }
 
+    /// A Use live names no model geometry for (deterministic ids without a query or a capture: c2-hex-bookcase-derived,
+    /// bracket03-mattie), or whose named geometry lands elsewhere: our model edge (vertex) nearest where it's stored
+    /// whose Use lands exactly there; else the Use back, drawn where it's stored.
+    fn use_nearest(&mut self, oid: &str, id: &str, mut u: Use, problems: &mut Vec<String>, moved: &mut Vec<[f64; 2]>) -> Option<Use> {
+        let Some(&[o, x, y]) = self.frames.get(oid) else { return Some(u) };
+        let at = |p: [f64; 2]| -> [f64; 3] { std::array::from_fn(|i| o[i] + p[0] * x[i] + p[1] * y[i]) };
+        let (near, kind) = match (u.point, u.ends) {
+            (Some(p), _) => (at(p), "vertices"),
+            (None, Some([a, b])) if u.shape["tool"] != "point" => (at([(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]), "edges"),
+            _ => return Some(u),
+        };
+        let Ok(reply) = self.call("query_entities", json!({ "kind": kind, "near": mm(near), "limit": 6 })) else { return Some(u) };
+        let tried = u.reference.clone();
+        let ids: Vec<String> = reply[kind].as_array().into_iter().flatten().filter_map(|e| e["id"].as_str().map(str::to_string)).filter(|r| *r != tried).collect();
+        for r in ids {
+            u.reference = r;
+            match self.use_projected(oid, id, u, problems) {
+                Ok(step) => {
+                    moved.extend(step);
+                    return None;
+                }
+                Err(back) => u = *back,
+            }
+        }
+        u.reference = String::new();
+        Some(u)
+    }
+
     /// Live's Uses that ours can't make where they're stored (no model geometry named, or ours lands elsewhere),
     /// drawn where they're stored: where they were when drawn, before the model moved. When every Use of the sketch
     /// that ours made moved by the same step (infento-subs' Multi angle joint, Sketch 4: its hole circle 0.5 mm from
@@ -4465,7 +4493,10 @@ impl<'a> Translator<'a> {
                     uses.push(Use { eid, reference: used.unwrap_or_default(), shape: s, ends: end_points, point });
                 }
                 // A Use whose model geometry isn't named: drawn after the Uses ours makes (`moved_uses`).
-                Some(s) if projected.contains_key(&eid) => unnamed_uses.push(Use { eid, reference: String::new(), shape: s, ends: end_points, point: None }),
+                Some(s) if projected.contains_key(&eid) => {
+                    let point = (s["tool"] == "point").then(|| [e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0)]);
+                    unnamed_uses.push(Use { eid, reference: String::new(), shape: s, ends: end_points, point });
+                }
                 Some(s) => {
                     shapes.push(s);
                     local.push(eid);
@@ -4476,8 +4507,14 @@ impl<'a> Translator<'a> {
         }
         // The ends of Uses whose model geometry isn't named, drawn where live's solve put them (`join_use_ends`).
         let mut use_ends: Vec<(String, [[f64; 2]; 2])> = Vec::new();
+        let ours = self.call("sketch_get", json!({ "sketch": id }))?;
+        let unit = per_unit(&ours["units"]);
+        let v = |key: &str| -> [f64; 3] { std::array::from_fn(|i| ours["frame"][key][i].as_f64().unwrap_or(0.0)) };
+        self.sketch_map = SketchMap { onshape: frame, ours: [v("origin").map(|c| c * unit), v("x"), v("y")], k: unit };
         if uses.is_empty() {
-            for u in unnamed_uses.drain(..) {
+            let mut moved = Vec::new();
+            let left: Vec<Use> = std::mem::take(&mut unnamed_uses).into_iter().filter_map(|u| self.use_nearest(&oid, &id, u, problems, &mut moved)).collect();
+            for u in left {
                 use_ends.extend(u.ends.map(|e| (u.eid.clone(), e)));
                 shapes.push(u.shape);
                 local.push(u.eid);
@@ -4486,10 +4523,6 @@ impl<'a> Translator<'a> {
         }
         // Curves first, then the free points, so each reply lists ours in
         // Onshape's order.
-        let ours = self.call("sketch_get", json!({ "sketch": id }))?;
-        let unit = per_unit(&ours["units"]);
-        let v = |key: &str| -> [f64; 3] { std::array::from_fn(|i| ours["frame"][key][i].as_f64().unwrap_or(0.0)) };
-        self.sketch_map = SketchMap { onshape: frame, ours: [v("origin").map(|c| c * unit), v("x"), v("y")], k: unit };
         let map = self.sketch_map;
         for points in [false, true] {
             let (batch, ids): (Vec<Value>, Vec<String>) = shapes.iter().zip(&local).filter(|(s, _)| (s["tool"] == "point") == points).map(|(s, e)| (s.clone(), e.clone())).unzip();
@@ -4536,6 +4569,7 @@ impl<'a> Translator<'a> {
                 Err(u) => unnamed_uses.push(*u),
             }
         }
+        let unnamed_uses: Vec<Use> = unnamed_uses.into_iter().filter_map(|u| self.use_nearest(&oid, &id, u, problems, &mut moved)).collect();
         use_ends.extend(self.moved_uses(&oid, &id, frame.is_some(), unnamed_uses, &moved, problems));
         self.join_use_ends(&oid, &id, &use_ends, f);
         for t in &texts {
@@ -4845,9 +4879,15 @@ impl<'a> Translator<'a> {
                     continue;
                 }
                 // Ours made with Use (`use_projected`), else drawn where live's solve put it.
+                // A used curve's ends are projected with it; an orphaned Use (no model reference in live either) is
+                // drawn where it is stored, as live keeps it.
                 "PROJECTED" => {
-                    let local = c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "localFirst").and_then(|p| p["value"].as_str());
-                    if !local.is_some_and(|l| self.used.contains(&(oid.to_string(), l.to_string()))) {
+                    let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name);
+                    let local = par("localFirst").and_then(|p| p["value"].as_str());
+                    let orphan = par("externalSecond").is_none_or(|p| p["queries"].as_array().is_none_or(|q| q.is_empty()));
+                    let used = |l: &str| self.used.contains(&(oid.to_string(), l.to_string()));
+                    let made = local.is_some_and(|l| used(l) || l.strip_suffix(".start").or_else(|| l.strip_suffix(".end")).is_some_and(used));
+                    if !made && !orphan {
                         *missed.entry(format!("{ty} (not used: its model geometry not found)")).or_default() += 1;
                     }
                     continue;
@@ -4873,6 +4913,7 @@ impl<'a> Translator<'a> {
             };
             let mut entities: Vec<String> = Vec::new();
             let mut external = false;
+            let mut unmapped = false;
             // Each slot local or model geometry (`externalEntity1` where `localEntity1` would be: a midpoint between
             // two model vertices, cf-sheet-metal-hem's derived Sketch 3 centring its circle), in the slots' order.
             let param = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned();
@@ -4881,7 +4922,7 @@ impl<'a> Translator<'a> {
                 if let Some(v) = par(n) {
                     match self.sketch_entities.get(&(oid.to_string(), v)) {
                         Some(e) => entities.push(e.clone()),
-                        None => external = true,
+                        None => unmapped = true,
                     }
                     continue;
                 }
@@ -4898,6 +4939,22 @@ impl<'a> Translator<'a> {
                 match self.external_ref(k, p) {
                     Some(e) => entities.push(e),
                     None => external = true,
+                }
+            }
+            // A Coincident to model geometry live names by an id alone (no query, no capture): the model vertex
+            // where live solved the sketch's point, else an edge through it (c2-fan-blade-sweep's Sketch 12).
+            if unmapped {
+                if ty == "COINCIDENT" {
+                    self.pin_external_vertex(k, oid, c);
+                }
+                *missed.entry(format!("{ty} (its sketch entity not translated)")).or_default() += 1;
+                continue;
+            }
+            if external && ty == "COINCIDENT" && entities.len() == 1 {
+                let local = c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("local")) && p["value"].is_string()).and_then(|p| p["value"].as_str());
+                if let Some(e) = local.and_then(|l| self.model_at(oid, l)) {
+                    entities.push(e);
+                    external = false;
                 }
             }
             if external {
@@ -4965,8 +5022,54 @@ impl<'a> Translator<'a> {
             return Some("origin".into());
         }
         let [q] = queries.as_slice() else { return None };
+        // A co-edge query (an edge as one face's boundary): the edge.
+        let q = if q["edgeQuery"].is_object() { &q["edgeQuery"] } else { q };
         match self.query(k, q) {
             Ok(ids) if ids.len() == 1 => ids.into_iter().next(),
+            _ => None,
+        }
+    }
+
+    /// Our model vertex where live solved sketch `oid`'s point `local`, else a line or circle edge through it (to
+    /// 1e-4 mm).
+    fn model_at(&mut self, oid: &str, local: &str) -> Option<String> {
+        let &[o, x, y] = self.frames.get(oid)?;
+        let g = self.solved.get(&(oid.to_string(), local.to_string()))?;
+        let (u, v) = (g["point"][0].as_f64()?, g["point"][1].as_f64()?);
+        let p: [f64; 3] = std::array::from_fn(|i| (o[i] + u * x[i] + v * y[i]) * 1000.0);
+        let near = |q: &Value| f3(q).is_some_and(|q| (0..3).map(|i| (q[i] - p[i]).powi(2)).sum::<f64>().sqrt() < 1e-4);
+        let reply = self.call("query_entities", json!({ "kind": "vertices", "near": mm(p.map(|c| c / 1000.0)), "limit": 1 })).ok()?;
+        if let Some(id) = reply["vertices"].as_array().into_iter().flatten().find(|e| near(&e["position"])).and_then(|e| e["id"].as_str()) {
+            return Some(id.to_string());
+        }
+        let reply = self.call("query_entities", json!({ "kind": "edges", "near": mm(p.map(|c| c / 1000.0)), "limit": 4 })).ok()?;
+        let sub = |a: [f64; 3], b: [f64; 3]| -> [f64; 3] { std::array::from_fn(|i| a[i] - b[i]) };
+        let dot = |a: [f64; 3], b: [f64; 3]| (0..3).map(|i| a[i] * b[i]).sum::<f64>();
+        let through = |e: &Value| -> bool {
+            let (Some(a), Some(b)) = (f3(&e["start"]), f3(&e["end"])) else { return false };
+            match (e["curve"].as_str(), f3(&e["center"])) {
+                (Some("line"), _) => {
+                    let (d, w) = (sub(b, a), sub(p, a));
+                    let t = dot(w, d) / dot(d, d).max(1e-30);
+                    (-1e-9..=1.0 + 1e-9).contains(&t) && dot(sub(w, d.map(|c| c * t)), sub(w, d.map(|c| c * t))).sqrt() < 1e-4
+                }
+                (Some("circle"), Some(c)) => {
+                    let r = dot(sub(a, c), sub(a, c)).sqrt();
+                    let m = f3(&e["midpoint"]).unwrap_or(a);
+                    // In the circle's plane: the normal from two radii.
+                    let (r1, r2) = (sub(a, c), sub(m, c));
+                    let n = [r1[1] * r2[2] - r1[2] * r2[1], r1[2] * r2[0] - r1[0] * r2[2], r1[0] * r2[1] - r1[1] * r2[0]];
+                    let nl = dot(n, n).sqrt();
+                    let off = if nl > 1e-12 { dot(sub(p, c), n) / nl } else { 0.0 };
+                    (dot(sub(p, c), sub(p, c)).sqrt() - r).abs() < 1e-4 && off.abs() < 1e-4
+                }
+                _ => false,
+            }
+        };
+        let found: Vec<&Value> = reply["edges"].as_array().into_iter().flatten().filter(|e| through(e)).collect();
+        // One edge only: at a corner two run through the point, and which live meant isn't known.
+        match found.as_slice() {
+            [e] => e["id"].as_str().map(str::to_string),
             _ => None,
         }
     }

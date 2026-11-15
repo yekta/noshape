@@ -770,6 +770,10 @@ fn sketch_use_intersection_and_model_references() {
     let lines = created(&used, "line");
     assert_eq!(lines.len(), 4, "{used}");
     assert!(lines.iter().all(|l| l["external"] == true), "{used}");
+    // The Origin used: a point where it projects, linked to it.
+    let used = call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": ["origin"] }));
+    let p = created(&used, "point");
+    assert!(p.len() == 1 && p[0]["external"] == true && near(&p[0]["at"], 0.0, 0.0), "{used}");
     // The Front plane crosses the top face along a line at Z = 10.
     let s3 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }))["sketch"].as_str().unwrap().to_string();
     let inter = call(&mut ctx, "sketch_intersection", json!({ "sketch": s3, "face": top }));
