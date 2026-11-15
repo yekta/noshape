@@ -96,8 +96,8 @@ pub fn ops() -> Vec<Op> {
         op(
             "offset",
             "Offset sketch curves or model edges (the Offset tool)",
-            "Offsets the curves (a connected chain offsets as one) by `distance`. Model edges (`edge:…`) and other sketches' curves offset as Onshape's tool does: the copies stay linked to the edge and follow it when the model changes. The default side is the one the tool's arrow shows first; `toward` picks the side whose offset passes nearer that point, `flip` flips the side.",
-            vec![req("entities", ids(), "Curves to offset: this sketch's (`entity:…`), model edges (`edge:…`) or other sketches' curves."), opt("distance", value(), "Offset distance (default: the tool's, 5 mm / 0.25 in)."), opt("toward", point(), "A point on the side to offset to."), opt("flip", json!({ "type": "boolean" }), "Offset to the other side.")],
+            "Offsets the curves (a connected chain offsets as one) by `distance`. Model edges (`edge:…`), a model face (`face:…`: its outer loop) and other sketches' curves offset as Onshape's tool does: the copies stay linked to the edge and follow it when the model changes. The default side is the one the tool's arrow shows first; `toward` picks the side whose offset passes nearer that point, `flip` flips the side.",
+            vec![req("entities", ids(), "Curves to offset: this sketch's (`entity:…`), model edges (`edge:…`), a model face (`face:…`, its outer loop) or other sketches' curves."), opt("distance", value(), "Offset distance (default: the tool's, 5 mm / 0.25 in)."), opt("toward", point(), "A point on the side to offset to."), opt("flip", json!({ "type": "boolean" }), "Offset to the other side.")],
             offset,
         ),
         op(
@@ -404,7 +404,24 @@ fn offset(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let before = existing(&t);
     // Model edges and other sketches' curves: a linked reference curve (not shown) is what offsets.
     let model = |v: &Value| matches!(refs::parse_str(v.as_str().unwrap_or("")), Some(noshape_model::reference::Reference::Edge(_) | noshape_model::reference::Reference::SketchEntity { .. }));
-    let curves: Vec<EntityId> = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, &mut t, model(v), false).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<_, _>>()?;
+    let mut curves: Vec<EntityId> = Vec::new();
+    let mut of_face = false;
+    for (i, v) in a.array("entities")?.iter().enumerate() {
+        // A model face: its outer loop (live: the face is accepted, its outer loop offset as one chain).
+        if let Some(face @ noshape_model::reference::Reference::Face(_)) = refs::parse_str(v.as_str().unwrap_or("")) {
+            let bb = t.data.sketch.bbox();
+            let cursor = if bb.is_empty() { DVec2::ZERO } else { bb.center() };
+            let m = sketch_use::Model { context: &t.regen.context, display: &t.regen.display, frame: &t.frame };
+            let outer: Vec<EntityId> = m.outer_edge_refs(&face).iter().filter_map(|e| sketch_use::external_entity(&mut t.data, m, WORLD_PER_PX, cursor, e, false, true)).collect();
+            if outer.is_empty() {
+                return Err(OpError::param(&format!("entities[{i}]"), "the face has no edges to offset in this sketch"));
+            }
+            curves.extend(outer);
+            of_face = true;
+            continue;
+        }
+        curves.push(parse_entity(v, &mut t, model(v), false).map_err(|e| e.with_param(format!("entities[{i}]")))?);
+    }
     if let Some(i) = curves.iter().position(|e| t.data.sketch.kind(*e) == Some(EntityKind::Point)) {
         return Err(OpError::param(&format!("entities[{i}]"), "points can't be offset; give curves"));
     }
@@ -420,6 +437,9 @@ fn offset(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // Select the curves, then the tool (the preselection becomes the offset).
     ed.selection = curves;
     ed.apply_preselection(&mut t.data);
+    if of_face {
+        ed.offset_out_of_face(&t.data.sketch);
+    }
     if let Some(p) = a.get("toward") {
         let p = point_value(p, &t.units).map_err(|e| e.with_param("toward"))?;
         // The side whose offset curves pass nearer the point (clicking the

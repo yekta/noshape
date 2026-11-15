@@ -2683,6 +2683,36 @@ impl SketchEditor {
         self.offset_pending = Some(ids);
     }
 
+    /// Offset tool on a model face (live: accepted, its outer loop offset as one chain): `ids` the loop's reference
+    /// curves. With an offset already pending it isn't added (one chain at once).
+    pub fn offset_loop(&mut self, sk: &Sketch, ids: Vec<EntityId>) -> EditOutcome {
+        if ids.is_empty() || self.tool != Tool::Offset {
+            return EditOutcome::none();
+        }
+        if self.offset_pending.is_some() {
+            self.toast = Some("Can only offset a single chain at once.".into());
+            return EditOutcome::redraw();
+        }
+        self.start_offset(sk, ids);
+        self.offset_out_of_face(sk);
+        self.selection = self.offset_pending.clone().unwrap_or_default();
+        self.message = None;
+        EditOutcome::redraw()
+    }
+
+    /// A face's pending offset goes out of the face by default (its loop's reference curves bound no region of the
+    /// sketch): the side whose copies span more.
+    pub fn offset_out_of_face(&mut self, sk: &Sketch) {
+        let span = |ed: &Self| {
+            ed.offset_result(sk).map_or(0.0, |(tmp, made)| made.iter().filter_map(|e| tmp.curve(*e)).fold(noshape_sketch::BBox::EMPTY, |b, c| b.union(&c.bbox())).size().length())
+        };
+        let here = span(self);
+        self.offset_out = !self.offset_out;
+        if span(self) <= here {
+            self.offset_out = !self.offset_out;
+        }
+    }
+
     /// The pending offset's signed distance for `Sketch::offset`.
     fn offset_signed(&self) -> f64 {
         if self.offset_flip != self.offset_out { -self.offset_distance } else { self.offset_distance }

@@ -934,6 +934,22 @@ impl PartStudioView {
                 let round_pick = self.sketch_data(cx).is_some_and(|d| picks.iter().any(|e| matches!(d.sketch.kind(*e), Some(noshape_sketch::EntityKind::Circle | noshape_sketch::EntityKind::Arc))));
                 let plane_area = |r: &Reference| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. });
                 let skip_plane = |r: &Reference| !picks.is_empty() && plane_area(r) && (round_pick || self.is_own_sketch_plane(r, cx));
+                // Offset on a model face (live q-off): its outer loop, offset as one chain.
+                if hovered.is_none()
+                    && tool_now == Some(Tool::Offset)
+                    && let Some(face) = self.hover.clone().filter(|r| matches!(r, Reference::Face(_)))
+                {
+                    let edges = match (self.context.clone(), self.sketch.as_ref().map(|s| s.frame)) {
+                        (Some(ctx), Some(frame)) => noshape_ops::sketch_use::Model { context: &ctx, display: &self.display, frame: &frame }.outer_edge_refs(&face),
+                        _ => Vec::new(),
+                    };
+                    let ids: Vec<noshape_sketch::EntityId> = edges.iter().filter_map(|e| self.external_entity(e, false, true, cx)).collect();
+                    if let Some(out) = self.with_sketch(cx, |ed, data| ed.offset_loop(&data.sketch, ids)) {
+                        self.apply_outcome(out, window, cx);
+                    }
+                    cx.notify();
+                    return true;
+                }
                 let hovered = match (hovered, self.hover.clone().filter(|r| !skip_plane(r)), tool_now) {
                     // Offset: a model edge or another sketch's curve offsets through a linked reference curve (live's
                     // OFFSET externalMaster), which follows the model.

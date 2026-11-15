@@ -68,6 +68,15 @@ impl Model<'_> {
 
     /// The edges of a model face (an edge gives itself).
     pub fn edge_refs(&self, r: &Reference) -> Vec<Reference> {
+        self.face_edge_refs(r, false)
+    }
+
+    /// A face's outer loop's edges (live's Offset of a face: the outer loop only); an edge itself.
+    pub fn outer_edge_refs(&self, r: &Reference) -> Vec<Reference> {
+        self.face_edge_refs(r, true)
+    }
+
+    fn face_edge_refs(&self, r: &Reference, outer: bool) -> Vec<Reference> {
         let mut refs: Vec<Reference> = Vec::new();
         match r {
             Reference::Edge(_) => refs.push(r.clone()),
@@ -78,7 +87,10 @@ impl Model<'_> {
                     if let Some(body) = self.context.body(&b.id).or_else(|| self.display.context_shapes.iter().find(|x| x.id == b.id))
                         && let Ok(face) = body.shape.sub_shape(noshape_kernel::ShapeType::Face, fi)
                     {
-                        for e in face.edges() {
+                        // (The outer loop: the wire spanning the most.)
+                        let size = |w: &noshape_kernel::Shape| w.bounding_box(false).map_or(0.0, |b| b.diagonal());
+                        let edges = if outer { face.wires().into_iter().max_by(|a, b| size(a).total_cmp(&size(b))).map_or_else(|| face.edges(), |w| w.edges()) } else { face.edges() };
+                        for e in edges {
                             if let Some(i) = body.shape.index_of(&e, noshape_kernel::ShapeType::Edge)
                                 && let Some(n) = body.edges.get(i)
                             {

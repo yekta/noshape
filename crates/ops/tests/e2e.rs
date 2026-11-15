@@ -843,6 +843,27 @@ fn sketch_offset_of_model_edges_follows_the_model() {
     assert!(a.len() == 1 && (a[0] - (span(0) - 6.0) * (span(1) - 6.0)).abs() < 1e-6, "{a:?}, block {} x {}", span(0), span(1));
 }
 
+/// Live (behaviours "Sketch Offset (O) on model edges"): Offset on a model face offsets its outer loop as one chain,
+/// 5 mm outward by default; its inner loop (a hole) isn't offset.
+#[test]
+fn sketch_offset_of_a_model_face_offsets_its_outer_loop() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "offset-face.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[10, 10], [13, 10]] }));
+    let regions = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"].clone();
+    let ring = regions.as_array().unwrap().iter().max_by(|a, b| num(&a["area"]).total_cmp(&num(&b["area"]))).unwrap()["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [ring], "depth": "10 mm" } }));
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1], "near": [30, 10, 10], "limit": 1 }));
+    let face = top["faces"][0]["id"].clone();
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top", "name": "Offsets" }))["sketch"].as_str().unwrap().to_string();
+    let off = call(&mut ctx, "sketch_offset", json!({ "sketch": s2, "entities": [face] }));
+    let st = call(&mut ctx, "sketch_get", json!({ "sketch": s2 }));
+    let areas: Vec<f64> = st["regions"].as_array().unwrap().iter().map(|r| num(&r["area"])).collect();
+    assert!(areas.len() == 1 && (areas[0] - 50.0 * 30.0).abs() < 1e-6, "{areas:?} {off}");
+    assert!(!st["entities"].as_array().unwrap().iter().any(|e| e["type"] == "circle" && e["external"] != true), "the hole isn't offset: {st}");
+}
+
 #[test]
 fn sketch_text_and_imports() {
     let mut ctx = Ctx::new();

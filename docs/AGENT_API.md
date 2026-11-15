@@ -1872,7 +1872,7 @@ Examples:
 
 Offset sketch curves or model edges (the Offset tool) (edits the document (one undoable history entry)).
 
-Offsets the curves (a connected chain offsets as one) by `distance`. Model edges (`edge:…`) and other sketches' curves offset as Onshape's tool does: the copies stay linked to the edge and follow it when the model changes. The default side is the one the tool's arrow shows first; `toward` picks the side whose offset passes nearer that point, `flip` flips the side.
+Offsets the curves (a connected chain offsets as one) by `distance`. Model edges (`edge:…`), a model face (`face:…`: its outer loop) and other sketches' curves offset as Onshape's tool does: the copies stay linked to the edge and follow it when the model changes. The default side is the one the tool's arrow shows first; `toward` picks the side whose offset passes nearer that point, `flip` flips the side.
 
 Examples:
 
@@ -1885,7 +1885,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
-| `entities` | array of string | required | Curves to offset: this sketch's (`entity:…`), model edges (`edge:…`) or other sketches' curves. |
+| `entities` | array of string | required | Curves to offset: this sketch's (`entity:…`), model edges (`edge:…`), a model face (`face:…`, its outer loop) or other sketches' curves. |
 | `distance` | string or number |  | Offset distance (default: the tool's, 5 mm / 0.25 in). |
 | `toward` | array of number or string |  | A point on the side to offset to. |
 | `flip` | boolean |  | Offset to the other side. |
