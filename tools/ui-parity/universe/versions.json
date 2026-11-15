@@ -3064,7 +3064,7 @@
     [
      {
       "on": {
-       "field": "Search items"
+       "field": "Search"
       }
      }
     ],
@@ -3277,7 +3277,7 @@
     [
      {
       "on": {
-       "menu": "Revision history"
+       "menu": "Revision history…"
       }
      }
     ]
@@ -3313,7 +3313,7 @@
     [
      {
       "on": {
-       "menu": "Revision history"
+       "menu": "Revision history…"
       }
      },
      {
@@ -3336,7 +3336,7 @@
     [
      {
       "on": {
-       "menu": "Revision history"
+       "menu": "Revision history…"
       }
      },
      {
@@ -3508,7 +3508,12 @@
     [
      {
       "on": {
-       "button": "Edit revision table template"
+       "nav": "Release management"
+      }
+     },
+     {
+      "on": {
+       "button": "Edit"
       }
      }
     ]
