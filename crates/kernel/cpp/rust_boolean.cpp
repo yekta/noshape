@@ -3937,6 +3937,83 @@ static IntTools_Curve refined_section(const IntTools_Curve& ic, const TopoDS_Fac
   return IntTools_Curve(nc, na, nb, tol, ic.TangentialTolerance());
 }
 
+// The extent along a cylinder's axis of face `ff` (its box's corners), the cylinder face's own [v0, v1] in it.
+static std::pair<double, double> along_axis(const gp_Cylinder& cy, const TopoDS_Face& ff, double v0, double v1)
+{
+  Bnd_Box box;
+  BRepBndLib::Add(ff, box);
+  double lo = v0, hi = v1;
+  if (box.IsVoid())
+    return {lo, hi};
+  double xmin, ymin, zmin, xmax, ymax, zmax;
+  box.Get(xmin, ymin, zmin, xmax, ymax, zmax);
+  for (const double x : {xmin, xmax})
+    for (const double y : {ymin, ymax})
+      for (const double z : {zmin, zmax})
+      {
+        double u = 0, v = 0;
+        ElSLib::Parameters(cy, gp_Pnt(x, y, z), u, v);
+        lo = std::min(lo, v);
+        hi = std::max(hi, v);
+      }
+  return {lo, hi};
+}
+
+// The section of a whole cylinder's face (the first face where `cyl_first`) made long enough to hold the free-form
+// face's along its axis, and the free-form face; none where the faces aren't those or OCCT finds none.
+static std::optional<std::vector<IntTools_Curve>> long_cylinder_section(const TopoDS_Face& fa, const TopoDS_Face& fb, bool cyl_first)
+{
+  const TopoDS_Face& fc = cyl_first ? fa : fb;
+  const TopoDS_Face& ff = cyl_first ? fb : fa;
+  const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(fc));
+  if (cs.IsNull())
+    return std::nullopt;
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  BRepTools::UVBounds(fc, u0, u1, v0, v1);
+  const auto [lo, hi] = along_axis(cs->Cylinder(), ff, v0, v1);
+  const double margin = 0.1 * (hi - lo) + 1e-6;
+  BRepBuilderAPI_MakeFace mk(cs, u0, u1, lo - margin, hi + margin, Precision::Confusion());
+  if (!mk.IsDone())
+    return std::nullopt;
+  IntTools_FaceFace again;
+  again.SetParameters(true, true, true, 1e-7);
+  if (cyl_first)
+    again.Perform(mk.Face(), ff);
+  else
+    again.Perform(ff, mk.Face());
+  if (!again.IsDone() || again.Lines().IsEmpty())
+    return std::nullopt;
+  std::vector<IntTools_Curve> out;
+  for (const IntTools_Curve& ic : again.Lines())
+    out.push_back(refined_section(ic, cyl_first ? mk.Face() : ff, cyl_first ? ff : mk.Face()));
+  return out;
+}
+
+// A whole cylinder's face and a B-spline face reaching past its rims along its axis (a thread round its bolt's shaft):
+// the long cylinder's section at once, where OCCT's of the face as it is leaves out the part past the last seam crossing
+// and sections_past_seam then asks again (c2-helical-sweep's Sweep 1 cut: 18 ms each of its two flanks' sections, its
+// longest).
+static std::optional<std::vector<IntTools_Curve>> seam_first(const TopoDS_Face& fa, const TopoDS_Face& fb)
+{
+  for (const bool cyl_first : {true, false})
+  {
+    const TopoDS_Face& fc = cyl_first ? fa : fb;
+    const TopoDS_Face& ff = cyl_first ? fb : fa;
+    const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(fc));
+    if (cs.IsNull() || BRepAdaptor_Surface(ff, false).GetType() != GeomAbs_BSplineSurface)
+      continue;
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    BRepTools::UVBounds(fc, u0, u1, v0, v1);
+    if (std::abs(u1 - u0 - 2 * M_PI) > 1e-9)
+      continue;
+    const auto [lo, hi] = along_axis(cs->Cylinder(), ff, v0, v1);
+    if (lo >= v0 - 1e-6 && hi <= v1 + 1e-6)
+      continue;
+    return long_cylinder_section(fa, fb, cyl_first);
+  }
+  return std::nullopt;
+}
+
 // A whole cylinder's face (going round, its seam an edge of it) against a free-form face: OCCT's section of the two
 // left out its last part, from the last crossing of the seam to the cylinder's rim (c2-fan-blade-sweep's thread on
 // the bolt's shaft: its flanks' helices one turn short, so the thread fell outside the bolt, live's overlap lost).
@@ -3980,39 +4057,7 @@ static std::optional<std::vector<IntTools_Curve>> sections_past_seam(const TopoD
     }
     if (!dangling)
       return std::nullopt;
-    // (Long enough: the free-form face's extent along the axis, and the face's own.)
-    Bnd_Box box;
-    BRepBndLib::Add(ff, box);
-    if (box.IsVoid())
-      return std::nullopt;
-    double xmin, ymin, zmin, xmax, ymax, zmax;
-    box.Get(xmin, ymin, zmin, xmax, ymax, zmax);
-    double lo = v0, hi = v1;
-    for (const double x : {xmin, xmax})
-      for (const double y : {ymin, ymax})
-        for (const double z : {zmin, zmax})
-        {
-          double u = 0, v = 0;
-          ElSLib::Parameters(cy, gp_Pnt(x, y, z), u, v);
-          lo = std::min(lo, v);
-          hi = std::max(hi, v);
-        }
-    const double margin = 0.1 * (hi - lo) + 1e-6;
-    BRepBuilderAPI_MakeFace mk(cs, u0, u1, lo - margin, hi + margin, Precision::Confusion());
-    if (!mk.IsDone())
-      return std::nullopt;
-    IntTools_FaceFace again;
-    again.SetParameters(true, true, true, 1e-7);
-    if (cyl_first)
-      again.Perform(mk.Face(), ff);
-    else
-      again.Perform(ff, mk.Face());
-    if (!again.IsDone() || again.Lines().IsEmpty())
-      return std::nullopt;
-    std::vector<IntTools_Curve> out;
-    for (const IntTools_Curve& ic : again.Lines())
-      out.push_back(refined_section(ic, cyl_first ? mk.Face() : ff, cyl_first ? ff : mk.Face()));
-    return out;
+    return long_cylinder_section(fa, fb, cyl_first);
   }
   return std::nullopt;
 }
@@ -4055,6 +4100,12 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
         return;
       }
       jobs[k].lines.clear();
+      if (std::optional<std::vector<IntTools_Curve>> first = seam_first(jobs[k].fa, jobs[k].fb))
+      {
+        jobs[k].lines = std::move(*first);
+        jobs[k].done  = true;
+        return;
+      }
       IntTools_FaceFace ff;
       ff.SetParameters(true, true, true, 1e-7);
       ff.Perform(jobs[k].fa, jobs[k].fb);
