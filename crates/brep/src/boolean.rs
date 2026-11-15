@@ -888,6 +888,8 @@ impl End {
 
 /// Pool vertices sorted by x, by the argument they belong to (None: new or several arguments').
 type ByOwner = Vec<(Option<u32>, Sorted3)>;
+/// Sections' end vertices with their pairs of faces, by cell of space.
+type SectionEnds = HashMap<(i64, i64, i64), Vec<(u32, usize, usize)>>;
 
 /// Vertices by x (each its x, vertex), grouped by their owner.
 type ByOwnerX = Vec<(Option<u32>, Vec<(f64, u32)>)>;
@@ -972,8 +974,8 @@ struct Ctx<'a> {
     solids: Vec<GSolid>,
     side_cache: HashMap<(u32, usize), i8>,
     in_face_done: HashSet<(usize, usize)>,
-    /// Sections' new end vertices where they cross an edge, by (that edge, the pair's other face): [`Self::end_on_edge`].
-    edge_ends: HashMap<(usize, usize), Vec<u32>>,
+    /// Sections' new end vertices with their pairs of faces, by cell ([`Self::end_on_edge`]).
+    section_ends: SectionEnds,
     /// Curves added to each face.
     face_segs: Vec<Vec<Seg>>,
     /// For each of a face's curves, the section it is (its index in `sections`), or `usize::MAX`.
@@ -1906,22 +1908,43 @@ impl Ctx<'_> {
         Ok(())
     }
 
-    /// The vertex of a section's end `p` where it crosses an edge of face `fs` or `ft` (within `stol`, the section's
-    /// tolerance): another section's end there within reach that crossed the same edge with the same other face (two
-    /// faces' sections with a third, each ending where it crosses the edge between those two, 2.2 um apart on
-    /// c2-helical-sweep's thread cutter at the bar's rim: OCCT's one pave of that edge on the third face), merged;
-    /// else a new one, kept for those.
+    /// The vertex of a section's end `p` (faces `fs` and `ft`, `stol` its tolerance): another section's end within
+    /// reach where the two cross one edge, between one face of each, their other faces the same (two faces' sections
+    /// with a third, each ending where it crosses the edge between those two, 2.2 um apart on c2-helical-sweep's
+    /// thread cutter at the bar's rim: OCCT's one pave of that edge on the third face), merged; else a new one.
     fn end_on_edge(&mut self, fs: usize, ft: usize, p: DVec3, stol: f64) -> R<u32> {
-        let keys: Vec<(usize, usize)> = [(fs, ft), (ft, fs)]
-            .into_iter()
-            .flat_map(|(f, g)| self.faces[f].edges.iter().map(move |&(e, _)| (e, g)))
-            .filter(|&(e, _)| {
-                let (u, d) = self.seg_param(&self.edge_seg(e), p);
-                stol > self.pool.pair(0.0, 0.0) && d <= stol && (0.0..=1.0).contains(&u)
+        if stol <= self.pool.pair(0.0, 0.0) {
+            return self.pool.add(p);
+        }
+        const CELL: f64 = 2e-5;
+        let cell = |q: DVec3| ((q.x / CELL).floor() as i64, (q.y / CELL).floor() as i64, (q.z / CELL).floor() as i64);
+        let c = cell(p);
+        let mut near: Vec<(u32, usize, usize, f64)> = Vec::new();
+        for d in 0..27 {
+            let k = (c.0 + d % 3 - 1, c.1 + d / 3 % 3 - 1, c.2 + d / 9 - 1);
+            for &(w, a, b) in self.section_ends.get(&k).into_iter().flatten() {
+                let dist = (self.p(w) - p).length();
+                if dist <= self.pool.pair(stol, self.pool.t[w as usize]) && !near.iter().any(|x| x.0 == w) {
+                    near.push((w, a, b, dist));
+                }
+            }
+        }
+        // (An edge of a face of each pair, the same other face, both points on it within `stol`.)
+        let on = |e: usize, q: DVec3| {
+            let (u, d) = self.seg_param(&self.edge_seg(e), q);
+            d <= stol && (0.0..=1.0).contains(&u)
+        };
+        let found = near
+            .iter()
+            .filter(|&&(w, a, b, _)| {
+                [(fs, ft), (ft, fs)].into_iter().any(|(f, g)| {
+                    [(a, b), (b, a)].into_iter().any(|(f2, g2)| {
+                        g == g2 && f != f2 && self.faces[f].edges.iter().any(|&(e, _)| self.faces[f2].edges.iter().any(|x| x.0 == e) && on(e, p) && on(e, self.p(w)))
+                    })
+                })
             })
-            .collect();
-        let near = self.pool.near_tol(p, stol);
-        let found = keys.iter().flat_map(|k| self.edge_ends.get(k).into_iter().flatten()).filter_map(|&w| near.iter().find(|x| x.0 == w)).min_by(|a, b| a.1.total_cmp(&b.1)).map(|x| x.0);
+            .min_by(|x, y| x.3.total_cmp(&y.3))
+            .map(|x| x.0);
         let w = match found {
             Some(w) => {
                 self.pool.merge_with(w, p, 0.0);
@@ -1929,12 +1952,7 @@ impl Ctx<'_> {
             }
             None => self.pool.add(p)?,
         };
-        for k in keys {
-            let list = self.edge_ends.entry(k).or_default();
-            if !list.contains(&w) {
-                list.push(w);
-            }
-        }
+        self.section_ends.entry(cell(self.p(w))).or_default().push((w, fs, ft));
         Ok(w)
     }
 
@@ -2003,7 +2021,13 @@ impl Ctx<'_> {
                         // seam (c2-helical-sweep's thread cutter crossing the bar's seam, OCCT's curve up to 1.7 um
                         // off it).)
                         let c: &Ctx = cx;
-                        let seam = |f: usize, e: usize| c.faces[f].edges.iter().filter(|x| x.0 == e).count() == 2;
+                        // (A line at the seam's angle used twice by the face.)
+                        let seam = |f: usize, e: usize| {
+                            let (Geo::Line, Surf::Cyl { o, x, y, th0, full: true, .. }) = (c.edges[e].g, &c.faces[f].s) else { return false };
+                            let m = (c.p(c.edges[e].v[0]) + c.p(c.edges[e].v[1])) * 0.5 - *o;
+                            let off_seam = (m.dot(*y).atan2(m.dot(*x)) - th0).rem_euclid(TAU);
+                            off_seam.min(TAU - off_seam) <= 1e-6 && c.faces[f].edges.iter().filter(|x| x.0 == e).count() == 2
+                        };
                         let (d, q) = [(fs, ft), (ft, fs)]
                             .into_iter()
                             .flat_map(|(f, g)| c.faces[f].edges.iter().filter(move |x| c.in_face_done.contains(&(x.0, g)) || seam(f, x.0)))
@@ -4173,7 +4197,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         solids: Vec::new(),
         side_cache: HashMap::default(),
         in_face_done: Default::default(),
-        edge_ends: Default::default(),
+        section_ends: Default::default(),
         face_segs: Vec::new(),
         seg_section: Vec::new(),
         seg_edge_tol: Vec::new(),
