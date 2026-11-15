@@ -4,39 +4,43 @@ Area: crates/assembly, crates/assembly-ui, the assembly ops in crates/ops and th
 scenarios, the assembly parity suite (`parity_assemblies`) and the parity translator (crates/ops/src/parity.rs) for
 the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: docs/DECISIONS.md.
 
-## State (2026-11-15 22:27 UTC)
+## State (2026-11-15 23:59 UTC)
 
 ### In flight
 - Worktree /root/projects/noshape-wt/asm (detached on 93346d03 = landed fd98e8a6), on top (none landed):
   - 60b13cba (**decision with the lead**): `regions_by_sum` takes the closest group of live's sketch regions.
-  - 70ae7e9b: in-context bodies from live's `<element>.context.jsonl` (`context_bodies`: a planar one-face sheet as its
-    face from chained edges; wires, curved or multi-face sheets as 3D edges; splines through live's 10 points). A
-    non-sketch feature's sub-feature maps to its first Import (1b88ff's Extrude 3 / 4). An in-context sketch sits on
-    live's planar face when there is one (its edges split the regions as live's), else on the 1 m square. 1b88ff 6 ->
-    12/12 features, a2e4a2 7 -> 9/64; isaac-ball on today's data 116/121, 89/121 -> 90/122 mates.
-  - 154e6c65: an assembly's Save view / Delete view is no undo step (psui's FYI). UI test passes on the Mac.
-  - 08d6feee: configured refs.jsonl lines (`configuration`, live 19:51): those of the studio's build configuration;
-    instances inserted by our part's body id (the nut's custDesc names the part per size).
-  - 07f3351a + 0c676223 + fd230597: BOM scoring. live's bom.json (all 24 corpora) against our structured
-    `assembly_bom`: each live row matched with an unused row of ours by parent row and fields (indent, name, quantity,
-    part number, description, material; no material = "- None -" as live's panel); order reported apart. Our
-    default-named parts ("Part N") renamed to live's names; standard content parts get our catalogue's material;
-    our subassembly rows ("Sub <eid>") compared under live's assembly names. Naming the subassembly *tabs* as live's
-    broke keyboard-pattern's studios (19 -> 8/25 occurrences, reason not found yet): only the comparison maps them.
-    config-assembly 12/12 rows.
-  - (latest) mate-messages.json (live / live2): a mate live leaves in ERROR with red (unresolved) connectors that ours
-    solves counts as live and is listed as "live defect" (DECISIONS 11-15; isaac-ball's 7).
-- Runs: base29 (main's code) full suite done on today's data: 1596/1711 occurrences, 609/656 mates (vibe6
-  ~/agents/asm-keep/full/base29.sum; earlyoom killed the first run at scissor-lift, 8.4 GB RSS: the last five reran
-  alone, base29b.log). s41 (all my commits) full suite running on vibe6 (full/s41.log, SLOT_MIN_GB=12; vibe7's slot
-  was held by qa's ui-parity shards). Then compare per assembly, land, SCORE row.
-- Naming our subassembly tabs as live's (s37/s38) broke keyboard-pattern's studio 2bb133 (Plane 1 "Point-Plane
-  requires a point and a plane", then its sketches): tab names reach studio translation somewhere. Reverted (s39);
-  not chased.
-- Model gate (s30, same base as s29): identical per model except cf-spur-gear and exercise-chino, which drop for s29
-  too since their refs were refetched at 19:28 (asked the lead whose).
-- Captures: live keeps isaac-ball (done) and infento-subs mate messages; live2 takes every other corpus with error or
-  warning mates (from ~22:30). Live has no message text for these mates: `redFields` and the dialog lines only.
+  - 70ae7e9b: in-context bodies from live's `<element>.context.jsonl` (a planar one-face sheet as its face, wires and
+    curved sheets as 3D edges, splines through live's 10 points; an in-context sketch on live's planar face). 1b88ff 6
+    -> 12/12 features, a2e4a2 7 -> 9/64.
+  - 154e6c65: an assembly's Save view / Delete view is no undo step (psui's FYI).
+  - 08d6feee: configured refs.jsonl lines (`configuration`): the studio's build configuration's; instances by our
+    part's body id. config-assembly 21 -> 25/25 occurrences, 14 -> 18/18 mates.
+  - 07f3351a + 0c676223 + fd230597: BOM scoring against live's bom.json (rows matched by parent and fields; "Part N"
+    renamed to live's names; standard content gets our catalogue's material; our "Sub <eid>" rows named as live's in
+    the comparison only: naming the tabs broke keyboard-pattern, s38).
+  - cde9262e: a mate live leaves unresolved (mate-messages.json message or red connectors) that ours solves counts as
+    live, listed as "live defect" (DECISIONS 11-15).
+  - 40205609: an in-context POINT body (context.jsonl) imported as a point body (keyboard 2bb133's Plane 1).
+  - 668e761a: mate status = mate-messages.json's liveStatusNow / status over the older featureStates.
+  - f4159c6d: a Derived picking its source's sketch brings it in; regions live names as the Derived's found in it; an
+    empty `foreignId` takes blobData's file. keyboard-pattern (s47, with live's new refs) 20 -> 21/25, BOM 13 -> 15/16.
+  - 913fad5f: a sketch instance (live's type "Feature") inserted as ours of that sketch (T1; keyboard's three need
+    studio a66ca5, requested from live).
+- Runs on vibe6 (queue g49/run.sh, each through ~/bin/slot, status in g49/status): s41 full suite (to 668e761a)
+  running (full/s41b.log; 9 of 24 at 23:24, equal to base29 but config-assembly 25/25, 18/18); then the model gate
+  base29 vs s49 (g49/models-*.log); then the full suite with s49 (full/s49.log) for the SCORE row. Then land.
+- Tried and reverted (s48): keeping a sketch moved by a configuration variable's dimension (20e932's
+  #WidthAcrossFlats, stored at the workspace's configuration). config-assembly fell 25 -> 23/25, the Revolves still
+  fail. Not the cause; 20e932's Revolves stay open.
+- Asked live (REQUESTS.md 23:25 to 23:5x): (1) every studio's part metadata (studios/<element>.metadata.json) for the
+  BOM's part number, description and material (clamp-pattern 2/14, gearbox-std 2/8, hand-drill-pinslot 0/20 rows);
+  then the translator sets them with part_set_properties / part_set_material. (2) refs for non-sketch features of
+  keyboard 8c3f79 (Plane 1's importTag edge) and df4a26 (Extrude 1's endBoundEntityVertex, 49 of ours). (3)
+  config-assembly d2ecd2's Feature Studios (setData, custDesc not built: #SocketSize). (4) keyboard studio a66ca5.
+- keyboard 2bb133 left: Sketch 2's Use (projected) entities from the derived sketch aren't drawn ("clicks didn't
+  complete a line"), 20 PROJECTED find no model geometry; Extrude 3, Chamfer 2, Transform 1 after it.
+- dx lands a configured-suppression translation (parity.rs: Step.suppressed, `__liveConfiguration`). It touches the
+  Translator constructor line and the step loop near mine: whoever lands second rebases.
 
 ### Queued to land
 - Nothing. Landed today: 790ecad5, 36ebccbc, 163918c9, fd98e8a6, 8ffdb51e / 72805bc5 (this file).
