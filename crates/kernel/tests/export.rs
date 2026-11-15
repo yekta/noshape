@@ -1912,3 +1912,29 @@ fn a_planes_cut_across_a_spline_extrusion_is_rebuilt_exact() {
     let (v0, v1) = (volume_properties(&cut).unwrap().mass, volume_properties(&exact).unwrap().mass);
     assert!((v1 - v0).abs() <= 1e-6 * v0, "{v0} -> {v1}");
 }
+
+/// Two adjacent faces on one plane up to rounding (1e-9 rad apart) are exported on one plane exactly: live's import
+/// merges faces on one surface only when their planes are equal (cf-sheet-metal-model-plus: 61 faces of ours, 58 of
+/// its own, where three adjacent pairs differed by 3e-11 to 5e-9 m). Neither moves by more than that.
+#[test]
+fn adjacent_faces_on_one_plane_up_to_rounding_export_on_one_plane() {
+    use glam::DVec2;
+    let rect = |y0: f64, y1: f64| vec![Segment2d::Line { a: DVec2::new(0.0, y0), b: DVec2::new(0.01, y0) }, Segment2d::Line { a: DVec2::new(0.01, y0), b: DVec2::new(0.01, y1) }, Segment2d::Line { a: DVec2::new(0.01, y1), b: DVec2::new(0.0, y1) }, Segment2d::Line { a: DVec2::new(0.0, y1), b: DVec2::new(0.0, y0) }];
+    let a = make_face_2d(&Plane::from_normal(DVec3::ZERO, DVec3::Z), &rect(-0.01, 0.0), &[]).unwrap();
+    let tilt = 1e-9_f64;
+    let b = make_face_2d(&Plane::from_normal(DVec3::ZERO, DVec3::new(0.0, -tilt.sin(), tilt.cos())), &rect(0.0, 0.01), &[]).unwrap();
+    let shell = sew(&[a, b], 1e-6, false).unwrap().shape;
+    let normals = |s: &Shape| -> Vec<(DVec3, f64)> {
+        s.sub_shapes(ShapeType::Face).iter().map(|f| match f.face_surface().unwrap() {
+            Surface::Plane(p) => (p.normal, p.normal.dot(p.origin)),
+            other => panic!("{other:?}"),
+        }).collect()
+    };
+    let before = normals(&shell);
+    assert_eq!(before.len(), 2);
+    assert_ne!(before[0].0.abs(), before[1].0.abs(), "the sewn faces' planes are one already: the case no longer tests anything");
+    let after = normals(&exact_edges(&shell).unwrap());
+    assert_eq!(after[0].0.abs(), after[1].0.abs(), "{after:?}");
+    assert!((after[0].1.abs() - after[1].1.abs()).abs() < 1e-15, "{after:?}");
+    assert!(after.iter().zip(&before).all(|(x, y)| (x.0 - y.0).length() < 1e-8), "{before:?} -> {after:?}");
+}

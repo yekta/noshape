@@ -15,6 +15,7 @@
 #include <ShapeFix_Shape.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRepLib.hxx>
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
 #include <Geom_RectangularTrimmedSurface.hxx>
@@ -1431,60 +1432,173 @@ std::optional<ExactEdge> exact_between(const TopoDS_Edge& e, const TopoDS_Face (
     const gp_Pln pln = pl[ip]->Pln();
     const gp_XYZ n = pln.Axis().Direction().XYZ(), d = ext->Direction().XYZ(), o = pln.Location().XYZ();
     const double nd = n.Dot(d);
-    if (std::abs(nd) < 1e-6)
-      return std::nullopt;
     // The range: the edge's ends as the surface's u (its own curve on it).
     double                          f0, l0;
     const occ::handle<Geom2d_Curve> old = BRep_Tool::CurveOnSurface(e, f[1 - ip], f0, l0);
     if (old.IsNull())
       return std::nullopt;
-    x.t0 = old->Value(f0).X();
-    x.t1 = old->Value(l0).X();
-    // An extrusion's offset is the extrusion of its basis curve's offset (along the normal T x d, the same at every
-    // v): that offset curve as a B-spline within 1e-10 m over the edge's range, then carried as a basis curve is.
-    occ::handle<Geom_BSplineCurve> bs = occ::down_cast<Geom_BSplineCurve>(basis);
-    if (!off.IsNull())
+    if (std::abs(nd) < 1e-9)
     {
-      const double            lo = std::min(x.t0, x.t1), hi = std::max(x.t0, x.t1);
-      GeomConvert_ApproxCurve fit(new Geom_TrimmedCurve(new Geom_OffsetCurve(basis, off->Offset(), gp_Dir(d)), lo, hi), 1e-10, GeomAbs_C2, 400, 9);
-      if (!fit.HasResult() || fit.MaxError() > 1e-9)
+      // A plane along the extrusion: a ruling, the line along it through where the basis curve (or its offset)
+      // crosses the plane; its parameter the surface's v.
+      const occ::handle<Geom_Curve> cx = off.IsNull() ? basis : occ::handle<Geom_Curve>(new Geom_OffsetCurve(basis, off->Offset(), gp_Dir(d)));
+      double                        t  = 0.5 * (old->Value(f0).X() + old->Value(l0).X());
+      for (int it = 0; it < 50; ++it)
+      {
+        gp_Pnt p;
+        gp_Vec dt;
+        cx->D1(t, p, dt);
+        const double h = n.Dot(p.XYZ() - o), slope = n.Dot(dt.XYZ());
+        if (std::abs(slope) < 1e-12)
+          return std::nullopt;
+        t -= h / slope;
+        if (std::abs(h) < 1e-15)
+          break;
+      }
+      const gp_Pnt q = cx->Value(t);
+      if (std::abs(n.Dot(q.XYZ() - o)) > 1e-12)
         return std::nullopt;
-      bs = fit.Curve();
-    }
-    if (bs.IsNull() || bs->IsRational() || bs->IsPeriodic())
-      return std::nullopt;
-    const int                    np = bs->NbPoles(), deg = bs->Degree();
-    NCollection_Array1<gp_Pnt>   poles(1, np);
-    NCollection_Array1<gp_Pnt2d> on_ext(1, np), on_plane(1, np);
-    NCollection_Array1<double>   flat(1, np + deg + 1);
-    bs->KnotSequence(flat);
-    for (int i = 1; i <= np; ++i)
-    {
-      const gp_XYZ p = bs->Pole(i).XYZ();
-      const double v = n.Dot(o - p) / nd;
-      poles(i)       = gp_Pnt(p + v * d);
-      // (u = t: the Greville abscissae as poles.)
-      double g = 0;
-      for (int j = i + 1; j <= i + deg; ++j)
-        g += flat(j);
-      on_ext(i) = gp_Pnt2d(g / deg, v);
+      x.t0       = old->Value(f0).Y();
+      x.t1       = old->Value(l0).Y();
+      x.curve    = new Geom_Line(q, gp_Dir(d));
+      x.on[1 - ip] = new Geom2d_Line(gp_Pnt2d(t, 0), gp_Dir2d(0, 1));
       double pu, pv;
-      ElSLib::Parameters(pln, poles(i), pu, pv);
-      on_plane(i) = gp_Pnt2d(pu, pv);
+      ElSLib::Parameters(pln, q, pu, pv);
+      x.on[ip] = new Geom2d_Line(gp_Pnt2d(pu, pv), gp_Dir2d(d.Dot(pln.XAxis().Direction().XYZ()), d.Dot(pln.YAxis().Direction().XYZ())));
     }
-    NCollection_Array1<double> knots(1, bs->NbKnots());
-    NCollection_Array1<int>    mults(1, bs->NbKnots());
-    bs->Knots(knots);
-    bs->Multiplicities(mults);
-    x.curve      = new Geom_BSplineCurve(poles, knots, mults, deg);
-    x.on[1 - ip] = new Geom2d_BSplineCurve(on_ext, knots, mults, deg);
-    x.on[ip]     = new Geom2d_BSplineCurve(on_plane, knots, mults, deg);
+    else
+    {
+      x.t0 = old->Value(f0).X();
+      x.t1 = old->Value(l0).X();
+      // An extrusion's offset is the extrusion of its basis curve's offset (along the normal T x d, the same at every
+      // v): that offset curve as a B-spline within 1e-10 m over the edge's range, then carried as a basis curve is.
+      occ::handle<Geom_BSplineCurve> bs = occ::down_cast<Geom_BSplineCurve>(basis);
+      if (!off.IsNull())
+      {
+        const double            lo = std::min(x.t0, x.t1), hi = std::max(x.t0, x.t1);
+        GeomConvert_ApproxCurve fit(new Geom_TrimmedCurve(new Geom_OffsetCurve(basis, off->Offset(), gp_Dir(d)), lo, hi), 1e-10, GeomAbs_C2, 400, 9);
+        if (!fit.HasResult() || fit.MaxError() > 1e-9)
+          return std::nullopt;
+        bs = fit.Curve();
+      }
+      if (bs.IsNull() || bs->IsRational() || bs->IsPeriodic())
+        return std::nullopt;
+      const int                    np = bs->NbPoles(), deg = bs->Degree();
+      NCollection_Array1<gp_Pnt>   poles(1, np);
+      NCollection_Array1<gp_Pnt2d> on_ext(1, np), on_plane(1, np);
+      NCollection_Array1<double>   flat(1, np + deg + 1);
+      bs->KnotSequence(flat);
+      for (int i = 1; i <= np; ++i)
+      {
+        const gp_XYZ p = bs->Pole(i).XYZ();
+        const double v = n.Dot(o - p) / nd;
+        poles(i)       = gp_Pnt(p + v * d);
+        // (u = t: the Greville abscissae as poles.)
+        double g = 0;
+        for (int j = i + 1; j <= i + deg; ++j)
+          g += flat(j);
+        on_ext(i) = gp_Pnt2d(g / deg, v);
+        double pu, pv;
+        ElSLib::Parameters(pln, poles(i), pu, pv);
+        on_plane(i) = gp_Pnt2d(pu, pv);
+      }
+      NCollection_Array1<double> knots(1, bs->NbKnots());
+      NCollection_Array1<int>    mults(1, bs->NbKnots());
+      bs->Knots(knots);
+      bs->Multiplicities(mults);
+      x.curve      = new Geom_BSplineCurve(poles, knots, mults, deg);
+      x.on[1 - ip] = new Geom2d_BSplineCurve(on_ext, knots, mults, deg);
+      x.on[ip]     = new Geom2d_BSplineCurve(on_plane, knots, mults, deg);
+    }
     if (std::min(x.t0, x.t1) < x.curve->FirstParameter() - 1e-9 || std::max(x.t0, x.t1) > x.curve->LastParameter() + 1e-9)
       return std::nullopt;
   }
   if (std::abs(x.t1 - x.t0) < 1e-9 || x.curve->Value(x.t0).Distance(a) > reach || x.curve->Value(x.t1).Distance(b) > reach)
     return std::nullopt;
   return x;
+}
+
+// Adjacent faces on one plane up to rounding put on one plane exactly, on a copy: a reader merges faces on one surface
+// (live's import of its own cf-sheet-metal-model-plus sheet metal part: 58 faces; of ours 61, where three adjacent pairs'
+// planes differed, by up to 0.75 um across a face). One plane: each face's vertices within 1e-6 m of the other's. None
+// merges here.
+TopoDS_Shape snap_coplanar(const TopoDS_Shape& in)
+{
+  auto pairs = [](const TopoDS_Shape& sh, bool any) {
+    ShapeIMap fm;
+    TopExp::MapShapes(sh, TopAbs_FACE, fm);
+    NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef;
+    TopExp::MapShapesAndUniqueAncestors(sh, TopAbs_EDGE, TopAbs_FACE, ef);
+    std::vector<std::pair<int, int>> out;
+    auto plane = [](const TopoDS_Face& f) {
+      return f.Location().IsIdentity() ? occ::down_cast<Geom_Plane>(BRep_Tool::Surface(f)) : occ::handle<Geom_Plane>();
+    };
+    for (int i = 1; i <= ef.Extent(); ++i)
+    {
+      const NCollection_List<TopoDS_Shape>& fs = ef(i);
+      if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()))
+        continue;
+      const TopoDS_Face a = TopoDS::Face(fs.First()), b = TopoDS::Face(fs.Last());
+      const occ::handle<Geom_Plane> pa = plane(a), pb = plane(b);
+      if (pa.IsNull() || pb.IsNull())
+        continue;
+      const gp_Pln qa = pa->Pln(), qb = pb->Pln();
+      const gp_XYZ na = qa.Axis().Direction().XYZ(), nb = qb.Axis().Direction().XYZ();
+      // (The normals' angle by their cross product: 1 - cos rounds a 1e-9 rad tilt to 0.)
+      const double dn = na.Crossed(nb).Modulus(), dd = std::abs(na.Dot(qb.Location().XYZ() - qa.Location().XYZ()));
+      if (dn > 1e-3 || (!any && dn == 0 && dd == 0))
+        continue;
+      // One plane within 1e-6 m: each face's vertices that close to the other's plane.
+      auto off = [](const TopoDS_Face& f, const gp_Pln& p) {
+        double d = 0;
+        for (TopExp_Explorer v(f, TopAbs_VERTEX); v.More(); v.Next())
+          d = std::max(d, p.Distance(BRep_Tool::Pnt(TopoDS::Vertex(v.Current()))));
+        return d;
+      };
+      if (off(b, qa) > 1e-6 || off(a, qb) > 1e-6)
+        continue;
+      out.emplace_back(fm.FindIndex(a), fm.FindIndex(b));
+    }
+    return std::make_pair(out, fm);
+  };
+  if (pairs(in, false).first.empty())
+    return in;
+  BRepBuilderAPI_Copy copy(in, true, false);
+  const TopoDS_Shape  out = copy.Shape();
+  const auto [ps, fm]     = pairs(out, true);
+  // Faces joined by those pairs: each group on its first face's plane.
+  std::vector<int> up(fm.Extent() + 1);
+  for (int i = 0; i <= fm.Extent(); ++i)
+    up[i] = i;
+  std::function<int(int)> root = [&](int i) { return up[i] == i ? i : up[i] = root(up[i]); };
+  for (const auto& [a, b] : ps)
+  {
+    const int ra = root(a), rb = root(b);
+    up[std::max(ra, rb)] = std::min(ra, rb);
+  }
+  for (int i = 1; i <= fm.Extent(); ++i)
+  {
+    const int r = root(i);
+    if (r == i)
+      continue;
+    const occ::handle<Geom_Plane> own = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(TopoDS::Face(fm(i))));
+    const gp_Pln                  ref = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(TopoDS::Face(fm(r))))->Pln();
+    gp_Ax3                        ax  = own->Position();
+    gp_XYZ                        n   = ref.Axis().Direction().XYZ();
+    if (n.Dot(ax.Direction().XYZ()) < 0)
+      n.Reverse();
+    // Its frame turned onto the reference's normal (handedness kept), its origin onto that plane.
+    const gp_Vec turn = gp_Vec(ax.Direction()).Crossed(gp_Vec(n));
+    if (turn.Magnitude() > 1e-15)
+      ax.Rotate(gp_Ax1(ax.Location(), gp_Dir(turn)), std::asin(std::min(1.0, turn.Magnitude())));
+    const gp_XYZ o = ax.Location().XYZ();
+    ax.SetLocation(gp_Pnt(o - n * n.Dot(o - ref.Location().XYZ())));
+    ax.SetDirection(gp_Dir(n));
+    own->SetPosition(ax);
+  }
+  // The edges' tolerances to their faces' new planes (exact_edges then rebuilds the lines between them).
+  BRepLib::UpdateTolerances(out, false);
+  return BRepCheck_Analyzer(out).IsValid() ? out : in;
 }
 } // namespace
 
@@ -1495,12 +1609,13 @@ std::optional<ExactEdge> exact_between(const TopoDS_Edge& e, const TopoDS_Face (
 std::unique_ptr<OcShape> exact_edges(const OcShape& s)
 {
   require_non_null(s.shape, "shape");
-  constexpr double exact = 1e-7;
-  ShapeIMap        es;
-  TopExp::MapShapes(s.shape, TopAbs_EDGE, es);
+  constexpr double   exact = 1e-7;
+  const TopoDS_Shape shape = snap_coplanar(s.shape);
+  ShapeIMap          es;
+  TopExp::MapShapes(shape, TopAbs_EDGE, es);
   NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef, ve;
-  TopExp::MapShapesAndUniqueAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
-  TopExp::MapShapesAndUniqueAncestors(s.shape, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  TopExp::MapShapesAndUniqueAncestors(shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  TopExp::MapShapesAndUniqueAncestors(shape, TopAbs_VERTEX, TopAbs_EDGE, ve);
   struct Made
   {
     TopoDS_Edge edge;
@@ -1532,7 +1647,7 @@ std::unique_ptr<OcShape> exact_edges(const OcShape& s)
     }
   }
   if (made.empty())
-    return wrap(s.shape);
+    return wrap(shape);
   // Each vertex at an exact edge's end: where those ends are.
   NCollection_IndexedDataMap<TopoDS_Shape, std::vector<gp_Pnt>, TopTools_ShapeMapHasher> ends;
   for (const Made& m : made)
@@ -1596,8 +1711,8 @@ std::unique_ptr<OcShape> exact_edges(const OcShape& s)
     bb.SameRange(ne, true);
     rs->Replace(m.edge, along ? ne : TopoDS::Edge(ne.Reversed()));
   }
-  const TopoDS_Shape out = rs->Apply(s.shape);
-  return wrap(BRepCheck_Analyzer(out).IsValid() ? out : s.shape);
+  const TopoDS_Shape out = rs->Apply(shape);
+  return wrap(BRepCheck_Analyzer(out).IsValid() ? out : shape);
 }
 
 std::unique_ptr<OcShape> read_iges(rust::Str path)
