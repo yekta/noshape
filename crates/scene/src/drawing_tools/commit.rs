@@ -577,9 +577,8 @@ impl SheetPick<'_> {
     }
 
     /// A click of a profile tool (Crop view, Broken-out section, Detail view profiles): a snap point, else onto the
-    /// nearest visible edge within 7 px inside the material or 6 px outside (screen px, any zoom), else the point in
-    /// the view under `c`. (live2 crop-snap-reach measured 8 px inside; live's drw-crop-spline take and live2's 11-15
-    /// trace of it leave clicks 7.8 px inside the block unsnapped, at the take's 3.9 px/mm.)
+    /// nearest visible edge within 6 px on screen, inside the material or out (live2 crop-snap-reach outside, and
+    /// crop-snap-inside 11-15: snapped at 5.5 px inside, free from 6.5), else the point in the view under `c`.
     pub fn profile_point(&self, c: [f64; 2], view: Option<ViewId>) -> Option<PickedPoint> {
         if let Some(p) = self.snap_at(c).filter(|p| view.is_none_or(|v| v == p.view)) {
             return Some(p);
@@ -588,8 +587,7 @@ impl SheetPick<'_> {
         let pl = self.placement(v)?;
         let q = pl.to_view(c);
         let Some(g) = self.geoms.get(&v) else { return Some(PickedPoint { view: v, p: q, r: None }) };
-        let px = if views::inside_material(&g.edges, q) { 7.0 } else { 6.0 };
-        let reach = self.tol_mm(px) / (pl.scale * 1000.0);
+        let reach = self.tol_mm(6.0) / (pl.scale * 1000.0);
         let nearest = g
             .edges
             .iter()
