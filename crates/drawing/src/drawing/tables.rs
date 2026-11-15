@@ -47,6 +47,11 @@ pub struct TableData {
     /// Columns and rows sized to their text as live's BOM tables (live 2232), columns at least `min_col` mm.
     pub text_sized: bool,
     pub min_col: f64,
+    /// Columns of a fixed width, a multiple of the content text height (at least 1 in), whatever their text (None: from
+    /// the text); text wider wraps.
+    pub width_factors: Vec<Option<f64>>,
+    /// Rows a multiple of their text height plus the padding: title, header, content.
+    pub row_factors: Option<[f64; 3]>,
 }
 
 /// A table's Drawing properties › Tables look, resolved: row text heights
@@ -181,6 +186,13 @@ pub struct RevisionTemplate {
     pub all_caps: bool,
 }
 
+/// A revision table's column widths in content text heights (live2 feel/revtable, ANSI and ISO alike; at least 1 in):
+/// fixed, whatever the text (it wraps).
+const REVISION_COLUMN_WIDTHS: [(&str, f64); 4] = [("Revision", 11.044), ("Revision description", 15.068), ("Date approved", 11.24), ("Approver", 7.649)];
+
+/// A revision table's rows in text heights, plus the padding: title, header, content (live2 feel/revtable).
+const REVISION_ROWS: [f64; 3] = [1.333, 1.395, 5.0 / 3.0];
+
 /// The Onshape default template's columns (help image relmgmt-workflows-14).
 pub const DEFAULT_REVISION_COLUMNS: [&str; 4] = ["Revision", "Revision description", "Date approved", "Approver"];
 
@@ -283,7 +295,8 @@ fn revision_data_with(kind: &TableKind, revisions: &[RevisionRow], template: Opt
     let header: Vec<String> = t.columns.iter().enumerate().map(|(i, c)| headers.get(i).cloned().flatten().unwrap_or_else(|| caps(c.clone()))).collect();
     let rows: Vec<Vec<String>> = shown.iter().map(|r| t.columns.iter().map(|c| caps(RevisionTemplate::cell(c, r, &desc_of(r)))).collect()).collect();
     let pending = shown.iter().enumerate().filter(|(_, r)| r.pending).map(|(i, _)| i).collect();
-    TableData { title: Some(title.clone().unwrap_or_else(|| REVISION_TITLE.into())), header: Some(header), rows, pending, padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), ..Default::default() }
+    let width_factors = t.columns.iter().map(|c| REVISION_COLUMN_WIDTHS.iter().find(|(n, _)| n == c).map(|(_, k)| *k)).collect();
+    TableData { title: Some(title.clone().unwrap_or_else(|| REVISION_TITLE.into())), header: Some(header), rows, pending, padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), width_factors, row_factors: Some(REVISION_ROWS), ..Default::default() }
 }
 
 /// Label of a revision callout: the revision, with the unreleased suffix while pending; None
@@ -948,6 +961,12 @@ pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
     w
 }
 
+/// `auto` with the columns of a fixed width ([`TableData::width_factors`]) at theirs.
+fn fixed_widths(table: &Table, data: &TableData, auto: Vec<f64>) -> Vec<f64> {
+    let h = data.content_height(table);
+    auto.into_iter().enumerate().map(|(i, w)| data.width_factors.get(i).copied().flatten().map_or(w, |k| (k * h).max(25.4))).collect()
+}
+
 /// Live 2232's BOM columns: each as wide as its widest text (in its own weight) plus a third of its height and the
 /// padding on both sides, at least `min_col`.
 fn text_widths(table: &Table, data: &TableData) -> Vec<f64> {
@@ -970,11 +989,15 @@ fn text_widths(table: &Table, data: &TableData) -> Vec<f64> {
 /// "Descrip/tion"): at spaces, and inside a word that doesn't fit by itself.
 pub fn cell_lines(table: &Table, data: &TableData, ri: usize, ci: usize, text: &str, width: Option<f64>) -> Vec<String> {
     let lines = text.split('\n').map(str::to_string);
-    let (true, Some(width)) = (data.text_sized && table.col_widths.len() == data.columns(), width) else { return lines.collect() };
+    let wraps = (data.text_sized && table.col_widths.len() == data.columns()) || data.width_factors.get(ci).copied().flatten().is_some();
+    let (true, Some(width)) = (wraps, width) else { return lines.collect() };
     let h = cell_height(table, data, ri, ci);
     let f = table.cell_formats.iter().find(|s| s.row == ri && s.col == ci).map(|s| s.format.clone()).unwrap_or_else(|| data.default_format(ri, ci, data.all_rows().len()));
     let family = f.font.as_deref().unwrap_or(font::DEFAULT_FAMILY);
-    let fits = |s: &str| font::text_width_font(s, h, family, f.bold, f.italic) <= width - h / 3.0 - data.padding[0] * 2.0 + 1e-6;
+    // A fixed-width column (a revision table's) keeps one padding clear (live2 feel/revtable: its bold "Revision
+    // description" fits at 0.12 in, "DATE APPROVED" wraps at 3.5 mm); a BOM column a third of the height and both.
+    let room = if data.width_factors.get(ci).copied().flatten().is_some() { width - data.padding[0] } else { width - h / 3.0 - data.padding[0] * 2.0 };
+    let fits = |s: &str| font::text_width_font(s, h, family, f.bold, f.italic) <= room + 1e-6;
     let mut out = Vec::new();
     for line in lines {
         let mut cur = String::new();
@@ -1004,8 +1027,13 @@ pub fn cell_lines(table: &Table, data: &TableData, ri: usize, ci: usize, text: &
 pub fn row_need(table: &Table, data: &TableData, ri: usize, row: &[String], vpad: f64, widths: &[f64]) -> f64 {
     let th = data.row_text_height(table, ri);
     // Live 2232's BOM rows: 5/3 of the text height (26/15 in a bold header) and the padding.
-    let line = |h: f64| if data.text_sized { h * if data.default_format(ri, 0, data.all_rows().len()).bold { 26.0 / 15.0 } else { 5.0 / 3.0 } } else { h };
-    let floor = if data.text_sized { 0.0 } else { table.row_height };
+    let rows = data.all_rows().len();
+    let line = |h: f64| match data.row_factors {
+        Some(f) => h * if data.is_header(ri, rows) { f[1] } else { f[2] },
+        None if data.text_sized => h * if data.default_format(ri, 0, rows).bold { 26.0 / 15.0 } else { 5.0 / 3.0 },
+        None => h,
+    };
+    let floor = if data.text_sized || data.row_factors.is_some() { 0.0 } else { table.row_height };
     let mut need = floor.max(line(th) + 2.0 * vpad);
     for (ci, c) in row.iter().enumerate() {
         if table.merge_at(ri, ci).is_some_and(|m| m.rows > 1 || (m.row, m.col) != (ri, ci)) {
@@ -1014,7 +1042,7 @@ pub fn row_need(table: &Table, data: &TableData, ri: usize, row: &[String], vpad
         let h = cell_height(table, data, ri, ci);
         let more = (cell_lines(table, data, ri, ci, c, widths.get(ci).copied()).len().max(1) - 1) as f64 * h * 1.5;
         need = need.max(line(h) + 2.0 * vpad + more);
-        if !data.text_sized {
+        if !data.text_sized && data.row_factors.is_none() {
             need = need.max(table.row_height - th + h + more);
         }
     }
@@ -1022,10 +1050,13 @@ pub fn row_need(table: &Table, data: &TableData, ri: usize, row: &[String], vpad
 }
 
 pub fn layout(table: &Table, data: &TableData) -> TableLayout {
-    let widths = if table.col_widths.len() == data.columns() { table.col_widths.clone() } else { auto_widths(table, data) };
+    let widths = if table.col_widths.len() == data.columns() { table.col_widths.clone() } else { fixed_widths(table, data, auto_widths(table, data)) };
     let mut heights: Vec<f64> = Vec::new();
     if data.title.is_some() {
-        heights.push(table.row_height.max(data.title_height(table) + 2.0 * data.padding[1]));
+        heights.push(match data.row_factors {
+            Some(f) => f[0] * data.title_height(table) + 2.0 * data.padding[1],
+            None => table.row_height.max(data.title_height(table) + 2.0 * data.padding[1]),
+        });
     }
     let all = data.all_rows();
     let set = table.row_heights.len() == all.len();
@@ -1341,6 +1372,34 @@ mod tests {
         assert_eq!(tag_letters(0), "A");
         assert_eq!(tag_letters(25), "Z");
         assert_eq!(tag_letters(26), "AA");
+    }
+
+    /// Live2 feel/revtable (11-15): a revision table's columns are fixed multiples of the content text height (ANSI's
+    /// Approver held at 1 in), its rows its text heights times 1.333 / 1.395 / 5/3 plus the padding; a long description
+    /// wraps, the column keeps its width.
+    #[test]
+    fn revision_table_sizes_as_live() {
+        let rows = |d: &str| vec![RevisionRow { revision: "A".into(), description: d.into(), date: "11/15/2026".into(), approved: "-".into(), ..Default::default() }];
+        let t = Table::new(1, TableKind::revision(), [400.0, 280.0]);
+        for (ansi, widths, heights) in [(true, [33.66, 45.93, 34.26, 25.4], [8.33, 7.30, 8.13]), (false, [38.66, 52.74, 39.34, 26.77], [9.07, 7.88, 8.83])] {
+            let mut d = Drawing::default();
+            crate::drawing::templates::template_sizes(&mut d.props, ansi);
+            let data = table_data(&d, &t, None, None, None, &rows(""), &|s| s.to_string());
+            let l = layout(&t, &data);
+            let w: Vec<f64> = l.xs.windows(2).map(|x| x[1] - x[0]).collect();
+            let h: Vec<f64> = l.ys.windows(2).map(|y| y[0] - y[1]).collect();
+            assert!(w.iter().zip(widths).all(|(a, b)| (a - b).abs() < 0.02), "ansi {ansi}: columns {w:?}");
+            assert!(h.iter().zip(heights).all(|(a, b)| (a - b).abs() < 0.02), "ansi {ansi}: rows {h:?}");
+            let long = table_data(&d, &t, None, None, None, &rows("A REVISION DESCRIPTION OF ABOUT SIXTY CHARACTERS IN ALL HERE"), &|s| s.to_string());
+            let l2 = layout(&t, &long);
+            assert_eq!(l2.xs, l.xs, "text never widens a column");
+            assert!(l2.ys[2] - l2.ys[3] > h[2] + 1.0, "the description wraps and its row grows");
+            // Released: the approver's name wraps in its column (live's 13.98 mm row in ISO).
+            let mut released = rows("");
+            released[0].approved = "Loopelf Loopelf".into();
+            let l3 = layout(&t, &table_data(&d, &t, None, None, None, &released, &|s| s.to_string()));
+            assert!(l3.xs == l.xs && l3.ys[2] - l3.ys[3] > h[2] + 1.0, "{:?}", l3.ys);
+        }
     }
 
     #[test]
