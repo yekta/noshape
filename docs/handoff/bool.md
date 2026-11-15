@@ -4,7 +4,28 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-14 17:55 UTC; restart from here)
+## bool, now (11-15 04:00 UTC; restart from here)
+- Landed: Shell stage 1 (af629bc6), the glued-fuse guard (c10dbd61), Shell stage 2 (59239698). Queued after its gate:
+  d1d038643 (recut_arc_seams: after usd_kept_volume a cylinder face merged round onto itself along an arc gets its seam
+  on a plain stretch; e53bba's Extrude 9 202 faces, no arc seam, test a_band_merged_round_onto_its_end_has_a_straight_
+  seam), 160b35ec8 (brep: another argument's ellipse across a whole cylinder split at its seam; of_face keeps a thin
+  piece's point where the deeper one leaves the bound; tests a_letters_ellipse_across_a_holes_seam_fused_as_occt,
+  a_tiny_wedge_face_under_a_tolerant_plate_fused_as_occt), ba07f18ec (Shell stage 3 part 1: quad::newton_foot, the
+  feet on free-form faces by Newton, OCCT's projection past the bounds; rings-loft Shell 738 -> ~700 ms vibe7).
+- rings-loft Shell 1 now ~700 ms on vibe7 (live 235): edges ~250, repair ~280, self-interference ~110, faces ~110,
+  volumes ~60, thin ~45, check ~35. Next for it: the joins' and add_pcurve's projections (add_pcurve 6 %), the 4 edges
+  still OCCT's (march out of halvings), volumes / thin check by our own integrals.
+- st-5d8bc1 Extrude 55 after the two fixes: the whole fuse declines "a piece's point on another solid's face"; subsets
+  "an ellipse on another face" (tools 1-65), "a non-manifold result" (98-130). Recording vibe6/vibe7
+  ~/agents/bool-keep/m5d8rec2/cee9172049a1487c; probe_tool_subset (xprobe) bisects (PROBE_TOOLS, PROBE_OCCT=1 to record
+  OCCT's).
+- Queue (lead 11-15 + core / bool2): impeller cap 1.3e-5 short of live (36 suite features, predates the Shell work);
+  speed table: c2-bottle-split Shell 1 66 vs 3 ms, cf-snap-hook Shell 1 103 vs 6, impeller Boolean Flansch+Gehäuse 1008
+  vs 154 (bool2: offset x plane sections_ahead, case 7519a27ac8f397d0), c2-helical-sweep Sweep 1 297 vs 28 (our decline
+  then OCCT), c2-valve-config Circular pattern 1 425 vs 67 (one_by_one 358); copies vibe5 ~/agents/bool-keep/spd. bool2
+  writes a "move a cylinder face's seam to angle a" helper next to merge_cylinder_groups; recut_arc_seams to use it.
+
+## bool, earlier (11-14 17:55 UTC)
 - Queued 17:54 as 17e65775 (common.cpp): shown_topology joins two faces of one periodic surface whose shared iso line
   lies whole periods apart on them (the edge as each face holds it; same_frame for copies of one elementary surface):
   the tyre's tread across its r169 cylinder at u = pi (input cylinder from pi to 3pi); and two B-spline sections
