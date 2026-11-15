@@ -5108,9 +5108,11 @@ impl<'a> Translator<'a> {
                 }
                 r.ok()
             };
-            // One linked by where live solved it that over-defines the sketch (c2-hex-bookcase-derived's clip: a
-            // polygon's corners on a mesh's nodes, a hair off live's): taken back.
-            if linked && reply.as_ref().is_some_and(|r| r["status"].as_str().is_some_and(|t| t.starts_with("over defined"))) {
+            // One on model geometry that over-defines the sketch: taken back (c2-hex-bookcase-derived's clip, linked
+            // by where live solved it: a polygon's corners on a mesh's nodes, a hair off live's; exercise-chino's
+            // Sketch 3: a slot's line with both ends on a model line, which live keeps without a conflict).
+            let to_model = c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external")));
+            if (linked || to_model) && reply.as_ref().is_some_and(|r| r["status"].as_str().is_some_and(|t| t.starts_with("over defined"))) {
                 let _ = self.call("history_undo", json!({}));
                 *missed.entry(format!("{ty} to external geometry")).or_default() += 1;
                 continue;
