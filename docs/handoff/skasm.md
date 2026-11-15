@@ -1,6 +1,15 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
-## Resume here (2026-11-15 03:10 UTC): sketch constraints the model suite leaves to the solved geometry (lead)
+## Resume here (2026-11-15 04:25 UTC): sketch constraints the model suite leaves to the solved geometry (lead)
+- 04:25: 269 -> 107 (full suite, vibe7: 80/87, 878/947; only knife changed, main's). Since 03:10: dx's mesh points
+  link hex-bookcase's Uses (PROJECTED 46 -> 29); ellipse centres and conic points mapped; Use of a circular edge's
+  centre (`implicit:center:<edge>`, app + regeneration, e2e) and the translator tries circle centres for point Uses;
+  a Coincident linked by where live solved it is undone when it over-defines the sketch (hex's clip: polygon corners
+  on mesh nodes, a hair off). Left unmapped: fillets' zero-length leftover sides (11), text right / centre lines (4,
+  on purpose: our font's advances), a circle ours draws as a spline (1).
+- Probes 20 answered (fixture sketch-probe-20.live.json, 0/11 match): live keeps the slot's line with fewer
+  tangencies (l1 on a tie) and moves the other; ours keeps the arcs' centres. The pass keeps l1, l3 and a4 then falls
+  back to a symmetric solve: next fuzz work.
 - Dropped constraints, full suite on vibe6 (/root/skasm-scratch/bin/dropped.py on the suite log): 269 -> 132
   (PROJECTED 146 -> 46, COINCIDENT to model geometry 68 -> 16); documents and features unchanged (80/87, 870/947).
 - Fixed: a used line's `.start` / `.end` PROJECTED counted as its line's; orphan Uses (no reference in live either)
