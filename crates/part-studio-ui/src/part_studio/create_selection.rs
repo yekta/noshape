@@ -316,7 +316,7 @@ impl PartStudioView {
             div()
                 .id(label)
                 .flex_1()
-                .h(px(26.))
+                .h(px(25.))
                 .relative()
                 .flex()
                 .items_center()
@@ -391,7 +391,7 @@ impl PartStudioView {
                 div()
                     .px(px(6.))
                     .when(empty, |d| d.pt(px(6.)).pb(px(5.)).text_size(px(12.)).line_height(px(13.33)))
-                    .when(!empty, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.)))
+                    .when(!empty, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(10.)))
                     .text_color(pal.text_muted)
                     .child("Selection"),
             )
@@ -400,6 +400,8 @@ impl PartStudioView {
         let checkbox = h_flex()
             .id("cs-patterns")
             .h(px(27.))
+            // Live 54b: 6 px under the Selection field.
+            .mt(px(6.))
             .px(px(4.))
             .gap(px(4.))
             .cursor_pointer()
@@ -499,12 +501,13 @@ impl PartStudioView {
                 .child(self.render_cs_select(list, current, cs.list_open, cx))
                 .child(field)
                 .child(checkbox)
-                .child(div().h(px(22.)).px(px(3.)).text_size(px(12.)).line_height(px(21.6)).child(result))
+                .child(div().h(px(21.)).px(px(3.)).text_size(px(12.)).line_height(px(21.)).child(result))
                 .child(h_flex().h(px(27.)).px(px(3.)).justify_center().child(add))
                 .child(
-                    // ? help row (22 px).
+                    // ? help row (live 54b: 27 px, the ? centred 15.5 px down).
                     h_flex()
-                        .h(px(22.))
+                        .h(px(27.))
+                        .pt(px(4.))
                         .pr(px(4.))
                         .justify_end()
                         .child(div().size(px(14.)).rounded_full().bg(with_alpha(pal.text, 0.55)).flex().items_center().justify_center().text_size(px(10.)).text_color(pal.dialog_bg).child("?")),
@@ -517,7 +520,6 @@ impl PartStudioView {
     /// dom/dialog-create-selection.txt: 194 px, white, 1 px #d7d7d7 underline,
     /// 13.33 px black text, padding 1 6 1 / 20 px right for the arrow).
     fn render_cs_select(&self, list: &'static [(Criterion, &'static str)], current: Criterion, open: bool, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
         let highlight = gpui_kit::rgb(0x1e90ff);
         let rows = list.iter().map(|(k, label)| {
             let (k, on) = (*k, *k == current);
@@ -551,13 +553,13 @@ impl PartStudioView {
                     .id("cs-kind")
                     .h(px(26.))
                     .pl(px(6.))
-                    .pr(px(6.))
                     .bg(gpui_kit::rgb(0xffffff))
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
                     .cursor_pointer()
                     .child(div().flex_1().text_size(px(13.33)).text_color(gpui_kit::rgb(0x000000)).child(kind_label(current)))
-                    .child(crate::ui::glyph("ui-caret-down", 10., pal.text))
+                    // Live 54b: an 8 x 5 px #777 caret, its right end 6 px in from the select's.
+                    .child(crate::ui::glyph("ui-caret-down", 20., gpui_kit::rgb(0x777777)))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(cs) = &mut this.ui.create_selection {
                             cs.list_open = !cs.list_open;
