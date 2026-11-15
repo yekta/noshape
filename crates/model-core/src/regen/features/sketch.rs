@@ -448,6 +448,34 @@ pub fn project_edge(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneF
             }
             Some(Curve2::Arc { center: c, radius, start_angle: a0, end_angle: e })
         }
+        // An ellipse seen as a circle (a cylinder cut obliquely, seen along its axis: c2-hunting-knife's Sketch 16
+        // offsets such an edge as a circle, live): its projected semi-axes equal and perpendicular.
+        k::Curve::Ellipse { center, axis, x_dir, major_radius, minor_radius } => {
+            let c = frame.to_local(center);
+            let u = frame.to_local(center + x_dir.normalize() * major_radius) - c;
+            let v = frame.to_local(center + axis.normalize().cross(x_dir.normalize()) * minor_radius) - c;
+            let radius = u.length();
+            if radius < 1e-12 || (v.length() - radius).abs() > 1e-7 * radius || u.dot(v).abs() > 1e-7 * radius * radius {
+                return None;
+            }
+            if info.closed {
+                return Some(Curve2::Circle { center: c, radius });
+            }
+            let ang = |p: glam::DVec3| {
+                let d = frame.to_local(p) - c;
+                d.y.atan2(d.x)
+            };
+            // The edge runs CCW from u to v; seen from the sketch normal it is CCW when u × v is positive.
+            let (mut a0, mut a1) = (ang(info.start), ang(info.end));
+            if u.perp_dot(v) < 0.0 {
+                std::mem::swap(&mut a0, &mut a1);
+            }
+            let mut e = a1;
+            while e <= a0 {
+                e += std::f64::consts::TAU;
+            }
+            Some(Curve2::Arc { center: c, radius, start_angle: a0, end_angle: e })
+        }
         _ => None,
     }
 }

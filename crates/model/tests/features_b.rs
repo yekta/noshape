@@ -1817,6 +1817,28 @@ fn an_edge_on_circle_projects_to_an_exact_line() {
     }
 }
 
+/// An ellipse that projects onto a circle (a cylinder cut obliquely, seen along its axis): a circle, or an arc between
+/// the edge's projected ends (live offsets such an edge as a circle: c2-hunting-knife's Sketch 16).
+#[test]
+fn an_ellipse_seen_as_a_circle_projects_to_a_circle() {
+    use noshape_model::regen::features::sketch::project_edge;
+    use noshape_sketch::Curve2;
+    let frame = noshape_model::display::PlaneFrame { origin: DVec3::ZERO, x: DVec3::X, y: DVec3::Y, normal: DVec3::Z };
+    let (t, r) = (0.6_f64, 0.007);
+    let plane = noshape_kernel::Plane::new(DVec3::new(0.01, 0.02, 0.005), DVec3::new(0.0, -t.sin(), t.cos()), DVec3::X);
+    let full = noshape_kernel::Segment2d::Ellipse { center: DVec2::ZERO, major_radius: r / t.cos(), minor_radius: r, rotation: PI / 2.0 };
+    let edge = noshape_kernel::make_edge_2d(&plane, &full).unwrap();
+    let Some(Curve2::Circle { center, radius }) = project_edge(&edge, &frame) else { panic!("not a circle: {:?}", project_edge(&edge, &frame)) };
+    assert!((center - DVec2::new(0.01, 0.02)).length() < 1e-12 && (radius - r).abs() < 1e-12, "{center:?} {radius}");
+    let quarter = noshape_kernel::Segment2d::EllipseArc { center: DVec2::ZERO, major_radius: r / t.cos(), minor_radius: r, rotation: PI / 2.0, start_angle: 0.0, end_angle: PI / 2.0 };
+    let edge = noshape_kernel::make_edge_2d(&plane, &quarter).unwrap();
+    let info = edge.edge_info().unwrap();
+    let Some(c @ Curve2::Arc { radius, start_angle, end_angle, .. }) = project_edge(&edge, &frame) else { panic!("not an arc") };
+    let ends = [frame.to_local(info.start), frame.to_local(info.end)];
+    let on = |p: DVec2| ends.iter().any(|e| (*e - p).length() < 1e-9);
+    assert!((radius - r).abs() < 1e-12 && (end_angle - start_angle - PI / 2.0).abs() < 1e-9 && on(c.start_point()) && on(c.end_point()), "{c:?} {ends:?}");
+}
+
 /// Move boundary with nothing selected marks its "Surface or boundary edges" field whatever the end condition, as
 /// live does with Up to part/surface, Up to face and Up to vertex (psui's move-boundary-up-to-* scenarios, step 3).
 #[test]
