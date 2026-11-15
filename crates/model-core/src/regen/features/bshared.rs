@@ -231,10 +231,11 @@ pub fn surface_result(ev: &mut EvalCtx, tool: NamedShape) -> FResult<()> {
     }
     let mut shapes: Vec<Shape> = targets.iter().map(|&i| ev.ctx.bodies[i].shape.clone()).collect();
     // A patch lying on faces already there joins them as they are (live: a Boundary surface between two opposite
-    // edges of a plane surface leaves that surface alone).
+    // edges of a plane surface leaves that surface alone, with the Boolean's note).
     let target_faces: Vec<Shape> = shapes.iter().flat_map(|s| s.faces()).collect();
     let tool_faces = tool.shape.faces();
     if !tool_faces.is_empty() && tool_faces.iter().all(|f| target_faces.iter().any(|g| face_duplicates(f, g))) {
+        ev.infos.push(crate::regen::eval::NO_GEOMETRY_CHANGE.into());
         return Ok(());
     }
     shapes.push(tool.shape.clone());

@@ -1663,7 +1663,8 @@ fn fill_on_an_open_box_knits_a_solid() {
 
 /// psui's boundary-surface-new-edit-reedit (ui-parity start "surfaces"): a Boundary surface between two opposite edges
 /// of a plane surface lies on it; with Add (Merge with all) live's parts stay one surface there and the plane crossing
-/// it, no part (ours sewed the two coincident sheets into a solid and took the crossing sheet with it).
+/// it, no part (ours sewed the two coincident sheets into a solid and took the crossing sheet with it), and the feature
+/// notes "Boolean resulted in no geometry change…" (Info) as live's step 4.
 #[test]
 fn a_boundary_surface_on_a_surface_already_there_adds_nothing() {
     let mut s = Studio::new();
@@ -1707,6 +1708,8 @@ fn a_boundary_surface_on_a_surface_already_there_adds_nothing() {
     let kinds: Vec<BodyKind> = r.context.bodies.iter().map(|b| b.kind).collect();
     assert_eq!(kinds, vec![BodyKind::Surface, BodyKind::Surface]);
     assert!(near(surface_area(&r, 0), 1600e-6, 1e-10), "area {} mm²", surface_area(&r, 0) * 1e6);
+    let st = r.display.features.last().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Info, Some(noshape_model::regen::eval::NO_GEOMETRY_CHANGE)));
 }
 
 /// Mutual trim's keep-side flips as std's (audit-part-studio M11; mutualTrim.fs createManipulators): a Front fill
