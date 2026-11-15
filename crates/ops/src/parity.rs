@@ -3396,27 +3396,10 @@ impl<'a> Translator<'a> {
         if name == "SWEPT_BODY" {
             // Whatever made it (opExtrude, opRevolve, opThicken…): the feature's part.
             let op = strings.iter().find_map(|s| s.rsplit_once(".op").map(|(f, _)| f.to_string()))?;
-            // The part our Extrude made (the part of its faces).
-            // (A custom feature's own operation, Spur gear's `blank`: the feature's part.)
-            let built = self.feature_ids.get(&op).or_else(|| op.split_once('.').and_then(|(f, _)| self.feature_ids.get(f)));
-            let Some(ours) = built.cloned() else { return Some(Err(format!("SWEPT_BODY: feature {op} was not built"))) };
-            // One of an Extrude's several parts, told by the sketch curve it was swept from (its ORIGINAL_DEPENDENCY:
-            // asm-infento-subs' Boolean 6 unites two parts of one Extrude, both "its part" before).
-            if let Some(sk) = strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string)
-                && strings.iter().any(|s| s.ends_with(".opExtrude"))
-            {
-                let ids: Vec<String> = strings.windows(2).filter(|w| w[0] == "sketchEntityId").map(|w| w[1].clone()).collect();
-                for id in ids {
-                    let Some(c) = self.curve_of(&sk, &id) else { continue };
-                    if let Ok(face) = self.extrude_entity("SWEPT_FACE", false, None, &op, &sk, &[c])
-                        && let Some(part) = self.part_of_entity(&face)
-                    {
-                        return Some(Ok(part));
-                    }
-                }
-            }
-            let r = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 1 }));
-            return Some(r.and_then(|f| f["faces"][0]["part"].as_str().map(str::to_string).ok_or_else(|| format!("SWEPT_BODY of {op}: no part of ours"))));
+            let sk = strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string);
+            let ids: Vec<String> = strings.windows(2).filter(|w| w[0] == "sketchEntityId").map(|w| w[1].clone()).collect();
+            let extrude = strings.iter().any(|s| s.ends_with(".opExtrude"));
+            return Some(self.swept_body(&op, sk.as_deref(), &ids, extrude));
         }
         // The cap's own feature's (a disambiguation names other features' extrudes first: asm-config-assembly studio
         // 08590a's Hole 2 on Sheet metal model 2's wall, told apart by Sheet metal model 1's edges).
@@ -3522,6 +3505,27 @@ impl<'a> Translator<'a> {
         tip["id"].as_str().map(|id| Ok(id.to_string()))
     }
 
+    /// The part a feature's operation `op` swept (live's `SWEPT_BODY`): the feature's part; of an Extrude's several, the
+    /// one swept from the sketch curves `ids` of `sk` (its ORIGINAL_DEPENDENCY: asm-infento-subs' Boolean 6 unites two
+    /// parts of one Extrude, both "its part" before).
+    fn swept_body(&mut self, op: &str, sk: Option<&str>, ids: &[String], extrude: bool) -> Result<String, String> {
+        // (A custom feature's own operation, Spur gear's `blank`: the feature's part.)
+        let built = self.feature_ids.get(op).or_else(|| op.split_once('.').and_then(|(f, _)| self.feature_ids.get(f)));
+        let Some(ours) = built.cloned() else { return Err(format!("SWEPT_BODY: feature {op} was not built")) };
+        if let Some(sk) = sk.filter(|_| extrude) {
+            for id in ids {
+                let Some(c) = self.curve_of(sk, id) else { continue };
+                if let Ok(face) = self.extrude_entity("SWEPT_FACE", false, None, op, sk, &[c])
+                    && let Some(part) = self.part_of_entity(&face)
+                {
+                    return Ok(part);
+                }
+            }
+        }
+        let r = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 1 }));
+        r.and_then(|f| f["faces"][0]["part"].as_str().map(str::to_string).ok_or_else(|| format!("SWEPT_BODY of {op}: no part of ours")))
+    }
+
     /// The written-out form (`makeQuery(id + "F….opExtrude", "CAP_FACE",
     /// EntityType.FACE, {… sketchEntityQuery(id + "<sketch>.wireOp", …,
     /// "<entity>") …, "isStart" : false})`; learning-center-devon).
@@ -3529,6 +3533,19 @@ impl<'a> Translator<'a> {
         let rest = text.trim_start_matches("query=").trim_start().strip_prefix("makeQuery(id+\"")?;
         let (op, rest) = rest.split_once('"')?;
         let name = rest.split('"').nth(1)?;
+        // (A swept body by its sketch's curves: asm-config-assembly studio 20e932's Revolve 1 cuts Extrude 1's hex nut,
+        // not one of Sketch 1's edges.)
+        if name == "SWEPT_BODY" {
+            let feature = op.rsplit_once(".op").map(|(f, _)| f.to_string())?;
+            let mut sk = None;
+            let mut ids = Vec::new();
+            for q in text.split("sketchEntityQuery(id+\"").skip(1) {
+                let (s, after) = q.split_once(".wireOp\"")?;
+                sk = Some(s.to_string());
+                ids.push(after.split('"').nth(1)?.to_string());
+            }
+            return Some(self.swept_body(&feature, sk.as_deref(), &ids, op.ends_with(".opExtrude")));
+        }
         if !["CAP_FACE", "SWEPT_FACE", "CAP_EDGE", "SWEPT_EDGE", "CAP_VERTEX"].contains(&name) {
             return None;
         }
