@@ -633,7 +633,7 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
                     }
                 }
             }
-            TableData { title: Some("HOLE TABLE".into()), header: Some(header), rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new(), merges, ..Default::default() }
+            TableData { title: None, header: Some(header), rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: *bottom_to_top, overridden: Vec::new(), merges, ..Default::default() }
         }
         TableKind::Revision { .. } => revision_data(&table.kind, revisions),
         // Resolved by [`table_data_with`] from the evaluated tables.
@@ -722,6 +722,12 @@ fn finish(drawing: &Drawing, table: &Table, mut data: TableData) -> TableData {
         // Live 2232: an inch drawing's BOM columns are at least 1.0 in; a millimetre one's have no floor.
         let inch = drawing.props.units.map_or(!drawing.units_mm, |u| u.imperial());
         data.min_col = if inch { 25.4 } else { 0.0 };
+    }
+    // Hole tables (behaviours "dx 1735" D4, holetable-indicator-ansi.dxf, drw-hole-table-properties.dxf): no title
+    // row; rows as a BOM's, columns at least 1.0 in in mm drawings too.
+    if matches!(table.kind, TableKind::Hole { .. }) {
+        data.text_sized = true;
+        data.min_col = 25.4;
     }
     data
 }

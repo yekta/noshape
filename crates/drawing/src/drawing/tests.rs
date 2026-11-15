@@ -808,7 +808,7 @@ fn bom_hole_table_and_linked_balloons() {
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
     // 1 large hole (A1) and 2 small ones (B1, B2), located from the corner.
-    for want in ["HOLE TABLE", "A1", "B1", "B2", "⌀24 THRU", "⌀9.6 THRU", "50", "30", "12", "88", "48", "QTY"] {
+    for want in ["A1", "B1", "B2", "⌀24 THRU", "⌀9.6 THRU", "50", "30", "12", "88", "48", "QTY"] {
         assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
     }
     // Live 1983: a size's SIZE and QTY cells merged down its rows (B1, B2: one ⌀9.6 THRU, QTY 2).
@@ -832,10 +832,13 @@ fn bom_hole_table_and_linked_balloons() {
     if let TableKind::Hole { exclude, .. } = &mut drawing.sheets[0].tables[0].kind {
         exclude.clear();
     }
-    // Exports include the table.
-    assert!(export::to_svg(&built.geometry).contains("HOLE TABLE"));
-    assert!(export::to_dxf(&built.geometry).contains("HOLE TABLE"));
-    assert!(export::pdf_texts(&export::to_pdf(&built.geometry)).iter().any(|t| t == "HOLE TABLE"));
+    // No title row (live D4); columns at least 1.0 in, rows sized as a BOM's (live drw-hole-table-properties.dxf).
+    assert!(!t.iter().any(|x| x == "HOLE TABLE"), "{t:?}");
+    let lay = built.table_layout(drawing.sheets[0].tables[0].id).unwrap();
+    assert!(!lay.title && lay.xs.windows(2).all(|w| (w[1] - w[0]).abs() >= 25.4 - 1e-9), "{:?}", lay.xs);
+    assert!(export::to_svg(&built.geometry).contains("X LOC"));
+    assert!(export::to_dxf(&built.geometry).contains("X LOC"));
+    assert!(export::pdf_texts(&export::to_pdf(&built.geometry)).iter().any(|t| t == "X LOC"));
     // The origin indicator as live 1609: the X arrow starts 0.7375 in under
     // the origin and runs 0.5 in to +X; ISO adds a "0" and a circle at each
     // arrow's tail.
@@ -5204,7 +5207,7 @@ fn showcase_hole_table_lists_the_plate_holes() {
     let si = drawing.sheets.iter().position(|s| s.tables.iter().any(|t| matches!(t.kind, TableKind::Hole { .. }))).expect("a hole table");
     let built = render_sheet(&drawing, si, &sources, &ViewCache::new(), false).unwrap();
     let t = texts(&built);
-    for want in ["HOLE TABLE", "A1", "B1", "B2", "⌀24.0 THRU", "⌀9.6 THRU", "50.0", "30.0"] {
+    for want in ["TAG", "A1", "B1", "B2", "⌀24.0 THRU", "⌀9.6 THRU", "50.0", "30.0"] {
         assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
     }
 }
