@@ -3951,6 +3951,45 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
         std::swap(qb, qt);
       }
       const double u0 = qb.X();
+      // Whether the boundary meets the seam between its ends: a vertex on it, or an edge passing its angle (sampled on
+      // its 3D curve). No face has its seam there (c2-helical-sweep's thread land, 17 ms of projection for nothing).
+      auto crosses_seam = [&]() {
+        for (const TopoDS_Edge& e : bnd)
+        {
+          double                        f, l;
+          const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, f, l);
+          if (c3.IsNull())
+            return false;
+          for (TopExp_Explorer x(e, TopAbs_VERTEX); x.More(); x.Next())
+          {
+            const TopoDS_Vertex& w = TopoDS::Vertex(x.Current());
+            if (w.IsSame(vb) || w.IsSame(vt))
+              continue;
+            const gp_Pnt2d q = uv(BRep_Tool::Pnt(w));
+            const double   t = BRep_Tool::Tolerance(w);
+            if (std::abs(std::remainder(q.X() - u0, 2 * M_PI)) * C.Radius() <= t && q.Y() > qb.Y() + t && q.Y() < qt.Y() - t)
+              return true;
+          }
+          double pd = 0, pv = 0;
+          for (int i = 0; i <= 64; ++i)
+          {
+            double u = 0, v = 0;
+            ElSLib::Parameters(C, c3->Value(f + (l - f) * i / 64), u, v);
+            const double d = std::remainder(u - u0, 2 * M_PI);
+            if (i > 0 && std::abs(d - pd) < 1 && std::min(std::abs(d), std::abs(pd)) > 1e-7 && (d > 0) != (pd > 0))
+            {
+              const double vc = pv + (v - pv) * pd / (pd - d);
+              if (vc > qb.Y() + 1e-7 && vc < qt.Y() - 1e-7)
+                return true;
+            }
+            pd = d;
+            pv = v;
+          }
+        }
+        return false;
+      };
+      if (crosses_seam())
+        continue;
       // Each boundary edge's curve on the new face, its u within a turn from the seam by its middle, its ends checked.
       std::map<const void*, occ::handle<Geom2d_Curve>> pc;
       bool                                             projected = true;

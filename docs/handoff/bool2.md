@@ -1,18 +1,21 @@
-# bool2: current state (11-15 19:25 UTC)
+# bool2: current state (11-15 20:22 UTC)
 
 Second agent on noshape's own Boolean (crates/brep, crates/kernel/cpp/rust_boolean.cpp, boolean.cpp's unify). A case
 is taken only where it equals OCCT (or live, with a capture); results identical end to end (docs/DECISIONS.md 11-14).
 History: docs/handoff/archive/bool2.md. Rulings: docs/DECISIONS.md.
 
 ## In flight
-- Nothing gating or queued. Worktree /root/projects/noshape-wt/bool2 (branch bool2-chamfer, on main 450ae013f),
-  scratch /root/bool2-scratch.
+- Nothing gating or queued. Worktree /root/projects/noshape-wt/bool2 (branch bool2-chamfer), scratch /root/bool2-scratch.
 - Uncommitted on purpose: crates/kernel/tests/all.rs registers the scratch probes (`mod sampler; mod xprobe;`, copy in
   /root/bool2-scratch/all-with-probe.rs), crates/kernel/tests/{xprobe,sampler}.rs (untracked), scratch-docs/ (qa's
   saved docs for Mac timing). Take all.rs back out (`git checkout crates/kernel/tests/all.rs`) before land.sh, put it
   back after.
-- WIP, not committed: /root/bool2-scratch/groups-wip.patch (boolean.cpp, merge_cylinder_groups; timers and debug
-  prints in it, see next item 1).
+- WIP in boolean.cpp (merge_cylinder_groups, DBG_TURN prints): next item 1.
+- qa's dock P0 (tab "B - Cakil Tasi", Puck Huni 941 ms on v0.4.52): already fixed on main by bool's 7ac4debfa +
+  b27a78c40 (Puck Huni 146-250 ms on vibe5 under load, no unify.reordered). Tab B's top-10 list sent to qa 11-15.
+- Valve pattern recording: vibe5 ~/agents/bool2-keep/rec-valve (52970b93111ac42b = Circular pattern 1's cut by 7),
+  copy in scratch-docs/rec-valve; the doc in ~/agents/bool2-keep/valve-doc. Profile script:
+  vibe5 ~/tmp/bool2/dock-prof.sh <cli> <tag> (mode-700 copy, deleted after; copy in /root/bool2-scratch/bin).
 
 ## Landed today (11-15)
 - 897b690f, 7eedbae5: chamfer fallback, sphere sections, trimmed conversion, unify order, near-whole circle, exact
@@ -34,13 +37,12 @@ History: docs/handoff/archive/bool2.md. Rulings: docs/DECISIONS.md.
 - c2-valve-config 267 ms (live 175): Circular pattern 1 140, Extrude 3 55, Extrude 2 46.
 
 ## Next items, in order
-1. Helical Sweep 1's unify: merge_cylinder_groups(any_frame) finds one group of 8 cylinder faces, builds the merged
-   face and BRepCheck finds it invalid (likely a thread land going round several turns: no valid single face). 16.5 of
-   its 17.5 ms is projecting the boundary edges' curves (GeomProjLib::Curve2d of the helical B-spline sections). The
-   patch's own_curve (reuse an edge's pcurve on a group face on the same surface) never applied; its DBGOWN print says
-   why (other surface handle / location / range). Either map pcurves across cylinder frames (u' = ±u + du,
-   v' = ±v + dv) or reject a group that can't be one face before projecting; the result must stay the same (the merge
-   rejected), only cheaper.
+1. Helical Sweep 1's unify: merge_cylinder_groups(any_frame) finds one group of 8 cylinder faces (two closed chains,
+   one turn each), projects its boundary (GeomProjLib, 16.5 of 17.5 ms) and BRepCheck rejects the face:
+   SelfIntersectingWire. Reusing the faces' own pcurves (/root/bool2-scratch/own-curve.patch, 74 -> 52 ms) is out:
+   they differ from the projection by up to 1e-5 and broke features::a_tube_ends_offset_chamfer... (unify invalid).
+   Now: reject before projecting where a boundary edge passes the seam's angle between vb and vt (crosses_seam,
+   sampled 3D curves). Verify it fires only where the face was rejected anyway (DBG run over the corpora), then gate.
 2. Helical Sweep 1's Boolean: OCCT's sections ahead 22 of 34 ms (Mac).
 3. Valve Circular pattern 1 (one cut by 7 copies, ours one tool at a time since they meet below the part): OCCT's cone
    x cone sections ~8-10 ms a step; share the copies' sections across steps (as moved_pair does within one Boolean).
@@ -56,8 +58,9 @@ History: docs/handoff/archive/bool2.md. Rulings: docs/DECISIONS.md.
    sections (128 spans each); 33-point refits didn't measurably help.
 
 ## How to run
-- Builds and crate tests: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo test --release -p noshape-kernel --test all <f>`
-  (Mac slot; vibe5 builds only when the lead allows). rb.sh drops env prefixes: put env inside `bash -c '...'`.
+- Builds, crate tests, probes: vibe5 (DECISIONS e23d34587): `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh bash -c 'export
+  CARGO_BUILD_JOBS=4; cargo test --release -p noshape-kernel --test all <f>'`. The Mac's one slot only for short crate
+  tests. rb.sh drops env prefixes: put env inside `bash -c '...'`.
 - Gate (vibe5, one of mine at a time; its replays go through ~/bin/slot there): `systemd-run --unit=bool2-gateNN
   --collect -p WorkingDirectory=/root/projects/noshape-wt/bool2 --setenv=NOSHAPE_GATE_HOST=vibe5 --setenv=HOME=/root
   bash -c 'bash tools/bool/gate.sh <sha> --jobs 4 > /root/bool2-scratch/gateNN.out 2>&1'`; read with
