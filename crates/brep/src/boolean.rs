@@ -2433,6 +2433,48 @@ impl Ctx<'_> {
         Ok(false)
     }
 
+    /// Whether two round faces on parallel axes, a cone among them, are apart: in each plane across the axes their
+    /// surfaces are circles a fixed distance apart whose radii run linearly along them, and over the faces' shared
+    /// stretch of the axis (by their boxes, the grey band more) those circles never meet (c2-valve-config's pattern
+    /// of seven cone cutters off the part's axis: OCCT's empty sections, 35-95 ms a pair).
+    fn round_apart(&self, f1: usize, f2: usize) -> bool {
+        let (&Surf::Cyl { o: o1, a: a1, r0: r1, k: k1, .. }, &Surf::Cyl { o: o2, a: a2, r0: r2, k: k2, .. }) = (&self.faces[f1].s, &self.faces[f2].s) else { return false };
+        if a1.cross(a2).length() > 1e-12 {
+            return false;
+        }
+        let g = GREY * self.tol;
+        let (sg, w) = (a1.dot(a2), o2 - o1);
+        let along = w.dot(a1);
+        let d = (w - a1 * along).length();
+        let stretch = |f: usize| {
+            let (lo, hi) = (self.faces[f].lo, self.faces[f].hi);
+            (0..8).map(|c| DVec3::new([lo.x, hi.x][c & 1], [lo.y, hi.y][(c >> 1) & 1], [lo.z, hi.z][c >> 2])).fold((f64::INFINITY, f64::NEG_INFINITY), |(l, h), p| {
+                let s = (p - o1).dot(a1);
+                (l.min(s), h.max(s))
+            })
+        };
+        let ((l1, h1), (l2, h2)) = (stretch(f1), stretch(f2));
+        let (mut lo, mut hi) = (l1.max(l2) - g, h1.min(h2) + g);
+        // Radii at s along the first axis from its origin: r1 + k1 s, r2 + k2 sg (s - along). Where p + q s >= 0.
+        let mut keep = |p: f64, q: f64| {
+            if q.abs() < 1e-300 {
+                if p < 0.0 {
+                    hi = lo - 1.0;
+                }
+            } else if q > 0.0 {
+                lo = lo.max(-p / q);
+            } else {
+                hi = hi.min(-p / q);
+            }
+        };
+        let (sum0, sum1) = (r1 + r2 - k2 * sg * along, k1 + k2 * sg);
+        let (dif0, dif1) = (r1 - r2 + k2 * sg * along, k1 - k2 * sg);
+        keep(sum0 - (d - g), sum1);
+        keep(d + g - dif0, -dif1);
+        keep(d + g + dif0, dif1);
+        lo > hi
+    }
+
     /// Whether faces `fs` and `ft` are clearly apart (`free::apart`; found once).
     fn faces_apart(&mut self, fs: usize, ft: usize) -> bool {
         if let Some(&x) = self.apart.get(&(fs, ft)) {
@@ -3368,6 +3410,9 @@ impl Ctx<'_> {
         let w = w - a1 * w.dot(a1);
         let dl = w.length();
         if (k1 != 0.0 || k2 != 0.0) && dl > GREY * tol {
+            if self.round_apart(f1, f2) {
+                return Ok(());
+            }
             if self.src.is_some() {
                 return self.nurbs_pair(f1, f2);
             }
@@ -4743,7 +4788,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                                 continue;
                             }
                             pairs.push((fs, ft));
-                        } else if occt_round(x, y) {
+                        } else if occt_round(x, y) && !cx.round_apart(fs, ft) {
                             round_pairs.push((fs, ft));
                         }
                     }
