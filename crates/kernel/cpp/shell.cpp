@@ -7490,6 +7490,15 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       return true;
     };
     auto on_wall = [&](const gp_Pnt& p, double eps) { return on_wall_in(sf, inside, p, eps); };
+    // (The kept faces' meshes made at once on all threads: one by one as first asked, they were a third of the
+    // first split's checks, c2-rings-loft's Shell 1.)
+    {
+      std::vector<int> ks;
+      for (int j = 1; j <= nf; ++j)
+        if (kept[(size_t)j])
+          ks.push_back(j);
+      OSD_Parallel::For(0, static_cast<int>(ks.size()), [&](int k) { mesh_of(ks[(size_t)k]); });
+    }
     // The edges split at the points on them, their pieces on the wall kept (an edge by no point: kept or dropped);
     // `ends`: the faces and the point of each kept piece's and new edge's ends.
     NCollection_DataMap<TopoDS_Shape, std::vector<TopoDS_Edge>, TopTools_ShapeMapHasher> pieces_of;
