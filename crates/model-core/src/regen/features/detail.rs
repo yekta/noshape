@@ -1192,7 +1192,7 @@ pub fn sides_as_offsets(shape: &k::Shape, edges: &[usize], reference: &[k::Shape
 /// the first profile segment, the start cap, the end cap, then the other sides
 /// in profile order (G30's block drawn (0,0)→(40,0)→(40,20)→(0,20): front,
 /// bottom, top, right, back, left). Other faces follow in name order.
-pub(crate) fn face_order(ev: &EvalCtx, body: &crate::regen::context::Body, face: &Name) -> (usize, u8, Name) {
+pub fn face_order(ev: &EvalCtx, body: &crate::regen::context::Body, face: &Name) -> (usize, u8, Name) {
     face_order_in(ev, body, face, None)
 }
 

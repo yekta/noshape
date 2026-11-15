@@ -883,7 +883,15 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
             let flipped: HashSet<usize> = overrides.iter().filter(|(b, _)| *b == bi).map(|&(_, e)| e).collect();
             let (mut spec, mut reference) = (spec, Vec::new());
             if (chamfer && !matches!(spec, k::ChamferSpec::Equal(_))) || apex {
-                reference = distance_faces(&body.shape, &edges, def_bool(&def, "oppositeDirection", false), &flipped).map_err(|e| fe(e.to_string()))?;
+                // The first edge in Onshape's entity order (by its faces': a disc's rim on its start cap before the end cap's).
+                let ef = body.shape.edge_faces().map_err(|e| fe(e.to_string()))?;
+                let rank = |e: usize| {
+                    let mut r: Vec<_> = ef.get(e).into_iter().flatten().filter_map(|&f| body.faces.get(f as usize)).map(|n| crate::regen::features::detail::face_order(ev, &body, n)).collect();
+                    r.sort();
+                    r
+                };
+                let first = (0..edges.len()).min_by_key(|&i| rank(edges[i])).unwrap_or(0);
+                reference = distance_faces(&body.shape, &edges, first, def_bool(&def, "oppositeDirection", false), &flipped).map_err(|e| fe(e.to_string()))?;
             }
             // Onshape's sides where OCCT reads them otherwise (a face curved across the edge): two distances.
             use crate::regen::features::blend_section::ChamferSides;
@@ -932,11 +940,12 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
     Ok(Value::Undefined)
 }
 
-/// The face each edge's distance lies on for opChamfer's distance and angle (live 2336 / 2393): the face all the edges
-/// share (a blank's two rims: its cylinder), else each edge's face on the left of its curve's direction (a cylinder's
-/// top rim: its cap, its bottom rim: the cylinder); Opposite direction the other face, and so a direction override for
-/// its chain. Empty where an edge doesn't have two faces (OCCT's choice then).
-fn distance_faces(shape: &Shape, edges: &[usize], opposite: bool, flipped: &HashSet<usize>) -> Result<Vec<Shape>, k::KernelError> {
+/// The face each edge's distance lies on for opChamfer's distance and angle (live 2336 / 2393 / 3120): each edge's face
+/// on the left of its curve's direction (a cylinder's top rim: its cap, its bottom rim: the cylinder), where the edges
+/// share a face the side the first edge (`edges[first]`) takes (a disc's two rims: both on the cylinder or both on the
+/// caps); Opposite
+/// direction the other face, and so a direction override for its chain. Empty where an edge doesn't have two faces (OCCT's choice then).
+fn distance_faces(shape: &Shape, edges: &[usize], first: usize, opposite: bool, flipped: &HashSet<usize>) -> Result<Vec<Shape>, k::KernelError> {
     let ef = shape.edge_faces()?;
     let faces = shape.faces();
     let Some(pairs) = edges.iter().map(|&e| ef.get(e).and_then(|f| <[u32; 2]>::try_from(f.as_slice()).ok())).collect::<Option<Vec<_>>>() else { return Ok(Vec::new()) };
@@ -959,27 +968,37 @@ fn distance_faces(shape: &Shape, edges: &[usize], opposite: bool, flipped: &Hash
             }
         }
     }
+    // (The face the step `n × t` from the edge stays on is on its left.)
+    let left_of = |e: usize, pair: &[u32; 2]| -> Result<Option<u32>, k::KernelError> {
+        let edge = shape.sub_shape(ShapeType::Edge, e)?;
+        let info = edge.edge_info()?;
+        let t = 0.5 * (info.first_param + info.last_param);
+        let (p, along) = (edge.point_at(t)?, edge.tangent_at(t)?.normalize());
+        Ok(pair.iter().copied().find(|&f| {
+            let face = &faces[f as usize];
+            face.normal_at_point(p).is_ok_and(|n| face.contains_point(p + n.normalize().cross(along) * (scale * 1e-4), scale * 1e-7).unwrap_or(false))
+        }))
+    };
+    // Edges sharing a face all take the side the first one takes (both rims of a disc: live 3120).
+    let first_on_shared = match shared.as_slice() {
+        [f] if edges.len() > 1 => match left_of(edges[first], &pairs[first])? {
+            Some(l) => Some(l == *f),
+            None => return Ok(Vec::new()),
+        },
+        _ => None,
+    };
+    let other = |pair: &[u32; 2], f: u32| if f == pair[0] { pair[1] } else { pair[0] };
     let mut out = Vec::with_capacity(edges.len());
     for ((&e, pair), flip) in edges.iter().zip(&pairs).zip(flip) {
-        let pick = match shared.as_slice() {
-            [f] if edges.len() > 1 => *f,
-            _ => {
-                let edge = shape.sub_shape(ShapeType::Edge, e)?;
-                let info = edge.edge_info()?;
-                let t = 0.5 * (info.first_param + info.last_param);
-                let (p, along) = (edge.point_at(t)?, edge.tangent_at(t)?.normalize());
-                // (The face the step `n × t` from the edge stays on is on its left.)
-                let left = pair.iter().copied().find(|&f| {
-                    let face = &faces[f as usize];
-                    face.normal_at_point(p).is_ok_and(|n| face.contains_point(p + n.normalize().cross(along) * (scale * 1e-4), scale * 1e-7).unwrap_or(false))
-                });
-                match left {
-                    Some(f) => f,
-                    None => return Ok(Vec::new()),
-                }
-            }
+        let pick = match (shared.as_slice(), first_on_shared) {
+            ([f], Some(true)) => *f,
+            ([f], Some(false)) => other(pair, *f),
+            _ => match left_of(e, pair)? {
+                Some(f) => f,
+                None => return Ok(Vec::new()),
+            },
         };
-        let face = if opposite != flip { if pick == pair[0] { pair[1] } else { pair[0] } } else { pick };
+        let face = if opposite != flip { other(pair, pick) } else { pick };
         out.push(faces[face as usize].clone());
     }
     Ok(out)

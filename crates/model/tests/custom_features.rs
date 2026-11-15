@@ -3980,20 +3980,17 @@ export const tiltedBlock = defineFeature(function(context is Context, id is Id, 
     }
 }
 
-/// Live 2336 / 2393: opChamfer's distance and angle (2 mm at 30°) lies on the face all the edges share, else on each
-/// edge's face left of its direction (a block's top front edge: the top; a cylinder's top rim: the cap, its bottom rim:
+/// Live 2336 / 2393: opChamfer's distance and angle (2 mm at 30°) lies on each edge's face left of its direction (a block's top front edge: the top; a cylinder's top rim: the cap, its bottom rim:
 /// the cylinder); Opposite direction swaps. The cap's area after it (mm²): r 18 is 1,017.876, r 18.8453 1,115.7219.
 #[test]
 fn op_chamfer_distance_lies_on_the_shared_or_left_face_as_live() {
     let cuboid = "fCuboid(context, id + \"c\", { \"corner1\" : vector(0, 0, 0) * millimeter, \"corner2\" : vector(40, 20, 10) * millimeter });";
     let cylinder = "fCylinder(context, id + \"c\", { \"bottomCenter\" : vector(0, 0, 0) * millimeter, \"topCenter\" : vector(0, 0, 10) * millimeter, \"radius\" : 20 * millimeter });";
     let edge = |at: &str| format!("qContainsPoint(qCreatedBy(id + \"c\", EntityType.EDGE), {at} * millimeter)");
-    let both = format!("qUnion([{}, {}])", edge("vector(20, 0, 10)"), edge("vector(20, 0, 0)"));
-    let cases: [(&str, String, &str, [f64; 2]); 4] = [
+    let cases: [(&str, String, &str, [f64; 2]); 3] = [
         (cuboid, edge("vector(20, 0, 10)"), "vector(20, 15, 10)", [720.0, 753.812]),
         (cylinder, edge("vector(20, 0, 10)"), "vector(0, 0, 10)", [1017.876, 1115.7219]),
         (cylinder, edge("vector(20, 0, 0)"), "vector(0, 0, 0)", [1115.7219, 1017.876]),
-        (cylinder, both, "vector(0, 0, 10)", [1115.7219, 1017.876]),
     ];
     for (shape, entities, cap_at, want) in cases {
         for (opposite, area) in [(false, want[0]), (true, want[1])] {
@@ -4019,6 +4016,40 @@ export const chamferProbe = defineFeature(function(context is Context, id is Id,
             let got: f64 = custom::run::output_of(fid).unwrap().output.trim().parse().unwrap();
             assert!((got - area).abs() < 1e-3, "{entities} opposite {opposite}: cap {got} mm², live {area}");
         }
+    }
+}
+
+/// Live 2393 / 3120 (FS 1576): both rims of an extruded Ø40 disc in one opChamfer (qLargest, as cf-spur-gear) take
+/// the side the first rim takes, the sketch's: up, the 2 mm on the cylinder at both rims (caps r 18.8453); down, on
+/// both caps (r 18). Opposite direction swaps.
+#[test]
+fn op_chamfer_on_both_rims_takes_the_first_rims_side_as_live() {
+    for (up, opposite, cap) in [(true, false, 1115.7219), (true, true, 1017.876), (false, false, 1017.876), (false, true, 1115.7219)] {
+        let src = format!(
+            r#"FeatureScript 1576;
+import(path : "onshape/std/geometry.fs", version : "1576.0");
+annotation {{ "Feature Type Name" : "Chamfer probe" }}
+export const chamferProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {{}}
+    {{
+        const sk = newSketchOnPlane(context, id + "sk", {{ "sketchPlane" : plane(vector(0, 0, 0) * millimeter, vector(0, 0, 1)) }});
+        skCircle(sk, "c", {{ "center" : vector(0, 0) * millimeter, "radius" : 20 * millimeter }});
+        skSolve(sk);
+        opExtrude(context, id + "ex", {{ "entities" : qSketchRegion(id + "sk"), "direction" : vector(0, 0, {dir}), "endBound" : BoundingType.BLIND, "endDepth" : 10 * millimeter }});
+        opDeleteBodies(context, id + "del", {{ "entities" : qCreatedBy(id + "sk", EntityType.BODY) }});
+        opChamfer(context, id + "ch", {{ "entities" : qLargest(qCreatedBy(id + "ex", EntityType.EDGE)), "chamferType" : ChamferType.OFFSET_ANGLE, "width" : 2 * millimeter, "angle" : 30 * degree, "oppositeDirection" : {opposite}, "tangentPropagation" : false }});
+    }});
+"#,
+            dir = if up { 1 } else { -1 }
+        );
+        let fx = Fixture::new(&src);
+        let mut ps = PartStudio::new();
+        let f = ps.new_feature(&fx.ty("chamferProbe"), &fx.units).unwrap();
+        ps.features.push(f);
+        let r = fx.regen(&mut Regenerator::new(), &ps);
+        assert_ok(&r);
+        let caps: Vec<f64> = r.context.bodies[0].shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Plane { .. }))).map(|f| f.area().unwrap() * 1e6).collect();
+        assert!(caps.len() == 2 && caps.iter().all(|a| (a - cap).abs() < 1e-3), "up {up} opposite {opposite}: caps {caps:?} mm², live {cap}");
     }
 }
 
