@@ -5,6 +5,19 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
+## 11-15 16:22 UTC: 1dc32b pulley from live's refs; draft speed
+- 1dc32b's pulley (RvCD, our Part 15; core's Draft 1 input): Chamfer 4's query is an EDGE (live S0C5E, the r 48.25 rim
+  at x -14), our translator made it a Ø6.3 hole wall; Fillet 5's 11 derivedFrom queries (10 concave arcs on the x -8
+  face, plane RbDa at x -17) became sketch regions. Live's evaluated geometry (dx/q-ch4, dx/q-f5) is in the studio's
+  refs (studios/1dc32b….refs.jsonl, 15 lines, all hosts, .bak-1535): Chamfer 4 and Hole 2 now match live to 0.001
+  mm³. The general fix (these derivedFrom / ORIGINAL_DEPENDENCY queries resolved by type) is still open.
+- Landed 3073e7d8: a draft's tangent propagation takes a planar neighbour's normal from its plane (Feature Pattern 307
+  -> 223 ms, Part Draft 3's 8 x 100 ms area integrations of gear caps gone). Left in custom features: draft_robust's
+  whole-body is_valid (14 x 7.5 ms, core told), Spur Gear's opDeleteBodies 86 ms (the delete's query of sketch
+  bodies? 55 make_face_on_plane; unprofiled), its opFillet 268 ms (15203 min_distance calls: blend's).
+- Chamfer 3 / Fillet 3: blend has the rim chamfer built (blend-ch3-wip), waits on live's mirrored-body side rule.
+- earlyoom on vibe6 killed my run and blend's assemblies at 16:22: 1dc32b runs go to vibe7 (~/tmp/dx/st1dc14.sh).
+
 ## 11-15 15:23 UTC: exchange 43 / 48; 1dc32b Chamfer 3 to blend
 - Live re-imported all 48 files exported from main at 14:51 (blend's f7125520d, skasm's a5b52aae4 / 6f5b151e1; the
   03:41 files in /root/parity/exchange/<doc>/bak-0341, live's old imports live-ours.json.bak-1115b): live imports
