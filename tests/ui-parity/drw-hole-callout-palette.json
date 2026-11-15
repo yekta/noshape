@@ -1,0 +1,124 @@
+{
+ "name": "drw-hole-callout-palette",
+ "about": "holes-plate-drawing: a Hole/thread callout on a \u00d85 hole in Top, placed; double-click it: the dimension palette; tick Override precision/tolerance; open the Precision list (0 \u2026 0.123456, \u2713 0.123 (Drawing)); pick 0.12 (the value reads .20); Escape",
+ "area": "studios",
+ "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): Hole/thread callout, 62 items no take compared (live, from live2's M1 queue)",
+ "start": "holes-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole/thread callout"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      12.5,
+      10,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     40,
+     175
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "sheet_point": [
+     22,
+     175
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1800
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Override precision/tolerance"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Precision"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "0.12"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

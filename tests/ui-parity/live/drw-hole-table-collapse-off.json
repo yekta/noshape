@@ -1,19 +1,19 @@
 {
  "scenario": "drw-hole-table-collapse-off",
- "recorded": "2026-11-14T12:49:09.925Z",
+ "recorded": "2026-11-15T05:30:02.090Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "1e662ef0153290ac7a6dff0b",
-  "workspace": "1d5dc28d0de6987cc8103fb5",
-  "element": "cfc045f8b9361cc977c44643",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "78de670738a6308643f089d1",
   "start": "holes-plate-drawing",
-  "startElement": "cfc045f8b9361cc977c44643",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "beaf48ecb256fc95fb522a05",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -95,35 +95,7 @@
    ],
    "annotations": [],
    "selection": []
-  },
-  "document": {
-   "workspace": "Main",
-   "history": null,
-   "compare": null,
-   "tabs": [
-    {
-     "name": "Part Studio 1",
-     "kind": "partstudio",
-     "active": false
-    },
-    {
-     "name": "Part 1 Drawing 1",
-     "kind": "drawing",
-     "active": true
-    },
-    {
-     "name": "Assembly 1",
-     "kind": "assembly",
-     "active": false
-    }
-   ],
-   "folder": null,
-   "renaming": null,
-   "panel": null,
-   "switcher": null
-  },
-  "variables": null,
-  "featurestudio": null
+  }
  },
  "steps": [
   {
@@ -264,37 +236,9 @@
      ],
      "annotations": [],
      "selection": []
-    },
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 1",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
-       "active": true
-      },
-      {
-       "name": "Assembly 1",
-       "kind": "assembly",
-       "active": false
-      }
-     ],
-     "folder": null,
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
+    }
    },
-   "t": 142805
+   "t": 229011
   },
   {
    "step": 2,
@@ -429,37 +373,9 @@
      ],
      "annotations": [],
      "selection": []
-    },
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 1",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
-       "active": true
-      },
-      {
-       "name": "Assembly 1",
-       "kind": "assembly",
-       "active": false
-      }
-     ],
-     "folder": null,
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
+    }
    },
-   "t": 168965
+   "t": 254956
   },
   {
    "step": 3,
@@ -591,37 +507,9 @@
      ],
      "annotations": [],
      "selection": []
-    },
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 1",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
-       "active": true
-      },
-      {
-       "name": "Assembly 1",
-       "kind": "assembly",
-       "active": false
-      }
-     ],
-     "folder": null,
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
+    }
    },
-   "t": 194232
+   "t": 280086
   },
   {
    "step": 4,
@@ -748,37 +636,9 @@
      ],
      "annotations": [],
      "selection": []
-    },
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 1",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
-       "active": true
-      },
-      {
-       "name": "Assembly 1",
-       "kind": "assembly",
-       "active": false
-      }
-     ],
-     "folder": null,
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
+    }
    },
-   "t": 220033
+   "t": 305669
   },
   {
    "step": 5,
@@ -790,8 +650,8 @@
    },
    "ok": true,
    "at": [
-    727,
-    350
+    749,
+    326
    ],
    "state": {
     "focus": {
@@ -913,37 +773,9 @@
      ],
      "annotations": [],
      "selection": []
-    },
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 1",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
-       "active": true
-      },
-      {
-       "name": "Assembly 1",
-       "kind": "assembly",
-       "active": false
-      }
-     ],
-     "folder": null,
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
+    }
    },
-   "t": 245185
+   "t": 331056
   },
   {
    "step": 6,
@@ -1073,37 +905,9 @@
      ],
      "annotations": [],
      "selection": []
-    },
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 1",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
-       "active": true
-      },
-      {
-       "name": "Assembly 1",
-       "kind": "assembly",
-       "active": false
-      }
-     ],
-     "folder": null,
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
+    }
    },
-   "t": 270911
+   "t": 355846
   },
   {
    "step": 7,
@@ -1198,37 +1002,9 @@
      ],
      "annotations": [],
      "selection": []
-    },
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 1",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
-       "active": true
-      },
-      {
-       "name": "Assembly 1",
-       "kind": "assembly",
-       "active": false
-      }
-     ],
-     "folder": null,
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
+    }
    },
-   "t": 296313
+   "t": 380441
   },
   {
    "step": 8,
@@ -1243,8 +1019,8 @@
    },
    "ok": true,
    "at": [
-    1023,
-    526
+    1019,
+    485
    ],
    "state": {
     "focus": {
@@ -1326,37 +1102,9 @@
      ],
      "annotations": [],
      "selection": []
-    },
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 1",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
-       "active": true
-      },
-      {
-       "name": "Assembly 1",
-       "kind": "assembly",
-       "active": false
-      }
-     ],
-     "folder": null,
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
+    }
    },
-   "t": 323816
+   "t": 407424
   },
   {
    "step": 9,
@@ -1446,37 +1194,9 @@
      ],
      "annotations": [],
      "selection": []
-    },
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 1",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
-       "active": true
-      },
-      {
-       "name": "Assembly 1",
-       "kind": "assembly",
-       "active": false
-      }
-     ],
-     "folder": null,
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
+    }
    },
-   "t": 351918
+   "t": 437046
   },
   {
    "step": 10,
@@ -1573,37 +1293,9 @@
      ],
      "annotations": [],
      "selection": []
-    },
-    "document": {
-     "workspace": "Main",
-     "history": null,
-     "compare": null,
-     "tabs": [
-      {
-       "name": "Part Studio 1",
-       "kind": "partstudio",
-       "active": false
-      },
-      {
-       "name": "Part 1 Drawing 1",
-       "kind": "drawing",
-       "active": true
-      },
-      {
-       "name": "Assembly 1",
-       "kind": "assembly",
-       "active": false
-      }
-     ],
-     "folder": null,
-     "renaming": null,
-     "panel": null,
-     "switcher": null
-    },
-    "variables": null,
-    "featurestudio": null
+    }
    },
-   "t": 379834
+   "t": 465521
   }
  ]
 }
