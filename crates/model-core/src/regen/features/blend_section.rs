@@ -506,7 +506,15 @@ fn section_wire(p: DVec3, f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> 
         Section::Chamfer => k::make_line(t1, t2)?,
         Section::Curvature(m) => curvature_profile(p, t1, t2, m)?,
     };
-    // (A chamfer as sections: its corner out in the air, so the tool's sides needn't lie on free-form faces.)
+    // (A chamfer as sections: its corner out in the air, so the tool's sides needn't lie on free-form faces; its line
+    // run on a tenth past each face, so the faces cross only the chamfer, not where three of the tool's faces meet.)
+    if spec.reference.is_some() && convex && matches!(spec.section, Section::Chamfer) {
+        let run = (t1 - t2) * 0.1;
+        let (a, b) = (t1 + run, t2 - run);
+        let corner = p - (f.m[0] + f.m[1]).normalize() * s1.max(s2) * 1.2;
+        let edges = [k::make_line(corner, a)?, k::make_line(a, b)?, k::make_line(b, corner)?];
+        return Ok((k::make_wire(&edges)?, edges, convex));
+    }
     let p = if spec.reference.is_some() && convex { p - (f.m[0] + f.m[1]).normalize() * s1.max(s2) } else { p };
     let edges = [k::make_line(p, t1)?, curve, k::make_line(t2, p)?];
     Ok((k::make_wire(&edges)?, edges, convex))
