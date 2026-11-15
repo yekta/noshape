@@ -1421,7 +1421,7 @@ impl Sketch {
                 (Geometry::Point { pos: p }, Geometry::Point { pos: q }) => (*p - *q).length() > 1e-9,
                 _ => false,
             }));
-            if rep.is_solved() && !moved() {
+            if rep.is_solved() && !moved() && self.collapsed_lines(&snapshot).is_empty() {
                 rep
             } else {
                 *self = snapshot.clone();

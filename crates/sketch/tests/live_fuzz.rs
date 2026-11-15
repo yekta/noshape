@@ -3587,6 +3587,7 @@ fn one_case() {
     }
     let o = ours(&mut c);
     eprintln!("{}", o["points"]);
+    eprintln!("status {} conflicting {} redundant {} dof {}", o["status"], o["conflicting"], o["redundant"], o["dof"]);
 }
 
 /// Live fuzz s222 / s1057: an outline tied to the resized one only by Parallel / Perpendicular (or otherwise still
@@ -3599,6 +3600,31 @@ fn a_neighbour_that_still_fits_stays_put() {
         let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
         assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
     }
+}
+
+/// A quad turned by an Angle to a horizontal line that stays is placed from its first side's start, Equal sides
+/// taking the second's length; the line's loop, held by its own Horizontal, shifts for a Distance instead of turning
+/// (live probes 11 r226-k12 / k14 / k15, fuzz s226; ours was over defined or 50-120 mm off). Live's anchor drifts
+/// 2.6 um, so within 10 um a point. T1: the fixtures' answers, no live.
+#[test]
+fn a_quad_turned_by_an_angle_keeps_its_anchor() {
+    // The largest distance of a point both name (the spline's own points aren't among ours).
+    let worst = |case: &Value, l: &Value| -> f64 {
+        let at = |v: &Value, i: usize| v[i].as_f64().unwrap_or(f64::NAN);
+        l["points"].as_object().unwrap().iter().map(|(n, p)| (at(&case["ours"]["points"][n], 0) - at(p, 0)).hypot(at(&case["ours"]["points"][n], 1) - at(p, 1))).filter(|d| !d.is_nan()).fold(0.0, f64::max)
+    };
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-probe-11.live.json")).unwrap()).unwrap();
+    let b = probe_batch(probes11());
+    let picked: Vec<&Value> = b["cases"].as_array().unwrap().iter().filter(|c| ["r226-k12", "r226-k14", "r226-k15"].contains(&c["case"].as_str().unwrap())).collect();
+    assert_eq!(picked.len(), 3);
+    for case in picked {
+        let d = worst(case, &live["cases"][case["case"].as_str().unwrap()]);
+        assert!(d < 0.01, "{}: {d:.4} mm", case["case"]);
+    }
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-3.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 226, true);
+    let d = worst(&ours["cases"][0], &live["cases"]["s226"]);
+    assert!(d < 0.01, "s226: {d:.4} mm");
 }
 
 /// A free slot whose arcs grow keeps the side with fewer Tangents (the first drawn on a tie) and grows away from it

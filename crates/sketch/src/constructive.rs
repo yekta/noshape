@@ -2028,7 +2028,10 @@ impl Sketch {
             if outward.iter().any(|o| elsewhere(o) && is_distance(o)) {
                 continue;
             }
-            if !outward.is_empty() && !outward.iter().any(elsewhere) {
+            // (Not one whose own Horizontal / Vertical holds its turn: it shifts, the kept loop turns to it, live
+            // probes 11 r226-k15.)
+            let oriented = self.constraints().filter(|c| c.driving).any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: None } | ConstraintKind::Vertical { a, b: None } if group.contains(&a)));
+            if !outward.is_empty() && !outward.iter().any(elsewhere) && !oriented {
                 self.place_loop_rigidly(&group, &kept_loop, cons);
                 continue;
             }
@@ -2286,15 +2289,61 @@ impl Sketch {
         if ring.len() != 4 || ring.iter().any(|x| self.kind(*x) != Some(EntityKind::Line) || placed.contains(x)) || !self.closed(&ring) {
             return None;
         }
-        let kind = |c: crate::ids::ConstraintId| self.constraint(c).map(|k| k.kind.clone());
-        // Each side's new direction (from its own H / V or a relation to placed geometry) and new length.
+        let rule = |c: crate::ids::ConstraintId| self.constraint(c).map(|k| (k.kind.clone(), k.hints.reverse));
+        // Each side's new direction (from its own H / V or a relation to placed geometry, carried round the loop by
+        // the relations between its sides) and new length (its Length, or that of a side it is Equal to).
         let mut dir: HashMap<EntityId, DVec2> = HashMap::new();
         let mut length: HashMap<EntityId, f64> = HashMap::new();
         let mut by_placed: BTreeSet<EntityId> = BTreeSet::new();
         let (mut horizontal, mut vertical) = (BTreeSet::new(), BTreeSet::new());
         let own = |x: EntityId| self.line_pts(x).map(|(a, b)| b - a);
-        for (c, us) in cons.iter().filter(|(c, us)| !holds[c] && us.iter().any(|x| ring.contains(x))) {
-            match kind(*c)? {
+        // Placed geometry, or a line outside the loop that stays: all its relations not to the loop hold.
+        let fixed = |x: EntityId| placed.contains(&x) || (self.kind(x) == Some(EntityKind::Line) && cons.iter().filter(|(_, us)| us.contains(&x) && !us.iter().any(|y| ring.contains(y))).all(|(c, _)| holds[c]));
+        // (a, b, the turn from a's line to b's) between two sides; Equal pairs of sides.
+        let mut turns: Vec<(EntityId, EntityId, f64)> = Vec::new();
+        let mut equal: Vec<(EntityId, EntityId)> = Vec::new();
+        let mut outside: HashSet<crate::ids::ConstraintId> = HashSet::new();
+        // Sides an Angle to outside geometry turns: one at most (two or three: live keeps other sides, fuzz s225).
+        let mut angled = 0;
+        for (c, us) in cons.iter().filter(|(_, us)| us.iter().any(|x| ring.contains(x))) {
+            let (k, reverse) = rule(*c)?;
+            let turn = match k {
+                ConstraintKind::Parallel { a, b } => Some((a, b, 0.0)),
+                ConstraintKind::Perpendicular { a, b } => Some((a, b, std::f64::consts::FRAC_PI_2)),
+                ConstraintKind::Angle { a, b, value } => Some((a, b, if reverse { -value } else { value })),
+                _ => None,
+            };
+            if let Some((a, b, t)) = turn {
+                if ring.contains(&a) && ring.contains(&b) {
+                    turns.push((a, b, t));
+                    continue;
+                }
+                if holds[c] {
+                    continue;
+                }
+                let (mine, d) = if ring.contains(&a) && fixed(b) {
+                    (a, DVec2::from_angle(-t).rotate(own(b)?))
+                } else if ring.contains(&b) && fixed(a) {
+                    (b, DVec2::from_angle(t).rotate(own(a)?))
+                } else {
+                    return None;
+                };
+                dir.insert(mine, d.normalize_or_zero());
+                by_placed.insert(mine);
+                angled += usize::from(matches!(k, ConstraintKind::Angle { .. }));
+                continue;
+            }
+            if let ConstraintKind::Equal { a, b } = k
+                && ring.contains(&a)
+                && ring.contains(&b)
+            {
+                equal.push((a, b));
+                continue;
+            }
+            if holds[c] {
+                continue;
+            }
+            match k {
                 ConstraintKind::Horizontal { a, b: None } if ring.contains(&a) => {
                     dir.insert(a, DVec2::X);
                     horizontal.insert(a);
@@ -2303,25 +2352,54 @@ impl Sketch {
                     dir.insert(a, DVec2::Y);
                     vertical.insert(a);
                 }
-                k @ (ConstraintKind::Parallel { .. } | ConstraintKind::Perpendicular { .. }) => {
-                    let (a, b) = match k {
-                        ConstraintKind::Parallel { a, b } | ConstraintKind::Perpendicular { a, b } => (a, b),
-                        _ => unreachable!(),
-                    };
-                    let (mine, other) = if ring.contains(&a) && placed.contains(&b) { (a, b) } else if ring.contains(&b) && placed.contains(&a) { (b, a) } else { return None };
-                    let d = own(other)?.normalize_or_zero();
-                    dir.insert(mine, if matches!(k, ConstraintKind::Perpendicular { .. }) { d.perp() } else { d });
-                    by_placed.insert(mine);
-                }
-                ConstraintKind::Length { curve, value } if ring.contains(&curve) && length.is_empty() => {
+                ConstraintKind::Length { curve, value } if ring.contains(&curve) => {
                     length.insert(curve, value);
+                }
+                ConstraintKind::Equal { a, b } => {
+                    let (mine, other) = if ring.contains(&a) && fixed(b) { (a, b) } else if ring.contains(&b) && fixed(a) { (b, a) } else { return None };
+                    length.insert(mine, own(other)?.length());
+                }
+                // A Distance to geometry outside the loop not placed yet: that geometry follows the loop (r226-k15).
+                ConstraintKind::Distance { .. } if us.iter().any(|x| !ring.contains(x)) && !us.iter().any(|x| placed.contains(x)) => {
+                    outside.insert(*c);
                 }
                 _ => return None,
             }
-            let _ = us;
+        }
+        for _ in 0..4 {
+            for &(a, b, t) in &turns {
+                match (dir.get(&a).copied(), dir.get(&b).copied()) {
+                    (Some(d), None) => {
+                        dir.insert(b, DVec2::from_angle(t).rotate(d));
+                    }
+                    (None, Some(d)) => {
+                        dir.insert(a, DVec2::from_angle(-t).rotate(d));
+                    }
+                    _ => {}
+                }
+            }
+            for &(a, b) in &equal {
+                match (length.get(&a).copied(), length.get(&b).copied()) {
+                    (Some(l), None) => {
+                        length.insert(b, l);
+                    }
+                    (None, Some(l)) => {
+                        length.insert(a, l);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        // Equal sides neither sized: the first takes the second's length (live probes 11 r226-k15).
+        for &(a, b) in &equal {
+            let (la, lb) = (own(a)?.length(), own(b)?.length());
+            if !length.contains_key(&a) && !length.contains_key(&b) && (la - lb).abs() > 1e-9 {
+                length.insert(a, lb);
+                length.insert(b, lb);
+            }
         }
         // Only a loop that has to turn.
-        if dir.is_empty() {
+        if dir.is_empty() || angled > 1 {
             return None;
         }
         // Every side keeps its sense; one with no new direction keeps its own.
@@ -2349,13 +2427,18 @@ impl Sketch {
             (horizontal.contains(&a) && vertical.contains(&b)) || (vertical.contains(&a) && horizontal.contains(&b))
         });
         let at = if by_placed.contains(&first) { 0 } else { hv_corner.unwrap_or(0) };
-        let sized = order.iter().position(|x| length.contains_key(x));
-        // The two sides placed, as a walk from the anchor: forward (the side starting there) or backward.
-        let forward = match sized {
-            Some(k) if k == at || k == (at + 3) % 4 => None,
-            Some(k) if k == (at + 1) % 4 => Some(true),
-            Some(_) => Some(false),
-            None => None,
+        let sized: Vec<usize> = (0..4).filter(|i| length.contains_key(&side(*i))).collect();
+        let within = |pair: [usize; 2]| sized.iter().all(|k| pair.contains(k));
+        // The two sides placed, as a walk from the anchor: both at it, forward (the side starting there and the next)
+        // or backward; the resized sides among them.
+        let forward = if within([at, (at + 3) % 4]) {
+            None
+        } else if within([at, (at + 1) % 4]) {
+            Some(true)
+        } else if within([(at + 3) % 4, (at + 2) % 4]) {
+            Some(false)
+        } else {
+            return None;
         };
         let (s0, _) = self.endpoints(side(at))?;
         let anchor = self.point(s0)?;
@@ -2363,7 +2446,19 @@ impl Sketch {
         // Corner positions: corner i is where side i starts.
         let mut corner: [Option<DVec2>; 4] = [None; 4];
         corner[at] = Some(anchor);
+        // Both resized sides away from the anchor: the side before them stays whole, they follow it with their new
+        // directions and lengths, and the last side closes the loop back (live fuzz s210).
+        let whole = forward == Some(false) && sized.len() == 2;
+        if whole {
+            let (s1, _) = self.endpoints(side(at + 1))?;
+            corner = [None; 4];
+            corner[(at + 1) % 4] = Some(self.point(s1)?);
+            for k in 1..4 {
+                corner[(at + k + 1) % 4] = Some(corner[(at + k) % 4]? + dir[&side(at + k)] * len(side(at + k))?);
+            }
+        }
         match forward {
+            _ if whole => {}
             None => {
                 corner[(at + 1) % 4] = Some(anchor + dir[&side(at)] * len(side(at))?);
                 corner[(at + 3) % 4] = Some(anchor - dir[&side(at + 3)] * len(side(at + 3))?);
@@ -2378,15 +2473,16 @@ impl Sketch {
             }
         }
         // The open corner: where the two closing sides' lines meet.
-        let open = (0..4).find(|i| corner[*i].is_none())?;
-        let (pa, da) = (corner[(open + 3) % 4]?, dir[&side(open + 3)]);
-        let (pb, db) = (corner[(open + 1) % 4]?, dir[&side(open)]);
-        let den = da.perp_dot(db);
-        if den.abs() < 1e-9 {
-            return None;
+        if let Some(open) = (0..4).find(|i| corner[*i].is_none()) {
+            let (pa, da) = (corner[(open + 3) % 4]?, dir[&side(open + 3)]);
+            let (pb, db) = (corner[(open + 1) % 4]?, dir[&side(open)]);
+            let den = da.perp_dot(db);
+            if den.abs() < 1e-9 {
+                return None;
+            }
+            let t = (pb - pa).perp_dot(db) / den;
+            corner[open] = Some(pa + da * t);
         }
-        let t = (pb - pa).perp_dot(db) / den;
-        corner[open] = Some(pa + da * t);
         let pts: BTreeSet<EntityId> = ring.iter().filter_map(|x| self.entity(*x)).flat_map(|e| e.point_refs()).collect();
         let was: Vec<(EntityId, DVec2)> = pts.iter().filter_map(|p| Some((*p, self.point(*p)?))).collect();
         let mut moves: Vec<(EntityId, DVec2)> = Vec::new();
@@ -2400,7 +2496,7 @@ impl Sketch {
             let _ = self.set_point(p, at);
         }
         let unheld = self.unheld_constraints(1e-9);
-        if cons.iter().any(|(c, us)| us.iter().any(|x| ring.contains(x)) && unheld.contains(c)) {
+        if cons.iter().any(|(c, us)| us.iter().any(|x| ring.contains(x)) && unheld.contains(c) && !outside.contains(c)) {
             for (p, at) in was {
                 let _ = self.set_point(p, at);
             }
