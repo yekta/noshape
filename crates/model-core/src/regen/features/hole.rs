@@ -481,10 +481,11 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         // An axis beside the part with the hole still crossing it cuts a notch
         // (live "qa4 round 5 v2 s1 follow-up": a pattern instance at the
         // part's edge): rays across the hole's disk, each part's span from
-        // the first entry to the last exit.
+        // the first entry to the last exit. Its widest disk, a counterbore's or countersink's (asm-infento-subs'
+        // 1dc32b Hole 2: a Ø1 hole with a Ø13.5 counterbore on a Ø6.3 bore already there).
         if hits.iter().all(|(_, iv)| iv.is_empty()) {
             let (u, w) = (perp(dir), dir.cross(perp(dir)));
-            let r = dims.diameter * 0.5;
+            let r = dims.cbore.map(|c| c.0).into_iter().chain(dims.csink.map(|c| c.0)).fold(dims.diameter, f64::max) * 0.5;
             for f in [0.5, 0.98] {
                 for k in 0..16 {
                     let a = k as f64 * std::f64::consts::TAU / 16.0;

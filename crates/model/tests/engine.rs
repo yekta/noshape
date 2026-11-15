@@ -1833,3 +1833,29 @@ fn a_sketch_above_the_extrude_of_its_face_misses_its_plane() {
     assert_eq!(s.message.as_deref(), Some("Select a sketch plane."));
     assert_eq!(s.missing, 1);
 }
+
+/// A counterbored hole on a bore already there (asm-infento-subs' 1dc32b Hole 2, live OK): its Ø1 axis meets nothing,
+/// its Ø12 counterbore cuts the bore's mouth. A 100 × 50 × 25 block with a Ø6 hole through it, then a Ø1 hole 9 mm
+/// deep with a Ø12 × 4 counterbore on the same axis: the ring around the bore removed.
+#[test]
+fn a_counterbored_hole_on_a_bore_already_there_cuts_its_counterbore() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.1, 0.05, "25 mm");
+    let pl = t.top_plane("25 mm");
+    let at = |sk: &mut noshape_sketch::Sketch| sk.add_point(DVec2::new(0.05, 0.025));
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = at(&mut sk);
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }])), ("unitsSystem", en("METRIC")), ("styleV2", en("SIMPLE")), ("endStyleV2", en("THROUGH")), ("holeDiameterV3", e("6 mm"))]);
+    let before = t.ok().context.bodies[0].shape.volume().unwrap();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = at(&mut sk);
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let h = t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }])), ("unitsSystem", en("METRIC")), ("styleV2", en("C_BORE")), ("endStyleV2", en("BLIND")), ("holeDiameterV3", e("1 mm")), ("holeDepthV3", e("9 mm")), ("cBoreDiameterV3", e("12 mm")), ("cBoreDepthV3", e("4 mm"))]);
+    let res = t.regen();
+    let st = res.display.features.iter().find(|x| x.id == h).unwrap();
+    assert_eq!(st.status, FeatureStatus::Ok, "{:?}", st.message);
+    let removed = (before - res.context.bodies[0].shape.volume().unwrap()) * 1e9;
+    let ring = std::f64::consts::PI * (36.0 - 9.0) * 4.0;
+    assert!((removed - ring).abs() < 1e-3, "{removed} mm³, the ring {ring}");
+}
