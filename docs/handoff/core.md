@@ -1,15 +1,23 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-15 19:50 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-15 20:50 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
 - **Queued 55e517e0** (core-rmx, branch core-rayspeed; vibe6 pair SAME-PER-DOC, speed lines loaded-host noise):
   a Hole's rays skip parts whose box they miss and cross a composite part's solids one by one (1dc32b Holes 1-7 71.7
   -> 3.0 s); a loft takes curved faces as profiles (FS host `op_loft` and the Loft feature; GearLab 90f78b). asm told.
-- **core-oc, branch core-shellcheck** (220142955, not landed): Shell by regions checks its result's volume with
-  `rough_volume_by_faces` (as the smooth path), not two exact integrals (c2-rings-loft Shell 2: check 65 -> 9 ms a
-  call; same result). Gates on vibe7: g++-13 build, kernel/model `shell` tests, suite pair hbase / hshell. Then land.
+- **core-oc, branch core-shellcheck** (not landed; same changes also in core-trace branch core-pusplit):
+  - 220142955 Shell by regions checks its result's volume with `rough_volume_by_faces` (c2-rings-loft Shell 2: check
+    65 -> 9 ms a call; same result).
+  - 3315dcd6d Shell by regions takes parts with pockets (SHELL-SLOW tail): block = polytope of the supporting planes,
+    pockets = block - part (each convex, planes / cylinders, clear of removed faces; a plain hole stays the hole tube),
+    each grown by t through by_regions itself (t < 0 returns the grown region) and added as a tube. Concave edges stay
+    sharp as live (behaviours S4); slabs rounded them. T1 features::a_pocketed_block_shells_with_sharp_concave_
+    corners_as_live (pocket with R2 floor fillets: 1.4 s / 41 faces in slabs -> ~75 ms / 29 faces = the exact walls).
+  - Gates: g++-13 + kernel / model shell tests (vibe7, running); suite pair hbase / hshell queued in vibe7's slot
+    (behind asm's assembly suites). Results may change in suite documents with concave shells: check each against
+    live before landing; hats/dock userdocs too (kernel result change).
 
 ## Waiting on others
 - **GearLab 90f78b:** with ae8b7f751 plus asm's unlanded 93346d03d (custom features with a `def` map; std 1777/1793)
@@ -34,17 +42,17 @@ docs/DECISIONS.md (read first; it wins over anything here).
 ## Next, in order
 1. Land core-shellcheck (above) after its pair; check 55e517e0 landed.
 2. qa's speed list (P0), what is mine: c2-valve-config Extrude 3 `prism_until.split` 131 ms (a logo up to one revolved
-   dome face: OCCT's splitter; a projection-built extrude would be a big change for ~100 ms); c2-rings-loft Shell 2
+   dome face: OCCT's splitter, 26 face-face intersections; OBB and a (u, v) patch of the dome tried 11-15, no gain; a
+   projection-built extrude would be a big change for ~100 ms; valve's other time is bool's / bool2's); c2-rings-loft Shell 2
    `regions.tubes` 55-65 ms (Common of the solid with the hole tubes + fuse) and prism_until (~35 ms a call up to a
    1 m² cylinder face). Not mine there: rings Shell 1 (bool's quadrics), Circular patterns and Extrude 5 / housing
    Rotieren 1 (bool's Rust Boolean), Fillet 1 / Chamfer 1 (blend). The suite's per-feature part checks cost seconds of
    area / volume on offset faces (impeller's -3 mm wall 2.8 s); that is harness time, not regeneration.
 3. psui's Move boundary: Up to vertex / face land for picked straight edges (81a182b14); other edge kinds and Up to part
    still open.
-4. SHELL-SLOW tail: concave parts with fillets (pocket with floor fillets 2.3-2.9 s in slabs) need regions with concave
-   edges; hang402 Shell 5's cost is the corner patches' slab fans (archive "Next, in order" 2).
-5. MESH-AVX2 (TICKETS).
-6. Live specs not implemented: revolved cones framed at their apex, tori / spheres at their centre (`reframe_cylinder`
+4. SHELL-SLOW tail after pockets: hang402 Shell 5's cost is the corner patches' slab fans (archive "Next, in order" 2);
+   rounded blocks with pockets still decline regions (an outer fillet's sliver isn't a convex pocket).
+5. Live specs not implemented: revolved cones framed at their apex, tori / spheres at their centre (`reframe_cylinder`
    covers cylinders only); extruded circle edges on the sketch circle's frame vs our seam at u = 0; extrude side faces'
    x along their bottom edge (check).
 
