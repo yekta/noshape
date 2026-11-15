@@ -1,0 +1,20 @@
+{
+  "name": "drw-mbd-status-panel",
+  "about": "MBD status panel (right rail)",
+  "area": "drawing",
+  "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "button": "MBD status"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    }
+  ]
+}

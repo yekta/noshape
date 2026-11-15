@@ -1,0 +1,41 @@
+{
+  "name": "drw-create-drawing-custom-template",
+  "about": "Create Drawing of Part 1… (part's menu) › the Custom template tab: its fields and lists",
+  "area": "drawing",
+  "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
+  "start": "block",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "part": "Part 1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Create Drawing of Part 1…"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 5000
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Custom template"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

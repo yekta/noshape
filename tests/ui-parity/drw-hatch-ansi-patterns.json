@@ -1,0 +1,39 @@
+{
+  "name": "drw-hatch-ansi-patterns",
+  "about": "Hatch region panel › ANSI patterns: the pattern list",
+  "area": "drawing",
+  "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Hatch region"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ANSI patterns"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

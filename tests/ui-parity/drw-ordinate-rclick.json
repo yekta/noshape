@@ -1,0 +1,85 @@
+{
+  "name": "drw-ordinate-rclick",
+  "about": "An ordinate dimension group (origin + one point) right-clicked at its label: the menu",
+  "area": "drawing",
+  "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Ordinate dimension"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            0,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            0,
+            -10,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            40,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            0,
+            -10,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

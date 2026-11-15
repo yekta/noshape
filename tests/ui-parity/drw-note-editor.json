@@ -1,0 +1,42 @@
+{
+  "name": "drw-note-editor",
+  "about": "Note: placed on the sheet, the note editor's toolbar open with text typed",
+  "area": "drawing",
+  "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Note"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          60,
+          40
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "type",
+      "text": "MATRIX"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

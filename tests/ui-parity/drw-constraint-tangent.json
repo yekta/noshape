@@ -1,0 +1,25 @@
+{
+  "name": "drw-constraint-tangent",
+  "about": "Drawing constraint dropdown ▾ › Tangent: picked",
+  "area": "drawing",
+  "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Horizontal",
+        "menu": "Tangent"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

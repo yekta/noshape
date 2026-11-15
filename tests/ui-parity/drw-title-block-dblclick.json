@@ -1,0 +1,27 @@
+{
+  "name": "drw-title-block-dblclick",
+  "about": "Title block double-clicked: what it opens",
+  "area": "drawing",
+  "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "dblclick",
+      "on": {
+        "sheet_point": [
+          240,
+          20
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

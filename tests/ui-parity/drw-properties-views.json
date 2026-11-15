@@ -1,0 +1,44 @@
+{
+  "name": "drw-properties-views",
+  "about": "Drawing properties (empty sheet's menu) › the Views tab: its fields and lists",
+  "area": "drawing",
+  "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          140,
+          120
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Drawing properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Views"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

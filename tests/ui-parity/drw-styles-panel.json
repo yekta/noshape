@@ -1,0 +1,20 @@
+{
+  "name": "drw-styles-panel",
+  "about": "Styles panel (right rail): its rows",
+  "area": "drawing",
+  "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "button": "Styles"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    }
+  ]
+}

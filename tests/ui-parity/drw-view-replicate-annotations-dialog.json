@@ -1,0 +1,30 @@
+{
+  "name": "drw-view-replicate-annotations-dialog",
+  "about": "A view's menu › Replicate annotations: what opens",
+  "area": "drawing",
+  "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Right"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Replicate annotations"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

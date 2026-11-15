@@ -1,0 +1,25 @@
+{
+  "name": "drw-sketch-tool-3-point-circle",
+  "about": "Drawing sketch tool 3 point circle: picked (active tool, any panel)",
+  "area": "drawing",
+  "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Center point circle",
+        "menu": "3 point circle"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
