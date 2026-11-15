@@ -972,6 +972,8 @@ struct Ctx<'a> {
     solids: Vec<GSolid>,
     side_cache: HashMap<(u32, usize), i8>,
     in_face_done: HashSet<(usize, usize)>,
+    /// Sections' new end vertices where they cross an edge, by (that edge, the pair's other face): [`Self::end_on_edge`].
+    edge_ends: HashMap<(usize, usize), Vec<u32>>,
     /// Curves added to each face.
     face_segs: Vec<Vec<Seg>>,
     /// For each of a face's curves, the section it is (its index in `sections`), or `usize::MAX`.
@@ -1904,29 +1906,36 @@ impl Ctx<'_> {
         Ok(())
     }
 
-    /// A new vertex within `stol` (a section's tolerance) of `p`, a section's end where it crosses an edge of face
-    /// `fs` or `ft`, lying on that edge within `stol` too: another section's end there (two faces' sections with a
-    /// third, each ending where it crosses the edge between those two, 2.2 um apart on c2-helical-sweep's thread
-    /// cutter at the bar's rim: OCCT's one pave of that edge on the third face).
-    fn end_on_edge(&self, fs: usize, ft: usize, p: DVec3, stol: f64) -> Option<u32> {
-        if stol <= self.pool.pair(0.0, 0.0) {
-            return None;
-        }
-        let edges: Vec<Seg> = [fs, ft]
-            .iter()
-            .flat_map(|&f| self.faces[f].edges.iter())
-            .filter(|&&(e, _)| {
-                let (u, d) = self.seg_param(&self.edge_seg(e), p);
-                d <= self.pool.pair(self.edges[e].t, 0.0) && (0.0..=1.0).contains(&u)
-            })
-            .map(|&(e, _)| self.edge_seg(e))
-            .collect();
-        self.pool
-            .near_tol(p, stol)
+    /// The vertex of a section's end `p` where it crosses an edge of face `fs` or `ft` (within `stol`, the section's
+    /// tolerance): another section's end there within reach that crossed the same edge with the same other face (two
+    /// faces' sections with a third, each ending where it crosses the edge between those two, 2.2 um apart on
+    /// c2-helical-sweep's thread cutter at the bar's rim: OCCT's one pave of that edge on the third face), merged;
+    /// else a new one, kept for those.
+    fn end_on_edge(&mut self, fs: usize, ft: usize, p: DVec3, stol: f64) -> R<u32> {
+        let keys: Vec<(usize, usize)> = [(fs, ft), (ft, fs)]
             .into_iter()
-            .filter(|&(w, _, _)| self.pool.inputs[w as usize].is_empty() && edges.iter().any(|s| s.v[0] != w && s.v[1] != w && self.seg_param(s, self.p(w)).1 <= stol))
-            .min_by(|a, b| a.1.total_cmp(&b.1))
-            .map(|x| x.0)
+            .flat_map(|(f, g)| self.faces[f].edges.iter().map(move |&(e, _)| (e, g)))
+            .filter(|&(e, _)| {
+                let (u, d) = self.seg_param(&self.edge_seg(e), p);
+                stol > self.pool.pair(0.0, 0.0) && d <= stol && (0.0..=1.0).contains(&u)
+            })
+            .collect();
+        let near = self.pool.near_tol(p, stol);
+        let found = keys.iter().flat_map(|k| self.edge_ends.get(k).into_iter().flatten()).filter_map(|&w| near.iter().find(|x| x.0 == w)).min_by(|a, b| a.1.total_cmp(&b.1)).map(|x| x.0);
+        let w = match found {
+            Some(w) => {
+                self.pool.merge_with(w, p, 0.0);
+                w
+            }
+            None => self.pool.add(p)?,
+        };
+        for k in keys {
+            let list = self.edge_ends.entry(k).or_default();
+            if !list.contains(&w) {
+                list.push(w);
+            }
+        }
+        Ok(w)
     }
 
     /// Where both faces' intervals of a section overlap: its edges, in both faces.
@@ -2006,11 +2015,8 @@ impl Ctx<'_> {
                             .fold((f64::INFINITY, p), |m, x| if x.0 < m.0 { x } else { m });
                         if d > cx.pool.pair(0.0, 0.0) && d <= stol {
                             cx.pool.add_tol(q, 1.5 * d)?
-                        } else if let Some(w) = cx.end_on_edge(fs, ft, p, stol) {
-                            cx.pool.merge_with(w, p, 0.0);
-                            w
                         } else {
-                            cx.pool.add(p)?
+                            cx.end_on_edge(fs, ft, p, stol)?
                         }
                     }
                 },
@@ -4167,6 +4173,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         solids: Vec::new(),
         side_cache: HashMap::default(),
         in_face_done: Default::default(),
+        edge_ends: Default::default(),
         face_segs: Vec::new(),
         seg_section: Vec::new(),
         seg_edge_tol: Vec::new(),
