@@ -39,6 +39,8 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   nobody reads by default. Update it whenever you land or report, so a compaction never loses anything.
 - 11-15 Heavy runs (model/assembly/exchange suites, gates, parity pairs) on a vibe host go through `~/bin/slot` there,
   which takes the host's single suite lock and waits for free memory; never two at once on one host.
+- 11-15 Build hosts: bool2 and bool build and gate on vibe5; the Mac's one slot is for crate tests and short builds, never
+  a 45-min hold. Light checks (5 app runs, a quit check) don't take ~/bin/slot.
 - 11-15 No recurring "gate --main" runs: main's watcher and the land queue cover main.
 - 11-11 Private user documents (hats, dock, anything in ~/lead-private): never in the repo, artifacts or logs; work only
   on mode-700 copies in ~/tmp/<agent> on the vibe host and delete them afterwards (CLI batches with mutating ops save).
