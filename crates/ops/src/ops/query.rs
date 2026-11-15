@@ -138,6 +138,19 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // Each part's volume, area and box at once (each a whole-body
     // integration or distance search: ~350 ms in a row for a filleted part).
     let bodies = &r.context.bodies;
+    // NOSHAPE_EDGE_TOL_TRACE: each edge off its faces by over 1e-7 m, its curve and its faces' surfaces.
+    if std::env::var_os("NOSHAPE_EDGE_TOL_TRACE").is_some() {
+        for b in bodies.iter().filter(|b| b.shape.max_edge_tolerance() > 1e-7) {
+            let faces = b.shape.sub_shapes(noshape_kernel::ShapeType::Face);
+            let ef = b.shape.edge_faces().unwrap_or_default();
+            for (i, e) in b.shape.sub_shapes(noshape_kernel::ShapeType::Edge).iter().enumerate().filter(|(_, e)| e.max_edge_tolerance() > 1e-7) {
+                let kind = |s: Result<noshape_kernel::Surface, _>| s.map(|s| format!("{s:?}").split([' ', '{', '(']).next().unwrap_or("").to_string()).unwrap_or_default();
+                let on: Vec<String> = ef.get(i).into_iter().flatten().filter_map(|f| faces.get(*f as usize)).map(|f| kind(f.face_surface())).collect();
+                let curve = e.edge_info().map(|x| format!("{:?}", x.curve).split([' ', '{', '(']).next().unwrap_or("").to_string()).unwrap_or_default();
+                eprintln!("EDGETOL {} edge {i}: {:.2e} m, {curve} on {}", b.name, e.max_edge_tolerance(), on.join(" / "));
+            }
+        }
+    }
     let volumes: Vec<std::sync::OnceLock<Option<noshape_kernel::MassProperties>>> = bodies.iter().map(|_| Default::default()).collect();
     let areas: Vec<std::sync::OnceLock<Option<f64>>> = bodies.iter().map(|_| Default::default()).collect();
     let boxes: Vec<std::sync::OnceLock<Option<noshape_kernel::BoundingBox>>> = bodies.iter().map(|_| Default::default()).collect();

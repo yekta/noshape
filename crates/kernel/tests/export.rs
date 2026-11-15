@@ -1890,3 +1890,25 @@ fn a_hoses_walls_write_whole() {
     let (v0, v1) = (hose.volume().unwrap(), back.volume().unwrap());
     assert!((v1 - v0).abs() < 2e-6 * v0, "{v1} vs {v0}");
 }
+
+/// A plane's cut across a spline extrusion leaves OCCT's approximated intersection edge (µm off its faces; a STEP or
+/// IGES reader refits it, live's import of cf-sheet-metal-model-plus's sheet metal part made 61 faces of 58):
+/// `exact_edges` rebuilds it as the basis curve carried onto the plane, within 1e-7 m, the solid unchanged.
+#[test]
+fn a_planes_cut_across_a_spline_extrusion_is_rebuilt_exact() {
+    use glam::DVec2;
+    let spline = Segment2d::BSpline { poles: vec![DVec2::new(0.0, 0.0), DVec2::new(0.01, 0.008), DVec2::new(0.02, -0.004), DVec2::new(0.03, 0.006)], weights: None, knots: vec![0.0, 1.0], mults: vec![4, 4], degree: 3, periodic: false };
+    let outline = [spline, Segment2d::Line { a: DVec2::new(0.03, 0.006), b: DVec2::new(0.03, -0.01) }, Segment2d::Line { a: DVec2::new(0.03, -0.01), b: DVec2::new(0.0, -0.01) }, Segment2d::Line { a: DVec2::new(0.0, -0.01), b: DVec2::new(0.0, 0.0) }];
+    let face = make_face_2d(&Plane::from_normal(DVec3::ZERO, DVec3::Z), &outline, &[]).unwrap();
+    let solid = extrude(&face, DVec3::new(0.0, 0.0, 0.01)).unwrap().shape;
+    let tool = make_box_corners(DVec3::new(-0.01, -0.03, 0.005), DVec3::new(0.05, 0.03, 0.03)).unwrap();
+    let tool = tool.transformed(&Transform::Rotate { origin: DVec3::new(0.015, 0.0, 0.005), axis: DVec3::new(1.0, 0.3, 0.0).normalize(), angle: 0.35 }).unwrap();
+    let cut = cut(&solid, &tool).unwrap().shape;
+    let before = cut.max_edge_tolerance();
+    assert!(before > 1e-7, "OCCT's intersection edge is exact already ({before:e} m): the case no longer tests anything");
+    let exact = exact_edges(&cut).unwrap();
+    assert!(exact.is_valid());
+    assert!(exact.max_edge_tolerance() <= 1.0001e-7, "{:e} m (was {before:e})", exact.max_edge_tolerance());
+    let (v0, v1) = (volume_properties(&cut).unwrap().mass, volume_properties(&exact).unwrap().mass);
+    assert!((v1 - v0).abs() <= 1e-6 * v0, "{v0} -> {v1}");
+}

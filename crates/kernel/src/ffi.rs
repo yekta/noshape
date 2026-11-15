@@ -853,6 +853,7 @@ pub(crate) mod ffi {
         fn read_step_pmi(path: &str) -> Result<Vec<String>>;
         fn read_iges(path: &str) -> Result<UniquePtr<OcShape>>;
         fn straighten_edges(s: &OcShape, tol: f64) -> Result<UniquePtr<OcShape>>;
+        fn exact_edges(s: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn read_mesh(path: &str, merge_limit: u32) -> Result<UniquePtr<OcShape>>;
         fn write_iges(shapes: &OcShapeList, names: &[String], colours: &[f64], path: &str, system: &str, version: &str) -> Result<()>;
         fn write_iges_assembly(shapes: &OcShapeList, names: &[String], colours: &[f64], part: &[u32], tf: &[f64], path: &str, system: &str, version: &str) -> Result<()>;

@@ -1064,6 +1064,7 @@ void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names
 rust::Vec<rust::String> read_step_pmi(rust::Str path);
 std::unique_ptr<OcShape> read_iges(rust::Str path);
 std::unique_ptr<OcShape> straighten_edges(const OcShape& s, double tol);
+std::unique_ptr<OcShape> exact_edges(const OcShape& s);
 std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit);
 void                     write_iges(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path,
                                     rust::Str system, rust::Str version);

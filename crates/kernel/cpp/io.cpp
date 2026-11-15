@@ -14,6 +14,16 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <ShapeFix_Shape.hxx>
 #include <BRepTools_ReShape.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
+#include <Geom_Line.hxx>
+#include <Geom_Plane.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
+#include <Geom_SurfaceOfLinearExtrusion.hxx>
+#include <Geom_TrimmedCurve.hxx>
+#include <Geom_OffsetCurve.hxx>
+#include <Geom_OffsetSurface.hxx>
+#include <GeomConvert_ApproxCurve.hxx>
+#include <optional>
 #include <TopExp.hxx>
 #include <gp_Lin.hxx>
 #include <BRepAdaptor_Surface.hxx>
@@ -1340,6 +1350,254 @@ std::unique_ptr<OcShape> straighten_edges(const OcShape& s, double tol)
   };
   const bool same = count(fixed, TopAbs_FACE) == count(out, TopAbs_FACE) && count(fixed, TopAbs_EDGE) == count(out, TopAbs_EDGE);
   return wrap(same && BRepCheck_Analyzer(fixed).IsValid() ? fixed : s.shape);
+}
+
+namespace
+{
+// A face's surface (its location applied), a rectangular trim taken off.
+occ::handle<Geom_Surface> bare_surface(const TopoDS_Face& f)
+{
+  occ::handle<Geom_Surface> s = BRep_Tool::Surface(f);
+  if (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(s); !t.IsNull())
+    s = t->BasisSurface();
+  return s;
+}
+
+// An edge's exact curve between two faces, its curves on them (same parameter), and its parameters at its first and
+// last vertices (t0 > t1: the curve runs the other way).
+struct ExactEdge
+{
+  occ::handle<Geom_Curve>   curve;
+  occ::handle<Geom2d_Curve> on[2];
+  double                    t0 = 0, t1 = 0;
+};
+
+// Two planes: their line. A plane and a linear extrusion of a non-rational B-spline: the basis curve carried along the
+// extrusion onto the plane (an affine map, so its poles carried, the same knots), on the extrusion (u, v) = (t, the
+// distance carried), on the plane the carried poles' (u, v). A plane and such an extrusion's offset (a sheet's other
+// side): the same, from the basis curve's offset. Else none.
+std::optional<ExactEdge> exact_between(const TopoDS_Edge& e, const TopoDS_Face (&f)[2])
+{
+  const occ::handle<Geom_Surface> s[2] = {bare_surface(f[0]), bare_surface(f[1])};
+  const occ::handle<Geom_Plane>   pl[2] = {occ::down_cast<Geom_Plane>(s[0]), occ::down_cast<Geom_Plane>(s[1])};
+  TopoDS_Vertex                   v0, v1;
+  TopExp::Vertices(e, v0, v1);
+  const gp_Pnt a = BRep_Tool::Pnt(v0), b = BRep_Tool::Pnt(v1);
+  const double reach = std::max(1e-5, 10 * BRep_Tool::Tolerance(e));
+  ExactEdge    x;
+  if (!pl[0].IsNull() && !pl[1].IsNull())
+  {
+    const gp_Pln p0 = pl[0]->Pln(), p1 = pl[1]->Pln();
+    const gp_XYZ n0 = p0.Axis().Direction().XYZ(), n1 = p1.Axis().Direction().XYZ();
+    gp_XYZ       d  = n0.Crossed(n1);
+    const double dd = d.SquareModulus();
+    if (dd < 1e-12)
+      return std::nullopt;
+    const double c0 = n0.Dot(p0.Location().XYZ()), c1 = n1.Dot(p1.Location().XYZ()), k = n0.Dot(n1);
+    const gp_XYZ o  = ((c0 - c1 * k) * n0 + (c1 - c0 * k) * n1) / dd;
+    d.Normalize();
+    if ((b.XYZ() - a.XYZ()).Dot(d) < 0)
+      d.Reverse();
+    x.t0    = (a.XYZ() - o).Dot(d);
+    x.t1    = (b.XYZ() - o).Dot(d);
+    x.curve = new Geom_Line(gp_Pnt(o), gp_Dir(d));
+    for (int i = 0; i < 2; ++i)
+    {
+      const gp_Pln& p = i ? p1 : p0;
+      double        u, v;
+      ElSLib::Parameters(p, gp_Pnt(o), u, v);
+      x.on[i] = new Geom2d_Line(gp_Pnt2d(u, v), gp_Dir2d(d.Dot(p.XAxis().Direction().XYZ()), d.Dot(p.YAxis().Direction().XYZ())));
+    }
+  }
+  else
+  {
+    const int ip = pl[0].IsNull() ? 1 : 0;
+    if (pl[ip].IsNull())
+      return std::nullopt;
+    occ::handle<Geom_Surface>                       other = s[1 - ip];
+    const occ::handle<Geom_OffsetSurface>           off   = occ::down_cast<Geom_OffsetSurface>(other);
+    if (!off.IsNull())
+    {
+      other = off->BasisSurface();
+      if (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(other); !t.IsNull())
+        other = t->BasisSurface();
+    }
+    const occ::handle<Geom_SurfaceOfLinearExtrusion> ext = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(other);
+    if (ext.IsNull())
+      return std::nullopt;
+    occ::handle<Geom_Curve> basis = ext->BasisCurve();
+    if (const occ::handle<Geom_TrimmedCurve> t = occ::down_cast<Geom_TrimmedCurve>(basis); !t.IsNull())
+      basis = t->BasisCurve();
+    const gp_Pln pln = pl[ip]->Pln();
+    const gp_XYZ n = pln.Axis().Direction().XYZ(), d = ext->Direction().XYZ(), o = pln.Location().XYZ();
+    const double nd = n.Dot(d);
+    if (std::abs(nd) < 1e-6)
+      return std::nullopt;
+    // The range: the edge's ends as the surface's u (its own curve on it).
+    double                          f0, l0;
+    const occ::handle<Geom2d_Curve> old = BRep_Tool::CurveOnSurface(e, f[1 - ip], f0, l0);
+    if (old.IsNull())
+      return std::nullopt;
+    x.t0 = old->Value(f0).X();
+    x.t1 = old->Value(l0).X();
+    // An extrusion's offset is the extrusion of its basis curve's offset (along the normal T x d, the same at every
+    // v): that offset curve as a B-spline within 1e-10 m over the edge's range, then carried as a basis curve is.
+    occ::handle<Geom_BSplineCurve> bs = occ::down_cast<Geom_BSplineCurve>(basis);
+    if (!off.IsNull())
+    {
+      const double            lo = std::min(x.t0, x.t1), hi = std::max(x.t0, x.t1);
+      GeomConvert_ApproxCurve fit(new Geom_TrimmedCurve(new Geom_OffsetCurve(basis, off->Offset(), gp_Dir(d)), lo, hi), 1e-10, GeomAbs_C2, 400, 9);
+      if (!fit.HasResult() || fit.MaxError() > 1e-9)
+        return std::nullopt;
+      bs = fit.Curve();
+    }
+    if (bs.IsNull() || bs->IsRational() || bs->IsPeriodic())
+      return std::nullopt;
+    const int                    np = bs->NbPoles(), deg = bs->Degree();
+    NCollection_Array1<gp_Pnt>   poles(1, np);
+    NCollection_Array1<gp_Pnt2d> on_ext(1, np), on_plane(1, np);
+    NCollection_Array1<double>   flat(1, np + deg + 1);
+    bs->KnotSequence(flat);
+    for (int i = 1; i <= np; ++i)
+    {
+      const gp_XYZ p = bs->Pole(i).XYZ();
+      const double v = n.Dot(o - p) / nd;
+      poles(i)       = gp_Pnt(p + v * d);
+      // (u = t: the Greville abscissae as poles.)
+      double g = 0;
+      for (int j = i + 1; j <= i + deg; ++j)
+        g += flat(j);
+      on_ext(i) = gp_Pnt2d(g / deg, v);
+      double pu, pv;
+      ElSLib::Parameters(pln, poles(i), pu, pv);
+      on_plane(i) = gp_Pnt2d(pu, pv);
+    }
+    NCollection_Array1<double> knots(1, bs->NbKnots());
+    NCollection_Array1<int>    mults(1, bs->NbKnots());
+    bs->Knots(knots);
+    bs->Multiplicities(mults);
+    x.curve      = new Geom_BSplineCurve(poles, knots, mults, deg);
+    x.on[1 - ip] = new Geom2d_BSplineCurve(on_ext, knots, mults, deg);
+    x.on[ip]     = new Geom2d_BSplineCurve(on_plane, knots, mults, deg);
+    if (std::min(x.t0, x.t1) < x.curve->FirstParameter() - 1e-9 || std::max(x.t0, x.t1) > x.curve->LastParameter() + 1e-9)
+      return std::nullopt;
+  }
+  if (std::abs(x.t1 - x.t0) < 1e-9 || x.curve->Value(x.t0).Distance(a) > reach || x.curve->Value(x.t1).Distance(b) > reach)
+    return std::nullopt;
+  return x;
+}
+} // namespace
+
+// Edges where two faces meet, rebuilt exact where the faces allow it (two planes; a plane and a B-spline extrusion):
+// OCCT's approximated intersections lie up to 3e-5 m off their faces (PS-INEXACT-INTERSECTION-EDGES), and an exported
+// file's readers refit them (live's import of a sheet metal part: 61 faces, its own 58). Their vertices move onto the
+// exact ends. The shape unchanged when nothing is rebuilt or the result doesn't check valid.
+std::unique_ptr<OcShape> exact_edges(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  constexpr double exact = 1e-7;
+  ShapeIMap        es;
+  TopExp::MapShapes(s.shape, TopAbs_EDGE, es);
+  NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef, ve;
+  TopExp::MapShapesAndUniqueAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  TopExp::MapShapesAndUniqueAncestors(s.shape, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  struct Made
+  {
+    TopoDS_Edge edge;
+    TopoDS_Face faces[2];
+    ExactEdge   x;
+  };
+  std::vector<Made> made;
+  for (int i = 1; i <= es.Extent(); ++i)
+  {
+    const TopoDS_Edge e = TopoDS::Edge(es(i).Oriented(TopAbs_FORWARD));
+    if (BRep_Tool::Degenerated(e) || BRep_Tool::Tolerance(e) <= exact || !e.Location().IsIdentity())
+      continue;
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    const NCollection_List<TopoDS_Shape>* fs = ef.Seek(e);
+    if (v0.IsNull() || v1.IsNull() || v0.IsSame(v1) || fs == nullptr || fs->Extent() != 2 || fs->First().IsSame(fs->Last()))
+      continue;
+    Made m{e, {TopoDS::Face(fs->First()), TopoDS::Face(fs->Last())}, {}};
+    try
+    {
+      if (std::optional<ExactEdge> x = exact_between(e, m.faces))
+      {
+        m.x = *x;
+        made.push_back(m);
+      }
+    }
+    catch (const Standard_Failure&)
+    {
+    }
+  }
+  if (made.empty())
+    return wrap(s.shape);
+  // Each vertex at an exact edge's end: where those ends are.
+  NCollection_IndexedDataMap<TopoDS_Shape, std::vector<gp_Pnt>, TopTools_ShapeMapHasher> ends;
+  for (const Made& m : made)
+  {
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(m.edge, v0, v1);
+    for (int k = 0; k < 2; ++k)
+    {
+      const TopoDS_Shape v = (k ? v1 : v0).Oriented(TopAbs_FORWARD);
+      if (!ends.Contains(v))
+        ends.Add(v, {});
+      ends.ChangeFromKey(v).push_back(m.x.curve->Value(k ? m.x.t1 : m.x.t0));
+    }
+  }
+  occ::handle<BRepTools_ReShape> rs(new BRepTools_ReShape);
+  BRep_Builder                   bb;
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Vertex, TopTools_ShapeMapHasher> moved;
+  for (int i = 1; i <= ends.Extent(); ++i)
+  {
+    const TopoDS_Vertex v = TopoDS::Vertex(ends.FindKey(i));
+    gp_XYZ              sum(0, 0, 0);
+    for (const gp_Pnt& p : ends(i))
+      sum += p.XYZ();
+    const gp_Pnt at(sum / double(ends(i).size()));
+    // Its tolerance: to the exact ends, and to the other edges' ends there.
+    double tol = exact;
+    for (const gp_Pnt& p : ends(i))
+      tol = std::max(tol, 1.001 * at.Distance(p));
+    if (const NCollection_List<TopoDS_Shape>* es_v = ve.Seek(v))
+      for (NCollection_List<TopoDS_Shape>::Iterator it(*es_v); it.More(); it.Next())
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(it.Value());
+        if (BRep_Tool::Degenerated(e) || std::any_of(made.begin(), made.end(), [&](const Made& m) { return m.edge.IsSame(e); }))
+          continue;
+        double                         f, l;
+        const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
+        if (c.IsNull())
+          continue;
+        const double t = BRep_Tool::Parameter(v, e);
+        tol            = std::max(tol, 1.001 * at.Distance(c->Value(t)) + BRep_Tool::Tolerance(e));
+      }
+    const TopoDS_Vertex nv = BRepBuilderAPI_MakeVertex(at);
+    bb.UpdateVertex(nv, tol);
+    moved.Bind(v, nv);
+    rs->Replace(v, nv);
+  }
+  for (const Made& m : made)
+  {
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(m.edge, v0, v1);
+    // Along its curve: from the vertex at the lower parameter (the edge reversed when that's its last).
+    const bool  along = m.x.t0 < m.x.t1;
+    TopoDS_Edge ne;
+    bb.MakeEdge(ne, m.x.curve, exact);
+    bb.Add(ne, moved.Find((along ? v0 : v1).Oriented(TopAbs_FORWARD)).Oriented(TopAbs_FORWARD));
+    bb.Add(ne, moved.Find((along ? v1 : v0).Oriented(TopAbs_FORWARD)).Oriented(TopAbs_REVERSED));
+    for (int k = 0; k < 2; ++k)
+      bb.UpdateEdge(ne, m.x.on[k], m.faces[k], exact);
+    bb.Range(ne, std::min(m.x.t0, m.x.t1), std::max(m.x.t0, m.x.t1));
+    bb.SameParameter(ne, true);
+    bb.SameRange(ne, true);
+    rs->Replace(m.edge, along ? ne : TopoDS::Edge(ne.Reversed()));
+  }
+  const TopoDS_Shape out = rs->Apply(s.shape);
+  return wrap(BRepCheck_Analyzer(out).IsValid() ? out : s.shape);
 }
 
 std::unique_ptr<OcShape> read_iges(rust::Str path)

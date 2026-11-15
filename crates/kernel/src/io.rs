@@ -713,6 +713,13 @@ pub fn straighten_edges(shape: &Shape, tol: f64) -> Result<Shape> {
     Shape::from_res(ffi::straighten_edges(shape.raw(), tol))
 }
 
+/// Edges where two planes, or a plane and a B-spline extrusion, meet rebuilt exact (OCCT's approximated intersections lie
+/// up to 3e-5 m off their faces; an exported file's reader refits them, PS-INEXACT-INTERSECTION-EDGES), their vertices
+/// moved onto the exact ends; the shape unchanged when nothing is rebuilt or the result doesn't check valid.
+pub fn exact_edges(shape: &Shape) -> Result<Shape> {
+    Shape::from_res(ffi::exact_edges(shape.raw()))
+}
+
 /// Read an STL (ASCII or binary) or OBJ mesh whose coordinates are in
 /// `file_unit` (mesh files carry no unit) as a shape in meters: one
 /// planar face per triangle in a connected shell (a solid when closed).
