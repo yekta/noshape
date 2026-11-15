@@ -4,20 +4,17 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-15 19:24 UTC.
+Updated 11-15 19:35 UTC.
 
 ## In flight
-- Landing: branch bool-land-41c (worktree /root/projects/noshape-wt/bool-split) = 41c844b78 + f1b32bd0e on main
-  a2212ff24. Gate 41c844b78 clean (CHECK: knurls only; 0 new differences; model suite 80 -> 80 to the end,
-  883/935 features; crate tests pass). Waiting on the hats/dock comparison (/root/bool-hat-scratch/udoc-ab.sh, output
-  udoc-ab.out: cli at the branch and at its merge base, every Part Studio tab's bodies, face / edge / vertex counts,
-  volumes, feature statuses); land only if all tabs are SAME (DECISIONS 11-14).
+- Queued to land: 14c0b668 (41c844b78 + f1b32bd0e, branch bool-land-41c). Gate clean (CHECK: knurls only; 0 new
+  differences; model suite 80 -> 80, 883/935); hats/dock: all 12 tabs SAME (bodies, counts, volumes, statuses).
   - f1b32bd0e: Shell's offset value on a free-form face searches for a foot once where Newton's steps fail, and not
     locally where that foot lies past the surface's end. c2-rings-loft Shell 1 ~8 % less CPU, the same result.
   - 41c844b78: torus_sections (was plane_torus_sections): a plane along the torus axis (off it) and a sphere off the
-    axis too, exact point by point round the axis, interpolated (no fitted fallback). learning-center-michael's
-    12-tool cut (known-sections 1447eaf22e0cd418): 24 more pairs ours (OCCT's ~220 ms CPU). T1
-    bool_patterns::a_rings_top_cut_along_its_axis_and_by_a_ball_as_occt.
+    axis too, exact point by point round the axis, interpolated. learning-center-michael's 12-tool cut: 24 more
+    pairs ours. T1 bool_patterns::a_rings_top_cut_along_its_axis_and_by_a_ball_as_occt.
+- Now: cf-snap-hook's Booleans (Next 1).
 
 ## Parked (branches / diffs, not landing as they are)
 - Plane x B-spline marcher + our own least-squares fit (branch bool-free-sections-wip: 71efdd87e, f6c77c748, ...):
@@ -39,24 +36,27 @@ Updated 11-15 19:24 UTC.
 - blend's known sections entry point: parked (few pairs are tangent contacts).
 
 ## Next, in order
-1. Land bool-land-41c when hats/dock are SAME (land.sh from worktree bool-split; drop nothing else onto it).
-2. cf-snap-hook's Booleans (dx 11-15: x3.4 live; Snap Hook 1/2 opBoolean 256-286 ms vs live's whole features 81-83).
+1. cf-snap-hook's Booleans (dx 11-15: x3.4 live; Snap Hook 1/2 opBoolean 256-286 ms vs live's whole features 81-83).
    Recorded: vibe5 ~/tmp/bool/snap (9 cases); costliest ddcfc2632aeb7365 and bcab565b15f622ca (body cut by 2 tools,
    50-90 ms each; probe_case_timed). Profile: OCCT sections ahead ~16 %, GFace::uv_of ~16 % (FreeSurface::derivs in
    param_of, from c2_of/to2 and on_free_surface/surface_distance), intervals_on ~11 %, offset_as_bspline ~10 %.
-   Lever: seed param_of from the previous point's uv along a curve instead of the grid's nearest (crates/brep: gate).
+   Lever: an exact (face, point) cache in GFace::uv_of if points repeat (bit-identical); else seed param_of from the
+   previous point's uv (may move last digits: full gate). Measure first: /root/bool-scratch/uvdbg.diff (UVDBG=1).
    The 414 bounding_box calls dx saw are the suite measuring after the feature: not regen.
-3. c2-rings-loft Shell 1 (~510-590 ms, live 235): repair 251 (traces 95, split 78, crossings 26, joins 17),
+2. c2-rings-loft Shell 1 (~510-590 ms, live 235): repair 251 (traces 95, split 78, crossings 26, joins 17),
    self-interference 67 (its EF time in ~23 pairs on free-form faces; quadric pairs are cheap), edges 44, check 35,
    thin 34. Points with no square foot: OCCT's global search found none wherever a Newton search from the own 25 x 25
    grid's local minima found none (160 of 160), so the global search may be skipped there (needs the gate).
-4. The marcher's knife regression (above), then gate it again.
-5. learning-center-michael (363 vs 96): cylinder x torus (22 pairs ~220 ms CPU), cylinder x sphere 24 pairs ~60 ms,
+3. The marcher's knife regression (above), then gate it again.
+4. learning-center-michael (363 vs 96): cylinder x torus (22 pairs ~220 ms CPU), cylinder x sphere 24 pairs ~60 ms,
    cylinder x cylinder 10 pairs.
-6. skasm's cf-sheet-metal-shaped-flange: vibe6 ~/agents/skasm-keep/sf-bool-cases (40 cases): ~15 corner-relief cuts of a
+5. skasm's cf-sheet-metal-shaped-flange: vibe6 ~/agents/skasm-keep/sf-bool-cases (40 cases): ~15 corner-relief cuts of a
    6-face bend solid, 7-24 ms each; the part's final fuses 27-83 ms.
-7. c2-rings-loft Circular pattern 1: 51 prism_until splits 254 ms (features.cpp, OCCT's Splitter; history and naming
+6. c2-rings-loft Circular pattern 1: 51 prism_until splits 254 ms (features.cpp, OCCT's Splitter; history and naming
    there: decision needed with the lead before touching).
+7. core's FYI (qa's speed list 11-15, vibe7 loaded): c2-housing-draft Rotieren 1 77 ms (live 13; boolean.rust.brep 70,
+   sections_ahead 41); c2-rings-loft Extrude 5 295 ms (live 39; boolean.rust 128-216, ahead 25-60); Shell 1 dump
+   vibe7 ~/tmp/core/rh/dd/shell-9 (crash_inputs::replay_one).
 
 ## Measured (ours vs live, ms; vibe5 under load, candidates per DECISIONS 11-15)
 c2-rings-loft 1880 / 1557; c2-sm-louver 4008 / 4987; c2-housing-draft 126 / 105; cf-lighten 158 / 114;
