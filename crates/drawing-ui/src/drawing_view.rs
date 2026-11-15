@@ -171,9 +171,15 @@ fn hover_after_menu(window: &mut Window) {
     });
 }
 
-/// Open a drawing's right-click `menu` (live's top edge is 2 px under the pointer: dx 2442 (7)).
+/// Open a drawing panel's or list's right-click `menu` (its top edge 2 px under the pointer: dx 2442 (7)).
 pub fn open_drawing_menu(position: Point<Pixels>, menu: Entity<crate::os_menu::OsMenu>, window: &mut Window, cx: &mut App) {
     crate::os_menu::open(position + point(px(0.), px(2.)), menu, window, cx);
+}
+
+/// The sheet's right-click menu: its top 35 px above the pointer and its left edge 1 px right of it, so the pointer is
+/// on its second row, at any height (live2 feel/rmb-probe: five pointer heights, s7 of drw-datum-copy-paste).
+pub fn open_canvas_menu(position: Point<Pixels>, menu: Entity<crate::os_menu::OsMenu>, window: &mut Window, cx: &mut App) {
+    crate::os_menu::open(position + point(px(1.), px(-35.)), menu, window, cx);
 }
 
 /// [`fill_menu`] for Onshape's right-click menus ([`crate::os_menu`]).
@@ -192,9 +198,11 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
                     ed.update(cx, |t, cx| {
                         // Paste lands at the pointer where Paste was clicked, not where the menu opened (live2
                         // drw-datum-copy-paste: both runs at that pointer + the copy's offset).
+                        let at = t.to_sheet(t.local(window.mouse_position()));
                         if paste {
-                            t.cursor = t.to_sheet(t.local(window.mouse_position()));
+                            t.cursor = at;
                         }
+                        t.menu_closed_at = Some(at);
                         act(t, window, cx);
                         // Live: a menu action that opens nothing leaves nothing selected (a view's Send to back, Show
                         // hidden lines; View properties keeps its view until it closes).
@@ -362,6 +370,9 @@ pub struct DrawingEditor {
     canvas_hovered: bool,
     cursor_sync: crate::cursor::CursorSync,
     pub hover: Option<u32>,
+    /// Where the pointer was when a menu row was clicked: what it then hovers reads lit until it moves (live2
+    /// drw-note-move-to-title-block s8).
+    pub menu_closed_at: Option<[f64; 2]>,
     /// The Projected view tool's parent is drawn picked: the view Insert view just placed (live 2068), until the tool
     /// places a view or ends.
     pub projection_parent_lit: bool,
@@ -378,6 +389,9 @@ pub struct DrawingEditor {
     /// Align views ▸ Vertically / Horizontally: (view to move, vertical)
     /// until the next click picks the view to align with.
     pub align_views: Option<(ViewId, bool)>,
+    /// Align views done: the view aligned, the one it was aligned with and the pointer then; both read lit until the
+    /// pointer moves or Esc (live2 drw-view-align-horizontally s4).
+    pub aligned: Option<(ViewId, ViewId, [f64; 2])>,
     /// Rotate view vertically / horizontally: (view, vertical) until the
     /// next click picks the straight edge to line up.
     pub rotate_to_edge: Option<(ViewId, bool)>,
@@ -728,6 +742,8 @@ impl DrawingEditor {
             canvas_hovered: false,
             cursor_sync: Default::default(),
             hover: None,
+            aligned: None,
+            menu_closed_at: None,
             projection_parent_lit: false,
             hover_snap: None,
             selection: Vec::new(),

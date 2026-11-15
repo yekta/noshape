@@ -48,7 +48,7 @@ pub fn ops() -> Vec<Op> {
     };
     let mut display = vec![
         opt("tangent_edges", json!({ "type": "string", "enum": TANGENTS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Tangent edges ▸ Hidden / Solid / Phantom."),
-        opt("orientation", s(), "View orientation ▸ (base views): front, back, top, bottom, left, right, isometric, or a named view of the source."),
+        opt("orientation", s(), "View orientation ▸: front, back, top, bottom, left, right, isometric, or (base views) a named view of the source. On a projected view its base turns so that this view shows it, the family following."),
     ];
     display.extend(SHOW_HIDE.iter().map(|(f, what, _)| opt(f, json!({ "type": "boolean" }), what)));
     vec![
@@ -187,12 +187,20 @@ fn view_display(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let v = view_of(&t, id);
     let axes = t.m.geoms.get(&id).is_some_and(|g| !g.axes.is_empty());
     // Every choice checked first, then one edit each, as in the editor.
-    let mut edits: Vec<(&'static str, Edit)> = Vec::new();
-    if let Some(name) = a.opt_str("orientation")? {
-        let ViewKind::Base { source, .. } = v.kind else { return Err(OpError::param("orientation", "base views only (View orientation ▸)")) };
+    let mut edits: Vec<(&'static str, ViewId, Edit)> = Vec::new();
+    // A projected view's: its base turned so that it shows the one picked, the family following.
+    if let Some(name) = a.opt_str("orientation")?.filter(|_| matches!(v.kind, ViewKind::Projected { .. })) {
+        let o = ORIENTATIONS.iter().find(|o| o.0 == name).map(|o| o.1).ok_or_else(|| OpError::param("orientation", &format!("one of {}", ORIENTATIONS.iter().map(|o| o.0).collect::<Vec<_>>().join(", "))))?;
+        if noshape_model::drawing::views::standard_orientation(&t.d, &t.d.sheets[t.sheet], id) == Some(o) {
+            return Err(OpError::param("orientation", &format!("the view already shows {name}")));
+        }
+        let (base, named, frame) = noshape_model::drawing::views::reoriented_base(&t.d, &t.d.sheets[t.sheet], id, o).ok_or_else(|| OpError::param("view", "a projected view of a base view"))?;
+        edits.push(("View orientation", base, Box::new(move |v| ve::set_base_frame(v, named, frame))));
+    } else if let Some(name) = a.opt_str("orientation")? {
+        let ViewKind::Base { source, .. } = v.kind else { return Err(OpError::param("orientation", "base and projected views only (View orientation ▸)")) };
         let doc = od.doc();
         match ORIENTATIONS.iter().find(|o| o.0 == name) {
-            Some(&(_, o)) => edits.push(("View orientation", Box::new(move |v| ve::set_standard_orientation(v, o)))),
+            Some(&(_, o)) => edits.push(("View orientation", id, Box::new(move |v| ve::set_standard_orientation(v, o)))),
             None => {
                 let frame = dr::named_view_frame(doc, source, name).ok_or_else(|| {
                     let mut names: Vec<String> = ORIENTATIONS.iter().map(|o| o.0.to_string()).collect();
@@ -203,6 +211,7 @@ fn view_display(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 let section = dr::named_view_section(doc, source, name);
                 edits.push((
                     "View orientation",
+                    id,
                     Box::new(move |v| {
                         v.custom_frame = Some(frame);
                         v.named_view = Some(n.clone());
@@ -214,7 +223,7 @@ fn view_display(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     if let Some(m) = a.opt_str("tangent_edges")? {
         let m = TANGENTS.iter().find(|x| x.0 == m).map(|x| x.1).ok_or_else(|| OpError::param("tangent_edges", "hidden, solid or phantom"))?;
-        edits.push(("Tangent edges", Box::new(move |v| m.apply(v))));
+        edits.push(("Tangent edges", id, Box::new(move |v| m.apply(v))));
     }
     for (field, _, desc) in SHOW_HIDE {
         let Some(on) = a.get(field).map(|x| x.as_bool().ok_or_else(|| OpError::param(field, "true (show) or false (hide)"))).transpose()? else { continue };
@@ -244,13 +253,13 @@ fn view_display(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             "bend_lines" => Box::new(move |v| v.hide_bend_lines = !on),
             _ => Box::new(move |v| v.hide_bend_notes = !on),
         };
-        edits.push((desc, edit));
+        edits.push((desc, id, edit));
     }
     if edits.is_empty() {
         return Err(OpError::invalid("nothing to change: give tangent_edges, orientation or a Show/hide field"));
     }
-    for (desc, f) in edits {
-        edit_view(&mut t, id, |v| f(v));
+    for (desc, at, f) in edits {
+        edit_view(&mut t, at, |v| f(v));
         commit(od, t.tab, t.sheet, t.d.clone(), desc)?;
     }
     Ok(reply(od, t.tab, t.sheet, false)?.into())

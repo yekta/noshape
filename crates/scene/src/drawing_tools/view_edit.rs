@@ -59,6 +59,13 @@ pub fn set_standard_orientation(v: &mut DrawingView, o: ViewOrientation) {
     }
 }
 
+/// A base view turned by a projected view's View orientation ▸ (`reoriented_base`): `o` names it, `frame` (when not
+/// `o`'s own) is its view frame.
+pub fn set_base_frame(v: &mut DrawingView, o: ViewOrientation, frame: Option<[[f64; 3]; 2]>) {
+    set_standard_orientation(v, o);
+    v.custom_frame = frame;
+}
+
 /// Default view name: the orientation of a base view or the standard
 /// orientation a projected view shows ("Right"), else the view type.
 pub fn default_view_name(drawing: &Drawing, sheet: &Sheet, v: &DrawingView) -> String {

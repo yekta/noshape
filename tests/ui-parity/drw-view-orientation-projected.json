@@ -1,0 +1,33 @@
+{
+  "name": "drw-view-orientation-projected",
+  "about": "Right's menu: View orientation ▸ Top turns the Front base so that Right shows Top, the family following",
+  "area": "studios",
+  "source": "live2 vo-probe 11-15",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Right"
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "View orientation"
+      },
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Top"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 4000
+    }
+  ]
+}

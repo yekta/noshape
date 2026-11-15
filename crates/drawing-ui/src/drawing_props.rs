@@ -214,6 +214,16 @@ impl DrawingEditor {
             }
         }
         out.push(MenuEntry::Submenu("Show/hide".into(), show));
+        // A projected view's View orientation ▸: the one it shows greyed, no checks; a pick turns its base so that it
+        // shows that one, the family following (live2 vo-probe 11-15).
+        if matches!(v.kind, ViewKind::Projected { .. }) {
+            let cur = views::standard_orientation(&self.drawing, sheet, id);
+            let entries = ORIENTATIONS
+                .iter()
+                .map(|&(o, name)| MenuEntry::item(name, move |t, _, cx| t.reorient_from(id, o, cx)).disabled(Some(o) == cur))
+                .collect();
+            out.push(MenuEntry::Submenu("View orientation".into(), entries));
+        }
         // View orientation ▸ (base views; the current one is checked).
         if let ViewKind::Base { orientation, source, .. } = &v.kind {
             let (cur, source) = (*orientation, *source);
@@ -495,6 +505,7 @@ impl DrawingEditor {
             Some(to) if target != Some(id) => {
                 self.edit_view("Align views", id, cx, |v| noshape_scene::drawing_tools::view_edit::align_view(v, to, vertical));
                 self.status = None;
+                self.aligned = target.map(|t| (id, t, self.cursor));
             }
             _ => self.status = Some("Align views cancelled".into()),
         }
@@ -1258,5 +1269,13 @@ impl DrawingEditor {
                 .child(v_flex().p(px(3.)).pb(px(6.)).children(rows))
                 .into_any_element(),
         )
+    }
+}
+
+impl DrawingEditor {
+    /// View orientation ▸ `o` on a projected view: its base turned so that it shows `o`, the family following.
+    pub(crate) fn reorient_from(&mut self, id: ViewId, o: ViewOrientation, cx: &mut Context<Self>) {
+        let Some((base, named, frame)) = views::reoriented_base(&self.drawing, self.current_sheet(), id, o) else { return };
+        self.edit_view("View orientation", base, cx, move |v| noshape_scene::drawing_tools::view_edit::set_base_frame(v, named, frame));
     }
 }

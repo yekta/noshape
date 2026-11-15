@@ -5230,7 +5230,7 @@ Examples:
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `view` | integer | required | View id (drawing_get). |
 | `tangent_edges` | one of `hidden`, `solid`, `phantom` |  | Tangent edges ▸ Hidden / Solid / Phantom. |
-| `orientation` | string |  | View orientation ▸ (base views): front, back, top, bottom, left, right, isometric, or a named view of the source. |
+| `orientation` | string |  | View orientation ▸: front, back, top, bottom, left, right, isometric, or (base views) a named view of the source. On a projected view its base turns so that this view shows it, the family following. |
 | `hidden_lines` | boolean |  | Show/Hide hidden lines |
 | `shaded` | boolean |  | Show/Hide shaded view |
 | `threads` | boolean |  | Show/Hide threads |

@@ -975,6 +975,31 @@ pub fn standard_orientation(drawing: &Drawing, sheet: &Sheet, id: ViewId) -> Opt
         .find(|o| orientation_frame(*o).dir.normalize().dot(dir) > 1.0 - 1e-9)
 }
 
+/// A projected view's View orientation ▸ `target`: its base view and the base's new orientation and frame (viewing
+/// direction, up) under which this view shows `target`; the family follows, still projected (live2 vo-probe: Right ›
+/// Top turns the Front base into Left, the old Top into Back).
+/// The frame is None when it is `o`'s own (a standard orientation, no custom frame).
+pub fn reoriented_base(drawing: &Drawing, sheet: &Sheet, id: ViewId, target: ViewOrientation) -> Option<(ViewId, ViewOrientation, Option<[[f64; 3]; 2]>)> {
+    let mut base = id;
+    for _ in 0..32 {
+        match &sheet.view(base)?.kind {
+            ViewKind::Projected { parent, .. } => base = *parent,
+            ViewKind::Base { .. } => break,
+            _ => return None,
+        }
+    }
+    let (b, p, t) = (view_frame(drawing, sheet, base)?, view_frame(drawing, sheet, id)?, orientation_frame(target));
+    // This view's axes in the base's (a fixed turn, whatever the base's frame), carried onto the target's.
+    let (bx, px, tx) = ([b.right, b.up, b.dir], [p.right, p.up, p.dir], [t.right, t.up, t.dir]);
+    let axis = |j: usize| (0..3).fold(DVec3::ZERO, |s, k| s + tx[k] * px[k].dot(bx[j]));
+    let (up, dir) = (axis(1), axis(2));
+    let named = [ViewOrientation::Front, ViewOrientation::Back, ViewOrientation::Top, ViewOrientation::Bottom, ViewOrientation::Left, ViewOrientation::Right, ViewOrientation::Isometric];
+    let o = named.into_iter().find(|o| orientation_frame(*o).dir.dot(dir.normalize()) > 1.0 - 1e-9).unwrap_or(ViewOrientation::Front);
+    let own = orientation_frame(o);
+    let standard = own.dir.dot(dir.normalize()) > 1.0 - 1e-9 && own.up.dot(up.normalize()) > 1.0 - 1e-9;
+    Some((base, o, (!standard).then(|| [dir.to_array(), up.to_array()])))
+}
+
 pub fn view_frame(drawing: &Drawing, sheet: &Sheet, id: ViewId) -> Option<ViewFrame> {
     view_frame_depth(drawing, sheet, id, 0)
 }

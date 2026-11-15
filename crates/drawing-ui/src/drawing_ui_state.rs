@@ -463,6 +463,25 @@ impl DrawingEditor {
                     selection.push(("EDGE".into(), self.ui_view_name(v.id)));
                 }
             }
+            // A view hovered under the pointer where a menu row was clicked: live lights it at once, its 11-15 reader
+            // reads it (live2 drw-note-move-to-title-block s8, drw-view-align-horizontally s4).
+            let hovered = self.hover.filter(|_| self.menu_closed_at == Some(self.cursor)).and_then(|h| match b.picks.get(h as usize) {
+                Some(PickTarget::View(v) | PickTarget::Edge { view: v, .. }) => Some(*v),
+                _ => None,
+            });
+            if let Some(v) = hovered {
+                selection.push(("EDGE+".into(), self.ui_view_name(v)));
+            }
+        }
+        // Align views: the view being aligned reads framed while the target is picked, and with the target (under
+        // the pointer) after, until the pointer moves; the 11-15 recorder reads them, older ones didn't (live2
+        // drw-view-align-horizontally s3-s4, drw-view-align-vertically).
+        if let Some((v, _)) = self.align_views {
+            selection.push(("VIEW+".into(), self.ui_view_name(v)));
+        }
+        if let Some((v, to, _)) = self.aligned.filter(|a| a.2 == self.cursor) {
+            selection.push(("VIEW+".into(), self.ui_view_name(v)));
+            selection.push(("EDGE+".into(), self.ui_view_name(to)));
         }
         // Nothing while the Edit hatch dialog is open (drw-section-hatch-edit, drw-hatch-edit).
         if self.hatch_dlg.is_some() {
@@ -470,8 +489,9 @@ impl DrawingEditor {
         }
         selection.sort();
         selection.dedup();
-        let lit: Vec<String> = selection.iter().filter(|(k, _)| k == "EDGE").map(|(_, o)| o.clone()).collect();
-        selection.retain(|(k, o)| k != "EDGE+" || !lit.contains(o));
+        // (A marked one goes when the same is read anyway.)
+        let plain: Vec<(String, String)> = selection.iter().filter(|(k, _)| !k.ends_with('+')).cloned().collect();
+        selection.retain(|(k, o)| k.strip_suffix('+').is_none_or(|k| !plain.iter().any(|p| p.0 == k && p.1 == *o)));
         let selection: Vec<Value> = selection
             .into_iter()
             .map(|(k, o)| match k.strip_suffix('+') {

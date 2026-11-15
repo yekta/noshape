@@ -95,6 +95,7 @@ impl DrawingEditor {
 
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
         self.projection_parent_lit = false;
+        self.aligned = None;
         // A hole table following the pointer after ✓: Esc leaves it there (live 2131).
         if self.hole_table_placing() {
             self.place_hole_table(cx);
@@ -2081,7 +2082,7 @@ impl DrawingEditor {
         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
         if !menu.read(cx).is_empty() {
             self.frame_menu = Some(menu.downgrade());
-            crate::drawing_view::open_drawing_menu(position, menu, window, cx);
+            crate::drawing_view::open_canvas_menu(position, menu, window, cx);
         }
         cx.notify();
     }
