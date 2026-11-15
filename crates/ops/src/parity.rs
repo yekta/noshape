@@ -4942,9 +4942,14 @@ impl<'a> Translator<'a> {
             let mut placed: Vec<String> = Vec::new();
             for n in order {
                 if let Some(v) = par(n) {
-                    match self.sketch_entities.get(&(oid.to_string(), v)) {
+                    match self.sketch_entities.get(&(oid.to_string(), v.clone())) {
                         Some(e) => entities.push(e.clone()),
-                        None => unmapped = true,
+                        None => {
+                            if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                                eprintln!("TRACE {ty} {}: {v} not translated", c["entityId"].as_str().unwrap_or(""));
+                            }
+                            unmapped = true;
+                        }
                     }
                     continue;
                 }
@@ -5055,7 +5060,11 @@ impl<'a> Translator<'a> {
         let [q] = queries.as_slice() else { return None };
         // A co-edge query (an edge as one face's boundary): the edge.
         let q = if q["edgeQuery"].is_object() { &q["edgeQuery"] } else { q };
-        match self.query(k, q) {
+        let r = self.query(k, q);
+        if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() && !matches!(&r, Ok(ids) if ids.len() == 1) {
+            eprintln!("TRACE external {}: {:?}", p["parameterId"].as_str().unwrap_or(""), r.as_ref().map(|ids| ids.len()));
+        }
+        match r {
             Ok(ids) if ids.len() == 1 => ids.into_iter().next(),
             _ => None,
         }
