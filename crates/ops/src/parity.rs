@@ -5006,6 +5006,8 @@ impl<'a> Translator<'a> {
             // two model vertices, cf-sheet-metal-hem's derived Sketch 3 centring its circle), in the slots' order.
             let param = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned();
             let mut placed: Vec<String> = Vec::new();
+            // Model references given as co-edge queries (an edge as a face's boundary): where they are in `entities`.
+            let mut co_edges: Vec<(usize, Value)> = Vec::new();
             // A Concentric between two points (an arc's centre and a line's end, learning-center-frank's Skizze 1): live
             // names a circle by its centre; ours takes the circle, whose centre then lies on the point.
             let points_only = ty == "CONCENTRIC" && c["parameters"].as_array().into_iter().flatten().all(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("local")) && p["value"].as_str().is_some_and(|v| v.contains('.')));
@@ -5030,14 +5032,24 @@ impl<'a> Translator<'a> {
                 if let Some(p) = param(&ext).filter(|p| p["queries"].as_array().is_some_and(|q| !q.is_empty())) {
                     placed.push(ext);
                     match self.external_ref(k, c["entityId"].as_str().unwrap_or(""), &p) {
-                        Some(e) => entities.push(e),
+                        Some(e) => {
+                            if p["queries"][0]["faceQuery"].is_object() {
+                                co_edges.push((entities.len(), p.clone()));
+                            }
+                            entities.push(e)
+                        }
                         None => external = true,
                     }
                 }
             }
             for p in c["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external") && !placed.iter().any(|x| x == n))) {
                 match self.external_ref(k, c["entityId"].as_str().unwrap_or(""), p) {
-                    Some(e) => entities.push(e),
+                    Some(e) => {
+                        if p["queries"][0]["faceQuery"].is_object() {
+                            co_edges.push((entities.len(), p.clone()));
+                        }
+                        entities.push(e)
+                    }
                     None => external = true,
                 }
             }
@@ -5101,6 +5113,20 @@ impl<'a> Translator<'a> {
                 None
             } else {
                 let r = self.call("sketch_constrain", json!({ "sketch": id, "constraint": ours, "entities": entities }));
+                // A Concentric to a co-edge whose edge isn't round (c2-hunting-knife's Sketch 17: a near-circle
+                // spline on a cylinder about the sketch's normal): with the face, whose outline is the circle.
+                let r = match r {
+                    Err(_) if ty == "CONCENTRIC" && !co_edges.is_empty() => {
+                        let mut with_faces = entities.clone();
+                        for (i, p) in &co_edges {
+                            if let Some(f) = self.external_face_ref(k, c["entityId"].as_str().unwrap_or(""), p) {
+                                with_faces[*i] = f;
+                            }
+                        }
+                        self.call("sketch_constrain", json!({ "sketch": id, "constraint": ours, "entities": with_faces }))
+                    }
+                    r => r,
+                };
                 if let Err(e) = &r
                     && std::env::var_os("NOSHAPE_PARITY_TRACE").is_some()
                 {
@@ -5158,6 +5184,22 @@ impl<'a> Translator<'a> {
         }
         if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() && !matches!(&r, Ok(ids) if ids.len() == 1) {
             eprintln!("TRACE external {}: {:?}", p["parameterId"].as_str().unwrap_or(""), r.as_ref().map(|ids| ids.len()));
+        }
+        match r {
+            Ok(ids) if ids.len() == 1 => ids.into_iter().next(),
+            _ => None,
+        }
+    }
+
+    /// A co-edge model reference's face (`faceQuery`), as [`Self::external_ref`] takes its edge.
+    fn external_face_ref(&mut self, k: usize, cid: &str, p: &Value) -> Option<String> {
+        let q = p["queries"].as_array().and_then(|q| q.first())?["faceQuery"].clone();
+        let name = p["parameterId"].as_str().unwrap_or("");
+        let mut r = self.query(k, &q);
+        if !matches!(&r, Ok(ids) if ids.len() == 1)
+            && let [id] = self.refs.iter().filter(|((j, _), l)| *j == k && l.constraints.iter().any(|(c, n)| c == cid && *n == format!("{name}.faceQuery"))).map(|((_, id), _)| id.clone()).collect::<Vec<_>>().as_slice()
+        {
+            r = self.query(k, &json!({ "btType": q["btType"], "deterministicIds": [id] }));
         }
         match r {
             Ok(ids) if ids.len() == 1 => ids.into_iter().next(),
