@@ -7219,6 +7219,9 @@ pub struct AssemblyResult {
     /// quantity, part number, description, material).
     pub bom_rows: usize,
     pub bom_matching: usize,
+    /// Live's own failures ours doesn't copy (docs/DECISIONS.md 11-15), counted as live: a mate whose connectors live
+    /// leaves unresolved (`mate-messages.json` `redFields`) that ours solves.
+    pub live_defects: Vec<String>,
     /// Differences, first one first.
     pub differences: Vec<String>,
     /// What wasn't translated, with the reason.
@@ -8550,8 +8553,15 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         // (An inactive mate, an instance of it suppressed, is ERROR in live's capture: asm-config-assembly, live 2580.)
         let inactive = m["message"].as_str().is_some_and(|t| t.contains("instances is suppressed"));
         let ok = m["ok"] == true && !inactive;
+        // Live can't resolve its connectors or instances (its tooltip's message, or the dialog's red entries).
+        let live_msg = &asm["liveMateMessages"][id.as_str()];
+        let red: Vec<&str> = live_msg["redFields"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
+        let unresolved = live_msg["message"].as_str().filter(|t| ["Mate cannot resolve mate connectors.", "Failed to resolve the instance for mate."].contains(t)).map(str::to_string).or_else(|| (!red.is_empty()).then(|| format!("{} unresolved", red.join(", "))));
         if ok == live_ok {
             res.mates_matching += 1;
+        } else if let Some(why) = unresolved.filter(|_| ok) {
+            res.mates_matching += 1;
+            res.live_defects.push(format!("{name}: live ERROR ({why}), ours solves it"));
         } else {
             let ends = mate_ends_off(&mut *placer.ctx, root, name).map(|e| format!("; {e}")).unwrap_or_default();
             res.differences.push(format!("{name}: {}, live {}{ends}", if ok { "OK".to_string() } else { format!("error ({})", m["message"].as_str().unwrap_or("")) }, states[id.as_str()]["featureStatus"].as_str().unwrap_or("?")));

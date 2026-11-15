@@ -2783,6 +2783,10 @@ fn parity_assemblies() {
         if let Some(bom) = read(&dir.join("bom.json")) {
             asm["liveBom"] = bom;
         }
+        // Live's mate messages and unresolved connectors (live / live2 11-15: `mate-messages.json`).
+        if let Some(m) = read(&dir.join("mate-messages.json")) {
+            asm["liveMateMessages"] = m;
+        }
         // Studios no instance uses whose sketch a Frame elsewhere takes as its profile: built too, with no parts.
         let profile_sources: std::collections::HashSet<String> = std::fs::read_dir(dir.join("studios"))
             .into_iter()
@@ -2916,6 +2920,9 @@ fn parity_assemblies() {
         for u in &r.untranslated {
             println!("  untranslated: {u}");
         }
+        for d in &r.live_defects {
+            println!("  live defect: {d}");
+        }
     }
     println!("assemblies: {matching}/{docs} as live, occurrences {occurrences_matching}/{occurrences}, mates {mates_matching}/{mates}, BOM rows {bom_matching}/{bom_rows}");
 }
@@ -2968,6 +2975,18 @@ fn an_assembly_is_rebuilt_as_lives() {
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-bom3.noshape"), &with_bom, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
     assert_eq!((r.bom_matching, r.bom_rows), (0, 1), "{r:?}");
     assert!(r.differences.iter().any(|d| d.starts_with("BOM row 1 ")), "{r:?}");
+    // Live's Revolute in error with its connectors unresolved (red in its dialog, or its tooltip's message), ours
+    // solving it: a live defect, counted as live (docs/DECISIONS.md 11-15); without either a difference.
+    let mut defect = asm.clone();
+    defect["features"]["featureStates"]["M1"]["featureStatus"] = json!("ERROR");
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-defect0.noshape"), &defect, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert_eq!((r.mates_matching, r.live_defects.len()), (0, 0), "{r:?}");
+    defect["liveMateMessages"] = json!({ "M1": { "name": "Revolute 1", "status": "ERROR", "message": null, "redFields": ["Mate connector of Part 1 <2>"] } });
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-defect.noshape"), &defect, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert_eq!((r.mates_matching, r.mates, r.live_defects.len()), (1, 1, 1), "{r:?}");
+    defect["liveMateMessages"] = json!({ "M1": { "name": "Revolute 1", "status": "ERROR", "message": "Mate cannot resolve mate connectors." } });
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-defect2.noshape"), &defect, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert_eq!((r.mates_matching, r.live_defects.len()), (1, 1), "{r:?}");
     // A place the Revolute doesn't allow: freed there, ours solves it back
     // onto the mate, 10 mm.
     let mut off = asm.clone();
