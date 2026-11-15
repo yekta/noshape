@@ -22,11 +22,13 @@ pub struct TabThumbs {
     /// switcher asks for several at once), made in turn.
     queued: Vec<TabId>,
     evaluator: Arc<parking_lot::Mutex<noshape_model::assembly::eval::AssemblyEvaluator>>,
+    /// Part Studios not open in a view (incremental across pictures).
+    regen: Arc<parking_lot::Mutex<noshape_model::regen::Regenerator>>,
 }
 
 impl TabThumbs {
     pub fn new(doc: Entity<DocModel>) -> Self {
-        Self { doc, images: HashMap::new(), made_for: HashMap::new(), busy: false, queued: Vec::new(), evaluator: Default::default() }
+        Self { doc, images: HashMap::new(), made_for: HashMap::new(), busy: false, queued: Vec::new(), evaluator: Default::default(), regen: Default::default() }
     }
 
     /// The tab's picture: `None` while it is being made, `Some(None)` when
@@ -68,35 +70,70 @@ impl TabThumbs {
         let versions = self.doc.read(cx).session.pinned_documents();
         let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
         let evaluator = self.evaluator.clone();
+        // A Part Studio: the open view's display, else regenerated here with coarse meshes (enough for the card),
+        // stopped when a view of the document regenerates (qa's dock: the hovered tab's picture, regenerated with
+        // fine meshes, ran beside the clicked tab's opening and doubled it).
+        let studio = match &t.content {
+            TabContent::PartStudio(ps) => {
+                let path = self.doc.read(cx).session.path.clone();
+                let doc_vars = noshape_model::variables::element_variables(&doc, tab);
+                match crate::start_thumbnail::shown_display(&path, tab, ps, &doc_vars, cx) {
+                    Some(d) => Some(Ok(d)),
+                    None => {
+                        let cancel = noshape_model::regen::RegenCancel::default();
+                        let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
+                        let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features_lazy();
+                        let opts = noshape_model::regen::RegenOptions { document_variables: doc_vars, preview_meshes: true, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel.clone()), ..Default::default() };
+                        crate::start_thumbnail::picture_job_started(&path, cancel, cx);
+                        Some(Err((self.regen.clone(), opts)))
+                    }
+                }
+            }
+            _ => None,
+        };
         cx.spawn(async move |this, cx| {
             let picture = cx
                 .background_spawn(async move {
-                    let t = doc.tab(tab)?;
+                    // `None`: stopped (made again later); `Some(None)`: nothing to draw.
+                    let Some(t) = doc.tab(tab) else { return Some(None) };
                     if let TabContent::Drawing(d) = &t.content {
-                        return crate::tab_manager::drawing_thumbnail(&doc, &versions, d, t.name.clone());
+                        return Some(crate::tab_manager::drawing_thumbnail(&doc, &versions, d, t.name.clone()));
                     }
-                    let scene = match &t.content {
-                        TabContent::Assembly(a) => {
+                    let scene = match (&t.content, studio) {
+                        (TabContent::Assembly(a), _) => {
                             let result = evaluator.lock().evaluate(&doc, a, &Default::default(), None);
                             crate::assembly_scene::build(&result, &Default::default(), &mut Default::default(), gpu.uploader()).scene
                         }
-                        _ => {
-                            let result = evaluator.lock().studio(&doc, tab, &Default::default())?;
+                        (TabContent::PartStudio(ps), Some(made)) => {
+                            let display = match made {
+                                Ok(d) => d,
+                                Err((regen, opts)) => {
+                                    let r = regen.lock().regenerate(ps, &ps.configuration.defaults(), &doc.settings.units, &opts);
+                                    if r.cancelled {
+                                        return None;
+                                    }
+                                    Arc::new(r.display)
+                                }
+                            };
                             let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: false, show_origin: false, ..Default::default() };
-                            crate::scene_builder::build(&result.display, &opts, &mut Default::default(), gpu.uploader()).scene
+                            crate::scene_builder::build(&display, &opts, &mut Default::default(), gpu.uploader()).scene
                         }
+                        _ => return Some(None),
                     };
-                    let (lo, hi) = scene.bounds()?;
+                    let Some((lo, hi)) = scene.bounds() else { return Some(None) };
                     let (w, h) = CARD_PICTURE;
                     let camera = crate::start_thumbnail::fit_camera(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64);
-                    let png = gpu.render_png(Arc::new(scene), camera, crate::start_thumbnail::thumbnail_style(), w, h).await.ok()?;
-                    crate::tab_manager::decode(&png)
+                    let Ok(png) = gpu.render_png(Arc::new(scene), camera, crate::start_thumbnail::thumbnail_style(), w, h).await else { return Some(None) };
+                    Some(crate::tab_manager::decode(&png))
                 })
                 .await;
             let _ = this.update(cx, |this: &mut Self, cx| {
                 this.busy = false;
-                this.made_for.insert(tab, hash);
-                this.images.insert(tab, picture);
+                // Stopped for a view's regeneration: made again at the next hover.
+                if let Some(picture) = picture {
+                    this.made_for.insert(tab, hash);
+                    this.images.insert(tab, picture);
+                }
                 // The next queued tab that needs a picture (an unchanged one
                 // or one without any returns at once).
                 while !this.busy && !this.queued.is_empty() {

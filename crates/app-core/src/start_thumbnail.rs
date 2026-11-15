@@ -58,6 +58,26 @@ struct ThumbnailJobs(HashMap<PathBuf, RegenCancel>);
 
 impl Global for ThumbnailJobs {}
 
+/// Other pictures' regenerations of a document's studios while they run (a tab's hover card): a view's regeneration
+/// stops them too.
+#[derive(Default)]
+struct PictureJobs(HashMap<PathBuf, Vec<RegenCancel>>);
+
+impl Global for PictureJobs {}
+
+/// A picture of a studio of `path` started regenerating it: `cancel` stops when a view of the document regenerates.
+pub fn picture_job_started(path: &Path, cancel: RegenCancel, cx: &mut App) {
+    cx.default_global::<PictureJobs>().0.entry(path.to_path_buf()).or_default().push(cancel);
+}
+
+/// The open view's display of `studio` (its head, these document variables), if it shows one.
+pub fn shown_display(path: &Path, tab: TabId, studio: &PartStudio, doc_vars: &BTreeMap<String, Quantity>, cx: &App) -> Option<Arc<StudioDisplay>> {
+    match source(cx, path, tab, studio, doc_vars) {
+        Source::Shown(d) => Some(d),
+        Source::Wait | Source::Regenerate => None,
+    }
+}
+
 /// A thumbnail regeneration stopped by the user's own work: nothing is stored, it runs again later.
 #[derive(Debug)]
 struct Cancelled;
@@ -80,6 +100,11 @@ pub fn regen_started(path: &Path, tab: TabId, cx: &mut App) {
         job.abort();
         if noshape_render::perf::enabled() {
             log::info!(target: "perf", "thumbnail: stopped, tab {} regenerates in its view", tab.0);
+        }
+    }
+    if cx.has_global::<PictureJobs>() {
+        for job in cx.global_mut::<PictureJobs>().0.remove(path).unwrap_or_default() {
+            job.abort();
         }
     }
 }
