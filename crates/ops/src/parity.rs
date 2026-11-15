@@ -249,6 +249,15 @@ fn doc_units(u: &Value) -> (Option<&'static str>, Option<&'static str>) {
     (l, a)
 }
 
+/// The lines of `refs.jsonl` for the configuration a studio is built in (`configuration`: an instance's encoded
+/// configuration, as live evaluated each one: asm-config-assembly's nut at #12-24 and #10-32), and those for any.
+pub fn refs_in_configuration(text: &str, configuration: Option<&str>) -> String {
+    text.lines()
+        .filter(|l| serde_json::from_str::<Value>(l).ok().is_none_or(|v| v["configuration"].as_str().is_none_or(|c| Some(c) == configuration)))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Parses `refs.jsonl` (one referenced id per line, see the module docs).
 pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
     let mut out: HashMap<(usize, String), LiveRef> = HashMap::new();
@@ -7725,6 +7734,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     // Each studio's features, live's id → ours (its Mate connector features, which an assembly's mates use).
     let mut studio_features: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut part_names: HashMap<(String, String), String> = HashMap::new();
+    // Our body id of each (element, live part id): an instance inserts it by id, since a configured part's name may
+    // change with its configuration (asm-config-assembly's nut, named per size by its custDesc feature).
+    let mut part_bodies: HashMap<(String, String), String> = HashMap::new();
     let mut entities: HashMap<Key, String> = HashMap::new();
     // A LOOP_CENTER connector's loop: an edge of it (the connector's entity is its face).
     let mut loops: HashMap<Key, String> = HashMap::new();
@@ -7753,7 +7765,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let mut studio = studio.clone();
         // A studio fetched without its configuration whose instances carry variables (standard content's #Pitch…):
         // its configuration variables from the first instance's values (asm 11-07).
-        let first_config = levels.iter().flat_map(|l| l.instances.iter()).filter(|i| i["elementId"] == element.as_str()).map(|i| instance_config_values(i)).find(|v| !v.is_empty());
+        let first = levels.iter().flat_map(|l| l.instances.iter()).filter(|i| i["elementId"] == element.as_str()).find(|i| !instance_config_values(i).is_empty());
+        let first_config = first.map(|i| instance_config_values(i));
+        let first_encoded = first.and_then(|i| i["configuration"].as_str()).map(str::to_string);
         if studio["configuration"].is_null()
             && let Some(vars) = first_config
         {
@@ -7805,7 +7819,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         // Live's per-feature geometry (the studio's `live` lines, `<element>.live.jsonl`) for its id-only queries.
         let mut refs = studio["live"].as_array().map(|lines| refs_from_bodies(lines)).unwrap_or_default();
         // Live's evaluated references (`<element>.refs.jsonl`, as a model's refs.jsonl) win over them.
-        refs.extend(parse_refs(studio["refs"].as_str().unwrap_or_default()));
+        refs.extend(parse_refs(&refs_in_configuration(studio["refs"].as_str().unwrap_or_default(), first_encoded.as_deref())));
         // Its sketches' bodies at the final state (live 2267, `<element>.sketches.json`): their regions, edges and
         // points, under live's own lines.
         let features = studio["features"].as_array().map(Vec::as_slice).unwrap_or_default();
@@ -7942,6 +7956,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         }
         for (p, ours) in listed.iter().zip(chosen) {
             if let (Some(pid), Some(ours)) = (p["partId"].as_str(), ours) {
+                if let Some((.., id)) = solids.iter().find(|(n, _, id)| *n == ours || *id == ours) {
+                    part_bodies.insert((element.clone(), pid.to_string()), id.clone());
+                }
                 part_names.insert((element.clone(), pid.to_string()), ours);
             }
         }
@@ -8172,7 +8189,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
             trace(&format!("insert {}: {args}", i["name"]));
             if i["type"] == "Part" {
-                match i["partId"].as_str().and_then(|p| part_names.get(&(element.to_string(), p.to_string()))) {
+                let key = i["partId"].as_str().map(|p| (element.to_string(), p.to_string()));
+                match key.and_then(|k| part_bodies.get(&k).or_else(|| part_names.get(&k))) {
                     Some(n) => args["part"] = json!(n),
                     None => {
                         res.untranslated.push(format!("instance {}: part {} not in its Part Studio's parts list", i["name"], i["partId"]));
@@ -8657,6 +8675,21 @@ mod tests {
         assert!(connector_params(&mc(json!([p("transform", json!(false)), e("translationX", "20 mm"), p("flipPrimary", json!(false)), p("secondaryAxisType", json!("PLUS_X"))]))).is_none());
         let axis = json!({ "parameterId": "primaryAxisQuery", "queries": [{ "deterministicIds": ["LFRfa"] }] });
         assert!(connector_params(&mc(json!([p("realign", json!(true)), axis, p("flipPrimary", json!(true))]))).is_none(), "realigned");
+    }
+
+    /// A configured studio's refs lines (live evaluated each id once per configuration its instances use): those of the
+    /// configuration it is built in, and those for any.
+    #[test]
+    fn a_studios_refs_are_those_of_its_configuration() {
+        let text = [json!({ "index": 2, "id": "JHs", "point": [0.0, 0.0, 0.002], "configuration": "A" }), json!({ "index": 2, "id": "JHs", "point": [0.0, 0.0, 0.0024], "configuration": "B" }), json!({ "index": 0, "id": "IB", "point": [0.0, 0.0, 0.0] })]
+            .iter()
+            .map(Value::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        let refs = parse_refs(&refs_in_configuration(&text, Some("B")));
+        assert_eq!(refs.len(), 2);
+        assert_eq!(refs[&(2, "JHs".to_string())].point, Some([0.0, 0.0, 0.0024]));
+        assert_eq!(parse_refs(&refs_in_configuration(&text, None)).len(), 1, "no configuration: only the lines for any");
     }
 
     /// Live's in-context face from its context.jsonl lines, its edges in any order and sense: a line, a half circle by
