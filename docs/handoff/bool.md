@@ -348,6 +348,16 @@ Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS le
     a circle round from its one vertex 1.2e-7 of a turn short. Now a whole turn where the shortfall is within the
     vertex's tolerance (943e3c90d): 1.49 -> 0.5 s, 0.47 -> 0.1 s, OCCT's counts, volumes 1.4e-8 apart (GProp's own
     variance bound there 3.5e-10 m³, 270x that).
+  - Exact face boxes (ExactBoxes: apart_across_slab / resting_on_plane, OCCT's PSO on offset faces) kept on the face's
+    OcShape (myExactBoxes), so a chain of Booleans on one part finds each once: the seat fuse 1.09 -> 0.96 s (18703bac3).
+  - free::ray_hits on NURBS faces of several spans (and extrusions): Newton only from the Bézier pieces (each span
+    halved twice, control-point boxes, the piece path's clear-of test) the ray meets, where the grid's grown boxes
+    let it meet ~45 a ray (472bb861e): c2-helical-sweep's cut 2695 -> 136 patches met, 35k -> 3.9k Newton steps,
+    best 149 -> 82 ms. Capped at 256 pieces a face (the grid past that): cf-surface-pattern's base surface with 4096
+    ran 9 starts a piece and lost 8 %; with the cap level.
+  - Not done: c2-impeller-loft's Extrude 4 fuse (f10ce62e, 0.5-0.7 s): extrusion x B-spline sections 340 ms each in
+    OCCT, a third of it IntTools_TopolTool::SamplePnts (per pair); Extrude Flansch's fuse (e05c4cf9, 0.23 s) declines
+    "a shared shape OCCT may keep or remake".
   - Left: chamfer 26's own cut (f37371b8, OCCT 0.9 s) declines "a piece's point on another solid's face": the run-on
     tail lies along the strip's tolerant B-spline face (8.5 µm). Delete face 2 (core's OCCT defeaturing) is 17-26 s on
     the chamfered body (was 4-7 s); told core and the lead (decision needed). Recordings vibe6
