@@ -628,12 +628,12 @@ impl MetaForm {
         self.changed(cx);
     }
 
-    /// Reset all is enabled: some value isn't the one it would restore (live dk-999, part-studio/1840; several parts: a
-    /// part has an edited property, q2962).
-    fn can_reset(&self, cx: &App) -> bool {
+    /// Reset all is enabled: a part has a saved edited property (q2962); typing alone doesn't enable it (live
+    /// part-properties-typed-reset-all: "P-100" stays).
+    fn can_reset(&self) -> bool {
         match &self.multi {
             Some(m) => m.reset || m.shown.iter().any(|&i| m.values.get(i) != m.reset_to.get(i)),
-            None => self.reset_to.as_ref().is_some_and(|r| *r != self.values(cx)),
+            None => self.reset_to.as_ref().is_some_and(|r| *r != self.saved),
         }
     }
 
@@ -919,7 +919,7 @@ impl MetaForm {
             let mut disabled: Vec<&str> = [(self.at == 0, ""), (self.at + 1 >= self.history.len(), "")].into_iter().filter(|(off, _)| *off).map(|(_, b)| b).collect();
             if self.reset_to.is_some() {
                 buttons.push("Reset all");
-                if !self.can_reset(cx) {
+                if !self.can_reset() {
                     disabled.push("Reset all");
                 }
             }
@@ -1005,6 +1005,7 @@ fn check_row_mixed(id: impl Into<ElementId>, text: impl Into<SharedString>, on: 
 pub fn footer_button(id: &'static str, text: &'static str, primary: bool, enabled: bool) -> Stateful<Div> {
     div()
         .id(id)
+        .debug_selector(move || id.to_string())
         .map(|d| crate::ui_script::mark(d, || format!("button:{text}")))
         .h(px(34.))
         .px(px(10.5))
@@ -1398,8 +1399,8 @@ impl Render for MetaForm {
                             .child(undo_button("meta-redo", "redo", "Redo", can_redo).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.undo(true, window, cx))))
                             .when(self.reset_to.is_some(), |d| {
                                 // Live (dk-999, part-studio/1840): disabled while
-                                // every value is the one it would restore.
-                                let can_reset = self.can_reset(cx);
+                                // every saved value is the one it would restore.
+                                let can_reset = self.can_reset();
                                 d.child(
                                     footer_button("meta-reset", "Reset all", true, can_reset)
                                         .tooltip(crate::ui::tooltip("Reset all properties"))

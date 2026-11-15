@@ -813,3 +813,30 @@ fn several_parts_share_one_properties_dialog(cx: &mut TestAppContext) {
     cx.update_window(l.window, |_, w, cx| form.update(cx, |f, cx| f.press_row(1, Modifiers::secondary_key(), w, cx))).unwrap();
     assert_eq!(cx.update(|cx| form.read(cx).header()), "2 selected");
 }
+
+/// A part's Properties: Reset all goes by the saved values, so a Part number only typed stays (live
+/// part-properties-typed-reset-all: "P-100" kept); one saved is reset.
+#[gpui::test]
+fn reset_all_resets_saved_properties_not_typing(cx: &mut TestAppContext) {
+    let l = studio(cx, "reset-props", 1.0);
+    let open = |cx: &mut TestAppContext| {
+        l.right_click(cx, "part:Part 1");
+        let at = l.bounds(cx, "menu:Properties…").expect("Properties… in the menu").center();
+        l.press(cx, at, MouseButton::Left, NONE, 1);
+        draw(cx, l.window);
+        crate::properties_dialog::open_form().expect("the Properties modal")
+    };
+    let pn = |cx: &mut TestAppContext, f: &Entity<crate::properties_dialog::MetaForm>| cx.update(|cx| f.read(cx).values(cx).part_number);
+    let form = open(cx);
+    cx.update_window(l.window, |_, w, cx| form.update(cx, |f, cx| f.focus_field("Part number", w, cx))).unwrap();
+    gpui_kit::VisualTestContext::from_window(l.window, cx).simulate_input("P-100");
+    draw(cx, l.window);
+    l.click(cx, "meta-reset", NONE);
+    assert_eq!(pn(cx, &form), "P-100", "typing alone doesn't enable Reset all");
+    cx.update_window(l.window, |_, w, cx| form.update(cx, |f, cx| f.press_save(true, w, cx))).unwrap();
+    draw(cx, l.window);
+    let form = open(cx);
+    assert_eq!(pn(cx, &form), "P-100", "saved");
+    l.click(cx, "meta-reset", NONE);
+    assert_eq!(pn(cx, &form), "", "a saved Part number is reset");
+}
