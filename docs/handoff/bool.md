@@ -340,6 +340,27 @@ The suite's per-feature kernel profiles count its own measuring (props_surface v
 Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **11-15 08:30 UTC, speed rows (qa / lead) and the gate's grooves; stack 65a2dc4e2..bfb5b2910 gating on vibe5:**
+  - Gate45 failed two knurl tests (grooves_crossing_just_above_the_end / _37_um_): the segmented volume check in
+    merge_cylinder_groups (742a166f5) merged pieces OCCT's GProp keeps apart. Now opt-in (c8319d982): only
+    op_unify_precise (`unify_same_domain_precise`, rim_chamfer_cut's unify) sets it. The chamfer test checks the merge
+    (input + 3 faces, live's 30 -> 33: our input has one face more than live after Boolean 1, upstream).
+  - c2-helical-sweep (bedaeda88, seam_first): the long cylinder's section at once, 96 -> 78 ms.
+  - cf-surface-pattern d6500b16 (baa0daad4, sphere_sections): two spheres' exact circle, cut at either's seam (one
+    piece a turn round where it rounds a pole), pcurves projected to 1e-7 and moved into the face's turn; OCCT's where
+    the circle comes within 10 µm of a seam's plane or a face's latitude bounds (the Boolean calls such a pass a touch:
+    a 2.3 µm one in d6500b16), or the face isn't a whole turn. ~0.7 s CPU less a cut (same binary, toggled), the
+    volume nearer OCCT's than the recorded one (T1 balls_cut_from_a_ball_off_its_axis). Left there (DBG_AHEAD,
+    /root/bool2-scratch/dbg-ahead.patch): sphere x B-spline 272 pairs, 178 real sections at ~9 ms each (1.7 s CPU; the
+    lever is our own marcher), 94 empty at ~2 ms; sphere x offset 85 empty pairs, 0.26 s (bool's offset work).
+  - c2-impeller-loft's Extrude Bohrungssitz Ansaugflansch (qa, 1271 ms): (1) its checked-glue fuse of nine seats
+    declines the plain fuse ("pattern instances overlapping") and goes to rust_fuse_trimmed, which converted the part
+    once per seat: now the plain fuse's converted shapes are reused (8904a17f8), 2.42 -> 1.45 s at load 30. (2) Its
+    unify: merge_cylinder_bands integrated and BRepCheck'd the whole shape twice per candidate pair; now only the faces
+    it changed (their shares after less before, one GProp call) and the shells (BRepCheck_Shell / _Solid)
+    (bfb5b2910): 1070 -> 100 ms, the same 72 faces. Recording: vibe5/vibe6 ~/agents/bool2-keep/imp46; probes
+    xprobe probe_case_repeat / probe_case_unify_sample, bin/callers.py (a frame's callers from a sampler profile).
+  - qa's c2-valve-config / c2-helical-sweep rows are cb65f775a / bedaeda88 above.
 - **11-15 06:25 UTC, the impeller's chamfer 26 and two speed rows:**
   - Chamfer Stevenrohr Halterung (OCCT's chamfer fails on the stern tube end's two 0.3117 mm spline edges): new
     fallback (crates/kernel/src/rim_chamfer.rs, blend_section::rim_chamfer_cut, after OCCT's retry in detail.rs's
