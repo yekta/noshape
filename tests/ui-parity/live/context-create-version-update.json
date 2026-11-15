@@ -1,19 +1,23 @@
 {
  "scenario": "context-create-version-update",
- "recorded": "2026-11-13T06:27:24.689Z",
+ "recorded": "2026-11-15T13:33:46.619Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.2"
  },
  "live": {
-  "document": "20445c8993b348a528efd58c",
-  "workspace": "0f4b9a4c22a906c163a23cc3",
-  "element": "f9778469c60d2f4b5c6b86a3",
+  "document": "4f4f72ec9e2e98181e2f64f2",
+  "workspace": "17de099dad65424ad6b61e91",
+  "element": "7b93efef7ebf4bf689230c56",
   "start": "doc-linked",
-  "startElement": "f9778469c60d2f4b5c6b86a3",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "7b93efef7ebf4bf689230c56",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -83,9 +87,9 @@
     -116.913,
     77.942
    ],
-   "width_mm": 460.686,
+   "width_mm": 419.494,
    "height_mm": 243.974,
-   "mmPerPixel": 0.275365,
+   "mmPerPixel": 0.250744,
    "orthographic": true
   },
   "measure": null,
@@ -125,7 +129,7 @@
    "ok": true,
    "at": [
     381,
-    976
+    1063
    ],
    "state": {
     "focus": {
@@ -210,9 +214,9 @@
       -7.946,
       20.297
      ],
-     "width_mm": 62.753,
+     "width_mm": 57.142,
      "height_mm": 33.233,
-     "mmPerPixel": 0.037509,
+     "mmPerPixel": 0.034155,
      "orthographic": true
     },
     "measure": null,
@@ -240,7 +244,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 27841
+   "t": 29052
   },
   {
    "step": 2,
@@ -286,7 +290,8 @@
       "Open linked document",
       "Pin reference",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 1…",
@@ -372,9 +377,9 @@
       -7.946,
       20.297
      ],
-     "width_mm": 62.753,
+     "width_mm": 57.142,
      "height_mm": 33.233,
-     "mmPerPixel": 0.037509,
+     "mmPerPixel": 0.034155,
      "orthographic": true
     },
     "measure": null,
@@ -402,7 +407,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 31354
+   "t": 31768
   },
   {
    "step": 3,
@@ -477,9 +482,10 @@
      "rollbackAfter": "Extrude 2"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
@@ -509,9 +515,9 @@
       -101.981,
       82.987
      ],
-     "width_mm": 62.753,
+     "width_mm": 57.142,
      "height_mm": 33.233,
-     "mmPerPixel": 0.037509,
+     "mmPerPixel": 0.034155,
      "orthographic": true
     },
     "measure": null,
@@ -539,7 +545,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 50537
+   "t": 51495
   },
   {
    "step": 4,
@@ -608,9 +614,10 @@
      "rollbackAfter": "Extrude 2"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
@@ -640,9 +647,9 @@
       -101.981,
       82.987
      ],
-     "width_mm": 62.753,
+     "width_mm": 57.142,
      "height_mm": 33.233,
-     "mmPerPixel": 0.037509,
+     "mmPerPixel": 0.034155,
      "orthographic": true
     },
     "measure": null,
@@ -670,7 +677,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 65113
+   "t": 65697
   },
   {
    "step": 5,
@@ -768,9 +775,9 @@
       -7.946,
       20.297
      ],
-     "width_mm": 62.753,
+     "width_mm": 57.142,
      "height_mm": 33.233,
-     "mmPerPixel": 0.037509,
+     "mmPerPixel": 0.034155,
      "orthographic": true
     },
     "measure": null,
@@ -798,7 +805,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 71367
+   "t": 71393
   },
   {
    "step": 6,
@@ -890,9 +897,9 @@
       -7.946,
       20.297
      ],
-     "width_mm": 62.753,
+     "width_mm": 57.142,
      "height_mm": 33.233,
-     "mmPerPixel": 0.037509,
+     "mmPerPixel": 0.034155,
      "orthographic": true
     },
     "measure": null,
@@ -920,7 +927,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 76484
+   "t": 77558
   }
  ]
 }

@@ -1,11 +1,15 @@
 {
  "scenario": "docs-account-dark-mode",
- "recorded": "2026-11-09T03:13:24.097Z",
+ "recorded": "2026-11-15T13:33:39.371Z",
  "app": {
   "name": "live",
-  "version": "1.223.92697.90c317e616c3",
+  "version": "1.223.93837.5293d8314b5b",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 3dedc795"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 81d2b384"
  },
  "live": {
   "page": "documents"
@@ -35,7 +39,7 @@
    "advanced": false,
    "columns": false
   },
-  "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+  "url": "/documents?nodeId=6ad49ec58b4a0a5a73d38e52&resourceType=resourceuserowner"
  },
  "steps": [
   {
@@ -63,6 +67,7 @@
      "kind": "context-menu",
      "rows": [
       "My account",
+      "Loopelf company settings",
       "View support tickets",
       "App Store dev portal",
       "View in dark mode beta",
@@ -76,6 +81,7 @@
       "kind": "menu",
       "rows": [
        "My account",
+       "Loopelf company settings",
        "View support tickets",
        "App Store dev portal",
        "View in dark mode beta",
@@ -88,6 +94,7 @@
       "kind": "context-menu",
       "rows": [
        "My account",
+       "Loopelf company settings",
        "View support tickets",
        "App Store dev portal",
        "View in dark mode beta",
@@ -114,9 +121,9 @@
      "advanced": false,
      "columns": false
     },
-    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+    "url": "/documents?nodeId=6ad49ec58b4a0a5a73d38e52&resourceType=resourceuserowner"
    },
-   "t": 2196
+   "t": 2182
   },
   {
    "step": 2,
@@ -128,8 +135,8 @@
    },
    "ok": true,
    "at": [
-    1884,
-    170
+    1805,
+    198
    ],
    "state": {
     "focus": {
@@ -142,6 +149,7 @@
      "kind": "context-menu",
      "rows": [
       "My account",
+      "Loopelf company settings",
       "View support tickets",
       "App Store dev portal",
       "View in dark mode beta",
@@ -155,6 +163,7 @@
       "kind": "menu",
       "rows": [
        "My account",
+       "Loopelf company settings",
        "View support tickets",
        "App Store dev portal",
        "View in dark mode beta",
@@ -167,6 +176,7 @@
       "kind": "context-menu",
       "rows": [
        "My account",
+       "Loopelf company settings",
        "View support tickets",
        "App Store dev portal",
        "View in dark mode beta",
@@ -193,10 +203,10 @@
      "advanced": false,
      "columns": false
     },
-    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+    "url": "/documents?nodeId=6ad49ec58b4a0a5a73d38e52&resourceType=resourceuserowner"
    },
-   "t": 4560
+   "t": 4543
   }
  ],
- "tabsOpened": 7
+ "tabsOpened": 1
 }

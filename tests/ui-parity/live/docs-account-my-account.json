@@ -1,11 +1,15 @@
 {
  "scenario": "docs-account-my-account",
- "recorded": "2026-11-09T03:08:37.871Z",
+ "recorded": "2026-11-15T13:33:02.441Z",
  "app": {
   "name": "live",
-  "version": "1.223.92697.90c317e616c3",
+  "version": "1.223.93837.5293d8314b5b",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 3dedc795"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 81d2b384"
  },
  "live": {
   "page": "documents"
@@ -35,7 +39,7 @@
    "advanced": false,
    "columns": false
   },
-  "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+  "url": "/documents?nodeId=6ad49ec58b4a0a5a73d38e52&resourceType=resourceuserowner"
  },
  "steps": [
   {
@@ -63,6 +67,7 @@
      "kind": "context-menu",
      "rows": [
       "My account",
+      "Loopelf company settings",
       "View support tickets",
       "App Store dev portal",
       "View in dark mode beta",
@@ -76,6 +81,7 @@
       "kind": "menu",
       "rows": [
        "My account",
+       "Loopelf company settings",
        "View support tickets",
        "App Store dev portal",
        "View in dark mode beta",
@@ -88,6 +94,7 @@
       "kind": "context-menu",
       "rows": [
        "My account",
+       "Loopelf company settings",
        "View support tickets",
        "App Store dev portal",
        "View in dark mode beta",
@@ -114,9 +121,9 @@
      "advanced": false,
      "columns": false
     },
-    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+    "url": "/documents?nodeId=6ad49ec58b4a0a5a73d38e52&resourceType=resourceuserowner"
    },
-   "t": 2191
+   "t": 2195
   },
   {
    "step": 2,
@@ -145,14 +152,14 @@
     "parts": [],
     "undo": null,
     "message": null,
-    "tooltip": "Try Onshape Professional",
+    "tooltip": null,
     "sketch": null,
     "drawing": null,
     "document": null,
     "url": "/user/profile"
    },
-   "t": 4519
+   "t": 6991
   }
  ],
- "tabsOpened": 7
+ "tabsOpened": 1
 }
