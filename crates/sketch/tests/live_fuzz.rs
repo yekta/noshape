@@ -155,6 +155,12 @@ impl Case {
         let (pa, pb) = self.sk.endpoints(e).unwrap();
         self.points.push((format!("{id}.start"), pa));
         self.points.push((format!("{id}.end"), pb));
+        // Live's names for its start, control and end (REST /sketches).
+        if let Some(Geometry::Conic { start, control, end, .. }) = self.sk.entity(e).map(|x| x.geometry.clone()) {
+            for (n, p) in [start, control, end].into_iter().enumerate() {
+                self.points.push((format!("{id}.{n}.internal"), p));
+            }
+        }
         self.curves.push((id.clone(), e, Kind::Free));
         self.os_entities.push(json!({"btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": 1.0,
             "geometry": {"btType": "BTCurveGeometryConic-2284", "rho": rho, "points": [a.x * MM, a.y * MM, ctrl.x * MM, ctrl.y * MM, b.x * MM, b.y * MM]}}));
