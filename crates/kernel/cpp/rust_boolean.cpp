@@ -98,6 +98,7 @@
 #include <GeomLib_IsPlanarSurface.hxx>
 #include <Geom_Plane.hxx>
 #include <Geom_TrimmedCurve.hxx>
+#include <set>
 #include <TopExp.hxx>
 #include <TopoDS.hxx>
 #include <Precision.hxx>
@@ -3018,9 +3019,46 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
   if (!(narrow > 0) || 4 * along / narrow > 4096)
     return false;
   const int m = std::max({64, 16 * (knots.Length() - 1), static_cast<int>(std::ceil(4 * along / narrow))});
-  // (Never two roots in the range: no branch folds back or crosses another inside the face (OCCT's then).)
+  auto g = [&](double side, double sx) {
+    const gp_Pnt c = A->Value(sx);
+    return (1 - side) * (1 - side) * c.X() + 2 * side * (1 - side) * c.Y() + side * side * c.Z();
+  };
+  auto in_t = [&](double sx) {
+    int n = 0;
+    for (const double t : roots(sx))
+      n += t >= ta - slack && t <= tb + slack;
+    return n;
+  };
+  // (A step in which the plane crosses a side of the face (not one lying in it) with its roots in the range as many at
+  // both ends: a run shorter than the step (the plane across a narrow round); unless an arc lying in the plane is in
+  // the step (c2-tpd-fillet-variable's rounds cut at their ends' arcs).)
+  auto crosses_unseen = [&](double a, double b) {
+    if (near_flat(a) || near_flat(b) || std::any_of(flats.begin(), flats.end(), [&](double f) { return f >= a && f <= b; }))
+      return false;
+    int crossed = 0;
+    for (const double side : {ta, tb})
+      crossed += !((side == ta && side0) || (side == tb && side1)) && (g(side, a) < 0) != (g(side, b) < 0);
+    return crossed > 0 && in_t(a) == in_t(b);
+  };
+  // The samples: m steps, those such a crossing is in cut in 64, twice at most.
+  std::vector<double> ss(m + 1);
   for (int i = 0; i <= m; ++i)
-    if (const double sx = s0 + (s1 - s0) * i / m; !near_flat(sx) && in_range(sx) > 1)
+    ss[(size_t)i] = s0 + (s1 - s0) * i / m;
+  for (int pass = 0; pass < 2; ++pass)
+  {
+    std::vector<double> finer{ss[0]};
+    for (size_t i = 1; i < ss.size(); ++i)
+    {
+      if (crosses_unseen(ss[i - 1], ss[i]))
+        for (int q = 1; q < 64; ++q)
+          finer.push_back(ss[i - 1] + (ss[i] - ss[i - 1]) * q / 64);
+      finer.push_back(ss[i]);
+    }
+    ss.swap(finer);
+  }
+  // (Never two roots in the range: no branch folds back or crosses another inside the face (OCCT's then).)
+  for (const double sx : ss)
+    if (!near_flat(sx) && in_range(sx) > 1)
       return false;
   // The runs with one root in the range, their ends bisected where it crosses ta or tb.
   auto edge = [&](double a, double b) {
@@ -3035,9 +3073,9 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
   std::vector<std::pair<double, double>> runs;
   double start = s0;
   bool   in    = in_range(s0) == 1;
-  for (int i = 1; i <= m; ++i)
+  for (size_t i = 1; i < ss.size(); ++i)
   {
-    const double s = s0 + (s1 - s0) * i / m, prev = s0 + (s1 - s0) * (i - 1) / m;
+    const double s = ss[i], prev = ss[i - 1];
     if ((in_range(s) == 1) == in)
       continue;
     const double at = edge(prev, s);
@@ -3051,21 +3089,11 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
   // (A run shorter than the samples' step (a plane nearly along the arcs crosses the face within one: c2-rings-loft's
   // slots across its ring's 68 mm round, 35 um of it): where the plane crosses a side of the face inside the plane
   // face's box a run ends, and a step whose roots in the range are as many at both ends crosses no side; else OCCT's.)
-  auto g = [&](double side, double sx) {
-    const gp_Pnt c = A->Value(sx);
-    return (1 - side) * (1 - side) * c.X() + 2 * side * (1 - side) * c.Y() + side * side * c.Z();
-  };
-  auto in_t = [&](double sx) {
-    int n = 0;
-    for (const double t : roots(sx))
-      n += t >= ta - slack && t <= tb + slack;
-    return n;
-  };
   // (Nor a fold between two samples (the plane all but touching the arcs: its section a cap about where two roots
   // meet, their branch steep there) where the two roots at the sample that has them span part of the range.)
-  for (int i = 1; i <= m && !side0 && !side1; ++i)
+  for (size_t i = 1; i < ss.size() && !side0 && !side1; ++i)
   {
-    const double a = s0 + (s1 - s0) * (i - 1) / m, b = s0 + (s1 - s0) * i / m;
+    const double a = ss[i - 1], b = ss[i];
     if (near_flat(a) || near_flat(b))
       continue;
     const std::vector<double> ra = roots(a), rb = roots(b);
@@ -3075,26 +3103,18 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
     if (std::max(r[0], r[1]) >= ta - slack && std::min(r[0], r[1]) <= tb + slack)
       return false;
   }
-  for (int i = 1; i <= m; ++i)
-  {
-    const double a = s0 + (s1 - s0) * (i - 1) / m, b = s0 + (s1 - s0) * i / m;
-    if (near_flat(a) || near_flat(b))
-      continue;
-    int crossed = 0;
-    for (const double side : {ta, tb})
-      crossed += !((side == ta && side0) || (side == tb && side1)) && (g(side, a) < 0) != (g(side, b) < 0);
-    if (crossed > 0 && in_t(a) == in_t(b))
+  for (size_t i = 1; i < ss.size(); ++i)
+    if (crosses_unseen(ss[i - 1], ss[i]))
       return false;
-  }
   for (const double side : {ta, tb})
   {
     if ((side == ta && side0) || (side == tb && side1))
       continue;
-    for (int i = 1; i <= m; ++i)
+    for (size_t i = 1; i < ss.size(); ++i)
     {
-      double a = s0 + (s1 - s0) * (i - 1) / m, b = s0 + (s1 - s0) * i / m;
+      double a = ss[i - 1], b = ss[i];
       const double ga = g(side, a), gb = g(side, b);
-      if ((ga < 0) == (gb < 0) || near_flat(a) || near_flat(b))
+      if ((ga < 0) == (gb < 0) || near_flat(a) || near_flat(b) || std::any_of(flats.begin(), flats.end(), [&](double f) { return f >= a && f <= b; }))
         continue;
       for (int it = 0; it < 80 && b - a > 1e-14 * (1 + std::abs(s0) + std::abs(s1)); ++it)
       {
@@ -3224,6 +3244,683 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
   out.insert(out.end(), found.begin(), found.end());
   return true;
 }
+
+// A section given point by point, as interpolated()'s, fitted by least squares instead: B-splines of degree 5 over
+// spans of equal length along the section (its chords through the points), one solve for the curve and both its
+// curves on the faces, its ends on the section's, the spans doubled from 1 until the points halfway between those
+// fitted to are within 1e-7 too (the curves on the faces' misses times `ka` and `kb`; up to 64 spans). Where the
+// curve on face `side` (0 or 1) crosses one of `lines` (u, then v: the B-spline face's knots of little continuity, the
+// section's kinks) a piece ends and the next one starts there. A few spans, as OCCT's approximation gives, where
+// interpolation carries one a point (the Boolean's work on a curve grows with its spans). False where it can't.
+static bool fitted(const std::function<bool(double, gp_Pnt&, gp_Pnt2d&, gp_Pnt2d&)>& at, double t0, double t1, IntTools_Curve& out, double ka, double kb, const std::vector<std::pair<int, double>>& lines = {}, int side = 1)
+{
+  constexpr int p   = 5;
+  const double  tol = 1e-7;
+  using Row         = std::array<double, 7>;
+  auto near_turn    = [](double x, double to) { return x + 2 * M_PI * std::round((to - x) / (2 * M_PI)); };
+  auto eval         = [&](double t, const Row* before, Row& r) {
+    gp_Pnt   x;
+    gp_Pnt2d a, b;
+    if (!at(t, x, a, b))
+      return false;
+    r = {x.X(), x.Y(), x.Z(), before ? near_turn(a.X(), (*before)[3]) : a.X(), a.Y(), before ? near_turn(b.X(), (*before)[5]) : b.X(), b.Y()};
+    return true;
+  };
+  // The basis functions not nought at `t` over `s` equal spans of [0, hi]: the first one's index, their values.
+  auto basis = [&](int s, double hi, double t, double* nb) {
+    const double h    = hi / s;
+    const int    j    = std::clamp(int(t / h), 0, s - 1);
+    auto         knot = [&](int i) { return h * std::clamp(i - p, 0, s); };
+    double       left[p + 1], right[p + 1];
+    nb[0] = 1;
+    for (int d = 1; d <= p; ++d)
+    {
+      left[d]      = t - knot(j + p + 1 - d);
+      right[d]     = knot(j + p + d) - t;
+      double saved = 0;
+      for (int r = 0; r < d; ++r)
+      {
+        const double tmp = nb[r] / (right[r + 1] + left[d - r]);
+        nb[r]            = saved + right[r + 1] * tmp;
+        saved            = left[d - r] * tmp;
+      }
+      nb[d] = saved;
+    }
+    return j;
+  };
+  struct Piece
+  {
+    std::vector<Row> poles;
+    int              s   = 1;
+    double           len = 0, err = 0;
+  };
+  // One piece from `ta` to `tb`, its first point turned as `before`.
+  auto piece = [&](double ta, double tb, const Row* before, Piece& pc) {
+    int              s = 1, g = (p + 1) * s;
+    double           was = 0;
+    std::vector<Row> pts(g + 1), mids(g);
+    for (int k = 0; k <= g; ++k)
+      if (!eval(ta + (tb - ta) * k / g, k ? &pts[k - 1] : before, pts[k]))
+        return false;
+    for (;;)
+    {
+      for (int k = 0; k < g; ++k)
+        if (!eval(ta + (tb - ta) * (k + 0.5) / g, &pts[k], mids[k]))
+          return false;
+      // The section's own length along it its parameter: the curve as smooth as the section, whatever `t`'s steps.
+      std::vector<double> tau(2 * g + 1, 0.0);
+      for (int k = 1; k <= 2 * g; ++k)
+      {
+        const Row& u = k % 2 ? pts[k / 2] : mids[k / 2 - 1];
+        const Row& v = k % 2 ? mids[k / 2] : pts[k / 2];
+        tau[k]       = tau[k - 1] + std::hypot(v[0] - u[0], v[1] - u[1], v[2] - u[2]);
+      }
+      const double hi = tau[2 * g];
+      if (!(hi > 0))
+        return false;
+      // Normal equations for the poles but the two end ones (the piece's ends), dense: at most 67 unknowns.
+      const int           n = s + p, nf = n - 2;
+      std::vector<double> A(nf * nf, 0.0), B(nf * 7, 0.0);
+      double              nb[p + 1];
+      for (int k = 0; k <= g; ++k)
+      {
+        const int j = basis(s, hi, tau[2 * k], nb);
+        Row       r = pts[k];
+        for (int i = 0; i <= p; ++i)
+          for (int c = 0; c < 7; ++c)
+            r[c] -= (j + i == 0 ? nb[i] * pts[0][c] : 0) + (j + i == n - 1 ? nb[i] * pts[g][c] : 0);
+        for (int i = 0; i <= p; ++i)
+        {
+          const int fi = j + i - 1;
+          if (fi < 0 || fi >= nf)
+            continue;
+          for (int c = 0; c < 7; ++c)
+            B[fi * 7 + c] += nb[i] * r[c];
+          for (int q = 0; q <= p; ++q)
+          {
+            const int fq = j + q - 1;
+            if (fq >= 0 && fq < nf)
+              A[fi * nf + fq] += nb[i] * nb[q];
+          }
+        }
+      }
+      // Cholesky, then the two triangular solves for all seven coordinates.
+      for (int i = 0; i < nf; ++i)
+        for (int q = 0; q <= i; ++q)
+        {
+          double v = A[i * nf + q];
+          for (int r = 0; r < q; ++r)
+            v -= A[i * nf + r] * A[q * nf + r];
+          if (q < i)
+            A[i * nf + q] = v / A[q * nf + q];
+          else if (v > 1e-300)
+            A[i * nf + i] = std::sqrt(v);
+          else
+            return false;
+        }
+      for (int c = 0; c < 7; ++c)
+      {
+        for (int i = 0; i < nf; ++i)
+        {
+          double v = B[i * 7 + c];
+          for (int r = 0; r < i; ++r)
+            v -= A[i * nf + r] * B[r * 7 + c];
+          B[i * 7 + c] = v / A[i * nf + i];
+        }
+        for (int i = nf - 1; i >= 0; --i)
+        {
+          double v = B[i * 7 + c];
+          for (int r = i + 1; r < nf; ++r)
+            v -= A[r * nf + i] * B[r * 7 + c];
+          B[i * 7 + c] = v / A[i * nf + i];
+        }
+      }
+      pc.poles.assign(n, Row{});
+      pc.poles[0]     = pts[0];
+      pc.poles[n - 1] = pts[g];
+      for (int i = 0; i < nf; ++i)
+        for (int c = 0; c < 7; ++c)
+          pc.poles[i + 1][c] = B[i * 7 + c];
+      double err   = 0;
+      auto   check = [&](double t, const Row& r) {
+        const int j = basis(s, hi, t, nb);
+        Row       v{};
+        for (int i = 0; i <= p; ++i)
+          for (int c = 0; c < 7; ++c)
+            v[c] += nb[i] * pc.poles[j + i][c];
+        err = std::max({err, std::hypot(v[0] - r[0], v[1] - r[1], v[2] - r[2]), ka * std::hypot(v[3] - r[3], v[4] - r[4]), kb * std::hypot(v[5] - r[5], v[6] - r[6])});
+      };
+      for (int k = 0; k < g; ++k)
+      {
+        check(tau[2 * k], pts[k]);
+        check(tau[2 * k + 1], mids[k]);
+      }
+      if (err <= tol)
+      {
+        pc.s = s, pc.len = hi, pc.err = err;
+        return true;
+      }
+      // (Smooth points come within a third or less a doubling from 8 spans on; a kink's don't.)
+      if (s == 64 || (s >= 8 && err > was / 3))
+        return false;
+      was = err;
+      std::vector<Row> finer(2 * g + 1);
+      for (int k = 0; k < g; ++k)
+        finer[2 * k] = pts[k], finer[2 * k + 1] = mids[k];
+      finer[2 * g] = pts[g];
+      pts.swap(finer);
+      s *= 2;
+      g *= 2;
+      mids.assign(g, Row{});
+    }
+  };
+  // The pieces' ends: where the curve on face `side` crosses a line, found on 64 steps then halving.
+  std::vector<double> cuts{t0};
+  if (!lines.empty())
+  {
+    const int col = side ? 5 : 3, n = 64;
+    Row       prev, r;
+    if (!eval(t0, nullptr, prev))
+      return false;
+    for (int k = 1; k <= n; ++k)
+    {
+      const double ta = t0 + (t1 - t0) * (k - 1) / n, tb = t0 + (t1 - t0) * k / n;
+      if (!eval(tb, &prev, r))
+        return false;
+      std::vector<double> here;
+      for (const auto& [d, v] : lines)
+      {
+        if ((prev[col + d] - v) * (r[col + d] - v) >= 0)
+          continue;
+        double a = ta, b = tb;
+        for (int it = 0; it < 40; ++it)
+        {
+          Row m;
+          if (!eval(0.5 * (a + b), &prev, m))
+            return false;
+          ((m[col + d] - v) * (prev[col + d] - v) > 0 ? a : b) = 0.5 * (a + b);
+        }
+        here.push_back(0.5 * (a + b));
+      }
+      std::sort(here.begin(), here.end());
+      for (const double t : here)
+        if (t - cuts.back() > 1e-6 * (t1 - t0) && t1 - t > 1e-6 * (t1 - t0))
+          cuts.push_back(t);
+      prev = r;
+    }
+  }
+  cuts.push_back(t1);
+  std::vector<Piece> pieces(cuts.size() - 1);
+  for (size_t i = 0; i < pieces.size(); ++i)
+    if (!piece(cuts[i], cuts[i + 1], i ? &pieces[i - 1].poles.back() : nullptr, pieces[i]))
+      return false;
+  // The pieces joined: their shared ends one pole, a knot of multiplicity p there.
+  int nk = 1, np = 1;
+  for (const Piece& pc : pieces)
+    nk += pc.s, np += pc.s + p - 1;
+  NCollection_Array1<gp_Pnt>   p3(1, np);
+  NCollection_Array1<gp_Pnt2d> pa(1, np), pb(1, np);
+  NCollection_Array1<double>   knots(1, nk);
+  NCollection_Array1<int>      mults(1, nk);
+  int                          ip = 1, ik = 1;
+  double                       base = 0, err = 0;
+  knots(1) = 0, mults(1) = p + 1;
+  for (size_t i = 0; i < pieces.size(); ++i)
+  {
+    const Piece& pc = pieces[i];
+    for (size_t q = i ? 1 : 0; q < pc.poles.size(); ++q, ++ip)
+    {
+      const Row& r = pc.poles[q];
+      p3(ip)       = gp_Pnt(r[0], r[1], r[2]);
+      pa(ip)       = gp_Pnt2d(r[3], r[4]);
+      pb(ip)       = gp_Pnt2d(r[5], r[6]);
+    }
+    for (int q = 1; q <= pc.s; ++q)
+    {
+      ++ik;
+      knots(ik) = q == pc.s ? base + pc.len : base + pc.len * q / pc.s;
+      mults(ik) = q < pc.s ? 1 : i + 1 < pieces.size() ? p : p + 1;
+    }
+    base += pc.len;
+    err = std::max(err, pc.err);
+  }
+  out = IntTools_Curve(new Geom_BSplineCurve(p3, knots, mults, p), new Geom2d_BSplineCurve(pa, knots, mults, p), new Geom2d_BSplineCurve(pb, knots, mults, p), std::max(Precision::Confusion(), err));
+  return true;
+}
+
+// fitted() without cuts first (the face's knots of little continuity are mostly smooth joins), then cut at its C0 knots,
+// then at its C1 ones too (`lines`: the direction plus 2 where a knot is C0).
+static bool fitted_section(const std::function<bool(double, gp_Pnt&, gp_Pnt2d&, gp_Pnt2d&)>& at, double t0, double t1, IntTools_Curve& out, double ka, double kb, const std::vector<std::pair<int, double>>& lines, int side)
+{
+  if (fitted(at, t0, t1, out, ka, kb, {}, side))
+    return true;
+  std::vector<std::pair<int, double>> corners, all;
+  for (const auto& [d, v] : lines)
+  {
+    if (d >= 2)
+      corners.emplace_back(d - 2, v);
+    all.emplace_back(d % 2, v);
+  }
+  return (!corners.empty() && fitted(at, t0, t1, out, ka, kb, corners, side)) || (all.size() > corners.size() && fitted(at, t0, t1, out, ka, kb, all, side));
+}
+
+// A plane or a cylinder against a B-spline face (not a pair plane_tube_sections takes): the zero set of the analytic
+// surface's signed distance over the B-spline face's parameter box (a hair wider, as OCCT's). Its poles all on one
+// side of the plane, or all inside the cylinder: none. Else the distance on a grid of four cells a knot span each way
+// (8 to 256 a way), its sign changes along the cells' sides found exactly and joined cell by cell (a saddle by the
+// cell's middle), each chain of them a section: a curve fitted through them the guide, each point of it brought onto
+// the analytic surface by Newton's steps along the distance's gradient, fitted (fitted_section, within 1e-7) over the
+// stretches inside the analytic face's box a tenth wider each way. c2-rings-loft's pattern cut and
+// c2-tpd-fillet-variable's fillet tools: 0.3-2.5 ms a pair where OCCT's marching took 4-10. False where a side's or a
+// cell's distances leave room for zeros they don't show (a tangency, a loop inside a cell): OCCT's then.
+static bool analytic_freeform_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+{
+  static const bool debug = std::getenv("NOSHAPE_FREE_DEBUG") != nullptr;
+  const auto        t_in  = std::chrono::steady_clock::now();
+  auto              ms    = [&] { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_in).count(); };
+  auto              why   = [&](int k) {
+    if (debug)
+      std::fprintf(stderr, "free sections: declined %d after %.2f ms\n", k, ms());
+    return false;
+  };
+  static const bool off = (std::getenv("NOSHAPE_FREE_SECTIONS") != nullptr && std::string(std::getenv("NOSHAPE_FREE_SECTIONS")) == "0")
+                          || (std::getenv("NOSHAPE_OWN_SECTIONS") != nullptr && std::string(std::getenv("NOSHAPE_OWN_SECTIONS")) == "0");
+  if (off)
+    return why(1);
+  const BRepAdaptor_Surface ka(fa, false), kb(fb, false);
+  // (A cylinder's sections with c2-rings-loft's loft, taken so, left its pattern cut non-manifold: planes only for now.)
+  const auto                analytic = [](GeomAbs_SurfaceType t) { return t == GeomAbs_Plane; };
+  if (analytic(ka.GetType()) == analytic(kb.GetType()))
+    return why(2);
+  const bool                 p_first = analytic(ka.GetType());
+  const BRepAdaptor_Surface& K       = p_first ? ka : kb;
+  const TopoDS_Face&         ff      = p_first ? fb : fa;
+  const TopoDS_Face&         fp      = p_first ? fa : fb;
+  occ::handle<Geom_Surface>  base    = BRep_Tool::Surface(ff);
+  while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(base))
+    base = t->BasisSurface();
+  const occ::handle<Geom_BSplineSurface> S = occ::down_cast<Geom_BSplineSurface>(base);
+  if (S.IsNull())
+    return why(3);
+  // The analytic surface's signed distance, its gradient, and a point's parameters on it.
+  const bool        plane = K.GetType() == GeomAbs_Plane;
+  const gp_Pln      P     = plane ? K.Plane() : gp_Pln();
+  const gp_Cylinder Y     = plane ? gp_Cylinder() : K.Cylinder();
+  const gp_XYZ      n = P.Axis().Direction().XYZ(), o = Y.Location().XYZ(), ax = Y.Axis().Direction().XYZ();
+  const double      d = n.Dot(P.Location().XYZ()), r = Y.Radius();
+  auto              off_axis = [&](const gp_XYZ& x) {
+    const gp_XYZ w = x - o;
+    return w - ax * ax.Dot(w);
+  };
+  auto dist = [&](const gp_XYZ& x) { return plane ? n.Dot(x) - d : off_axis(x).Modulus() - r; };
+  auto grad = [&](const gp_XYZ& x) -> gp_XYZ {
+    if (plane)
+      return n;
+    const gp_XYZ q = off_axis(x);
+    const double m = q.Modulus();
+    return m > 0 ? q / m : gp_XYZ(0, 0, 0);
+  };
+  auto params_on = [&](const gp_Pnt& x, double& pu, double& pv) {
+    if (plane)
+      ElSLib::Parameters(P, x, pu, pv);
+    else
+      ElSLib::Parameters(Y, x, pu, pv);
+  };
+  // (A B-spline lies within its poles' hull: all on one side of the plane, or all inside the cylinder (the hull's
+  // farthest from the axis is a pole), no section.)
+  double lo = std::numeric_limits<double>::max(), hi = -lo, size = 0;
+  for (int i = 1; i <= S->NbUPoles(); ++i)
+    for (int j = 1; j <= S->NbVPoles(); ++j)
+    {
+      const double g = dist(S->Pole(i, j).XYZ());
+      lo = std::min(lo, g), hi = std::max(hi, g), size = std::max(size, S->Pole(i, j).XYZ().Modulus());
+    }
+  if ((plane && lo > 0) || hi < 0)
+  {
+    if (debug)
+      std::fprintf(stderr, "free sections: none by its poles\n");
+    return true;
+  }
+  double u0, u1, v0, v1, su0, su1, sv0, sv1;
+  BRepTools::UVBounds(ff, u0, u1, v0, v1);
+  S->Bounds(su0, su1, sv0, sv1);
+  {
+    const double hair = 2 * std::max(BRep_Tool::MaxTolerance(fa, TopAbs_EDGE), BRep_Tool::MaxTolerance(fb, TopAbs_EDGE));
+    u0 = std::max(u0 - hair, su0), u1 = std::min(u1 + hair, su1), v0 = std::max(v0 - hair, sv0), v1 = std::min(v1 + hair, sv1);
+  }
+  if (!(u1 > u0) || !(v1 > v0))
+    return why(2);
+  // The grid: four cells a knot span (8 to 256 a way), eight or sixteen where four leave room for zeros.
+  auto params = [](const NCollection_Array1<double>& knots, double a, double b, int per, std::vector<double>& at) {
+    at.push_back(a);
+    for (int k = knots.Lower(); k < knots.Upper(); ++k)
+    {
+      const double k0 = std::max(a, knots(k)), k1 = std::min(b, knots(k + 1));
+      if (!(k1 > k0))
+        continue;
+      for (int q = 1; q <= per; ++q)
+        at.push_back(k0 + (k1 - k0) * q / per);
+    }
+    if (at.back() < b)
+      at.push_back(b);
+    while (at.size() < 9)
+    {
+      std::vector<double> twice{at[0]};
+      for (size_t k = 1; k < at.size(); ++k)
+        twice.push_back(0.5 * (at[k - 1] + at[k])), twice.push_back(at[k]);
+      at = std::move(twice);
+    }
+  };
+  const double        scale = std::max(size, 1e-3);
+  auto                f     = [&](double u, double v) { return dist(S->Value(u, v).XYZ()); };
+  std::vector<double> us, vs, F;
+  int                 nu = 0, nv = 0;
+  auto                at_ij = [&](int i, int j) -> double& { return F[(size_t)i * nv + j]; };
+  // (Room for zeros the grid doesn't show: the distance's second derivative along each way at each node (from its
+  // neighbours, steps unequal) four times over, a quadratic along a side without a sign change reaching nought
+  // between its ends, or one over a cell without one dipping through its corners' mean at its middle: a tangency or a
+  // loop the cells miss.)
+  auto bend = [&](int i, int j, bool along_u) {
+    const std::vector<double>& t = along_u ? us : vs;
+    const int                  k = along_u ? i : j, m = along_u ? nu : nv;
+    double                     b = 0;
+    for (int c = std::max(k - 1, 1); c <= std::min(k + 1, m - 2); ++c)
+    {
+      const double h1 = t[(size_t)c] - t[(size_t)c - 1], h2 = t[(size_t)c + 1] - t[(size_t)c];
+      const double f0 = along_u ? at_ij(c - 1, j) : at_ij(i, c - 1), f1 = along_u ? at_ij(c, j) : at_ij(i, c), f2 = along_u ? at_ij(c + 1, j) : at_ij(i, c + 1);
+      b = std::max(b, std::abs(2 * ((f2 - f1) / h2 - (f1 - f0) / h1) / (h1 + h2)));
+    }
+    return 4 * b;
+  };
+  auto room = [&]() {
+    for (int i = 0; i < nu; ++i)
+      for (int j = 0; j < nv; ++j)
+        for (const bool along_u : {true, false})
+        {
+          const int i2 = along_u ? i + 1 : i, j2 = along_u ? j : j + 1;
+          if (i2 >= nu || j2 >= nv || (at_ij(i, j) >= 0) != (at_ij(i2, j2) >= 0))
+            continue;
+          const double h = along_u ? us[(size_t)i2] - us[(size_t)i] : vs[(size_t)j2] - vs[(size_t)j];
+          const double c = std::max(bend(i, j, along_u), bend(i2, j2, along_u));
+          const double r = std::sqrt(std::abs(at_ij(i, j))) + std::sqrt(std::abs(at_ij(i2, j2)));
+          if (c * h * h / 2 >= r * r)
+            return true;
+        }
+    for (int i = 0; i + 1 < nu; ++i)
+      for (int j = 0; j + 1 < nv; ++j)
+      {
+        const double c[4] = {at_ij(i, j), at_ij(i + 1, j), at_ij(i + 1, j + 1), at_ij(i, j + 1)};
+        const bool   pos  = c[0] >= 0;
+        if ((c[1] >= 0) != pos || (c[2] >= 0) != pos || (c[3] >= 0) != pos)
+          continue;
+        const double hu = us[(size_t)i + 1] - us[(size_t)i], hv = vs[(size_t)j + 1] - vs[(size_t)j];
+        double       cu = 0, cv = 0;
+        for (int a = i; a <= i + 1; ++a)
+          for (int b = j; b <= j + 1; ++b)
+            cu = std::max(cu, bend(a, b, true)), cv = std::max(cv, bend(a, b, false));
+        if ((cu * hu * hu + cv * hv * hv) / 8 >= 0.25 * std::abs(c[0] + c[1] + c[2] + c[3]))
+          return true;
+      }
+    return false;
+  };
+  bool open = true;
+  for (int per = 4; per <= 16 && open; per *= 2)
+  {
+    us.clear(), vs.clear();
+    params(S->UKnots(), u0, u1, per, us);
+    params(S->VKnots(), v0, v1, per, vs);
+    nu = static_cast<int>(us.size()), nv = static_cast<int>(vs.size());
+    if (nu > 257 || nv > 257 || (size_t)nu * nv > 16384)
+      return why(3);
+    F.assign((size_t)nu * nv, 0.0);
+    for (int i = 0; i < nu; ++i)
+      for (int j = 0; j < nv; ++j)
+        at_ij(i, j) = f(us[(size_t)i], vs[(size_t)j]);
+    open = room();
+  }
+  if (open)
+    return why(4);
+  // Each side's crossing (where the sign changes along it), exactly: sides along u (i, j)-(i+1, j) as 2 (i nv + j),
+  // along v (i, j)-(i, j+1) as 2 (i nv + j) + 1.
+  std::map<long, gp_Pnt2d> cross;
+  auto                     root = [&](gp_Pnt2d a, gp_Pnt2d b, double fa_, double fb_) {
+    for (int it = 0; it < 80; ++it)
+    {
+      const double   s = fa_ / (fa_ - fb_);
+      const gp_Pnt2d m(a.X() + (b.X() - a.X()) * std::min(std::max(s, 0.05), 0.95), a.Y() + (b.Y() - a.Y()) * std::min(std::max(s, 0.05), 0.95));
+      const double   fm = f(m.X(), m.Y());
+      if (std::abs(fm) <= 1e-14 * scale || a.Distance(b) <= 1e-15 * (u1 - u0 + v1 - v0))
+        return m;
+      if ((fm >= 0) == (fa_ >= 0))
+        a = m, fa_ = fm;
+      else
+        b = m, fb_ = fm;
+    }
+    return gp_Pnt2d(0.5 * (a.X() + b.X()), 0.5 * (a.Y() + b.Y()));
+  };
+  auto side = [&](int i, int j, bool along_u) -> long {
+    const int i2 = along_u ? i + 1 : i, j2 = along_u ? j : j + 1;
+    const long key = 2L * ((long)i * nv + j) + (along_u ? 0 : 1);
+    if ((at_ij(i, j) >= 0) == (at_ij(i2, j2) >= 0))
+      return -1;
+    if (cross.find(key) == cross.end())
+      cross[key] = root(gp_Pnt2d(us[(size_t)i], vs[(size_t)j]), gp_Pnt2d(us[(size_t)i2], vs[(size_t)j2]), at_ij(i, j), at_ij(i2, j2));
+    return key;
+  };
+  // Segments cell by cell, joined into chains at the crossings they share.
+  std::map<long, std::vector<long>> next;
+  for (int i = 0; i + 1 < nu; ++i)
+    for (int j = 0; j + 1 < nv; ++j)
+    {
+      const long s[4] = {side(i, j, true), side(i + 1, j, false), side(i, j + 1, true), side(i, j, false)};
+      std::vector<long> on;
+      for (const long k : s)
+        if (k >= 0)
+          on.push_back(k);
+      auto join = [&](long a, long b) { next[a].push_back(b), next[b].push_back(a); };
+      if (on.size() == 2)
+        join(on[0], on[1]);
+      else if (on.size() == 4)
+      {
+        // (A saddle: the corners on the middle's side joined round it.)
+        const bool mid = f(0.5 * (us[(size_t)i] + us[(size_t)i + 1]), 0.5 * (vs[(size_t)j] + vs[(size_t)j + 1])) >= 0;
+        if ((at_ij(i, j) >= 0) == mid)
+          join(s[0], s[1]), join(s[2], s[3]);
+        else
+          join(s[0], s[3]), join(s[1], s[2]);
+      }
+      else if (!on.empty())
+        return why(6);
+    }
+  // (Where the surfaces meet within a few degrees of touching: a grazing section, OCCT's (c2-rings-loft's up-to
+  // cylinder 0.1 mm off its loft).)
+  for (const auto& [k, q] : cross)
+  {
+    gp_Pnt p;
+    gp_Vec du, dv;
+    S->D1(q.X(), q.Y(), p, du, dv);
+    const gp_Vec nf = du.Crossed(dv);
+    if (!(nf.Magnitude() > 0) || std::abs(nf.Normalized().XYZ().Dot(grad(p.XYZ()))) > 0.999)
+      return why(9);
+  }
+  std::vector<std::vector<gp_Pnt2d>> chains;
+  std::set<long>                     used;
+  auto walk = [&](long from) {
+    std::vector<gp_Pnt2d> c{cross[from]};
+    used.insert(from);
+    long at = from;
+    for (;;)
+    {
+      long to = -1;
+      for (const long k : next[at])
+        if (used.count(k) == 0)
+          to = k;
+      if (to < 0)
+      {
+        // (Closed: back to its start.)
+        if (next[at].size() == 2 && std::find(next[at].begin(), next[at].end(), from) != next[at].end() && c.size() > 2)
+          c.push_back(cross[from]);
+        break;
+      }
+      used.insert(to);
+      c.push_back(cross[to]);
+      at = to;
+    }
+    chains.push_back(std::move(c));
+  };
+  for (const auto& [k, nb] : next)
+    if (nb.size() == 1 && used.count(k) == 0)
+      walk(k);
+  for (const auto& [k, nb] : next)
+    if (used.count(k) == 0)
+      walk(k);
+  // Each chain: its guide (through its crossings by their distances in space), each point of it brought onto the plane.
+  double pu0, pu1, pv0, pv1;
+  BRepTools::UVBounds(fp, pu0, pu1, pv0, pv1);
+  {
+    const double du = 0.1 * (pu1 - pu0), dv = 0.1 * (pv1 - pv0);
+    pu0 -= du, pu1 += du, pv0 -= dv, pv1 += dv;
+    if (!plane && pu1 - pu0 >= 2 * M_PI)
+      pu0 = -1e300, pu1 = 1e300;
+  }
+  // The B-spline's knots of little continuity (C1, or C0 as 2 + the direction): the section's kinks, where its
+  // fitted pieces end.
+  std::vector<std::pair<int, double>> lines;
+  for (int d = 0; d < 2; ++d)
+  {
+    const int deg = d ? S->VDegree() : S->UDegree(), nk = d ? S->NbVKnots() : S->NbUKnots();
+    for (int q = 2; q < nk; ++q)
+    {
+      const int mult = d ? S->VMultiplicity(q) : S->UMultiplicity(q);
+      if (mult >= deg - 1)
+        lines.emplace_back(mult >= deg ? d + 2 : d, d ? S->VKnot(q) : S->UKnot(q));
+    }
+  }
+  for (const std::vector<gp_Pnt2d>& c : chains)
+  {
+    if (c.size() < 2)
+      return why(7);
+    const int                                  m = static_cast<int>(c.size());
+    occ::handle<NCollection_HArray1<gp_Pnt2d>> pts = new NCollection_HArray1<gp_Pnt2d>(1, m);
+    occ::handle<NCollection_HArray1<double>>   ts  = new NCollection_HArray1<double>(1, m);
+    double                                     len = 0;
+    for (int k = 0; k < m; ++k)
+    {
+      if (k > 0)
+      {
+        const double step = S->Value(c[(size_t)k].X(), c[(size_t)k].Y()).Distance(S->Value(c[(size_t)k - 1].X(), c[(size_t)k - 1].Y()));
+        if (!(step > 1e-12 * scale))
+          return why(8);
+        len += step;
+      }
+      pts->SetValue(k + 1, c[(size_t)k]);
+      ts->SetValue(k + 1, len);
+    }
+    occ::handle<Geom2d_Curve> guide;
+    if (m == 2)
+      guide = new Geom2d_Line(c[0], gp_Dir2d(gp_Vec2d(c[0], c[1])));
+    else
+    {
+      Geom2dAPI_Interpolate ip(pts, ts, false, 1e-12);
+      ip.Perform();
+      if (!ip.IsDone())
+        return why(9);
+      guide = ip.Curve();
+    }
+    const double chord = m == 2 ? c[0].Distance(c[1]) / len : 1;
+    // (The B-spline face's size in space a unit of its parameters along the chain: its curve on the face fitted to
+    // what that is in space, as the section's own.)
+    double k = 0;
+    for (const size_t q : {(size_t)0, c.size() / 2, c.size() - 1})
+    {
+      gp_Pnt p;
+      gp_Vec du, dv;
+      S->D1(c[q].X(), c[q].Y(), p, du, dv);
+      k = std::max({k, du.Magnitude(), dv.Magnitude()});
+    }
+    auto         at    = [&](double t, gp_Pnt& x, gp_Pnt2d& a, gp_Pnt2d& b) {
+      gp_Pnt2d q = guide->Value(t * chord);
+      for (int it = 0; it < 12; ++it)
+      {
+        gp_Pnt p;
+        gp_Vec du, dv;
+        S->D1(q.X(), q.Y(), p, du, dv);
+        const gp_XYZ gr = grad(p.XYZ());
+        const double g = dist(p.XYZ()), gu = gr.Dot(du.XYZ()), gv = gr.Dot(dv.XYZ()), g2 = gu * gu + gv * gv;
+        if (std::abs(g) <= 1e-14 * scale)
+          break;
+        if (!(g2 > 0))
+          return false;
+        q.SetCoord(q.X() - g * gu / g2, q.Y() - g * gv / g2);
+      }
+      x = S->Value(q.X(), q.Y());
+      if (std::abs(dist(x.XYZ())) > 1e-12 * scale)
+        return false;
+      double pu = 0, pv = 0;
+      params_on(x, pu, pv);
+      a = p_first ? gp_Pnt2d(pu, pv) : q;
+      b = p_first ? q : gp_Pnt2d(pu, pv);
+      return true;
+    };
+    // The stretches within the plane face's box: by its crossings at the chain's points, then halving between.
+    auto inside = [&](double t) {
+      gp_Pnt   x;
+      gp_Pnt2d a, b;
+      if (!at(t, x, a, b))
+        return false;
+      const gp_Pnt2d& pp = p_first ? a : b;
+      // (A cylinder's angle by whole turns into its box.)
+      const double pu = plane ? pp.X() : pp.X() + 2 * M_PI * std::ceil((pu0 - pp.X()) / (2 * M_PI));
+      return pu >= pu0 && pu <= pu1 && pp.Y() >= pv0 && pp.Y() <= pv1;
+    };
+    std::vector<double> marks;
+    for (int k = 1; k <= m; ++k)
+    {
+      marks.push_back(ts->Value(k));
+      if (k < m)
+        for (int q = 1; q < 4; ++q)
+          marks.push_back(ts->Value(k) + (ts->Value(k + 1) - ts->Value(k)) * q / 4);
+    }
+    double start = -1;
+    bool   was   = false;
+    for (size_t k = 0; k < marks.size(); ++k)
+    {
+      const bool now = inside(marks[k]);
+      if (k > 0 && now != was)
+      {
+        double a = marks[k - 1], b = marks[k];
+        for (int it = 0; it < 50; ++it)
+          (inside(0.5 * (a + b)) == was ? a : b) = 0.5 * (a + b);
+        const double edge = was ? a : b;
+        if (now)
+          start = edge;
+        else if (start >= 0)
+        {
+          IntTools_Curve ic;
+          if (edge - start > 1e-9 * len && !fitted_section(at, start, edge, ic, p_first ? 1 : k, p_first ? k : 1, lines, p_first ? 1 : 0))
+            return why(10);
+          if (edge - start > 1e-9 * len)
+            out.push_back(ic);
+          start = -1;
+        }
+      }
+      else if (k == 0 && now)
+        start = marks[0];
+      was = now;
+    }
+    if (was && start >= 0 && len - start > 1e-9 * len)
+    {
+      IntTools_Curve ic;
+      if (!fitted_section(at, start, len, ic, p_first ? 1 : k, p_first ? k : 1, lines, p_first ? 1 : 0))
+        return why(11);
+      out.push_back(ic);
+    }
+  }
+  if (debug)
+    std::fprintf(stderr, "free sections: %zu curves from %zu chains, grid %d x %d, %.2f ms\n", out.size(), chains.size(), nu, nv, ms());
+  return true;
+}
+
 
 // A plane or a sphere against a torus face (c2-rings-loft's ring against its patterned prongs: ~300 plane / torus pairs
 // of OCCT's marching; learning-center-michael's rounds against planes along their axes and balls): round the axis at
@@ -4808,6 +5505,9 @@ static bool hulls_apart(const TopoDS_Face& fa, const TopoDS_Face& fb)
 static bool boolean_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out, ExactBoxes& exact)
 {
   if (own_sections(fa, fb, out))
+    return true;
+  out.clear();
+  if (analytic_freeform_sections(fa, fb, out))
     return true;
   out.clear();
   // (Only with a free-form face: OCCT's sections of planes, cylinders, cones and spheres are analytic and quick (a plate's

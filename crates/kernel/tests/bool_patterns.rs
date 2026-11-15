@@ -2919,3 +2919,30 @@ fn faces_apart_across_a_slanted_gap_cut_as_occt() {
 fn a_blade_and_its_mirror_image_fuse_as_occt() {
     valid_as_occt("682aa19d75e30e09", 1e-8);
 }
+
+
+/// A loft's B-spline side (circles of 10, 6 and 10 mm) cut by boxes whose planes cross it: noshape's Boolean (each
+/// plane's sections of the side its own, fitted by least squares), valid and as OCCT's.
+#[test]
+fn a_lofts_side_cut_by_planes_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let ring = |z: f64, r: f64| k::make_wire(&[k::make_circle(DVec3::new(0.0, 0.0, z), DVec3::Z, r).unwrap()]).unwrap();
+    let body = k::loft(&[ring(0.0, 0.010), ring(0.015, 0.006), ring(0.030, 0.010)], &k::LoftOptions { solid: true, ..Default::default() }).unwrap().shape;
+    for (lo, hi) in [(DVec3::new(-0.02, -0.02, 0.008), DVec3::new(0.003, 0.02, 0.022)), (DVec3::new(-0.004, -0.02, -0.01), DVec3::new(0.02, 0.0025, 0.012))] {
+        let tool = k::make_box_corners(lo, hi).unwrap();
+        let run = |rust: bool| {
+            k::set_rust_boolean(Some(rust));
+            let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&body), std::slice::from_ref(&tool), &k::BooleanOptions::default()).expect("the cut");
+            let path = k::last_boolean_path();
+            k::set_rust_boolean(None);
+            (r.shape, path)
+        };
+        let ((ours, path), (occt, _)) = (run(true), run(false));
+        assert_eq!(path, "rust", "{lo:?}: {}", k::last_rust_decline());
+        assert!(ours.is_valid() && occt.is_valid(), "{lo:?}: valid");
+        assert_eq!(ours.count(k::ShapeType::Face), occt.count(k::ShapeType::Face), "{lo:?}: faces");
+        assert_eq!(ours.count(k::ShapeType::Edge), occt.count(k::ShapeType::Edge), "{lo:?}: edges");
+        let (v, w) = (ours.volume().unwrap(), occt.volume().unwrap());
+        assert!((v - w).abs() <= 1e-6 * w, "{lo:?}: volume {v} vs OCCT's {w}");
+    }
+}
