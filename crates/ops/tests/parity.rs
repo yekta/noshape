@@ -1365,6 +1365,25 @@ fn a_region_query_is_read_from_onshapes_packed_form() {
     assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A Composite part feature's part named as Onshape packs it (a DUMMY query of the BODY its opCreateCompositePart
+/// made: asm-infento-subs' studio 1dc32b, Transform 16 / 17 / 23 / 24 / 46 and Mirror 4) is ours of that feature, no
+/// live geometry needed: the Transform moves it 10 mm up.
+#[test]
+fn a_composite_parts_packed_query_is_its_part() {
+    let q = |id: &str, s: &str| json!({ "btType": "BTMParameterQueryList-148", "parameterId": id, "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": format!("query=qCompressed(1.0,\"{s}\",id);") }] });
+    let swept = "%B5$QueryM4Sa$entityTypeBa$EntityTypeS4$BODYSb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.9$FyUE18XOUbMicpL_0opExtrudeS9$queryTypeSa$SWEPT_BODY";
+    let composite = "%B5$QueryM4Sa$entityTypeBa$EntityTypeS4$BODYSb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S3.15$FC1opCreateCompositePartS9$queryTypeS5$DUMMY";
+    let features = pack_src_model(vec![
+        json!({ "btType": "BTMFeature-134", "featureType": "compositePart", "featureId": "FC1", "name": "Composite part 1", "parameters": [q("bodies", swept)] }),
+        json!({ "btType": "BTMFeature-134", "featureType": "transform", "featureId": "FT1", "name": "Transform 1", "parameters": [
+            q("entities", composite),
+            { "btType": "BTMParameterEnum-145", "parameterId": "transformType", "value": "TRANSLATION_3D" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "dz", "expression": "10 mm" }] }),
+    ]);
+    let r = run_model("packed-composite", &features, &[], "");
+    assert!(r.untranslated.is_empty(), "{:?}", r.untranslated);
+}
+
 /// An ellipse (Onshape's BTCurveGeometryEllipse) extruded: π·a·b·h.
 #[test]
 fn an_ellipse_is_rebuilt() {

@@ -2415,6 +2415,13 @@ impl<'a> Translator<'a> {
         {
             return Ok(vec![format!("fplane:{ours}")]);
         }
+        // A Composite part feature's part (`DUMMY` BODY created by "F….opCreateCompositePart": asm-infento-subs' studio
+        // 1dc32b, Transform 16 / 17 / 23 / 24 / 46 and Mirror 4 move composite parts): ours of that feature.
+        if let Some(fid) = packed_strings_of(text).iter().find_map(|s| s.strip_suffix(".opCreateCompositePart").map(str::to_string))
+            && let Some(ours) = self.feature_ids.get(&fid)
+        {
+            return Ok(vec![format!("body:{ours}.0")]);
+        }
         // A Mate connector feature's connector (`dummyQuery(id+"F….mateConnectorOp", …)`), written or packed.
         if let Some(fid) = text.split("id+\"").nth(1).and_then(|r| r.split(".mateConnectorOp\"").next()).filter(|f| !f.contains('"')).map(str::to_string).or_else(|| packed_strings_of(text).iter().find_map(|s| s.strip_suffix(".mateConnectorOp").map(str::to_string)))
             && let Some(ours) = self.feature_ids.get(&fid)
