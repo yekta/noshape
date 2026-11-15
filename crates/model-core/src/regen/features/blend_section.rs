@@ -1258,7 +1258,9 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
 enum Support {
     Plane { o: DVec3, n: DVec3 },
     Cylinder { o: DVec3, a: DVec3, r: f64, s: f64 },
-    Face(Shape, f64),
+    /// Any other face: each foot by Newton's method on it from the last one where that lands inside it (c2-hunting-
+    /// knife's Fillet 8 on the revolved ring: 1100 projections, 57 ms), else its projection.
+    Face(Shape, f64, std::sync::Arc<std::sync::Mutex<Option<glam::DVec2>>>),
     /// A B-spline face by its own surface: each foot by Newton's method from the last one (the ball's centres move
     /// little from section to section; a bridge projection each took ~0.4 ms on c2-hunting-knife's lofted handle, 3772
     /// of them in Fillet 8), the first one the face's projection. `s`: the inward side of the surface's du x dv.
@@ -1286,9 +1288,9 @@ impl Support {
                     let s = if su.cross(sv).dot(inward) < 0.0 { -1.0 } else { 1.0 };
                     Support::Nurbs { face: face.clone(), n: std::sync::Arc::new(n), s, last: std::sync::Arc::new(std::sync::Mutex::new(Some(glam::DVec2::new(pr.u, pr.v)))) }
                 }
-                None => Support::Face(face.clone(), if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 }),
+                None => Support::Face(face.clone(), if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 }, Default::default()),
             },
-            _ => Support::Face(face.clone(), if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 }),
+            _ => Support::Face(face.clone(), if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 }, Default::default()),
         })
     }
 
@@ -1305,8 +1307,13 @@ impl Support {
                 }
                 (*o + along + radial * *r, radial * *s)
             }
-            Support::Face(f, s) => {
-                let pr = f.project_point(q)?;
+            Support::Face(f, s, last) => {
+                let seed = *last.lock().unwrap_or_else(|e| e.into_inner());
+                let pr = match seed {
+                    Some(uv) => f.project_point_near(q, uv)?,
+                    None => f.project_point(q)?,
+                };
+                *last.lock().unwrap_or_else(|e| e.into_inner()) = Some(glam::DVec2::new(pr.u, pr.v));
                 (pr.point, f.normal_at_uv(pr.u, pr.v)?.normalize() * *s)
             }
             Support::Nurbs { face, n, s, last } => {
