@@ -2549,6 +2549,13 @@ fn contains_point(q: &QueryCx, e: &Ent, p: DVec3) -> bool {
             if matches!(e, Ent::Datum(_) | Ent::Plane(_) | Ent::PlaneBody(_)) {
                 return q.plane(e).is_some_and(|pl| (p - pl.origin).dot(pl.normal).abs() < 1e-8);
             }
+            // Not in its box, kept for the body (a Spur Gear's qContainsPoint over its 760 edges for each of 20
+            // fillet points: 15,203 BRepExtrema distances, cf-part-draft).
+            if let Some(Some(b)) = q.sub_box(e)
+                && (b.min - p).max(p - b.max).max_element() > 1e-7
+            {
+                return false;
+            }
             if matches!(e, Ent::Face(..))
                 && let Some(f) = q.shape(e)
             {
