@@ -340,6 +340,24 @@ The suite's per-feature kernel profiles count its own measuring (props_surface v
 Mirror 1 ours; Shell hollows; single-thread checks of elementary walls; NURBS length table), docs 574c2f8db, 51efc6d91.
 
 ## bool2 (second agent, from 11-11 23:40 UTC; worktree /root/projects/noshape-wt/bool2, scratch /root/bool2-scratch)
+- **11-15 05:07 UTC, the impeller's chamfer 26 and two speed rows:**
+  - Chamfer Stevenrohr Halterung (OCCT's chamfer fails on the stern tube end's two 0.3117 mm spline edges): new
+    fallback (crates/kernel/src/rim_chamfer.rs, blend_section::rim_chamfer_cut, after OCCT's retry in detail.rs's
+    chamfer): an Offset chamfer of a plane face's rim whose sides run along its normal, as a cut; each edge's chamfer
+    ruled d down its side to its offset e in; at an open chain's ends the chamfer runs on along the edge's own curve
+    to the face across the plane's next edge (live q2985c). Feature 26: 35/90/56, live 33/90/58, volume live's within
+    5e-6; mitres and run-on ends within 3 µm. Left: Part 3's cylinder stays three faces (the two patches the cut
+    leaves): USD won't merge them even on f0's own surface handle, and merge_cylinder_groups' one-loop merge (after
+    accepting the cut's 6 µm intersection-edge gap) builds a face of the right area but another volume share, so it's
+    rejected. Fillet 3 (27) selects Je1 / Je5, which in ours are split at x 5 there: it still fails, and 28-29 with it.
+    Probe and dump: vibe5 ~/agents/bool2-keep/imp-chamfer26, xprobe probe_rim_chamfer (untracked, all.rs patch
+    /root/bool2-scratch/all-with-probe.rs).
+  - c2-valve-config's pattern cut 0d1cff8f (bool's row): its cost was OCCT's empty cone x cone sections (35-95 ms a
+    pair, most 0 curves). New free-of-OCCT test: round faces on parallel axes whose cross-section circles never meet
+    over their shared stretch are apart (brep cyl_cyl and the sections-ahead pairing); about one empty pair per tool is
+    left (angularly apart, not radially). Timing not yet measured on a quiet host.
+  - c2-helical-sweep's cut 2e082aa1 (bool's row): sections ahead 84 ms of 140, cylinder x helical sweep, mostly real
+    intersections (1-8 curves); the marcher is dropped, so it waits for a cheaper OCCT setting (bool's PSO note).
 - **11-15 01:55 UTC (from 11-14 23:35), c2-impeller-loft from feature 12 (lead's item; core has no WIP there):**
   - Feature 12 "Extrude Flansch": our flange's geometry is live's at its points; the 0.07 mm³ is live's
     integration (core's handoff reached the same).
