@@ -1,5 +1,28 @@
 # Blends (agent "blend")
 
+## 11-15 07:16 UTC: fsorder landed; leanf8, paramline, runlaw gating; knife 46/52 with runlaw
+
+Landed: fsorder 4b3905a5. Builds and crate tests on the Mac from blend10 only (lead); pairs / asms on vibe5/6/7.
+Gating (units here, flags /root/blend-scratch/*.done):
+- blend7 `blend-leanf8` cf74e2de7: pair clean (877 = 877); its asm on vibe7 was SIGTERMed after robot-relations
+  (isaac-ball 97 -> 96 mates in the part it ran). paramline's asm (blend5, vibe7, a base without leanf8) tells whether
+  that's main's. Then land and tell core (their lean loft waits on it).
+- blend5 `blend-paramline` c714c20b6 (moved from blend10): pair clean (tpd faster); asm on vibe7 (blend-paramline-asm7b).
+- blend10 `blend-runlaw` 73e5339f9: a variable fillet's tangent run takes ONE law along it (live 04:16: knife Fillet 7's
+  side 1.093 mm mid-edge, ours was the straight 1.625 of the side alone). Pair on vibe6: 879 -> 892, all the knife (33 ->
+  46/52, its first difference now Revolve 1, core's vertex). T1 detail::tests::a_variable_runs_law_is_one_along_the_run_as_live.
+  asm on vibe6 (runlaw-asm.done). Land after.
+- cf-spur-gear 20-tooth (dx): my cb0551bfe puts opChamfer's distance on the caps for flipGear (opposite true, blank
+  extruded down); live has it on the cylinder for both gears. Asked live for a FS 1576 probe (REQUESTS 06:14).
+- Round-edge split: live's surface has C1 joints at all 31 u-knots; it splits only at 3 (+mirrors) of 4 with big
+  curvature jumps (not at u 0.4674, jump 166 1/m, near the handle top where the ring runs near-tangent). Assembly suite:
+  no fillets on B-spline supports. Parked (one case).
+- L-joint Fillet 2 (asm, normal priority): live's corners (sphere 4.01 + torus 15.14 + B-spline 20.885 each) where OCCT
+  fills one 37.85 B-spline: a support-switching vertex (x 8 plane -> 45° face at the pocket's z ±12). Needs a corner
+  builder. Data blend/q-ljoint.
+- Impeller Fillet 3 (bool2's): parked/impf3-wip.patch; the part's 1.8 mm-loose vertices make frame_at's probes all
+  OnBoundary; with fallbacks the conic loft builds but the cut is invalid.
+
 ## 11-15 02:25 UTC: mitretools landed; fsorder, leanf8, paramline gating; the round-edge split data
 
 Landed: mitretools 79fdec63d. Gating (units here, flags /root/blend-scratch/*.done):
