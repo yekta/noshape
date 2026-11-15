@@ -4,7 +4,23 @@ Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/
 scratch /root/bool-scratch.
 
 
-## bool, now (11-15 10:55 UTC; restart from here)
+## bool, now (11-15 14:40 UTC; restart from here)
+- Landing (gate 95a4684be clean: every corpus + parity56 at 0 differences, model suite 80/98 as main; knurls not run,
+  31 GB host): the Shell speed stack below (aa381fc3's land failed once on planar_mesh's notched plate, not seen in 3
+  reruns), plane x torus sections on our own (69d6d1577; the plane's box a tenth wider, as OCCT's against a quadric:
+  95a4684be), face areas by their boundary's line integral where the area element is a function of one parameter
+  (c57af4c85: cf-snap-hook's qLargest areas 854 -> 146 ms; its Snap Hooks were areas, not Booleans).
+- Gating next (branch bool-split-faces, worktree bool-split): f5baf22c6, a solid split by edges lying on its faces on
+  our own (rings cut at the face boundary, the faces made again by OCCT's BuilderFace): c2-hunting-knife Split 4's
+  op_split 2.1 s -> 30 ms, the same faces, edges and history as OCCT's. Then (not committed yet): a straight line
+  projected along a direction as the target's section by its plane, kept where it lies within the line's reach
+  (BRepProj's sweep's edges against the B-spline handle were most of 160 ms a projection: now ~15-20 ms; 7 per Split 4).
+- c2-bottle-split Split 1: ~12 ms a run in release (brep ~7.6 for both halves); the 79 ms was a cold or debug number.
+- blend's known sections (parked, /root/blend-scratch/parked/knownsec-wip.patch): barely any pair is a tangent contact;
+  the lever is transverse plane x rational B-spline and quadric x quadric pairs at 8-10 ms each in occt_ahead, and
+  tool x tool pairs (blend's per-pair numbers in its 11-15 message; debug patch zz-ahead-dbg.patch).
+
+## bool, earlier (11-15 10:55 UTC)
 - Stage 3 landed (e576bf0f). Queued (gate a52cf8e74 clean, knurls 6-8 % faster than main): the volumes face by face on
   all threads where a face is free-form (rings-loft 60 -> 20 ms), the kept faces meshed at once (first split 55 -> 48),
   every made plane's pcurves stored (skasm: big faces' std queries 30-120 us each without), big planes' on all threads,
