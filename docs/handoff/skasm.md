@@ -1,5 +1,25 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-15 15:24 UTC): dropped constraints wait on live's refs; psui's sheet metal rows
+- Exchange: live imports model-plus's STEP / IGES as 58/151/94 since 6f5b151e (dx: "live imports ours" 43/48; the
+  rest are dx's / deliberate). Corner-break (qa P0) after bool's plane pcurves: vibe6, 5 interleaved pairs, median
+  1850 ms main vs 1997 before (live 1972); told qa to re-time in a quiet window.
+- Dropped sketch constraints, full suite 13:00 (vibe6, suite-1300.log): 99 (80/87, 882/947). cc96cc97: a
+  constraint's model query without ids takes the ids of live's refs line for that constraint (refs.jsonl
+  `constraintId` / `parameter`, LiveRef.constraints): knife 19 -> 13, fan blade unchanged. 3ec41add: a Concentric
+  between an arc's centre and a point takes the arc (learning-center-frank). Left: ~30 "query not mapped (no live
+  geometry for <id>)" in 16 documents: REQUESTS.md 14:58 asks live for the same refs capture (dx/q1113/run.js);
+  rerun those documents when it lands. OFFSET of model edges (10: knife, impeller, point-pattern, surface-pattern)
+  needs our sketch Offset to take model edges (not built: decision for the lead). Knife: Ic / Id (Sketch 6's own
+  later entities), Sketch 12's 5 Uses (blade B-splines), Sketch 17 Concentric to a spline edge; fan blade: fillet
+  zero-length sides.
+- psui's ui-parity rows (11-15 run): a3eac522 (queued) Jog shows the angle std sets, read-only (bendAngleReadOnly,
+  jog-anchor-nominal / jog-bounding-thickness-outside). Gusset 20 / 10 vs 25: live's remembered values (take
+  artefact, told psui). Open: tab-new-edit-reedit "Face of Flange 1" (ours Sheet metal model 1) and bend-relief
+  "Vertex of Flange 1" (ours Flange 2): the feature a sheet metal face / vertex is named after; frames (end-cap-*,
+  gusset-rectangle-aligned): the +x member of frame-l is Part 1 in live, Part 2 in ours (std frame's path order vs
+  our body order).
+
 ## Resume here (2026-11-15 12:53 UTC): PS-INEXACT-INTERSECTION-EDGES (dx) done on our side; dropped constraints next
 - a5b52aae: export rebuilds plane / plane, plane / spline-extrusion (and its offset) edges exact (`exact_edges`,
   io.cpp). 6f5b151e (queued): adjacent planar faces on one plane up to rounding (vertices within 1 um of the other's
