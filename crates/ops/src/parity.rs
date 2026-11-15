@@ -83,6 +83,9 @@ pub struct Step {
     pub frame: Option<String>,
 }
 
+/// The default planes' and the Origin's deterministic ids in every Part Studio, and ours.
+const DEFAULT_IDS: [(&str, &str); 4] = [("JDC", "plane:top"), ("JCC", "plane:front"), ("JEC", "plane:right"), ("IB", "origin")];
+
 pub struct Translator<'a> {
     ctx: &'a mut Ctx,
     features: Vec<Value>,
@@ -158,6 +161,8 @@ pub struct Translator<'a> {
     import_bodies: HashMap<String, Vec<String>>,
     /// Sketch entities (sketch, live id) ours made with Use: their PROJECTED constraint is that.
     used: std::collections::HashSet<(String, String)>,
+    /// Sketch curves live made as a curved face's silhouette (SILHOUETTED): their Use keeps that one silhouette.
+    silhouettes: std::collections::HashSet<(String, String)>,
     /// The image tab standing in for icons live hasn't fetched.
     placeholder: Option<String>,
     /// Each Feature Studio's pinned std and the one our host serves for it.
@@ -361,7 +366,7 @@ impl<'a> Translator<'a> {
             // (A boolean configuration's default is a JSON boolean.)
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -1364,16 +1369,29 @@ impl<'a> Translator<'a> {
         let mark = top(self);
         let point = u.shape["tool"] == "point";
         let made = self.call("sketch_use", json!({ "sketch": id, "references": [u.reference] })).ok();
-        let ours = made.as_ref().and_then(|r| r["created"].as_array()?.iter().find(|c| (c["type"] == "point") == point).cloned());
         let near = |c: &Value, key: &str, q: [f64; 2]| {
             let q = map.local(q);
             c[key][0].as_f64().zip(c[key][1].as_f64()).is_some_and(|(x, y)| (x * map.k - q[0]).hypot(y * map.k - q[1]) < 1e-7)
         };
-        let lands = ours.as_ref().is_some_and(|c| match (u.point, u.ends) {
+        let landed = |c: &Value| match (u.point, u.ends) {
             (Some(p), _) => near(c, "at", p),
             (None, Some([a, b])) => (near(c, "start", a) && near(c, "end", b)) || (near(c, "start", b) && near(c, "end", a)),
             (None, None) => true,
-        });
+        };
+        let created: Vec<Value> = made.as_ref().and_then(|r| r["created"].as_array().cloned()).unwrap_or_default();
+        let kind: Vec<&Value> = created.iter().filter(|c| (c["type"] == "point") == point).collect();
+        // A curved face's Use makes each of its silhouettes: the one live's curve is (live keeps only that one,
+        // c2-fan-blade-sweep's Sketch 4).
+        let ours = kind.iter().find(|c| landed(c)).or(kind.first()).map(|c| (*c).clone());
+        let lands = ours.as_ref().is_some_and(landed);
+        if lands
+            && kind.len() > 1
+            && self.silhouettes.contains(&(oid.to_string(), u.eid.clone()))
+            && let Some(keep) = ours.as_ref().and_then(|c| c["id"].as_str())
+        {
+            let others: Vec<&str> = kind.iter().filter_map(|c| c["id"].as_str()).filter(|x| *x != keep).collect();
+            let _ = self.call("sketch_delete", json!({ "sketch": id, "entities": others }));
+        }
         if let (true, Some(c)) = (lands, ours) {
             // A construction Use stays construction (c2-fan-blade-sweep's Sketch 9: its Ø6.8 boss circle bounds no
             // region, the Ø7.5 circle's whole disc is cut).
@@ -2308,6 +2326,13 @@ impl<'a> Translator<'a> {
             }
             _ => text,
         };
+        // The default planes' and the Origin's deterministic ids (fixed in every Part Studio): ours, before any line's
+        // geometry (c2-hunting-knife's Sketch 6 mirrors about JCC, the Front plane; by its box another face).
+        if let [id] = ids.as_slice()
+            && let Some(p) = DEFAULT_IDS.iter().find(|(i, _)| i == id).map(|(_, p)| p)
+        {
+            return Ok(vec![p.to_string()]);
+        }
         // Not placed just before feature k (live's line after a sketch has no
         // bodies): where an earlier line has them all (an id names one entity).
         let k = if !ids.is_empty() && !ids.iter().all(|id| self.refs.contains_key(&(k, id.clone()))) {
@@ -2381,7 +2406,7 @@ impl<'a> Translator<'a> {
         // The default planes' and the Origin's deterministic ids (fixed in
         // every Part Studio), also when the query text is empty.
         if let [id] = ids.as_slice()
-            && let Some(p) = [("JDC", "plane:top"), ("JCC", "plane:front"), ("JEC", "plane:right"), ("IB", "origin")].iter().find(|(i, _)| i == id).map(|(_, p)| p)
+            && let Some(p) = DEFAULT_IDS.iter().find(|(i, _)| i == id).map(|(_, p)| p)
         {
             return Ok(vec![p.to_string()]);
         }
@@ -4364,15 +4389,21 @@ impl<'a> Translator<'a> {
         let mut zero_lines: Vec<String> = Vec::new();
         let mut texts: Vec<Value> = Vec::new();
         // Live's Use (PROJECTED): the entity's model geometry, used after the drawing as live's sketch uses it.
+        for c in f["constraints"].as_array().into_iter().flatten().filter(|c| c["constraintType"] == "SILHOUETTED") {
+            if let Some(l) = c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "localCurve").and_then(|p| p["value"].as_str()) {
+                self.silhouettes.insert((oid.clone(), l.to_string()));
+            }
+        }
         let projected: HashMap<String, Value> = f["constraints"]
             .as_array()
             .into_iter()
             .flatten()
-            .filter(|c| c["constraintType"] == "PROJECTED")
+            .filter(|c| c["constraintType"] == "PROJECTED" || c["constraintType"] == "SILHOUETTED")
             .filter_map(|c| {
+                // (A silhouette: its curve and the curved face it outlines.)
                 let params = c["parameters"].as_array()?;
-                let local = params.iter().find(|p| p["parameterId"] == "localFirst")?["value"].as_str()?.to_string();
-                Some((local, params.iter().find(|p| p["parameterId"] == "externalSecond")?.clone()))
+                let local = params.iter().find(|p| p["parameterId"] == "localFirst" || p["parameterId"] == "localCurve")?["value"].as_str()?.to_string();
+                Some((local, params.iter().find(|p| p["parameterId"] == "externalSecond" || p["parameterId"] == "externalFace")?.clone()))
             })
             .collect();
         let mut uses: Vec<Use> = Vec::new();
@@ -4902,10 +4933,10 @@ impl<'a> Translator<'a> {
                 // Ours made with Use (`use_projected`), else drawn where live's solve put it.
                 // A used curve's ends are projected with it; an orphaned Use (no model reference in live either) is
                 // drawn where it is stored, as live keeps it.
-                "PROJECTED" => {
+                "PROJECTED" | "SILHOUETTED" => {
                     let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name);
-                    let local = par("localFirst").and_then(|p| p["value"].as_str());
-                    let orphan = par("externalSecond").is_none_or(|p| p["queries"].as_array().is_none_or(|q| q.is_empty()));
+                    let local = par("localFirst").or(par("localCurve")).and_then(|p| p["value"].as_str());
+                    let orphan = par("externalSecond").or(par("externalFace")).is_none_or(|p| p["queries"].as_array().is_none_or(|q| q.is_empty()));
                     let used = |l: &str| self.used.contains(&(oid.to_string(), l.to_string()));
                     let made = local.is_some_and(|l| used(l) || l.strip_suffix(".start").or_else(|| l.strip_suffix(".end")).is_some_and(used));
                     if !made && !orphan {
@@ -5024,7 +5055,17 @@ impl<'a> Translator<'a> {
             let ours = if ours == "quadrant" { "coincident" } else { ours };
             // A point mirrored onto itself (ours merged the pair: a point on the mirror line) lies on the line.
             let (ours, entities) = if ours == "symmetric" && entities.len() == 3 && entities[0] == entities[1] { ("coincident", vec![entities[0].clone(), entities[2].clone()]) } else { (ours, entities) };
-            let reply = if entities.is_empty() { None } else { self.call("sketch_constrain", json!({ "sketch": id, "constraint": ours, "entities": entities })).ok() };
+            let reply = if entities.is_empty() {
+                None
+            } else {
+                let r = self.call("sketch_constrain", json!({ "sketch": id, "constraint": ours, "entities": entities }));
+                if let Err(e) = &r
+                    && std::env::var_os("NOSHAPE_PARITY_TRACE").is_some()
+                {
+                    eprintln!("TRACE {ty} {} rejected: {entities:?}: {e}", c["entityId"].as_str().unwrap_or(""));
+                }
+                r.ok()
+            };
             // One linked by where live solved it that over-defines the sketch (c2-hex-bookcase-derived's clip: a
             // polygon's corners on a mesh's nodes, a hair off live's): taken back.
             if linked && reply.as_ref().is_some_and(|r| r["status"].as_str().is_some_and(|t| t.starts_with("over defined"))) {
