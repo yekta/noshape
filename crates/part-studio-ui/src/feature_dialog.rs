@@ -477,12 +477,13 @@ impl FeatureDialog {
 
     /// First visible query parameter (initial selection focus).
     pub fn first_visible_query(&self) -> Option<String> {
-        self.ty
-            .params
-            .iter()
-            .filter(|s| s.is_visible(&self.feature.params))
-            // Selection-driven arrays pick too (Loft's Profiles, live loft-01).
+        let visible = || self.ty.params.iter().filter(|s| s.is_visible(&self.feature.params));
+        // Selection-driven arrays pick too (Loft's Profiles, live loft-01).
+        visible()
             .find(|s| matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS))
+            // None shown: an array whose entries pick (live cut-list-new-edit-reedit: Select all frames on, reopened, the
+            // Overrides array has the keyboard).
+            .or_else(|| visible().find(|s| matches!(&s.kind, ParamKind::Array { item, .. } if item.iter().any(|i| matches!(i.kind, ParamKind::Query { .. })))))
             .map(|s| s.id.to_string())
     }
 
@@ -627,7 +628,11 @@ impl FeatureDialog {
                 Some((true, false)) => !before_gone || picks_geometry,
                 _ => before_gone,
             };
-        if takes && self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str())) {
+        // A field the edit swapped for its same-named twin isn't one it brought up (live loft-surface-thin-tabs: Surface
+        // trades Profiles for the wire profiles' Profiles; the keyboard stays off it).
+        let label = |q: &Option<String>| q.as_deref().and_then(|q| self.spec_for_path(q)).map(|s| s.label);
+        let twin = active.is_some() && label(&active) == label(&self.active_query);
+        if takes && !twin && self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str())) {
             self.focus_dialog_pending = true;
             // (A tab that brings the field up doesn't leave the keyboard outside: live extrude-surface-tab.)
             self.keyboard_left = false;
@@ -2479,7 +2484,13 @@ impl FeatureDialog {
                                 Self::leave_keyboard_after_menu(&v, window, cx);
                             }));
                         }
-                        configure_items(m, &view, &pid, is_configured)
+                        // Esc closes it with the keyboard off the field (live dialog-number-rclick-menu).
+                        let m = configure_items(m, &view, &pid, is_configured);
+                        if query {
+                            return m;
+                        }
+                        let v = view.clone();
+                        m.after_escape(move |window, cx| Self::leave_keyboard_after_menu(&v, window, cx))
                     };
                     // Over a number field the menu wins over the input's own
                     // Cut / Copy / Paste (live: none); pick rows keep theirs.

@@ -768,6 +768,23 @@ fn add_custom_features_closes_on_escape_and_its_close_button(cx: &mut TestAppCon
     assert!(cx.update(|cx| view.read(cx).ui.add_features.is_none()), "✕ closes it");
 }
 
+/// Live loft-surface-thin-tabs: Loft's Surface tab swaps Profiles for its same-named twin (the wire profiles'); the
+/// tab click leaves nothing focused, as from any tab.
+#[gpui::test]
+fn a_tab_that_swaps_a_field_for_its_twin_leaves_the_keyboard_off(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "zz-loft");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("loft", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("Loft").dialog.clone());
+    draw(cx, window);
+    let f0 = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)["focus"].clone()).unwrap();
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| { let fh = gpui::Focusable::focus_handle(d, cx); w.focus(&fh, cx); d.keyboard_left = true; d.set_value("bodyType", noshape_model::ParamValue::Enum("SURFACE".into()), cx); })).unwrap();
+    draw(cx, window);
+    let f1 = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)["focus"].clone()).unwrap();
+    assert_eq!((f0["kind"].as_str(), f0["label"].as_str()), (Some("field"), Some("Profiles")));
+    assert_eq!(f1["kind"].as_str(), Some("none"), "{f1}");
+}
+
 /// Live 3096: the Create selection panel opened from a field's button sits 4 px right of the dialog, its top 64 px
 /// under the button's (Mirror › Face mirror: button top 141, panel 205).
 #[gpui::test]
