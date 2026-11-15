@@ -3593,39 +3593,54 @@ impl SketchEditor {
     /// the bottom right (live Onshape: `Length: 1.003 in`, `Diameter: 0.401
     /// in`, `Angle: 35.538 deg`, `Parallel dist: …`, `Point: X … Y … Z …`).
     /// Returns (label, value); `None` for an empty or mixed selection.
-    pub fn selection_readout(&self, data: &SketchData, units: &UnitPrefs) -> Option<(String, String)> {
+    pub fn selection_readout(&self, data: &SketchData, units: &UnitPrefs) -> Vec<(String, String)> {
         let sk = &data.sketch;
-        let len = |v: f64| noshape_units::format_quantity(Quantity::new(v, Dim::LENGTH), units);
+        // Live's readouts keep their precision ("30.000 mm", sketch-mirror-model-edge).
+        let len = |v: f64| format!("{} {}", noshape_units::to_fixed(v / units.si_factor(Dim::LENGTH), units.length_precision), units.length.symbol());
+        let one = |label: &str, text: String| vec![(label.to_string(), text)];
         let sel: Vec<EntityId> = self.selection.iter().copied().filter(|e| sk.entity(*e).is_some()).collect();
         match sel.as_slice() {
             [e] => {
                 if let Some(p) = sk.point(*e) {
                     let w = self.frame.to_world(p);
-                    return Some(("Point".into(), format!("X {}  Y {}  Z {}", len(w.x), len(w.y), len(w.z))));
+                    return one("Point", format!("X {}  Y {}  Z {}", len(w.x), len(w.y), len(w.z)));
                 }
-                match sk.curve(*e)? {
-                    Curve2::Line { a, b } => Some(("Length".into(), len((b - a).length()))),
-                    Curve2::Circle { radius, .. } => Some(("Diameter".into(), len(radius * 2.0))),
-                    Curve2::Arc { radius, .. } => Some(("Radius".into(), len(radius))),
-                    c => Some(("Length".into(), len(c.length()))),
+                match sk.curve(*e) {
+                    Some(Curve2::Line { a, b }) => one("Length", len((b - a).length())),
+                    Some(Curve2::Circle { radius, .. }) => one("Diameter", len(radius * 2.0)),
+                    Some(Curve2::Arc { radius, .. }) => one("Radius", len(radius)),
+                    Some(c) => one("Length", len(c.length())),
+                    None => Vec::new(),
                 }
             }
             [a, b] => {
                 if let (Some(p), Some(q)) = (sk.point(*a), sk.point(*b)) {
-                    return Some(("Distance".into(), len((q - p).length())));
+                    return one("Distance", len((q - p).length()));
                 }
-                let (Some(Curve2::Line { a: a0, b: a1 }), Some(Curve2::Line { a: b0, b: b1 })) = (sk.curve(*a), sk.curve(*b)) else { return None };
-                let (u, v) = ((a1 - a0).try_normalize()?, (b1 - b0).try_normalize()?);
-                if u.perp_dot(v).abs() < 1e-9 {
-                    Some(("Parallel dist".into(), len((b0 - a0).perp_dot(u).abs())))
-                } else {
-                    let ang = u.dot(v).clamp(-1.0, 1.0).acos();
-                    let ang = ang.min(PI - ang);
-                    let text = noshape_units::format_quantity(Quantity::new(ang, Dim::ANGLE), units).replace('°', " deg");
-                    Some(("Angle".into(), text))
+                match (sk.curve(*a), sk.curve(*b)) {
+                    (Some(Curve2::Line { a: a0, b: a1 }), Some(Curve2::Line { a: b0, b: b1 })) => {
+                        let (Some(u), Some(v)) = ((a1 - a0).try_normalize(), (b1 - b0).try_normalize()) else { return Vec::new() };
+                        if u.perp_dot(v).abs() < 1e-9 {
+                            one("Parallel dist", len((b0 - a0).perp_dot(u).abs()))
+                        } else {
+                            let ang = u.dot(v).clamp(-1.0, 1.0).acos();
+                            let ang = ang.min(PI - ang);
+                            one("Angle", format!("{} deg", noshape_units::to_fixed(ang.to_degrees(), units.angle_precision)))
+                        }
+                    }
+                    // A line and a circle (live sketch-mirror-preselected-batch): the nearest and farthest distances
+                    // between them and the centre's distance to the line.
+                    (Some(Curve2::Line { a: l0, b: l1 }), Some(Curve2::Circle { center, radius })) | (Some(Curve2::Circle { center, radius }), Some(Curve2::Line { a: l0, b: l1 })) => {
+                        let Some(d) = (l1 - l0).try_normalize() else { return Vec::new() };
+                        let t = (center - l0).dot(d).clamp(0.0, (l1 - l0).length());
+                        let near = (l0 + d * t - center).length();
+                        let far = (l0 - center).length().max((l1 - center).length());
+                        vec![("Min dist".into(), len((near - radius).max(0.0))), ("Max dist".into(), len(far + radius)), ("Center dist".into(), len((center - l0).perp_dot(d).abs()))]
+                    }
+                    _ => Vec::new(),
                 }
             }
-            _ => None,
+            _ => Vec::new(),
         }
     }
 
@@ -8472,16 +8487,19 @@ mod tests {
         let readout = |ed: &SketchEditor, sel: &[EntityId]| {
             let mut ed2 = SketchEditor::new(ed.feature, ed.frame);
             ed2.selection = sel.to_vec();
-            ed2.selection_readout(&d, &u).map(|(l, v)| format!("{l}: {v}"))
+            let r = ed2.selection_readout(&d, &u);
+            (!r.is_empty()).then(|| r.iter().map(|(l, v)| format!("{l}: {v}")).collect::<Vec<_>>().join("; "))
         };
-        assert_eq!(readout(&ed, &[l1]).as_deref(), Some("Length: 20 mm"));
-        assert_eq!(readout(&ed, &[c]).as_deref(), Some("Diameter: 10 mm"));
-        assert_eq!(readout(&ed, &[l1, l2]).as_deref(), Some("Parallel dist: 10 mm"));
+        assert_eq!(readout(&ed, &[l1]).as_deref(), Some("Length: 20.000 mm"));
+        assert_eq!(readout(&ed, &[c]).as_deref(), Some("Diameter: 10.000 mm"));
+        assert_eq!(readout(&ed, &[l1, l2]).as_deref(), Some("Parallel dist: 10.000 mm"));
         assert!(readout(&ed, &[l1, l3]).is_some_and(|t| t.starts_with("Angle: 45") && t.ends_with(" deg")));
-        assert!(readout(&ed, &[p]).is_some_and(|t| t.starts_with("Point: X 10 mm")), "{:?}", readout(&ed, &[p]));
+        assert!(readout(&ed, &[p]).is_some_and(|t| t.starts_with("Point: X 10.000 mm")), "{:?}", readout(&ed, &[p]));
+        // A line and a circle (live sketch-mirror-preselected-batch): nearest, farthest, the centre to the line.
+        assert_eq!(readout(&ed, &[l1, c]).as_deref(), Some("Min dist: 53.310 mm; Max dist: 75.711 mm; Center dist: 50.000 mm"));
         assert_eq!(readout(&ed, &[l1, l2, c]), None, "mixed selection shows nothing");
         ed.selection.clear();
-        assert_eq!(ed.selection_readout(&d, &u), None);
+        assert!(ed.selection_readout(&d, &u).is_empty());
         let _ = &mut d;
     }
 

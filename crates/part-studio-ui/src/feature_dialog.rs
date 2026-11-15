@@ -465,7 +465,7 @@ impl FeatureDialog {
             external_field: None,
             extra: None,
         };
-        d.active_query = d.first_visible_query();
+        d.active_query = d.opening_query();
         // A sketch opened on its plane lets the filled plane field go
         // (defocusFilledSketchPlaneQLV, live sketch/21: editing Sketch 1 the
         // field is white and sketch curves pre-highlight).
@@ -477,14 +477,27 @@ impl FeatureDialog {
 
     /// First visible query parameter (initial selection focus).
     pub fn first_visible_query(&self) -> Option<String> {
-        let visible = || self.ty.params.iter().filter(|s| s.is_visible(&self.feature.params));
-        // Selection-driven arrays pick too (Loft's Profiles, live loft-01).
-        visible()
+        self.ty
+            .params
+            .iter()
+            .filter(|s| s.is_visible(&self.feature.params))
+            // Selection-driven arrays pick too (Loft's Profiles, live loft-01).
             .find(|s| matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS))
-            // None shown: an array whose entries pick (live cut-list-new-edit-reedit: Select all frames on, reopened, the
-            // Overrides array has the keyboard).
-            .or_else(|| visible().find(|s| matches!(&s.kind, ParamKind::Array { item, .. } if item.iter().any(|i| matches!(i.kind, ParamKind::Query { .. })))))
             .map(|s| s.id.to_string())
+    }
+
+    /// The field a dialog opens with: [`Self::first_visible_query`], else, with none shown, an array whose entries pick
+    /// (live cut-list-new-edit-reedit: Select all frames on, reopened, the Overrides array has the keyboard; ticking it
+    /// in the open dialog leaves the keyboard on the checkbox).
+    fn opening_query(&self) -> Option<String> {
+        self.first_visible_query().or_else(|| {
+            self.ty
+                .params
+                .iter()
+                .filter(|s| s.is_visible(&self.feature.params))
+                .find(|s| matches!(&s.kind, ParamKind::Array { item, .. } if item.iter().any(|i| matches!(i.kind, ParamKind::Query { .. }))))
+                .map(|s| s.id.to_string())
+        })
     }
 
     /// A new feature whose first selection field is a single pick the

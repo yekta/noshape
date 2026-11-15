@@ -270,8 +270,7 @@ impl PartStudioView {
         // Live (assign-material-05): the name left, the numbers right-aligned.
         let ro_value = |v: String, right: bool| div().flex_1().h(px(26.)).pt(px(5.)).px(px(3.)).flex().when(right, |d| d.justify_end()).text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(v);
         let tab = |id: &'static str, on: bool, to_custom: bool, cx: &mut Context<Self>| {
-            div()
-                .id(id)
+            crate::ui_script::mark(div().id(id), move || format!("tab:{}", if to_custom { "Custom" } else { "Library" }))
                 .flex_1()
                 .h(px(32.))
                 .relative()
@@ -416,8 +415,7 @@ impl PartStudioView {
                     })
                     .into_any_element()
             } else {
-                    h_flex()
-                        .id("mat-picker")
+                    crate::ui_script::mark(h_flex().id("mat-picker"), || "dropdown:Material".into())
                         .debug_selector(|| "mat-picker".into())
                         .h(px(34.))
                         .pl(px(11.))
@@ -466,8 +464,8 @@ impl PartStudioView {
                             }
                         }
                         // Live: 44 px rows, 20 px in, #555; the active one #b2ddf6.
-                        v_flex()
-                            .id(SharedString::from(format!("mat-row-{i}")))
+                        let row_name = name.clone();
+                        crate::ui_script::mark(v_flex().id(SharedString::from(format!("mat-row-{i}"))), move || format!("list_row:{row_name}"))
                             .h(px(44.))
                             .flex_none()
                             .justify_center()
@@ -540,8 +538,7 @@ impl PartStudioView {
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_material(cx))),
                         )
                         .child(
-                            div()
-                                .id("mat-cancel")
+                            crate::ui_script::mark(div().id("mat-cancel"), || "button:cancel".into())
                                 .size(px(28.))
                                 .flex()
                                 .items_center()

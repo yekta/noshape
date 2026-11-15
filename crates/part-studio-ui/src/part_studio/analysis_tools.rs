@@ -115,7 +115,7 @@ pub struct ToolOptions {
 impl Default for ToolOptions {
     // Fresh defaults as live (behaviours "skasm (2026-10-31, P3 workflow-analysis 18)" (a)).
     fn default() -> Self {
-        Self { combs: true, show_u: true, show_v: true, u_curves: 8, v_curves: 8, inflections: false, min_radius: true, extend: false, control_points: false, knots: false, details: false, radians: false, threshold: false, high_deg: 180.0, low_deg: 0.0, scale: 0.3, surface: false, minmax_location: true, absolute: false, show_class: [false, true, true, true, true], tolerances: Default::default(), zebra: Default::default(), reflection: Default::default() }
+        Self { combs: true, show_u: true, show_v: true, u_curves: 8, v_curves: 8, inflections: false, min_radius: true, extend: false, control_points: false, knots: false, details: true, radians: false, threshold: false, high_deg: 180.0, low_deg: 0.0, scale: 0.3, surface: false, minmax_location: true, absolute: false, show_class: [false, true, true, true, true], tolerances: Default::default(), zebra: Default::default(), reflection: Default::default() }
     }
 }
 
@@ -435,7 +435,7 @@ impl PartStudioView {
             chips(&mut text, f.origin.as_slice());
             text.push("Flattened position (mate connector)".into());
             chips(&mut text, f.position.as_slice());
-            for (label, v) in [("Flattened offset", q(f.offset, noshape_units::Dim::LENGTH)), ("Flattened angle", q(f.angle_deg.to_radians(), noshape_units::Dim::ANGLE))] {
+            for (label, v) in [("Flattened offset", q(f.offset, noshape_units::Dim::LENGTH)), ("Flattened angle", format!("{} deg", noshape_units::format_number(f.angle_deg, 2)))] {
                 text.extend([label.to_string(), v.clone()]);
                 fields.push(json!({ "label": label, "kind": "input", "value": v }));
             }
@@ -489,7 +489,11 @@ impl PartStudioView {
                     None => (String::new(), String::new()),
                 };
                 let units = if o.radians { "Radians" } else { "Degrees" };
-                text.extend(["Units".to_string(), units.into(), "Max".into(), hi.clone(), "Min".into(), lo.clone()]);
+                // (An empty value has no text of its own: live shortcut-shift-d, "Max" then "Min".)
+                text.extend(["Units".to_string(), units.into(), "Max".into()]);
+                text.extend((!hi.is_empty()).then(|| hi.clone()));
+                text.push("Min".into());
+                text.extend((!lo.is_empty()).then(|| lo.clone()));
                 fields.push(json!({ "label": units, "kind": "input", "value": "" }));
                 fields.push(json!({ "label": "Max", "kind": "input", "value": hi }));
                 fields.push(json!({ "label": "Min", "kind": "input", "value": lo }));

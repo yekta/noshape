@@ -294,8 +294,13 @@ impl PartStudioView {
         let ed = self.sketch.as_ref()?;
         let data = self.sketch_data(cx)?;
         let units = self.doc.read(cx).session.doc.settings.units;
-        let (label, text) = ed.selection_readout(&data, &units)?;
+        let all = ed.selection_readout(&data, &units);
         let split = |t: String| t.rsplit_once(' ').map(|(v, u)| (v.to_string(), u.to_string())).unwrap_or((t, String::new()));
+        if all.len() > 1 {
+            let readout: Vec<Value> = all.into_iter().map(|(name, text)| { let (value, units) = split(text); json!({ "name": name, "value": value, "units": units }) }).collect();
+            return Some(json!({ "readout": readout, "panel": null }));
+        }
+        let (label, text) = all.into_iter().next()?;
         let readout = match (label.as_str(), ed.selection.as_slice()) {
             ("Point", [e]) => {
                 let w = ed.frame.to_world(data.sketch.point(*e)?);

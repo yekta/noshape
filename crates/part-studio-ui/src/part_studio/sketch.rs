@@ -3372,21 +3372,20 @@ impl PartStudioView {
         // tools at the bottom right (live: `Length: 1.003 in`, monospace value)
         // (the one element so far that doesn't follow the camera)
         let readout = ed.selection_readout(&data, &units);
-        let fixed = usize::from(readout.is_some());
-        if let Some((label, value)) = readout {
+        let fixed = usize::from(!readout.is_empty());
+        if !readout.is_empty() {
             out.push(
                 h_flex()
                     .absolute()
                     .bottom_0()
                     .right(px(120.))
                     .h(px(30.))
-                    .gap_1()
+                    .gap(px(12.))
                     .items_center()
                     .text_size(px(13.))
                     .text_color(rgb(0x333333))
                     .whitespace_nowrap()
-                    .child(format!("{label}:"))
-                    .child(div().font_family("monospace").child(value))
+                    .children(readout.into_iter().map(|(label, value)| h_flex().gap_1().child(format!("{label}:")).child(div().font_family("monospace").child(value))))
                     .into_any_element(),
             );
         }
