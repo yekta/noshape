@@ -267,12 +267,15 @@ impl DrawingEditor {
         {
             out.push(MenuEntry::item("Change configuration...", move |t, w, cx| t.open_table_change_config(id, w, cx)));
         }
-        out.push(MenuEntry::item("Copy", move |t, _, cx| {
-            if !t.selection.contains(&Sel::Table(id)) {
-                t.selection = vec![Sel::Table(id)];
-            }
-            t.copy_entities(cx);
-        }));
+        // (A hole table has no Copy: live's hole table menus, 11-15.)
+        if !matches!(t.kind, TableKind::Hole { .. }) {
+            out.push(MenuEntry::item("Copy", move |t, _, cx| {
+                if !t.selection.contains(&Sel::Table(id)) {
+                    t.selection = vec![Sel::Table(id)];
+                }
+                t.copy_entities(cx);
+            }));
+        }
         // Live: always present, never greyed.
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
             t.paste_as_table(cx);
@@ -291,7 +294,11 @@ impl DrawingEditor {
         let alone = sheet.tables.len() == 1 && sheet.annotations.is_empty() && sheet.images.is_empty();
         out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_table(id, true, cx)).disabled(alone));
         out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_table(id, false, cx)).disabled(alone));
-        out.push(MenuEntry::Separator);
+        // A separator before a Switch to… row only (live2 dom/context-menus-drawing-2.txt: a plain table's Move to
+        // sheet... follows Send to back).
+        if matches!(t.kind, TableKind::Bom { .. } | TableKind::Custom { .. }) {
+            out.push(MenuEntry::Separator);
+        }
         let doc = &self.doc.read(cx).session.doc;
         if let TableKind::Bom { view, .. } = t.kind
             && let Some((key, _)) = noshape_model::drawing::views::view_source(sheet, view)

@@ -727,7 +727,15 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         run("drawing_sketch", json!({ "drawing": dw, "tool": "point", "picks": [[80, 200]] }));
         run("drawing_table", json!({ "drawing": dw, "position": [20, 280], "rows": 3, "columns": 2, "header_row": true }));
         run("drawing_revision_table", json!({ "drawing": dw, "position": [300, 290] }));
-        run("drawing_hatch_region", json!({ "drawing": dw, "points": [[100, 240], [140, 240], [140, 270]] }));
+        run("drawing_sketch", json!({ "drawing": dw, "tool": "corner_rectangle", "picks": [[100, 240], [140, 270]] }));
+        run("drawing_hatch_region", json!({ "drawing": dw, "points": [[120, 255]] }));
+        run("drawing_centerline", json!({ "drawing": dw, "kind": "two_point", "picks": [a, [a[0], a[1] + 8.0]] }));
+        // A 1×1 PNG.
+        let png = std::env::temp_dir().join(format!("noshape-menu-dump-{}.png", std::process::id()));
+        let bytes: &[u8] = &[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0x1f, 0x15, 0xc4, 0x89, 0, 0, 0, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0xfc, 0xff, 0x9f, 0xa1, 0x1e, 0, 0x07, 0x82, 0x02, 0x7f, 0x3d, 0xc8, 0x48, 0xef, 0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82];
+        if std::fs::write(&png, bytes).is_ok() {
+            run("drawing_insert_image", json!({ "drawing": dw, "path": png.to_string_lossy(), "position": [200, 230], "to": [230, 260] }));
+        }
     }));
     let (window, editor) = drawing(cx, "menu-dump");
     real_sheet(cx, window, &editor);
@@ -765,6 +773,8 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
                 },
                 PickTarget::SketchEntity(_) => "sketch".into(),
                 PickTarget::Hatch(_) => "hatch".into(),
+                PickTarget::Image(_) => "image".into(),
+                t if format!("{t:?}").contains("Centermark") => "centermark".into(),
                 _ => continue,
             };
             if !seen.insert(name.clone()) {
@@ -776,6 +786,11 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
                 [x.pos[0] + w / 2.0, x.pos[1] + x.height / 2.0]
             }).or_else(|| {
                 b.geometry.lines.iter().find(|l| l.pick as usize == pick && l.points.len() >= 2).map(|l| [(l.points[0][0] + l.points[1][0]) / 2.0, (l.points[0][1] + l.points[1][1]) / 2.0])
+            });
+            // An image: the middle of its picture.
+            let at = at.or_else(|| match t {
+                PickTarget::Image(id) => sheet.images.iter().find(|i| i.id == *id).map(|i| [i.pos[0] + i.size[0] / 2.0, i.pos[1] + i.size[1] / 2.0]),
+                _ => None,
             });
             if let Some(at) = at {
                 out.push((name, pick as u32, at));
@@ -827,10 +842,25 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         ("revision-table", with_tail(&["Revision table properties...", "Paste as table", "Move to ▸", "Bring to front", "Send to back"])),
         ("surface-finish", with_tail(&["Edit...", "Copy", "Paste as table", "Add leader", "Move to ▸"])),
         ("weld", with_tail(&["Edit...", "Flip", "Copy", "Paste as table", "Move to ▸"])),
+        // Live2's second pass (11-15).
+        ("general-table", with_tail(&["Table properties...", "Copy", "Paste as table", "Move to ▸", "Bring to front", "Send to back", "Move to sheet..."])),
+        ("centerline", ["Clear selection", "Zoom to fit", "Delete"].map(String::from).to_vec()),
+        ("centermark", ["Paste as table", "Align centermark", "——", "Clear selection", "Zoom to fit"].map(String::from).to_vec()),
+        ("hatch", with_tail(&["Copy", "Paste as table", "Edit hatch region..."])),
     ];
     for (entity, rows) in live {
         assert_eq!(dump.get(entity), Some(&json!(rows)), "{entity}'s menu");
     }
+    // An image: its Switch to <file tab> row names the tab.
+    let image: Vec<String> = cx.update(|cx| {
+        let e = editor.read(cx);
+        let id = e.current_sheet().images.first().map(|i| i.id).expect("an image");
+        // (Nothing copied: the menu drops Paste, as `context_menu_entries` does.)
+        flat(&e.image_entries(id, cx)).into_iter().filter(|r| r != "Paste").collect::<Vec<_>>()
+    });
+    let switch = image.iter().position(|r| r.starts_with("Switch to ")).expect("Switch to …");
+    assert_eq!(&image[..switch], ["Image properties...", "Show image borders", "Copy", "Paste as table", "Move to ▸", "Bring to front", "Send to back", "——"]);
+    assert_eq!(&image[switch + 1..], ["——", "Clear selection", "Zoom to fit", "Delete"]);
     // With a note copied every menu gains Paste (live2: after ctrl+c on a note): the note's after Explode note.
     let note = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Note { .. })).map(|a| a.id)).expect("a note");
     let (pick, at) = cx.update(|cx| {
@@ -848,4 +878,45 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         e.context_menu_entries(Some(pick), cx)
     }));
     assert_eq!(&flat(&rows)[..4], ["Edit note...", "Explode note", "Paste", "Copy"]);
+}
+
+/// Live (dx/q-centermark): a Single centermark clicked on a hole that has an automatic mark lasts only with ✓; Esc
+/// drops it, the automatic mark staying.
+#[gpui::test]
+fn a_single_centermark_over_an_automatic_one_goes_with_escape(cx: &mut TestAppContext) {
+    use noshape_model::drawing::views::EdgeGeom;
+    use noshape_scene::drawing_tools::Tool;
+    SUGGESTED.set(true);
+    HOLED.set(true);
+    let (window, editor) = drawing(cx, "centermark-over-auto");
+    real_sheet(cx, window, &editor);
+    let marks = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing.sheets[0].annotations.iter().filter(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Centermark { .. })).count());
+    let rim = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        b.placements.iter().find_map(|pl| {
+            let g = e.geoms.get(&pl.id)?;
+            g.model_edges.iter().find_map(|m| match m.geom {
+                EdgeGeom::Circle { center, radius, face_on: true, .. } => Some(pl.to_sheet([center[0] + radius, center[1]])),
+                _ => None,
+            })
+        })
+    });
+    let rim = rim.expect("a hole seen face on");
+    let before = marks(cx);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Centermark, cx)));
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        editor.update(cx, |e, cx| {
+            e.cursor = rim;
+            e.update_preview(cx);
+            e.tool_click(w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    assert_eq!(marks(cx), before + 1, "the Single mark is drawn at once");
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    draw(cx, window);
+    assert_eq!(marks(cx), before, "Esc drops it over the automatic mark");
 }

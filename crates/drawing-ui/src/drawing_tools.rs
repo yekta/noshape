@@ -2067,7 +2067,18 @@ impl DrawingEditor {
         if crate::drawing_props::view_clipboard(cx).is_none() {
             entries.retain(|e| !matches!(e, MenuEntry::Item { label, .. } if label.as_ref() == "Paste"));
         }
-        entries
+        // No separator at either end or twice in a row (live: a centerline's menu starts with Clear selection).
+        let mut out: Vec<MenuEntry> = Vec::with_capacity(entries.len());
+        for e in entries {
+            if matches!(e, MenuEntry::Separator) && out.last().is_none_or(|l| matches!(l, MenuEntry::Separator)) {
+                continue;
+            }
+            out.push(e);
+        }
+        while out.last().is_some_and(|l| matches!(l, MenuEntry::Separator)) {
+            out.pop();
+        }
+        out
     }
 
     fn context_menu_rows(&mut self, pick: Option<u32>, cx: &mut Context<Self>) -> Vec<MenuEntry> {

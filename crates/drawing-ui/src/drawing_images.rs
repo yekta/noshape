@@ -201,28 +201,11 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// Context menu of an image (live 1613 (a), in order): Image
-    /// properties..., Show / Hide image borders, Paste, Copy, Paste as
-    /// table, Move to ▸, Bring to front, Send to back, (ours: Move to sheet
-    /// ▸), Switch to <image tab>, Clear selection, Zoom to fit, Delete.
+    /// Context menu of an image (live 1613 (a), live2 11-15, in order): Image properties..., Show / Hide image
+    /// borders, Paste, Copy, Paste as table, Move to ▸, Bring to front, Send to back, Switch to <image tab>, Clear
+    /// selection, Zoom to fit, Delete.
     pub fn image_entries(&self, id: u64, cx: &App) -> Vec<MenuEntry> {
         let borders = self.drawing.props.image_borders;
-        let cur = self.sheet;
-        let sheets: Vec<MenuEntry> = self
-            .drawing
-            .sheets
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| *i != cur)
-            .map(|(i, s)| {
-                MenuEntry::item(s.name.clone(), move |t, _, cx| {
-                    t.selection.clear();
-                    t.edit(noshape_ops::drawing::MOVE_IMAGE_TO_SHEET, cx, |d| {
-                        noshape_ops::drawing::move_image_to_sheet(d, cur, id, i);
-                    });
-                })
-            })
-            .collect();
         let mut out = vec![
             MenuEntry::item("Image properties...", move |t, _, cx| t.open_image_props(id, cx)),
             MenuEntry::item(noshape_ops::drawing::image_borders_label(borders), move |t, _, cx| t.edit(noshape_ops::drawing::IMAGE_BORDERS, cx, |d| d.props.image_borders = !borders)),
@@ -256,9 +239,6 @@ impl DrawingEditor {
         let front = sheet.images.last().is_some_and(|i| i.id == id);
         out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_image(id, true, cx)).disabled(front));
         out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_image(id, false, cx)));
-        if !sheets.is_empty() {
-            out.push(MenuEntry::Submenu("Move to sheet".into(), sheets));
-        }
         let tab = self.current_sheet().images.iter().find(|i| i.id == id).and_then(|im| Self::image_tab(&self.doc.read(cx).session.doc, im));
         if let Some((tab, name)) = tab {
             out.push(MenuEntry::Separator);
