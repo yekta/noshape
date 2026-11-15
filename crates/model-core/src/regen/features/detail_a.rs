@@ -536,8 +536,15 @@ fn propagate_tangent_faces(shape: &Shape, seed: &[usize], pull: DVec3, angle: f6
                 continue;
             }
             // Steep: the face normal is within `angle` of perpendicular to pull (asked once per face, before the
-            // edge: a gear's caps meet its 150 drafted faces).
-            let steep = *steep_known[other].get_or_insert_with(|| faces.get(other).and_then(point_on_face).and_then(|p| face_normal_near(&faces[other], p)).is_some_and(|(_, n)| n.normalize().dot(pull).abs() < angle.sin().max(1e-6) + 1e-9));
+            // edge: a gear's caps meet its 150 drafted faces). A plane's normal is its surface's (no centroid to
+            // integrate: cf-circular-pattern's 14 patterned drafts spent 90 ms on them).
+            let steep = *steep_known[other].get_or_insert_with(|| {
+                let normal = match faces[other].face_surface() {
+                    Ok(k::Surface::Plane(p)) => Some(p.normal),
+                    _ => point_on_face(&faces[other]).and_then(|p| face_normal_near(&faces[other], p)).map(|(_, n)| n),
+                };
+                normal.is_some_and(|n| n.normalize().dot(pull).abs() < angle.sin().max(1e-6) + 1e-9)
+            });
             if !steep {
                 continue;
             }
