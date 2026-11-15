@@ -1836,6 +1836,27 @@ fn a_fuse_with_revolved_arcs_as_occt() {
     valid_as_occt("4a77bf0cde101133", 1e-9);
 }
 
+/// c2-housing-draft's Rotieren 1 (recorded): a housing cut by an arc revolved about an axis in its plane (a spindle
+/// torus, its outer part, OCCT keeping it as a surface of revolution), its sections with the housing's planes along that
+/// axis our own, exact point by point: valid, its faces, edges and vertices as recorded (live's 41 faces; OCCT's own
+/// cut gives 42), the volume within 1e-6 (OCCT's sections, recorded, run 4 nm off the revolution).
+#[test]
+fn a_cut_by_a_revolved_arcs_spindle_torus_as_recorded() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "4361c232e43fc0c1").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let got = k::bool_corpus::Summary::of(&r);
+    let want = &c.summary;
+    assert!(got.valid, "valid");
+    assert_eq!((got.faces, got.edges, got.vertices), (want.faces, want.edges, want.vertices));
+    assert!((got.volume - want.volume).abs() <= 1e-6 * want.volume, "volume {} against {}", got.volume, want.volume);
+}
+
 /// cf-snap-hook's rounds at its four pegs' bases (recorded): each round's ring fused to the plate (glued, op_boolean's
 /// scaled inputs), its inner face on the peg's revolved face and its edge there a full circle from the peg's seam. As
 /// OCCT's (it declined "an edge on another argument's free-form face"), its history too: on scaled copies OCCT has the

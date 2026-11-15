@@ -3240,8 +3240,42 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
       b = t->BasisSurface();
     return b;
   };
+  // (A torus, or a circle's arc revolved about an axis in its plane (a torus OCCT keeps as a revolution: c2-housing-draft's
+  // and cf-snap-hook's revolved arcs): that torus, its angle round the tube phi + sv times the arc's parameter.)
+  auto torus_of = [](const occ::handle<Geom_Surface>& s, gp_Torus& T, double& phi, double& sv) {
+    phi = 0, sv = 1;
+    if (const occ::handle<Geom_ToroidalSurface> t = occ::down_cast<Geom_ToroidalSurface>(s))
+    {
+      T = t->Torus();
+      return true;
+    }
+    const occ::handle<Geom_SurfaceOfRevolution> rv = occ::down_cast<Geom_SurfaceOfRevolution>(s);
+    if (rv.IsNull())
+      return false;
+    occ::handle<Geom_Curve> bc = rv->BasisCurve();
+    while (const occ::handle<Geom_TrimmedCurve> t = occ::down_cast<Geom_TrimmedCurve>(bc))
+      bc = t->BasisCurve();
+    const occ::handle<Geom_Circle> ci = occ::down_cast<Geom_Circle>(bc);
+    if (ci.IsNull())
+      return false;
+    const gp_Circ C = ci->Circ();
+    const gp_Ax1  A = rv->Axis();
+    const gp_XYZ  D = A.Direction().XYZ(), w = C.Location().XYZ() - A.Location().XYZ(), N = C.Axis().Direction().XYZ();
+    const double  h = w.Dot(D);
+    const gp_XYZ  rad = w - D * h;
+    const double  R = rad.Modulus(), r = C.Radius();
+    if (!(R > 0) || !(r > 0) || std::abs(N.Dot(D)) > 1e-12 || std::abs(w.Dot(N)) > 1e-12 * (R + r))
+      return false;
+    const gp_XYZ X = rad / R, Xc = C.XAxis().Direction().XYZ(), Yc = C.YAxis().Direction().XYZ();
+    phi = std::atan2(Xc.Dot(D), Xc.Dot(X));
+    sv  = Yc.Dot(D * std::cos(phi) - X * std::sin(phi)) > 0 ? 1 : -1;
+    T   = gp_Torus(gp_Ax3(gp_Pnt(A.Location().XYZ() + D * h), gp_Dir(D), gp_Dir(X)), R, r);
+    return true;
+  };
   const occ::handle<Geom_Surface> sa = bare(fa), sb = bare(fb);
-  const bool                      t_a = !occ::down_cast<Geom_ToroidalSurface>(sa).IsNull(), t_b = !occ::down_cast<Geom_ToroidalSurface>(sb).IsNull();
+  gp_Torus                        tor_a, tor_b;
+  double                          phi_a = 0, sv_a = 1, phi_b = 0, sv_b = 1;
+  const bool                      t_a = torus_of(sa, tor_a, phi_a, sv_a), t_b = torus_of(sb, tor_b, phi_b, sv_b);
   if (t_a == t_b)
     return false;
   const bool                               p_first = t_b;
@@ -3249,12 +3283,12 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
   const occ::handle<Geom_SphericalSurface> sp      = occ::down_cast<Geom_SphericalSurface>(p_first ? sa : sb);
   if (pl.IsNull() && sp.IsNull())
     return false;
-  const TopoDS_Face&                      f  = p_first ? fb : fa;
-  const occ::handle<Geom_ToroidalSurface> ts = occ::down_cast<Geom_ToroidalSurface>(p_first ? sb : sa);
-  const gp_Torus T  = ts->Torus();
+  const TopoDS_Face& f   = p_first ? fb : fa;
+  const gp_Torus     T   = p_first ? tor_b : tor_a;
+  const double       phi = p_first ? phi_b : phi_a, sv = p_first ? sv_b : sv_a;
   const gp_Ax3   ax = T.Position();
   const double   R = T.MajorRadius(), r = T.MinorRadius();
-  if (!(r > 0) || !(R > r))
+  if (!(r > 0) || !(R > 0))
     return false;
   const gp_Pln    P  = pl.IsNull() ? gp_Pln() : pl->Pln();
   const gp_Sphere Sp = sp.IsNull() ? gp_Sphere() : sp->Sphere();
@@ -3282,6 +3316,19 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
   }
   double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
   BRepTools::UVBounds(f, u0, u1, v0, v1);
+  {
+    // (A revolution's v as the torus's.)
+    const double w0 = phi + sv * v0, w1 = phi + sv * v1;
+    v0 = std::min(w0, w1), v1 = std::max(w0, w1);
+  }
+  // (The face away from the axis (a revolved arc's spindle torus, R < r: its outer part).)
+  if (R <= r)
+  {
+    const bool   across = std::floor((v1 - M_PI) / (2 * M_PI)) > std::floor((v0 - M_PI) / (2 * M_PI)) || std::remainder(v0 - M_PI, 2 * M_PI) == 0;
+    const double lo     = across ? -1.0 : std::min(std::cos(v0), std::cos(v1));
+    if (!(R + r * lo > 1e-6 * (R + r)))
+      return false;
+  }
   if (!(u1 > u0) || !(v1 > v0) || v1 - v0 > 2 * M_PI + 1e-9 || u1 - u0 > 2 * M_PI + 1e-9)
     return false;
   // (A plane face's box widened a tenth each way, as OCCT's against a quadric (CorrectPlaneBoundaries), a sphere
@@ -3425,7 +3472,7 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
           x         = point(u, v);
           double pu = 0, pv = 0;
           params_on(x, pu, pv);
-          const gp_Pnt2d on_t(u, v), on_p(pu, pv);
+          const gp_Pnt2d on_t(u, sv * (v - phi)), on_p(pu, pv);
           g = p_first ? on_p : on_t;
           c = p_first ? on_t : on_p;
           return true;
@@ -3442,7 +3489,7 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
   // the tube, cf-snap-hook's drafted sides): by v, the circle at v round the axis meeting the other surface where
   // c = cos(u - psi) = -(a0 + b0 cos v + c0 sin v) / (a1 + b1 cos v), two branches u = psi +- acos(c), the same way.)
   auto by_v = [&](std::vector<IntTools_Curve>& found) {
-    if (!(a1 > std::abs(b1)))
+    if (!(a1 > 0))
       return false;
     const double ue     = 1e-12;
     auto         cos_at = [&](double v) { return -(a0 + b0 * std::cos(v) + c0 * std::sin(v)) / (a1 + b1 * std::cos(v)); };
@@ -3539,7 +3586,7 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
           x         = point(u, v);
           double pu = 0, pv = 0;
           params_on(x, pu, pv);
-          const gp_Pnt2d on_t(u, v), on_p(pu, pv);
+          const gp_Pnt2d on_t(u, sv * (v - phi)), on_p(pu, pv);
           g = p_first ? on_p : on_t;
           c = p_first ? on_t : on_p;
           return true;
