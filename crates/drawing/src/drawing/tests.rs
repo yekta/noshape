@@ -1319,6 +1319,10 @@ fn grouped_ordinate_dimensions() {
     for want in ["0", "12", "14", "50", "88", "100"] {
         assert!(vals.contains(&want), "missing {want}: {vals:?}");
     }
+    // Each extension line starts the Geometry gap from its point (live drw-ordinate-dimension.dxf: 0.0625 in).
+    let o = built.placement(ViewId(2)).unwrap().to_sheet(origin);
+    let first = built.geometry.lines.iter().filter(|l| l.pick == pick).find(|l| (l.points[0][0] - o[0]).abs() < 1e-6).expect("the origin's line").points[0];
+    assert!(((first[1] - o[1]).abs() - drawing.props.dim_geometry_gap).abs() < 1e-9, "{first:?} {o:?}");
     // Every value on one line; the close values 12 and 14 are jogged apart.
     let xs: Vec<f64> = ts.iter().map(|t| t.pos[0]).collect();
     let mut sorted = xs.clone();

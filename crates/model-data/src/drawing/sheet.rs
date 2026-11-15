@@ -2149,7 +2149,9 @@ impl SheetGeometry {
                     let e = a.position;
                     let along = (e[0] - p[0]) * n[0] + (e[1] - p[1]) * n[1];
                     let sg = if along < 0.0 { -1.0 } else { 1.0 };
-                    let start = [p[0] + n[0] * sg * 1.0, p[1] + n[1] * sg * 1.0];
+                    // From the point by Dimensions › Geometry gap (live drw-ordinate-dimension.dxf: 0.0625 in).
+                    let gap = self.style.geometry_gap;
+                    let start = [p[0] + n[0] * sg * gap, p[1] + n[1] * sg * gap];
                     let knee_t = (along - sg * 4.0).abs().min(along.abs()) * sg;
                     let knee = [p[0] + n[0] * knee_t, p[1] + n[1] * knee_t];
                     let end = e;
@@ -2277,7 +2279,7 @@ impl SheetGeometry {
                         let value = if *horizontal { (p[0] - origin[0]).abs() } else { (p[1] - origin[1]).abs() };
                         let t = env.text(a, value, false, "");
                         let (s0, s1) = (along[i], text_pos[i]);
-                        let l0 = dot(sheet_pts[i], n) + sg * 1.0;
+                        let l0 = dot(sheet_pts[i], n) + sg * self.style.geometry_gap;
                         let pts = if (s1 - s0).abs() < 1e-6 {
                             vec![at(s0, l0), at(s0, level)]
                         } else {
