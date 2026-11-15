@@ -2582,7 +2582,20 @@ impl PartStudioView {
                                 .when_some(family, |d, f| d.font_family(f))
                                 .when(bold, |d| d.font_weight(FontWeight::BOLD))
                                 .when(italic, |d| d.italic())
+                                .flex()
+                                .flex_col()
                                 .child(Input::new(&input).appearance(false).text_size(px(18.67)).px(px(2.)))
+                                // Live (sketch-text-font-typed-ok, a textarea): a click under the text puts the caret at its end.
+                                .child(div().flex_1().cursor_text().on_mouse_down(MouseButton::Left, {
+                                    let input = input.clone();
+                                    move |_, window, cx| {
+                                        input.update(cx, |s, cx| {
+                                            let end = s.value().len();
+                                            s.focus(window, cx);
+                                            s.set_selected_range(end..end, cx);
+                                        })
+                                    }
+                                }))
                                 .os_context_menu(move |menu, _, _| {
                                     let v = view.clone();
                                     menu.item(crate::os_menu::OsMenuItem::new(if is_expr { "Convert to text" } else { "Convert to expression" }).on_click(move |_, _, cx| {
