@@ -3564,8 +3564,9 @@ bool march_offsets(const Surf* S[2], const TopoDS_Edge& e, const TopoDS_Face F[2
     }
     return true;
   };
-  // Halved where the fitted curves miss the point between two by more than the fit's tolerance.
-  for (int round = 0; round < 8; ++round)
+  // Halved where the fitted curves miss the point between two by more than the fit's tolerance (twelve times at most: an edge
+  // where two offsets meet at a small angle needed more than eight, c2-rings-loft's Shell 1).
+  for (int round = 0; round < 12; ++round)
   {
     if (!fit(out))
       return false;
