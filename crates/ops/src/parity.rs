@@ -4822,18 +4822,25 @@ impl<'a> Translator<'a> {
 
     /// Live's OFFSET (`localSecondOffset` the copy of `localSecond`, tied to the first pair `localMaster` /
     /// `localOffset`): the pair already drawn linked as our Offset tool links its copies.
-    fn sketch_offset(&mut self, oid: &str, id: &str, c: &Value) -> Result<(), String> {
-        let ours = |name: &str| -> Result<String, String> {
-            let v = c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).and_then(|p| p["value"].as_str()).ok_or_else(|| format!("no {name}"))?;
-            self.sketch_entities.get(&(oid.to_string(), v.to_string())).cloned().ok_or_else(|| format!("{v} not translated"))
+    fn sketch_offset(&mut self, k: usize, oid: &str, id: &str, c: &Value) -> Result<(), String> {
+        let param = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned();
+        let ours = |t: &Self, name: &str| -> Result<String, String> {
+            let v = param(name).and_then(|p| p["value"].as_str().map(str::to_string)).ok_or_else(|| format!("no {name}"))?;
+            t.sketch_entities.get(&(oid.to_string(), v.clone())).cloned().ok_or_else(|| format!("{v} not translated"))
         };
-        if c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "externalMaster") {
-            return Err("to external geometry".into());
-        }
-        let (ms, mc) = (ours("localMaster")?, ours("localOffset")?);
+        // A source of live's: this sketch's curve (localMaster / localSecond), or a model edge (externalMaster /
+        // externalSecond: an Offset of model edges).
+        let cid = c["entityId"].as_str().unwrap_or("").to_string();
+        let source_of = |t: &mut Self, local: &str, external: &str| -> Result<String, String> {
+            match param(external) {
+                Some(p) => t.external_ref(k, &cid, &p).ok_or_else(|| "to external geometry".to_string()),
+                None => ours(t, local),
+            }
+        };
+        let (ms, mc) = (source_of(self, "localMaster", "externalMaster")?, ours(self, "localOffset")?);
         // (A lone pair: its own master.)
         let has = |name: &str| c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == name);
-        let (source, copy) = if has("localSecond") { (ours("localSecond")?, ours("localSecondOffset")?) } else { (ms.clone(), mc.clone()) };
+        let (source, copy) = if has("localSecond") || has("externalSecond") { (source_of(self, "localSecond", "externalSecond")?, ours(self, "localSecondOffset")?) } else { (ms.clone(), mc.clone()) };
         let mut args = json!({ "sketch": id, "source": source, "copy": copy, "master_source": ms, "master_copy": mc });
         if let Some(tab) = &self.tab {
             args["tab"] = json!(tab);
@@ -4930,7 +4937,7 @@ impl<'a> Translator<'a> {
                 // Dimensions: `dimensions`.
                 "DISTANCE" | "LENGTH" | "DIAMETER" | "RADIUS" | "ANGLE" | "CENTERLINE_DIMENSION" | "MAJOR_DIAMETER" | "MINOR_DIAMETER" => continue,
                 "OFFSET" => {
-                    if let Err(e) = self.sketch_offset(oid, id, c) {
+                    if let Err(e) = self.sketch_offset(k, oid, id, c) {
                         *missed.entry(format!("{ty} ({e})")).or_default() += 1;
                     }
                     continue;

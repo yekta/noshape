@@ -95,9 +95,9 @@ pub fn ops() -> Vec<Op> {
         ),
         op(
             "offset",
-            "Offset sketch curves (the Offset tool)",
-            "Offsets the curves (a connected chain offsets as one) by `distance`. The default side is the one the tool's arrow shows first; `toward` picks the side whose offset passes nearer that point, `flip` flips the side.",
-            vec![req("entities", ids(), "Curves to offset."), opt("distance", value(), "Offset distance (default: the tool's, 5 mm / 0.25 in)."), opt("toward", point(), "A point on the side to offset to."), opt("flip", json!({ "type": "boolean" }), "Offset to the other side.")],
+            "Offset sketch curves or model edges (the Offset tool)",
+            "Offsets the curves (a connected chain offsets as one) by `distance`. Model edges (`edge:…`) and other sketches' curves offset as Onshape's tool does: the copies stay linked to the edge and follow it when the model changes. The default side is the one the tool's arrow shows first; `toward` picks the side whose offset passes nearer that point, `flip` flips the side.",
+            vec![req("entities", ids(), "Curves to offset: this sketch's (`entity:…`), model edges (`edge:…`) or other sketches' curves."), opt("distance", value(), "Offset distance (default: the tool's, 5 mm / 0.25 in)."), opt("toward", point(), "A point on the side to offset to."), opt("flip", json!({ "type": "boolean" }), "Offset to the other side.")],
             offset,
         ),
         op(
@@ -402,7 +402,9 @@ fn offset(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let vars = variables_at(od, tab)?;
     let mut t = target(od, tab, a)?;
     let before = existing(&t);
-    let curves = entity_list(a, "entities", &mut t, false)?;
+    // Model edges and other sketches' curves: a linked reference curve (not shown) is what offsets.
+    let model = |v: &Value| matches!(refs::parse_str(v.as_str().unwrap_or("")), Some(noshape_model::reference::Reference::Edge(_) | noshape_model::reference::Reference::SketchEntity { .. }));
+    let curves: Vec<EntityId> = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, &mut t, model(v), false).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<_, _>>()?;
     if let Some(i) = curves.iter().position(|e| t.data.sketch.kind(*e) == Some(EntityKind::Point)) {
         return Err(OpError::param(&format!("entities[{i}]"), "points can't be offset; give curves"));
     }

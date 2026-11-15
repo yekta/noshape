@@ -935,6 +935,13 @@ impl PartStudioView {
                 let plane_area = |r: &Reference| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. });
                 let skip_plane = |r: &Reference| !picks.is_empty() && plane_area(r) && (round_pick || self.is_own_sketch_plane(r, cx));
                 let hovered = match (hovered, self.hover.clone().filter(|r| !skip_plane(r)), tool_now) {
+                    // Offset: a model edge or another sketch's curve offsets through a linked reference curve (live's
+                    // OFFSET externalMaster), which follows the model.
+                    (None, Some(r), Some(Tool::Offset))
+                        if matches!(r, Reference::Edge(_)) || matches!(&r, Reference::SketchEntity { sketch, .. } if Some(*sketch) != self.sketch.as_ref().map(|s| s.feature)) =>
+                    {
+                        self.external_entity(&r, false, true, cx)
+                    }
                     (None, Some(r), Some(t @ (Tool::Dimension | Tool::Constraint(_) | Tool::Mirror)))
                         if matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_))
                             || matches!(&r, Reference::SketchEntity { sketch, .. } if Some(*sketch) != self.sketch.as_ref().map(|s| s.feature)) =>

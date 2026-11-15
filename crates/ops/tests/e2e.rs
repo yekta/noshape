@@ -810,6 +810,39 @@ fn sketch_use_intersection_and_model_references() {
     assert!(last.ends_with(":: Suppress : Extrude 1"), "{last}");
 }
 
+/// Offset of model edges (live: the sketch Offset tool on a block's top edges): the copies stay linked to the edges
+/// (hidden reference curves) and follow them when the model changes.
+#[test]
+fn sketch_offset_of_model_edges_follows_the_model() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "offset-model.noshape", "plane:top");
+    let rect = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let edges = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }));
+    let top: Vec<Value> = edges["edges"].as_array().unwrap().iter().filter(|e| (num(&e["start"][2]) - 10.0).abs() < 1e-6 && (num(&e["end"][2]) - 10.0).abs() < 1e-6).map(|e| e["id"].clone()).collect();
+    assert_eq!(top.len(), 4, "{edges}");
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top", "name": "Offsets" }))["sketch"].as_str().unwrap().to_string();
+    let off = call(&mut ctx, "sketch_offset", json!({ "sketch": s2, "entities": top, "distance": "3 mm", "toward": [20, 10] }));
+    let area = |ctx: &mut Ctx| -> Vec<f64> { call(ctx, "sketch_get", json!({ "sketch": s2 }))["regions"].as_array().unwrap().iter().map(|r| num(&r["area"])).collect() };
+    let a = area(&mut ctx);
+    assert!(a.len() == 1 && (a[0] - 34.0 * 14.0).abs() < 1e-6, "{a:?} {off}");
+    let st = call(&mut ctx, "sketch_get", json!({ "sketch": s2 }));
+    assert!(st["constraints"].as_array().unwrap().iter().any(|c| c["type"] == "Offset"), "{st}");
+    // The block made 50 mm wide: the copies follow its edges.
+    let bottom = created(&rect, "line").into_iter().find(|l| num(&l["start"][1]).abs() < 1e-6 && num(&l["end"][1]).abs() < 1e-6).unwrap()["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "kind": "length", "entities": [bottom], "value": "50 mm" }));
+    let edges = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }));
+    let top: Vec<&Value> = edges["edges"].as_array().unwrap().iter().filter(|e| (num(&e["start"][2]) - 10.0).abs() < 1e-6 && (num(&e["end"][2]) - 10.0).abs() < 1e-6).collect();
+    let span = |i: usize| {
+        let c: Vec<f64> = top.iter().flat_map(|e| [num(&e["start"][i]), num(&e["end"][i])]).collect();
+        c.iter().copied().fold(f64::MIN, f64::max) - c.iter().copied().fold(f64::MAX, f64::min)
+    };
+    assert!((span(0) - 50.0).abs() < 1e-6, "{edges}");
+    let a = area(&mut ctx);
+    assert!(a.len() == 1 && (a[0] - (span(0) - 6.0) * (span(1) - 6.0)).abs() < 1e-6, "{a:?}, block {} x {}", span(0), span(1));
+}
+
 #[test]
 fn sketch_text_and_imports() {
     let mut ctx = Ctx::new();

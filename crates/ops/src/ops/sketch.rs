@@ -430,8 +430,9 @@ pub(crate) fn link_sketch_offset(ctx: &mut Ctx, args: &Value) -> Result<(), OpEr
     let a = Args { op, value: args };
     let (od, tab) = studio_target(ctx, &a)?;
     let mut t = target(od, tab, &a)?;
-    let id = |name: &str, t: &mut SketchTarget| parse_entity(args.get(name).ok_or_else(|| OpError::param(name, "required"))?, t, false, false);
-    let (source, copy, ms, mc) = (id("source", &mut t)?, id("copy", &mut t)?, id("master_source", &mut t)?, id("master_copy", &mut t)?);
+    // (A source may be model geometry: live's externalMaster / externalSecond, an Offset of model edges.)
+    let id = |name: &str, t: &mut SketchTarget, external: bool| parse_entity(args.get(name).ok_or_else(|| OpError::param(name, "required"))?, t, external, false);
+    let (source, copy, ms, mc) = (id("source", &mut t, true)?, id("copy", &mut t, false)?, id("master_source", &mut t, true)?, id("master_copy", &mut t, false)?);
     t.data.sketch.link_offset_pair(source, copy, ms, mc).map_err(|e| OpError::invalid(e.to_string()))?;
     t.data.sketch.solve();
     commit(od, t)
