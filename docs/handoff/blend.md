@@ -1,5 +1,25 @@
 # Blends (agent "blend")
 
+## 11-15 14:45 UTC: the stack, runlaw and the face blend fields landed; chamferair gating; knife speed notes
+
+Landed: spurside f7125520d (dx told), seams 2b3a92e25, unifyskip 6211481af, planarmemo aa14a4d0c, sliverskip
+fe4857504, runlaw 2f3d67990, face blend No trim fields 4cd2d9bc4 (psui told). Mac release, main 39ef18819 -> stack:
+knife 3225 -> 2770 ms, michael 94 -> 85 (live 96); tpd 63 (44) and faceblend 41 (58) unchanged.
+- Known sections (lead: build it, bool reviews): built and parked (/root/blend-scratch/parked/knownsec-wip.patch, bool
+  agrees). The tangent support pairs it covers aren't the cost: tpd's is transverse plane x rational B-spline (~10 ms a
+  pair) and the cut's tool x tool pairs, michael's transverse cyl x torus / cyl x cyl. bool has them queued with the
+  recorded cuts (vibe5 ~/agents/blend-keep/known-sections). Per-pair debug: parked/zz-ahead-dbg.patch.
+- blend10 `blend-chamferair` 31473b9cd: a chamfer as sections runs its line a tenth past each face (corner further
+  out): knife Chamfer 1 167 -> 150 ms, the Boolean's build 22 -> 2. Pair + asm on vibe6 (blend8 base, blend4 new; unit
+  blend-chair-gates, flags chair-*.done). Land after.
+- Knife Fillet 2 (run-on, 100 ms; live 10): OCCT's split of the tool by the extended walls 26 ms, the fuse 29, distances
+  to find the walls 14, extend_face_over 10, OCCT's first try 7. Fillet 3 (84; live 11): OCCT's fillet is tried first
+  (27 ms) and thrown away (split_blends), then rolling balls: lofts 17, blend_direct 27, canonical edges 6. Chamfer 1:
+  the chords' projections onto the B-spline faces 35 ms (a Newton on face_nurbs from the last foot diverges on the
+  blade's face: parked/chordfoot-wip.patch), lofts 35, the Boolean 63.
+- cf-setback-fillet feature 3: Fillet 1's faces read ~0.04 % larger than live's (planes exact: live's curved areas are
+  faceted), and one corner's fill face +1.2 mm2 (the G1 fill surface itself).
+
 ## 11-15 11:32 UTC: leanf8 + paramline landed; a combo of five speed / parity changes gating
 
 Landed: paramline f3866ebc5, leanf8 5c044b9b3 (core told). Gating as one stack in blend4 (base blend8 = 39ef18819):
