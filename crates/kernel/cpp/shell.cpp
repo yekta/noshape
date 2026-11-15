@@ -3060,7 +3060,82 @@ struct Surf
   // (The nearest foot over the whole surface, its search grid built once: solve3_damped.)
   mutable std::shared_ptr<GeomAPI_ProjectPointOnSurf> nearest;
   double                                              own[4] = {0, 0, 0, 0}; // the face's own parameters' box
+  // (Points over the face's own patch, made when first asked for: the start of a foot with no last one.)
+  mutable std::shared_ptr<const std::vector<std::pair<gp_XYZ, gp_Pnt2d>>> grid;
 };
+
+// The foot of P on `S` near uv (the distance's stationary point, a minimum): Newton on the gradient of |S(u, v) - P|²
+// with the surface's second derivatives, from uv; false where it doesn't converge or leaves the surface's bounds.
+bool newton_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& uv)
+{
+  double U0, U1, V0, V1;
+  S->Bounds(U0, U1, V0, V1);
+  const bool uper = S->IsUPeriodic(), vper = S->IsVPeriodic();
+  double     u = uv.X(), v = uv.Y();
+  for (int it = 0; it < 24; ++it)
+  {
+    gp_Pnt Q;
+    gp_Vec Su, Sv, Suu, Svv, Suv;
+    S->D2(u, v, Q, Su, Sv, Suu, Svv, Suv);
+    const gp_Vec r(P, Q.XYZ());
+    const double f1 = r.Dot(Su), f2 = r.Dot(Sv);
+    double       j11 = Su.Dot(Su) + r.Dot(Suu), j12 = Su.Dot(Sv) + r.Dot(Suv), j22 = Sv.Dot(Sv) + r.Dot(Svv);
+    double       det = j11 * j22 - j12 * j12;
+    // (Far on a surface's hollow side the distance's Hessian needn't be positive: a Gauss-Newton step there.)
+    if (!(det > 0) || !(j11 > 0))
+    {
+      j11 = Su.Dot(Su), j12 = Su.Dot(Sv), j22 = Sv.Dot(Sv);
+      det = j11 * j22 - j12 * j12;
+      if (!(det > 0))
+        return false;
+    }
+    const double u0 = u, v0 = v;
+    u -= (j22 * f1 - j12 * f2) / det;
+    v -= (j11 * f2 - j12 * f1) / det;
+    // (Past a bound the surface ends at: OCCT's projection, which takes the bounds its own way.)
+    if ((!uper && (u < U0 || u > U1)) || (!vper && (v < V0 || v > V1)))
+      return false;
+    if (std::abs(u - u0) * Su.Magnitude() + std::abs(v - v0) * Sv.Magnitude() < 1e-13)
+    {
+      uv = gp_Pnt2d(u, v);
+      return true;
+    }
+  }
+  return false;
+}
+
+// A free-form face's surface's foot of x: Newton from the last foot, or from the nearest point of a grid over the face's
+// own patch; OCCT's projection where that fails (its global one was a sixth of c2-rings-loft's Shell 1).
+gp_Pnt2d foot(const Surf& s, const gp_XYZ& x)
+{
+  gp_Pnt2d uv = s.hint;
+  if (s.has_hint && newton_foot(s.base, x, uv))
+    return uv;
+  if (s.has_hint)
+    return s.sas->NextValueOfUV(s.hint, gp_Pnt(x), 1e-12);
+  if (s.own[1] > s.own[0] && s.own[3] > s.own[2])
+  {
+    if (!s.grid)
+    {
+      auto      g = std::make_shared<std::vector<std::pair<gp_XYZ, gp_Pnt2d>>>();
+      const int n = 24;
+      for (int a = 0; a <= n; ++a)
+        for (int b = 0; b <= n; ++b)
+        {
+          const gp_Pnt2d q(s.own[0] + (s.own[1] - s.own[0]) * a / n, s.own[2] + (s.own[3] - s.own[2]) * b / n);
+          g->push_back({s.base->Value(q.X(), q.Y()).XYZ(), q});
+        }
+      s.grid = g;
+    }
+    double best = 1e300;
+    for (const auto& [p, q] : *s.grid)
+      if (const double d = (p - x).SquareModulus(); d < best)
+        best = d, uv = q;
+    if (newton_foot(s.base, x, uv))
+      return uv;
+  }
+  return s.sas->ValueOfUV(gp_Pnt(x), 1e-12);
+}
 
 // Signed distance-like value of x from s's offset (zero on it).
 double eval(const Surf& s, const gp_XYZ& x)
@@ -3073,7 +3148,7 @@ double eval(const Surf& s, const gp_XYZ& x)
     const gp_Pnt   P(x);
     // (No maxpreci: x lies a wall off the surface, so a foot is never within one; with it every call also
     // projected onto iso curves, c2-rings-loft's Shell 1 25 % of its time.)
-    const gp_Pnt2d uv = s.has_hint ? s.sas->NextValueOfUV(s.hint, P, 1e-12) : s.sas->ValueOfUV(P, 1e-12);
+    const gp_Pnt2d uv = foot(s, x);
     s.hint            = uv;
     s.has_hint        = true;
     gp_Pnt S;
@@ -3108,7 +3183,7 @@ double eval_grad(const Surf& s, const gp_XYZ& x, gp_XYZ& g)
   if (s.general)
   {
     const gp_Pnt   P(x);
-    const gp_Pnt2d uv = s.has_hint ? s.sas->NextValueOfUV(s.hint, P, 1e-12) : s.sas->ValueOfUV(P, 1e-12);
+    const gp_Pnt2d uv = foot(s, x);
     s.hint            = uv;
     s.has_hint        = true;
     gp_Pnt S;
@@ -3571,7 +3646,9 @@ double eval_grad_near(const Surf& q, const gp_XYZ& p, gp_XYZ& g, double scale, b
   // short of the surface's end, where a projection is held.)
   if (q.has_hint)
   {
-    const gp_Pnt2d w = q.sas->NextValueOfUV(q.hint, gp_Pnt(p), 1e-9 * scale, 1e-3 * scale);
+    gp_Pnt2d w = q.hint;
+    if (!newton_foot(q.base, p, w))
+      w = q.sas->NextValueOfUV(q.hint, gp_Pnt(p), 1e-9 * scale, 1e-3 * scale);
     double         U0, U1, V0, V1;
     q.base->Bounds(U0, U1, V0, V1);
     const double eu = 1e-6 * (U1 - U0), ev = 1e-6 * (V1 - V0);
@@ -8513,7 +8590,9 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
           for (int k = 0; k <= n; ++k)
           {
             const double w = j0 + (j1 - j0) * k / n;
-            gp_Pnt2d     q = k == 0 ? h1->Value(r1 ? p1 : p0) : saj->NextValueOfUV(uvj(k), c3->Value(w), 1e3 * tol);
+            gp_Pnt2d q = k == 0 ? h1->Value(r1 ? p1 : p0) : uvj(k);
+            if (k > 0 && !quad::newton_foot(Sj, c3->Value(w).XYZ(), q))
+              q = saj->NextValueOfUV(uvj(k), c3->Value(w), 1e3 * tol);
             // (Continuous through a period.)
             if (k > 0 && Sj->IsUPeriodic())
               q.SetX(q.X() + std::round((uvj(k).X() - q.X()) / Sj->UPeriod()) * Sj->UPeriod());
