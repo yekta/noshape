@@ -25,6 +25,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-15 A bool replay flag (1e-9 volume, history hash) from a more exact curve than OCCT's is accepted when the end-to-end
   check is identical (every suite document's topology and feature status, hats/dock SAME, corner-break 42 faces) and
   the volume is within live's band; any end-to-end difference parks it (rings-loft / knife Mirror 11-15).
+- 11-15 Edges live adds only inside a sub-micron near-tangent sliver (Parasolid's tolerance choices, e.g. impeller f15)
+  are a known live difference when ours is the exact intersection and no later feature references them; chase
+  them only if a later feature or a selection depends on them.
 - 11-15 OCCT loops must poll the break hook and have a deterministic work bound (patch 0030); never a wall clock.
 - 11-15 Draft 1 (1dc32b): OCCT patch + wedge fallback, not wedges-first.
 - 11-15 Parsed-std disk cache parked: at most 2 ms gain for 15 MB and more code. Keep it simple.
