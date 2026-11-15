@@ -1431,6 +1431,44 @@ fn jog_matches_live() {
     assert!((volume_mm3(&r) - 4825.132741228719).abs() < 1e-6 && body.faces.len() == 22 && near(bb.max.z, 9.0) && near(bb.max.x, 55.8893813), "{} mm³, {} faces, {bb:?}: {:#?}", volume_mm3(&r), body.faces.len(), face_report(&r));
 }
 
+/// Live (ui-parity jog-anchor-nominal): Jog offset anchor Nominal on the 2 mm plate (radius 2 mm, offset 5 mm)
+/// leaves too little offset for 90°: std's editing logic sets the angle itself, acos(1 - 5 / 6) = 80.406°, and the
+/// dialog shows it read-only in the angle's place.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_jog_offset_too_small_for_its_angle_shows_the_angle_it_sets() {
+    let mut s = plate("2 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let (a, b) = (sk.add_point(glam::DVec2::new(mm(30.0), 0.0)), sk.add_point(glam::DVec2::new(mm(30.0), mm(40.0))));
+    let line = sk.add_line_between(a, b).unwrap().0;
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
+    s.add("sheetMetalJog", move |p| {
+        p.set("bendReference", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: line }]));
+        p.set("face", ParamValue::Query(vec![top]));
+        p.set("bendOffsetAnchor", en("NOMINAL"));
+    });
+    let index = s.ps.features.len() - 1;
+    let new = s.ps.features[index].params.clone();
+    let changed = noshape_model::custom::std_feature::editing_logic(&s.ps, index, &ConfigValues::default(), &s.units, &RegenOptions::default(), &ParamValues::default(), &new, &["bendOffsetAnchor".to_string()], true).expect("editing logic");
+    assert!(changed.bool("bendAngleSetProgrammatically"), "{changed:?}");
+    let mut values = new;
+    for (k, v) in changed.0 {
+        values.set(&k, v);
+    }
+    let jog = noshape_model::features::get("sheetMetalJog").unwrap();
+    let shown = |id: &str| jog.params.iter().find(|p| p.id == id).is_some_and(|p| p.is_visible(&values));
+    assert!(shown("bendAngleReadOnly") && !shown("bendAngle"));
+    s.ps.features[index].params = values;
+    let r = s.ok();
+    let state = r.display.features.last().unwrap();
+    assert!(matches!(state.computed("bendAngleReadOnly"), Some(noshape_model::display::ComputedValue::Text(t)) if t == "80.406°"), "{:?}", state.computed);
+}
+
 /// Live ("qa5 sm tools"): a Tab (60,10)–(75,30) beside the plate merges into
 /// the plate (5400 mm³, 10 faces); without a flange to merge it fails "Select
 /// a sheet metal wall to join the tab to." and adds nothing.

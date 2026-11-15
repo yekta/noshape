@@ -179,7 +179,7 @@ impl FeatureDialog {
                 ParamKind::Bool { .. } => fields.push(json!({ "label": label, "kind": "boolean", "checked": values.bool(s.id), "state": "ok" })),
                 // A read-only output (Edit curve's Degree): the computed value, disabled (live edit-curve-tool).
                 ParamKind::Num(_) if s.hints.has(Hints::READ_ONLY) => {
-                    let text = self.computed.get(s.id).cloned().or_else(|| values.expr(s.id).map(|e| e.text.clone())).unwrap_or_default();
+                    let text = self.read_only_text(s, s.id, values);
                     fields.push(json!({ "label": label, "kind": "number", "text": text, "focused": false, "state": "disabled" }));
                 }
                 ParamKind::Num(n) => {

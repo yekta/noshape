@@ -3985,13 +3985,22 @@ impl FeatureDialog {
         }));
     }
 
+    /// A read-only output's text: the value the model computed (an angle as the dialog writes angles, "80.406 deg").
+    fn read_only_text(&self, s: &ParamSpec, path: &str, values: &ParamValues) -> String {
+        let text = self.computed.get(path).cloned().or_else(|| values.expr(s.id).map(|e| e.text.clone())).unwrap_or_default();
+        match &s.kind {
+            ParamKind::Num(n) if n.kind == noshape_model::params::NumKind::Angle => dialog_angle_text(&text),
+            _ => text,
+        }
+    }
+
     /// Input element for a numeric or text value.
     fn render_inline_value(&mut self, s: &ParamSpec, path: &str, values: &ParamValues, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         // Read-only outputs (Variable "Distance", "Along X"…): the value the
         // model computed, gray, not editable.
         if s.hints.has(Hints::READ_ONLY) {
             let pal = p();
-            let text = self.computed.get(path).cloned().or_else(|| values.expr(s.id).map(|e| e.text.clone())).unwrap_or_default();
+            let text = self.read_only_text(s, path, values);
             return Some(div().w_full().h(px(26.)).flex().items_center().justify_end().pr(px(4.)).border_b_1().border_color(gpui_kit::rgb(0xeeeeee)).text_size(px(13.33)).text_color(pal.text_faint).child(text).into_any_element());
         }
         let text = match (&s.kind, values.get(s.id)) {

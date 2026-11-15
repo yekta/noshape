@@ -406,10 +406,18 @@ pub fn bend() -> FeatureType {
 pub fn jog() -> FeatureType {
     let bt = |v: &ParamValues, t: &str| v.is("offsetType", t);
     let mut p = bend_top(359.9);
-    if let Some(a) = p.iter_mut().find(|s| s.id == "bendAngle") {
-        a.hints = a.hints | Hints::UNCONFIGURABLE;
+    // sheetMetalJog.fs: a jog offset too small for the bend angle sets the angle itself (its editing logic), shown
+    // read-only in the angle's place (live jog-anchor-nominal: "80.406 deg", disabled).
+    let by_angle = |v: &ParamValues| v.is("angleControlType", "BEND_ANGLE");
+    let set = |v: &ParamValues| v.bool("bendAngleSetProgrammatically");
+    if let Some(i) = p.iter().position(|s| s.id == "bendAngle") {
+        let angle = p[i].clone();
+        let mut computed = angle.clone().hints(Hints::READ_ONLY).visible(move |v| by_angle(v) && set(v));
+        computed.id = "bendAngleReadOnly";
+        p[i] = angle.hints(Hints::UNCONFIGURABLE).visible(move |v| by_angle(v) && !set(v));
+        p.insert(i + 1, computed);
+        p.insert(i, hidden(ParamSpec::bool("bendAngleSetProgrammatically", "Bend angle set programmatically", false)));
     }
-    p.push(hidden(ParamSpec::bool("bendAngleSetProgrammatically", "Bend angle set programmatically", false)));
     p.extend(bend_radius_override(always, "bendRadius"));
     p.extend(k_factor_override(always));
     p.extend([
