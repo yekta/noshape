@@ -28,6 +28,24 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-15 14:12 UTC: live's page height per take, sheet fit, dimension palette halo
+
+Where to work: as below, but ui-parity runs on vibe7 now (lead 11-15 12:50: ≤3 apps; vibe6 is psui's and blend's).
+`~/tmp/studios/shards-names.sh` and the names files are there; build with `NOSHAPE_RB_HOST=vibe7 rb.sh`.
+
+- Live's runners record at two page heights: 1919x992 (graphics 1673x886) and, on live2's lanes 1/2/4 at times from
+  11-13 and on live's runner, 1919x1079 (graphics / drawing canvas 973 px). run.py's `window_heights` reads each
+  take's: the recorder's `app.viewport` (from recorder 2026-11-15.2), else its camera (height_mm / mmPerPixel + 106),
+  else a drawing's sheet_point click against the ANSI A fit, else the nearest take of the same lane within 6 h; it
+  passes NOSHAPE_UI_WINDOW_HEIGHT, the app's default stays 992. On 11-15: 889 takes 992, 173 1079, 1046 unknown.
+- `camera_ops::drawing_fit`: the paper 926 px of a 973 px canvas, 15 px low (live2 sheet-fit; ISO A4 differs, open).
+- Dimension palette: its main row starts at the text's centre line (top = text mid - 42 px); a transparent halo (40
+  px left, 20 right, 30 above / below) closes a palette not yet clicked into and swallows clicks once it has been
+  (live2 dim-palette-halo; T1 `the_dimension_palettes_halo_keeps_it_open_once_clicked_into`).
+- Fixed my 6a6c7523 regression: the view cube's menus keep their per-row `disabled` flags (camera-menu-*).
+- Runs (vibe7, this build): drawings 272/287 per take (the two palette takes now match); psui's sample: their 29
+  takes 26 → 26 against main (move-face-rotate fixed by its 1079 height), 24 other areas' takes match.
+
 ### 2026-11-15 12:16 UTC: drawing and release re-takes, live2's 32 drawing-matrix takes, live's hole takes
 
 Where to work: builds and crate tests on the Mac (`NOSHAPE_RB_HOST=mac tools/tiers/rb.sh …`); ui-parity on vibe6

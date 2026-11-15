@@ -488,8 +488,10 @@ def normalize_live(state):
                 f["value"] = re.sub(r"∅ ?", "⌀", f["value"])
     lst = (state or {}).get("list")
     # Live's recorder from 2026-11-15.1 gives a menu's disabled rows as one flag per row (live
-    # drw-hole-table-cell-format), before as the rows' indices (ours).
-    if isinstance(lst, dict) and isinstance(lst.get("disabled"), list) and lst["disabled"] and all(isinstance(v, bool) for v in lst["disabled"]):
+    # drw-hole-table-cell-format), before as the rows' indices (ours); the view cube's menus were always flags, on both
+    # sides (camera-menu-*).
+    camera = isinstance(lst, dict) and str(lst.get("kind", "")).startswith("camera")
+    if isinstance(lst, dict) and not camera and isinstance(lst.get("disabled"), list) and lst["disabled"] and all(isinstance(v, bool) for v in lst["disabled"]):
         lst["disabled"] = [i for i, v in enumerate(lst["disabled"]) if v]
     if isinstance(lst, dict):
         rows = lst.get("rows") or []
