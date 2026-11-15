@@ -3175,3 +3175,37 @@ fn a_sweep_rebuilding_the_part_adds_to_it() {
     assert_eq!(changed.get("operationType"), Some(&ParamValue::Enum("ADD".into())), "{changed:?}");
     assert_eq!(changed.query("booleanScope"), [Reference::Body(b.id.clone())]);
 }
+
+/// A Part mirror of a centred block about Right picks Add, as live, with or without a boss off the plane (psui's
+/// mirror-part-entities-mate-connector step 11): the copy's block lies on the part's from the same side, an overlap.
+#[test]
+fn a_part_mirror_onto_its_own_block_adds_with_a_boss_too() {
+    for boss in [false, true] {
+        let mut t = T::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let p: Vec<_> = [(-0.02, -0.015), (0.02, -0.015), (0.02, 0.015), (-0.02, 0.015)].iter().map(|&(x, y)| sk.add_point(DVec2::new(x, y))).collect();
+        for i in 0..4 {
+            sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+        }
+        let s1 = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let r1 = t.regions(s1)[0].clone();
+        let e1 = t.add("extrude", &[("entities", q(vec![r1])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+        if boss {
+            let mut sk = noshape_sketch::Sketch::new();
+            sk.add_circle(DVec2::new(0.01, 0.0), 0.004);
+            let s2 = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+            let r2 = t.regions(s2)[0].clone();
+            t.add("extrude", &[("entities", q(vec![r2])), ("depth", e("20 mm")), ("operationType", en("ADD")), ("defaultScope", b(true))]);
+        }
+        let part = Reference::Body(noshape_model::reference::BodyId { feature: e1, index: 0 });
+        let m = t.add("mirror", &[("patternType", en("PART")), ("entities", q(vec![part]))]);
+        let at = t.ps.features.iter().position(|f| f.id == m).unwrap();
+        let old = t.ps.features[at].params.clone();
+        let mut new = old.clone();
+        new.set("mirrorPlane", q(vec![Reference::Plane(DatumPlane::Right)]));
+        let ctx = t.reg.regenerate(&t.ps, &ConfigValues::default(), &t.units, &RegenOptions { upto: Some(at), ..Default::default() }).context;
+        let f = t.ps.features[at].clone();
+        let changed = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), "mirror", f.id, &f.name, &t.units, &old, &new, &["mirrorPlane".to_string()], false).expect("std's editing logic ran");
+        assert_eq!(changed.get("operationType"), Some(&ParamValue::Enum("ADD".into())), "boss {boss}: {changed:?}");
+    }
+}

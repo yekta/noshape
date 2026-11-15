@@ -1024,8 +1024,10 @@ fn face_pair(a: &k::Shape, b: &k::Shape) -> bool {
 /// Two touching faces cross (interfere) when they meet along a curve inside
 /// both; touching along a boundary or lying on each other is abutting
 /// (std Tab: a tab on its wall, live sm8). Faces of two solids lying on each
-/// other from opposite sides (a boss sketched on a part's face) interfere:
-/// std's boolean heuristics then pick Add, as live (qa5 EXT1).
+/// other interfere: from opposite sides (a boss sketched on a part's face)
+/// std's boolean heuristics then pick Add, as live (qa5 EXT1); from the same
+/// side the solids overlap there (a Part mirror's copy of a block with a boss
+/// off its plane: live's Mirror picks Add, psui's mirror-part-entities).
 ///
 /// Only faces on one surface can lie on each other, so only those get the
 /// faces' common; the section runs under a bound of work and one that takes
@@ -1043,7 +1045,7 @@ fn faces_cross_within(a: &k::Shape, b: &k::Shape, solids: bool, work: u64) -> bo
             let p = c.shape.faces().first()?.bounding_box(false).ok()?.center();
             Some(a.normal_at_point(p).ok()?.dot(b.normal_at_point(p).ok()?) < 0.0)
         };
-        return solids && facing() == Some(true);
+        return solids && facing().is_some();
     }
     let sec = match k::with_section_work(work, || k::section(a, b)) {
         Ok(sec) => sec,
