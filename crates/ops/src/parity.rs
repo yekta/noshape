@@ -84,6 +84,8 @@ pub struct Step {
     pub custom: bool,
     /// A sketch whose frame (origin, x, normal) isn't live's.
     pub frame: Option<String>,
+    /// Suppressed in the default configuration (after it was added: `status` is the add's).
+    pub suppressed: bool,
 }
 
 /// The default planes' and the Origin's deterministic ids in every Part Studio, and ours.
@@ -369,13 +371,20 @@ impl<'a> Translator<'a> {
             }
         }
         let foreign = doc["foreignFiles"].as_object().map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
-        let config_defaults = doc["configuration"]["configurationParameters"]
+        let mut config_defaults: HashMap<String, String> = doc["configuration"]["configurationParameters"]
             .as_array()
             .into_iter()
             .flatten()
             // (A boolean configuration's default is a JSON boolean.)
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
+        // The configuration live's lines were taken at, for inputs the document doesn't define (a corpus studio without
+        // its configuration: asm-bjr-config 5d8bc1's "Manufacture=false").
+        for kv in doc["__liveConfiguration"]["configuration"].as_str().unwrap_or_default().split(';') {
+            if let Some((k, v)) = kv.split_once('=') {
+                config_defaults.entry(k.to_string()).or_insert_with(|| v.to_string());
+            }
+        }
         Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
@@ -594,6 +603,20 @@ impl<'a> Translator<'a> {
             self.call("config_edit_option", json!({ "input": id, "option": d, "set_default": true }))?;
         }
         Ok(())
+    }
+
+    /// Whether a feature is suppressed in the default configuration: its configured suppression's value there (live's
+    /// `suppressed` is the feature's own flag, whatever the configuration: asm-bjr-config 5d8bc1's Kerf Compensation 1
+    /// is suppressed at Manufacture=false, its default, its flag false), else its flag.
+    fn suppressed_by_default(&self, f: &Value) -> bool {
+        let state = &f["suppressionState"];
+        let default = state["configurationParameterId"].as_str().and_then(|i| self.config_defaults.get(i));
+        let at_default = state["values"].as_array().into_iter().flatten().find(|v| match (&v["enumValue"], &v["booleanValue"], default) {
+            (Value::String(o), _, Some(d)) => o == d,
+            (_, Value::Bool(b), Some(d)) => b.to_string() == *d,
+            _ => false,
+        });
+        at_default.and_then(|v| v["value"]["value"].as_bool()).unwrap_or(f["suppressed"].as_bool() == Some(true))
     }
 
     /// Feature `id`'s configured parameters (live's `BTMParameterConfigured` at its top level) configured by their
@@ -849,10 +872,18 @@ impl<'a> Translator<'a> {
                 if !self.config_inputs.is_empty() {
                     self.configure_params(k, &f, &id, &mut step.problems);
                 }
-                if f["suppressed"].as_bool() == Some(true)
-                    && let Err(e) = self.call("feature_suppress", json!({ "features": [id.clone()], "suppressed": true }))
+                if self.suppressed_by_default(&f) {
+                    match self.call("feature_suppress", json!({ "features": [id.clone()], "suppressed": true })) {
+                        Ok(_) => step.suppressed = true,
+                        Err(e) => step.problems.push(format!("suppressed: {e}")),
+                    }
+                }
+                // Its suppression configured (live's `BTMSuppressionStateConfigured`): each configuration's.
+                let state = &f["suppressionState"];
+                if let Some(input) = state["configurationParameterId"].as_str().filter(|i| self.config_inputs.contains(*i))
+                    && let Err(e) = self.configure_values(k, json!({ "feature": id, "param": "suppressed" }), input, state)
                 {
-                    step.problems.push(format!("suppressed: {e}"));
+                    step.problems.push(format!("suppression: not configured ({e})"));
                 }
                 if f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")) {
                     step.frame = self.frame_difference(&f, &id);
@@ -7222,12 +7253,13 @@ fn decode_config(enc: &str) -> Option<String> {
 }
 
 /// A Part Studio's List and Checkbox inputs as live's `configurationParameters`, read from its configured values
-/// (`BTMParameterConfigured` anywhere in `features`) and the configurations its `instances` use.
+/// (`BTMParameterConfigured` and configured suppressions anywhere in `features`) and the configurations its `instances`
+/// use.
 fn choice_inputs<'v>(features: &Value, instances: impl Iterator<Item = &'v Value>) -> Vec<Value> {
     fn walk(v: &Value, out: &mut Vec<(String, bool, Vec<String>)>) {
         match v {
             Value::Object(m) => {
-                if m.get("btType").and_then(Value::as_str).is_some_and(|t| t.starts_with("BTMParameterConfigured"))
+                if m.get("btType").and_then(Value::as_str).is_some_and(|t| t.starts_with("BTMParameterConfigured") || t.starts_with("BTMSuppressionStateConfigured"))
                     && let Some(id) = m.get("configurationParameterId").and_then(Value::as_str)
                 {
                     let values = m.get("values").and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
@@ -7619,7 +7651,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             // use Corner break." are live's INFO too, skasm 12:40.)
             let live_status = studio["live"].as_array().into_iter().flatten().find(|l| l["index"].as_u64() == Some(k as u64)).and_then(|l| l["status"].as_str());
             let as_live = step.status.as_deref().zip(live_status).is_some_and(|(o, l)| o.eq_ignore_ascii_case(l));
-            if step.status.as_deref().is_some_and(|s| s != "Ok") && studio["features"][k]["suppressed"] != true && !as_live {
+            if step.status.as_deref().is_some_and(|s| s != "Ok") && !step.suppressed && studio["features"][k]["suppressed"] != true && !as_live {
                 res.differences.push(format!("{name} › {}: {} ({})", step.name, step.status.as_deref().unwrap_or(""), step.message.as_deref().unwrap_or("")));
             }
         }
@@ -8376,6 +8408,20 @@ fn empty_live_query(q: &Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A studio configured only by suppressions (asm-bjr-config 5d8bc1: holes and Kerf Compensation by Manufacture) gets
+    /// its checkbox from them.
+    #[test]
+    fn a_configured_suppression_makes_its_input() {
+        let state = |on_false: bool| json!({ "btType": "BTMSuppressionStateConfigured-2598", "configurationParameterId": "Manufacture", "values": [
+            { "btType": "BTMConfiguredValueByBoolean-1501", "booleanValue": false, "value": { "btType": "BTMParameterBoolean-144", "value": on_false } },
+            { "btType": "BTMConfiguredValueByBoolean-1501", "booleanValue": true, "value": { "btType": "BTMParameterBoolean-144", "value": !on_false } } ] });
+        let features = json!({ "features": [{ "name": "Kerf Compensation 1", "suppressed": false, "suppressionState": state(true) }] });
+        let instances = [json!({ "elementId": "e", "configuration": "Manufacture=false" })];
+        let inputs = choice_inputs(&features, instances.iter());
+        assert_eq!(inputs.len(), 1);
+        assert_eq!((&inputs[0]["parameterId"], &inputs[0]["defaultValue"]), (&json!("Manufacture"), &json!(false)));
+    }
 
     /// A curved face's normal in live's refs (its tangent plane's) is no filter for planar faces of ours; a plane's is.
     #[test]

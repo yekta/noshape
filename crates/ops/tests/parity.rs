@@ -336,10 +336,12 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         res.custom_compared += usize::from(step.custom);
         let mut diff = Vec::new();
         let live_status = line["status"].as_str().unwrap_or("OK").to_uppercase();
-        let ours = step.status.clone().unwrap_or_else(|| "not built".into()).to_uppercase();
+        // Suppressed in the configuration live's lines were taken at: its add's status is gone, and live's line reads the
+        // feature's own flag (asm-bjr-config 5d8bc1's Kerf Compensation 1 at Manufacture=false: "OK").
+        let ours = if step.suppressed { "SUPPRESSED".into() } else { step.status.clone().unwrap_or_else(|| "not built".into()).to_uppercase() };
         // A status live's fetch didn't name (cf-planetary-gears: "474"): not compared.
         let known = ["OK", "INFO", "WARNING", "ERROR"].contains(&live_status.as_str());
-        if known && ours != live_status {
+        if known && ours != live_status && !step.suppressed {
             let why = step.message.as_deref().map(|m| format!(" ({m})")).unwrap_or_default();
             diff.push(format!("status {ours}{why}, live {live_status}"));
         }
@@ -2003,15 +2005,20 @@ export const thrower = defineFeature(function(context is Context, id is Id, defi
         { "btType": "BTMFeature-134", "featureType": "thrower", "namespace": "e0aaa::m1", "featureId": "FT2", "name": "Thrower 2", "parameters": [
             { "btType": "BTMParameterQueryList-148", "parameterId": "edge", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JXX"], "queryString": "" }] }
         ] },
-        { "btType": "BTMFeature-134", "featureType": "thrower", "namespace": "e0aaa::m1", "featureId": "FT3", "name": "Thrower 3", "suppressed": true, "parameters": [] }
-    ] });
+        { "btType": "BTMFeature-134", "featureType": "thrower", "namespace": "e0aaa::m1", "featureId": "FT3", "name": "Thrower 3", "suppressed": true, "parameters": [] },
+        { "btType": "BTMFeature-134", "featureType": "thrower", "namespace": "e0aaa::m1", "featureId": "FT4", "name": "Thrower 4", "suppressed": false, "parameters": [],
+          "suppressionState": { "btType": "BTMSuppressionStateConfigured-2598", "configurationParameterId": "Manufacture", "values": [
+            { "btType": "BTMConfiguredValueByBoolean-1501", "booleanValue": false, "value": { "btType": "BTMParameterBoolean-144", "value": true } },
+            { "btType": "BTMConfiguredValueByBoolean-1501", "booleanValue": true, "value": { "btType": "BTMParameterBoolean-144", "value": false } } ] } }
+    ], "__liveConfiguration": { "configuration": "Manufacture=false" } });
     std::fs::write(dir.join("features.json"), features.to_string()).unwrap();
     let (features, _, refs) = read_model(&dir).unwrap();
-    let live = vec![json!({ "index": 0, "status": "OK", "parts": [] }), json!({ "index": 1, "status": "OK", "parts": [] }), json!({ "index": 2, "status": "OK", "parts": [] }), json!({ "index": 3, "status": "SUPPRESSED", "parts": [] })];
+    let live = vec![json!({ "index": 0, "status": "OK", "parts": [] }), json!({ "index": 1, "status": "OK", "parts": [] }), json!({ "index": 2, "status": "OK", "parts": [] }), json!({ "index": 3, "status": "SUPPRESSED", "parts": [] }), json!({ "index": 4, "status": "OK", "parts": [] })];
     let r = run_model("custom-failures", &features, &live, &refs);
-    assert_eq!(r.custom_compared, 4, "{r:?}");
-    // Suppressed in live: never run there.
-    assert!(!r.custom.iter().any(|c| c.starts_with("Thrower 3")), "{:?}", r.custom);
+    assert_eq!(r.custom_compared, 5, "{r:?}");
+    // Suppressed in live: never run there (Thrower 4 in the configuration live's lines were taken at, its line "OK").
+    assert!(!r.custom.iter().any(|c| c.starts_with("Thrower 3") || c.starts_with("Thrower 4")), "{:?}", r.custom);
+    assert!(!r.differing.iter().any(|d| d.contains("Thrower 4")), "{:?}", r.differing);
     // Its edge not placed: the translation's failure, not the host's.
     assert!(!r.custom.iter().any(|c| c.starts_with("Thrower 2")), "{:?}", r.custom);
     assert!(r.custom.iter().any(|c| c.starts_with("0bbb: failed to compile")), "{:?}", r.custom);

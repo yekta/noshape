@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-15 21:48 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-15 23:46 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -9,31 +9,29 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land: tell asm.
 
 ## In flight
-- Worktree /root/projects/noshape-wt/dx (branch dx-bosdxf), uncommitted: crates/ops/tests/parity.rs, the exchange
-  suite's STL as live's REST default: 5°, 15° when the exported parts have over 500 faces (live2 exchange-kw; only
-  cf-spur-gear, 848 faces); `held_to_model(…, mesh)`: live's import of our STL held within twice live's own mesh error
-  from the model, never "live's failure" (its 65-tooth gear is 5.3 % under at 15°: tessellation, not failure).
-  Verified on vibe5 (ours.stl 9646 triangles, live 9000; per part within 0.4 % of live's mesh). Test
-  an_import_off_its_model_holds_ours_as_close on the Mac (waiting for the slot), then land. Live must re-import
-  ours.stl of cf-spur-gear after it lands (live-ours.json) for the row to change.
+- Configured suppression (live's `BTMSuppressionStateConfigured`), landing 23:46 (see Queued): a feature's own
+  suppression is its value at the input's default (`suppressed_by_default`; live's `suppressed` is the feature's flag
+  whatever the configuration), each configuration's set by config_configure "suppressed"; `choice_inputs` makes inputs
+  from configured suppressions; a studio's default is the configuration live's lines were taken at
+  (`__liveConfiguration`); the report counts such a step as suppressed (its add's status isn't compared, no "failed
+  to run"). Checked: 5d8bc1 alone at Manufacture=false 107/124 (was 89 against the true lines), Kerf suppressed as
+  live (~/tmp/dx/st5d8.log, vibe7); c2-extension-spring A/B 12/12 both; asm no objection. Post-land check:
+  asm-bjr-config with build I on vibe5 (~/tmp/dx/bjr-asmI.log, waiting in the slot behind core and bool2). Corpora
+  with configured suppressions: asm-bjr-config, asm-config-assembly, asm-xdev-subs (asm's full run), c2-extension-spring.
+- 5d8bc1's first difference stays Extrude 55 "vanity plate front" 369/955/601, live 365/943/593 (bool / core, parked).
 
 ## Queued to land
-- Nothing. Landed today (latest first): 104e822e assembly studios take their imported Feature Studios (Kerf compiles);
+- dx-bosdxf: configured suppression (parity.rs + tests/parity.rs report), land.sh 23:46. Landed today (latest first): c1af60ab exchange STL 15° over 500 faces + mesh hold; 104e822e assembly studios take their imported Feature Studios (Kerf compiles);
   bb0641ba region faces kept per sketch; a2212ff2 qContainsPoint box skip; 3073e7d8 draft tangent propagation;
   drawing exports 84 / 84 (revision table, note shoulder, splines, jog).
 
 ## Open: my studios (studio-alone runs, vibe7)
-- bjr-config 5d8bc1: 89/124 (19:03 and 21:19). First difference Extrude 55 "vanity plate front" 369/955/601, live
-  365/943/593 (bool / core, parked). With the current CLI only Kerf Compensation 1 and Decal 1 fail (the old
-  cli-main lacked core's sweep: rebuild it after kernel changes). Kerf compiles now (live's 19:19 fetch) and fails in
-  opOffsetFace ("Could not offset selected faces"): sent to core 21:5x with the repro (vibe7
-  ~/agents/dx-keep/repro-kerf). Its input is live's: hole 95 cuts three countersinks in "side triangle" (11 faces,
-  3685.749 mm³; live dx/q-hole95/out.json: 3 cones + 3 bores, all three locations resolve though their
-  deterministicIds are empty). live.jsonl's line there (8 faces, 3704.237) is wrong: don't trust that studio's lines
-  around 96-97. Text 1 / 2 blocked (private import 403). Translation left: Sheet metal model 1's region REDG (a face
-  of Sketch 34's imprint bounded by model edges only: the plate's cap edges and fillet blends; region_from_query
-  finds "curves []"), Sketch 39's in-feature cPoint, Decal 1's image. Sketch 29 / 28 / 33 taken back to live's
-  geometry (harmless); Extrude 4 / 24 suppressed in live.
+- bjr-config 5d8bc1: 107/124 at Manufacture=false (23:42, live's retaken lines). First difference Extrude 55 "vanity
+  plate front" 369/955/601, live 365/943/593 (bool / core, parked). Kerf Compensation 1 is suppressed at false (as live);
+  Kerf compiles (live's 19:19 fetch); core's e138d597 redoes OCCT's empty metre offset in mm (their check: the true
+  case 3704.237 -> 3745.156). Hole 95 matches live at false (dx/q-hole95). Text 1 / 2 blocked (private import
+  403). Sheet metal model 1's REDG note is harmless (its first query, qSketchRegion, brings both regions; it builds).
+  Left: Sketch 39's in-feature cPoint, Decal 1's image.
 - infento 1dc32b: pulley = live through Fillet 5 (live's refs in studios/1dc32b….refs.jsonl, 15 lines, all hosts) and
   Draft 1 (core, -1306.543 mm³). Chamfer 3: blend (blend-ch3-wip, waits on live's mirrored-body side rule); Fillet 3
   after it.
@@ -48,12 +46,11 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   (only opExtrude / opRevolve): live's per-feature geometry maps them when present (5d8bc1 Shell 1 does).
 
 ## Open: other
-- c2-impeller-loft (core 19:1x, FYI): first difference feature 15 Boolean Flansch+Gehäuse 19/53/36, live 19/56/39,
-  both inputs matching (looks like the Boolean's edge merging: bool / core). Translation notes there: Sketch Bohrung
-  Flansch (3 dims unsolved, 2.4 mm back), Fillet Flansch zum Stroemungskanal (KsZB: no edge), Sketch Bohrung
-  Ansaugflansch (2 OFFSET, 44 mm back). Save: vibe7 ~/tmp/core/imp/c2-impeller-loft.noshape. Check and hand on.
-- Exchange ("live imports ours") 43/48 (live re-import of the 14:51 files). Left: hose x_t (deliberate split rings);
-  65-tooth STEP area -0.17 mm² (lead: left); STL rows: gear (in flight above), radijator (ours 17 % fewer triangles,
+- c2-impeller-loft: f15's Boolean is a known live difference (bool, DECISIONS); 24/48, see Next 2.
+- Exchange ("live imports ours") 43/48 (live re-import of the 14:51 files; the gear STL re-imported at 15° 22:0x,
+  synced). Left: hose x_t (deliberate split rings); 65-tooth STEP area -0.17 mm² (lead: left); STL rows: gear's Ø0.1
+  pin only (ours 12 triangles, live 96: Medium's min facet width; a tiny one gives the pin 92 but the gear 11,182
+  triangles for live's 9,000: parked), radijator (ours 17 % fewer triangles,
   under 500 faces: not the angle rule; unexplored), sheet metal plus. Live's REST STL default: 5°, 15° over 500
   exported faces (live2 /root/onshape-research/live/exchange-kw/README.md), the default chord (chord 100 in ours
   matches at 15° within 0.4 % per part); a tiny feature in a large export goes coarser (r 0.05 in a 520 mm studio,
@@ -70,13 +67,32 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   blend (FYI). draft_robust whole-body is_valid: core's 77715251. The kernel profile's per-feature block also counts
   the suite's measurement after the feature (boxes, props, display mesh): compare with the feature's own regen ms.
 
+- Corpus widening (lead via live): live captures 5 public documents for the least-covered features, approved by me
+  (before 23:20): c2-surf-workshop-<studio>, c2-surf-intro-<studio>, c2-rib-wrap, c2-sm-tablet-stand,
+  c2-sm-rocker-enclosure (in that order; assemblies only if asm wants them), each with its configuration definition,
+  `__liveConfiguration` and refs.jsonl; then a second search (sweep twist, loft path/guides, sheet metal rip/corner/hem,
+  a configured part). Run them alone once in, sort first differences to owners.
+
 ## Next, in order
-1. Land the STL rule + mesh hold (after the Mac test); ask live to re-import cf-spur-gear's ours.stl.
-2. 5d8bc1 Sheet metal model 1's REDG (Kerf with core).
-3. c2-impeller-loft: confirm the Boolean is the first difference on main, hand it to bool / core with the repro.
-4. 74d3d6: Sketch 15's unsolved diameter (after core's Extrude 4, or alone if it matters downstream).
+1. Configured suppression: landed? (`land.sh --status`); then asm-bjr-config's post-land check (vibe5).
+2. c2-impeller-loft: f15 is a known live difference (bool / DECISIONS 6ea431265): 24/48, next first difference
+   feature 24 "Extrude 4" (UP_TO_SURFACE the shell's OFFSET_FACE) Part 3 5/9/6, live 5/10/7: live's extra edge JcV is
+   0.047 mm at one corner only (Ic-JcE, y=+4.13 mm, z=-63.2 mm; none at the mirror corner). Checking our inputs
+   (vibe7 ~/tmp/dx/imp.log, save ~/tmp/dx/saveimp), then route (core) or a known-difference ruling; then its
+   translation notes (Sketch Bohrung Flansch dims, Fillet KsZB, Sketch Bohrung Ansaugflansch OFFSET).
+3. (5d8bc1: nothing of mine before Extrude 55.)
+4. 74d3d6 Sketch 15 = the general derivedFrom fix (below, in progress): its plane is Plane 1, whose three points
+   (imprint INTERSECT VERTEX queries, no live geometry) all became one region (`region_from_query` read any query
+   naming SKETCH_ENTITY + FACE + TOPOLOGY + IMPRINT as a region), so Sketch 15 had no plane (the 49.98 mm move).
 5. 1dc32b: Fillet 3 once blend lands Chamfer 3.
-6. The general derivedFrom / ORIGINAL_DEPENDENCY fix, on a case from 3-5.
+6. The general derivedFrom / ORIGINAL_DEPENDENCY fix (uncommitted in the dx worktree, above the configured-suppression commit):
+   `region_from_query` refuses an EDGE / VERTEX query (test an_imprint_vertex_is_not_a_region passes, vibe7).
+   74d3d6 with it (build J, md5 976913a6d920; ~/tmp/dx/st74J.log): still 9/127; Plane 1 now says why it can't map:
+   "INTERSECT: SWEPT_FACE: revolve FOxgtrMDqncXEjd_7.holeBodies.* was not built" (a Hole's internal revolve faces
+   aren't named by ours; no live geometry for RJCk / RJCc / RJCY). Ask live for those three points' refs once Extrude
+   4 matches (Sketch 15 can't be scored before). Model-suite gate A = build I (ops-I7), B = J: vibe6
+   `~/bin/slot … gate-tr.sh … rf` (out ~/tmp/dx/gate-tr-rf.out, sums gate-rf-{A,B}.sum / .untr), queued by 23:33 behind
+   skasm. Land if the sums are SAME and the untranslated diff is only lines that were wrong regions before.
 
 ## How to run
 - Builds and crate tests on the Mac: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo test -p <crate> …` (one slot).
