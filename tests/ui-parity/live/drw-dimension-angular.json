@@ -1,18 +1,19 @@
 {
  "scenario": "drw-dimension-angular",
- "recorded": "2026-11-05T22:29:05.105Z",
+ "recorded": "2026-11-15T00:05:52.348Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.1 backfilled"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "e64db2b3aae161b3009913a4",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "03a030de35adacddf54a8e3a",
   "start": "hole-plate-drawing",
-  "startElement": "164441c15ca44d6dfc6c413e"
+  "startElement": "ac3109d7c4982f44b949727b",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -21,6 +22,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -49,6 +51,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -56,6 +62,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -63,6 +73,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -70,6 +84,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -101,6 +119,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -129,6 +148,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -136,6 +159,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -143,6 +170,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -150,6 +181,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -159,7 +194,7 @@
      "selection": []
     }
    },
-   "t": 237310
+   "t": 230459
   },
   {
    "step": 2,
@@ -178,8 +213,8 @@
    },
    "ok": true,
    "at": [
-    1153,
-    326
+    1171,
+    350
    ],
    "state": {
     "focus": {
@@ -188,6 +223,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -216,6 +252,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -223,6 +263,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -230,6 +274,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -237,6 +285,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -246,7 +298,7 @@
      "selection": []
     }
    },
-   "t": 252398
+   "t": 256394
   },
   {
    "step": 3,
@@ -265,8 +317,8 @@
    },
    "ok": true,
    "at": [
-    1264,
-    326
+    1292,
+    350
    ],
    "state": {
     "focus": {
@@ -275,6 +327,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -303,6 +356,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -310,6 +367,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -317,6 +378,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -324,6 +389,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -338,7 +407,7 @@
      ]
     }
    },
-   "t": 267684
+   "t": 281660
   },
   {
    "step": 4,
@@ -357,8 +426,8 @@
    },
    "ok": true,
    "at": [
-    1209,
-    332
+    1231,
+    357
    ],
    "state": {
     "focus": {
@@ -367,6 +436,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -395,6 +465,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -402,6 +476,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -409,6 +487,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -416,6 +498,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -424,13 +510,17 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "120.0°"
+       "text": "120.0°",
+       "position": [
+        198.2,
+        160.8
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 284522
+   "t": 307147
   },
   {
    "step": 5,
@@ -439,6 +529,11 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -446,6 +541,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -474,6 +570,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -481,6 +581,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -488,6 +592,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -495,6 +603,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -503,13 +615,210 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "120.0°"
+       "text": "120.0°",
+       "position": [
+        198.2,
+        160.8
+       ]
       }
      ],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      }
+     ]
     }
    },
-   "t": 299453
+   "t": 332755
   }
- ]
+ ],
+ "_meta": {
+  "export": [
+   {
+    "format": "DXF",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-dimension-angular.dxf",
+    "bytes": 101009,
+    "error": null,
+    "formatBefore": "PDF",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "DXF"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "Release 14"
+     },
+     {
+      "label": "Sheets",
+      "id": null,
+      "value": "All sheets"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": null,
+      "value": "Export as text"
+     },
+     {
+      "label": "Units",
+      "id": "drawing-units-dropdown",
+      "value": "Use drawing units"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Export splines as polylines",
+      "checked": false
+     },
+     {
+      "label": "Set z-height to zero and normals to positive",
+      "checked": true
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     },
+     {
+      "label": "Exclude off-sheet content",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   },
+   {
+    "format": "DWG",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-dimension-angular.dwg",
+    "bytes": 27746,
+    "error": null,
+    "formatBefore": "DXF",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "DWG"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "2018"
+     },
+     {
+      "label": "Sheets",
+      "id": null,
+      "value": "All sheets"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": null,
+      "value": "Export as text"
+     },
+     {
+      "label": "Units",
+      "id": "drawing-units-dropdown",
+      "value": "Use drawing units"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Export splines as polylines",
+      "checked": false
+     },
+     {
+      "label": "Set z-height to zero and normals to positive",
+      "checked": true
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     },
+     {
+      "label": "Exclude off-sheet content",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   },
+   {
+    "format": "PDF",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-dimension-angular.pdf",
+    "bytes": 80556,
+    "error": null,
+    "formatBefore": "DWG",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "PDF"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "1.5"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": "drawing-export-text-dropdown",
+      "value": "Normal"
+     },
+     {
+      "label": "Color",
+      "id": "drawing-export-color-dropdown",
+      "value": "Color"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   }
+  ]
+ }
 }

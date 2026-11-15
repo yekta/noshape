@@ -1,16 +1,16 @@
 {
  "scenario": "drw-inspection-edit",
- "recorded": "2026-11-08T03:38:45.069Z",
+ "recorded": "2026-11-14T23:05:46.556Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "96f3261d20e0ede60f871656",
+  "element": "1447b3651d4e0c570f4e95c0",
   "start": "block-drawing",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -51,6 +51,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -58,6 +62,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -65,6 +73,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -72,6 +84,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -131,6 +147,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -138,6 +158,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -145,6 +169,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -152,6 +180,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -161,7 +193,7 @@
      "selection": []
     }
    },
-   "t": 236226
+   "t": 228158
   },
   {
    "step": 2,
@@ -180,8 +212,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    618
+    727,
+    672
    ],
    "state": {
     "focus": {
@@ -219,6 +251,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -226,6 +262,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -233,6 +273,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -240,16 +284,25 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ]
     }
    },
-   "t": 252033
+   "t": 253861
   },
   {
    "step": 3,
@@ -268,8 +321,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    587
+    727,
+    637
    ],
    "state": {
     "focus": {
@@ -307,6 +360,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -314,6 +371,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -321,6 +382,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -328,6 +393,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -336,13 +405,17 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 268697
+   "t": 280521
   },
   {
    "step": 4,
@@ -395,6 +468,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -402,6 +479,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -409,6 +490,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -416,6 +501,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -424,13 +513,17 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 285554
+   "t": 306170
   },
   {
    "step": 5,
@@ -476,6 +569,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Circle (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters (Drawing)"
+      }
      ]
     },
     "dialogs": [],
@@ -508,6 +613,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -515,6 +624,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -522,6 +635,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -529,6 +646,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -537,13 +658,17 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 300951
+   "t": 330644
   },
   {
    "step": 6,
@@ -584,6 +709,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Circle (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters (Drawing)"
+      }
      ]
     },
     "dialogs": [],
@@ -616,6 +753,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -623,6 +764,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -630,6 +775,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -637,6 +786,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -645,13 +798,17 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 317629
+   "t": 356460
   },
   {
    "step": 7,
@@ -663,8 +820,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    587
+    727,
+    637
    ],
    "state": {
     "focus": {
@@ -697,6 +854,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Circle (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters (Drawing)"
+      }
      ]
     },
     "dialogs": [],
@@ -729,6 +898,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -736,6 +909,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -743,6 +920,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -750,6 +931,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -758,17 +943,25 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       },
       {
        "kind": "inspectionsymbol",
-       "text": "1"
+       "text": "1",
+       "position": [
+        78.8,
+        99.4
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 347643
+   "t": 393733
   },
   {
    "step": 8,
@@ -821,6 +1014,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -828,6 +1025,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -835,6 +1036,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -842,6 +1047,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -850,17 +1059,25 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       },
       {
        "kind": "inspectionsymbol",
-       "text": "1"
+       "text": "1",
+       "position": [
+        78.8,
+        99.4
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 363722
+   "t": 419462
   },
   {
    "step": 9,
@@ -873,8 +1090,8 @@
    },
    "ok": true,
    "at": [
-    743,
-    566
+    717,
+    614
    ],
    "state": {
     "focus": {
@@ -912,6 +1129,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -919,6 +1140,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -926,6 +1151,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -933,6 +1162,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -941,17 +1174,25 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       },
       {
        "kind": "inspectionsymbol",
-       "text": "1"
+       "text": "1",
+       "position": [
+        78.8,
+        99.4
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 392611
+   "t": 456335
   },
   {
    "step": 10,
@@ -963,8 +1204,8 @@
    },
    "ok": true,
    "at": [
-    784,
-    545
+    758,
+    593
    ],
    "state": {
     "focus": {
@@ -997,6 +1238,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Circle (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters (Drawing)"
+      }
      ]
     },
     "dialogs": [],
@@ -1029,6 +1282,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -1036,6 +1293,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1043,6 +1304,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1050,6 +1315,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1058,17 +1327,25 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       },
       {
        "kind": "inspectionsymbol",
-       "text": "1"
+       "text": "1",
+       "position": [
+        78.8,
+        99.4
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 407788
+   "t": 482017
   },
   {
    "step": 11,
@@ -1109,6 +1386,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Circle (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters (Drawing)"
+      }
      ]
     },
     "dialogs": [],
@@ -1141,6 +1430,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -1148,6 +1441,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1155,6 +1452,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1162,6 +1463,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1170,17 +1475,25 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       },
       {
        "kind": "inspectionsymbol",
-       "text": "1"
+       "text": "1",
+       "position": [
+        78.8,
+        99.4
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 423723
+   "t": 508325
   },
   {
    "step": 12,
@@ -1233,6 +1546,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -1240,6 +1557,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1247,6 +1568,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1254,6 +1579,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1262,17 +1591,25 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       },
       {
        "kind": "inspectionsymbol",
-       "text": "1"
+       "text": "1",
+       "position": [
+        78.8,
+        99.4
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 439417
+   "t": 533982
   }
  ]
 }

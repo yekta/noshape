@@ -1,0 +1,264 @@
+{
+ "scenario": "rel-workflow-diagrams",
+ "recorded": "2026-11-15T02:31:10.118Z",
+ "app": {
+  "name": "live",
+  "version": "1.223.93837.5293d8314b5b",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-14.2 81d2b384"
+ },
+ "live": {
+  "page": "documents"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": null,
+  "features": null,
+  "parts": [],
+  "undo": null,
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": null,
+  "documents": {
+   "place": "Owned by me",
+   "selected": null,
+   "search": "",
+   "panel": "Details",
+   "advanced": false,
+   "columns": false
+  },
+  "url": "/documents?nodeId=6ad49ec58b4a0a5a73d38e52&resourceType=resourceuserowner"
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Account menu"
+    }
+   },
+   "ok": true,
+   "at": [
+    1843,
+    20
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "My account",
+      "Loopelf company settings",
+      "View support tickets",
+      "App Store dev portal",
+      "View in dark mode beta",
+      "Sign out"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "lists": [
+     {
+      "kind": "menu",
+      "rows": [
+       "My account",
+       "Loopelf company settings",
+       "View support tickets",
+       "App Store dev portal",
+       "View in dark mode beta",
+       "Sign out"
+      ],
+      "highlighted": null,
+      "disabled": []
+     },
+     {
+      "kind": "context-menu",
+      "rows": [
+       "My account",
+       "Loopelf company settings",
+       "View support tickets",
+       "App Store dev portal",
+       "View in dark mode beta",
+       "Sign out"
+      ],
+      "highlighted": null,
+      "disabled": []
+     }
+    ],
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "documents": {
+     "place": "Owned by me",
+     "selected": null,
+     "search": "",
+     "panel": "Details",
+     "advanced": false,
+     "columns": false
+    },
+    "url": "/documents?nodeId=6ad49ec58b4a0a5a73d38e52&resourceType=resourceuserowner"
+   },
+   "t": 2177
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Company settings"
+    }
+   },
+   "ok": true,
+   "at": [
+    1805,
+    86
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "url": "/companySettings/6af7beb4dcdc6f515c15d244/users"
+   },
+   "t": 4334
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "nav": "Release management"
+    }
+   },
+   "ok": true,
+   "at": [
+    110,
+    429
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "a"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "url": "/companySettings/6af7beb4dcdc6f515c15d244/release"
+   },
+   "t": 6482
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "tab": "Obsoletion workflow"
+    }
+   },
+   "ok": true,
+   "at": [
+    540,
+    284
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "url": "/companySettings/6af7beb4dcdc6f515c15d244/release"
+   },
+   "t": 8640
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "tab": "Release workflow"
+    }
+   },
+   "ok": true,
+   "at": [
+    365,
+    284
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "url": "/companySettings/6af7beb4dcdc6f515c15d244/release"
+   },
+   "t": 10802
+  }
+ ],
+ "tabsOpened": 1
+}

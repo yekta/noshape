@@ -26,6 +26,12 @@
   {
    "do": "click",
    "on": {
+    "nav": "Release management"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
     "tab": "Obsoletion workflow"
    }
   },

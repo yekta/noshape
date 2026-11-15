@@ -1,19 +1,19 @@
 {
  "scenario": "drw-dimension-palette-esc-twice",
- "recorded": "2026-11-12T17:38:05.891Z",
+ "recorded": "2026-11-14T23:35:03.095Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "6005b7eab8ae0cc1306330b4",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "209c79404b79207ca85e065a",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -193,7 +193,7 @@
      "selection": []
     }
    },
-   "t": 227232
+   "t": 229991
   },
   {
    "step": 2,
@@ -212,8 +212,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    618
+    727,
+    672
    ],
    "state": {
     "focus": {
@@ -294,10 +294,15 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ]
     }
    },
-   "t": 253117
+   "t": 255036
   },
   {
    "step": 3,
@@ -316,8 +321,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    587
+    727,
+    637
    ],
    "state": {
     "focus": {
@@ -403,14 +408,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 278360
+   "t": 281100
   },
   {
    "step": 4,
@@ -511,14 +516,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 304928
+   "t": 306386
   },
   {
    "step": 5,
@@ -530,8 +535,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    587
+    727,
+    637
    ],
    "state": {
     "focus": {
@@ -623,14 +628,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 341545
+   "t": 343973
   },
   {
    "step": 6,
@@ -730,14 +735,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 367434
+   "t": 370099
   },
   {
    "step": 7,
@@ -749,8 +754,8 @@
    },
    "ok": true,
    "at": [
-    999,
-    601
+    978,
+    651
    ],
    "state": {
     "focus": {
@@ -852,14 +857,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 393054
+   "t": 394660
   },
   {
    "step": 8,
@@ -960,14 +965,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 418226
+   "t": 421098
   },
   {
    "step": 9,
@@ -1068,14 +1073,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 443997
+   "t": 446695
   }
  ]
 }

@@ -1,19 +1,19 @@
 {
  "scenario": "drw-insert-view-top-1to1",
- "recorded": "2026-11-12T18:30:01.588Z",
+ "recorded": "2026-11-15T01:19:34.217Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "55bedddd7a8b0df61bf16212",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "fc21ac2dc565981a6fbdc28f",
   "start": "block-drawing-empty",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -93,6 +93,38 @@
       "Ratio to part",
       "Auto",
       "Show sketch appearances"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -126,7 +158,7 @@
      "selection": []
     }
    },
-   "t": 158025
+   "t": 157567
   },
   {
    "step": 2,
@@ -175,6 +207,38 @@
       "Ratio to part",
       "Auto",
       "Show sketch appearances"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -182,7 +246,7 @@
      {
       "id": "_OSDRAWINGVIEW",
       "title": "Select a part or assembly",
-      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-1 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / start block-broken / start block-fillet / start config-block-drawing / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / start plate (",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-2 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / start block-broken / start block-fillet / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / start plate (ui) / start two-blocks / star",
       "inputs": [
        {
         "placeholder": "Search parts or sketches",
@@ -220,7 +284,7 @@
      "selection": []
     }
    },
-   "t": 182860
+   "t": 180235
   },
   {
    "step": 3,
@@ -264,6 +328,38 @@
       "Ratio to part",
       "Auto",
       "Show sketch appearances"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -271,7 +367,7 @@
      {
       "id": "_OSDRAWINGVIEW",
       "title": "Select a part or assembly",
-      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-1 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / Part 1 / start block-broken / start block-fillet / start config-block-drawing / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / star",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-2 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / Part 1 / start block-broken / start block-fillet / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / start plate (ui) / start two-bloc",
       "inputs": [
        {
         "placeholder": "Search parts or sketches",
@@ -309,7 +405,7 @@
      "selection": []
     }
    },
-   "t": 205712
+   "t": 202850
   },
   {
    "step": 4,
@@ -353,6 +449,43 @@
       "Auto",
       "Show sketch appearances",
       "Show annotations from model"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start block Copy 1 Part 1"
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -386,7 +519,7 @@
      "selection": []
     }
    },
-   "t": 228402
+   "t": 225364
   },
   {
    "step": 5,
@@ -402,7 +535,7 @@
     218,
     149
    ],
-   "via": "native select in the drawing: marked for the next menu step (its popup is not in the DOM)",
+   "via": "native select in the drawing: option picked by its label",
    "state": {
     "focus": {
      "kind": "other",
@@ -432,6 +565,43 @@
       "Auto",
       "Show sketch appearances",
       "Show annotations from model"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start block Copy 1 Part 1"
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -465,7 +635,7 @@
      "selection": []
     }
    },
-   "t": 240484
+   "t": 237219
   },
   {
    "step": 6,
@@ -479,11 +649,13 @@
    "ok": true,
    "at": [
     211,
-    -238
+    205
    ],
+   "via": "drawing combo: list opened by its ▾, row scrolled into view and clicked",
    "state": {
     "focus": {
-     "kind": "none"
+     "kind": "other",
+     "tag": "iframe"
     },
     "dialog": {
      "kind": "drawing-panel",
@@ -508,17 +680,44 @@
       "Ratio to part",
       "Auto",
       "Show sketch appearances",
-      "Show annotations from model",
-      "1:1",
-      "1:2",
-      "1:3",
-      "1:4",
-      "1:5",
-      "1:6",
-      "1:8",
-      "1:10",
-      "1:12",
-      "1:16"
+      "Show annotations from model"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start block Copy 1 Part 1"
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -552,7 +751,7 @@
      "selection": []
     }
    },
-   "t": 264257
+   "t": 250158
   },
   {
    "step": 7,
@@ -567,8 +766,8 @@
    },
    "ok": true,
    "at": [
-    784,
-    524
+    765,
+    569
    ],
    "state": {
     "focus": {
@@ -604,27 +803,27 @@
      "tool": "Projected view",
      "views": [
       {
-       "name": "Front",
+       "name": "Top",
        "kind": "base",
        "position": [
-        89.7,
+        89.8,
         110.2
        ],
        "parent": null,
-       "scale": "2:1",
+       "scale": "1:1",
        "brokenOut": 0
       }
      ],
      "annotations": [],
      "selection": [
       {
-       "kind": "EDGE",
-       "owner": "Front"
+       "kind": "VIEW",
+       "owner": "Top"
       }
      ]
     }
    },
-   "t": 288977
+   "t": 275645
   },
   {
    "step": 8,
@@ -635,11 +834,11 @@
    "ok": true,
    "pointer": {
     "at": [
-     402,
-     16
+     487,
+     583
     ],
     "hover": [],
-    "element": "div.navbar-document-name"
+    "element": "iframe.foreign-data-container"
    },
    "state": {
     "focus": {
@@ -675,14 +874,14 @@
      "tool": null,
      "views": [
       {
-       "name": "Front",
+       "name": "Top",
        "kind": "base",
        "position": [
-        89.7,
+        89.8,
         110.2
        ],
        "parent": null,
-       "scale": "2:1",
+       "scale": "1:1",
        "brokenOut": 0
       }
      ],
@@ -690,7 +889,7 @@
      "selection": []
     }
    },
-   "t": 315095
+   "t": 300792
   }
  ]
 }

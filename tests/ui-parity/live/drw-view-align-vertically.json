@@ -1,19 +1,19 @@
 {
  "scenario": "drw-view-align-vertically",
- "recorded": "2026-11-07T12:40:41.417Z",
+ "recorded": "2026-11-15T01:30:33.792Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0 + live2 2026-11-07.5"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "cb96de055387fab4e9d608d3",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "53eab3fddc4df63d73e54cc3",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -51,6 +51,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -58,6 +62,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -65,6 +73,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -72,6 +84,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -92,8 +108,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    326
+    727,
+    350
    ],
    "state": {
     "focus": {
@@ -131,6 +147,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -138,6 +158,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -145,6 +169,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -152,6 +180,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -160,13 +192,13 @@
      "annotations": [],
      "selection": [
       {
-       "kind": "EDGE",
+       "kind": "VIEW",
        "owner": "Top"
       }
      ]
     }
    },
-   "t": 230919
+   "t": 228961
   },
   {
    "step": 2,
@@ -179,8 +211,8 @@
    },
    "ok": true,
    "at": [
-    790,
-    471
+    767,
+    496
    ],
    "state": {
     "focus": {
@@ -218,6 +250,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -225,6 +261,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -232,6 +272,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -239,6 +283,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -247,13 +295,13 @@
      "annotations": [],
      "selection": [
       {
-       "kind": "EDGE",
+       "kind": "VIEW",
        "owner": "Top"
       }
      ]
     }
    },
-   "t": 245278
+   "t": 253865
   },
   {
    "step": 3,
@@ -265,8 +313,8 @@
    },
    "ok": true,
    "at": [
-    1041,
-    472
+    1018,
+    497
    ],
    "state": {
     "focus": {
@@ -304,6 +352,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -311,6 +363,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -318,6 +374,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -325,6 +385,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -334,7 +398,7 @@
      "selection": []
     }
    },
-   "t": 260792
+   "t": 280006
   },
   {
    "step": 4,
@@ -346,8 +410,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    638
+    727,
+    693
    ],
    "state": {
     "focus": {
@@ -385,6 +449,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -392,6 +460,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -399,6 +471,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -406,6 +482,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -415,7 +495,7 @@
      "selection": []
     }
    },
-   "t": 275724
+   "t": 305669
   },
   {
    "step": 5,
@@ -424,6 +504,11 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -460,6 +545,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -467,6 +556,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -474,6 +567,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -481,6 +578,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -490,7 +591,7 @@
      "selection": []
     }
    },
-   "t": 290990
+   "t": 332187
   }
  ]
 }

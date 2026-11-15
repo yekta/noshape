@@ -26,7 +26,13 @@
   {
    "do": "click",
    "on": {
-    "button": "Edit revision table template"
+    "nav": "Release management"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Edit"
    }
   }
  ]

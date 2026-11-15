@@ -1,19 +1,19 @@
 {
  "scenario": "drw-update-after-model-change",
- "recorded": "2026-11-12T17:12:19.958Z",
+ "recorded": "2026-11-15T00:03:21.786Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "38e54affc51d506498f8ecd2",
-  "workspace": "24db5f467e1ccbd8d405a2a9",
-  "element": "d26df83b5d7fd3ecaba5e2a2",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "22cb372796c099397ad4e592",
   "start": "block-drawing",
-  "startElement": "ff2245ce846878221ff975e1",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -193,7 +193,7 @@
      "selection": []
     }
    },
-   "t": 226589
+   "t": 227981
   },
   {
    "step": 2,
@@ -212,8 +212,8 @@
    },
    "ok": true,
    "at": [
-    828,
-    638
+    813,
+    693
    ],
    "state": {
     "focus": {
@@ -294,10 +294,15 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ]
     }
    },
-   "t": 251892
+   "t": 253747
   },
   {
    "step": 3,
@@ -316,8 +321,8 @@
    },
    "ok": true,
    "at": [
-    859,
-    638
+    847,
+    693
    ],
    "state": {
     "focus": {
@@ -402,7 +407,7 @@
        "kind": "dimension",
        "text": "0.394",
        "position": [
-        108.6,
+        108.9,
         81
        ]
       }
@@ -410,7 +415,7 @@
      "selection": []
     }
    },
-   "t": 278399
+   "t": 279517
   },
   {
    "step": 4,
@@ -510,7 +515,7 @@
        "kind": "dimension",
        "text": "0.394",
        "position": [
-        108.6,
+        108.9,
         81
        ]
       }
@@ -518,7 +523,7 @@
      "selection": []
     }
    },
-   "t": 305376
+   "t": 305761
   },
   {
    "step": 5,
@@ -531,7 +536,7 @@
    "ok": true,
    "at": [
     624,
-    976
+    1063
    ],
    "state": {
     "focus": {
@@ -580,7 +585,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "error": "translation failed <a class=osx-import-filename href='6af5f3f545edf683ae9671d3'>{1}</a> failed to translate."
+     "error": "translation failed <a class=osx-import-filename href='6af8f7477af8357d6561f07c'>{1}</a> failed to translate."
     },
     "camera": {
      "direction": [
@@ -603,14 +608,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 327611
+   "t": 323474
   },
   {
    "step": 6,
@@ -875,7 +880,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "error": "translation failed <a class=osx-import-filename href='6af5f40745edf683ae967209'>{1}</a> failed to translate."
+     "error": "translation failed <a class=osx-import-filename href='6af8f7557af8357d6561f080'>{1}</a> failed to translate."
     },
     "camera": {
      "direction": [
@@ -898,14 +903,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 341071
+   "t": 333337
   },
   {
    "step": 7,
@@ -1176,7 +1181,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "error": "translation failed <a class=osx-import-filename href='6af5f40e45edf683ae967219'>{1}</a> failed to translate."
+     "error": "translation failed <a class=osx-import-filename href='6af8f75b7af8357d6561f084'>{1}</a> failed to translate."
     },
     "camera": {
      "direction": [
@@ -1199,14 +1204,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 347940
+   "t": 339592
   },
   {
    "step": 8,
@@ -1220,9 +1225,7 @@
      358,
      257
     ],
-    "hover": [
-     "FAgvuZAayZRza3J_0"
-    ],
+    "hover": [],
     "element": "input.os-param-number.dropdown-source"
    },
    "state": {
@@ -1481,7 +1484,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "error": "translation failed <a class=osx-import-filename href='6af5f41545edf683ae967228'>{1}</a> failed to translate."
+     "error": "translation failed <a class=osx-import-filename href='6af8f7617af8357d6561f088'>{1}</a> failed to translate."
     },
     "camera": {
      "direction": [
@@ -1504,14 +1507,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 354669
+   "t": 345285
   },
   {
    "step": 9,
@@ -1776,7 +1779,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "error": "translation failed <a class=osx-import-filename href='6af5f41b45edf683ae967288'>{1}</a> failed to translate."
+     "error": "translation failed <a class=osx-import-filename href='6af8f7677af8357d6561f08c'>{1}</a> failed to translate."
     },
     "camera": {
      "direction": [
@@ -1799,14 +1802,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 361348
+   "t": 351161
   },
   {
    "step": 10,
@@ -2068,7 +2071,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "error": "translation failed <a class=osx-import-filename href='6af5f42845edf683ae96729e'>{1}</a> failed to translate."
+     "error": "translation failed <a class=osx-import-filename href='6af8f7737af8357d6561f095'>{1}</a> failed to translate."
     },
     "camera": {
      "direction": [
@@ -2091,14 +2094,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 373877
+   "t": 362994
   },
   {
    "step": 11,
@@ -2354,7 +2357,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "error": "translation failed <a class=osx-import-filename href='6af5f43d45edf683ae9672c4'>{1}</a> failed to translate."
+     "error": "translation failed <a class=osx-import-filename href='6af8f7877af8357d6561f099'>{1}</a> failed to translate."
     },
     "camera": {
      "direction": [
@@ -2377,14 +2380,14 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 419.494,
      "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
+     "mmPerPixel": 0.250744,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 394719
+   "t": 383304
   },
   {
    "step": 12,
@@ -2397,7 +2400,7 @@
    "ok": true,
    "at": [
     775,
-    976
+    1063
    ],
    "state": {
     "focus": {
@@ -2482,7 +2485,7 @@
        "kind": "dimension",
        "text": "0.394",
        "position": [
-        108.6,
+        108.9,
         81
        ]
       }
@@ -2490,7 +2493,7 @@
      "selection": []
     }
    },
-   "t": 427234
+   "t": 416685
   },
   {
    "step": 13,
@@ -2583,7 +2586,7 @@
        "kind": "dimension",
        "text": "0.394",
        "position": [
-        108.6,
+        108.9,
         81
        ]
       }
@@ -2591,7 +2594,7 @@
      "selection": []
     }
    },
-   "t": 454571
+   "t": 443950
   },
   {
    "step": 14,
@@ -2689,7 +2692,7 @@
        "kind": "dimension",
        "text": "0.394",
        "position": [
-        108.6,
+        108.9,
         81
        ]
       }
@@ -2697,7 +2700,7 @@
      "selection": []
     }
    },
-   "t": 478847
+   "t": 468617
   },
   {
    "step": 15,
@@ -2789,7 +2792,7 @@
        "kind": "dimension",
        "text": "0.394",
        "position": [
-        108.6,
+        108.9,
         81
        ]
       }
@@ -2797,7 +2800,7 @@
      "selection": []
     }
    },
-   "t": 517838
+   "t": 508040
   }
  ]
 }

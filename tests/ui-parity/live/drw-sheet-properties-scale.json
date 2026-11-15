@@ -1,19 +1,19 @@
 {
  "scenario": "drw-sheet-properties-scale",
- "recorded": "2026-11-12T16:32:37.081Z",
+ "recorded": "2026-11-14T23:55:03.853Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
  },
  "live": {
-  "document": "38e54affc51d506498f8ecd2",
-  "workspace": "24db5f467e1ccbd8d405a2a9",
-  "element": "20f28bfee1dab5b9646c2308",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "3e27e6e8fc8db7d948429ccc",
   "start": "block-drawing",
-  "startElement": "ff2245ce846878221ff975e1",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -193,7 +193,7 @@
      "selection": []
     }
    },
-   "t": 227840
+   "t": 225920
   },
   {
    "step": 2,
@@ -212,8 +212,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    618
+    727,
+    672
    ],
    "state": {
     "focus": {
@@ -294,10 +294,15 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ]
     }
    },
-   "t": 252469
+   "t": 250090
   },
   {
    "step": 3,
@@ -316,8 +321,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    587
+    727,
+    637
    ],
    "state": {
     "focus": {
@@ -403,14 +408,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 279387
+   "t": 275352
   },
   {
    "step": 4,
@@ -511,14 +516,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 305451
+   "t": 300216
   },
   {
    "step": 5,
@@ -533,8 +538,8 @@
    },
    "ok": true,
    "at": [
-    1019,
-    524
+    1023,
+    569
    ],
    "state": {
     "focus": {
@@ -620,14 +625,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 330166
+   "t": 324244
   },
   {
    "step": 6,
@@ -639,8 +644,8 @@
    },
    "ok": true,
    "at": [
-    1060,
-    526
+    1064,
+    570
    ],
    "state": {
     "focus": {
@@ -665,6 +670,23 @@
       "Reference",
       "start block Copy 1 Part 1",
       "Unassigned"
+     ],
+     "fields": [
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "Custom"
+      },
+      {
+       "label": "Size",
+       "kind": "select",
+       "value": "A"
+      },
+      {
+       "label": "Reference",
+       "kind": "select",
+       "value": "start block Copy 1 Part 1"
+      }
      ]
     },
     "dialogs": [],
@@ -745,14 +767,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 355075
+   "t": 349466
   },
   {
    "step": 7,
@@ -785,6 +807,23 @@
       "Reference",
       "start block Copy 1 Part 1",
       "Unassigned"
+     ],
+     "fields": [
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "Custom"
+      },
+      {
+       "label": "Size",
+       "kind": "select",
+       "value": "A"
+      },
+      {
+       "label": "Reference",
+       "kind": "select",
+       "value": "start block Copy 1 Part 1"
+      }
      ]
     },
     "dialogs": [],
@@ -865,14 +904,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 381389
+   "t": 375079
   },
   {
    "step": 8,
@@ -904,6 +943,23 @@
       "Reference",
       "start block Copy 1 Part 1",
       "Unassigned"
+     ],
+     "fields": [
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "Custom"
+      },
+      {
+       "label": "Size",
+       "kind": "select",
+       "value": "A"
+      },
+      {
+       "label": "Reference",
+       "kind": "select",
+       "value": "start block Copy 1 Part 1"
+      }
      ]
     },
     "dialogs": [],
@@ -984,14 +1040,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 406206
+   "t": 399777
   },
   {
    "step": 9,
@@ -1031,6 +1087,23 @@
       "Reference",
       "start block Copy 1 Part 1",
       "Unassigned"
+     ],
+     "fields": [
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "Custom"
+      },
+      {
+       "label": "Size",
+       "kind": "select",
+       "value": "A"
+      },
+      {
+       "label": "Reference",
+       "kind": "select",
+       "value": "start block Copy 1 Part 1"
+      }
      ]
     },
     "dialogs": [],
@@ -1111,14 +1184,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.1
+        94.2
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 430946
+   "t": 423848
   },
   {
    "step": 10,
@@ -1217,14 +1290,14 @@
        "text": "1.575",
        "position": [
         91,
-        91.6
+        91.7
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 456801
+   "t": 448342
   },
   {
    "step": 11,
@@ -1317,14 +1390,14 @@
        "text": "1.575",
        "position": [
         91,
-        91.6
+        91.7
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 495687
+   "t": 486969
   }
  ]
 }

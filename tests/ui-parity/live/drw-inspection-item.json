@@ -1,19 +1,19 @@
 {
  "scenario": "drw-inspection-item",
- "recorded": "2026-11-09T12:15:38.433Z",
+ "recorded": "2026-11-14T23:14:51.134Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "fea1b55dd78b69d78a6deb38",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "40593a918ea935161d162446",
   "start": "block-drawing",
-  "startElement": "392bca590892e6ffb484a34b",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -41,7 +41,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1 (1)",
+   "tab": "Part 1 Drawing 1",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -51,6 +51,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -58,6 +62,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -65,6 +73,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -72,6 +84,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -121,7 +137,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -131,6 +147,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -138,6 +158,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -145,6 +169,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -152,6 +180,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -161,7 +193,7 @@
      "selection": []
     }
    },
-   "t": 238917
+   "t": 226902
   },
   {
    "step": 2,
@@ -180,8 +212,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    618
+    727,
+    672
    ],
    "state": {
     "focus": {
@@ -209,7 +241,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -219,6 +251,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -226,6 +262,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -233,6 +273,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -240,16 +284,25 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ]
     }
    },
-   "t": 266630
+   "t": 252632
   },
   {
    "step": 3,
@@ -268,8 +321,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    587
+    727,
+    637
    ],
    "state": {
     "focus": {
@@ -297,7 +350,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -307,6 +360,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -314,6 +371,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -321,6 +382,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -328,6 +393,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -336,13 +405,17 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 294962
+   "t": 277749
   },
   {
    "step": 4,
@@ -385,7 +458,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -395,6 +468,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -402,6 +479,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -409,6 +490,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -416,6 +501,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -424,13 +513,17 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 323653
+   "t": 303357
   },
   {
    "step": 5,
@@ -476,6 +569,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Circle (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters (Drawing)"
+      }
      ]
     },
     "dialogs": [],
@@ -498,7 +603,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -508,6 +613,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -515,6 +624,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -522,6 +635,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -529,6 +646,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -537,13 +658,17 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 352241
+   "t": 326978
   },
   {
    "step": 6,
@@ -584,6 +709,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Circle (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters (Drawing)"
+      }
      ]
     },
     "dialogs": [],
@@ -606,7 +743,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -616,6 +753,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -623,6 +764,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -630,6 +775,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -637,6 +786,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -645,13 +798,17 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 380626
+   "t": 352076
   },
   {
    "step": 7,
@@ -663,8 +820,8 @@
    },
    "ok": true,
    "at": [
-    749,
-    587
+    727,
+    637
    ],
    "state": {
     "focus": {
@@ -697,6 +854,18 @@
       "3 Characters",
       "4 Characters",
       "5 Characters"
+     ],
+     "fields": [
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Circle (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters (Drawing)"
+      }
      ]
     },
     "dialogs": [],
@@ -719,7 +888,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -729,6 +898,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -736,6 +909,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -743,6 +920,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -750,6 +931,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -758,17 +943,25 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       },
       {
        "kind": "inspectionsymbol",
-       "text": "1"
+       "text": "1",
+       "position": [
+        78.8,
+        99.4
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 422985
+   "t": 390153
   },
   {
    "step": 8,
@@ -811,7 +1004,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -821,6 +1014,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -828,6 +1025,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -835,6 +1036,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -842,6 +1047,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -850,17 +1059,213 @@
      "annotations": [
       {
        "kind": "dimension",
-       "text": "1.575"
+       "text": "1.575",
+       "position": [
+        81,
+        94.2
+       ]
       },
       {
        "kind": "inspectionsymbol",
-       "text": "1"
+       "text": "1",
+       "position": [
+        78.8,
+        99.4
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 450954
+   "t": 415889
   }
- ]
+ ],
+ "_meta": {
+  "export": [
+   {
+    "format": "DXF",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-inspection-item.dxf",
+    "bytes": 99835,
+    "error": null,
+    "formatBefore": "PDF",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "DXF"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "Release 14"
+     },
+     {
+      "label": "Sheets",
+      "id": null,
+      "value": "All sheets"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": null,
+      "value": "Export as text"
+     },
+     {
+      "label": "Units",
+      "id": "drawing-units-dropdown",
+      "value": "Use drawing units"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Export splines as polylines",
+      "checked": false
+     },
+     {
+      "label": "Set z-height to zero and normals to positive",
+      "checked": true
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     },
+     {
+      "label": "Exclude off-sheet content",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   },
+   {
+    "format": "DWG",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-inspection-item.dwg",
+    "bytes": 27425,
+    "error": null,
+    "formatBefore": "DXF",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "DWG"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "2018"
+     },
+     {
+      "label": "Sheets",
+      "id": null,
+      "value": "All sheets"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": null,
+      "value": "Export as text"
+     },
+     {
+      "label": "Units",
+      "id": "drawing-units-dropdown",
+      "value": "Use drawing units"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Export splines as polylines",
+      "checked": false
+     },
+     {
+      "label": "Set z-height to zero and normals to positive",
+      "checked": true
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     },
+     {
+      "label": "Exclude off-sheet content",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   },
+   {
+    "format": "PDF",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-inspection-item.pdf",
+    "bytes": 78984,
+    "error": null,
+    "formatBefore": "DWG",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "PDF"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "1.5"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": "drawing-export-text-dropdown",
+      "value": "Normal"
+     },
+     {
+      "label": "Color",
+      "id": "drawing-export-color-dropdown",
+      "value": "Color"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   }
+  ]
+ }
 }
