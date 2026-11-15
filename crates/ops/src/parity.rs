@@ -6982,6 +6982,59 @@ struct Level<'a> {
     tab: String,
 }
 
+/// A mate connector's own Flip primary axis, Reorient secondary axis and Move (live's `flipPrimary`, `secondaryAxisType`,
+/// `transform`) as a mate end's `flip`, `reorient` and `move`, with the move's translation (m); `None` when it has none.
+fn connector_params(mc: &Value) -> Option<(Value, glam::DVec3)> {
+    let par = |id: &str| mc["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id);
+    let value = |id: &str, dim: noshape_units::Dim| -> f64 {
+        let e = par(id).and_then(|p| p["expression"].as_str());
+        e.and_then(|e| noshape_units::evaluate_as(e, dim, &noshape_units::UnitPrefs::default(), &noshape_units::EmptyScope).ok()).map_or(0.0, |q| q.value)
+    };
+    // (Realigned to other entities: not a mate end's; its flip is about that axis, asm-xdev-subs' Mate connector 1.)
+    let picked = |id: &str| par(id).and_then(|p| p["queries"].as_array()).is_some_and(|q| !q.is_empty());
+    if par("realign").is_some_and(|p| p["value"] == true) && (picked("primaryAxisQuery") || picked("secondaryAxisQuery")) {
+        return None;
+    }
+    let mut own = Map::new();
+    if par("flipPrimary").is_some_and(|p| p["value"] == true) {
+        own.insert("flip".into(), json!(true));
+    }
+    let quarters = match par("secondaryAxisType").and_then(|p| p["value"].as_str()) {
+        Some("PLUS_Y") => 1,
+        Some("MINUS_X") => 2,
+        Some("MINUS_Y") => 3,
+        _ => 0,
+    };
+    if quarters > 0 {
+        own.insert("reorient".into(), json!(quarters));
+    }
+    let mut t = glam::DVec3::ZERO;
+    if par("transform").is_some_and(|p| p["value"] == true) {
+        use noshape_units::Dim;
+        t = glam::DVec3::new(value("translationX", Dim::LENGTH), value("translationY", Dim::LENGTH), value("translationZ", Dim::LENGTH));
+        let rotation = value("rotation", Dim::ANGLE);
+        let mut m = Map::new();
+        for (k, v) in ["x", "y", "z"].iter().zip(t.to_array()) {
+            if v != 0.0 {
+                m.insert((*k).into(), json!(format!("{} mm", (v * 1e12).round() / 1e9)));
+            }
+        }
+        if rotation != 0.0 {
+            let axis = match par("rotationType").and_then(|p| p["value"].as_str()) {
+                Some("ABOUT_X") => "x",
+                Some("ABOUT_Y") => "y",
+                _ => "z",
+            };
+            m.insert("rotation_axis".into(), json!(axis));
+            m.insert("rotation".into(), json!(format!("{} deg", (rotation.to_degrees() * 1e9).round() / 1e9)));
+        }
+        if !m.is_empty() {
+            own.insert("move".into(), Value::Object(m));
+        }
+    }
+    (!own.is_empty()).then(|| (Value::Object(own), t))
+}
+
 /// The entities an implicit connector of `inference` sits on, and the point of theirs it is at (query_entities' kind
 /// and key).
 fn connector_kind(inference: &str) -> (&'static str, &'static str) {
@@ -7306,16 +7359,16 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let features = values(&asm["subAssemblyFeatures"][e]["features"]);
         levels.push(Level { element: e.to_string(), instances: values(&sub["instances"]), features, defs: values(&sub["features"]), tab: format!("Sub {}", &e[..e.len().min(6)]) });
     }
-    // An instance's element (its Part Studio, or its subassembly) at any level.
-    let mut element_of: HashMap<String, String> = HashMap::new();
-    for l in &levels {
-        for i in &l.instances {
-            if let (Some(id), Some(e)) = (i["id"].as_str(), i["elementId"].as_str()) {
-                element_of.insert(id.to_string(), e.to_string());
-            }
-        }
-    }
-    let instance_of: HashMap<String, &Value> = levels.iter().flat_map(|l| l.instances.iter()).filter_map(|i| Some((i["id"].as_str()?.to_string(), *i))).collect();
+    // Each level's instances and their elements (its Part Studio, or its subassembly), by (level, instance id): an id is
+    // only its assembly's (asm-suspension's Upper and Lower Control Arm share six, from two Part Studios).
+    let instance_of: HashMap<(String, String), &Value> = levels.iter().flat_map(|l| l.instances.iter().filter_map(|i| Some(((l.element.clone(), i["id"].as_str()?.to_string()), *i)))).collect();
+    let element_of: HashMap<(String, String), String> = instance_of.iter().filter_map(|(k, i)| Some((k.clone(), i["elementId"].as_str()?.to_string()))).collect();
+    // The element at the end of an occurrence path of `level`, and that path's last instance.
+    let element_at = |level: &str, path: &[String]| -> Option<String> { path.iter().try_fold(level.to_string(), |l, id| element_of.get(&(l, id.clone())).cloned()) };
+    let instance_at = |level: &str, path: &[String]| -> Option<&Value> {
+        let (last, outer) = path.split_last()?;
+        instance_of.get(&(element_at(level, outer)?, last.clone())).copied()
+    };
     // Mate connectors (implicit ones live in their mate's `mateConnectors`): (level, feature id) → (occurrence path in
     // that level, inference, the entity query).
     type Key = (String, String);
@@ -7325,6 +7378,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     let mut connectors: HashMap<Key, Connector> = HashMap::new();
     let mut connector_origins: HashMap<Key, [f64; 3]> = HashMap::new();
     let mut connector_z: HashMap<Key, [f64; 3]> = HashMap::new();
+    // A connector's own Flip primary axis, secondary axis and Move (live's mateConnector parameters; asm-infento-subs'
+    // Fastened 18, 20 mm along X): its mate end's flip, reorient and move, and the move's translation (m).
+    let mut connector_own: HashMap<Key, (Value, glam::DVec3)> = HashMap::new();
     for l in &levels {
         for f in &l.features {
             let all = std::iter::once(*f).chain(f["mateConnectors"].as_array().into_iter().flatten());
@@ -7334,6 +7390,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 let query = json!({ "queryString": q["entityQuery"], "deterministicIds": q["deterministicIds"], "second": q["secondDeterministicId"] });
                 if let Some(id) = mc["featureId"].as_str() {
                     connectors.insert((l.element.clone(), id.to_string()), (ids(&q["path"]), q["inferenceType"].as_str().unwrap_or("").to_string(), query));
+                    if let Some(own) = connector_params(mc) {
+                        connector_own.insert((l.element.clone(), id.to_string()), own);
+                    }
                 }
             }
         }
@@ -7342,9 +7401,31 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         for m in &l.defs {
             let Some(f) = l.features.iter().find(|f| f["featureId"] == m["id"]) else { continue };
             let picks = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "mateConnectorsQuery").and_then(|p| p["queries"].as_array());
-            for (q, e) in picks.into_iter().flatten().zip(m["featureData"]["matedEntities"].as_array().into_iter().flatten()) {
+            // (Each pick's own occurrence's: live leaves out the assembly origin's and one it can't resolve, asm-infento-
+            // subs' Planar 23, so the order alone pairs the other pick with it.)
+            let mated: Vec<&Value> = m["featureData"]["matedEntities"].as_array().into_iter().flatten().collect();
+            let picks: Vec<&Value> = picks.into_iter().flatten().collect();
+            let path_of = |q: &Value| q["featureId"].as_str().and_then(|id| connectors.get(&(l.element.clone(), id.to_string()))).map(|c| c.0.clone());
+            let paired = picks.iter().enumerate().filter_map(|(i, q)| {
+                let path = path_of(q);
+                let by_path = path.as_ref().and_then(|p| mated.iter().find(|e| ids(&e["matedOccurrence"]) == *p));
+                let e = if picks.len() == mated.len() && by_path.is_none() { mated.get(i) } else { by_path };
+                Some((*q, *e?))
+            });
+            for (q, e) in paired.collect::<Vec<_>>() {
                 if let (Some(id), Some(o)) = (q["featureId"].as_str(), f3(&e["mateConnectorCS"]["origin"])) {
-                    connector_origins.insert((l.element.clone(), id.to_string()), o);
+                    // (Live's point before the connector's own move, where its entity's point lies: its translation runs
+                    // along the frame's axes, unturned when it has no rotation.)
+                    let key = (l.element.clone(), id.to_string());
+                    let cs = &e["mateConnectorCS"];
+                    let base = match (connector_own.get(&key), f3(&cs["xAxis"]), f3(&cs["yAxis"]), f3(&cs["zAxis"])) {
+                        (Some((own, t)), Some(x), Some(y), Some(z)) if own["move"]["rotation"].is_null() => {
+                            let at = glam::DVec3::from(o) - glam::DVec3::from(x) * t.x - glam::DVec3::from(y) * t.y - glam::DVec3::from(z) * t.z;
+                            at.to_array()
+                        }
+                        _ => o,
+                    };
+                    connector_origins.insert(key, base);
                 }
                 if let (Some(id), Some(z)) = (q["featureId"].as_str(), f3(&e["mateConnectorCS"]["zAxis"])) {
                     connector_z.insert((l.element.clone(), id.to_string()), z);
@@ -7583,22 +7664,22 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         // configuration; then back to the default.
         let mut here: Vec<ToFind> = connectors
             .iter()
-            .filter(|(_, (path, ..))| path.last().and_then(|i| element_of.get(i)) == Some(element))
+            .filter(|(key, (path, ..))| element_at(&key.0, path).as_ref() == Some(element))
             .map(|(key, c)| {
-                let choices = c.0.last().and_then(|i| instance_of.get(i)).map(|i| instance_config_entries(i).into_iter().filter(|(n, _)| t.config_inputs.contains(n)).collect()).unwrap_or_default();
+                let choices = instance_at(&key.0, &c.0).map(|i| instance_config_entries(i).into_iter().filter(|(n, _)| t.config_inputs.contains(n)).collect()).unwrap_or_default();
                 (key, c, choices)
             })
             .collect();
         here.sort_by(|a, b| a.2.cmp(&b.2));
         let mut active: Vec<(String, String)> = Vec::new();
         // Our part of an instance (its body id), for a connector found by live's point alone.
-        let own_part = |instance: &Option<String>| -> Option<String> {
-            let pid = instance_of.get(instance.as_ref()?)?["partId"].as_str()?;
+        let own_part = |instance: Option<&Value>| -> Option<String> {
+            let pid = instance?["partId"].as_str()?;
             let ours = part_names.get(&(element.clone(), pid.to_string()))?;
             solids.iter().find(|(n, _, id)| n == ours || id == ours).map(|(.., id)| id.clone())
         };
         for (key, (path, inference, q), choices) in here {
-            let path_end = path.last().cloned();
+            let path_end = instance_at(&key.0, path);
             if choices != active {
                 let values: serde_json::Map<String, Value> = choices.iter().map(|(n, v)| (n.clone(), json!(v))).collect();
                 if let Err(e) = t.call("config_activate", json!({ "tab": t.tab, "reset": true, "values": values })) {
@@ -7617,7 +7698,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             // point or a face's centre: the face's end circles have the same point, not the same frame.
             // On another part of the studio than the instance's (asm-tvc-mount's rings and Revolute 2's two parts read as
             // one edge): the instance's own entity at live's point.
-            let own = own_part(&path_end);
+            let own = own_part(path_end);
             let found = match found {
                 Ok(e) if own.as_ref().is_some_and(|part| t.part_of_entity(&e).is_some_and(|p| p != *part)) && connector_origins.contains_key(key) => {
                     let (part, o) = (own.clone().unwrap_or_default(), connector_origins[key]);
@@ -7631,7 +7712,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 // edge read as a hole of another part): the one at live's point.
                 (Ok(e), Some(o)) if matches!(inference.as_str(), "CENTER" | "MID_POINT") && e.starts_with("edge:") => match t.connector_entities_on_part_of(&e, inference, *o) {
                     Ok(at) if !at.is_empty() && !at.contains(&e) => Ok(at[0].clone()),
-                    Ok(at) if at.is_empty() => Ok(own_part(&path_end).and_then(|part| t.connector_candidates(inference, *o).ok()?.into_iter().find(|(_, p)| *p == part).map(|(id, _)| id)).unwrap_or(e)),
+                    Ok(at) if at.is_empty() => Ok(own_part(path_end).and_then(|part| t.connector_candidates(inference, *o).ok()?.into_iter().find(|(_, p)| *p == part).map(|(id, _)| id)).unwrap_or(e)),
                     _ => Ok(e),
                 },
                 (found, _) => found,
@@ -7652,11 +7733,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     None => res.untranslated.push(format!("mate connector {}: LOOP_CENTER: its loop on {face} not found (the face's centroid taken)", key.1)),
                 }
             }
-            // An edge's midpoint or centre picked on a face (live's query: the face, its second id the edge; asm-infento-
-            // subs' Planar 10, SQCyD / SQC1J; Revolute 15-17's U-block and Multi angle joint holes, not the faces'
-            // centroids): the edge's point, Z along the face's normal.
+            // An edge's midpoint or centre, or a vertex, picked on a face (live's query: the face, its second id the edge
+            // or vertex; asm-infento-subs' Planar 10, SQCyD / SQC1J; Revolute 15-17's U-block and Multi angle joint holes,
+            // not the faces' centroids): the edge's or vertex's point, Z along the face's normal.
             let found = match (inference.as_str(), q["second"].as_str().filter(|s| !s.is_empty())) {
-                (point @ ("MID_POINT" | "CENTER"), Some(second)) => {
+                (point @ ("MID_POINT" | "CENTER" | "POINT"), Some(second)) => {
                     let face = t.resolve(q).ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("face:")));
                     // The edge of the face's part whose midpoint is at live's point; else the second id's (named at
                     // the feature live read it after, not always ours at the end: Fastened 18's read another edge).
@@ -7664,7 +7745,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     let at_live = connector_origins.get(key).zip(part.clone()).and_then(|(o, part)| t.connector_candidates(point, *o).ok()?.into_iter().find(|(_, p)| *p == part).map(|(id, _)| id));
                     // (A centre only at live's point when it is known: a face's centre may be its centroid.)
                     let by_second = !(point == "CENTER" && connector_origins.contains_key(key));
-                    let edge = at_live.or_else(|| by_second.then(|| t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [second] })).ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with("edge:")))).flatten());
+                    // (A point's is a vertex: asm-infento-subs' Planar 15, the crank's corner, not the face's centroid.)
+                    let kind = if point == "POINT" { "vertex:" } else { "edge:" };
+                    let edge = at_live.or_else(|| by_second.then(|| t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [second] })).ok().and_then(|ids| ids.into_iter().find(|i| i.starts_with(kind)))).flatten());
                     trace(&format!("{name}: mate connector {}: {point} on face {face:?}, its second {second} edge {edge:?}", key.1));
                     // (A centre takes the face's normal only on a plane across its circle; else the circle's own axis, as
                     // live: a countersink's cone, or a face of ours not the hole's, asm-infento-subs' Fastened 4 74° off.)
@@ -7680,7 +7763,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     };
                     match (edge, face) {
                         (Some(edge), Some(face)) => {
-                            if point == "MID_POINT" || across(&face, &edge) {
+                            if point != "CENTER" || across(&face, &edge) {
                                 aligns.insert(key.clone(), face);
                             }
                             Ok(edge)
@@ -7825,7 +7908,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         for i in &l.instances {
             let Some(id) = i["id"].as_str() else { continue };
             let Some(name) = ours.get(&(l.element.clone(), id.to_string())).cloned() else { continue };
-            let found = occurrences.iter().map(|o| ids(&o["path"])).find(|p| p.last().map(String::as_str) == Some(id) && (k == 0) == (p.len() == 1) && (k == 0 || p.len() >= 2 && element_of.get(&p[p.len() - 2]) == Some(&l.element)));
+            let found = occurrences.iter().map(|o| ids(&o["path"])).find(|p| p.last().map(String::as_str) == Some(id) && (k == 0) == (p.len() == 1) && (k == 0 || p.len() >= 2 && element_at("", &p[..p.len() - 1]).as_ref() == Some(&l.element)));
             let Some(p) = found else { continue };
             let o = occurrences.iter().find(|o| ids(&o["path"]) == p).copied();
             let fixed = o.is_some_and(|o| o["fixed"] == true);
@@ -7854,7 +7937,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             let mut names = Vec::new();
             for id in path {
                 names.push(ours.get(&(level.clone(), id.clone()))?.clone());
-                level = element_of.get(id)?.clone();
+                level = element_of.get(&(level, id.clone()))?.clone();
             }
             Some(names.join(" > "))
         };
@@ -7896,7 +7979,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     // A Part Studio's Mate connector on an instance: ours there.
                     if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMPartStudioMateConnectorQuery")) {
                         let path = ids(&q["path"]);
-                        let ours = path.last().and_then(|i| element_of.get(i)).and_then(|e| studio_features.get(e)).and_then(|f| f.get(id))?;
+                        let ours = element_at(&l.element, &path).and_then(|e| studio_features.get(&e)).and_then(|f| f.get(id))?;
                         return Some((json!({ "instance": path_names(&path)?, "reference": format!("mc:{}.0", ours.trim_start_matches("mc:")) }), String::new(), None, None));
                     }
                     let key = (l.element.clone(), id.to_string());
@@ -7910,6 +7993,13 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     }
                     if let Some(face) = aligns.get(&key) {
                         c["align"] = json!(face);
+                    }
+                    // (Its own flip and move: live's frame is past them, no correction toward it.)
+                    if let Some((own, _)) = connector_own.get(&key) {
+                        for (k, v) in own.as_object().into_iter().flatten() {
+                            c[k] = v.clone();
+                        }
+                        return Some((c, inf.clone(), None, None));
                     }
                     Some((c, inf.clone(), connector_z.get(&key).copied(), connector_origins.get(&key).copied()))
                 })();
@@ -8032,11 +8122,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             continue;
         }
         let (outer, inner) = p.split_at(p.len() - 2);
-        let level = outer.last().map_or(Some(String::new()), |id| element_of.get(id).cloned());
+        let level = element_at("", outer);
         let Some(level) = level else { continue };
         let Some(tab) = levels.iter().find(|l| l.element == level).map(|l| l.tab.clone()) else { continue };
         let Some(sub) = ours.get(&(level.clone(), inner[0].clone())) else { continue };
-        let Some(child) = element_of.get(&inner[0]).and_then(|e| ours.get(&(e.clone(), inner[1].clone()))) else { continue };
+        let Some(child) = element_at(&level, &inner[..1]).and_then(|e| ours.get(&(e, inner[1].clone()))) else { continue };
         let name = format!("{sub} > {child}");
         if !placed_inside.insert((tab.clone(), name.clone())) {
             continue;
@@ -8070,13 +8160,13 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let mut names = Vec::new();
         for id in path {
             names.push(ours.get(&(level.clone(), id.clone()))?.clone());
-            level = element_of.get(id)?.clone();
+            level = element_of.get(&(level, id.clone()))?.clone();
         }
         Some(names.join(" > "))
     };
     for o in &occurrences {
         let p = ids(&o["path"]);
-        if p.len() > 1 && levels.iter().any(|l| Some(&l.element) == element_of.get(p.last().unwrap_or(&String::new()))) {
+        if p.len() > 1 && element_at("", &p).is_some_and(|e| levels.iter().any(|l| l.element == e)) {
             continue;
         }
         res.occurrences += 1;
@@ -8237,6 +8327,23 @@ mod tests {
         assert_eq!((&side["translationY"], &side["rotationType"], &side["rotation"]), (&json!("-4 mm"), &json!("ABOUT_X"), &json!("90 deg")));
         assert!(at([0.0; 3], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]).unwrap().get("flipPrimary").is_none());
         assert!(at([0.0; 3], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]).is_none());
+    }
+
+    /// A mate connector's own flip, secondary axis and Move go on its mate end (asm-infento-subs' Fastened 18: Mate
+    /// connector 1, 20 mm along X); one with none has nothing to add.
+    #[test]
+    fn a_connectors_own_flip_and_move_go_on_its_mate_end() {
+        let mc = |params: Value| json!({ "btType": "BTMMateConnector-66", "parameters": params });
+        let p = |id: &str, v: Value| json!({ "parameterId": id, "value": v });
+        let e = |id: &str, x: &str| json!({ "parameterId": id, "value": 0, "expression": x });
+        let (own, t) = connector_params(&mc(json!([p("transform", json!(true)), e("translationX", "20 mm"), e("translationY", "0.0*mm"), e("translationZ", "0 mm"), p("rotationType", json!("ABOUT_Z")), e("rotation", "0 deg"), p("flipPrimary", json!(true)), p("secondaryAxisType", json!("MINUS_Y"))]))).unwrap();
+        assert_eq!(own, json!({ "flip": true, "reorient": 3, "move": { "x": "20 mm" } }));
+        assert!((t - glam::DVec3::new(0.02, 0.0, 0.0)).length() < 1e-12);
+        let (turned, _) = connector_params(&mc(json!([p("transform", json!(true)), p("rotationType", json!("ABOUT_X")), e("rotation", "90 deg")]))).unwrap();
+        assert_eq!(turned, json!({ "move": { "rotation_axis": "x", "rotation": "90 deg" } }));
+        assert!(connector_params(&mc(json!([p("transform", json!(false)), e("translationX", "20 mm"), p("flipPrimary", json!(false)), p("secondaryAxisType", json!("PLUS_X"))]))).is_none());
+        let axis = json!({ "parameterId": "primaryAxisQuery", "queries": [{ "deterministicIds": ["LFRfa"] }] });
+        assert!(connector_params(&mc(json!([p("realign", json!(true)), axis, p("flipPrimary", json!(true))]))).is_none(), "realigned");
     }
 
 

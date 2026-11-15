@@ -3759,6 +3759,30 @@ fn revolved_rims_between_curved_faces_point_against_the_revolve_axis() {
     assert_eq!(seen, [(0, -1), (2, -1), (4, -1), (20, 1)], "(rim z mm, Z's z)");
 }
 
+/// A torus's axis points are on its axis, Z along it (asm-infento-subs' tyre, Fastened 24's MID_AXIS_POINT: live's Z
+/// along the wheel's axis), not at its centroid along the normal there.
+#[test]
+fn a_torus_face_has_its_axis_points_on_its_axis() {
+    use noshape_kernel::{ShapeType, Surface};
+    // A 5 mm circle 20 mm off the axis (sketch Y on Front: world Z), revolved whole.
+    let studio = revolved_studio(|sk| {
+        sk.add_circle(DVec2::new(0.02, 0.0), 0.005);
+    });
+    let f = doc_with(vec![studio]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let b = &r.context.bodies[0];
+    let torus = b.faces.iter().enumerate().find(|(i, _)| matches!(b.shape.sub_shape(ShapeType::Face, *i).and_then(|s| s.face_surface()), Ok(Surface::Torus { .. }))).map(|(_, n)| Reference::Face((**n).clone())).expect("a torus face");
+    let units = UnitPrefs::default();
+    for (inference, z) in [(Inference::MidAxis, 0.0), (Inference::TopAxis, 0.005), (Inference::BottomAxis, -0.005)] {
+        let c = Reference::Implicit { on: Box::new(torus.clone()), inference };
+        let f = super::eval::resolve_connector_in(&r.context, Some(&body), &c, &units).expect("a connector");
+        assert!(f.z().z.abs() > 1.0 - 1e-9, "{inference:?}: Z along the axis, {:?}", f.z());
+        // (Top and bottom by the axis's own sense, to the box's tolerance.)
+        assert!(f.origin.truncate().length() < 1e-9 && (f.origin.z - z * f.z().z.signum()).abs() < 1e-6, "{inference:?} at {:?}", f.origin);
+    }
+}
+
 #[test]
 fn inference_points_on_cones_spheres_arcs_and_vertices() {
     use super::eval::inference_candidates;

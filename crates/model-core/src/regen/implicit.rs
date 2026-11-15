@@ -25,8 +25,18 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
         Reference::Face(_) => {
             let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(on)).first()?;
             let face = ev.face_shape(bi, fi).ok()?;
-            match face.face_surface().ok()? {
-                k::Surface::Cylinder { origin, axis, .. } | k::Surface::Cone { origin, axis, .. } => {
+            let surface = face.face_surface().ok()?;
+            // (A torus's or other revolved face's axis points too: asm-infento-subs' tyre, Fastened 24, not the normal at
+            // its centroid.)
+            let axis_point = matches!(inference, Inference::TopAxis | Inference::MidAxis | Inference::BottomAxis);
+            let revolved = match surface {
+                k::Surface::Cylinder { origin, axis, .. } | k::Surface::Cone { origin, axis, .. } => Some((origin, axis)),
+                k::Surface::Torus { center, axis, .. } | k::Surface::Sphere { center, axis, .. } if axis_point => Some((center, axis)),
+                k::Surface::Revolution { axis_origin, axis_dir } if axis_point => Some((axis_origin, axis_dir)),
+                _ => None,
+            };
+            match revolved {
+                Some((origin, axis)) => {
                     let bb = face.bounding_box(true).ok()?;
                     let c = bb.center();
                     let t = (c - origin).dot(axis);
@@ -38,7 +48,7 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
                     };
                     Some(mk(origin + axis * along, axis))
                 }
-                _ => {
+                None => {
                     let c = face.centroid().ok()?;
                     let n = face.normal_at_point(c).ok()?;
                     Some(mk(c, n))
