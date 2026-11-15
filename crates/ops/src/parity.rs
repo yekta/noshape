@@ -6348,6 +6348,9 @@ pub struct PartState {
     /// rest "other"), when known (live: its bodydetails).
     pub face_types: Option<std::collections::BTreeMap<String, usize>>,
     pub edge_types: Option<std::collections::BTreeMap<String, usize>>,
+    /// Live's lines and others counted as one where its fetch read straight edges as OTHER (docs/PARITY-SUITES.md,
+    /// "Straight edges of offset faces").
+    pub line_or_other: bool,
     /// Ours: the area of the part's faces on other surfaces (blends' procedural surfaces, B-splines), m², whose area
     /// live measures up to 0.22 % low (docs/PARITY-SUITES.md, "Area of procedural blend faces").
     pub freeform_area: Option<f64>,
@@ -6579,6 +6582,7 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             freeform_area: None,
             edge_tolerance: None,
             edge_length: None,
+            line_or_other: false,
         })
         .collect()
 }
@@ -6656,6 +6660,7 @@ pub fn parts_from_query(r: &Value) -> Vec<PartState> {
             freeform_area: None,
             edge_tolerance: p["edge_tolerance"].as_f64().map(|t| t * k),
             edge_length: p["edge_length"].as_f64().map(|l| l * k),
+            line_or_other: false,
         })
         .collect()
 }
@@ -6690,6 +6695,7 @@ pub fn parts_from_live_import(v: &Value, mesh: bool) -> Vec<PartState> {
             freeform_area: None,
             edge_tolerance: None,
             edge_length: None,
+            line_or_other: false,
         })
         .collect()
 }
@@ -6762,8 +6768,15 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
             {
                 out.push(format!("{who}: faces {}, live {}", show(a), show(b)));
             }
+            let merged = |m: &std::collections::BTreeMap<String, usize>| {
+                let mut m = m.clone();
+                if l.line_or_other && let Some(n) = m.remove("line") {
+                    *m.entry("other".into()).or_default() += n;
+                }
+                m
+            };
             if let (Some(a), Some(b)) = (&o.edge_types, &l.edge_types)
-                && a != b
+                && merged(a) != merged(b)
             {
                 out.push(format!("{who}: edges {}, live {}", show(a), show(b)));
             }

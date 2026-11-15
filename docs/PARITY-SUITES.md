@@ -63,6 +63,13 @@ part named "PEM FH4-M3-…" is held within 0.03 mm³ of live's volume, 0.15 mm²
 differences, the same on both stud lengths), its edges' kinds not compared, in every feature (the studs stay as imported); its
 counts and every other part are compared as usual (`LIVE_IMPORT_REFITS`, crates/ops/tests/parity.rs).
 
+**Straight edges of offset faces (core, lead 11-15).** Live's fetch types an edge LINE only when its tessellation is two
+points. Parasolid keeps a face moved by Move face › Offset as an offset surface, so that face's straight edges come back
+as longer polylines and are typed OTHER: c2-impeller-loft's Flansch verbreitern gives Part 2 8 line / 10 other edges,
+ours 12 / 6, the same volume. A user never sees the difference: live's evCurveDefinition and Measure still call such an
+edge a Line (live core/q-moveface). So from a feature named in `LIVE_LINES_AS_OTHER` (crates/ops/tests/parity.rs) on, that
+part's lines and others are compared as one count; its other edge kinds, its counts and everything else as usual.
+
 ## 2. Interaction suite: the same steps in live and in noshape
 
 **Scenarios (qa, live).** `tests/ui-parity/<name>.json`: short scripts of what a user does: keys, typed text, clicks

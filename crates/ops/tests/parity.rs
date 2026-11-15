@@ -86,9 +86,23 @@ const LIVE_IMPORT_REFITS: &[LiveRefit] = &[
     LiveRefit { docs: &["c2-gamma-imported", "c2-wire-clip-imported"], prefix: "PEM FH4-M3-", volume: 0.03e-9, area: 0.15e-6, centroid: 3e-6 },
 ];
 
+/// Parts whose straight edges live's fetch read as OTHER from a feature on (PARITY-SUITES.md "Straight edges of offset
+/// faces"): their lines and others counted as one; their counts and everything else compared as usual.
+struct LiveLineAsOther {
+    doc: &'static str,
+    from_feature: &'static str,
+    part: &'static str,
+}
+const LIVE_LINES_AS_OTHER: &[LiveLineAsOther] = &[
+    // bool 11-15: Flansch verbreitern (Move face › Offset of Extrude Flansch's swept faces) turns live's 4 straight edges
+    // of the moved faces OTHER (12 line / 6 other, live 8 / 10), the volume equal; live's evCurveDefinition and Measure
+    // still call such an edge a Line (live core/q-moveface): only the fetch's polyline rule reads it OTHER.
+    LiveLineAsOther { doc: "c2-impeller-loft", from_feature: "Flansch verbreitern", part: "Part 2" },
+];
+
 /// Live's parts after a feature, `reached` the names of the features up to it: its bands widened where
-/// [`LIVE_VOLUME_ALLOWANCES`] names a feature reached, and the importer's refit parts ([`LIVE_IMPORT_REFITS`]) held to their
-/// tolerances.
+/// [`LIVE_VOLUME_ALLOWANCES`] names a feature reached, the importer's refit parts ([`LIVE_IMPORT_REFITS`]) held to their
+/// tolerances, and lines counted with others where [`LIVE_LINES_AS_OTHER`] names a feature reached.
 fn allow_live_readings(doc: &str, reached: &[&str], mut parts: Vec<PartState>) -> Vec<PartState> {
     for r in LIVE_IMPORT_REFITS {
         if !r.docs.contains(&doc) {
@@ -107,6 +121,11 @@ fn allow_live_readings(doc: &str, reached: &[&str], mut parts: Vec<PartState>) -
                 p.centroid_band = Some([c.map(|x| x - centroid), c.map(|x| x + centroid)]);
             }
             p.edge_types = None;
+        }
+    }
+    for r in LIVE_LINES_AS_OTHER {
+        if r.doc == doc && reached.contains(&r.from_feature) {
+            parts.iter_mut().filter(|p| p.name == r.part).for_each(|p| p.line_or_other = true);
         }
     }
     for r in LIVE_VOLUME_ALLOWANCES {
@@ -129,6 +148,23 @@ fn allow_live_readings(doc: &str, reached: &[&str], mut parts: Vec<PartState>) -
         }
     }
     parts
+}
+
+/// c2-impeller-loft's Part 2 from Flansch verbreitern on: live's lines read as OTHER count with its others; before that
+/// feature, in another part, or with another kind off, the kinds still differ.
+#[test]
+fn live_lines_as_other_count_with_others_from_their_feature_on() {
+    let kinds = |line: usize, other: usize, circle: usize| Some([("line", line), ("other", other), ("circle", circle)].into_iter().map(|(k, n)| (k.to_string(), n)).collect());
+    let part = |name: &str, line, other, circle| PartState { name: name.into(), faces: 10, edges: 18 + circle as u64, vertices: 12, edge_types: kinds(line, other, circle), ..Default::default() };
+    let live = |name: &str, reached: &[&str]| allow_live_readings("c2-impeller-loft", reached, vec![part(name, 8, 10, 0)]);
+    let after = ["Extrude Flansch", "Flansch verbreitern"];
+    assert!(differences(&live("Part 2", &after), &[part("Part 2", 12, 6, 0)]).is_empty());
+    assert!(!differences(&live("Part 2", &["Extrude Flansch"]), &[part("Part 2", 12, 6, 0)]).is_empty(), "not before the feature");
+    assert!(!differences(&live("Part 1", &after), &[part("Part 1", 12, 6, 0)]).is_empty(), "only the named part");
+    let mut other_kind = live("Part 2", &after);
+    other_kind[0].edge_types = kinds(8, 9, 1);
+    other_kind[0].edges = 19;
+    assert!(!differences(&other_kind, &[part("Part 2", 12, 6, 1)]).is_empty(), "lines and others only");
 }
 
 #[test]
