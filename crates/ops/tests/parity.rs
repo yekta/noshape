@@ -1441,6 +1441,28 @@ fn a_constraints_model_query_without_ids_takes_the_ids_of_its_refs_line() {
     assert!(g["constraints"].as_array().is_some_and(|c| c.iter().filter(|c| to_vertex(c)).count() == 1), "{g} {:?}", s.problems);
 }
 
+/// A Concentric between an arc's centre and a line's end (learning-center-frank's Skizze 1): two points, which our
+/// Concentric refuses; the arc itself takes it, its centre on the line's end.
+#[test]
+fn a_concentric_between_two_points_takes_the_arc_whose_centre_it_names() {
+    let (mut features, _, refs) = block_model();
+    let sketch = &mut features["features"][0];
+    sketch["entities"] = json!([
+        { "btType": "BTMSketchCurveSegment-155", "entityId": "a1", "isConstruction": false, "startParam": 0.0, "endParam": std::f64::consts::FRAC_PI_2,
+          "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.01, "xCenter": 0.0, "yCenter": 0.02, "xDir": 1.0, "yDir": 0.0, "clockwise": false } },
+        { "btType": "BTMSketchCurveSegment-155", "entityId": "l1", "isConstruction": false, "startParam": 0.0, "endParam": 0.02,
+          "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": 0.02, "pntY": 0.02, "dirX": -1.0, "dirY": 0.0 } }]);
+    sketch["constraints"] = json!([{ "btType": "BTMSketchConstraint-2", "constraintType": "CONCENTRIC", "entityId": "cc", "parameters": [
+        { "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "a1.center" },
+        { "btType": "BTMParameterString-149", "parameterId": "localSecond", "value": "l1.end" }] }]);
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("concentric-points.noshape"), &features, parse_refs(&refs)).unwrap();
+    let s = t.step(0);
+    assert!(!s.problems.iter().any(|p| p.contains("CONCENTRIC")), "{:?}", s.problems);
+    let g = t.call("sketch_get", json!({ "sketch": s.ours.clone().unwrap() })).unwrap();
+    assert!(g["constraints"].as_array().is_some_and(|c| c.iter().any(|c| c["type"] == "Concentric")), "{g}");
+}
+
 #[test]
 fn translates_a_sketch_extrude_and_fillet() {
     let (features, mut live, refs) = block_model();

@@ -4982,8 +4982,15 @@ impl<'a> Translator<'a> {
             // two model vertices, cf-sheet-metal-hem's derived Sketch 3 centring its circle), in the slots' order.
             let param = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned();
             let mut placed: Vec<String> = Vec::new();
+            // A Concentric between two points (an arc's centre and a line's end, learning-center-frank's Skizze 1): live
+            // names a circle by its centre; ours takes the circle, whose centre then lies on the point.
+            let points_only = ty == "CONCENTRIC" && c["parameters"].as_array().into_iter().flatten().all(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("local")) && p["value"].as_str().is_some_and(|v| v.contains('.')));
             for n in order {
                 if let Some(v) = par(n) {
+                    let v = match v.strip_suffix(".center") {
+                        Some(curve) if points_only && self.sketch_entities.contains_key(&(oid.to_string(), curve.to_string())) => curve.to_string(),
+                        _ => v,
+                    };
                     match self.sketch_entities.get(&(oid.to_string(), v.clone())) {
                         Some(e) => entities.push(e.clone()),
                         None => {
