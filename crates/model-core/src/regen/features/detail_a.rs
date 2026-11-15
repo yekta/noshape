@@ -574,7 +574,8 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     let detach = ev.bool("detach");
     let solids = bodies_of(&side1).union(&bodies_of(&side2)).any(|&b| ev.ctx.bodies[b].shape.count(ShapeType::Solid) > 0);
     if matches!(ev.enum_("trim"), "LONG" | "NO_TRIM") && !detach && solids {
-        return err("Cannot attach long and no-trim blends to solid parts.");
+        // (Both sides' fields marked, as live's: psui's face-blend-trim-no-trim.)
+        return err_at(&["side1", "side2"], "Cannot attach long and no-trim blends to solid parts.");
     }
     let swept = ev.is("crossSection", "SWEPT_PROFILE");
     if swept {

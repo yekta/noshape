@@ -992,6 +992,7 @@ fn face_blend_propagation_detach_and_trim_as_live() {
         let res = run(vec![("trim", en(trim))]);
         let st = res.display.features.last().unwrap();
         assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Cannot attach long and no-trim blends to solid parts.")), "{trim}");
+        assert_eq!(st.faulty, vec!["side1".to_string(), "side2".to_string()], "{trim}: live marks both sides");
     }
     let res = run(vec![("detach", b(true))]);
     assert!(near_mm3(solid(&res), 24000.0, 6), "detached: the block stays");
