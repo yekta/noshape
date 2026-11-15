@@ -5,7 +5,7 @@ import/export (kernel and model import/export files), configurations, Variable S
 document visuals. Older notes: agent-api.md (api), ui2.md + theme-studios.md (ui2), drawing-behaviour.md (asb),
 drawing-verify.md (drw2), qa5-routing.md (api-owned rows).
 
-## 11-15 07:40 UTC: exports 81 / 84 by count; spur gear bisected to blend; 1dc32b 15 -> 9 failing
+## 11-15 07:18 UTC: exports 81 / 84 by count; spur gear bisected to blend; 1dc32b 15 -> 9 failing
 - Landed: hatch spacing (one region: diag / 9, several: / 13, spline control boxes), aux viewing line (W/2 + 3.63 mm,
   W/4 + 10.96 mm off, W the parent view's width), a Single centermark on an automatic one's hole is that mark, crop
   profiles as POLYLINEs, evEdgeConvexity one sample on steady edges, composite parts mapped by their feature
