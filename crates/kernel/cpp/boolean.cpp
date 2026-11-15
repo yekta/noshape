@@ -42,8 +42,6 @@
 #include <BRepBuilderAPI_ModifyShape.hxx>
 #include <BRepTools_TrsfModification.hxx>
 #include <BRepCheck_Analyzer.hxx>
-#include <BRepCheck_Shell.hxx>
-#include <BRepCheck_Solid.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
 #include <Geom2dConvert.hxx>
@@ -2149,34 +2147,6 @@ void check_scoped_unify(const TopoDS_Shape& s0, const TopoDS_Shape& got)
 TopoDS_Shape unify(const TopoDS_Shape& s0, HHist& hist)
 {
   return unify_in(s0, hist, nullptr, nullptr);
-}
-
-// Whether `s`'s shells, and its solids with them, check clean (BRepCheck_Shell's and BRepCheck_Solid's: closed, oriented,
-// the faces joined), its faces taken as they are.
-static bool shells_valid(const TopoDS_Shape& s)
-{
-  const auto clean = [](const NCollection_List<BRepCheck_Status>& l) {
-    for (const BRepCheck_Status st : l)
-      if (st != BRepCheck_NoError)
-        return false;
-    return true;
-  };
-  for (TopExp_Explorer so(s, TopAbs_SOLID); so.More(); so.Next())
-  {
-    for (TopExp_Explorer sh(so.Current(), TopAbs_SHELL); sh.More(); sh.Next())
-    {
-      const occ::handle<BRepCheck_Shell> r = new BRepCheck_Shell(TopoDS::Shell(sh.Current()));
-      r->InContext(so.Current());
-      if (!clean(r->Status()) || !clean(r->StatusOnShape(so.Current())))
-        return false;
-    }
-    if (!clean(occ::handle<BRepCheck_Solid>(new BRepCheck_Solid(TopoDS::Solid(so.Current())))->Status()))
-      return false;
-  }
-  for (TopExp_Explorer sh(s, TopAbs_SHELL, TopAbs_SOLID); sh.More(); sh.Next())
-    if (!clean(occ::handle<BRepCheck_Shell>(new BRepCheck_Shell(TopoDS::Shell(sh.Current())))->Status()))
-      return false;
-  return true;
 }
 
 // Two faces on one cylinder meeting at a full ring, each a band closed at
@@ -6153,8 +6123,13 @@ bool rust_cut_one_by_one(const TopoDS_Shape& target, const std::vector<TopoDS_Sh
     std::vector<std::unique_ptr<OcShape>> own;
     TopoDS_Shape                          next;
     HHist                                 h;
-    if (!rust_boolean(1, in, rs, own, next, h, opts.fuzzy, false))
-      return false;
+    {
+      std::optional<RustTargetChecked> checked;
+      if (!stages.empty())
+        checked.emplace();
+      if (!rust_boolean(1, in, rs, own, next, h, opts.fuzzy, false))
+        return false;
+    }
     for (int k = 1; k <= left.Extent(); ++k)
       if (h->IsRemoved(left(k)) || !h->Modified(left(k)).IsEmpty())
         return rust_decline("tools meeting inside the target");

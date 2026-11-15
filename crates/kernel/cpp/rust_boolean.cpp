@@ -5065,6 +5065,55 @@ static bool planar_valid(const TopoDS_Face& f)
 // planar_valid, the others by BRepCheck face by face.
 static bool cheaply_valid(const TopoDS_Shape& out, bool parallel);
 
+namespace
+{
+thread_local bool t_target_checked = false;
+}
+
+// Whether `s`'s shells, and its solids with them, check clean (BRepCheck_Shell's and BRepCheck_Solid's: closed, oriented,
+// the faces joined), its faces taken as they are.
+bool shells_valid(const TopoDS_Shape& s)
+{
+  const auto clean = [](const NCollection_List<BRepCheck_Status>& l) {
+    for (const BRepCheck_Status st : l)
+      if (st != BRepCheck_NoError)
+        return false;
+    return true;
+  };
+  for (TopExp_Explorer so(s, TopAbs_SOLID); so.More(); so.Next())
+  {
+    for (TopExp_Explorer sh(so.Current(), TopAbs_SHELL); sh.More(); sh.Next())
+    {
+      const occ::handle<BRepCheck_Shell> r = new BRepCheck_Shell(TopoDS::Shell(sh.Current()));
+      r->InContext(so.Current());
+      if (!clean(r->Status()) || !clean(r->StatusOnShape(so.Current())))
+        return false;
+    }
+    if (!clean(occ::handle<BRepCheck_Solid>(new BRepCheck_Solid(TopoDS::Solid(so.Current())))->Status()))
+      return false;
+  }
+  for (TopExp_Explorer sh(s, TopAbs_SHELL, TopAbs_SOLID); sh.More(); sh.Next())
+    if (!clean(occ::handle<BRepCheck_Shell>(new BRepCheck_Shell(TopoDS::Shell(sh.Current())))->Status()))
+      return false;
+  return true;
+}
+
+RustTargetChecked::RustTargetChecked() { t_target_checked = true; }
+RustTargetChecked::~RustTargetChecked() { t_target_checked = false; }
+
+// The result's check where its target was checked before: the faces `fs` (the result's, in `r`'s order) other than
+// the target's left as they were, then the shells.
+static bool made_valid(const TopoDS_Shape& out, const BrepResult& r, const std::vector<TopoDS_Shape>& fs, bool parallel)
+{
+  TopoDS_Compound made;
+  BRep_Builder    bb;
+  bb.MakeCompound(made);
+  for (size_t i = 0; i < fs.size(); ++i)
+    if (r.face_origin[3 * i] != 0 || r.face_origin[3 * i + 1] != 0)
+      bb.Add(made, fs[i]);
+  return BRepCheck_Analyzer(made, true, parallel).IsValid() && shells_valid(out);
+}
+
 static bool result_valid(const TopoDS_Shape& out, bool parallel)
 {
   // (Ours only says valid; where it can't (a shell's edge it counts once, a face BRepCheck flags alone), the whole
@@ -5673,7 +5722,9 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   // curve on a fillet patch 40 um off it; an input edge's piece 1.1 um off its curves), as OCCT's builder ends,
   // its arguments left as they are (CorrectTolerances, CorrectShapeTolerances); then checked again.)
   std::optional<KernelTimer> check_timer(std::in_place, "boolean.rust.check");
-  const bool valid = !full_check || result_valid(out, t_built.f.size() > 32);
+  // (The target checked as the step before's result (a cut one tool at a time): its faces left as they were aren't
+  // checked again; the made ones and the tool's are, then the shells.)
+  const bool valid = !full_check || (t_target_checked ? made_valid(out, r, t_built.f, t_built.f.size() > 32) : result_valid(out, t_built.f.size() > 32));
   check_timer.reset();
   if (!valid)
   {

@@ -230,6 +230,17 @@ occ::handle<Geom_Surface> as_cylinder(const occ::handle<Geom_Surface>& s, const 
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy = 0, bool touching_only = false, bool scaled_inputs = false);
+// While one lives, this thread's noshape Booleans take their first argument as already checked (a cut one tool at a
+// time, past its first step: the step before's result): only the faces they make or take from the others are.
+struct RustTargetChecked
+{
+  RustTargetChecked();
+  ~RustTargetChecked();
+  RustTargetChecked(const RustTargetChecked&)            = delete;
+  RustTargetChecked& operator=(const RustTargetChecked&) = delete;
+};
+// Whether `s`'s shells and solids check clean (BRepCheck_Shell's, BRepCheck_Solid's), its faces taken as they are.
+bool shells_valid(const TopoDS_Shape& s);
 // `s` as a flat body (its maps' indices the body's), from its cache; why not, or null.
 const char* brep_body_cached(const OcShape& s, BrepBody& b, double& max_tol);
 // noshape's own fillet / chamfer (rust_blend.cpp, NOSHAPE_BLEND_RUST=1): `es` with per edge (kind 0 fillet / 1
