@@ -225,7 +225,9 @@ impl FeatureDialog {
                     // Live (behaviours "psui (2144)"): a field the feature's error blames is invalid, empty or not (drawn
                     // red only while another field is active), and so is one with missing picks.
                     let missing = refs.iter().any(|r| self.ref_missing(r)) || self.field_error(s.id).is_some();
-                    fields.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(s.id), "state": if missing { "error" } else { "ok" } }));
+                    // (The field Create selection fills reads as not active while its panel is open: live
+                    // mirror-face-create-selection.)
+                    fields.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(s.id) && self.cs_target.as_deref() != Some(s.id), "state": if missing { "error" } else { "ok" } }));
                 }
                 // A table (the Hole's type and size): one select per level, each with its own label (live's recorder
                 // since 1994: "Hole type", "Drill size", …, `lookup: true`).

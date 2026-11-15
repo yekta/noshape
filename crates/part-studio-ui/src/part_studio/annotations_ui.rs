@@ -59,7 +59,10 @@ impl PartStudioView {
     }
 
     pub(super) fn close_datum_tool(&mut self, cx: &mut Context<Self>) {
-        self.ui.datum_edit = None;
+        // (Its face no longer selected: live annotation-datum-delete, after ✓.)
+        if let Some(face) = self.ui.datum_edit.take().and_then(|e| e.placed).map(|a| a.face) {
+            self.selection.retain(|r| *r != face);
+        }
         if self.ui.inspection_tool == Some("insp-datum") {
             self.ui.inspection_tool = None;
         }
@@ -106,6 +109,8 @@ impl PartStudioView {
         }
         let Some((_, _, screen_up)) = self.pixel_frame(at, cx) else { return };
         let up = (screen_up - normal * screen_up.dot(normal)).try_normalize().unwrap_or(frame.y);
+        // The face stays selected while the panel is open (live annotation-datum-delete).
+        self.selection = vec![r.clone()];
         let Some(e) = &mut self.ui.datum_edit else { return };
         let letter = e.letter.read(cx).value().trim().to_string();
         e.placed = Some(Annotation { id: 0, kind: AnnotationKind::Datum { letter }, face: r, at: at.to_array(), normal: normal.to_array(), up: up.to_array(), offset: None });
