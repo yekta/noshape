@@ -424,7 +424,7 @@ impl Render for OsSelect {
                         }),
                 )
                 // The list hangs from here, over the rows below.
-                .child(div().w_full().h_0().child(self.render_list(cx)))
+                .child(crate::ui::popup_anchor().child(self.render_list(cx)))
                 .into_any_element(),
         };
         let selector = format!("os-select:{}", self.id);

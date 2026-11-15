@@ -2135,7 +2135,7 @@ impl FeatureDialog {
             .child(kinds)
             .child(fields);
         // Anchored at a zero-size box under the field: up beside it.
-        div().relative().w_full().h_0().child(deferred(anchored().offset(point(px(107.), px(-40.))).snap_to_window().child(popup)).with_priority(5)).into_any_element()
+        crate::ui::popup_anchor().child(deferred(anchored().offset(point(px(107.), px(-38.))).snap_to_window().child(popup)).with_priority(5)).into_any_element()
     }
 
     /// ✓: create the variable; the field then resolves.
@@ -2491,7 +2491,8 @@ impl FeatureDialog {
             let menu = !self.configure_mode && self.configurable_inputs && can_configure && !matches!(s.kind, ParamKind::Bool { .. });
             let row = row.map(|r| {
                 let pid = s.id.to_string();
-                let mut el = div().id(SharedString::from(format!("cfg-{pid}"))).child(r);
+                let row_id = format!("row-{pid}");
+                let mut el = div().id(SharedString::from(format!("cfg-{pid}"))).debug_selector(move || row_id).child(r);
                 if is_configured {
                     // Live: no "Configured" tag on a checkbox row; a 2 px dotted outline round the row (live2
                     // config.json dialogMarker, configured-field.png: #fab601 dots 2 px apart).
@@ -4204,7 +4205,7 @@ impl FeatureDialog {
                 ))
                 .when_some(self.completion.as_ref().filter(|c| c.key == path), |d, c| {
                     let view = cx.entity();
-                    d.child(c.render(&self.variables, &self.units, move |i, window, cx| view.update(cx, |this, cx| this.accept_completion(Some(i), window, cx))))
+                    d.child(c.render_end(&self.variables, &self.units, move |i, window, cx| view.update(cx, |this, cx| this.accept_completion(Some(i), window, cx))))
                 })
                 .children(create_var_popup)
                 .when_some(num, |d, _| {

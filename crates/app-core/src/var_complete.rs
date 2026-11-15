@@ -19,6 +19,8 @@ use std::ops::Range;
 /// Rows shown at once; more scroll (live behaviours "Variable autocomplete in expression fields": 9).
 const VISIBLE_ROWS: usize = 9;
 const ROW_H: f32 = 31.;
+/// The list's corner radius (live ac-menu: 5.25 px).
+const MENU_RADIUS: f32 = 5.25;
 
 /// Live's functions and their argument placeholders, in its order.
 const FUNCTIONS: &[(&str, &[&str])] = &[
@@ -282,10 +284,23 @@ impl VarCompletion {
 
     /// The dropdown, drawn on top of everything below the field. `on_pick`
     /// gets the clicked index. Live: white, 1 px #d7d7d7, 5 px corners,
-    /// 31 px rows with a 15 px icon, 14 px text with grey placeholders (a
-    /// variable's value grey italic, live 11-02), the selected row #b2ddf6.
+    /// The list under its field, left edges lined up.
     pub fn render(&self, variables: &BTreeMap<String, noshape_units::Quantity>, units: &noshape_units::UnitPrefs, on_pick: impl Fn(usize, &mut Window, &mut App) + 'static) -> AnyElement {
+        crate::ui::popup_anchor().child(self.list(variables, units, on_pick, Anchor::TopLeft)).into_any_element()
+    }
+
+    /// The list under its field, right edges lined up (live ac-menu: a dialog's number field, `dropdown-menu-end`).
+    pub fn render_end(&self, variables: &BTreeMap<String, noshape_units::Quantity>, units: &noshape_units::UnitPrefs, on_pick: impl Fn(usize, &mut Window, &mut App) + 'static) -> AnyElement {
+        let list = self.list(variables, units, on_pick, Anchor::TopRight);
+        crate::ui::popup_anchor().child(div().absolute().top_0().right_0().size_0().child(list)).into_any_element()
+    }
+
+    /// 31 px rows with a 15 px icon, 14 px text with grey placeholders (a variable's value grey italic, live 11-02), the
+    /// selected row #b2ddf6. Live ac-menu: no padding and no shadow; the rows fill the 1 px border, the first and last
+    /// rounded with its inner curve (Chrome clips them to the 5.25 px radius).
+    fn list(&self, variables: &BTreeMap<String, noshape_units::Quantity>, units: &noshape_units::UnitPrefs, on_pick: impl Fn(usize, &mut Window, &mut App) + 'static, corner: Anchor) -> AnyElement {
         let pal = p();
+        let last = self.rows().saturating_sub(1);
         let (text, faint, active) = (rgb(0x333333), rgb(0x666666), rgb(0xb2ddf6));
         let on_pick = std::rc::Rc::new(on_pick);
         let names = self.row_names();
@@ -297,6 +312,8 @@ impl VarCompletion {
                 .h(px(31.))
                 .p(px(4.))
                 .gap(px(5.))
+                .when(i == 0, |d| d.rounded_t(px(MENU_RADIUS - 1.)))
+                .when(i == last, |d| d.rounded_b(px(MENU_RADIUS - 1.)))
                 .when(i == self.selected, |d| d.bg(active))
                 .when(i != self.selected, |d| d.hover(|d| d.bg(pal.row_hover)))
                 .cursor_pointer()
@@ -331,19 +348,17 @@ impl VarCompletion {
         });
         // Live 152: "(x) New variable…" (highlighted when selected).
         let new_row = self.new_variable.as_ref().map(|_| row("var-complete-new".into(), self.entries.len(), "variable").child("New variable…"));
-        // Anchored at a zero-height box in the flow right below the field.
-        let list = deferred(
-            anchored().snap_to_window().child(
+        deferred(
+            anchored().anchor(corner).snap_to_window().child(
                 v_flex()
                     .id("var-complete")
+                    .debug_selector(|| "var-complete".into())
                     .min_w(px(154.))
                     .max_w(px(320.))
-                    .p(px(1.))
                     .bg(rgb(0xffffff))
                     .border_1()
                     .border_color(rgb(0xd7d7d7))
-                    .rounded(px(5.))
-                    .shadow_md()
+                    .rounded(px(MENU_RADIUS))
                     .child(
                         v_flex()
                             .id("var-complete-rows")
@@ -355,8 +370,8 @@ impl VarCompletion {
                     ),
             ),
         )
-        .with_priority(4);
-        div().relative().w_full().h_0().child(list).into_any_element()
+        .with_priority(4)
+        .into_any_element()
     }
 }
 

@@ -969,6 +969,12 @@ pub fn disabled_accept<E: Styled>(e: E) -> E {
     if gpui_kit::hex_theme_active() { e.opacity(0.2) } else { e.bg(gpui_kit::rgb(0xcce9cc)) }
 }
 
+/// The box a popup list hangs from: its parent's bottom edge, out of the flow, so opening the list moves nothing.
+/// (A zero-height box in the flow still takes its column's gap: Depth's `#` list pushed the rows below 2 px down.)
+pub fn popup_anchor() -> Div {
+    div().absolute().left_0().right_0().top_full().h_0()
+}
+
 /// A single-color glyph (chevrons, carets): an app icon drawn as a mask
 /// tinted with `color`.
 pub fn glyph(name: &str, size: f32, color: impl Into<Hsla>) -> Svg {

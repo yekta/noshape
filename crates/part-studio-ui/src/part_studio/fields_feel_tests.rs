@@ -149,6 +149,29 @@ fn rows() -> Vec<Row> {
             let open = cx.update(|cx| dialog.read(cx).ui_list().is_some());
             expect((open, cx.update(|cx| view.read(cx).edit.is_some())), (false, true), "(list open, dialog open)")
         } },
+        Row { id: "autocomplete: the open list moves nothing, under the field's right end", live: "live2 ac-menu (11-15): the '#' and 'asin' lists overlay the rows below, which keep their rects; the list's top is the input's bottom, its right edge the input's",  gap: false, check: |cx| {
+            let (window, _view, dialog) = edit_extrude(cx, "fl-complete-still");
+            let bounds = |cx: &mut TestAppContext| {
+                draw(cx, window);
+                let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+                ["row-symmetric", "row-hasDraft", "feature-dialog"].map(|s| vcx.debug_bounds(s).map(|b| format!("{s} {:?} {:?}", b.origin, b.size)).unwrap_or_else(|| format!("no {s}")))
+            };
+            type_in(cx, window, &dialog, "depth", "1", &[]);
+            let closed = bounds(cx);
+            let mut open = Vec::new();
+            let mut placed = Vec::new();
+            for typed in ["#", "asin"] {
+                type_in(cx, window, &dialog, "depth", typed, &[]);
+                if cx.update(|cx| dialog.read(cx).ui_list().is_none()) {
+                    return Err(format!("no list after '{typed}'"));
+                }
+                open.push(bounds(cx));
+                let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+                let (Some(f), Some(l)) = (vcx.debug_bounds("numf-depth"), vcx.debug_bounds("var-complete")) else { return Err("no Depth field or list".into()) };
+                placed.push((l.top() - f.bottom(), l.right() - f.right()));
+            }
+            expect((open, placed), (vec![closed.clone(), closed], vec![(px(0.), px(0.)); 2]), "(row and dialog bounds, list top − field bottom and right − right) with the '#' and 'asin' lists open")
+        } },
         Row { id: "right press: no menu, the field takes the keyboard; one Esc cancels", live: "live2 11-15 (dialog-number-rclick-menu): no menu, Chrome's or Onshape's; Depth focused, all selected; Esc closes the dialog", gap: false, check: |cx| {
             let (window, view, _dialog) = edit_extrude(cx, "fl-rpress");
             draw(cx, window);

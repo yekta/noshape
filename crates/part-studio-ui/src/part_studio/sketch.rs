@@ -3667,7 +3667,7 @@ impl PartStudioView {
                         // The `#` autofill list, under the value field.
                         .when_some(self.ui_ref().and_then(|u| u.dim_completion.as_ref()), |d, c| {
                             let view = cx.entity();
-                            d.child(div().pl(px(20.)).child(c.render(&self.sketch_variables(cx), &units, move |i, window, cx| view.update(cx, |this, cx| this.accept_dim_completion(cid, Some(i), window, cx)))))
+                            d.child(crate::ui::popup_anchor().left(px(20.)).child(c.render(&self.sketch_variables(cx), &units, move |i, window, cx| view.update(cx, |this, cx| this.accept_dim_completion(cid, Some(i), window, cx)))))
                         })
                         .into_any_element(),
                 );

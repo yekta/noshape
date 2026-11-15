@@ -578,7 +578,7 @@ impl PartStudioView {
             )
             // The list hangs from the field, over the rows below.
             .when(open, |d| {
-                d.child(div().w_full().h_0().child(
+                d.child(crate::ui::popup_anchor().child(
                     deferred(
                         anchored().snap_to_window_with_margin(px(4.)).child(
                             v_flex()

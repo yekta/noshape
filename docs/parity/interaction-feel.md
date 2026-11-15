@@ -579,7 +579,7 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft angle). part-studio-ui
 `fields::the_fields_matrix_matches_live` (T1, no GPU) on the block start.
 
-**Matched: 10 / 10** (11-15 20:06 UTC: the right press row added and fixed; 9 / 9 at 11-14 00:33 UTC; 6 / 9 at the first run).
+**Matched: 11 / 11** (11-15 20:35 UTC: the open list row added and fixed; 10 / 10 at 20:06 UTC with the right press row; 9 / 9 at 11-14 00:33 UTC; 6 / 9 at the first run).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -593,6 +593,7 @@ live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft an
 | Autocomplete | "1 m": m, max( x , y ), min( x , y ), mm; "1 i": in, isInteger( x ) | the same (its rows as drawn) | = |
 | Autocomplete's Esc | closes the list only | the same | = |
 | Right press (live2 11-15, dialog-number-rclick-menu) | no menu, Chrome's or Onshape's; the field takes the keyboard, all selected; one Esc cancels the dialog | the input's Cut / Copy / Paste opened and took that Esc; now no menu | = (fixed) |
+| Autocomplete open (lead P1 11-15; live2 ac-menu) | the "#" and "asin" lists overlay the rows below, which keep their rects; the list's top is the input's bottom, its right edge the input's; 5.25 px corners, no shadow, the rows fill the 1 px border | the rows below moved 2 px down (the list hung from a box in the field's column, which took its gap); the list was left-aligned, inset 1 px with square highlighted corners and a shadow; now as live | = (fixed) |
 | Not yet in the matrix | Ctrl+Up ×0.1 (an existing test), the wheel over a focused field, the "#" list's New variable… and its popover, Tab taking the highlighted entry | – | – |
 
 ## Feedback (matrix, Part Studio rows)
