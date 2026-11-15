@@ -530,6 +530,19 @@ impl Sketch {
                 }
             }
         }
+        for &u in comp {
+            if placed.contains(&u) {
+                continue;
+            }
+            if let Some(ring) = self.turn_loop_whole(u, cons, &holds, &placed) {
+                placed.extend(ring.iter().copied());
+                kept.extend(ring.iter().copied());
+                let unheld = self.unheld_constraints(1e-9);
+                for (c, _) in cons {
+                    holds.insert(*c, !unheld.contains(c));
+                }
+            }
+        }
         while placed.len() < comp.len() {
             // Next: a unit with a constraint to placed units (or of its own)
             // that doesn't hold, the one with most of them; with none, a
@@ -2211,6 +2224,53 @@ impl Sketch {
         }
         for (p, at) in moves {
             let _ = self.set_point(p, at);
+        }
+        Some(ring)
+    }
+
+    /// A closed loop of lines that only has to turn (its own Horizontal / Vertical, a Parallel or Perpendicular to
+    /// placed geometry; no size of its own changes) turns whole about its first line's start (live probes 20 k21: a
+    /// tilted rectangle squares to the slot's sides about its first side's start, its sides keeping their lengths).
+    fn turn_loop_whole(&mut self, u: EntityId, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], holds: &HashMap<crate::ids::ConstraintId, bool>, placed: &BTreeSet<EntityId>) -> Option<BTreeSet<EntityId>> {
+        let ring = self.ring_of(u, cons);
+        if ring.len() < 3 || ring.iter().any(|x| self.kind(*x) != Some(EntityKind::Line) || placed.contains(x)) || !self.closed(&ring) {
+            return None;
+        }
+        let angle = |x: EntityId| self.line_pts(x).map(|(a, b)| (b - a).to_angle());
+        // The turn each unheld relation asks for (about π: a line's sense doesn't matter).
+        let wrap = |t: f64| (t + std::f64::consts::FRAC_PI_2).rem_euclid(std::f64::consts::PI) - std::f64::consts::FRAC_PI_2;
+        let mut turn: Option<f64> = None;
+        for (c, us) in cons.iter().filter(|(c, us)| !holds[c] && us.iter().any(|x| ring.contains(x))) {
+            let k = self.constraint(*c)?.kind.clone();
+            let want = match k {
+                ConstraintKind::Horizontal { a, b: None } if ring.contains(&a) => -angle(a)?,
+                ConstraintKind::Vertical { a, b: None } if ring.contains(&a) => std::f64::consts::FRAC_PI_2 - angle(a)?,
+                ConstraintKind::Parallel { a, b } | ConstraintKind::Perpendicular { a, b } => {
+                    let (mine, other) = if ring.contains(&a) && placed.contains(&b) { (a, b) } else if ring.contains(&b) && placed.contains(&a) { (b, a) } else { return None };
+                    let quarter = if matches!(k, ConstraintKind::Perpendicular { .. }) { std::f64::consts::FRAC_PI_2 } else { 0.0 };
+                    angle(other)? + quarter - angle(mine)?
+                }
+                _ => return None,
+            };
+            turn.get_or_insert(wrap(want));
+            let _ = us;
+        }
+        let t = turn?;
+        let first = *ring.iter().min()?;
+        let (start, _) = self.endpoints(first)?;
+        let pivot = self.point(start)?;
+        let pts: BTreeSet<EntityId> = ring.iter().filter_map(|x| self.entity(*x)).flat_map(|e| e.point_refs()).collect();
+        let was: Vec<(EntityId, DVec2)> = pts.iter().filter_map(|p| Some((*p, self.point(*p)?))).collect();
+        let rot = DVec2::from_angle(t);
+        for (p, at) in &was {
+            let _ = self.set_point(*p, pivot + rot.rotate(*at - pivot));
+        }
+        let unheld = self.unheld_constraints(1e-9);
+        if cons.iter().any(|(c, us)| us.iter().any(|x| ring.contains(x)) && unheld.contains(c)) {
+            for (p, at) in was {
+                let _ = self.set_point(p, at);
+            }
+            return None;
         }
         Some(ring)
     }

@@ -3587,12 +3587,12 @@ fn a_neighbour_that_still_fits_stays_put() {
 }
 
 /// A free slot whose arcs grow keeps the side with fewer Tangents (the first drawn on a tie) and grows away from it
-/// (live probes 20: without a top Tangent the top stays; without its Radius nothing moves; fuzz s228). T1: the
-/// fixtures' answers, no live.
+/// (live probes 20: without a top Tangent the top stays; without its Radius nothing moves; fuzz s228); a rectangle
+/// that only has to turn turns whole about its first side's start (k21). T1: the fixtures' answers, no live.
 #[test]
 fn a_growing_slot_keeps_its_less_tied_side() {
     let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-probe-20.live.json")).unwrap()).unwrap();
-    let names = ["r228-k5", "r228-k6", "r228-k7", "r228-k8", "r228-k18", "r228-k20"];
+    let names = ["r228-k5", "r228-k6", "r228-k7", "r228-k8", "r228-k18", "r228-k20", "r228-k21"];
     let b = probe_batch(probes20().into_iter().filter(|(n, _)| names.contains(&n.split(' ').next().unwrap())).collect());
     assert_eq!(b["cases"].as_array().unwrap().len(), names.len());
     for case in b["cases"].as_array().unwrap() {
