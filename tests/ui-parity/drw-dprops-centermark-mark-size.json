@@ -1,0 +1,63 @@
+{
+ "name": "drw-dprops-centermark-mark-size",
+ "about": "hole-plate-drawing: Drawing properties \u203a Construction geometry \u203a Centermarks \u203a Mark size 0.2 in (Enter): the hole centermark's cross grows",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Drawing properties: Centermark style)",
+ "start": "hole-plate-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     150,
+     110
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Drawing properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Construction geometry"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Mark size"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "0.2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  }
+ ]
+}

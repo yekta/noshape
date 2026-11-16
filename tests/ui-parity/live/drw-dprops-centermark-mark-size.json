@@ -1,0 +1,2065 @@
+{
+ "scenario": "drw-dprops-centermark-mark-size",
+ "recorded": "2026-11-16T03:34:32.541Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
+ },
+ "live": {
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "d7c496928997c6ca843129e6",
+  "start": "hole-plate-drawing",
+  "startElement": "ac3109d7c4982f44b949727b",
+  "runner": "live2 .nstate-uip-1.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "other",
+   "tag": "iframe"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": {
+   "tab": "Part 1 Drawing 1",
+   "sheet": "Sheet1",
+   "sheets": [
+    "Sheet1"
+   ],
+   "tool": null,
+   "views": [
+    {
+     "name": "Front",
+     "kind": "base",
+     "position": [
+      81,
+      81
+     ],
+     "parent": null,
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Isometric",
+     "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Right",
+     "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Top",
+     "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    }
+   ],
+   "annotations": [],
+   "selection": []
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "sheet_point": [
+      150,
+      110
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    1023,
+    569
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Paste as table",
+      "Sheet properties...",
+      "Drawing properties...",
+      "",
+      "Zoom to fit",
+      "Zoom to window",
+      "Zoom to sheet"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 228942
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Drawing properties..."
+    }
+   },
+   "ok": true,
+   "at": [
+    1095,
+    594
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Units and precision",
+      "Primary",
+      "Units",
+      "Millimeters",
+      "Centimeters",
+      "Meters",
+      "Inches",
+      "Inches fractional",
+      "Feet and inches",
+      "Feet",
+      "Yards",
+      "Decimal separator",
+      "Period",
+      "Comma",
+      "Precision",
+      "0",
+      "0.1",
+      "0.12",
+      "0.123",
+      "0.1234",
+      "0.12345",
+      "0.123456",
+      "Tolerance precision",
+      "0",
+      "0.1",
+      "0.12",
+      "0.123",
+      "0.1234",
+      "0.12345"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Inches"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Period"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1234"
+      },
+      {
+       "label": "Show dual dimensions",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show dual unit",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Millimeters"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "Length leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Length tolerance leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length tolerance trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 255082
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 2000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Units and precision",
+      "Primary",
+      "Units",
+      "Millimeters",
+      "Centimeters",
+      "Meters",
+      "Inches",
+      "Inches fractional",
+      "Feet and inches",
+      "Feet",
+      "Yards",
+      "Decimal separator",
+      "Period",
+      "Comma",
+      "Precision",
+      "0",
+      "0.1",
+      "0.12",
+      "0.123",
+      "0.1234",
+      "0.12345",
+      "0.123456",
+      "Tolerance precision",
+      "0",
+      "0.1",
+      "0.12",
+      "0.123",
+      "0.1234",
+      "0.12345"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Inches"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Period"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1234"
+      },
+      {
+       "label": "Show dual dimensions",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show dual unit",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Millimeters"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "Length leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Length tolerance leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length tolerance trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 282646
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "tab": "Construction geometry"
+    }
+   },
+   "ok": true,
+   "at": [
+    1720,
+    138
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Centermark",
+      "Edge extension",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "Sketch geometry",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 308716
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Centermark",
+      "Edge extension",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "Sketch geometry",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 334848
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Mark size"
+    }
+   },
+   "ok": true,
+   "at": [
+    1789,
+    639
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Centermark",
+      "Edge extension",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "Sketch geometry",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 362204
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "key",
+    "key": "mod+a"
+   },
+   "ok": true,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Centermark",
+      "Edge extension",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "Sketch geometry",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 387964
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "type",
+    "text": "0.2"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Centermark",
+      "Edge extension",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "Sketch geometry",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 413180
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Centermark",
+      "Edge extension",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "Sketch geometry",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 438555
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 2500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Centermark",
+      "Edge extension",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "Sketch geometry",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 466130
+  }
+ ]
+}

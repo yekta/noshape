@@ -1,0 +1,51 @@
+{
+ "name": "drw-dprops-centermark-extended",
+ "about": "hole-plate-drawing: Drawing properties \u203a Construction geometry \u203a Centermarks \u203a Extended lines unticked: the Top view's hole centermark loses its extended lines",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Drawing properties: Centermark style)",
+ "start": "hole-plate-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     150,
+     110
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Drawing properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Construction geometry"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Extended lines"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  }
+ ]
+}
