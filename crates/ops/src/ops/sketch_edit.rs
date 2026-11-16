@@ -131,7 +131,7 @@ pub fn ops() -> Vec<Op> {
                 opt("entities", ids(), "Seed entities (not needed when editing)."),
                 opt("center", json!({ "type": ["array", "string"] }), "Center: [x, y], a point entity id or `origin` (default: the origin)."),
                 opt("count", json!({ "type": "integer", "minimum": 2, "maximum": 100 }), "Instances (default 3)."),
-                opt("angle", value(), "Total angle (default 360 deg)."),
+                opt("angle", value(), "Total angle, clockwise from the seed as Onshape's (default 360 deg; a negative angle runs counter-clockwise)."),
                 opt("pattern", json!({ "type": "integer" }), "Pattern id to edit."),
             ],
             circular_pattern,

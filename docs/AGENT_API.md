@@ -1956,7 +1956,7 @@ Examples:
 | `entities` | array of string |  | Seed entities (not needed when editing). |
 | `center` | array or string |  | Center: [x, y], a point entity id or `origin` (default: the origin). |
 | `count` | integer |  | Instances (default 3). |
-| `angle` | string or number |  | Total angle (default 360 deg). |
+| `angle` | string or number |  | Total angle, clockwise from the seed as Onshape's (default 360 deg; a negative angle runs counter-clockwise). |
 | `pattern` | integer |  | Pattern id to edit. |
 
 #### sketch_transform

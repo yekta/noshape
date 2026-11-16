@@ -1394,7 +1394,8 @@ impl SketchEditor {
             pattern_second_distance: 0.02,
             pattern_second_angle: PI * 0.5,
             circular_count: 3,
-            circular_angle: TAU,
+            // Live runs clockwise (sketch-gaps5): counter-clockwise is positive here.
+            circular_angle: -TAU,
             pattern_center: DVec2::ZERO,
             xf_center_pinned: false,
             xf_offset: DVec2::ZERO,
@@ -4980,7 +4981,7 @@ impl SketchEditor {
                     && let Some((r, a0)) = self.circular_arm(sk)
                 {
                     let at = DVec2::from_angle(a0 + self.circular_angle * CIRCULAR_ANGLE_TEXT_AT);
-                    out.push((PatternHandle::CircularAngle, self.pattern_center + at * r * (1.0 + CIRCULAR_LABEL_BEYOND), self.circular_angle));
+                    out.push((PatternHandle::CircularAngle, self.pattern_center + at * r * (1.0 + CIRCULAR_LABEL_BEYOND), -self.circular_angle));
                 }
             }
             Tool::Transform if !self.selection.is_empty() => {
@@ -5017,7 +5018,8 @@ impl SketchEditor {
         match h {
             PatternHandle::LinearStep if v > 0.0 => self.pattern_distance = v,
             PatternHandle::LinearSecondStep if v > 0.0 => self.pattern_second_distance = v,
-            PatternHandle::CircularAngle if v.abs() > 1e-9 => self.circular_angle = v.clamp(-TAU, TAU),
+            // Typed (and the agent API's) angles read clockwise, as live shows them ("180°").
+            PatternHandle::CircularAngle if v.abs() > 1e-9 => self.circular_angle = -v.clamp(-TAU, TAU),
             PatternHandle::Rotate => self.xf_angle = v,
             PatternHandle::Scale if v > 0.0 => self.xf_scale = v,
             _ => {}
@@ -5040,6 +5042,17 @@ impl SketchEditor {
         let d = c - self.pattern_center;
         let r = d.length();
         (r > self.world_per_px * 4.0).then(|| (r, d.to_angle()))
+    }
+
+    /// The way a circular pattern runs: -1 clockwise (live's), 1 counter-clockwise.
+    fn circular_way(&self) -> f64 {
+        if self.circular_angle < 0.0 { -1.0 } else { 1.0 }
+    }
+
+    /// How far round from the seed (at angle `a0`) point `p` is, the pattern's way.
+    fn sweep_from_seed(&self, a0: f64, p: DVec2) -> f64 {
+        let at = (p - self.pattern_center).to_angle();
+        if self.circular_way() < 0.0 { noshape_sketch::geom::ccw_sweep(at, a0) } else { noshape_sketch::geom::ccw_sweep(a0, at) }
     }
 
     /// A circular pattern's handle arc: its radius and its start and end angles (the seed's and the last instance's).
@@ -5122,20 +5135,21 @@ impl SketchEditor {
                 self.pattern_center = self.inference_free_snap(sk, p) - shift;
                 self.xf_center_pinned = true;
             }
+            // Live (sketch-gaps5): the arrow sweeps the pattern's own way in 5° steps; back onto the seed it closes the
+            // pattern (it can't turn it the other way).
             PatternHandle::CircularAngle => {
                 if let Some((_, a0)) = self.circular_arm(sk) {
-                    let mut a = noshape_sketch::geom::ccw_sweep(a0, (p - self.pattern_center).to_angle());
-                    if a < 3f64.to_radians() || a > TAU - 3f64.to_radians() {
-                        a = TAU;
-                    }
-                    self.circular_angle = a;
+                    let step = 5f64.to_radians();
+                    let a = (self.sweep_from_seed(a0, p) / step).round() * step;
+                    let a = if a < step * 0.5 || a > TAU - step * 0.5 { TAU } else { a };
+                    self.circular_angle = a * self.circular_way();
                 }
             }
             PatternHandle::CircularCount => {
                 if let Some((_, a0)) = self.circular_arm(sk) {
-                    let a = noshape_sketch::geom::ccw_sweep(a0, (p - self.pattern_center).to_angle()).max(1f64.to_radians());
+                    let a = self.sweep_from_seed(a0, p).max(1f64.to_radians());
                     let (_, full) = self.circular_step();
-                    let n = (self.circular_angle / a).round().max(1.0) as usize;
+                    let n = (self.circular_angle.abs() / a).round().max(1.0) as usize;
                     self.circular_count = if full { n } else { n + 1 }.clamp(2, 100);
                 }
             }
@@ -8745,12 +8759,19 @@ mod tests {
         ed.selection = vec![circle];
         ed.pattern_center = v(0.0, 0.0);
         assert!((label(&ed, &d) - v(0.014, 0.07)).length() < 1e-9, "{:?}", label(&ed, &d));
+        // Clockwise, as live (sketch-gaps5): closed 3x, the arc's end on the first instance after the seed (240°
+        // round); open 4x at 180°, instances 60° apart clockwise from the seed at 78.69°.
+        let (r, a0) = (v(0.01, 0.05).length(), v(0.01, 0.05).to_angle());
+        let end = |ed: &SketchEditor, d: &SketchData| ed.circular_handle_arc(&d.sketch).unwrap().2;
+        assert!((end(&ed, &d) - (a0 - TAU * 2.0 / 3.0)).abs() < 1e-9, "{}", end(&ed, &d).to_degrees());
         // Below 360°: the angle on its dimension arc at 1.4 × the radius, ~0.64 of the way (live sketch-gaps4).
         assert!(ed.pattern_value_labels(&d.sketch).is_empty(), "no angle at 360°");
         ed.set_pattern_value(PatternHandle::CircularAngle, PI);
-        let (r, a0) = (v(0.01, 0.05).length(), v(0.01, 0.05).to_angle());
-        let at = ed.pattern_value_labels(&d.sketch)[0].1;
-        assert!((at - DVec2::from_angle(a0 + PI * 0.64) * r * 1.4).length() < 1e-9, "{at:?}");
+        ed.set_pattern_count(PatternHandle::CircularCount, 4);
+        assert!((end(&ed, &d) - (a0 - PI)).abs() < 1e-9 && (ed.circular_step().0 + PI / 3.0).abs() < 1e-9, "60° steps clockwise");
+        let (h, at, shown) = ed.pattern_value_labels(&d.sketch)[0];
+        assert!(h == PatternHandle::CircularAngle && (shown - PI).abs() < 1e-12, "shown as 180°");
+        assert!((at - DVec2::from_angle(a0 - PI * 0.64) * r * 1.4).length() < 1e-9, "{at:?}");
         let _ = &mut d;
     }
 
