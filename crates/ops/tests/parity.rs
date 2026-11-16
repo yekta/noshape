@@ -2287,6 +2287,33 @@ fn a_used_entity_is_used() {
     assert_eq!((lines[0]["start"].clone(), lines[0]["end"].clone()), (json!([10.0, 5.0]), json!([30.0, 5.0])), "{g}");
 }
 
+/// Live's Use of another sketch's spline: ours Uses it too (a used spline lands by its first and last points; it has
+/// no start / end of its own).
+#[test]
+fn a_used_spline_is_used() {
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }]);
+    let spline = |id: &str| json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": 1.0,
+        "geometry": { "btType": "BTCurveGeometryInterpolatedSpline-116", "isPeriodic": false, "interpolationPoints": [0.05, 0.0, 0.07, 0.01, 0.09, 0.0] } });
+    let edge = r#"query=qCompressed(1.0,"%B5$QueryM5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FXu6qWaggV6KMhx_1wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdSc$PPC1NZux0mWW",id);"#;
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FXu6qWaggV6KMhx_1", "name": "Sketch 1", "parameters": top, "entities": [spline("PPC1NZux0mWW")], "constraints": [] },
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2", "parameters": top, "entities": [spline("u")],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "PROJECTED", "parameters": [
+              { "btType": "BTMParameterEnum-145", "parameterId": "projectionType", "value": "USE" },
+              { "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "u" },
+              { "btType": "BTMParameterQueryList-148", "parameterId": "externalSecond", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": edge, "deterministicIds": ["JNB"] }] }
+          ] }] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("use-spline.noshape"), &features, Default::default()).unwrap();
+    assert!(t.step(0).problems.is_empty());
+    let step = t.step(1);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    let curves: Vec<&Value> = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] != "point").collect();
+    assert!(curves.len() == 1 && curves[0]["external"] == true, "{g}");
+}
+
 /// A text converted to an expression (c2-valve-config's Sketch 3: `toString(roundToPrecision(#espesor_material/mm, 0))`,
 /// live's "6"): ours an expression text, evaluated on regeneration, not live's empty value; its height dimensioned on
 /// the box's left side by live's name for it.

@@ -111,7 +111,7 @@ pub fn resolve_shapes(ctx: &Context, r: &Reference) -> Vec<Shape> {
                         out.push(v);
                     }
                 } else if let Some(c) = s.sketch.curve(id)
-                    && let Some(seg) = super::features::extrude::curve_to_segment(&c)
+                    && let Some(seg) = super::features::helpers_a::curve_segment(&c)
                     && let Ok(e) = k::make_edge_2d(&super::eval::kernel_plane(&s.frame), &seg)
                 {
                     out.push(e);

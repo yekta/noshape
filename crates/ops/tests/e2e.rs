@@ -2742,6 +2742,28 @@ fn a_point_pierces_another_sketchs_curve() {
     assert!((p1[0] - (30.0 + 75f64.sqrt())).abs() < 1e-9 && p1[1].abs() < 1e-9, "{p1:?}");
 }
 
+/// Use takes another sketch's spline, ellipse and conic (each comes as a curve of its own, linked), not only its lines
+/// and arcs.
+#[test]
+fn use_takes_another_sketchs_spline_ellipse_and_conic() {
+    let mut ctx = Ctx::new();
+    let s1 = new_sketch(&mut ctx, "use-curves.noshape", "plane:top");
+    let made = |ctx: &mut Ctx, shape: Value, ty: &str| {
+        let r = call(ctx, "sketch_draw", json!({ "sketch": s1, "shapes": [shape] }));
+        r["created"].as_array().unwrap().iter().find(|e| e["type"] == ty).unwrap_or_else(|| panic!("{r}"))["id"].clone()
+    };
+    let curves = [
+        made(&mut ctx, json!({ "tool": "spline", "points": [[0, 0], [10, 8], [20, 0]] }), "spline"),
+        made(&mut ctx, json!({ "tool": "ellipse", "points": [[40, 0], [50, 0], [40, 4]] }), "ellipse"),
+        made(&mut ctx, json!({ "tool": "conic", "points": [[60, 0], [80, 0], [70, 10]] }), "conic"),
+    ];
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    for c in &curves {
+        let used = call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": [c] }));
+        assert!(used["created"].as_array().is_some_and(|l| l.iter().any(|e| e["type"] != "point" && e["external"] == true)), "{c}: {used}");
+    }
+}
+
 /// Add custom features (live 2213): a Feature Studio's feature at another document's version, listed by
 /// feature_types with `document` and `version`, works in a document without Feature Studios.
 #[test]

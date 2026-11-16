@@ -1409,10 +1409,17 @@ impl<'a> Translator<'a> {
         let top = |t: &mut Self| t.ctx.doc(None).ok().and_then(|od| od.session.undo_tops().0);
         let mark = top(self);
         let point = u.shape["tool"] == "point";
-        let made = self.call("sketch_use", json!({ "sketch": id, "references": [u.reference] })).ok();
+        let made = self.call("sketch_use", json!({ "sketch": id, "references": [u.reference] })).inspect_err(|e| if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() { eprintln!("TRACE use {} {}: {e}", u.eid, u.reference) }).ok();
         let near = |c: &Value, key: &str, q: [f64; 2]| {
             let q = map.local(q);
-            c[key][0].as_f64().zip(c[key][1].as_f64()).is_some_and(|(x, y)| (x * map.k - q[0]).hypot(y * map.k - q[1]) < 1e-7)
+            // A spline's ends are its first and last points (control points of a B-spline).
+            let poles = c["points"].as_array().or(c["control_points"].as_array());
+            let p = match (key, poles) {
+                ("start", Some(l)) if c[key].is_null() => l.first(),
+                ("end", Some(l)) if c[key].is_null() => l.last(),
+                _ => Some(&c[key]),
+            };
+            p.and_then(|p| p[0].as_f64().zip(p[1].as_f64())).is_some_and(|(x, y)| (x * map.k - q[0]).hypot(y * map.k - q[1]) < 1e-7)
         };
         let landed = |c: &Value| match (u.point, u.ends) {
             (Some(p), _) => near(c, "at", p),
@@ -1454,6 +1461,9 @@ impl<'a> Translator<'a> {
                 Some([p[0] - q[0], p[1] - q[1]])
             });
             return Ok(step);
+        }
+        if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+            eprintln!("TRACE use {} {} not landed: live {:?} / {:?} (ours local), ours {:?}", u.eid, u.reference, u.point.map(|q| map.local(q)), u.ends.map(|e| e.map(|q| map.local(q))), kind.iter().map(|c| (c["type"].clone(), c["start"].clone(), c["end"].clone(), c["at"].clone(), c["points"].as_array().map(|l| (l.first().cloned(), l.last().cloned())))).collect::<Vec<_>>());
         }
         if made.is_some() && top(self) != mark {
             let _ = self.call("history_undo", json!({}));

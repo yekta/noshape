@@ -1,24 +1,25 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-15 22:25 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
+Updated 2026-11-16 01:31 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
 only when a line here points there).
 
 ## In flight
-- Landing 22:2x: "a sheet metal face, edge or vertex is labelled after the feature that first made its definition
-  entity" (each custom feature's transient base in Context.fs_transient_bases; CtxState::transient_feature decodes an
-  association attributeId, "{ queryType : TRANSIENT , transientId : JAB }"; SheetMetalData.label_owners; the
-  part-studio-ui labeler reads it) and "a second flange beside the first ends the first's bend where the plate does"
-  (host sheetmetal.rs: no skew end when both free sides are square to the bend; sm-box now 23 faces as live; all 70
-  sheet metal T2 tests and the 8 sheet metal suite documents match). T2 tests in sheetmetal_std.rs.
-- Parked (patch /root/skasm-scratch/wip-8020.patch + /root/skasm-scratch/frame_library_8020.json): exact 8020 sections
-  from live2's skasm-q1956 (108 profiles, converter /root/skasm-scratch/bin/f8020.py -> frame_library_8020.json,
-  loader `exact_8020` in frame_library.rs; every listed size builds). Waits on arc midpoints (REQUESTS 21:46): 1001's
-  18 semicircles can't be oriented from ends / centre / length (332.015 vs live 329.364 mm²). Then: regenerate the
-  JSON with the midpoints, check every profile's area against live's (f8020.py prints AREA lines), update
-  frame_library tests (1001 area 329.364444), drop `tslot`, land.
+- Landing 2026-11-16 01:3x: Use / measure / pierce / planes take another sketch's spline, ellipse and conic
+  (measure.rs resolve_shapes via helpers_a::curve_segment; was lines and arcs only, "That geometry can't be used in
+  this sketch"), and the translator lands a spline Use by its first / last points. Tests: e2e
+  use_takes_another_sketchs_spline_ellipse_and_conic, parity a_used_spline_is_used. Userdocs (hats, dock) vs 0.4.52
+  ALL SAME; suite-2354 (vibe6, 111 documents now): the 87 shared with 23:11 identical, dropped there 77 -> 74 (PIERCE).
+- Landed 23:57 (28840f15): Pierce takes another sketch's curve, the crossing found on the curve (bisected, not a
+  tessellation chord); the translator reads PIERCE: knife Sketch 13 kept whole (was taken back, 11.8 mm).
+- Landed 23:25 (2e81e8d9): Frame's 8020 profiles are live's sections (frame_library_8020.json from live2's
+  skasm-q1956 with each arc's mid2d via /root/skasm-scratch/bin/f8020.py, outer loop = largest area; all 108 areas
+  match live's; `tslot` dropped; preview_svg draws Arc3). 1001 329.364 mm2; End cap Internal refuses it as live.
+- Landed 23:08 (02a08d60): a Concentric to a co-edge whose edge isn't round takes its face (knife Sketch 17).
+- Knife Sketch 12 stays 5 PROJECTED: our blade edges end 0.03-0.04 mm from live's ((-5.0356, -12.1564) vs
+  (-5.0442, -12.1140) mm): the model geometry before it differs (feature not traced), not the translator.
 
 ## Waiting on others
-- live2: arc midpoints (21:46); identity tracking through a sheet boolean (22:02: live labels bend 1 and the corner
+- live2: identity tracking through a sheet boolean (22:02: live labels bend 1 and the corner
   vertices (60, -2, 4) / (60, 0, 4) after Flange 1, ours after Sheet metal model 1 because our tracking follows the
   plate edge to the merged bend edge, so std's assignSMAttributesToNewOrSplitEntities keeps its old association).
 - psui (4d0a82b2-8fc7-43e6-b45d-bd8cb225741e): told 20:3x the tab row is a pick difference (live hit Flange 1's wall).
@@ -39,18 +40,13 @@ only when a line here points there).
 1. The tracking answer (22:02): if Onshape's tracking drops a merged edge, make ours do the same (custom host query.rs
    tracking), check the 8 sheet metal suite documents + T2s, and restore the corner-vertex asserts in
    sheetmetal_std::sheet_metal_entities_are_labelled_after_their_definition_entitys_feature.
-2. 8020 sections when the midpoints land (above).
-3. Knife's own sketch rows: Sketch 17's Concentric is on a co-edge query whose edge is a spline (a near-circle,
-   r 2.5) and whose face JiS is a cylinder about Y (the Front sketch's normal): live is concentric with the
-   cylinder; ours rejects (needs a cylinder-axis reference). Sketch 12's 5 Uses (blade B-splines), Ic / Id; PIERCE
-   (tried and reverted 12:53: knife Sketch 13 moved 11.8 mm).
-4. A full suite (vibe6, ~/bin/slot) for the new dropped total (83 at 16:10; the 14 refreshed documents 33 -> 25).
-5. Fuzz P2 random cases (769 of 830, live/fuzz/skasm-sketch-probe-*.json).
+2. Fuzz P2 (61 of 830 open, list /root/skasm-scratch/fz/p2-2325.txt): s8 / s10 / s11 are live's status with redundant
+   constraints (a floating line "fully"), not targets; the rest are free placement and drag rules (s1: live's drag
+   leaves the dragged corner off its target) that per-case rules didn't converge on. Decision asked of the lead.
 
 ## Current numbers
-- Model suite 16:10 vibe6 (suite-1610.log): 76/87, 881/947 (the 4 Hole documents lost were studios' 8aea0c3c4, fixed
-  253c08ee: 80/87 expected). Sketch constraints left to the solved geometry: 83; with live's 19:28 refs the 14
-  documents re-run (pm14c.log, ~/tmp/skasm/pm14 on vibe6) went 33 -> 25.
+- Model suite 2026-11-16 00:01 vibe6 (suite-2354.log): 80/111 documents, 1019/1292 features (24 documents new to the
+  set). Sketch constraints left to the solved geometry: 586 over all, 74 over the 87 of 2026-11-15 (16:10: 83).
 - Sheet metal speed, quiet vibe6 19:00, ops binary of 17:43 (ours vs live ms): corner-break 1637-1782 / 1972,
   shaped-flange 809 / 1026, overcut-dogbone 210 / 270, hem 65 / 95. All four are faster than live; the suite's slower
   figures were host load.
