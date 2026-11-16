@@ -2903,3 +2903,11 @@ fn a_rings_top_cut_by_a_side_drafted_off_its_axis_as_occt() {
     let (v, w) = (ours.volume().unwrap(), occt.volume().unwrap());
     assert!((v - w).abs() <= 1e-6 * w, "volume {v} vs OCCT's {w}");
 }
+
+/// c2-hunting-knife's Chamfer 1 cut (a recorded case): its blade faces and the chamfer's B-spline faces 21-40 um apart
+/// across slanted gaps (their tolerances 0.1-5 um) are shown apart by their poles' hulls, not marched by OCCT; the
+/// result is OCCT's.
+#[test]
+fn faces_apart_across_a_slanted_gap_cut_as_occt() {
+    valid_as_occt("a3f92ad8f13ac4b1", 1e-8);
+}

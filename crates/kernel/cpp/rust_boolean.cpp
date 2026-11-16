@@ -4549,8 +4549,262 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
   return false;
 }
 
-// Our Boolean's own sections: own_sections, else a face resting on a plane or faces meeting only in a slab (not OCCT's
-// hook: its pave filler takes those cases' curves untried).
+// A face's surface over its UV box (a thousandth wider each way) as a B-spline, and its poles, which hold it (weights
+// positive). Exact conversions of surfaces periodic neither way only: planes, Béziers and B-splines, extrusions of
+// lines, Bézier and B-spline curves.
+struct Hull
+{
+  occ::handle<Geom_BSplineSurface> s;
+  std::vector<gp_XYZ>              p;
+  int                              depth = 0;
+};
+
+static void hull_poles(Hull& h)
+{
+  const NCollection_Array2<gp_Pnt>& p = h.s->Poles();
+  h.p.clear();
+  for (int i = p.LowerRow(); i <= p.UpperRow(); ++i)
+    for (int j = p.LowerCol(); j <= p.UpperCol(); ++j)
+      h.p.push_back(p(i, j).XYZ());
+}
+
+static std::optional<Hull> face_hull(const TopoDS_Face& f)
+{
+  TopLoc_Location           loc;
+  occ::handle<Geom_Surface> s = BRep_Tool::Surface(f, loc);
+  if (s.IsNull())
+    return std::nullopt;
+  while (const occ::handle<Geom_RectangularTrimmedSurface> r = occ::down_cast<Geom_RectangularTrimmedSurface>(s))
+    s = r->BasisSurface();
+  const GeomAbs_SurfaceType t = GeomAdaptor_Surface(s).GetType();
+  if (t != GeomAbs_Plane && t != GeomAbs_BezierSurface && t != GeomAbs_BSplineSurface && t != GeomAbs_SurfaceOfExtrusion)
+    return std::nullopt;
+  if (s->IsUPeriodic() || s->IsVPeriodic())
+    return std::nullopt;
+  if (t == GeomAbs_SurfaceOfExtrusion)
+  {
+    occ::handle<Geom_Curve> c = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(s)->BasisCurve();
+    while (const occ::handle<Geom_TrimmedCurve> r = occ::down_cast<Geom_TrimmedCurve>(c))
+      c = r->BasisCurve();
+    const GeomAbs_CurveType ct = GeomAdaptor_Curve(c).GetType();
+    if (ct != GeomAbs_Line && ct != GeomAbs_BezierCurve && ct != GeomAbs_BSplineCurve)
+      return std::nullopt;
+  }
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0, su0 = 0, su1 = 0, sv0 = 0, sv1 = 0;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  s->Bounds(su0, su1, sv0, sv1);
+  const double du = 1e-3 * (u1 - u0), dv = 1e-3 * (v1 - v0);
+  u0 -= du, u1 += du, v0 -= dv, v1 += dv;
+  u0 = std::max(u0, su0), u1 = std::min(u1, su1), v0 = std::max(v0, sv0), v1 = std::min(v1, sv1);
+  if (!(u1 > u0) || !(v1 > v0))
+    return std::nullopt;
+  Hull h;
+  try
+  {
+    h.s = GeomConvert::SurfaceToBSplineSurface(new Geom_RectangularTrimmedSurface(s, u0, u1, v0, v1));
+  }
+  catch (const Standard_Failure&)
+  {
+    return std::nullopt;
+  }
+  if (h.s.IsNull())
+    return std::nullopt;
+  // (Our own copy: a conversion may hand back the face's surface, which other threads evaluate and this moves.)
+  h.s = occ::down_cast<Geom_BSplineSurface>(h.s->Copy());
+  if (h.s->IsURational() || h.s->IsVRational())
+    for (int i = 1; i <= h.s->NbUPoles(); ++i)
+      for (int j = 1; j <= h.s->NbVPoles(); ++j)
+        if (!(h.s->Weight(i, j) > 0))
+          return std::nullopt;
+  if (!loc.IsIdentity())
+    h.s->Transform(loc.Transformation());
+  hull_poles(h);
+  return h;
+}
+
+// Faces apart by more than twice their tolerances where neither their boxes nor a slab shows it (c2-hunting-knife's
+// Chamfer 1: a blade face and the chamfer's B-spline 21 um apart across a slanted gap, 55 ms of OCCT's marching for no
+// curve): two patches (face_hull) are apart when their poles are, along an axis, either patch's normal at its middle,
+// or the line between their poles' centres; else the larger is halved across its longer direction and each half
+// tried, the closest pair first, up to 400 halvings. Only "apart" is proved: anything else is OCCT's.
+static bool hulls_apart(const TopoDS_Face& fa, const TopoDS_Face& fb)
+{
+  const auto tol = [](const TopoDS_Face& f) {
+    return std::max({BRep_Tool::Tolerance(f), BRep_Tool::MaxTolerance(f, TopAbs_EDGE), BRep_Tool::MaxTolerance(f, TopAbs_VERTEX)});
+  };
+  const double margin = 2 * (tol(fa) + tol(fb)) + Precision::Confusion();
+  // (A vertex of one within the margin of one of the other's: touching there, as far as this can tell.)
+  std::vector<gp_Pnt> vb;
+  for (TopExp_Explorer x(fb, TopAbs_VERTEX); x.More(); x.Next())
+    vb.push_back(BRep_Tool::Pnt(TopoDS::Vertex(x.Current())));
+  for (TopExp_Explorer x(fa, TopAbs_VERTEX); x.More(); x.Next())
+  {
+    const gp_Pnt p = BRep_Tool::Pnt(TopoDS::Vertex(x.Current()));
+    for (const gp_Pnt& q : vb)
+      if (p.SquareDistance(q) <= margin * margin)
+        return false;
+  }
+  std::optional<Hull> ha = face_hull(fa), hb = face_hull(fb);
+  if (!ha || !hb)
+    return false;
+  const auto normal = [](const Hull& h) {
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    h.s->Bounds(u0, u1, v0, v1);
+    gp_Pnt p;
+    gp_Vec du, dv;
+    h.s->D1((u0 + u1) / 2, (v0 + v1) / 2, p, du, dv);
+    return du.Crossed(dv).XYZ();
+  };
+  const auto centre = [](const Hull& h) {
+    gp_XYZ c(0, 0, 0);
+    for (const gp_XYZ& q : h.p)
+      c += q;
+    return c / static_cast<double>(h.p.size());
+  };
+  // How far apart two patches' poles are, at least (the largest gap along those axes; below 0: not shown apart).
+  const auto gap = [&](const Hull& a, const Hull& b) {
+    const gp_XYZ axes[] = {gp_XYZ(1, 0, 0), gp_XYZ(0, 1, 0), gp_XYZ(0, 0, 1), centre(b) - centre(a), normal(a), normal(b)};
+    double       best = -1e300;
+    for (gp_XYZ n : axes)
+    {
+      const double len = n.Modulus();
+      if (!(len > 1e-300))
+        continue;
+      n /= len;
+      double a0 = 1e300, a1 = -1e300, b0 = 1e300, b1 = -1e300;
+      for (const gp_XYZ& q : a.p)
+        a0 = std::min(a0, q.Dot(n)), a1 = std::max(a1, q.Dot(n));
+      for (const gp_XYZ& q : b.p)
+        b0 = std::min(b0, q.Dot(n)), b1 = std::max(b1, q.Dot(n));
+      best = std::max({best, b0 - a1, a0 - b1});
+    }
+    return best;
+  };
+  const auto size = [](const Hull& h) {
+    Bnd_Box box;
+    for (const gp_XYZ& q : h.p)
+      box.Add(gp_Pnt(q));
+    return box.SquareExtent();
+  };
+  // A patch halved across its longer direction (its control polygon's longest column or row: a closed row's ends
+  // meet).
+  const auto halves = [](const Hull& h) {
+    const int nu = h.s->NbUPoles(), nv = h.s->NbVPoles();
+    double    lu = 0, lv = 0;
+    for (int j = 0; j < nv; ++j)
+    {
+      double l = 0;
+      for (int i = 1; i < nu; ++i)
+        l += (h.p[static_cast<size_t>(i * nv + j)] - h.p[static_cast<size_t>((i - 1) * nv + j)]).Modulus();
+      lu = std::max(lu, l);
+    }
+    for (int i = 0; i < nu; ++i)
+    {
+      double l = 0;
+      for (int j = 1; j < nv; ++j)
+        l += (h.p[static_cast<size_t>(i * nv + j)] - h.p[static_cast<size_t>(i * nv + j - 1)]).Modulus();
+      lv = std::max(lv, l);
+    }
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    h.s->Bounds(u0, u1, v0, v1);
+    std::array<Hull, 2> out;
+    for (int k = 0; k < 2; ++k)
+    {
+      out[k].s     = occ::down_cast<Geom_BSplineSurface>(h.s->Copy());
+      out[k].depth = h.depth + 1;
+      if (lu >= lv)
+        out[k].s->Segment(k == 0 ? u0 : (u0 + u1) / 2, k == 0 ? (u0 + u1) / 2 : u1, v0, v1);
+      else
+        out[k].s->Segment(u0, u1, k == 0 ? v0 : (v0 + v1) / 2, k == 0 ? (v0 + v1) / 2 : v1);
+      hull_poles(out[k]);
+    }
+    return out;
+  };
+  // A patch's corners (its corner poles: a B-spline's own points there) and middle.
+  const auto points = [](const Hull& h) {
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    h.s->Bounds(u0, u1, v0, v1);
+    const int nv = h.s->NbVPoles();
+    return std::array<gp_XYZ, 5>{h.p.front(), h.p[static_cast<size_t>(nv - 1)], h.p[h.p.size() - static_cast<size_t>(nv)], h.p.back(), h.s->Value((u0 + u1) / 2, (v0 + v1) / 2).XYZ()};
+  };
+  const auto close_by = [&](const Hull& a, const Hull& b) {
+    const std::array<gp_XYZ, 5> pa = points(a), pb = points(b);
+    for (const gp_XYZ& p : pa)
+      for (const gp_XYZ& q : pb)
+        if ((p - q).SquareModulus() <= margin * margin)
+          return true;
+    return false;
+  };
+  // (A patch whose parameters span next to nothing either way: no halving it further.)
+  const auto narrow = [](const Hull& h) {
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    h.s->Bounds(u0, u1, v0, v1);
+    return u1 - u0 <= 1e-9 * std::max(1.0, std::abs(u0)) || v1 - v0 <= 1e-9 * std::max(1.0, std::abs(v0));
+  };
+  // (Past 8 halvings, each patch's surface points (corners, middle) beyond the other's poles on both sides along its
+  // middle normal by more than the margin: crossing, as far as this can tell. A knurl's crossing B-splines ran out the
+  // 400 halvings, k25-15's 532 pairs 473 ms; the knife's apart pairs are shown by then.)
+  const auto straddles = [&](const Hull& a, const Hull& b) {
+    gp_XYZ       n   = normal(a);
+    const double len = n.Modulus();
+    if (!(len > 1e-300))
+      return false;
+    n /= len;
+    double lo = 1e300, hi = -1e300;
+    for (const gp_XYZ& q : a.p)
+      lo = std::min(lo, q.Dot(n)), hi = std::max(hi, q.Dot(n));
+    bool above = false, below = false;
+    for (const gp_XYZ& q : points(b))
+      above = above || q.Dot(n) > hi + margin, below = below || q.Dot(n) < lo - margin;
+    return above && below;
+  };
+  const auto crossing = [&](const Hull& a, const Hull& b) { return std::min(a.depth, b.depth) >= 8 && straddles(a, b) && straddles(b, a); };
+  // The closest pair first (by its gap), so a touching pair's patches shrink to the margin soon.
+  struct Pair
+  {
+    double gap;
+    Hull   a, b;
+  };
+  const auto later = [](const Pair& x, const Pair& y) { return x.gap > y.gap; };
+  std::vector<Pair> todo;
+  const auto        push = [&](Hull&& a, Hull&& b) {
+    const double g = gap(a, b);
+    if (g > margin)
+      return;
+    todo.push_back(Pair{g, std::move(a), std::move(b)});
+    std::push_heap(todo.begin(), todo.end(), later);
+  };
+  int left = 400;
+  try
+  {
+    push(std::move(*ha), std::move(*hb));
+    while (!todo.empty())
+    {
+      std::pop_heap(todo.begin(), todo.end(), later);
+      Pair x = std::move(todo.back());
+      todo.pop_back();
+      // (Points of the surfaces (the patches' corners and middles) within the margin, patches within the margin both,
+      // or halved 30 times: touching, as far as this can tell.)
+      const double sa = size(x.a), sb = size(x.b);
+      if (--left < 0 || crossing(x.a, x.b) || close_by(x.a, x.b) || (sa <= 16 * margin * margin && sb <= 16 * margin * margin) || std::max(x.a.depth, x.b.depth) >= 30 || narrow(x.a) || narrow(x.b))
+        return false;
+      if (sa >= sb)
+        for (Hull& h : halves(x.a))
+          push(std::move(h), Hull(x.b));
+      else
+        for (Hull& h : halves(x.b))
+          push(Hull(x.a), std::move(h));
+    }
+  }
+  catch (const Standard_Failure&)
+  {
+    return false;
+  }
+  return true;
+}
+
+// Our Boolean's own sections: own_sections, else a face resting on a plane, faces meeting only in a slab or apart by
+// their hulls (not OCCT's hook: its pave filler takes those cases' curves untried).
 static bool boolean_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out, ExactBoxes& exact)
 {
   if (own_sections(fa, fb, out))
@@ -4559,7 +4813,7 @@ static bool boolean_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::
   // (Only with a free-form face: OCCT's sections of planes, cylinders, cones and spheres are analytic and quick (a plate's
   // holes paid the exact boxes for nothing).)
   const auto free_form = [](const TopoDS_Face& f) { return BRepAdaptor_Surface(f, false).GetType() > GeomAbs_Sphere; };
-  return (free_form(fa) || free_form(fb)) && (resting_on_plane(fa, fb, out, exact) || apart_across_slab(fa, fb, exact));
+  return (free_form(fa) || free_form(fb)) && (resting_on_plane(fa, fb, out, exact) || apart_across_slab(fa, fb, exact) || hulls_apart(fa, fb));
 }
 
 // OCCT's section of two faces, one of them free-form, brought onto both surfaces where its approximation is coarse
