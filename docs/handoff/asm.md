@@ -68,7 +68,10 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
 6. bjr-config (dx's): side triangle connectors (5d8bc1) and a subassembly instance id missing from the instance lists.
 7. suspension 805e29 Extrude 1 (Knuckle 707632 vs live 406039 mm³): ours 8 regions (the centre disc "0,23" twice), live
    6 (qSketchRegion(…, true) JGO JGS JGW JGa JGi + JGe the disc; JGi a ring whose point is the centre); no region_at
-   trace: find which path picks them (query's sketch_only text / ids, regions_by_sum).
+   trace. Cause (s71 trace): live's region lines come from refs.jsonl (refs.js, bodyType SKETCH), not the sketches
+   file, so `query()`'s area check (live_area needs `sketch_file`) is skipped and our qSketchRegion(…, true) text wins.
+   Fix after this land: take refs.js SKETCH_REGION areas too; needs a model gate (10 model documents have such lines:
+   c2-config-parts-*, c2-loft-guide-curves-*).
 8. robot-relations a4e419 (Fixed Side 2873 vs 61001 mm³): live2's refs (02:2x, 41 lines) once synced; Extrude 2's
    booleanScope names a body of its Derived by the source's feature.
 9. config-assembly 20e932: Revolve 1 / 2 still "do not intersect" (configured dimensions taken back by the translator).
