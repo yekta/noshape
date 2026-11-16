@@ -2404,12 +2404,13 @@ impl<'a> Translator<'a> {
     fn query(&mut self, k: usize, q: &Value) -> Result<Vec<String>, String> {
         let ids: Vec<&str> = q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
         let sketch_only = !ids.is_empty() && ids.iter().all(|id| (0..=k).any(|j| self.refs.get(&(j, id.to_string())).is_some_and(|r| r.sketch)));
-        // Sketch regions with live's own geometry (its sketch bodies file: area and box, live 2267): the text's regions
-        // while their area is live's for these ids, else the ids' (a region query's text names all of its sketch's
-        // regions, qSketchRegion(…, true); asm-suspension's Extrude 1 ring, whose text names the disc inside it).
+        // Sketch regions with live's own geometry (its sketch bodies file: area and box, live 2267; refs.js's region
+        // lines: their area): the text's regions while their area is live's for these ids, else the ids' (a region
+        // query's text names all of its sketch's regions, qSketchRegion(…, true); asm-suspension's Extrude 1 ring, whose
+        // text names the disc inside it).
         let live_area: Option<f64> = ids
             .iter()
-            .map(|id| (0..=k).rev().find_map(|j| self.refs.get(&(j, id.to_string())).filter(|r| r.kind == "SKETCH_REGION" && r.sketch_file).and_then(|r| r.measure)))
+            .map(|id| (0..=k).rev().find_map(|j| self.refs.get(&(j, id.to_string())).filter(|r| r.kind == "SKETCH_REGION" && (r.sketch_file || r.sketch)).and_then(|r| r.measure)))
             .sum();
         if sketch_only && let Some(want) = live_area {
             let text = self.query_text_first(k, q);
