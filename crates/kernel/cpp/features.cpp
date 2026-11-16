@@ -37,6 +37,7 @@
 #include <BRepFeat_MakeLinearForm.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
+#include <ChFi3d.hxx>
 #include <algorithm>
 #include <limits>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
@@ -8821,6 +8822,10 @@ OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const do
                 bool checked)
 {
   OpOut out;
+  // Each face's tangency sample count made once for the whole fillet, not on every Add's extremity check (patch 0029's
+  // scope; robot-relations a4e419's Fillet 1 spent a third of its time remaking it). Out here: the budget's jump skips
+  // destructors.
+  const ChFi3d::SamplesScope samples;
   const int r = run_budgeted(blend_budget_seconds(), [&] { out = op_fillet_unbudgeted(s, edges, radii, checked); });
   if (r == 1)
     fail_op("fillet took too long");
@@ -9628,6 +9633,7 @@ OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& 
                  uint8_t mode, double d1, double d2, bool checked)
 {
   OpOut out;
+  const ChFi3d::SamplesScope samples; // (as op_fillet's)
   const int r = run_budgeted(blend_budget_seconds(), [&] { out = op_chamfer_unbudgeted(s, edges, faces, mode, d1, d2, checked); });
   if (r == 1)
     fail_op("chamfer took too long");
