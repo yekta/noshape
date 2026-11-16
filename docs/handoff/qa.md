@@ -7,7 +7,7 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 
 ## Running units
 Local units are transient (`systemctl list-units 'qa-*'`); restart one with the `systemd-run` line in its description if it's gone.
-- **qa-compat-loop**: bin/compat-loop.sh <baseline>, now **0.4.52**. On every watcher green, bin/compat-check.sh runs userdocs.py
+- **qa-compat-loop**: bin/compat-loop.sh <baseline>, now **0.4.54**. On every watcher green, bin/compat-check.sh runs userdocs.py
   on vibe5 (hats, dock, 47 ticket docs, 16 authored docs from compat-docs/v0443) with the baseline's CLI against the green.
   A feature that gets worse writes compat/ALERT-<sha> and one line per feature to /tmp/lead/qa-alerts. Move the baseline by
   restarting the unit with the new version (rel-published.sh does it).
@@ -58,16 +58,13 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   full7 on vibe7, `SLOT_QUIET_OK=1 ~/bin/slot`, load every 30 s, removes ~/.slot-quiet -> nightly/ab-clean-<mmdd>.*; valid if
   load < ~1.5. Owners so far: impeller Delete face 2 is upstream (core: Move face 1 fails where live builds; blend Fillet 28/29),
   impeller fillet failure cost (blend 29c1841df), helical Sweep 1 fixed on main (bool2 895c8e3b / e47268f2).
-- v0.4.54: unit qa-pub-0454 builds the candidate CLI (release/v0.4.54 8a8537439, qa-bisect, vibe5), then rel-published.sh
-  0.4.54 and rel-compat.sh 0.4.53 0.4.54.
+- v0.4.54 published check done 11-16 (compat/published-0.4.54.txt, rel-0.4.54.txt): clean; baseline 0.4.54.
 - The suites runs of 11-16 00:32 (f14f85a8) and 04:43 (601df0ac) were stopped to keep vibe7 quiet; the loop reruns.
 - QUIT-ABORT-DOCK: verified fixed (80e16e42d); guarded by the nightly and rel-published.
 - f197 Fillet 1 vs 0.4.51 was core's 1ac08e247 (reverted on v0.4.52's branch); 0.4.52 baseline is clean.
 
 ## Expected userdocs differences (not regressions)
-- dock "E2 - C Stand" E2 Govde 1345 / 3103 / 1759 (was 3104 / 1760, volume 62443.95 the same) from core's ee16972d8 (shown
-  topology hides edges internal to a face; DECISIONS e677ec1c0). Expected in every compat / release check against a release
-  without it; drop this line once the baseline release has it.
+- none against 0.4.54 (E2 Govde's ee16972d8 topology is in it).
 
 ## Tools
 - userdocs.py <cliA> <tagA> <cliB> <tagB> <doc>...: fresh 600 copies in ~/tmp/qa/ud-<pid>, per Part Studio feature status /
