@@ -1400,11 +1400,12 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let shapes: Vec<k::Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
-        // A failed shell marks the whole part (std: the shelled body is the error entity; live feedback-gaps item 5).
+        // A failed shell marks the whole part, highlighted in place (std: the shelled body is the error entity; live
+        // feedback-gaps item 5).
         let res = match shell_part(&body.shape, &shapes, t, side) {
             Ok(r) => r,
             Err(e) => {
-                ev.error_shapes.push(body.shape.clone());
+                ev.error_bodies.push(body.id.clone());
                 return Err(e);
             }
         };

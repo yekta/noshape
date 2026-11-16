@@ -388,6 +388,10 @@ pub struct FeatureState {
     /// a Feature pattern's instances that couldn't be made (user's live
     /// shot 2026-10-23: red edges, dark red faces).
     pub error_mesh: Option<Arc<MeshBuffers>>,
+    /// A failed feature's error entities that are parts of the result (a failed Shell's part): live highlights them in
+    /// place (their own shading tinted error red, edges red), not as ghosts.
+    #[serde(default)]
+    pub error_parts: Vec<BodyId>,
     /// Hole: parts behind its locations (against the hole direction), for
     /// the dialog's flip heuristic (hole.fs holeScopeFlipHeuristics).
     pub touched_behind: Vec<BodyId>,

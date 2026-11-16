@@ -168,6 +168,8 @@ pub struct EvalCtx<'a> {
     /// See [`crate::display::FeatureState::error_mesh`]: shapes shown when
     /// the feature fails.
     pub error_shapes: Vec<Shape>,
+    /// Parts of the result the failure is about (a failed Shell's part): `FeatureState::error_parts`.
+    pub error_bodies: Vec<BodyId>,
     /// See [`crate::display::FeatureState::touched_behind`].
     pub touched_behind: Vec<BodyId>,
     /// See [`crate::display::FeatureState::debug`].
@@ -385,7 +387,7 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { aliases: Default::default(), feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: Features::default(), xform: None, custom: None, custom_type: None, cancel: None, scratch: false, probe_touched: false }
+        EvalCtx { aliases: Default::default(), feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), error_bodies: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: Features::default(), xform: None, custom: None, custom_type: None, cancel: None, scratch: false, probe_touched: false }
     }
 
     /// Puts the merged faces' other names noted while naming into the context's bodies (before the context is handed

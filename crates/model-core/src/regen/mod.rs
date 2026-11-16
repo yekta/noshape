@@ -531,7 +531,7 @@ impl Regenerator {
                 keys.push((f.id, key));
             }
             if i >= upto {
-                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
+                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
                 continue;
             }
             if let Some(versions) = self.entries.get_mut(&f.id)
@@ -598,7 +598,7 @@ impl Regenerator {
             let body_reads = reusable.then(|| Arc::new(context::BodyReads::default()));
             evaluated.push(f.id);
             let ft = Instant::now();
-            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
+            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
             if let Some(msg) = expr_error.take() {
                 state.status = FeatureStatus::Error;
                 state.message = Some(msg);
@@ -750,6 +750,7 @@ impl Regenerator {
                                 if !ev.error_shapes.is_empty() {
                                     state.error_mesh = Some(display::tessellate_error(&noshape_kernel::Shape::compound(&ev.error_shapes), opts));
                                 }
+                                state.error_parts = std::mem::take(&mut ev.error_bodies);
                             }
                             Err(_) => {
                                 state.status = FeatureStatus::Error;
