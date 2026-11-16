@@ -1,0 +1,19 @@
+--- a/src/ModelingAlgorithms/TKShHealing/ShapeUpgrade/ShapeUpgrade_UnifySameDomain.cxx
++++ b/src/ModelingAlgorithms/TKShHealing/ShapeUpgrade/ShapeUpgrade_UnifySameDomain.cxx
+@@ -3981,8 +3981,16 @@
+         gp_Pnt2d CurPoint   = StartPCurve->Value(CurParam);
+ 
+         TopoDS_Edge CurEdge = StartEdge;
++        // noshape (patch 0032): a wire takes each edge left at most once and each seam rebuilt along a removed edge;
++        // past that it never closes (c2-config-parts-screws' Revolve 9 on an invalid thread: its wire grew to 15 GB).
++        // A bound by work, the same on every machine, and the break hook (cancel, memory budget) on the way.
++        const int aNoshapeMost = 2 * (edges.Length() + RemovedEdges.Length()) + 16;
++        int       aNoshapeTurns = 0;
+         for (;;) // loop till the end of current new wire
+         {
++          noshapeUnifyCheck(++aNoshapeTurns);
++          if (aNoshapeTurns > aNoshapeMost)
++            throw Standard_Failure("noshape: a wire that never closes");
+           TopoDS_Edge NextEdge;
+           gp_Pnt2d    NextPoint;
+ 

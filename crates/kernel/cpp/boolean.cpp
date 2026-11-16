@@ -11159,7 +11159,21 @@ OpOut op_unify(const OcShape& s)
   dump_op("unify", s.shape, {}, sc != nullptr ? "unify scoped" : "unify whole");
   HHist        hist;
   bool         clean = false;
-  TopoDS_Shape res   = unify_in(s.shape, hist, sc, &clean);
+  TopoDS_Shape res;
+  try
+  {
+    res = unify_in(s.shape, hist, sc, &clean);
+  }
+  catch (const Standard_Failure& f)
+  {
+    // (USD building a wire that never closes, bounded by OCCT patch 0032 (an invalid thread's faces, c2-config-parts-
+    // screws' Revolve 9: 15 GB): nothing merged, the shape as it came.)
+    if (std::string(f.GetMessageString()) != "noshape: a wire that never closes")
+      throw;
+    res   = s.shape;
+    hist  = HHist();
+    clean = false;
+  }
   std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("unify.result");
   OpOut        r     = make_result({s.shape}, res, hist.get(), &srcs);
   r.shape->myUnifyClean = clean;
