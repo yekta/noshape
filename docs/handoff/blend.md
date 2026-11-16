@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-16 12:53 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-16 13:58 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -39,10 +39,16 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   where the contact tangents meet, weight rho/(1-rho)); into_face accepts a curved side by its sag (< step/5);
   Support::Extruded (feet on a swept face moved along its direction, past where it is trimmed); a swept face's
   section side interpolated through 9 feet (an arc was 0.04 mm / 17 deg off at the lip); lies_on classifies with
-  periodic recadre. Now both tools' sides are recognised and the direct build ends in "an invalid solid": next,
-  BRepCheck its result (ends at x 1.5 (chamfer faces) and ~55-61 (offset face), the ridge). Judge it with
-  regen_profile::dump_document on sg/imp.noshape (NOSHAPE_DUMP_AFTER="Fillet 3"; live 34/95/62, 71096.12 mm3): the
-  corpus run is blocked by asm's 57de87f07 (impeller Extrude 4 fails, core bisected; asm told).
+  periodic recadre. Both tools' sides recognised; the ridge comes out at z -43.902 (live -43.9), the side trimmed at
+  x 54.68 (live 54.7). What's left is the ends. Far end: the blends cross the rib's old footprint on the channel's
+  offset face (interior, not a face), so the direct build (pieces of existing faces only) can't close there. Near end:
+  the tools run on past the lips' start (x 1.5) to -1.5 and cut through the rib's join with the collar at x 0..5 (plane
+  x 0, r 6.25 hole, cone, plane x 5): the Boolean fallback (tried) leaves that collar as a 676 mm3 second solid; live
+  ends the rounds on the chamfer faces (6.18 -> 12.68 mm2). Needs end trimming by those faces (a capped tool or the
+  direct build growing a face into an interior region): a larger build. Impeller corpus runs again once core's
+  f24c11cc lands (asm's 57de87f07 broke Extrude 4).
+- asm, skasm, bool2, studios, live, live2 paused until ~11-17 10:15 UTC: no messages to them, write into their
+  handoffs or live/REQUESTS.md (lead 11-16).
 - Queued from asm (after the current items): asm-gearbox-std 6a912b / a470167 Fillet 2 (EDGE fillet of 2 faces' edges,
   tangent, 0.125 in: ours 38/92/56, live 38/88/52, -12.1 mm3; repro vibe6/7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/mgb
   NOSHAPE_PARITY_ONLY=m6a912b); asm-scissor-lift fed22d Fillet 3 (Top - Side 2 45/110/64 vs 48/116/64; Motor Mount
