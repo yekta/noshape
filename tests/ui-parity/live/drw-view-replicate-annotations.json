@@ -1,16 +1,20 @@
 {
  "scenario": "drw-view-replicate-annotations",
- "recorded": "2026-11-14T22:48:46.504Z",
+ "recorded": "2026-11-16T07:47:54.534Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-16.1"
  },
  "live": {
   "document": "a1e7207bcd206771836609af",
   "workspace": "6d6324b30f07aa9904363635",
-  "element": "3323f9b0fbad9ab01af6ea47",
+  "element": "f796ebf5e409d94db8609196",
   "start": "block-drawing",
   "startElement": "fec75b9b8f06f7e2fe8fa56f",
   "runner": "live2 .nstate-uip-1.json"
@@ -229,7 +233,7 @@
      "selection": []
     }
    },
-   "t": 226762
+   "t": 227106
   },
   {
    "step": 2,
@@ -369,7 +373,7 @@
      "selection": []
     }
    },
-   "t": 250850
+   "t": 252216
   },
   {
    "step": 3,
@@ -518,7 +522,7 @@
      "selection": []
     }
    },
-   "t": 276032
+   "t": 278055
   },
   {
    "step": 4,
@@ -626,7 +630,7 @@
      "selection": []
     }
    },
-   "t": 300860
+   "t": 304155
   },
   {
    "step": 5,
@@ -649,7 +653,83 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Show/hide",
+      "View orientation",
+      "Tangent edges",
+      "Adjust linestyle...",
+      "Insert custom table of start block Copy 1 ...",
+      "",
+      "View properties...",
+      "Order",
+      "Align views",
+      "",
+      "Switch to start block Copy 1",
+      "Move to sheet...",
+      "Copy",
+      "Paste as table",
+      "Select for replication",
+      "Replicate annotations",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -737,7 +817,7 @@
      ]
     }
    },
-   "t": 326451
+   "t": 330583
   },
   {
    "step": 6,
@@ -750,7 +830,7 @@
    },
    "ok": true,
    "at": [
-    767,
+    852,
     521
    ],
    "state": {
@@ -761,7 +841,23 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "View",
+      "Region..."
+     ],
+     "checked": [
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -849,7 +945,7 @@
      ]
     }
    },
-   "t": 350985
+   "t": 356895
   },
   {
    "step": 7,
@@ -955,7 +1051,7 @@
      "selection": []
     }
    },
-   "t": 376173
+   "t": 384025
   },
   {
    "step": 8,
@@ -978,7 +1074,86 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Show/hide",
+      "View orientation",
+      "Tangent edges",
+      "Adjust linestyle...",
+      "Insert custom table of start block Copy 1 ...",
+      "",
+      "View properties...",
+      "Order",
+      "Align views",
+      "",
+      "Switch to start block Copy 1",
+      "Move to sheet...",
+      "Suppress alignment with parent",
+      "Copy",
+      "Paste as table",
+      "Select for replication",
+      "Replicate annotations",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -1066,7 +1241,7 @@
      ]
     }
    },
-   "t": 400234
+   "t": 409952
   },
   {
    "step": 9,
@@ -1078,7 +1253,7 @@
    },
    "ok": true,
    "at": [
-    767,
+    852,
     663
    ],
    "state": {
@@ -1172,7 +1347,7 @@
      "selection": []
     }
    },
-   "t": 425058
+   "t": 435576
   }
  ]
 }

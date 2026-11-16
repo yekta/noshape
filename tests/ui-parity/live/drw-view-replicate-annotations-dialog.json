@@ -1,19 +1,23 @@
 {
  "scenario": "drw-view-replicate-annotations-dialog",
- "recorded": "2026-11-15T04:33:29.169Z",
+ "recorded": "2026-11-16T07:55:16.184Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-16.1"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "1552197d7eb808da369611ef",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "2d9f3b3a3bfba8930100d5af",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -119,7 +123,86 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Show/hide",
+      "View orientation",
+      "Tangent edges",
+      "Adjust linestyle...",
+      "Insert custom table of start block Copy 1 ...",
+      "",
+      "View properties...",
+      "Order",
+      "Align views",
+      "",
+      "Switch to start block Copy 1",
+      "Move to sheet...",
+      "Suppress alignment with parent",
+      "Copy",
+      "Paste as table",
+      "Select for replication",
+      "Replicate annotations",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -198,7 +281,7 @@
      ]
     }
    },
-   "t": 229108
+   "t": 226358
   },
   {
    "step": 2,
@@ -210,7 +293,7 @@
    },
    "ok": true,
    "at": [
-    1272,
+    1357,
     544
    ],
    "state": {
@@ -295,7 +378,7 @@
      "selection": []
     }
    },
-   "t": 254990
+   "t": 251681
   },
   {
    "step": 3,
@@ -387,7 +470,7 @@
      "selection": []
     }
    },
-   "t": 281369
+   "t": 276822
   },
   {
    "step": 4,
@@ -483,7 +566,7 @@
      "selection": []
     }
    },
-   "t": 308215
+   "t": 302957
   }
  ]
 }
