@@ -427,6 +427,34 @@ fn timed(window: &mut Window, cx: &mut App, f: impl FnOnce(&mut Window, &mut App
     CLOCK.with(|c| *c.borrow_mut() = Some(StepClock { t0, dispatch, frame }));
 }
 
+/// A document window not in `before`, once its active tab is built and drawn (at most 30 s): when (None: none opened).
+async fn document_opened(before: &[AnyWindowHandle], cx: &mut AsyncApp) -> Option<Instant> {
+    let t = Instant::now();
+    while t.elapsed() < Duration::from_secs(30) {
+        let docs: Vec<Entity<Workspace>> = cx.update(|cx| cx.windows().into_iter().filter(|w| !before.contains(w)).filter_map(|w| w.update(cx, |_, window, cx| crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<Workspace>().ok())).ok().flatten()).collect());
+        let Some(ws) = docs.first() else {
+            if t.elapsed() > Duration::from_secs(3) {
+                return None;
+            }
+            cx.background_executor().timer(Duration::from_millis(10)).await;
+            continue;
+        };
+        let busy = cx.update(|cx| {
+            let w = ws.read(cx);
+            match (w.active_part_studio(), w.active_drawing()) {
+                (Some(ps), _) => ps.read(cx).ui_busy(),
+                (None, Some(d)) => d.read(cx).ui_busy(),
+                (None, None) => w.ui_view_pending(cx),
+            }
+        });
+        if !busy {
+            return Some(Instant::now());
+        }
+        cx.background_executor().timer(Duration::from_millis(10)).await;
+    }
+    None
+}
+
 /// The last timed action's `timing` (`idle`: when the window's work was done).
 fn take_timing(idle: Option<Instant>) -> Option<Value> {
     let c = CLOCK.with(|c| c.borrow_mut().take())?;
@@ -954,6 +982,7 @@ pub fn start_page(cx: &mut App) {
             let mods = modifiers(&step);
             let target = step.get("on").or_else(|| step.get("from")).cloned().unwrap_or(Value::Null);
             redraw(w, cx).await;
+            let before: Vec<AnyWindowHandle> = cx.update(|cx| cx.windows());
             let find = |t: &Value, cx: &mut AsyncApp| cx.update(|cx| locate(t, &None, &None, &None, cx));
             // A control scrolled out of view is wheeled into it first, as a browser's click scrolls to it.
             let mut found = Err(String::new());
@@ -1099,13 +1128,15 @@ pub fn start_page(cx: &mut App) {
                 },
                 other => Err(format!("unknown step {other} on a page")),
             };
+            // Timed: a document the step opened, until its active tab is built and drawn (its `idle`).
+            let opened = if timing_on() { document_opened(&before, cx).await } else { None };
             // A document a step opened is built and drawn before its state is read.
             sleep(cx, 900).await;
             let Some(w) = follow(cx) else { break };
             let state_now = read(w, cx).await;
             screenshot(i + 1);
             let mut rec = json!({ "step": i + 1, "do": step, "ok": result.is_ok(), "state": state_now });
-            if let Some(t) = take_timing(None) {
+            if let Some(t) = take_timing(opened) {
                 rec["timing"] = t;
             }
             if let Err(e) = result {
