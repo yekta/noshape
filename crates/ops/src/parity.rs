@@ -2588,6 +2588,18 @@ impl<'a> Translator<'a> {
         {
             return Ok(vec![format!("fplane:{ours}")]);
         }
+        // A Helix's or fit spline's curve (packed `DUMMY` BODY of "F….opHelix" / "….opFitSpline"): ours of that feature, before
+        // any line's geometry (by_geometry finds no wire body: c2-config-parts-screws' Sweep 1 path took a part); its ends are
+        // fit_spline_vertex_from_query's.
+        let strings = packed_strings_of(text);
+        if strings.iter().any(|s| s == "DUMMY")
+            && strings.iter().any(|s| s == "BODY")
+            && !strings.iter().any(|s| s == "VERTEX" || s == "EDGE")
+            && let Some(fid) = strings.iter().find_map(|s| s.strip_suffix(".opHelix").or_else(|| s.strip_suffix(".opFitSpline")))
+            && let Some(ours) = self.feature_ids.get(fid)
+        {
+            return Ok(vec![format!("body:{ours}.0")]);
+        }
         // Not placed just before feature k (live's line after a sketch has no
         // bodies): where an earlier line has them all (an id names one entity).
         let k = if !ids.is_empty() && !ids.iter().all(|id| self.refs.contains_key(&(k, id.clone()))) {
