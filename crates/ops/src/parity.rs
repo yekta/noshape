@@ -2424,12 +2424,14 @@ impl<'a> Translator<'a> {
                 return text;
             }
             // Not the ids' regions where the face the sketch is on splits them (their keys hold imprinted segments,
-            // from 2^31): the text's whole region, as live extrudes it (c2-impeller-loft's Extrude 4: two pieces split
-            // by the target's own imprint fail up to it; the whole matches live).
+            // from 2^31) when another of the feature's queries names the same whole region: live picked the pieces of
+            // that region, the text's whole one (c2-impeller-loft's Extrude 4: two pieces split by the target's own
+            // imprint, extruded apart, fail up to it; the whole matches live). One query alone takes its piece
+            // (c2-sm-rocker-enclosure-body's Extrude 3).
             let imprinted = |ids: &[String]| ids.iter().any(|id| id.rsplit_once(':').is_some_and(|(_, keys)| keys.split(',').skip(1).any(|k| k.parse::<u64>().is_ok_and(|v| v >= 1 << 31))));
             if let Ok(found) = self.query_with(k, q, true)
                 && !found.is_empty()
-                && !(imprinted(&found) && text.as_ref().is_ok_and(|t| !t.is_empty() && !imprinted(t)))
+                && !(imprinted(&found) && text.as_ref().is_ok_and(|t| !t.is_empty() && !imprinted(t) && self.shares_whole_region(k, q, t)))
             {
                 return Ok(found);
             }
@@ -2448,6 +2450,12 @@ impl<'a> Translator<'a> {
             }
             other => self.import_bodies.get(&text).cloned().map(Ok).unwrap_or(other),
         }
+    }
+
+    /// Whether another query of feature `k` (other ids) names the same region `text` by its text.
+    fn shares_whole_region(&mut self, k: usize, q: &Value, text: &[String]) -> bool {
+        let others: Vec<Value> = self.features.get(k).and_then(|f| f["parameters"].as_array()).into_iter().flatten().flat_map(|p| p["queries"].as_array().cloned().unwrap_or_default()).filter(|o| o["deterministicIds"] != q["deterministicIds"] && o["queryString"].as_str().is_some_and(|t| !t.is_empty())).collect();
+        others.iter().any(|o| self.query_text_first(k, o).is_ok_and(|t| t == text))
     }
 
     /// [`Self::query`] for ids only a sketch body places: the query's text first, then its ids.
