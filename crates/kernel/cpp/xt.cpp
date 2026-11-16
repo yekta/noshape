@@ -990,6 +990,87 @@ struct BodyWriter
     cycle = {ring};
   }
 
+  // Arcs of one circle meeting at a vertex only they use once the seams are dropped (a periodic face's pieces joined
+  // across the seam: seam_pieces_joined) are one arc, as Parasolid has it; shared by both faces (`arcs`, by the arcs it
+  // covers, so the faces' loops fuse them in any order to the same edge).
+  std::map<std::vector<const void*>, TopoDS_Edge> arcs;
+  std::map<const void*, std::vector<const void*>> covers;
+  NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> kept_at; // vertex -> kept edges
+
+  static occ::handle<Geom_Circle> circle_of(const TopoDS_Edge& e)
+  {
+    double f, l;
+    return occ::down_cast<Geom_Circle>(basis_curve(BRep_Tool::Curve(e, f, l)));
+  }
+
+  void fused_arcs(std::vector<TopoDS_Edge>& cycle)
+  {
+    for (bool again = true; again && cycle.size() > 2;)
+    {
+      again = false;
+      for (size_t k = 0; k < cycle.size() && !again; ++k)
+      {
+        const TopoDS_Edge a = cycle[k], b = cycle[(k + 1) % cycle.size()];
+        const occ::handle<Geom_Circle> ca = circle_of(a), cb = circle_of(b);
+        if (ca.IsNull() || cb.IsNull() || a.IsSame(b) || ca->Location().Distance(cb->Location()) > kPrecision ||
+            std::abs(ca->Radius() - cb->Radius()) > kPrecision || std::abs(ca->Axis().Direction().Dot(cb->Axis().Direction())) < 1 - 1e-12)
+          continue;
+        const TopoDS_Vertex v = TopExp::LastVertex(a, true);
+        if (!v.IsSame(TopExp::FirstVertex(b, true)) || !kept_at.Contains(v) || kept_at.FindFromKey(v).Extent() != 2)
+          continue;
+        // (Both between the same two faces.)
+        std::vector<const void*> fa, fb;
+        for (const TopoDS_Shape& g : edge_faces.FindFromKey(a))
+          fa.push_back(g.TShape().get());
+        for (const TopoDS_Shape& g : edge_faces.FindFromKey(b))
+          fb.push_back(g.TShape().get());
+        std::sort(fa.begin(), fa.end());
+        std::sort(fb.begin(), fb.end());
+        if (fa != fb || fa.size() != 2)
+          continue;
+        auto of = [&](const TopoDS_Edge& e) {
+          auto c = covers.find(e.TShape().get());
+          return c == covers.end() ? std::vector<const void*>{e.TShape().get()} : c->second;
+        };
+        std::vector<const void*> key = of(a), kb = of(b);
+        key.insert(key.end(), kb.begin(), kb.end());
+        std::sort(key.begin(), key.end());
+        auto it = arcs.find(key);
+        if (it == arcs.end())
+        {
+          // Along the circle from the first arc's start to the second's end (or back).
+          const TopoDS_Vertex s0 = TopExp::FirstVertex(a, true), s1 = TopExp::LastVertex(b, true);
+          if (s0.IsSame(s1))
+            continue;
+          gp_Pnt p;
+          gp_Vec d;
+          double f, l;
+          BRep_Tool::Curve(a, f, l)->D1(a.Orientation() == TopAbs_REVERSED ? l : f, p, d);
+          if (a.Orientation() == TopAbs_REVERSED)
+            d.Reverse();
+          gp_Pnt q;
+          gp_Vec along;
+          ca->D1(ElCLib::Parameter(ca->Circ(), p), q, along);
+          BRepBuilderAPI_MakeEdge mk(ca->Circ(), d.Dot(along) > 0 ? s0 : s1, d.Dot(along) > 0 ? s1 : s0);
+          if (!mk.IsDone())
+            continue;
+          TopoDS_Edge arc = mk.Edge();
+          for (const TopoDS_Shape& g : edge_faces.FindFromKey(a))
+            ShapeFix_Edge().FixAddPCurve(arc, TopoDS::Face(g), false);
+          const NCollection_List<TopoDS_Shape> both = edge_faces.FindFromKey(a);
+          edge_faces.Add(arc, both);
+          covers[arc.TShape().get()] = key;
+          it                         = arcs.emplace(key, arc).first;
+        }
+        TopoDS_Edge arc = it->second;
+        arc.Orientation(TopExp::FirstVertex(arc).IsSame(TopExp::FirstVertex(a, true)) ? TopAbs_FORWARD : TopAbs_REVERSED);
+        cycle[k] = arc;
+        cycle.erase(cycle.begin() + (std::ptrdiff_t)((k + 1) % cycle.size()));
+        again = true;
+      }
+    }
+  }
+
   XSurface surface_of(const TopoDS_Face& f, int face_index)
   {
     TopLoc_Location           loc;
@@ -1628,9 +1709,24 @@ struct BodyWriter
     // Fins (seams of periodic surfaces and degenerate edges dropped), in loops.
     face_loops.resize(nf);
     for (int fi = 0; fi < nf; ++fi)
+      for (const auto& cycle : exchange_loops(TopoDS::Face(faces(fi + 1)), true))
+        for (const TopoDS_Edge& e : cycle)
+          for (const TopoDS_Vertex& v : {TopExp::FirstVertex(e), TopExp::LastVertex(e)})
+          {
+            if (!kept_at.Contains(v))
+              kept_at.Add(v, NCollection_List<TopoDS_Shape>());
+            NCollection_List<TopoDS_Shape>& l = kept_at.ChangeFromKey(v);
+            bool seen = false;
+            for (const TopoDS_Shape& x : l)
+              seen = seen || x.IsSame(e);
+            if (!seen)
+              l.Append(e);
+          }
+    for (int fi = 0; fi < nf; ++fi)
       for (auto cycle : exchange_loops(TopoDS::Face(faces(fi + 1)), true))
       {
         whole_ring(cycle);
+        fused_arcs(cycle);
         const size_t first = fins.size();
         for (const TopoDS_Edge& e : cycle)
         {
@@ -2491,11 +2587,37 @@ std::pair<std::string, const double*> name_colour(rust::Slice<const rust::String
   return {name, rgb};
 }
 
+// Pieces of one periodic face OCCT split only at its seam (shown as one face: face_joins) as the one face Parasolid has
+// (c2-housing-draft's draft cone read back as two faces, 37 for live's 36). Only the pieces and their edges merge.
+TopoDS_Shape seam_pieces_joined(const TopoDS_Shape& s)
+{
+  const std::unique_ptr<OcShape> o  = wrap(s);
+  const rust::Vec<uint32_t>      fj = face_joins(*o);
+  const ShapeIMap&               fm = o->map(TopAbs_FACE);
+  std::vector<bool>              piece(fj.size(), false);
+  for (size_t i = 0; i < fj.size(); ++i)
+    if (fj[i] != i)
+      piece[i] = piece[fj[i]] = true;
+  if (std::find(piece.begin(), piece.end(), true) == piece.end())
+    return s;
+  ShapeIMap mine;
+  for (int i = 1; i <= fm.Extent(); ++i)
+    if (piece[(size_t)i - 1])
+      TopExp::MapShapes(fm(i), TopAbs_EDGE, mine);
+  ShapeUpgrade_UnifySameDomain u(s, true, true, false);
+  for (TopExp_Explorer e(s, TopAbs_EDGE); e.More(); e.Next())
+    if (!mine.Contains(e.Current()))
+      u.KeepShape(e.Current());
+  u.Build();
+  const TopoDS_Shape out = u.Shape();
+  return out.IsNull() || !BRepCheck_Analyzer(out).IsValid() ? s : out;
+}
+
 // One part's BODY, as write_parasolid writes it.
 int write_body(Writer& w, const TopoDS_Shape& s)
 {
   require_non_null(s, "shape");
-  const TopoDS_Shape p = prepared(s, true, true);
+  const TopoDS_Shape p = prepared(seam_pieces_joined(s), true, true);
   bool               solid = false;
   for (TopExp_Explorer ex(p, TopAbs_SOLID); ex.More(); ex.Next())
     solid = true;

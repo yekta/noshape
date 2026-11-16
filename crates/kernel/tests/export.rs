@@ -2067,3 +2067,26 @@ fn offsets_of_a_periodic_bsurface_round_trip_through_parasolid() {
     let a = surface_properties(&back).unwrap().mass;
     assert!((a - want).abs() < 1e-4 * want, "{a} vs {want}");
 }
+
+/// A draft's cone face OCCT cut in two at its seam (shown as one face), with the four faces round it: written as one
+/// face, its rims one arc each (Parasolid has no seam), as shown: c2-housing-draft's Part 1 read back 37/82/46 for
+/// its 36/79/44.
+#[test]
+fn a_cone_face_cut_at_its_seam_writes_as_one_face() {
+    let faces = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts/housing-draft-cone-pieces.brep")).unwrap();
+    let shown = |s: &Shape| {
+        let t = s.shown_topology().unwrap();
+        (t.face_count(), t.edges.iter().enumerate().filter(|&(i, e)| *e && t.joined[i] == i).count(), t.vertices.iter().filter(|v| **v).count())
+    };
+    let want = shown(&faces);
+    let area = surface_properties(&faces).unwrap().mass;
+    let path = std::env::temp_dir().join(format!("noshape-xt-cone-pieces-{}.x_t", std::process::id()));
+    write_parasolid(&path, std::slice::from_ref(&faces), LengthUnit::Meter, false).unwrap();
+    let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(want.0, 4);
+    assert_eq!(back.count(ShapeType::Face), 4);
+    assert_eq!(shown(&back), want);
+    let a = surface_properties(&back).unwrap().mass;
+    assert!((a - area).abs() < 1e-6 * area, "{a} vs {area}");
+}
