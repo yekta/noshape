@@ -11411,11 +11411,6 @@ OpOut op_draft_parting_curve(const OcShape& solid_in, const OcShapeList& faces_i
         lo = a, hi = b;
         sample(lo, hi);
       }
-      catch (const Standard_Failure&)
-      {
-        lo = a, hi = b;
-        sample(lo, hi);
-      }
       // Both ends interpolated on the same parameters (the same knots), so
       // the rulings join C(t) to its far end: a degree 3 × 1 B-spline (live:
       // SPLINE, degrees 1 and 3).
