@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 18:14 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 18:15 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
@@ -21,7 +21,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Landed b0e98fa3: Move face on an active sheet metal part runs std's moveFace (sheetMetalAwareMoveFace;
   std_route.rs `moves_active_sheet_metal`): c2-sm-tablet-stand 6 -> 12/16 (only corpus document with it). T2
   sheetmetal_std::moving_a_sheet_metal_end_face_keeps_its_walls_and_bend_apart (fails without: 10 vs 14 faces).
-- **Committed in core-oc 6e18a81a0, in the same pair: a point on an elementary face is classified with its
+- **Committed in core-oc 8deb8156c (rebased on main 18:10; with 1357fddb1 split-face attributes and 11f1335b9
+  untrimmed cylinder split), all three in one release pair: a point on an elementary face is classified with its
   parameters moved by whole periods into the face's** (geom.cpp classify_periodic; g++-13 OK). tablet-stand's rolled
   wall faces cross the cylinder's seam, matched no definition piece (part_sources fell back to Face(0)), so std's SM
   Boolean never built the bend's tool: Extrude 1 = live (bool handed it back: the Boolean was right); with main's
@@ -29,7 +30,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   T1 kernel core::a_cylinder_face_across_its_seam_contains_its_points. A notch test across a rolled wall (/root/core-scratch/rolled-notch-test-wip.patch) still fails
   "Subtractive tool must cut all the way through ... rolled wall": std wants 2 cap faces per trimmed piece, ours has
   more (the caps split at the seam?).
-- **In a release pair (vibe7 ~/agents/core-keep/sppair.sh -> spres): opSplitFace keeps a split face's attributes on
+- **Pair: vibe7 ~/agents/core-keep/sppair.sh -> spres (base files ops.rs / split.rs / geom.cpp .base there; queued
+  behind qa's ui-parity since 17:00, restarted 18:00). Land the three when it shows nothing worse.** (1357fddb1): opSplitFace keeps a split face's attributes on
   every piece** (host ops.rs op_split_face; Parasolid's). std Bend's imprint split the wall and dropped its WALL
   attribute, so c2-sm-rocker-enclosure-sm's Extrude 1 read "Removal destroys sheet metal part" (eachSheetStillExists
   found no WALL face): 6 -> 8/14; 14 sheet metal docs otherwise unchanged. T1
@@ -54,7 +56,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - **Lofts (mine, from dx's list):** c2-loft-paths-guides Loft 1 (dome to a sketch point, f7a8d4d00) falls back to the
   cone in the document: built from a part's face (Front-plane circle, symmetric extrude) the dome's side face is
   "unorientable" (its wire breaks after the seam: the degenerate apex edge isn't reached). Repro test + debug:
-  /root/core-scratch/loft-apex-face-wip.patch (features_a::a_loft_from_a_parts_face_to_a_point_tangent_to_its_plane).
+  /root/core-scratch/loft-apex-face-wip.patch (features_a::a_loft_from_a_parts_face_to_a_point_tangent_to_its_plane; the
+  WIP dumps each side-face edge, last run hit a compile error not yet read).
   c2-loft-guide-curves-wave-washer Loft 1: 4 profiles along a closed path; live closes it (4/4/0, 2080.8 mm³). WIP
   /root/core-scratch/loft-closed-path-wip.patch closes it round the path but comes out −11279 mm³: two profiles sit
   83 mm off the 26 mm ring, so MakePipeShell's carried sections twist. c2-surf-workshop-pipe: guided loft of more than
