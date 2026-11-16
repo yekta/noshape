@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-16 01:54 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-16 02:23 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -37,8 +37,11 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   (5, +-2.61, -43.106): its end edge on each side is the top line itself, one 59.47 mm line from x = 1.5. Ours ends
   in OCCT's 3.5012 mm B-spline from (5, 2.61, -43.106) to (1.5, 2.616, -43.105), 6 um off the line's y = 2.6104, so
   the 55.97 mm line and it stay two edges (the +2). Debug patch parked/imp-d1-debug.patch; doc copy vibe6
-  ~/tmp/blend/imp/imp.noshape. Next: the chamfer's end edges exact (a line where the end section is straight in a
-  plane), then merged with the collinear line when they bound the same two faces.
+  ~/tmp/blend/imp/imp.noshape (and vibe5 ~/tmp/blend). Built by OUR rim_chamfer_cut (OCCT's distance-angle chamfer
+  fails on the dump vibe5 ~/tmp/blend/cd/chamfer-13): the spline edge's tool face (B-spline, 6.10 mm2) lies 6 um off
+  Extrude 4's extruded wall; live's lies on it (merged: the wall / cylinder line runs on to x = 1.5). join_edges_at
+  can't straighten it (chord 1.7e-3 rad off the line). Next: rim chamfer's tool face for a non-circle rim edge exactly
+  on the wall where the wall runs along the end plane's normal. Blocks core's Move face 1 / Delete face 2 speed work.
 - isaac-ball 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63): 14 line edges, R 4.5; face 21 has a 9 mm strip:
   full rounds across it (live one half cylinder each, face 21 split 618.32 + 216.00). checked_blend's hair-smaller
   retry leaves a 9e-9 m neck in face 21. Branch `blend-necks` d6de0d70f (blend4): necks cut (all, at the part's scale
@@ -55,6 +58,10 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - cf-snap-hook (dx): Mac release Fillet 6 26 ms (live 8), Fillet 3 14 (7); the document 243 vs live 274. Low.
 
 ## Next, in order
+
+0. dx 02:25: c2-sm-side-cuts-tab feature 7 "Corner break 1" (FILLET R 21 on a 42 mm edge: a full round, the two
+   rounds meeting at its middle) fails "Failed to break selected corners."; live OK. Running it on vibe5 (sct.log) to
+   see whether it's the blend (mine) or core's sheetmetal::corner_break.
 
 1. Dock scale-first (in flight).
 2. Chamfer 3 when live answers.
