@@ -123,6 +123,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (104.36, 0, -27.20): the sphere seam's end), both hidden by the seam-join rule. Live's ring RvBB (81.385 mm) has its
   arc-length midpoint exactly on the first, so live keeps one vertex, at the sphere seam's end. Rule unknown (a
   Parasolid sphere has no seam); a live capture of a dome revolved onto a swept handle would settle it.
+- c2-fan-blade-sweep Boolean 2 (48/53, parked; lead: core's): Subtract with Offset 0.2 mm on 6 picked tool faces
+  (11 per tool after the pattern copies: the sweep's free-form thread flanks among them). basic.rs offsets only analytic
+  faces (else the tool as is), so ours removes 54.7 mm³ less (56/139/84 vs live 56/143/88). OCCT's offset_faces on them,
+  limit lifted: fails every time after 33-62 s (4 tools). Needs a free-form face offset (Geom_OffsetSurface faces
+  trimmed against their neighbours' offsets) in the kernel: a sizeable item, not started.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
