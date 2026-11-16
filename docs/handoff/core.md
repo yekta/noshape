@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 17:26 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 18:14 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
@@ -21,10 +21,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Landed b0e98fa3: Move face on an active sheet metal part runs std's moveFace (sheetMetalAwareMoveFace;
   std_route.rs `moves_active_sheet_metal`): c2-sm-tablet-stand 6 -> 12/16 (only corpus document with it). T2
   sheetmetal_std::moving_a_sheet_metal_end_face_keeps_its_walls_and_bend_apart (fails without: 10 vs 14 faces).
-- **tablet-stand Extrude 1 (next difference), handed to bool 11-16 16:20:** the definition-sheet cut (recorded case
-  vibe5 ~/agents/core-keep/tsrec/a/7b08434da3624636, Rust declines, OCCT runs) keeps the bend cylinder whole although
-  its y∈[-5,0] strip lies inside the slot tool (tangent to the tool's start face): live's extra 140 mm³ is exactly that
-  strip, and the uncut bend is our false "Collision in sheet metal flat pattern". Recheck when bool says it's on main.
+- **Committed in core-oc 6e18a81a0, in the same pair: a point on an elementary face is classified with its
+  parameters moved by whole periods into the face's** (geom.cpp classify_periodic; g++-13 OK). tablet-stand's rolled
+  wall faces cross the cylinder's seam, matched no definition piece (part_sources fell back to Face(0)), so std's SM
+  Boolean never built the bend's tool: Extrude 1 = live (bool handed it back: the Boolean was right); with main's
+  narrowed translator rule c2-sm-tablet-stand is 16/16 to the end.
+  T1 kernel core::a_cylinder_face_across_its_seam_contains_its_points. A notch test across a rolled wall (/root/core-scratch/rolled-notch-test-wip.patch) still fails
+  "Subtractive tool must cut all the way through ... rolled wall": std wants 2 cap faces per trimmed piece, ours has
+  more (the caps split at the seam?).
 - **In a release pair (vibe7 ~/agents/core-keep/sppair.sh -> spres): opSplitFace keeps a split face's attributes on
   every piece** (host ops.rs op_split_face; Parasolid's). std Bend's imprint split the wall and dropped its WALL
   attribute, so c2-sm-rocker-enclosure-sm's Extrude 1 read "Removal destroys sheet metal part" (eachSheetStillExists
@@ -38,14 +42,23 @@ docs/DECISIONS.md (read first; it wins over anything here).
   whole_cylinder; the pieces unified): c2-rib-wrap 4 -> 10/18 (Split 1: 2 parts, the disc 3 faces as live). T1
   features_b::an_untrimmed_cylinder_face_splits_off_its_whole_disc. Next there: Wrap 1 (3.8 mm³; its sketch text's
   ascent dimension untranslated). Land both (one commit each) when the pair shows nothing worse.
-- **Speed, handed to bool 11-16 17:20 (thread 0f798808):** c2-parting-line-draft-parting-line Rib 1 / 2 0.9 -> 7 s
+- Landed bb61a968 (lead cherry-picks it onto v0.4.55): Rib takes the ribbed part with its history chained (bool's
+  suggestion), no second fuse. Was: c2-parting-line-draft-parting-line Rib 1 / 2 0.9 -> 7 s
   since this morning (vibe7 same-host A/B, binaries ~/agents/core-keep/tr/{morning,base}): Rib's merge fuse (part ∪
   ribbed part) is declined "a shared shape OCCT may keep or remake" and OCCT takes 3.5 s. Cases vibe5
   ~/agents/core-keep/plcase. Fusing a copy of the part made Rib 2 decline "a point near two vertices" (reverted).
-  Dropping the redundant fuse renames rib faces (needs a legacy flag): only if bool asks.
+  The chained history names faces as the fuse did (13 rib tests pass).
 - c2-surf-workshop-britatap Touch screen split (4/22): our projected split curve (BRepProj section, a degree 7
   B-spline) ends 0.116 mm from the face's corner along the rim, where the sketch edge ends exactly; live ends it on
   the corner (2/6/5 vs ours 2/7/6). Kernel projection precision at a tangent end; parked.
+- **Lofts (mine, from dx's list):** c2-loft-paths-guides Loft 1 (dome to a sketch point, f7a8d4d00) falls back to the
+  cone in the document: built from a part's face (Front-plane circle, symmetric extrude) the dome's side face is
+  "unorientable" (its wire breaks after the seam: the degenerate apex edge isn't reached). Repro test + debug:
+  /root/core-scratch/loft-apex-face-wip.patch (features_a::a_loft_from_a_parts_face_to_a_point_tangent_to_its_plane).
+  c2-loft-guide-curves-wave-washer Loft 1: 4 profiles along a closed path; live closes it (4/4/0, 2080.8 mm³). WIP
+  /root/core-scratch/loft-closed-path-wip.patch closes it round the path but comes out −11279 mm³: two profiles sit
+  83 mm off the 26 mm ring, so MakePipeShell's carried sections twist. c2-surf-workshop-pipe: guided loft of more than
+  two profiles unsupported (a Gordon surface over n profiles: big kernel item).
 - **Impeller speed P0 (qa 11-16 04:40): waiting on blend.** Delete face 2 3.9 -> 26.4 s from v0.4.48 to v0.4.53
   (release A/B beside asm's full7: a hint; qa reruns it quiet). Chamfer 26 now builds (Error -> Ok, as live), so OCCT's
   Defeaturing gets a bigger part (trimming faces 13.2 s, FF 6.4 s, EF 6.1 s). Root: Part 1 differs from Fillet 28 on
