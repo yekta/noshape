@@ -7670,7 +7670,12 @@ pub fn standard_spec_by_part_name(name: &str) -> Option<noshape_model::assembly:
             }
         }
     }
-    None
+    // Live names a screw threaded only partly with its thread length after its length ("… M12x1.75 x 60 x 36").
+    let (head, thread) = name.rsplit_once(" x ")?;
+    thread.parse::<f64>().ok()?;
+    let mut spec = standard_spec_by_part_name(head).filter(|s| s.length.is_some())?;
+    spec.params.insert(noshape_model::assembly::standard::THREAD_LENGTH.into(), thread.to_string());
+    Some(spec)
 }
 
 /// A part's volume band (m³, lo and hi) in an assembly corpus' parts list: `volume` [lo, hi] from `.mass.json`, else

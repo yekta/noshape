@@ -3781,6 +3781,9 @@ fn standard_content_is_found_by_its_part_name() {
         assert_eq!(spec.part_name(), name);
     }
     assert!(standard_spec_by_part_name("Hex socket head cap screw M3x0.50 x 7.3").is_none());
+    // Threaded partly: live's thread length after the length (asm-pattern-std's screws).
+    let spec = standard_spec_by_part_name("Hex socket head cap screw M12x1.75 x 60 x 36").expect("a partly threaded screw");
+    assert_eq!((spec.length.as_deref(), spec.params.get("Thread length").map(String::as_str)), (Some("60"), Some("36")));
 }
 
 /// Live's sketch bodies at a studio's final state (`<element>.sketches.json`, live 2267) are references from their
