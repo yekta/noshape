@@ -911,11 +911,12 @@ struct Builder
   // The tube of radius r round c over [f, l] as a NURBS surface: at each
   // station an exact rational circle (v) in a rotation-minimizing frame,
   // the stations' poles interpolated along u (exact at the stations, O(h^4)
-  // between them; stations a sixteenth of r or of the spine's radius of
-  // curvature apart).
+  // between them). Stations start a sixteenth of the spine's least radius of
+  // curvature apart and halve until the tube is round to 1 nm between them,
+  // a tenth of Parasolid's precision (a small radius needs no more: the
+  // frame turns with the spine, not the tube).
   static occ::handle<Geom_Surface> tube(const occ::handle<Geom_Curve>& c, double f, double l, double r)
   {
-    // Station spacing from length and curvature, sampled.
     double len = 0, rho = 1e300;
     gp_Pnt prev = c->Value(f);
     for (int i = 1; i <= 256; ++i)
@@ -934,8 +935,33 @@ struct Builder
           rho = std::min(rho, 1 / k);
       }
     }
-    const double h = std::min(r, rho) / 16;
-    const int    n = std::max(16, std::min(4000, (int)std::ceil(len / std::max(h, 1e-12))));
+    const double tol = 1e-9;
+    int          n   = std::max(16, std::min(4000, (int)std::ceil(len / std::max(rho / 16, 1e-12))));
+    for (;;)
+    {
+      occ::handle<Geom_BSplineSurface> t   = tube_at(c, f, l, r, n);
+      double                           err = 0;
+      for (int i = 0; i < n && err <= tol; ++i)
+      {
+        const double u = f + (l - f) * (i + 0.5) / n;
+        gp_Pnt       p;
+        gp_Vec       d1;
+        c->D1(u, p, d1);
+        const gp_Dir tg(d1);
+        for (int k = 0; k < 8; ++k)
+        {
+          const gp_Vec x(p, t->Value(u, (k + 0.5) * std::acos(-1.0) / 4));
+          err = std::max({err, std::abs(x.Magnitude() - r), std::abs(x.Dot(gp_Vec(tg)))});
+        }
+      }
+      if (err <= tol || n >= 4000)
+        return t;
+      n = std::min(4000, 2 * n);
+    }
+  }
+
+  static occ::handle<Geom_BSplineSurface> tube_at(const occ::handle<Geom_Curve>& c, double f, double l, double r, int n)
+  {
     // Rotation-minimizing frames (double reflection, Wang et al. 2008).
     std::vector<double> ts(n + 1);
     std::vector<gp_Pnt> cs(n + 1);
