@@ -3011,6 +3011,16 @@ fn standard_content_auto_size_and_bom() {
     assert_eq!(spec.length.as_deref(), Some("6"), "live's M6 list starts at 6");
     spec.length = Some("25".into());
     assert_eq!(spec.part_name(), "Hex socket head cap screw M6x1.00 x 25");
+    // Threaded partly: its thread length after the length (live: "… M12x1.75 x 60 x 36"); fully, the length alone.
+    let mut m12 = spec.clone();
+    m12.set_size("M12");
+    m12.length = Some("60".into());
+    let threads = bolt.thread_lengths(m12.size_row().unwrap(), "60");
+    let short = threads.iter().find(|t| t.as_str() != "60").expect("a partial thread at M12 x 60").clone();
+    m12.params.insert(standard::THREAD_LENGTH.into(), short.clone());
+    assert_eq!(m12.part_name(), format!("Hex socket head cap screw M12x1.75 x 60 x {short}"));
+    m12.params.insert(standard::THREAD_LENGTH.into(), "60".into());
+    assert_eq!(m12.part_name(), "Hex socket head cap screw M12x1.75 x 60");
     // Live's washer: 3/8, Series Narrow / Wide in the name and Description.
     let washer_a = CATALOGUE.iter().find(|c| c.name == "Type A flat washer").unwrap();
     let mut w = StandardSpec::new(washer_a);

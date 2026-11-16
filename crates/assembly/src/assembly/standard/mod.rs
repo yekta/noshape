@@ -279,7 +279,7 @@ pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
         // The chosen Thread length (where the shank face splits; live's
         // askew head bolt).
         if c.shape == Shape::Screw
-            && let Some(lt) = spec.length.as_deref().map(|l| c.thread_lengths(s, l)).and_then(|t| spec.params.get(THREAD_LENGTH).filter(|v| t.contains(*v)).cloned().or_else(|| t.first().cloned()))
+            && let Some(lt) = spec.thread_length()
             && let Some(lt) = c.length_m(&lt)
         {
             f.params.set("lt", mm(lt * 1e3));

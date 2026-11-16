@@ -292,10 +292,19 @@ impl StandardSpec {
         Some(std::iter::once(first).chain(rows).find(|s| s.when.iter().all(|(k, v)| self.param(k) == v)).unwrap_or(first))
     }
 
+    /// A screw's Thread length: the chosen option, else the size and
+    /// length's first (live's default).
+    pub fn thread_length(&self) -> Option<String> {
+        let c = component(self)?;
+        let options = c.thread_lengths(self.size_row()?, self.length.as_deref()?);
+        self.params.get(THREAD_LENGTH).filter(|v| options.contains(*v)).cloned().or_else(|| options.first().cloned())
+    }
+
     /// The part's name, which instances take ("<Name> <n>") and the
     /// Description starts with (live): the size row's label ("Hex socket
     /// head cap screw M6x1.00", "Type A flat washer 3/8 Narrow") and
-    /// " x <length>".
+    /// " x <length>", then " x <thread length>" when the thread is shorter
+    /// (live: "… M12x1.75 x 60 x 36").
     pub fn part_name(&self) -> String {
         let mut label = self.size_row().map(|s| s.label.clone()).unwrap_or_else(|| format!("{} {}", self.component, self.size));
         // Live names the chosen option where the label carries the default
@@ -328,6 +337,10 @@ impl StandardSpec {
             Some(l) => format!("{label} x {l}"),
             None => label.replace(" x {l}", ""),
         };
+        let shorter = |t: &str| Some(component(self)?.length_m(t)? < component(self)?.length_m(self.length.as_deref()?)? - 1e-12);
+        if let Some(t) = self.thread_length().filter(|t| shorter(t) == Some(true)) {
+            name = format!("{name} x {t}");
+        }
         // PEM®: the material's type code, then its finish code ("PEM SO-43.1-3 ZI").
         if let Some(m) = component(self).and_then(|c| c.material_codes.get(self.material())) {
             let code = self.size_row().and_then(|s| s.type_codes.get(self.material())).unwrap_or(&m.code);
