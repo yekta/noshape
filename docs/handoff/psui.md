@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-16 15:33 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-16 16:23 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -51,12 +51,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   hole-table / drawing-hole-table, configuration, import-foreign icons. Crops /root/psui-scratch/shadows.
 - Landed: d75fd4d1 (free-click readouts within one screen pixel on the sketch plane, doubled for two-click
   measures; `pixel_on_plane`; README), b752d3ad (toolbar dropdowns 180 px, icon 2 px in, rows with chips 35 px).
-- In flight (qa 11-16 regression, sketch-entity-copy-paste step 12: the click after a paste deselected the copy since
-  f2029e2a moved the manipulator to the lowest end): the arrows' shafts take a click (8 px out, 60 long, 6 px either
-  side; `XF_ARROW_GAP_PX`, `XF_ARROW_SHAFT_REACH_PX`). A first try (paste the lowest key point onto the pointer,
-  aeaf3a9e) failed the editing matrix: live pastes the copy's centre under the pointer (editing-gaps3 paste case).
-- Queued in vibe6's slot (behind asm / blend / qa runs): full psui shards (systemd unit psui-shards locally,
-  /root/psui-scratch/run-shards.sh; log full1116.log; out /home/ngyekta/tmp/psui/full1116).
+- Landed df0f2ae0: the manipulator's arrows grabbed along their shafts (qa's sketch-entity-copy-paste regression).
+- Full psui run 11-16 16:00 (vibe6 full1116): 1009 / 1021. Mine fixed with this land: sketch readouts of two points /
+  a point and a line ("Min dist") and two circles (Center / Max / Min dist), sketch-key-symmetric / -midpoint /
+  -concentric-two-circles match. Left, others': bend / jog / tab "Face of …" labels and bend-relief related rows
+  (skasm), gusset title error (skasm), face-rclick-export-dxf (dx).
 - Paused until ~10:15 UTC 11-17: asm, skasm, bool2, studios, live, live2. Don't message them (it wakes them): write
   into onshape-research/live/REQUESTS.md or their handoffs. Waiting there: live/live2's tool-list box model request
   (now measured from menus/ps-dropdown-*; can be dropped).
@@ -86,9 +85,6 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Known, left as they are
 
-- Sketch readouts of free clicks beyond ±1 px (DECISIONS 11-15): sketch-linear-pattern-click-commit (1.8 px),
-  sketch-key-symmetric (1.7), sketch-key-concentric-two-circles (2.0), sketch-key-midpoint (1.0, live's own point
-  1.67 px off in y). Reported to the lead.
 - sketch-mirror-preselected-batch: live's lost first click after a box select is a live defect (`live_defects` from
   step 20, DECISIONS 11-15); the rest matches.
 

@@ -3815,10 +3815,26 @@ impl SketchEditor {
                 }
             }
             [a, b] => {
+                // Live sketch-key-symmetric / -midpoint / -concentric-two-circles: two points, a point and a line, two
+                // circles.
                 if let (Some(p), Some(q)) = (sk.point(*a), sk.point(*b)) {
-                    return one("Distance", len((q - p).length()));
+                    return one("Min dist", len((q - p).length()));
+                }
+                let line_of = |e: EntityId| match sk.curve(e) {
+                    Some(Curve2::Line { a, b }) => Some((a, b)),
+                    _ => None,
+                };
+                if let Some((p, (l0, l1))) = sk.point(*a).zip(line_of(*b)).or_else(|| sk.point(*b).zip(line_of(*a))) {
+                    let d = l1 - l0;
+                    let t = if d.length_squared() > 0.0 { ((p - l0).dot(d) / d.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
+                    return one("Min dist", len((l0 + d * t - p).length()));
                 }
                 match (sk.curve(*a), sk.curve(*b)) {
+                    (Some(Curve2::Circle { center: c1, radius: r1 }), Some(Curve2::Circle { center: c2, radius: r2 })) => {
+                        let cd = (c2 - c1).length();
+                        let min = if cd >= r1 + r2 { cd - r1 - r2 } else { (r1.max(r2) - cd - r1.min(r2)).max(0.0) };
+                        vec![("Center dist".into(), len(cd)), ("Max dist".into(), len(cd + r1 + r2)), ("Min dist".into(), len(min))]
+                    }
                     (Some(Curve2::Line { a: a0, b: a1 }), Some(Curve2::Line { a: b0, b: b1 })) => {
                         let (Some(u), Some(v)) = ((a1 - a0).try_normalize(), (b1 - b0).try_normalize()) else { return Vec::new() };
                         if u.perp_dot(v).abs() < 1e-9 {
@@ -8952,6 +8968,8 @@ mod tests {
         let l3 = d.sketch.add_line(v(0.0, 0.0), v(0.01, 0.01));
         let c = d.sketch.add_circle(v(0.05, 0.05), 0.005);
         let p = d.sketch.add_point(v(0.01, 0.02));
+        let q = d.sketch.add_point(v(0.04, 0.06));
+        let c2 = d.sketch.add_circle(v(0.08, 0.09), 0.01);
         let readout = |ed: &SketchEditor, sel: &[EntityId]| {
             let mut ed2 = SketchEditor::new(ed.feature, ed.frame);
             ed2.selection = sel.to_vec();
@@ -8965,6 +8983,10 @@ mod tests {
         assert!(readout(&ed, &[p]).is_some_and(|t| t.starts_with("Point: X 10.000 mm")), "{:?}", readout(&ed, &[p]));
         // A line and a circle (live sketch-mirror-preselected-batch): nearest, farthest, the centre to the line.
         assert_eq!(readout(&ed, &[l1, c]).as_deref(), Some("Min dist: 53.310 mm; Max dist: 75.711 mm; Center dist: 50.000 mm"));
+        // Two points, a point and a line, two circles (live sketch-key-symmetric / -midpoint / -concentric-two-circles).
+        assert_eq!(readout(&ed, &[p, q]).as_deref(), Some("Min dist: 50.000 mm"));
+        assert_eq!(readout(&ed, &[p, l1]).as_deref(), Some("Min dist: 20.000 mm"));
+        assert_eq!(readout(&ed, &[c, c2]).as_deref(), Some("Center dist: 50.000 mm; Max dist: 65.000 mm; Min dist: 35.000 mm"));
         assert_eq!(readout(&ed, &[l1, l2, c]), None, "mixed selection shows nothing");
         ed.selection.clear();
         assert!(ed.selection_readout(&d, &u).is_empty());
