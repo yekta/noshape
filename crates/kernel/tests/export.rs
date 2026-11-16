@@ -1938,3 +1938,32 @@ fn adjacent_faces_on_one_plane_up_to_rounding_export_on_one_plane() {
     assert!((after[0].1.abs() - after[1].1.abs()).abs() < 1e-15, "{after:?}");
     assert!(after.iter().zip(&before).all(|(x, y)| (x.0 - y.0).length() < 1e-8), "{before:?} -> {after:?}");
 }
+
+/// One product whose shape is several B-rep representations, each by its own SHAPE_REPRESENTATION_RELATIONSHIP (FreeCAD's
+/// STEP: asm-corexy's Pulley_GT2-6mm-20T_bore_5_001, three solids): XDE makes each a component named by its link
+/// ("=>[0:1:1:2]"); every part takes the product's name, as live.
+#[test]
+fn a_products_solids_by_representation_relationships_take_its_name() {
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/step/face-colour.step")).unwrap();
+    // face-colour.step: three products, each SHAPE_REPRESENTATION (#333-#335) related to its own B-rep (#21-#23). All three
+    // B-reps to the first product's representation, the other two products dropped, names only on the product.
+    let freecad: String = text
+        .lines()
+        .filter(|l| !l.starts_with("#331=") && !l.starts_with("#332="))
+        .map(|l| match l {
+            _ if l.starts_with("#19=") => "#19=SHAPE_REPRESENTATION_RELATIONSHIP('','',#333,#22);".to_string(),
+            _ if l.starts_with("#20=") => "#20=SHAPE_REPRESENTATION_RELATIONSHIP('','',#333,#23);".to_string(),
+            _ if l.starts_with("#549=") => l.replace("'Part 3','Part 3','Part 3'", "'Pulley','Pulley',''"),
+            _ if l.starts_with("#333=") || l.contains("=MANIFOLD_SOLID_BREP(") => l.replace("'Part 3'", "''").replace("'Part 2'", "''").replace("'Part 1'", "''"),
+            _ => l.to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let dir = std::env::temp_dir().join(format!("noshape-step-srr-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("pulley.step");
+    std::fs::write(&path, freecad).unwrap();
+    let names: Vec<String> = read_step(&path, LengthUnit::Meter).unwrap().into_iter().map(|b| b.name.unwrap_or_default()).collect();
+    assert_eq!(names, ["Pulley", "Pulley", "Pulley"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}

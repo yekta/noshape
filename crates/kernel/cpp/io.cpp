@@ -179,6 +179,18 @@ std::string label_name(const TDF_Label& l)
   return utf8_name(n->Get());
 }
 
+// A label's own name: none when XDE made one up, for an unnamed instance (its link, "=>[0:1:1:2]") or an unnamed shape
+// (its type, "SOLID"), so the part is named by its product, as live (asm-corexy's Pulley_GT2-6mm-20T_bore_5_001: FreeCAD's
+// three solids of one product).
+std::string own_name(const TDF_Label& l)
+{
+  std::string n = label_name(l);
+  for (const char* t : {"COMPOUND", "COMPSOLID", "SOLID", "SHELL", "FACE", "WIRE", "EDGE", "VERTEX", "SHAPE"})
+    if (n == t)
+      return std::string();
+  return n.rfind("=>[", 0) == 0 ? std::string() : n;
+}
+
 bool label_color(const occ::handle<XCAFDoc_ColorTool>& ct, const TDF_Label& l,
                  const TopoDS_Shape& s, Quantity_Color& c)
 {
@@ -242,9 +254,9 @@ void collect(const occ::handle<XCAFDoc_ShapeTool>& st, const occ::handle<XCAFDoc
     XCAFDoc_ShapeTool::GetReferredShape(label, ref);
     here = loc * XCAFDoc_ShapeTool::GetLocation(label);
   }
-  std::string name = label_name(label);
+  std::string name = own_name(label);
   if (name.empty())
-    name = label_name(ref);
+    name = own_name(ref);
   if (name.empty())
     name = inheritedName;
   Quantity_Color c        = inheritedColor;
@@ -880,9 +892,9 @@ void walk_tree(TreeWalk& w, const TDF_Label& label, const TopLoc_Location& loc,
     local = XCAFDoc_ShapeTool::GetLocation(label);
     here  = loc * local;
   }
-  std::string name = label_name(label);
+  std::string name = own_name(label);
   if (name.empty())
-    name = label_name(ref);
+    name = own_name(ref);
   if (name.empty())
     name = inheritedName;
   Quantity_Color c        = inheritedColor;
