@@ -335,7 +335,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | A drag off the list | the drop line stays at its last spot; released over the canvas: nothing | the line went with the pointer's row (drawn by `drag_over`); now from the drop slot | = (fixed) |
 | Folders: sideways | every 19 px sideways in the slot steps a level: a last child's bottom half 19 px left drops after the folder, outside | no levels; now 19 px a level from where the pointer came onto the slot (`LIST_LEVEL_PX`) | = (fixed) |
 | Multi-part Properties… | one "2 selected" dialog, both parts listed, Name "Multiple values", shared fields editable (live 08:18, 2962) | the first part's Properties; now live's dialog (`open_parts_properties`; list `several_parts_share_one_properties_dialog`) | = (fixed 11-13) |
-| Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); an empty new folder's caret (live2's new-folder-empty, queued); the insertion line's look | – | – |
+| Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); an empty new folder's caret (live featurelist-gaps 11-16: shown, collapsed, on "New folder (0)"); the insertion line (live featurelist-gaps: rgb(22, 81, 176), 2 px, the row's width, a ~6 px ring filled rgb(202, 216, 237) at its left end, centred on the boundary above the hovered row in its upper half, below in its lower half; ours the same, the ring's fill was white) | – | – |
 
 ## Measure (matrix)
 

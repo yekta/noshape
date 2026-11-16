@@ -5825,7 +5825,8 @@ impl PartStudioView {
                         .rounded_full()
                         .border_2()
                         .border_color(pal.accent)
-                        .bg(gpui_kit::rgb(0xffffff))
+                        // Live featurelist-gaps: rgb(202, 216, 237) inside the ring.
+                        .bg(gpui_kit::rgb(0xcad8ed))
                         .when(self.ui.feature_drop_x.get().is_none() || self.ui.feature_drop.get().is_none_or(|(r, _)| r != i), |d| d.invisible()),
                 )
             })
