@@ -71,6 +71,8 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-15 Build hosts: bool2 and bool build and gate on vibe5; the Mac's one slot is for crate tests and short builds, never
   a 45-min hold. Light checks (5 app runs, a quit check) don't take ~/bin/slot.
 - 11-16 Gate builds (single-unit LTO, ~10 GB) also go through ~/bin/slot (SLOT_MIN_GB=12): earlyoom killed two on vibe5.
+- 11-16 Ours-vs-live speed is judged on the Mac (user-class hardware), release build, quiet run, median of 3: the vibe hosts
+  are shared build servers, so their absolute times are hints only. Ours-vs-ours A/Bs still follow the same-session rule.
 - 11-16 Every ~/bin/slot job runs under `timeout` sized to its expected length (a model suite ≤2 h). A run stuck on one
   document (100 % CPU, no progress) is killed by its owner, the document skipped and its owner told: two runs held the
   vibe5 and vibe6 slots 1.5 h each on c2-config-parts-screws' Split hang.
