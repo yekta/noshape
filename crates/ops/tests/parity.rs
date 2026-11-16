@@ -1930,6 +1930,14 @@ fn a_zero_centroid_is_unknown() {
     // A sheet of the UI fetch has no centroid; its box is the client's loose one too.
     let sheet = json!({ "index": 0, "parts": [{ "name": "Surface 1", "bodyType": "sheet", "faces": 1, "centroid": null, "bbox": { "min": [-0.074, -0.085, -0.014], "max": [0.074, 0.105, 0.103] } }] });
     assert!(live_parts(&sheet)[0].bbox_outer);
+    // A sheet's volume live reads as 0 is none (ours has none).
+    let mut zero = sheet.clone();
+    zero["parts"][0]["volume"] = json!(0.0);
+    assert_eq!(live_parts(&zero)[0].volume, None);
+    let mut solid = zero.clone();
+    solid["parts"][0]["bodyType"] = json!("solid");
+    solid["parts"][0]["volume"] = json!(1e-6);
+    assert_eq!(live_parts(&solid)[0].volume, Some(1e-6));
 }
 
 /// The comparison: counts exact; volume, area and centroid within live's
