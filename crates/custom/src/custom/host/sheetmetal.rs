@@ -88,6 +88,8 @@ struct Definition {
     /// (else `relief`).
     reliefs: BTreeMap<usize, BendRelief>,
     k_factor: f64,
+    /// The k-factor of rolled walls (the model's kFactorRolled).
+    k_factor_rolled: f64,
     /// Active (not finished by Finish sheet metal model), default bend radius.
     active: bool,
     default_radius: f64,
@@ -1370,6 +1372,26 @@ fn rolled_strip(topo: &Topo, fi: usize, radius: f64) -> Option<Strip> {
     })
 }
 
+/// The rolled walls (a curved definition face that is a wall, no BEND joint on it, between two walls: an arc of the
+/// sketch a sheet metal model extrudes, c2-sm-tablet-stand's): face index and inner radius, the side away from the
+/// axis's thickness off the definition radius.
+fn rolled_walls(def: &Definition, topo: &Topo) -> Vec<(usize, f64)> {
+    (0..topo.faces.len())
+        .filter(|fi| !def.rolled.contains_key(fi))
+        .filter_map(|fi| {
+            let Ok(k::Surface::Cylinder { origin, axis, radius, .. }) = topo.faces[fi].face_surface() else { return None };
+            let st = rolled_strip(topo, fi, radius)?;
+            if st.wall_b == usize::MAX {
+                return None;
+            }
+            let (p, n) = face_normal(&topo.faces[fi]).ok()?;
+            let axis = axis.normalize();
+            let out = (p - (origin + axis * (p - origin).dot(axis))).normalize_or_zero();
+            Some((fi, radius - if n.dot(out) > 0.0 { def.back } else { def.front }))
+        })
+        .collect()
+}
+
 /// The part solid of one definition sheet and the pieces its faces come from.
 fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     let topo = Topo::of(shape)?;
@@ -2320,7 +2342,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     }
                 }
             }
-            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids, model_id: model.get("attributeId").as_str().map(|s| s.to_string()), breaks: corner_breaks(&st, &q, b) });
+            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), k_factor_rolled: model.get("kFactorRolled").get("value").as_number().unwrap_or(0.5), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids, model_id: model.get("attributeId").as_str().map(|s| s.to_string()), breaks: corner_breaks(&st, &q, b) });
             let faces: Vec<Reference> = (0..body.faces.len()).map(|f| q.to_ref(&Ent::Face(b, f))).collect();
             let edges: Vec<Reference> = (0..body.edges.len()).map(|e| q.to_ref(&Ent::Edge(b, e))).collect();
             let vertices: Vec<Reference> = (0..body.vertices.len()).map(|v| q.to_ref(&Ent::Vertex(b, v))).collect();
@@ -3071,6 +3093,16 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
             bend: n,
         });
     }
+    // Rolled walls: each developed between its two walls' lines, a wall of both (no bend line).
+    for (fi, radius) in rolled_walls(def, topo) {
+        let Some(s) = rolled_strip(topo, fi, radius) else { continue };
+        let (Some(ma), Some(mb)) = (unfolded.walls.get(&s.wall_a), unfolded.walls.get(&s.wall_b)) else { continue };
+        let (a, b) = (s.a.map(|p| ma.transform_point3(p)), s.b.map(|p| mb.transform_point3(p)));
+        if let Ok(face) = k::make_polyline(&[a[0], b[0], b[1], a[1]], true).and_then(|w| k::make_face_from_wire(&w, true)) {
+            pieces.push(face);
+            owners.push([s.wall_a, s.wall_b, fi]);
+        }
+    }
     let joined = |i: usize, j: usize| owners[i].iter().any(|w| *w != usize::MAX && owners[j].contains(w));
     let collides = crate::sheetmetal::flat::pieces_collide(&pieces, &frame, joined);
     let mut flat = crate::sheetmetal::flat::flat_from_pieces(frame, &pieces, lines, thickness).ok()?;
@@ -3181,7 +3213,9 @@ fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: 
         }
         // Across rolled bends: wall b turned about the arc's axis onto wall
         // a's tangent line, then moved out by the developed length.
-        for (&fi, &radius) in &def.rolled {
+        // (Rolled walls too, developed with the rolled k-factor.)
+        let rolled = def.rolled.iter().map(|(&fi, &r)| (fi, r, k_factor)).chain(rolled_walls(def, topo).into_iter().map(|(fi, r)| (fi, r, def.k_factor_rolled)));
+        for (fi, radius, k_factor) in rolled {
             let Some(st) = rolled_strip(topo, fi, radius) else { continue };
             // (Bends meeting with no wall between, a jog's at its reduced angle: a bend placed from its neighbour lies on
             // their common tangent plane, from which it turns on to the wall past it.)
@@ -3273,7 +3307,7 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
             let body = &st.ctx.bodies[b];
             let (bends, rips, rolled, rip_styles, joint_ids) = joints(&st, &q, b);
             let k_factor = model.get("k-factor").get("value").as_number().unwrap_or(0.45);
-            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new(), model_id: None, breaks: BTreeMap::new() };
+            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), k_factor_rolled: model.get("kFactorRolled").get("value").as_number().unwrap_or(0.5), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new(), model_id: None, breaks: BTreeMap::new() };
             (e, body.shape.clone(), def, k_factor)
         })
     };

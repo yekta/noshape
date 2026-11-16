@@ -948,6 +948,45 @@ fn extruded_l_keeps_its_end_faces_in_pieces() {
     assert!((volume_mm3(&r) - 3211.3274).abs() < 1e-3 && faces == 14, "{} mm³, {} faces", volume_mm3(&r), faces);
 }
 
+/// Sheet metal model › Extrude of a line, a tangent arc and a line: the arc is a rolled wall (no bend), developed in
+/// the flat between the two walls at the rolled k-factor, not left out with the walls on each other (live
+/// c2-sm-tablet-stand's Sheet metal model 1: OK; ours said "Collision in sheet metal flat pattern.").
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn an_extruded_arc_is_a_rolled_wall_in_the_flat() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(0.0, 0.0), (40.0, 0.0), (46.0, 6.0), (46.0, 36.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    let c = sk.add_point(glam::DVec2::new(mm(40.0), mm(6.0)));
+    let curves = [sk.add_line_between(p[0], p[1]).unwrap(), sk.add_arc_between(c, p[1], p[2]).unwrap(), sk.add_line_between(p[2], p[3]).unwrap()];
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("EXTRUDE"));
+        pv.set("sketchCurves", ParamValue::Query(curves.iter().map(|e| Reference::SketchEntity { sketch, entity: e.0 }).collect()));
+        pv.set("depth", expr("18 mm"));
+        pv.set("thickness", expr("3 mm"));
+        pv.set("radius", expr("3 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(r.display.features.last().map(|f| f.status), Some(FeatureStatus::Ok), "{:?}", r.display.features.last().map(|f| &f.message));
+    let body = &r.context.bodies[part(&r)];
+    let faces = body.shape.faces();
+    let radii = faces.iter().filter_map(|f| match f.face_surface() {
+        Ok(noshape_kernel::Surface::Cylinder { radius, .. }) => Some(radius),
+        _ => None,
+    });
+    let inner = radii.fold(f64::INFINITY, f64::min) * 1e3;
+    let fp = noshape_model::sheetmetal::flat_pattern_for(&r.context, &body.id).expect("flat");
+    let (lo, hi) = fp.bounds();
+    let size = (hi - lo) * 1e3;
+    let want = 40.0 + 30.0 + std::f64::consts::FRAC_PI_2 * (inner + 0.5 * 3.0);
+    assert!((size.x.max(size.y) - want).abs() < 1e-3 && (size.x.min(size.y) - 18.0).abs() < 1e-3, "flat {size:?}, want {want} × 18");
+}
+
 /// A 60 × 40 plate (Thicken 2 mm, bend radius `radius` mm).
 fn plate(radius: &str) -> Studio {
     let mut s = Studio::new();
