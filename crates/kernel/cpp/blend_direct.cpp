@@ -231,19 +231,23 @@ std::vector<std::pair<gp_Pnt, gp_Vec>> lies_on_samples(const TopoDS_Face& t)
 // and every one within `atol`, normals within 0.02 rad (a loft's side spans a wall's planes and cylinders, each only
 // approximately: c2-variable-fillet-faceblend's held face blend, ~0.005 mm and ~0.009 rad off). Its largest distance in
 // `dev`. (`gbox`: `g`'s box; points off it are not projected. `pg`: a projector onto `g`'s surface, `in_g` its
-// classifier, each made here when null.)
+// classifier, each made here when null. `taken`: the points found on a part face before, skipped (no other face holds
+// them; c2-hunting-knife's Fillet 5 classified a side's points on its own face against the next cylinder, 2 ms); the
+// points on `g` added when it lies on it.)
 bool lies_on(const std::vector<std::pair<gp_Pnt, gp_Vec>>& ts, const TopoDS_Face& g, const Bnd_Box& gbox, double atol, double& dev,
-             std::unique_ptr<GeomAPI_ProjectPointOnSurf>& pg, std::unique_ptr<BRepTopAdaptor_FClass2d>& in_g)
+             std::unique_ptr<GeomAPI_ProjectPointOnSurf>& pg, std::unique_ptr<BRepTopAdaptor_FClass2d>& in_g, std::vector<bool>& taken)
 {
   const TopoDS_Face               gf = TopoDS::Face(g.Oriented(TopAbs_FORWARD));
   const occ::handle<Geom_Surface> sg = BRep_Tool::Surface(gf);
   Bnd_Box                         near_g = gbox;
   near_g.Enlarge(50 * atol);
-  int over = 0;
-  dev      = 0;
-  for (const auto& [q, nt] : ts)
+  std::vector<size_t> on;
+  dev = 0;
+  taken.resize(ts.size());
+  for (size_t k = 0; k < ts.size(); ++k)
   {
-    if (near_g.IsOut(q))
+    const auto& [q, nt] = ts[k];
+    if (taken[k] || near_g.IsOut(q))
       continue;
     if (!pg)
       pg = projector(gf);
@@ -264,9 +268,13 @@ bool lies_on(const std::vector<std::pair<gp_Pnt, gp_Vec>>& ts, const TopoDS_Face
     if (pr.LowerDistance() > atol || nt.Magnitude() < 1e-300 || ng.Magnitude() < 1e-300 || !gp_Dir(nt).IsParallel(gp_Dir(ng), 0.02))
       return false;
     dev = std::max(dev, pr.LowerDistance());
-    ++over;
+    on.push_back(k);
   }
-  return over >= 3;
+  if (on.size() < 3)
+    return false;
+  for (const size_t k : on)
+    taken[k] = true;
+  return true;
 }
 
 // A curve to split a face by: its 3D curve and its curve in the face's parameters, over [f, l].
@@ -929,6 +937,7 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
         if (internal.Contains(t))
           continue;
         std::optional<std::vector<std::pair<gp_Pnt, gp_Vec>>> samples;
+        std::vector<bool>                                     taken;
         Bnd_Box fb;
         BRepBndLib::Add(t, fb);
         fb.Enlarge(5e-3 * size);
@@ -945,7 +954,7 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
           if (!samples)
             samples = lies_on_samples(t);
           double dev = 0;
-          if (lies_on(*samples, TopoDS::Face(pfaces(j)), pboxes[j], 1e-4 * size, dev, pj[j], cl[j]))
+          if (lies_on(*samples, TopoDS::Face(pfaces(j)), pboxes[j], 1e-4 * size, dev, pj[j], cl[j], taken))
             out.push_back({j, true, dev});
         }
       }
