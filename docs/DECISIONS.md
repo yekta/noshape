@@ -24,7 +24,8 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 
 - 11-16 Sketch fuzz (830 cases): live calling a line with redundant constraints fully defined (s8, s10, s11) is a live
   defect, not a target. Where free geometry settles after a drag (s1 …) is parked: listed as known, not counted, until a
-  general rule for live's drag model is found (no per-case rules).
+  general rule for live's drag model is found (no per-case rules). The same holds for where under-defined geometry
+  settles in a plain solve; a case live fails to solve at all is a live defect.
 
 ## Geometry and speed
 - 11-07 Every crates/brep or Boolean change passes bool's gate: every corpus + parity56 at 0 OCCT differences.
