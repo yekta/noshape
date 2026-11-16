@@ -145,7 +145,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
        Speed (lead 23:00: first lever before topology): 661df0163 offsets the tools on all threads under the
        caller's stop state (k::stop_state / with_stop_state): Boolean 2 736 -> 624 ms on vibe5 vs live 364 ms
        (live.jsonl per_feature_ms; 81 ms with plain tools). Rest = subtract vs offset-surface tools: OCCT build
-       340 ms + fast path declining after 90-110 ms (sent to bool 23:05); B-spline approx of flanks no help.
+       340 ms + fast path declining after 90-110 ms (sent to bool 23:00); B-spline approx of flanks no help.
+       Topology: the two thread holes differ only in 0.07-0.27 mm2 slivers near the vanished crest end; live's
+       face list asked in REQUESTS.md (23:03). 0c328e3b7: NaN distance = removed face (open shell, rim on it;
+       bool told). 4c463c807: Move face Offset tries offset_solid first (impeller Flansch (vorne) 481 -> 20 ms,
+       live 6; impeller still 27/48). PAIR p3 (vibe5 ~/agents/core-keep/p3pair.sh, p3res/done.txt; started
+       23:21): 4c463c807 vs 68371308e, both binaries from the synced core-trace src (uncommitted parity probe in
+       both). Landing core-offset: git checkout crates/ops/tests/parity.rs first (probe), diff --stat vs main.
        Needs a release pair (model-core) before landing; land 1+2+2b once bool's gate passes (bool gating since
        22:40), then 3 after its pair. Next: the +1 face / -1 edge / -2 vertex difference vs live.
     4. bool's Shell may call it for its inner walls (bool decides).
