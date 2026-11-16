@@ -17,6 +17,11 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-15 Agent API Hole: a size the caller gives is never refused or replaced; one that differs from the Standard's table
   is kept and marked overridden ("Parameters have been overridden. Check input."), as live.
 
+- 11-16 Drawing title block: each TITLE line is its own field, as live. A field's pick area covers its own text line and
+  the line above (live's offset area), so live's clicks land and a click on the text itself is never lost.
+- 11-16 Menu rows for left-out cloud features (Add comment, Share, …) are not drawn or reserved; a take step that differs
+  only by such a row is marked a known difference (excluded feature).
+
 ## Geometry and speed
 - 11-07 Every crates/brep or Boolean change passes bool's gate: every corpus + parity56 at 0 OCCT differences.
 - 11-14 A faster path lands only if results are identical end to end (topology and feature status in every suite
