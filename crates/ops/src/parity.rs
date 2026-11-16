@@ -7346,7 +7346,8 @@ pub struct AssemblyResult {
     pub bom_rows: usize,
     pub bom_matching: usize,
     /// Live's own failures ours doesn't copy (docs/DECISIONS.md 11-15), counted as live: a mate whose connectors live
-    /// leaves unresolved (`mate-messages.json` `redFields`) that ours solves.
+    /// leaves unresolved (`mate-messages.json` `redFields`) that ours solves; an instance of a part live can't
+    /// resolve (not counted).
     pub live_defects: Vec<String>,
     /// Differences, first one first.
     pub differences: Vec<String>,
@@ -8734,6 +8735,13 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     for o in &occurrences {
         let p = ids(&o["path"]);
         if p.len() > 1 && element_at("", &p).is_some_and(|e| levels.iter().any(|l| l.element == e)) {
+            continue;
+        }
+        // (An instance of a part live can't resolve, its partId empty, is red in live and nothing in ours: a live defect,
+        // not counted. asm-hand-drill-pinslot's "Gearbox Spring <3>".)
+        if let Some(i) = p.last().and_then(|id| levels.iter().flat_map(|l| l.instances.iter()).find(|i| i["id"] == id.as_str() && i["type"] == "Part" && i["partId"] == ""))
+        {
+            res.live_defects.push(format!("{}: live's instance names no part (partId \"\")", i["name"].as_str().unwrap_or("")));
             continue;
         }
         res.occurrences += 1;

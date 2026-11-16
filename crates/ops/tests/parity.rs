@@ -3054,6 +3054,12 @@ fn an_assembly_is_rebuilt_as_lives() {
     defect["liveMateMessages"] = json!({ "M1": { "name": "Revolute 1", "status": "ERROR", "message": "Mate cannot resolve mate connectors." } });
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-defect2.noshape"), &defect, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
     assert_eq!((r.mates_matching, r.live_defects.len()), (1, 1), "{r:?}");
+    // An instance of a part live can't resolve (its partId empty): a live defect, not an occurrence counted.
+    let mut lost = asm.clone();
+    lost["rootAssembly"]["instances"].as_array_mut().unwrap().push(json!({ "id": "IC", "name": "Part 1 <3>", "type": "Part", "partId": "", "elementId": "E1" }));
+    lost["rootAssembly"]["occurrences"].as_array_mut().unwrap().push(json!({ "path": ["IC"], "fixed": false, "transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }));
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-lost.noshape"), &lost, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert_eq!((r.occurrences_matching, r.occurrences, r.live_defects.len()), (2, 2, 1), "{r:?}");
     // A place the Revolute doesn't allow: freed there, ours solves it back
     // onto the mate, 10 mm.
     let mut off = asm.clone();
