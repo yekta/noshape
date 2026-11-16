@@ -351,15 +351,47 @@ pub fn cad_document_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunit
         } else {
             doc.add_layout(&layout).map_err(|e| e.to_string())?;
         }
-        let (w, h) = (g.width * k, g.height * k);
-        let mut vp = acadrust::entities::Viewport::new();
-        vp.id = 2;
-        vp.center = Vector3::new(w / 2.0, h / 2.0, 0.0);
-        (vp.width, vp.height, vp.view_height) = (w, h, h);
-        vp.view_target = Vector3::new((dx + g.width / 2.0) * k, h / 2.0, 0.0);
-        doc.add_entity_to_layout(EntityType::Viewport(Box::new(vp)), &layout).map_err(|e| e.to_string())?;
+        layout_viewports(&mut doc, &layout, i == 0, g.width * k, g.height * k, (dx + g.width / 2.0) * k)?;
     }
     Ok(doc)
+}
+
+/// A sheet's layout as live's (drw2-l-3sheets.dxf, the exchange suite's drawings): the layout's own viewport (id 1,
+/// 2 % larger than the sheet, looking at its centre) and one the sheet's size looking at its content in model space
+/// (`target_x`), the layout active ($TILEMODE 0). (A layout acadrust adds has its own viewport already; the renamed
+/// default one, `own`, gets it here.)
+fn layout_viewports(doc: &mut CadDocument, layout: &str, own: bool, w: f64, h: f64, target_x: f64) -> Result<(), String> {
+    if own {
+        let mut paper = acadrust::entities::Viewport::new();
+        paper.id = 1;
+        (paper.width, paper.height, paper.view_height) = (w * 1.02, h * 1.02, h * 1.02);
+        paper.view_center = Vector3::new(w / 2.0, h / 2.0, 0.0);
+        doc.add_entity_to_layout(EntityType::Viewport(Box::new(paper)), layout).map_err(|e| e.to_string())?;
+    }
+    let mut vp = acadrust::entities::Viewport::new();
+    vp.id = 2;
+    vp.center = Vector3::new(w / 2.0, h / 2.0, 0.0);
+    (vp.width, vp.height, vp.view_height) = (w, h, h);
+    vp.view_target = Vector3::new(target_x, h / 2.0, 0.0);
+    doc.add_entity_to_layout(EntityType::Viewport(Box::new(vp)), layout).map_err(|e| e.to_string())?;
+    doc.header.show_model_space = false;
+    Ok(())
+}
+
+/// A drawing's one sheet as a DXF file of `version`, as live writes it: in model space where it is, and (2000+) a
+/// layout named after the sheet with its viewports onto it (live's ANSI A drawings in the exchange suite: two
+/// VIEWPORTs, layout "Sheet1", the second looking at the content's centre).
+pub fn to_dxf_sheet(name: &str, g: &SheetGeometry, insunits: u8, version: DxfVersion) -> Result<Vec<u8>, String> {
+    let mut doc = cad_document(g, insunits, version)?;
+    if version > DxfVersion::AC1014 {
+        let k = units_per_mm(insunits);
+        let [lo, hi] = content_x_range(g);
+        rename_layout(&mut doc, "Layout1", name);
+        layout_viewports(&mut doc, name, true, g.width * k, g.height * k, ((lo + hi) / 2.0 + g.cad_dx) * k)?;
+    }
+    strip_layouts_r14(&mut doc, version);
+    live_line_types(&mut doc, version);
+    DxfWriter::new(&doc).write_to_vec().map(caret_breaks).map(|b| r14_style_names(b, version)).map_err(|e| e.to_string())
 }
 
 /// Rename a layout (its object and its ACAD_LAYOUT dictionary entry).
@@ -1721,6 +1753,9 @@ mod tests {
         for (t, e) in targets.iter().zip(want) {
             assert!((t - e).abs() < 1e-6, "{targets:?} vs {want:?}");
         }
+        // Each layout has its own viewport too (live: 6 VIEWPORTs for 3 sheets), the layouts active.
+        assert_eq!(lines.chunks(2).filter(|p| p.len() == 2 && p[0] == "0" && p[1] == "VIEWPORT").count(), 6);
+        assert!(!acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf.clone().into_bytes())).unwrap().read().unwrap().header.show_model_space);
         // Release 14: model space only (no layouts); Release 11-12 likewise.
         // Live drw2-k-dxfR14: no LAYOUT objects at all (not even Model / Layout1).
         let r14 = String::from_utf8(to_dxf_sheets(&sheets, 1, DxfVersion::AC1014).unwrap()).unwrap();
@@ -1732,6 +1767,40 @@ mod tests {
         assert!(back.entities().count() >= 3 * sheets[0].1.lines.len());
         let r12 = String::from_utf8(to_dxf_sheets(&sheets, 1, DxfVersion::AC1009).unwrap()).unwrap();
         assert!(r12.contains("AC1009") && !r12.contains("AcDbViewport"));
+    }
+
+    /// One sheet as live's ANSI A drawings (exchange suite, c2-extension-spring's live-drawing.dxf): the sheet where it
+    /// is in model space, a layout named after the sheet with two viewports, the second the sheet's size looking at
+    /// the content's centre, and the layout active.
+    #[test]
+    fn one_sheet_has_a_layout_with_viewports_like_live() {
+        let g = sample();
+        let dxf = String::from_utf8(to_dxf_sheet("Sheet1", &g, 1, DxfVersion::AC1032).unwrap()).unwrap();
+        let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf.clone().into_bytes())).unwrap().read().unwrap();
+        let layouts: Vec<String> = doc.objects.values().filter_map(|o| if let acadrust::objects::ObjectType::Layout(l) = o { Some(l.name.clone()) } else { None }).collect();
+        assert!(layouts.contains(&"Sheet1".to_string()) && !layouts.contains(&"Layout1".to_string()), "{layouts:?}");
+        assert!(!doc.header.show_model_space);
+        let lines: Vec<&str> = dxf.lines().map(str::trim).collect();
+        let (mut vps, mut in_vp, mut target) = (0, false, None);
+        for pair in lines.chunks(2).filter(|p| p.len() == 2) {
+            if pair == ["0", "VIEWPORT"] {
+                vps += 1;
+            }
+            if pair[0] == "100" {
+                in_vp = pair[1] == "AcDbViewport";
+            }
+            if in_vp && pair[0] == "17" && vps == 2 {
+                target = pair[1].parse::<f64>().ok();
+            }
+        }
+        assert_eq!(vps, 2);
+        let [lo, hi] = content_x_range(&g);
+        let want = ((lo + hi) / 2.0 + g.cad_dx) / 25.4;
+        assert!(target.is_some_and(|t| (t - want).abs() < 1e-9), "{target:?} vs {want}");
+        // The flat pattern's and Release 14's DXF keep model space only.
+        let viewports = |b: Vec<u8>| String::from_utf8(b).unwrap().lines().map(str::trim).collect::<Vec<_>>().chunks(2).filter(|p| p == &["0", "VIEWPORT"]).count();
+        assert_eq!(viewports(to_dxf_version(&g, 1, DxfVersion::AC1032).unwrap()), 0);
+        assert_eq!(viewports(to_dxf_sheet("Sheet1", &g, 1, DxfVersion::AC1014).unwrap()), 0);
     }
 
     #[test]

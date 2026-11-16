@@ -443,7 +443,7 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
         DrawingFormat::Dxf if pages.len() > 1 => vec![(String::new(), cad::to_dxf_sheets(&pages, insunits, cad_version.unwrap_or(CadVersion::AC1009))?)],
         DrawingFormat::Dwg if pages.len() > 1 => vec![(String::new(), cad::to_dwg_sheets(&pages, insunits, cad_version.unwrap_or(CAD_VERSIONS[3].1))?)],
         DrawingFormat::Dxf => match cad_version {
-            Some(v) => pages.iter().map(|(n, g, _)| cad::to_dxf_version(g, insunits, v).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
+            Some(v) => pages.iter().map(|(n, g, _)| cad::to_dxf_sheet(n, g, insunits, v).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
             // Release 11-12: the view geometry only (live).
             None => pages.iter().map(|(n, g, _)| (n.clone(), cad::to_dxf_r12(g, insunits).into_bytes())).collect(),
         },
