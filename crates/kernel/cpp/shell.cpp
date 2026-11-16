@@ -173,6 +173,8 @@
 
 extern "C" int noshape_should_break();
 
+#include "offset_quad.hpp"
+
 namespace noshape {
 
 // The way this thread's last shell was built ("regions", "offset", "slabs").
@@ -3205,35 +3207,14 @@ bool by_smooth(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
 // exact for these), tangent faces' edges moved along their normal. The wall as by_planes builds it, then checked:
 // valid, free of self-interference (OCCT's checker: the offsets crossing each other or the part), its
 // volume inside the part's.
+} // namespace
+
 namespace quad {
-struct Surf
-{
-  GeomAbs_SurfaceType       kind;
-  occ::handle<Geom_Surface> off;    // the offset (world coordinates)
-  gp_Ax3                    ax;     // the offset's frame (cylinders, cones)
-  double                    r = 0;  // the offset's radius (cylinder, sphere) / reference radius (cone) / minor radius (torus)
-  double                    ang = 0; // a cone's semi-angle / a torus's major radius
-  gp_XYZ                    n;      // planes: outward normal, n.x = c
-  double                    c = 0;
-  // Free-form faces (B-spline, ...): the face's own surface, its offset distance along the natural normal (0 for a
-  // removed face) and the foot point of the last point evaluated (the next projection starts there).
-  bool                                  general = false;
-  occ::handle<Geom_Surface>             base;
-  occ::handle<ShapeAnalysis_Surface>    sas;
-  double                                d = 0;
-  mutable gp_Pnt2d                      hint;
-  mutable bool                          has_hint = false;
-  // (The nearest foot over the whole surface, its search grid built once: solve3_damped.)
-  mutable std::shared_ptr<GeomAPI_ProjectPointOnSurf> nearest;
-  double                                              own[4] = {0, 0, 0, 0}; // the face's own parameters' box
-  // (Points over the face's own patch, made when first asked for: the start of a foot with no last one.)
-  mutable std::shared_ptr<const std::vector<std::pair<gp_XYZ, gp_Pnt2d>>> grid;
-};
 
 // The foot of P on `S` near uv (the distance's stationary point, a minimum): Newton on the gradient of |S(u, v) - P|²
 // with the surface's second derivatives, from uv; false where it doesn't converge or leaves the surface's bounds
 // (`past` set where it would step outward from a bound it stands on).
-bool newton_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& uv, bool* past = nullptr)
+bool newton_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& uv, bool* past)
 {
   double U0, U1, V0, V1;
   S->Bounds(U0, U1, V0, V1);
@@ -3554,13 +3535,6 @@ bool solve_small(int n, double A[4][4], double b[4], double x[4])
 // An offset edge between two faces' offsets, one of them free-form at least, marched in the faces' own parameters:
 // its 3D curve and its curves on the free-form offsets (none on the other), all at the original edge's parameters
 // from `s0` to `s1`. No projection: each point solved by Newton on both offsets in the plane across the edge there.
-struct OffsetRun
-{
-  occ::handle<Geom_BSplineCurve>   c3;
-  occ::handle<Geom2d_BSplineCurve> pc[2];
-  double                           s0 = 0, s1 = 0;
-  bool                             done = false;
-};
 
 bool march_offsets(const Surf* S[2], const TopoDS_Edge& e, const TopoDS_Face F[2], const gp_Pnt& A, const gp_Pnt& B, double size, double fit_tol, OffsetRun& out)
 {
@@ -3882,7 +3856,7 @@ bool march_offsets(const Surf* S[2], const TopoDS_Edge& e, const TopoDS_Face F[2
 // eval_grad by a free-form face's nearest foot, square below the point (elsewhere a projection held at the surface's
 // end gives a false sheet of zeros, and the last foot's can jump to another sheet of the offset): 1e300 where there's
 // none.
-double eval_grad_near(const Surf& q, const gp_XYZ& p, gp_XYZ& g, double scale, bool global = true)
+double eval_grad_near(const Surf& q, const gp_XYZ& p, gp_XYZ& g, double scale, bool global)
 {
   // (From the last foot by Newton's steps only: where they fail, the searches below (eval_grad's own from the last
   // foot is the local one below again, both falling back to a global one: a fifth of c2-rings-loft's Shell 1).)
@@ -4910,6 +4884,8 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
   return true;
 }
 } // namespace quad
+
+namespace {
 
 // `bs` continued past its start (or end) in u by `len` (measured along the surface), as its end span's polynomial runs
 // on (Parasolid's continuation: live 1799, a flaring vase's outward wall). The clamped end knot moves out by δ and the
