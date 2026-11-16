@@ -4,48 +4,45 @@ Area: crates/assembly, crates/assembly-ui, the assembly ops in crates/ops and th
 scenarios, the assembly parity suite (`parity_assemblies`) and the parity translator (crates/ops/src/parity.rs) for
 the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: docs/DECISIONS.md.
 
-## State (2026-11-16 04:47 UTC)
+## State (2026-11-16 06:05 UTC)
+
+### Landed today
+- 57de87f0 (06:01, 33 commits): connectors on patterned instances / Origin connectors in mates; Derived mirror;
+  refs.js regions read with the sketches file's area (assemblies and, via `add_sketch_refs`, models) and their area
+  checked in `query()` too; in-context cylinder faces from two circles (corexy 771e5f Belt); standard content Thread
+  length lists + defaults from live's q-stdthread (29 of 83 components; importer ~/agents/asm-keep/thr_import.py here,
+  rerun when live has all 83; `threadDefaults`; the capture's remembered-value artefact corrected from neighbours);
+  standard content found by any Thread length; refgeom.rs sketch-owned connectors; earlier 11-16 items.
 
 ### In flight
-- Worktree /root/projects/noshape-wt/asm: 31 commits on main a2952b32, none landed (HEAD 0653696f). Since the 03:30
-  rebase: 83e390d7 patterned-instance connector paths without the pattern id; 591fdd87 Origin connectors held in
-  mates; f87eaa46 Derived mirror; 0474310b region-area trace; df5f994b refs.js SKETCH_REGION lines read with the
-  sketches file's area (suspension 805e29 Knuckle); 0653696f **Thread length lists + defaults from live's q-stdthread
-  table** (29 of 83 components so far; importer ~/agents/asm-keep/thr_import.py on this machine, rerun when live has
-  all 83; `threadDefaults` where live's default isn't the first option; the capture's remembered-value artefact
-  (ISO 4762 x 100, ANSI 7/8-9 x 10) corrected from the same size's neighbours).
-- 60b13cba (`regions_by_sum`) stays **with the lead** (isaac-ball occurrences 113 -> 116/121, mates 97/103 -> 89/121).
-- Binaries (~/agents/asm-keep/bin on vibe5/6/7): s70 = f87eaa46, base30 = main a2952b32 (A/B base).
-- **vibe7 full run** (s70, full7.sh, started 04:27, log full/s70v7.log, "ASM-DONE" in full7.status). It read the live
-  tree (before the snapshot ruling); no asm-* file changed after 04:27; snapshot ~/tmp/asm/models-s70v7 kept for
-  A/Bs. full7.sh now snapshots at start. First 7 corpora all >= base29 (bjr-config mates 10/21 -> 31/31,
-  config-assembly 21 -> 25/25 occurrences, corexy 58 -> 60/62).
-- vibe6: q73 (base30 hand-drill trace, cfg/b30-asm-hand-drill-pinslot.log) then q74 (base30 and s70 on tvc-mount,
-  snapshot ~/tmp/asm/tvc-0444, cfg/t74-*-tvc.log). Status lines in cfg/q6.status.
-- Single corpora at s70/s72: keyboard 25/25, 4/4 mates, 16/16 BOM; suspension 27/30, 8/8, 21/21; hand-drill 40/40,
-  51/67 mates (base29 67/67: 4ece4b Sweep 2 "Select entities for sweep path.", Helix 2 "made no single curve"; refs
-  identical, so code: q73 compares); tvc-mount 41/43 (base29 43/43): sub ba3cc3 (avionics bay: Part 2, Rough PCB)
-  placed 138 mm off, BOM top row "Rough PCB" where live has "Motor Mount" (7bc9d8 JHD; part matching is right) - q74
-  tells code from data (41b795 / 7bc9d8 metadata.json are new since base29).
+- fffe186b (closest-sum region match) **out** of the land (lead 06:0x): lands only if a per-mate diff (main vs it,
+  same session, fresh data) loses no mate main has as live. Branch asm-with-fffe186b; binaries vibe6 bin/ops-s76
+  (57de87f0) and ops-s77 (+fffe186b); q79 runs both on snapshot ~/tmp/asm/isaac-0603 in one slot hold
+  (cfg/t79-s7[67]-isaac.log). Compare the not-as-live mate lists; land it (with the list to the lead) or fix lost mates.
+- 3c5c58 sliver (lead asked): ours has it. As a model (vibe6 mi/m3c, ops-s76) Extrude 1's text gives our 1487.0 +
+  0.141 mm² regions = live's 1487.1; base29's error was area matching on old data. Confirm in t79-s76 (no "3c5c58 ›
+  Extrude 1").
+- vibe7 full run s70 (with fffe186b, started 04:27; full/s70v7.log; 10 corpora by 05:49) -> cmp.py vs base29.sum.
+  So far all >= base29 except hand-drill mates 67 -> 51/67, which base30 (main) shows too (q73): main or data, not my
+  stack. q75 (base30 + 4ece4b's pre-11-16 refs) and q76 (base29 on today's data) tell which.
+- tvc-mount 41/43 (base29 43/43: sub ba3cc3 avionics bay 138 mm off; BOM "Rough PCB" for root Motor Mount): q74
+  (base30 vs s70 on snapshot tvc-0444) tells code from data.
+- corexy on s73 (Belt fix): q77. Region-area gate (30 model documents with refs.js region lines, s73 vs s75): q78
+  (cfg/g78-*.log); it's landed already: a document worse -> fix forward.
+- vibe6 slot order (first come): skasm models, q74, blend, q79, then q75-q78.
 
 ### Queued to land
-- Nothing. Land after the full run: rebase, land.sh.
-
-### Decision with the lead
-- 60b13cba (above).
+- Nothing.
 
 ### Next, in order
-1. Full run vs full/base29.sum (`cmp.py`, on vibe7 too); corpora that drop: A/B with base30 on a snapshot. Fix
-   hand-drill (q73) and tvc-mount (q74). Land; SCORE.md "Assemblies" row (last 11-08); rescore corexy's BOM.
-2. Thread lengths: rerun thr_import.py when live has all 83 components (live asked to clear the remembered value).
-3. keyboard: done at s63 (4/4 mates).
-4. welding-config 9bdeb5 Extrude 4 (Part 5 7/15/10 faces vs live 6/12/8): ours draws live's trimmed piece; cause open.
-5. refs.js SKETCH_REGION areas in query() for models too: needs a model gate (10 model documents have such lines:
-   c2-config-parts-*, c2-loft-guide-curves-*).
-6. robot-relations a4e419 (Fixed Side 2873 vs 61001 mm³) with live2's refs; Extrude 2's booleanScope names a body of
+1. q79 per-mate diff -> fffe186b decision (above). q78 gate: no model document worse.
+2. Full run vs base29 per corpus; SCORE.md "Assemblies" row (last 11-08); corexy BOM rescore.
+3. hand-drill 51/67 (q75 / q76) and tvc-mount (q74): owner or fix.
+4. Thread lengths: rerun thr_import.py when live has all 83 components.
+5. robot-relations a4e419 (Fixed Side 2873 vs 61001 mm³) with live2's refs; Extrude 2's booleanScope names a body of
    its Derived by the source's feature.
-7. config-assembly 20e932: Revolve 1 / 2 "do not intersect" (configured dimensions taken back by the translator).
-8. bjr-config (dx's 5d8bc1); pattern-std's 9 Fastened on AR-S1 / AR-S2 (36b90f parts off live's volume, also base29).
+6. bjr-config (dx's 5d8bc1); pattern-std's 9 Fastened on AR-S1 / AR-S2 (36b90f parts off live's volume, also base29).
+- Done by others: welding 9bdeb5 Extrude 4 (core: an Add's apart tool has same-surface faces merged, 11-16).
 
 ### Others' items touching mine
 - dx keeps infento (1dc32b, 74d3d6) and bjr-config (5d8bc1). dx: derivedFrom + ORIGINAL_DEPENDENCY (top-level EDGE)
