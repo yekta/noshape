@@ -4233,6 +4233,176 @@ static bool sphere_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::v
   return true;
 }
 
+// An extrusion against a cylinder across its direction or a sphere (c2-rings-loft's Extrude 5: a sketch's quadratic
+// splines extruded across the ring): each ruling p(u) + w d meets the quadric where A w^2 + B w + C = 0 (|(p + w d - O)
+// across the axis|^2 = r^2, a sphere's |p + w d - O|^2 = r^2), two branches, exact point by point; each run of a branch
+// within the extrusion's heights and the other face's box (ends bisected between samples, 32 a span of the profile),
+// cut where its angle passes the other surface's own seam (as OCCT's), interpolated. False where a run ends where the
+// branches meet (a ruling tangent to the quadric) or crosses a knot of the profile.
+static bool quadric_across(const Extruded& e, bool e_first, const TopoDS_Face& other, std::vector<IntTools_Curve>& out)
+{
+  occ::handle<Geom_Surface> s = BRep_Tool::Surface(other);
+  while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(s))
+    s = t->BasisSurface();
+  const occ::handle<Geom_CylindricalSurface> cy = occ::down_cast<Geom_CylindricalSurface>(s);
+  const occ::handle<Geom_SphericalSurface>   sp = occ::down_cast<Geom_SphericalSurface>(s);
+  if (cy.IsNull() && sp.IsNull())
+    return false;
+  const gp_Cylinder Cy = cy.IsNull() ? gp_Cylinder() : cy->Cylinder();
+  const gp_Sphere   Sp = sp.IsNull() ? gp_Sphere() : sp->Sphere();
+  const gp_XYZ      O  = cy.IsNull() ? Sp.Location().XYZ() : Cy.Location().XYZ();
+  const gp_XYZ      ax = cy.IsNull() ? gp_XYZ() : Cy.Axis().Direction().XYZ();
+  const double      r  = cy.IsNull() ? Sp.Radius() : Cy.Radius();
+  auto              across = [&](const gp_XYZ& v) { return cy.IsNull() ? v : v - ax * v.Dot(ax); };
+  const gp_XYZ      dd = across(e.d.XYZ());
+  const double      A  = dd.SquareModulus();
+  if (!(A > 1e-12) || !(r > 0))
+    return false;
+  double ou0 = 0, ou1 = 0, ov0 = 0, ov1 = 0;
+  BRepTools::UVBounds(other, ou0, ou1, ov0, ov1);
+  if (!(ou1 > ou0) || !(ov1 > ov0) || ou1 - ou0 > 2 * M_PI + 1e-9)
+    return false;
+  const double ve = 1e-9 * std::max({1.0, std::abs(e.v0), std::abs(e.v1)}), oe = 1e-9 * std::max({1.0, std::abs(ov0), std::abs(ov1)});
+  // (The other face's parameters of a point, its angle by whole turns into the face's box.)
+  auto params_on = [&](const gp_Pnt& x, double& pu, double& pv) {
+    if (cy.IsNull())
+      ElSLib::Parameters(Sp, x, pu, pv);
+    else
+      ElSLib::Parameters(Cy, x, pu, pv);
+    pu += 2 * M_PI * std::ceil((ou0 - 1e-9 - pu) / (2 * M_PI));
+  };
+  auto disc_at = [&](double u, double& B, double& C) {
+    const gp_XYZ m = across(e.c->Value(u).XYZ() - O);
+    B = 2 * m.Dot(dd), C = m.SquareModulus() - r * r;
+    return B * B - 4 * A * C;
+  };
+  auto branch = [&](int k, double u, double& w) {
+    double       B = 0, C = 0;
+    const double disc = disc_at(u, B, C);
+    if (!(disc >= 0))
+      return false;
+    w = (-B + k * std::sqrt(disc)) / (2 * A);
+    return true;
+  };
+  auto valid = [&](int k, double u) {
+    double w = 0;
+    if (!branch(k, u, w) || w < e.v0 - ve || w > e.v1 + ve)
+      return false;
+    double pu = 0, pv = 0;
+    params_on(e.c->Value(u).Translated(gp_Vec(e.d) * w), pu, pv);
+    return pu <= ou1 + 1e-9 && pv >= ov0 - oe && pv <= ov1 + oe;
+  };
+  // (Meeting: the discriminant all but nought against B^2 there.)
+  auto meeting = [&](double u) {
+    double       B = 0, C = 0;
+    const double disc = disc_at(u, B, C);
+    return std::abs(disc) <= 1e-6 * std::max(B * B, std::abs(4 * A * C)) + 1e-300;
+  };
+  int spans = 0;
+  for (int i = 1; i < e.c->NbKnots(); ++i)
+    if (e.c->Knot(i + 1) > e.u0 && e.c->Knot(i) < e.u1)
+      ++spans;
+  const int                   n = std::max(256, 32 * spans);
+  std::vector<IntTools_Curve> found;
+  for (const int k : {-1, 1})
+  {
+    std::vector<std::pair<double, double>> runs;
+    double                                 prev = e.u0, start = e.u0;
+    bool                                   in = valid(k, e.u0);
+    for (int j = 1; j <= n; ++j)
+    {
+      const double u = e.u0 + (e.u1 - e.u0) * j / n;
+      if (valid(k, u) == in)
+      {
+        prev = u;
+        continue;
+      }
+      double a = prev, b = u;
+      for (int it = 0; it < 100 && b - a > 1e-15 * (1 + std::abs(e.u0) + std::abs(e.u1)); ++it)
+      {
+        const double mid = 0.5 * (a + b);
+        (valid(k, mid) == in ? a : b) = mid;
+      }
+      const double cut = 0.5 * (a + b);
+      if (in)
+        runs.emplace_back(start, cut);
+      start = cut, in = !in, prev = u;
+    }
+    if (in)
+      runs.emplace_back(start, e.u1);
+    // (Each run cut where the angle round the other surface's axis passes a whole turn, its own seam, as OCCT cuts its
+    // curves whatever turn the face's angles start at: a curve each side.)
+    auto raw = [&](double u) {
+      double w = 0, pu = 0, pv = 0;
+      branch(k, u, w);
+      const gp_Pnt x = e.c->Value(u).Translated(gp_Vec(e.d) * w);
+      if (cy.IsNull())
+        ElSLib::Parameters(Sp, x, pu, pv);
+      else
+        ElSLib::Parameters(Cy, x, pu, pv);
+      return pu;
+    };
+    std::vector<std::pair<double, double>> pieces;
+    for (const auto& [a, b] : runs)
+    {
+      double    from = a;
+      const int m    = 64;
+      for (int j = 1; j <= m; ++j)
+      {
+        double       lo = a + (b - a) * (j - 1) / m, hi = a + (b - a) * j / m;
+        const double p0 = raw(lo);
+        if (std::abs(raw(hi) - p0) <= M_PI)
+          continue;
+        for (int it = 0; it < 100 && hi - lo > 1e-15 * (1 + std::abs(a) + std::abs(b)); ++it)
+        {
+          const double mid = 0.5 * (lo + hi);
+          (std::abs(raw(mid) - p0) <= M_PI ? lo : hi) = mid;
+        }
+        pieces.emplace_back(from, 0.5 * (lo + hi));
+        from = 0.5 * (lo + hi);
+      }
+      pieces.emplace_back(from, b);
+    }
+    for (const auto& [a, b] : pieces)
+    {
+      if (b - a <= 1e-12 * (e.u1 - e.u0))
+        continue;
+      if (meeting(a) || meeting(b))
+        return false;
+      // (Not across a knot of the profile: one interpolated curve follows its kinks too slowly.)
+      for (int i = 2; i < e.c->NbKnots(); ++i)
+        if (e.c->Knot(i) > a && e.c->Knot(i) < b)
+          return false;
+      // (Its angles on the turn its middle's are in the face's box: a piece from the seam starts on it.)
+      double turn_at = 0, mv = 0;
+      {
+        double w = 0;
+        branch(k, 0.5 * (a + b), w);
+        params_on(e.c->Value(0.5 * (a + b)).Translated(gp_Vec(e.d) * w), turn_at, mv);
+      }
+      auto at = [&, k, turn_at](double u, gp_Pnt& x, gp_Pnt2d& g, gp_Pnt2d& c) {
+        double w = 0;
+        if (!branch(k, u, w))
+          return false;
+        x         = e.c->Value(u).Translated(gp_Vec(e.d) * w);
+        double pu = 0, pv = 0;
+        params_on(x, pu, pv);
+        pu += 2 * M_PI * std::round((turn_at - pu) / (2 * M_PI));
+        const gp_Pnt2d on_e = e.uv(u, w), on_o(pu, pv);
+        g = e_first ? on_e : on_o;
+        c = e_first ? on_o : on_e;
+        return true;
+      };
+      IntTools_Curve ic;
+      if (!interpolated(at, a, b, 8, ic))
+        return false;
+      found.push_back(ic);
+    }
+  }
+  out.insert(out.end(), found.begin(), found.end());
+  return true;
+}
+
 // noshape's own sections of faces `fa` and `fb`, as OCCT's IntTools_Curve gives them (the curve, its curves on `fa` and
 // `fb` in their own parameters (the same parameter), its tolerance): an extrusion against a plane across its
 // direction (the profile moved there), a cylinder along it or another extrusion along it (rulings where the profiles
@@ -4339,7 +4509,7 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
     const gp_Cylinder C = cs->Cylinder();
     const double      up = C.Axis().Direction().Dot(e.d);
     if (std::abs(std::abs(up) - 1) > along)
-      return false;
+      return quadric_across(e, e_first, other, out);
     const gp_Vec   w(frame.Location(), C.Location());
     const gp_Pnt2d centre(w.Dot(gp_Vec(frame.XDirection())), w.Dot(gp_Vec(frame.YDirection())));
     std::vector<std::pair<double, double>> at;
@@ -4355,6 +4525,8 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
     }
     return true;
   }
+  if (!occ::down_cast<Geom_SphericalSurface>(so).IsNull())
+    return quadric_across(e, e_first, other, out);
   // Another extrusion along it: rulings where the profiles cross.
   if (xa && xb)
   {

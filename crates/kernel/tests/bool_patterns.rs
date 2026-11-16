@@ -2813,6 +2813,39 @@ fn a_rings_top_cut_along_its_axis_and_by_a_ball_as_occt() {
     }
 }
 
+/// A quadratic spline's prism (c2-rings-loft's Extrude 5: a sketch's splines extruded across the ring) cut by a big
+/// cylinder lying across its direction and by a big ball, each crossing its walls midway: each ruling meets the quadric
+/// at the roots of a quadratic, noshape's own sections exact point by point; the cut noshape's, valid and as OCCT's.
+#[test]
+fn a_spline_prism_cut_by_a_cylinder_across_it_and_by_a_ball_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let mm = 1e-3;
+    let p = |x: f64, y: f64| DVec3::new(x, y, 0.0) * mm;
+    let side = k::make_bspline(&[p(0.0, 0.0), p(10.0, 18.0), p(20.0, 0.0)], None, &[0.0, 1.0], &[3, 3], 2, false).unwrap();
+    let base = k::make_bspline(&[p(20.0, 0.0), p(0.0, 0.0)], None, &[0.0, 1.0], &[2, 2], 1, false).unwrap();
+    let face = k::make_face_from_wire(&k::make_wire(&[side, base]).unwrap(), true).unwrap();
+    let prism = k::extrude(&face, DVec3::Z * 10.0 * mm).unwrap().shape;
+    let tools = [
+        k::make_cylinder(&k::Plane::new(DVec3::new(-5.0, 4.0, -25.0) * mm, DVec3::X, DVec3::Y), 30.0 * mm, 30.0 * mm, TAU).unwrap(),
+        k::make_sphere(&z_frame(DVec3::new(10.0, 4.0, -26.0) * mm), 30.0 * mm, TAU).unwrap(),
+    ];
+    for tool in &tools {
+        k::set_rust_boolean_only(true);
+        let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&prism), std::slice::from_ref(tool), &k::BooleanOptions::default());
+        let why = k::last_rust_decline();
+        k::set_rust_boolean_only(false);
+        let ours = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})")).shape;
+        k::set_rust_boolean(Some(false));
+        let occt = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&prism), std::slice::from_ref(tool), &k::BooleanOptions::default()).expect("OCCT's").shape;
+        k::set_rust_boolean(None);
+        assert!(ours.is_valid() && occt.is_valid(), "valid");
+        assert_eq!(ours.count(k::ShapeType::Face), occt.count(k::ShapeType::Face), "faces");
+        assert_eq!(ours.count(k::ShapeType::Edge), occt.count(k::ShapeType::Edge), "edges");
+        let (v, w) = (ours.volume().unwrap(), occt.volume().unwrap());
+        assert!((v - w).abs() <= 1e-6 * w, "volume {v} vs OCCT's {w}");
+    }
+}
+
 /// A ring's top cut by a box whose side is drafted 3° off its axis (cf-snap-hook's drafted sides against its rounds):
 /// the sections loops round the tube, each found by its angle round the tube; noshape's Boolean, valid and as OCCT's.
 #[test]
