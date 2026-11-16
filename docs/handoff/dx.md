@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-15 23:46 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-16 00:05 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -9,19 +9,19 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land: tell asm.
 
 ## In flight
-- Configured suppression (live's `BTMSuppressionStateConfigured`), landing 23:46 (see Queued): a feature's own
+- Configured suppression (live's `BTMSuppressionStateConfigured`), queued 921e815d (checking since 23:49): a feature's own
   suppression is its value at the input's default (`suppressed_by_default`; live's `suppressed` is the feature's flag
   whatever the configuration), each configuration's set by config_configure "suppressed"; `choice_inputs` makes inputs
   from configured suppressions; a studio's default is the configuration live's lines were taken at
   (`__liveConfiguration`); the report counts such a step as suppressed (its add's status isn't compared, no "failed
   to run"). Checked: 5d8bc1 alone at Manufacture=false 107/124 (was 89 against the true lines), Kerf suppressed as
-  live (~/tmp/dx/st5d8.log, vibe7); c2-extension-spring A/B 12/12 both; asm no objection. Post-land check:
-  asm-bjr-config with build I on vibe5 (~/tmp/dx/bjr-asmI.log, waiting in the slot behind core and bool2). Corpora
+  live (~/tmp/dx/st5d8.log, vibe7); c2-extension-spring A/B 12/12 both; asm no objection. Post-land check
+  done: asm-bjr-config with build I 127/137 occurrences, 25/25 mates (was 126/137, 21/22), no Kerf difference. Corpora
   with configured suppressions: asm-bjr-config, asm-config-assembly, asm-xdev-subs (asm's full run), c2-extension-spring.
 - 5d8bc1's first difference stays Extrude 55 "vanity plate front" 369/955/601, live 365/943/593 (bool / core, parked).
 
 ## Queued to land
-- dx-bosdxf: configured suppression (parity.rs + tests/parity.rs report), land.sh 23:46. Landed today (latest first): c1af60ab exchange STL 15° over 500 faces + mesh hold; 104e822e assembly studios take their imported Feature Studios (Kerf compiles);
+- 921e815d configured suppression (checking since 23:49); c2-impeller-loft's split vertex in LIVE_SLIVER_EDGES (00:05). Landed today (latest first): c1af60ab exchange STL 15° over 500 faces + mesh hold; 104e822e assembly studios take their imported Feature Studios (Kerf compiles);
   bb0641ba region faces kept per sketch; a2212ff2 qContainsPoint box skip; 3073e7d8 draft tangent propagation;
   drawing exports 84 / 84 (revision table, note shoulder, splines, jog).
 
@@ -75,11 +75,14 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 
 ## Next, in order
 1. Configured suppression: landed? (`land.sh --status`); then asm-bjr-config's post-land check (vibe5).
-2. c2-impeller-loft: f15 is a known live difference (bool / DECISIONS 6ea431265): 24/48, next first difference
-   feature 24 "Extrude 4" (UP_TO_SURFACE the shell's OFFSET_FACE) Part 3 5/9/6, live 5/10/7: live's extra edge JcV is
-   0.047 mm at one corner only (Ic-JcE, y=+4.13 mm, z=-63.2 mm; none at the mirror corner). Checking our inputs
-   (vibe7 ~/tmp/dx/imp.log, save ~/tmp/dx/saveimp), then route (core) or a known-difference ruling; then its
-   translation notes (Sketch Bohrung Flansch dims, Fillet KsZB, Sketch Bohrung Ansaugflansch OFFSET).
+2. c2-impeller-loft 26/48 (build L, run on vibe7 by 00:05, ~/tmp/dx/impL.log): f24's split vertex is a known live
+   difference (lead, DECISIONS bb69638d4; LIVE_SLIVER_EDGES Part 3 from Extrude 4, Part 1 from Boolean 1, both OTHER,
+   1 edge / 1 vertex; live keeps it to f47). First difference f26 "Chamfer Stevenrohr Halterung" (OFFSET_ANGLE 3.5 mm
+   20°) Part 1 33/88/56, live 33/86/54: inputs match live's (3 edges, same lengths); live moves Part 3's top lines from
+   x=5 to x=1.5 (55.97 -> 59.47 mm), ours don't: blend (its Distance-1 face rule, after 1dc32b's Chamfer 3; it runs
+   f26 against that fix next); f27 Fillet 3 fails from it. Translation matches through f27. Save: vibe7
+   ~/tmp/dx/saveimp (copy before batches). Its translation notes (Sketch Bohrung Flansch dims, Fillet KsZB, Sketch
+   Bohrung Ansaugflansch OFFSET) come later in the doc.
 3. (5d8bc1: nothing of mine before Extrude 55.)
 4. 74d3d6 Sketch 15 = the general derivedFrom fix (below, in progress): its plane is Plane 1, whose three points
    (imprint INTERSECT VERTEX queries, no live geometry) all became one region (`region_from_query` read any query

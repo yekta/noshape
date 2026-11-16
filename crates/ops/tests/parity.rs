@@ -124,9 +124,10 @@ const LIVE_LINES_AS_OTHER: &[LiveLineAsOther] = &[
     LiveLineAsOther { doc: "c2-impeller-loft", from_feature: "Boolean Flansch+Gehäuse", part: "Part 1" },
 ];
 
-/// Edges live adds inside a near-tangent sliver, within Parasolid's tolerance (PARITY-SUITES.md "Edges inside a
-/// near-tangent sliver"; DECISIONS 11-15): from `from_feature` on, `part`'s live counts less `edges` OTHER edges and
-/// `vertices` vertices; everything else compared as usual.
+/// Edges live adds inside a near-tangent sliver, within Parasolid's tolerance, or by a vertex splitting one edge into two
+/// pieces of the same curve (PARITY-SUITES.md "Edges inside a near-tangent sliver"; DECISIONS 11-15, bb69638d4): from
+/// `from_feature` on, `part`'s live counts less `edges` OTHER edges and `vertices` vertices; everything else compared as
+/// usual.
 struct LiveSliverEdges {
     doc: &'static str,
     from_feature: &'static str,
@@ -140,6 +141,11 @@ const LIVE_SLIVER_EDGES: &[LiveSliverEdges] = &[
     // um apart; ours, the exact intersection, meets the shared top curve at x 63.86. Referenced by no later feature;
     // live keeps them to the end.
     LiveSliverEdges { doc: "c2-impeller-loft", from_feature: "Boolean Flansch+Gehäuse", part: "Part 1", edges: 3, vertices: 3 },
+    // dx 11-15: Extrude 4 (up to the shell's offset face) splits Part 3's +y cap edge by a vertex 0.047 mm from its x=0
+    // corner (JcV 0.0469 + Jcd 65.4207 mm = ours, one 65.4677 mm edge; the -y edge one piece in both; the volume within
+    // 5 ppm). Referenced by no later feature; Boolean 1 fuses Part 3 into Part 1 and live keeps it to the end (JdZ).
+    LiveSliverEdges { doc: "c2-impeller-loft", from_feature: "Extrude 4", part: "Part 3", edges: 1, vertices: 1 },
+    LiveSliverEdges { doc: "c2-impeller-loft", from_feature: "Boolean 1", part: "Part 1", edges: 1, vertices: 1 },
 ];
 
 /// Live's parts after a feature, `reached` the names of the features up to it: its bands widened where
@@ -249,6 +255,20 @@ fn live_sliver_edges_come_off_lives_counts_from_their_feature_on() {
     assert!(differences(&live("Part 1", &after), &[part("Part 1", 53, 36, 43)]).is_empty());
     assert!(!differences(&live("Part 1", &after[..1]), &[part("Part 1", 53, 36, 43)]).is_empty(), "not before the feature");
     assert!(!differences(&live("Part 2", &after), &[part("Part 2", 53, 36, 43)]).is_empty(), "only the named part");
+}
+
+/// c2-impeller-loft's Extrude 4: live's vertex splitting Part 3's +y cap edge comes off its counts there, and off Part
+/// 1's once Boolean 1 fuses Part 3 into it (with the 3 sliver edges before it).
+#[test]
+fn a_live_vertex_splitting_an_edge_comes_off_lives_counts() {
+    let kinds = |other: usize| Some([("line", 2), ("other", other)].into_iter().map(|(k, n)| (k.to_string(), n)).collect());
+    let part = |name: &str, edges: u64, vertices: u64, other: usize| PartState { name: name.into(), faces: 5, edges, vertices, edge_types: kinds(other), ..Default::default() };
+    let reached = ["Boolean Flansch+Gehäuse", "Extrude 4"];
+    let live = |name: &str, reached: &[&str], e, v, o| allow_live_readings("c2-impeller-loft", reached, vec![part(name, e, v, o)]);
+    assert!(differences(&live("Part 3", &reached, 10, 7, 7), &[part("Part 3", 9, 6, 6)]).is_empty());
+    assert!(!differences(&live("Part 3", &reached[..1], 10, 7, 7), &[part("Part 3", 9, 6, 6)]).is_empty(), "not before Extrude 4");
+    let fused = ["Boolean Flansch+Gehäuse", "Extrude 4", "Boolean 1"];
+    assert!(differences(&live("Part 1", &fused, 83, 54, 50), &[part("Part 1", 79, 50, 46)]).is_empty(), "3 slivers + the split");
 }
 
 /// c2-impeller-loft's scatter: the larger of live's two self-disagreements (7.86e-5, JKG's), both ways, every part.

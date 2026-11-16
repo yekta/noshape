@@ -86,7 +86,10 @@ at ~0.01 rad along a 45 degree line that meets their shared top curve at x 63.86
 um apart. Ours is the exact intersection; no later feature references those edges or their vertices (Fillet
 Ansaugflansch zum Gehaeuse fillets the z = -4 junction edges next to them; live keeps all three to the end). So from a
 feature named in `LIVE_SLIVER_EDGES` (crates/ops/tests/parity.rs) on, that part's live counts are taken less those
-edges (as OTHER) and their vertices; everything else is compared as usual.
+edges (as OTHER) and their vertices; everything else is compared as usual. The same table takes a vertex live keeps
+splitting one edge into two pieces of the same curve, the faces alike, the volume within its band and nothing
+referencing it (lead 11-15, DECISIONS bb69638d4): c2-impeller-loft's Extrude 4 splits Part 3's +y cap edge 0.047 mm
+from its corner (0.0469 + 65.4207 mm = ours, one 65.4677 mm edge), kept to the end in Part 1 after Boolean 1.
 
 ## 2. Interaction suite: the same steps in live and in noshape
 
