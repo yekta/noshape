@@ -547,6 +547,45 @@ fn offset_surface_joins_faces_sharing_edges() {
     }
 }
 
+/// Offset sheets of one part's faces touching only at a corner are one surface (live c2-sm-hem-plus Offset surface 1:
+/// a 100 mm box made sheet metal, 7 faces of its hems picked at live's points, 0.1 mm: one sheet 7 / 24 / 18).
+#[test]
+fn offset_surface_keeps_sheets_touching_at_a_corner_as_one() {
+    let brep = include_str!("data/hem-box-sheet-metal.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let faces = b.shape.faces();
+    let picks: Vec<Reference> = [[40.25, -37.597, 2.929], [76.643, -64.233, -0.06], [-60.152, -76.243, 55.0], [-63.404, -76.604, 100.0], [-29.896, -40.185, 2.929], [44.795, -32.18, -4.142], [-70.114, -77.115, 55.0]]
+        .iter()
+        .map(|p| {
+            let v = noshape_kernel::make_vertex(DVec3::from_array(*p) * 1e-3).unwrap();
+            let fi = (0..faces.len()).min_by(|&x, &y| {
+                let d = |i: usize| noshape_kernel::distance(&faces[i], &v).unwrap().distance;
+                d(x).total_cmp(&d(y))
+            });
+            Reference::Face((*b.faces[fi.unwrap()]).clone())
+        })
+        .collect();
+    let f = s.add("offsetSurface", move |p| {
+        p.set("surfacesAndFaces", ParamValue::Query(picks));
+        p.set("offset", expr("0.1 mm"));
+    });
+    let r = s.ok();
+    let sheets: Vec<(usize, usize, usize)> = r
+        .context
+        .bodies
+        .iter()
+        .filter(|b| b.id.feature == f && b.kind == BodyKind::Surface)
+        .map(|b| {
+            let shown = b.shape.shown_topology().unwrap();
+            (b.shape.faces().len(), shown.edges.iter().filter(|e| **e).count(), shown.vertices.iter().filter(|v| **v).count())
+        })
+        .collect();
+    assert_eq!(sheets, [(7, 24, 18)]);
+}
+
 #[test]
 fn fill_closed_sketch_loop() {
     let mut s = Studio::new();

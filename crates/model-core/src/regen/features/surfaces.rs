@@ -3,10 +3,11 @@
 
 use super::bshared::{chain_wires, curve_edges, face_name, names_from_sources, new_face_names, order_chain, sample_chain, surface_result};
 use crate::display::BodyKind;
-use crate::naming::Name;
+use crate::naming::{Name, ShapeNames};
 use crate::reference::{BodyId, Reference, Role, Source, TopoName};
 use crate::regen::context::Body;
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, NamedShape, err, names_for};
+use std::collections::BTreeMap;
 use glam::{DQuat, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
@@ -27,6 +28,7 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
     let root = connected_groups(ev, &picked);
     let mut group_of: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
     let mut groups: Vec<Vec<(Shape, Name)>> = Vec::new();
+    let mut group_body: Vec<Option<usize>> = Vec::new();
     for r in refs {
         let one = std::slice::from_ref(r);
         match r {
@@ -40,6 +42,7 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
                         None => {
                             group_of.insert(root[k], groups.len());
                             groups.push(vec![face]);
+                            group_body.push(Some(bi));
                         }
                     }
                 }
@@ -48,18 +51,20 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
                 for bi in ev.resolve_bodies(one) {
                     let b = &ev.ctx.bodies[bi];
                     groups.push(b.shape.faces().into_iter().enumerate().map(|(fi, f)| (f, b.faces[fi].clone())).collect());
+                    group_body.push(None);
                 }
             }
             Reference::SketchRegion { .. } => {
                 for p in ev.profiles(one)? {
                     let name = face_name(ev, Role::Profile(p.key));
                     groups.push(vec![(p.shape, name)]);
+                    group_body.push(None);
                 }
             }
             _ => {}
         }
     }
-    groups.retain(|g| !g.is_empty());
+    let (groups, group_body): (Vec<_>, Vec<_>) = groups.into_iter().zip(group_body).filter(|(g, _)| !g.is_empty()).unzip();
     if groups.is_empty() {
         return crate::regen::eval::err_at(&["surfacesAndFaces"], "Select faces, surfaces, or sketch regions to offset from.");
     }
@@ -109,7 +114,56 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
         };
         tools.push(NamedShape::new(shape, names));
     }
+    let tools = join_touching(ev, tools, &group_body)?;
     ev.apply_operation(tools, "NEW", None, BodyKind::Surface)
+}
+
+/// Offset sheets of one part's faces that touch at a corner are one surface, their vertices there shared (live
+/// c2-sm-hem-plus Offset surface 1: a hem's three pieces meeting at two corners, one sheet 7 / 24 / 18).
+fn join_touching(ev: &EvalCtx, tools: Vec<NamedShape>, body: &[Option<usize>]) -> FResult<Vec<NamedShape>> {
+    if tools.len() < 2 {
+        return Ok(tools);
+    }
+    let points: Vec<Vec<DVec3>> = tools.iter().map(|t| t.shape.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect()).collect();
+    let mut root: Vec<usize> = (0..tools.len()).collect();
+    fn find(root: &mut [usize], mut i: usize) -> usize {
+        while root[i] != i {
+            root[i] = root[root[i]];
+            i = root[i];
+        }
+        i
+    }
+    for i in 0..tools.len() {
+        for j in (i + 1)..tools.len() {
+            if body[i].is_some() && body[i] == body[j] && points[i].iter().any(|p| points[j].iter().any(|q| (*p - *q).length() < 1e-7)) {
+                let (a, b) = (find(&mut root, i), find(&mut root, j));
+                root[a.max(b)] = a.min(b);
+            }
+        }
+    }
+    let mut clusters: BTreeMap<usize, Vec<NamedShape>> = BTreeMap::new();
+    for (i, t) in tools.into_iter().enumerate() {
+        clusters.entry(find(&mut root, i)).or_default().push(t);
+    }
+    let mut out = Vec::new();
+    for (_, mut group) in clusters {
+        if group.len() == 1 {
+            out.extend(group);
+            continue;
+        }
+        let first = group.remove(0);
+        let rest: Vec<Shape> = group.iter().map(|t| t.shape.clone()).collect();
+        let Ok(res) = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&first.shape), &rest, &k::BooleanOptions::default()) else {
+            out.push(first);
+            out.extend(group);
+            continue;
+        };
+        let mut inputs: Vec<&ShapeNames> = vec![&first.names];
+        inputs.extend(group.iter().map(|t| &t.names));
+        let names = ev.name_result(&inputs, &res.history, &res.shape, &BTreeMap::new(), None);
+        out.push(NamedShape { names: names_for(&res.shape, names), shape: res.shape });
+    }
+    Ok(out)
 }
 
 /// For each picked (body, face): the first picked face it is joined to through picked faces of its body sharing edges.
