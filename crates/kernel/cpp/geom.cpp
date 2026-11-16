@@ -787,6 +787,27 @@ static GeomAPI_ProjectPointOnSurf* face_projector(const TopoDS_Face& f)
   return kept.front().pr.get();
 }
 
+// A surface point's parameters classified in face `f`, moved by whole periods into the face's parameter box first
+// (a cylinder's projection gives u in [0, 2π); a face across its seam lies at, say, [3π/2, 2π + π/6]:
+// c2-sm-tablet-stand's rolled wall, matched to no piece of the sheet metal definition).
+static TopAbs_State classify_periodic(const TopoDS_Face& f, const occ::handle<Geom_Surface>& surf, double u, double v, double tol)
+{
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  auto into = [](double x, double lo, double hi, bool periodic, double period) {
+    if (!periodic || period <= 0)
+      return x;
+    for (int i = 0; i < 4 && x < lo - 1e-9; ++i)
+      x += period;
+    for (int i = 0; i < 4 && x > hi + 1e-9 && x - period >= lo - 1e-9; ++i)
+      x -= period;
+    return x;
+  };
+  u = into(u, u0, u1, surf->IsUPeriodic(), surf->IsUPeriodic() ? surf->UPeriod() : 0);
+  v = into(v, v0, v1, surf->IsVPeriodic(), surf->IsVPeriodic() ? surf->VPeriod() : 0);
+  return BRepClass_FaceClassifier(f, gp_Pnt2d(u, v), tol).State();
+}
+
 bool face_contains_point(const OcShape& fs, P3 p, double tol)
 {
   const TopoDS_Face&        f    = as_face(fs.shape, "shape");
@@ -801,8 +822,8 @@ bool face_contains_point(const OcShape& fs, P3 p, double tol)
       return false;
     double u, v;
     pr.LowerDistanceParameters(u, v);
-    BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), std::max(tol, BRep_Tool::Tolerance(f)));
-    return fc.State() == TopAbs_IN || fc.State() == TopAbs_ON;
+    const TopAbs_State st = classify_periodic(f, surf, u, v, std::max(tol, BRep_Tool::Tolerance(f)));
+    return st == TopAbs_IN || st == TopAbs_ON;
   }
   // Free-form: the surface's feet within the face's parameter box (a point on the face has one at 0), each classified.
   {
@@ -844,8 +865,8 @@ ProjPoint face_project_point(const OcShape& fs, P3 p)
       {
         double u, v;
         pr.LowerDistanceParameters(u, v);
-        BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), BRep_Tool::Tolerance(f));
-        if (fc.State() == TopAbs_IN || fc.State() == TopAbs_ON)
+        const TopAbs_State st = classify_periodic(f, surf, u, v, BRep_Tool::Tolerance(f));
+        if (st == TopAbs_IN || st == TopAbs_ON)
         {
           ProjPoint r{};
           r.point    = from_pnt(pr.NearestPoint());

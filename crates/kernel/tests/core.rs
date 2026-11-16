@@ -1261,3 +1261,20 @@ fn exit_now_ends_the_process_while_a_thread_is_in_the_kernel() {
     assert_eq!(out.status.code(), Some(7), "{}", String::from_utf8_lossy(&out.stderr));
     assert!(String::from_utf8_lossy(&out.stdout).contains("child about to exit"));
 }
+
+/// A point on a cylinder face across the surface's seam (an arc from -30° to 30° extruded: its u runs past 2π) is on
+/// the face whichever side of the seam (the projection's u lies in [0, 2π): c2-sm-tablet-stand's rolled wall matched no
+/// piece of its sheet metal definition).
+#[test]
+fn a_cylinder_face_across_its_seam_contains_its_points() {
+    let arc = make_arc(DVec3::ZERO, DVec3::Z, DVec3::X, 0.01, -std::f64::consts::FRAC_PI_6, std::f64::consts::FRAC_PI_6).unwrap();
+    let face = extrude(&arc, DVec3::new(0.0, 0.0, 0.01)).unwrap().shape.faces().remove(0);
+    for deg in [-20.0f64, -10.0, 10.0, 20.0] {
+        let a = deg.to_radians();
+        let p = DVec3::new(0.01 * a.cos(), 0.01 * a.sin(), 0.005);
+        assert!(face.contains_point(p, 1e-7).unwrap(), "{deg}° off the face");
+        assert!(face.project_point(p).unwrap().distance < 1e-9, "{deg}°");
+    }
+    let outside = DVec3::new(-0.01, 0.0, 0.005);
+    assert!(!face.contains_point(outside, 1e-7).unwrap());
+}
