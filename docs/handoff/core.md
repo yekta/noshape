@@ -1,9 +1,14 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 01:32 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 02:43 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
+- **Queued (core-bis, core-pldraft):** an open curved parting line's ruled sheet runs a tenth past the curve's ends
+  (ending on the end faces it split nothing and the whole slab was cut), and the final unify keeps edges off the drafted
+  faces (KeepShape): c2-parting-line-draft-parting-line Draft 1 258266 -> 367243.7 mm³ (live 367268.5), 8/18; doc 5 ->
+  9/17, next Extrude 2 (surface 12113.30 vs 12115.66 mm²). T1 features::a_wavy_parting_line_across_a_block_drafts_
+  both_sides_as_live. c2-steak-mold-draft unchanged.
 - **Queued 9c9f2481** (core-bis): shown_topology: an edge INTERNAL in every face holding it (bounds none: a Boolean's
   piece of a hole's old seam; rust_boolean.cpp and OCCT's builder both leave such edges) is no edge, the arc it split
   one (asm's a2e4a2 Extrude 5: 32/74/42 -> live's 32/72/40). T1 seam::an_edge_inside_a_face_is_not_an_edge (fixture
@@ -45,6 +50,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
+0. Asked of me 11-16 (in this order): psui's failed Shell marks its input body as the error entity (ev.error_shapes;
+   live feel/feedback-gaps.json item 5, /root/psui-scratch/fb5/shell-fail.json); dx's c2-sm-hem-plus feature 3 Offset
+   surface 1 on 7 sheet-metal faces gives 3 bodies, live one sewn 7/24/18 sheet 10216.46 mm² (vibe5 ~/tmp/dx/mhem/
+   hem-src, NOSHAPE_PARITY_MODELS=$HOME/tmp/dx/mhem); blend's c2-sm-side-cuts-tab feature 7 Corner break 1 FILLET R21
+   on a 42 mm edge fails before any blend op (sheetmetal::corner_break refuses radius = half the edge?; vibe5
+   ~/tmp/dx/savesct); dx's lofts: c2-loft-paths-guides f4 (face -> sketch point, TANGENT_TO_PROFILE: a point profile
+   takes its sketch's plane) and c2-loft-guide-curves-wave-washer f6 ("Loft path with more than two profiles is not
+   supported yet"; vibe5 ~/tmp/dx/savelf). Impeller Move face 1 / Delete face 2 speed waits on blend's chamfer at feature
+   26 (ours drifts to 37 faces vs live 59 by Extrude impellerraum).
 1. Knife's dish vertex: asked live in REQUESTS.md (11-16 01:32) for the face's surface type and its edges / vertices;
    then retry core-pole-v2 (Parked above) on what live says.
 2. qa's speed list (P0), what is mine: c2-valve-config Extrude 3 `prism_until.split` 131 ms (a logo up to one revolved
