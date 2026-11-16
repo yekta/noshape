@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-16 04:03 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-16 04:58 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -25,9 +25,15 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   chamfer cut's end edge (OCCT's B-spline, 1.7e-3 rad / 6 um off the side line over 3.5 mm) joins the line as one line
   on its extension (join_edges_at's max_turn: the far vertex moved onto it, the pcurve kept in the line's period; the
   unify's concatenation threw "Courbes non jointives"). 33/88/56 -> live's 33/86/54; kernel T1
-  blend::a_straight_section_turned_off_a_line_joins_it_on_the_lines_extension. Pair blend-base (main) vs blend3 +
-  g++-13 queued on vibe5 (unit blend-imp-pair, suite-imp-*, flag imp-pair.done; behind bool2's gate). Core and dx
+  blend::a_straight_section_turned_off_a_line_joins_it_on_the_lines_extension. Pair blend-base (main) vs blend3 on
+  vibe7 (suite-imp-*, flag imp-pair.done). Core and dx
   told. join_edges_at is in boolean.cpp but only blends call it (bool's gate not needed: no Boolean path changes).
+- qa P0 (11-16): impeller "Fillet Stevenrohr zum Halter" fails in 4.76 s on v0.4.53 (0.9 ms on v0.4.48, where the
+  chamfer before it failed). fillet_by_groups integrated the input's volume (2.2 s) before its first group failed in
+  5 ms: commit 29c1841df (blend3, on 12b25c47e) takes it lazily, same results; the v0.4.53 input's replay 2.60 s ->
+  346 ms. With 12b25c47e the fillet's input differs (282 ms). Both commits in the vibe7 pair (unit blend-seq-v7,
+  bin/seq-v7.sh: impeller pair, then scale-first's new suite and assemblies); g++-13 OK for 12b25c47e (rerun for
+  29c1841df before landing). qa told.
 - side-cuts-tab Corner break 1: core's (queued by core 03:2x).
 
 ## Open questions / waiting
