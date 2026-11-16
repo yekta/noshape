@@ -8311,6 +8311,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 }
                 active = choices;
             }
+            // On the part's own origin (live's PART_ORIGIN: no entity; asm-corexy's 11 Fastened on its imported parts).
+            if inference == "PART_ORIGIN" {
+                entities.insert(key.clone(), "origin".into());
+                continue;
+            }
             let found = match t.resolve(q) {
                 Ok(ids) if !ids.is_empty() => Ok(ids[0].clone()),
                 Ok(_) => Err("its entity resolved to nothing".to_string()),

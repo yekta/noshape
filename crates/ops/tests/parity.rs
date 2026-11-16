@@ -3088,6 +3088,13 @@ fn an_assembly_is_rebuilt_as_lives() {
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-origin.noshape"), &on_origin, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
     assert!(!r.untranslated.iter().any(|u| u.contains("connectors not translated")), "{r:?}");
     assert_eq!(r.mates, 1, "{r:?}");
+    // A connector on a part's own origin (live's PART_ORIGIN, no entity: asm-corexy's Fastened on imported parts):
+    // translated, its frame the part's.
+    let mut part_origin = asm.clone();
+    part_origin["features"]["features"][0]["mateConnectors"][0]["parameters"][0]["queries"][0] = json!({ "btType": "BTMInferenceQueryWithOccurrence-1083", "inferenceType": "PART_ORIGIN", "path": ["IA"], "entityQuery": "", "deterministicIds": [""] });
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-part-origin.noshape"), &part_origin, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert!(!r.untranslated.iter().any(|u| u.contains("connectors not translated") || u.contains("MA")), "{r:?}");
+    assert_eq!(r.mates, 1, "{r:?}");
     // A place the Revolute doesn't allow: freed there, ours solves it back
     // onto the mate, 10 mm.
     let mut off = asm.clone();
