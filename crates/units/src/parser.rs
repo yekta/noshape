@@ -396,6 +396,10 @@ impl Parser {
                 self.bump();
                 Ok(Expr::Constant(Constant::Pi))
             }
+            Some(Tok::Str(text)) => {
+                self.bump();
+                Ok(Expr::Str(text))
+            }
             Some(Tok::Ident(name)) => {
                 self.bump();
                 if self.peek() == Some(&Tok::LParen) {

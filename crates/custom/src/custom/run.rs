@@ -623,6 +623,7 @@ fn fs_source(e: &noshape_units::Expr) -> Option<String> {
         Expr::Constant(Constant::True) => "true".into(),
         Expr::Constant(Constant::False) => "false".into(),
         Expr::Var(name) => format!("getVariable(context, \"{name}\")"),
+        Expr::Str(t) => format!("\"{}\"", t.replace('\\', "\\\\").replace('"', "\\\"")),
         Expr::Unary(UnaryOp::Neg, x) => format!("(-{})", fs_source(x)?),
         Expr::Unary(UnaryOp::Not, x) => format!("(!{})", fs_source(x)?),
         Expr::Binary(op, a, b) => {

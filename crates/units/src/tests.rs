@@ -607,3 +607,28 @@ fn inch_lengths_are_featurescripts() {
     assert_eq!(ev("1 in").value, 0.025_400_000_000_000_002);
     assert_eq!(ev("2 ft").value, 2.0 * (12.0 * fs_inch));
 }
+
+/// A string variable compared with a string literal (c2-config-parts-nuts' Extrude 1 depth,
+/// `#name2 == "Nyloc" ? #hl : #hn`); `"` after a value is still inches.
+#[test]
+fn strings_compare_and_inches_stay() {
+    struct S;
+    impl VariableScope for S {
+        fn get(&self, name: &str) -> Option<Quantity> {
+            scope().get(name).copied()
+        }
+        fn get_text(&self, name: &str) -> Option<String> {
+            (name == "name2").then(|| "Nyloc".to_string())
+        }
+    }
+    let ev = |s: &str| evaluate(s, &S).unwrap_or_else(|e| panic!("{s}: {e}"));
+    assert_eq!(ev("#name2 == \"Nyloc\" ? #w : #h"), Quantity::mm(40.0));
+    assert_eq!(ev("#name2 != \"Nyloc\" ? #w : #h"), Quantity::mm(10.0));
+    assert_eq!(ev("\"a \\\"b\\\"\" == \"a \\\"b\\\"\" ? 1 : 0"), Quantity::unitless(1.0));
+    assert!(matches!(evaluate("#name2", &S), Err(ExprError::Eval(EvalError::Text(t))) if t == "Nyloc"));
+    assert!(matches!(evaluate("\"x\" + 1 mm", &S), Err(ExprError::Eval(EvalError::Text(_)))));
+    assert_mm("5\"", 127.0);
+    assert_mm("(2 + 3)\"", 127.0);
+    let e = parse("#name2 == \"a \\\"b\\\"\"").unwrap();
+    assert_eq!(parse(&e.to_string()), Ok(e));
+}

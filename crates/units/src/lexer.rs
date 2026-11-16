@@ -9,6 +9,8 @@ pub(crate) enum Tok {
     Number(f64),
     Ident(String),
     Var(String),
+    /// `"text"` (a FeatureScript string, where a value is expected: a configured part name compared, `#n == "M4"`)
+    Str(String),
     Plus,
     Minus,
     Star,
@@ -49,6 +51,7 @@ impl Tok {
             Tok::Number(n) => n.to_string(),
             Tok::Ident(s) => s.clone(),
             Tok::Var(s) => format!("#{s}"),
+            Tok::Str(s) => format!("{s:?}"),
             Tok::Plus => "+".into(),
             Tok::Minus => "-".into(),
             Tok::Star => "*".into(),
@@ -87,6 +90,20 @@ fn is_ident_start(c: char) -> bool {
 
 fn is_ident_continue(c: char) -> bool {
     (c.is_alphanumeric() || c == '_') && !matches!(c, '²' | '³' | 'π')
+}
+
+/// The string literal opening at `src[i]` (`"`): its text (`\"` and `\\` escapes) and the byte after its closing quote.
+fn string_at(src: &str, i: usize) -> Option<(String, usize)> {
+    let mut text = String::new();
+    let mut chars = src[i + 1..].char_indices();
+    while let Some((k, c)) = chars.next() {
+        match c {
+            '"' => return Some((text, i + 1 + k + 1)),
+            '\\' => text.push(chars.next()?.1),
+            c => text.push(c),
+        }
+    }
+    None
 }
 
 pub(crate) fn tokenize(src: &str) -> Result<Vec<Spanned>, ParseError> {
@@ -136,6 +153,22 @@ pub(crate) fn tokenize(src: &str) -> Result<Vec<Spanned>, ParseError> {
             }
             out.push((Tok::Number(v), i..j));
             i = j;
+            continue;
+        }
+        // A `"` where a value is expected opens a string (elsewhere it is inches: `5"`).
+        if c == '"'
+            && out.last().is_none_or(|(t, _): &Spanned| {
+                matches!(
+                    t,
+                    Tok::Plus | Tok::Minus | Tok::Star | Tok::Slash | Tok::Percent | Tok::Caret | Tok::LParen | Tok::Comma
+                        | Tok::Question | Tok::Colon | Tok::Lt | Tok::Le | Tok::Gt | Tok::Ge | Tok::EqEq | Tok::Ne
+                        | Tok::AndAnd | Tok::OrOr | Tok::Bang
+                )
+            })
+            && let Some((text, end)) = string_at(src, i)
+        {
+            out.push((Tok::Str(text), i..end));
+            i = end;
             continue;
         }
         if c == '#' {

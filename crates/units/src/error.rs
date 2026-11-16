@@ -107,6 +107,8 @@ pub enum EvalError {
     Domain { func: &'static str },
     #[error("result is not a finite number")]
     NotFinite,
+    #[error("{0:?} is a string, not a value")]
+    Text(String),
 }
 
 /// Either a parse or an evaluation error.

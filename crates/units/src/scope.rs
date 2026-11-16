@@ -9,6 +9,10 @@ use crate::Quantity;
 /// Something that can resolve `#name` references (name given without `#`).
 pub trait VariableScope {
     fn get(&self, name: &str) -> Option<Quantity>;
+    /// A variable whose value is a string (a Variable of type Any set to `"M4"`), compared in `#size == "M4"`.
+    fn get_text(&self, _name: &str) -> Option<String> {
+        None
+    }
 }
 
 /// A scope with no variables.
@@ -49,6 +53,9 @@ impl<T: VariableScope + ?Sized> VariableScope for &T {
     fn get(&self, name: &str) -> Option<Quantity> {
         (**self).get(name)
     }
+    fn get_text(&self, name: &str) -> Option<String> {
+        (**self).get_text(name)
+    }
 }
 
 /// Adapts a closure into a scope.
@@ -69,5 +76,8 @@ pub struct LayeredScope<'a> {
 impl VariableScope for LayeredScope<'_> {
     fn get(&self, name: &str) -> Option<Quantity> {
         self.inner.get(name).or_else(|| self.outer.get(name))
+    }
+    fn get_text(&self, name: &str) -> Option<String> {
+        self.inner.get_text(name).or_else(|| self.outer.get_text(name))
     }
 }

@@ -224,6 +224,8 @@ pub enum Expr {
     Constant(Constant),
     /// `#name`
     Var(String),
+    /// `"text"`: only compared (`#size == "M4"`), never a value.
+    Str(String),
     Unary(UnaryOp, Box<Expr>),
     Binary(BinaryOp, Box<Expr>, Box<Expr>),
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -251,7 +253,7 @@ impl Expr {
                     out.push(name.clone());
                 }
             }
-            Expr::Number(_) | Expr::Unit(_) | Expr::Constant(_) => {}
+            Expr::Number(_) | Expr::Unit(_) | Expr::Constant(_) | Expr::Str(_) => {}
             Expr::WithUnit { expr, .. } | Expr::Unary(_, expr) => expr.collect_vars(out),
             Expr::Binary(_, a, b) => {
                 a.collect_vars(out);
@@ -282,9 +284,11 @@ impl Expr {
             }
             Expr::Unit(u) => Ok(Quantity::with_unit(1.0, *u)),
             Expr::Constant(c) => Ok(c.value()),
-            Expr::Var(name) => scope
-                .get(name)
-                .ok_or_else(|| EvalError::UndefinedVariable(name.clone())),
+            Expr::Var(name) => scope.get(name).ok_or_else(|| match scope.get_text(name) {
+                Some(t) => EvalError::Text(t),
+                None => EvalError::UndefinedVariable(name.clone()),
+            }),
+            Expr::Str(t) => Err(EvalError::Text(t.clone())),
             Expr::Unary(UnaryOp::Neg, e) => Ok(-e.eval(scope)?),
             Expr::Unary(UnaryOp::Not, e) => Ok(bool_q(!e.eval(scope)?.is_truthy())),
             Expr::Binary(op, a, b) => eval_binary(*op, a, b, scope),
@@ -308,7 +312,7 @@ impl Expr {
     pub(crate) fn precedence(&self) -> u8 {
         match self {
             Expr::Number(v) if v.is_sign_negative() => PREC_UNARY,
-            Expr::Number(_) | Expr::Unit(_) | Expr::Constant(_) | Expr::Var(_) => PREC_ATOM,
+            Expr::Number(_) | Expr::Unit(_) | Expr::Constant(_) | Expr::Var(_) | Expr::Str(_) => PREC_ATOM,
             Expr::WithUnit { .. } | Expr::Call(..) => PREC_ATOM,
             Expr::Unary(..) => PREC_UNARY,
             Expr::Binary(op, ..) => op.precedence(),
@@ -341,6 +345,17 @@ fn eval_binary(
                 return Ok(bool_q(true));
             }
             return Ok(bool_q(b.eval(scope)?.is_truthy()));
+        }
+        // Two strings (a literal or a string variable each side) compare as text.
+        BinaryOp::Eq | BinaryOp::Ne => {
+            let text = |e: &Expr| match e {
+                Expr::Str(t) => Some(t.clone()),
+                Expr::Var(n) if scope.get(n).is_none() => scope.get_text(n),
+                _ => None,
+            };
+            if let (Some(l), Some(r)) = (text(a), text(b)) {
+                return Ok(bool_q((l == r) == (op == BinaryOp::Eq)));
+            }
         }
         _ => {}
     }
@@ -595,6 +610,7 @@ impl fmt::Display for Expr {
             Expr::Unit(u) => write!(f, "{u}"),
             Expr::Constant(c) => f.write_str(c.name()),
             Expr::Var(n) => write!(f, "#{n}"),
+            Expr::Str(t) => write!(f, "\"{}\"", t.replace('\\', "\\\\").replace('"', "\\\"")),
             Expr::Unary(op, e) => {
                 f.write_str(match op {
                     UnaryOp::Neg => "-",

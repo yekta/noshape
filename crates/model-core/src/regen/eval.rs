@@ -85,11 +85,15 @@ pub fn bounds_violation(v: f64, spec: &crate::params::NumSpec, units: &UnitPrefs
     None
 }
 
-struct ContextScope<'a>(&'a BTreeMap<String, Quantity>);
+/// The variables (and, inside the Part Studio, its string variables: `#size == "M4"`).
+struct ContextScope<'a>(&'a BTreeMap<String, Quantity>, Option<&'a BTreeMap<String, noshape_featurescript::Value>>);
 
 impl VariableScope for ContextScope<'_> {
     fn get(&self, name: &str) -> Option<Quantity> {
         self.0.get(name).copied()
+    }
+    fn get_text(&self, name: &str) -> Option<String> {
+        self.1?.get(name)?.as_str().map(|s| s.to_string())
     }
 }
 
@@ -453,8 +457,8 @@ impl<'a> EvalCtx<'a> {
             Some(ParamValue::Expr(e)) => e,
             _ => return err(format!("Missing value for {id}")),
         };
-        let scope_inner = ContextScope(&self.ctx.variables);
-        let scope_outer = ContextScope(self.outer_vars);
+        let scope_inner = ContextScope(&self.ctx.variables, Some(&self.ctx.fs_variables));
+        let scope_outer = ContextScope(self.outer_vars, None);
         let scope = LayeredScope { inner: &scope_inner, outer: &scope_outer };
         let expr = e.parse().map_err(|x| FeatureError::new(format!("{}: {x}", e.text)))?;
         let q = noshape_units::evaluate_expr_as(&expr, kind.dim(), self.units, &scope).map_err(|x| match x {
@@ -515,16 +519,16 @@ impl<'a> EvalCtx<'a> {
 
     /// Evaluate an arbitrary expression text, its dimension as written.
     pub fn eval_any(&self, text: &str) -> FResult<Quantity> {
-        let scope_inner = ContextScope(&self.ctx.variables);
-        let scope_outer = ContextScope(self.outer_vars);
+        let scope_inner = ContextScope(&self.ctx.variables, Some(&self.ctx.fs_variables));
+        let scope_outer = ContextScope(self.outer_vars, None);
         let scope = LayeredScope { inner: &scope_inner, outer: &scope_outer };
         noshape_units::evaluate(text, &scope).map_err(|x| FeatureError::new(format!("{text}: {x}")))
     }
 
     /// Evaluate an arbitrary expression text with a dimension.
     pub fn eval_text(&self, text: &str, dim: Dim) -> FResult<Quantity> {
-        let scope_inner = ContextScope(&self.ctx.variables);
-        let scope_outer = ContextScope(self.outer_vars);
+        let scope_inner = ContextScope(&self.ctx.variables, Some(&self.ctx.fs_variables));
+        let scope_outer = ContextScope(self.outer_vars, None);
         let scope = LayeredScope { inner: &scope_inner, outer: &scope_outer };
         noshape_units::evaluate_as(text, dim, self.units, &scope).map_err(|x| FeatureError::new(format!("{text}: {x}")))
     }
