@@ -87,6 +87,10 @@ def coverage(area, scenarios_dir):
     hits = {}
     for item in items:
         hits[item["id"]] = [n for n, steps in scenarios if any(chain_in(c, steps) for c in item.get("via") or [])]
+        # A "manual capture" item (lead 11-16: what live's recorder can't read, a cursor, a held key, a browser toast):
+        # covered by our GPUI test matching live2's written capture, not by a scenario.
+        if (item.get("manual") or {}).get("test"):
+            hits[item["id"]].append("manual:" + item["manual"]["test"])
     return universe, items, hits
 
 
@@ -119,7 +123,8 @@ def main():
     if args.uncovered:
         for item in sorted(items, key=lambda i: (i.get("freq", 3), i["category"], i["id"])):
             if not hits[item["id"]]:
-                print(f"  freq {item.get('freq', 3)}  {item['category']:15} {item['name']}  ({item['where']})")
+                pending = " [manual capture pending]" if item.get("manual") else ""
+                print(f"  freq {item.get('freq', 3)}  {item['category']:15} {item['name']}  ({item['where']}){pending}")
 
 
 if __name__ == "__main__":

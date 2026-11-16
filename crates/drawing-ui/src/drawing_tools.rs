@@ -152,7 +152,14 @@ impl DrawingEditor {
             self.selection.clear();
             return;
         }
-        if self.zoom_window.take().is_some() || self.rotate_to_edge.take().is_some() || self.align_views.take().is_some() || self.sheet_props.take().is_some() || self.shortcut_toolbar.take().is_some() || self.measure.take().is_some() || self.align_centermark.take().is_some() || self.align_auto_centermark.take().is_some() || self.painter.take().is_some() || self.cancel_inspection(cx) || self.cancel_hatch(cx) {
+        // Align centermark: Esc ends it with nothing left selected (live2 drw-centermark-align s8).
+        if self.align_centermark.take().is_some() || self.align_auto_centermark.take().is_some() {
+            self.selection.clear();
+            self.status = None;
+            self.redraw(cx);
+            return;
+        }
+        if self.zoom_window.take().is_some() || self.rotate_to_edge.take().is_some() || self.align_views.take().is_some() || self.sheet_props.take().is_some() || self.shortcut_toolbar.take().is_some() || self.measure.take().is_some() || self.painter.take().is_some() || self.cancel_inspection(cx) || self.cancel_hatch(cx) {
             self.status = None;
             cx.notify();
             return;

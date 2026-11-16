@@ -921,7 +921,11 @@
    "where": "editor",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:34759"
+   "source": "behaviours.md:34759",
+   "manual": {
+    "capture": "live2 manual capture (REQUESTS 2026-11-16 08:47, live/feel/manual-4)",
+    "test": null
+   }
   },
   {
    "id": "fs-ed-ctrl-click-std",

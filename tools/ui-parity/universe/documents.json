@@ -3296,7 +3296,11 @@
    "where": "☰ › Print…",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1494"
+   "source": "behaviours.md:1494",
+   "manual": {
+    "capture": "live2 manual capture (REQUESTS 2026-11-16 08:47, live/feel/manual-4)",
+    "test": null
+   }
   },
   {
    "id": "units-workspace-units-length-unit",
@@ -6637,7 +6641,11 @@
    "where": "Ctrl held + Space card",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:20869"
+   "source": "behaviours.md:20869",
+   "manual": {
+    "capture": "live2 manual capture (REQUESTS 2026-11-16 08:47, live/feel/manual-4)",
+    "test": null
+   }
   },
   {
    "id": "shortcut-alt-t-tab-manager",
@@ -6826,7 +6834,11 @@
    "where": "in a document",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:7366"
+   "source": "behaviours.md:7366",
+   "manual": {
+    "capture": "live2 manual capture (REQUESTS 2026-11-16 08:47, live/feel/manual-4)",
+    "test": null
+   }
   },
   {
    "id": "shortcut-undo-redo-toolbar-buttons-tooltip-fixed-enabled-state-only",

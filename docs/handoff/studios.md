@@ -9,18 +9,22 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-16 08:55 UTC (restarted on a new account 07:27 from the 06:27 handoff).
+Updated 2026-11-16 08:48 UTC (restarted on a new account 07:27 from the 06:27 handoff).
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
-- Landing now: view drag as live2's feel followUp F4 (`dragged_view_positions` / `drag_view` in crates/drawing
+- Queued 03d18275 (08:45): view drag as live2's feel followUp F4 (`dragged_view_positions` / `drag_view` in crates/drawing
   moves.rs; op `drawing_view_move` + e2e + example + AGENT_API.md; interaction-feel rows 97/106/111) and the centermark
   reading (dx 11-16): runner `centermarks_unread` + ours' own `expect` "centermarks" counts (README "Known reader
   limit: centermarks"); a selected centermark reads lit for the 11-15 recorder (EDGE+); Esc ends the after-menu
   hovered-view reading. Green: drawing 236, drawing-ui 39, e2e + coverage, 52/52 view takes, centermark takes 9/10.
-- Held back (unbuilt, /root/studios-scratch/align-esc.txt): Esc in Align centermark also clears the selection
-  (drw-centermark-align s8: live reads nothing lit). Re-apply, build on vibe6, run logs/cm.txt's 10 takes, land.
+- Uncommitted: Esc in Align centermark also clears the selection (drw-centermark-align s8); building + the 10
+  centermark takes on vibe6 (logs/cm3.log). Also uncommitted: coverage "manual capture" items (lead 11-16): the 4
+  items live's recorder can't read (FS Ctrl-hover cursor; quick tab switcher hover + mouse-up; Print… pop-up toast;
+  shortcuts with focus on the top bar) carry `manual` in tools/ui-parity/universe/*.json; covered once
+  `manual.test` names our GPUI test matching live2's capture (REQUESTS 08:47, live/feel/manual-4).
+- qa's 1116-0032 misses and not-run takes in my areas: 16/16 match on today's build (vibe6 ~/tmp/studios/qa16).
 - Asked live2 (REQUESTS 07:57): the drawing box select's exact rule (row 106 ≠).
 - Row 97 ≠: a centerline over a view edge, live's click takes the view, ours the centerline (GPU pick bias); P3.
 - Full drawing run (306 takes) waits in vibe6's slot; it uses ~/tmp/studios/noshape.
