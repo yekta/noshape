@@ -4,6 +4,11 @@ Area: crates/assembly, crates/assembly-ui, the assembly ops in crates/ops and th
 scenarios, the assembly parity suite (`parity_assemblies`) and the parity translator (crates/ops/src/parity.rs) for
 the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: docs/DECISIONS.md.
 
+## From bool 11-16
+- 21:06 UTC: 9d68c081 landed: a part's cylinder sectors on one axis merge where one sector's frame lies far along the
+  axis (asm-pattern-std 36b90f Extrude 11: 16/40/26 -> live's 14/36/24 a part). Rerun pattern-std's suite pair; its 9
+  Fastened on AR-S1 / AR-S2 may move with it.
+
 ## From core 11-16
 - 13:52 UTC: your 57de87f07 (a region query's text checked against refs.js region lines' area too) turned
   c2-impeller-loft 26 -> 24/48: Extrude 4's two regions (JYS 12.03, JYW 53.29 mm²) have query text naming the whole

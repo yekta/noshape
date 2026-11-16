@@ -4,28 +4,27 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-16 19:30 UTC.
+Updated 11-16 21:58 UTC.
 
 ## In flight
-- P0 c2-config-parts-screws memory: what grows is OCCT's UnifySameDomain wire loop (IntUnifyFaces /
-  ReconstructMissedSeam) in Revolve 9's unify of the thread Sweep 1 left invalid; not the Rust Boolean (every Boolean of
-  the doc goes OCCT's way, all results invalid: the sweep's band is 0.45 um off its cylinder). The memory budget (half
-  the machine, 4-16 GB) tripped at ~14.5 GB growth wherever it was next polled, hence dx's 14.8 GB "in sections_ahead".
-  Fix: bool2's OCCT patch 0032 (wire loop bounded by work, break hook polled; op_unify keeps its input) + 0031, both
-  cherry-picked on main in bool-hat, branch bool-screws-mem (4694fe512, f752ba60f) + T1
-  bool_patterns::a_wire_that_never_closes_leaves_the_unify_its_input (tests/data/unify/thread-wire-never-closes.brep,
-  Revolve 9's dumped input, 40 KB). Dump replay: 0032 10 faces kept in 106 ms; stock OCCT past 2 GB in seconds.
-  Checks clean 11-16: corpora + parity56 0 new differences, suite (screws out) 138 docs identical, hats/dock 12/12
-  SAME. Lead installed the libs on every host 11-16 ~19:2x; landing with bool2's 0031 + 0032 patch files.
-- Sweep 1 accuracy (the invalid thread): not a Boolean fix; with the lead (sweep owner).
-- Gates on vibe5: 31dbff530 (cylinder merge, asm-pattern-std Extrude 11 -> live 14/36/24) waiting for the slot; then
-  e5c584e35 again (unit bool-after-cyl-gate: its 12:13 run timed out behind bool2's stuck slot). Each: hats/dock
-  (udoc-ab.sh <commit>) then land; tell asm (handoff note) when 31dbff530 lands.
-- core's tablet-stand Extrude 1: not a Boolean; handed back to core 11-16 18:0x (std never builds the bend's tool:
-  no thickened-bend common in performSheetMetalBoolean; the cut 7b08434d is right for its plane-face tools).
-- core's parting-line Rib (7 s): not a Boolean regression (ribs now build); core dropped Rib's redundant merge fuse
-  (bb61a968).
-- Landed 11-16: a8b8f1851 (Shell filter), a2952b329 (extrusion x quadric sections); dx's 979de111a (gate reviewed).
+- Landed 11-16: 765b2281 (screws P0: OCCT 0031 + 0032, T1 a_wire_that_never_closes_leaves_the_unify_its_input; libs
+  installed on every host), 8e3067d8 (shell.cpp -Wexceptions), 9d68c081 (cylinder sectors merge; asm told in its
+  handoff), a8b8f1851, a2952b329.
+- Gating on vibe5 (unit bool-gate-apart, then bool-gate-core-offset): a53d2240d (branch bool-apart in bool-hat):
+  hulls_apart, free-form faces shown apart by their control points' hulls (closest pair first, 400 halvings, margin
+  2 x tolerances), knife Chamfer 1's cut Mac 60.6-63.6 -> 48.3 ms, same results; T1
+  faces_apart_across_a_slanted_gap_cut_as_occt. Then core's 148d531e6 (core-offset step 1: quad declarations into
+  offset_quad.hpp, no code change): tell core when clean.
+- cp2 e5c584e35 (branch bool-cp2-ahead, bool-split): gate replays clean, suite rerun without screws identical
+  (138 docs); hats/dock running (unit bool-udoc-e5c584e35), then land.
+- Knife: plane x B-spline pairs ~2 ms each in its Booleans (Mac release), not the lever; Fillet 2's 15-18 ms ones are
+  in blend's run-on split (OCCT's splitter). Touching B-spline pairs stay OCCT's (DECISIONS 11-15; lead 11-16: a
+  pre-check may skip only what it proves apart).
+- core's offset_solid (one free-form offset on quad, Shell's inner walls later): API asks sent 11-16 (sign, NaN =
+  removed faces, OpResult history, break hook, tolerance per face, per-worker surface copies); switch by_quadrics's
+  walls only when the Shell corpora are identical.
+- Not mine, handed back 11-16: tablet-stand Extrude 1 (std builds no bend tool), parting-line Rib (core bb61a968).
+- Next: qa's speed list (knife Split 4, then bottle Shell), profiled on the Mac (release, quiet, median of 3).
 
 ## Parked (branches / diffs, not landing as they are)
 - Plane x B-spline marcher + our own least-squares fit (branch bool-free-sections-wip: 71efdd87e, f6c77c748, ...):
