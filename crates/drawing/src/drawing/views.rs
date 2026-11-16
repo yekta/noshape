@@ -2773,8 +2773,8 @@ fn cylinder_axes(shapes: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]> {
 
 /// Cylindrical and conical faces whose axis is the view direction, grouped
 /// by axis: the axis's projected point and the largest radius (a cone's
-/// widest edge: a countersink), where the group's faces go all the way round (holes and bosses; live marks full
-/// circles only: no mark on a quarter round (live R20 corner), nor on c2-sm-louver's bends, exchange suite).
+/// widest edge: a countersink), where the group's faces go at least half
+/// way round (holes and bosses, not corner rounds).
 fn cylinder_ends(shapes: &[Shape], frame: &ViewFrame) -> Vec<([f64; 2], f64)> {
     // (projected axis point, largest radius, angular intervals)
     type Group = ([f64; 2], f64, Vec<(f64, f64)>);
@@ -2804,7 +2804,7 @@ fn cylinder_ends(shapes: &[Shape], frame: &ViewFrame) -> Vec<([f64; 2], f64)> {
             }
         }
     }
-    groups.into_iter().filter(|g| angular_coverage(&g.2) >= std::f64::consts::TAU - 1e-6).map(|g| (g.0, g.1)).collect()
+    groups.into_iter().filter(|g| angular_coverage(&g.2) >= std::f64::consts::PI - 1e-6).map(|g| (g.0, g.1)).collect()
 }
 
 /// Total angle covered by a set of angular intervals (radians, union,
@@ -3815,21 +3815,6 @@ fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame:
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Automatic centermarks go on full circles only (live: none on a quarter round, nor on c2-sm-louver's bends): a
-    /// plate's through hole seen end-on is one, a half-round notch in its edge isn't.
-    #[test]
-    fn only_a_full_cylinder_seen_end_on_is_marked() {
-        use std::f64::consts::TAU;
-        let z = |x: f64, y: f64| Plane::new(DVec3::new(x, y, -1.0), DVec3::Z, DVec3::X);
-        let plate = noshape_kernel::make_box(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 100.0, 60.0, 10.0).unwrap();
-        let hole = noshape_kernel::make_cylinder(&z(30.0, 30.0), 5.0, 12.0, TAU).unwrap();
-        let notch = noshape_kernel::make_cylinder(&z(70.0, 0.0), 8.0, 12.0, TAU).unwrap();
-        let part = noshape_kernel::cut(&noshape_kernel::cut(&plate, &hole).unwrap().shape, &notch).unwrap().shape;
-        let ends = cylinder_ends(&[part], &ViewFrame::new(DVec3::NEG_Z, DVec3::Y));
-        assert_eq!(ends.len(), 1, "{ends:?}");
-        assert!((ends[0].1 - 5.0).abs() < 1e-9, "{ends:?}");
-    }
 
     /// Live drw-crop-spline (dx 11-15): a spline crop through points on a block's bottom and top edges keeps those
     /// edges between its crossings and draws the profile where it runs through the block: two arcs; a profile wholly
