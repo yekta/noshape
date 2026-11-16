@@ -2834,7 +2834,9 @@ impl<'a> Translator<'a> {
                 packed_side = packed_edge_side(&tree);
                 // A body told apart by region faces is the body's (c2-hunting-knife's Extrude 8 booleanScope: Loft 1's
                 // SWEPT_BODY).
-                if packed_entity_type(&tree).as_deref() == Some("BODY") {
+                // An edge or vertex is never a region, though the faces it is derived from name a sketch's imprint
+                // (asm-infento-subs 74d3d6's Plane 1: three imprint INTERSECT vertices).
+                if matches!(packed_entity_type(&tree).as_deref(), Some("BODY" | "EDGE" | "VERTEX")) {
                     return Ok(None);
                 }
                 // A thickened or extruded face named by its cap or side (a sheet metal wall's `CAP_FACE` of
@@ -8561,6 +8563,19 @@ mod tests {
         let body = noshape_model::custom::host::packed::unpack("&56c$eJylVNuSojAQ/ZnsoxThpj5iiBovwCSsii8WStAoigLe5usHtGZG3anaXX2hQp8+p0/Snfxq6OBtz9NzX2dQAaHIgvVUzPdBLpKNFeSBCfvKn4h33nIGVeBQ0iK22ZtY2MW2hW3kszpIUjEXmyDOTA3JfZ3KpQiFrAY8x3V6TssvlnyTi1zwzDRMpcxiUxDyVBx42EyT9SUSXJPOZbVGAPDXD9MAtlq4oCxElifpNVgDiGLTI45dAMmWpxerJGwogIQmZBBKBmiudn2X5yv5tDz77+8T5ShS7mwL17vyGC5CIWBd7KH2BNse8XzGQbbi+WxxNUBCNpOgVIEG0Jaj36PTQTM80pNpldZonQZ0inhRrRJJVSDW21RscspZFZC+S4ntWfC6X2pcvl8kGlJOIwplVoF6qS5BAG9gqBU41Cms/jtfeZGvv8g3XuRXf+TTKqoXE9A0Eb7H7gUvXYBlo2TQHJNohdBgnuq78NyZKJ+1ZmBw9LtuO4qtAUYPjlT1Oy22o85+z8j6Dau3Q001qn+O8OOW7hzEqNaeoaFcPyanbH7roBXLMlfYqtlcth6HSAkKdg385ejU+rea5gk3X+ITG2Xz25TwPzQOo90xMczTkBbgcxqF7alUB+PETbYL0pGnXRSJOOa5mc6elzSkigrBiL6Nxj3bdTZr/JxWRVUvBku1HxWKoCo/RK9j13As/769xaNybBkrnunRQPi5kCdKsu0lUXntA8CG2PUmJesD5FWYjw==").unwrap();
         assert_eq!(super::packed_entity_type(&body).as_deref(), Some("BODY"));
         assert_eq!(super::packed_entity_type(&fan).as_deref(), Some("FACE"));
+    }
+
+    /// A vertex where two imprinted curves meet names the faces it is derived from, a sketch's imprint among them; it is
+    /// a vertex, never a region (asm-infento-subs 74d3d6's Plane 1: its three points became one region, Sketch 15 on it
+    /// had no plane).
+    #[test]
+    fn an_imprint_vertex_is_not_a_region() {
+        let q = r#"query=qCompressed(1.0,"&424$eJxlU113ojAQ/TPZlz1HDuFTHvkIll0RG9JW94UDJGtjFWxErf++I/TDtg/hhGTm3pk7N78CG90ehDqnTl4hLpQ8Ch6rduuboZ7aVL98c2wgLvfltpKrQ9nJtonKrvRxavy8YeedyLGJMppMkpk/LSIyJ7OIzMJl7qFWyZVsys3exz1wiUTTye58yQpKRD5+cguRaEKgpke571o1HI5RSInPkmwGF+1OqJ4y4YGBEu7jHGPNQfHskFrcHzMzt9ZTq3BPUolsB+zPl0Z7II7yv4SFNwWZsYQtc4H2T6KrH4cCEp5zbYzW9d39Ur/h/olXeiqValWYUzt0objYDwl16Zh6YT0QeyhuTsHxdKRmuWKxGRduuyMvnTpwQWvoNH8gc1b0iTbF1lX2CLuaCwBV225E2bS7YNhAmoXCbL78HAXFvpEa1KAmtQYNAcwZsGhFa8qpyGuktqpaeX/s26fGg3C9D3WoTrEABHxBADFZNs+m2WQJ234MUsBcfGNg840+WO8bdtA9oYwsrovmmovkdqdk00GhHkpmjNCchCwa4auiDAduXZSkcwoRwPsfMXpHrnxxJQfFEE2x++WovBxVgxH1a48SvhJvTurVcd560z+UMayvQxoJFG82genFD+fFWj5580J/F00rNRula9ZMpjU7/IsfOPimvhgM77tSdVA6+JosoMuvvv5s9p2m1MCIPVn2supUGj039YKseeE+wmCDloPSvwfHvbFXqG6VKDayEYXxDXBk6trIhOJNA5apjQwTQZohfvjoKhDe2o6KY7s5ikHR97Hb8DQjGJQNjxG0jPB3mXoUXMGqexr3FWBYQac=",id);"#;
+        let tree = noshape_model::custom::host::packed::unpack(q.split('"').nth(1).unwrap()).unwrap();
+        assert_eq!(super::packed_entity_type(&tree).as_deref(), Some("VERTEX"));
+        let mut ctx = Ctx::new();
+        let mut t = Translator::new(&mut ctx, &json!({ "features": [] }), HashMap::new()).unwrap();
+        assert_eq!(t.region_from_query(q), Ok(None));
     }
 
     /// A packed region query's piece of a curve: asm-hand-drill-pinslot's Triple Connector halves a circle by two lines

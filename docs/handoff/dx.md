@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-16 00:05 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-16 00:12 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -84,18 +84,17 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
    ~/tmp/dx/saveimp (copy before batches). Its translation notes (Sketch Bohrung Flansch dims, Fillet KsZB, Sketch
    Bohrung Ansaugflansch OFFSET) come later in the doc.
 3. (5d8bc1: nothing of mine before Extrude 55.)
-4. 74d3d6 Sketch 15 = the general derivedFrom fix (below, in progress): its plane is Plane 1, whose three points
+4. 74d3d6 Sketch 15 = the general derivedFrom fix (below): its plane is Plane 1, whose three points
    (imprint INTERSECT VERTEX queries, no live geometry) all became one region (`region_from_query` read any query
    naming SKETCH_ENTITY + FACE + TOPOLOGY + IMPRINT as a region), so Sketch 15 had no plane (the 49.98 mm move).
 5. 1dc32b: Fillet 3 once blend lands Chamfer 3.
-6. The general derivedFrom / ORIGINAL_DEPENDENCY fix (uncommitted in the dx worktree, above the configured-suppression commit):
-   `region_from_query` refuses an EDGE / VERTEX query (test an_imprint_vertex_is_not_a_region passes, vibe7).
-   74d3d6 with it (build J, md5 976913a6d920; ~/tmp/dx/st74J.log): still 9/127; Plane 1 now says why it can't map:
-   "INTERSECT: SWEPT_FACE: revolve FOxgtrMDqncXEjd_7.holeBodies.* was not built" (a Hole's internal revolve faces
-   aren't named by ours; no live geometry for RJCk / RJCc / RJCY). Ask live for those three points' refs once Extrude
-   4 matches (Sketch 15 can't be scored before). Model-suite gate A = build I (ops-I7), B = J: vibe6
-   `~/bin/slot … gate-tr.sh … rf` (out ~/tmp/dx/gate-tr-rf.out, sums gate-rf-{A,B}.sum / .untr), queued by 23:33 behind
-   skasm. Land if the sums are SAME and the untranslated diff is only lines that were wrong regions before.
+6. The general derivedFrom / ORIGINAL_DEPENDENCY fix, step 1 landing 00:12: `region_from_query` refuses an EDGE /
+   VERTEX query (test an_imprint_vertex_is_not_a_region). Gate (vibe6, A = build I, B = J): all 98 documents' scores
+   SAME, untranslated lines SAME but for re-synced custom namespaces (live's 3 c2-surf-workshop corpora arrived between
+   A and B: run alone A/B, SAME). 74d3d6's Plane 1 now says why it can't map ("INTERSECT: SWEPT_FACE: revolve
+   FOxgtrMDqncXEjd_7.holeBodies.* was not built": a Hole's internal revolve faces aren't named by ours; no live
+   geometry for RJCk / RJCc / RJCY): ask live for those refs once Extrude 4 matches. Next: 1dc32b's Chamfer 4 /
+   Fillet 5 without live's refs (do they resolve right now?).
 
 ## How to run
 - Builds and crate tests on the Mac: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo test -p <crate> …` (one slot).
