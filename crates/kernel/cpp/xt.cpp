@@ -1974,16 +1974,25 @@ struct BodyWriter
 // OCCT 8.0.1's BRepTools_Modifier::CreateOtherVertices asks NewCurve2d with a
 // null new face ("does this pcurve change?"), which SweptToElementary then
 // reads (a crash on parts of the NIST assembly). Answer as it would: a copied
-// pcurve, so changed.
+// pcurve, so changed. And on a face it doesn't convert (a sphere or torus beside a converted one), an edge copied
+// there makes it read its null swept surface (a crash: cf-snap-hook's Parasolid and ACIS export): just the copy, as it
+// does on the other faces.
 class SafeSweptToElementary : public ShapeCustom_SweptToElementary
 {
 public:
   bool NewCurve2d(const TopoDS_Edge& E, const TopoDS_Face& F, const TopoDS_Edge& NewE, const TopoDS_Face& NewF, occ::handle<Geom2d_Curve>& C, double& Tol) override
   {
-    if (!NewF.IsNull())
+    TopLoc_Location loc;
+    const occ::handle<Geom_Surface> S = BRep_Tool::Surface(F, loc);
+    const bool swept = !S.IsNull() && S->IsKind(STANDARD_TYPE(Geom_SweptSurface));
+    if (!NewF.IsNull() && swept)
       return ShapeCustom_SweptToElementary::NewCurve2d(E, F, NewE, NewF, C, Tol);
+    if (!NewF.IsNull() && E.IsSame(NewE))
+      return false;
     double f, l;
-    C   = BRep_Tool::CurveOnSurface(E, F, f, l);
+    C = BRep_Tool::CurveOnSurface(E, F, f, l);
+    if (!C.IsNull())
+      C = occ::down_cast<Geom2d_Curve>(C->Copy());
     Tol = BRep_Tool::Tolerance(E);
     return true;
   }
@@ -2227,12 +2236,18 @@ std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& F, bool 
   const occ::handle<Geom_Surface> fs = basis_surface(BRep_Tool::Surface(F, loc));
   const bool periodic = periodic_face(fs, F, periodic_splines);
   std::vector<TopoDS_Edge> mine;
+  // A seam is used twice by the face (once each way); an edge on the seam line used once bounds the face (live
+  // exchange suite: c2-housing-draft's drafted cone face starting at its seam).
+  std::vector<TopoDS_Shape> all;
+  for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More(); ee.Next())
+    all.push_back(ee.Current());
+  const auto twice = [&all](const TopoDS_Shape& e) { return std::count_if(all.begin(), all.end(), [&e](const TopoDS_Shape& x) { return x.IsSame(e); }) > 1; };
   for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More(); ee.Next())
   {
     const TopoDS_Edge& e = TopoDS::Edge(ee.Current());
     if (BRep_Tool::Degenerated(e))
       continue;
-    if (BRep_Tool::IsClosed(e, F))
+    if (BRep_Tool::IsClosed(e, F) && twice(e))
     {
       if (periodic)
         continue;
