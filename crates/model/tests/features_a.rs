@@ -3544,29 +3544,37 @@ fn up_to_a_bspline_face_ends_on_its_surface_through_a_hole_in_it() {
 }
 
 /// A profile whose end is two arcs of one circle (c2-fan-blade-sweep's "klammer": a 26 mm wide rectangle with R13
-/// fillets on both right corners, its right side gone) extrudes to one half cylinder there, as live's 6 faces.
+/// fillets on both right corners, its right side gone) extrudes to one half cylinder there, as live's 6 faces; whichever
+/// curve is drawn first, so also when the profile's loop starts between the two arcs (asm-tvc-mount 7bc9d8's Inner Ring).
 #[test]
 fn a_profiles_two_arcs_of_one_circle_extrude_to_one_face() {
-    let mut t = T::new();
-    let mut sk = noshape_sketch::Sketch::new();
-    let p = |x: f64, y: f64| DVec2::new(x * 1e-3, y * 1e-3);
-    let a = sk.add_point(p(60.0, 0.0));
-    let b = sk.add_point(p(73.0, 0.0));
-    let c = sk.add_point(p(86.0, 13.0));
-    let d = sk.add_point(p(73.0, 26.0));
-    let e = sk.add_point(p(60.0, 26.0));
-    let o = sk.add_point(p(73.0, 13.0));
-    sk.add_line_between(a, b).unwrap();
-    sk.add_arc_between(o, b, c).unwrap();
-    sk.add_arc_between(o, c, d).unwrap();
-    sk.add_line_between(d, e).unwrap();
-    sk.add_line_between(e, a).unwrap();
-    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
-    let r = t.regions(s)[0].clone();
-    t.extrude(r, "5 mm", "NEW");
-    let res = t.ok();
-    let b = &res.context.bodies[0];
-    assert_eq!((b.shape.faces().len(), b.shape.edges().len(), b.shape.vertices().len()), (6, 12, 8));
+    for first in 0..5 {
+        let mut t = T::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = |x: f64, y: f64| DVec2::new(x * 1e-3, y * 1e-3);
+        let a = sk.add_point(p(60.0, 0.0));
+        let b = sk.add_point(p(73.0, 0.0));
+        let c = sk.add_point(p(86.0, 13.0));
+        let d = sk.add_point(p(73.0, 26.0));
+        let e = sk.add_point(p(60.0, 26.0));
+        let o = sk.add_point(p(73.0, 13.0));
+        for k in 0..5 {
+            match (first + k) % 5 {
+                0 => sk.add_line_between(a, b).map(|_| ()),
+                1 => sk.add_arc_between(o, b, c).map(|_| ()),
+                2 => sk.add_arc_between(o, c, d).map(|_| ()),
+                3 => sk.add_line_between(d, e).map(|_| ()),
+                _ => sk.add_line_between(e, a).map(|_| ()),
+            }
+            .unwrap();
+        }
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let r = t.regions(s)[0].clone();
+        t.extrude(r, "5 mm", "NEW");
+        let res = t.ok();
+        let b = &res.context.bodies[0];
+        assert_eq!((b.shape.faces().len(), b.shape.edges().len(), b.shape.vertices().len()), (6, 12, 8), "drawn from curve {first}");
+    }
 }
 
 /// A blind start offset runs along the sketch's normal whatever Opposite direction says (std processStartOffsetData:

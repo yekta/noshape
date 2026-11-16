@@ -1746,6 +1746,20 @@ pub fn region_profile_with(s: &SketchResult, region: &noshape_sketch::regions::R
                 *fa = a;
             }
         }
+        // (Or inside a run of arcs on one circle: the last and the first one arc, as above; asm-tvc-mount 7bc9d8's
+        // Inner Ring, its top half circle two faces and its bottom one, live one each.)
+        if out.len() > 2
+            && !legacy
+            && let (Some((P::Arc { center: lc, radius: lr, start_angle: ls, end_angle: le, ccw: lw }, le_id)), Some((P::Arc { center: fc, radius: fr, start_angle: fs, end_angle: fe, ccw: fw }, fe_id))) = (out.last(), out.first())
+            && (le_id == fe_id || join_arcs)
+            && (*lc - *fc).length() < 1e-12
+            && (*lr - *fr).abs() < 1e-12
+            && lw == fw
+        {
+            let merged = (P::Arc { center: *lc, radius: *lr, start_angle: *ls, end_angle: *ls + (le - ls) + (fe - fs), ccw: *lw }, *le_id);
+            out.pop();
+            out[0] = merged;
+        }
         out = whole_closed(out);
         // Likewise a closed spline (a periodic fit spline, split at its
         // seam): one edge, so its extrusion is one face (live's lobed recess).
