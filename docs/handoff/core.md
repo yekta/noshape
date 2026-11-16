@@ -1,21 +1,27 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 04:16 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 04:48 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
-- **Queued (core-bis, core-pldraft):** an open curved parting line's ruled sheet runs a tenth past the curve's ends
-  (ending on the end faces it split nothing and the whole slab was cut), and the final unify keeps edges off the drafted
-  faces (KeepShape): c2-parting-line-draft-parting-line Draft 1 258266 -> 367243.7 mm³ (live 367268.5), 8/18; doc 5 ->
-  9/17, next Extrude 2 (surface 12113.30 vs 12115.66 mm²). T1 features::a_wavy_parting_line_across_a_block_drafts_
-  both_sides_as_live. c2-steak-mold-draft unchanged.
-- **Queued 9c9f2481** (core-bis): shown_topology: an edge INTERNAL in every face holding it (bounds none: a Boolean's
-  piece of a hole's old seam; rust_boolean.cpp and OCCT's builder both leave such edges) is no edge, the arc it split
-  one (asm's a2e4a2 Extrude 5: 32/74/42 -> live's 32/72/40). T1 seam::an_edge_inside_a_face_is_not_an_edge (fixture
-  tests/data/seam/a2e4a2-extrude5.brep). vibe5 pair: no suite document changes (asm told).
-- **Queued 85db0f89** (core-oc, core-routing): an interpolated Routing curve without derivatives is opFitSpline's fit
-  (centripetal knots, natural ends; shared `curves::fit_spline_edge`, the FS host's opFitSpline calls it too): psui's
-  routing-curve-new-edit-reedit 91.903 -> 91.693 mm, closed 134.227 as live. No suite document has a std Routing curve.
+- **Impeller speed P0 (qa 11-16 04:40):** Delete face 2 3.9 -> 26.4 s from v0.4.48 to v0.4.53 (release A/B beside
+  asm's full7 on vibe7: a hint only; qa reruns it quiet). Cause upstream and correct: Chamfer 26 now builds (Error ->
+  Ok, as live), so OCCT's Defeaturing gets a bigger part (trimming faces 13.2 s, FF 6.4 s, EF 6.1 s, 6 removals).
+  The real gap: our Move face 1 (OFFSET #flanschRandbreite of 4 faces of Part 2, Extrude 6's ring, 21/57/38,
+  2337.5 -> 11762.3 mm³ in live, topology kept) fails "Could not offset selected faces as requested." after 8 s in
+  op_defeature: it takes "Reapply fillet" (detail_a::blends_to_reapply -> reblend), so something on the ring reads as
+  a fillet. Delete face 2 then picks Move face's SPLIT faces, so on live's input it removes other faces. Probing our
+  Part 2 after Extrude 6 (core-trace, branch core-imp-mf = main + probe patch; vibe5). qa told.
+- **Queued 7d5e9394 (core-oc, core-apex):** a loft from a profile to a sketch point, Tangent to profile at the point,
+  arrives in the point's plane (features.cpp apex_tangent_loft: each lateral face's columns [Q, (Q+B2)/2, B2, P],
+  B2 = P - m/3 (P - Q) in the plane; solid_a.rs Section.point_normal). The NotClosed was UpdateEdge giving the apex's
+  degenerate edge's new pcurve the range [0, 1]: its range is set back. 370666.7 mm³ vs live 370677.7, whose own band
+  is ±3875.5 (T1 features_a::a_loft_to_a_sketch_point_tangent_to_its_plane). dx to rerun c2-loft-paths-guides and
+  c2-loft-guide-curves-wave-washer once its Sketch 2 plane fix (e7e19bfa6) is on main.
+- Landed 11-16: 41c146a8 (Routing curve fit), 48beead66 (parting-line draft), ee16972d8 (INTERNAL edges hidden; DECISIONS
+  e677ec1c0), ce0e6ae8 + 601df0ac (failed Shell: error shapes, FeatureState::error_parts), c2fd0ca7 (corner break
+  takes a side whole), 7629ea25 (Offset surface sheets at a corner as one), 09c11d4f (path loft through middle
+  profiles: c2-loft-guide-curves-wave-washer Loft 1).
 - **Parked: knife Revolve 1's 19th vertex (branch core-pole-v2 in core-bis, not landed).** Our sphere's pole there sits
   where live's vertex is, (114.5, 0, -12.56), inside the dish. "Pole shown where the face has a boundary" regressed
   cf-box-dovetail-joint, prize-wheel-tim, cf-surface-pattern; "boundary not only circles round the pole's axis" still
@@ -50,22 +56,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. Asked of me 11-16, left: dx's lofts. (a) c2-loft-paths-guides Loft 1 (face -> sketch point, TANGENT_TO_PROFILE);
-   dx's e7e19bfa6 puts Sketch 2 on Plane 1, then ours fails "Only planar profiles ...". Branch core-loftpt2 in core-oc
-   (2 WIP commits, not for landing): solid_a.rs Section.point_normal (the point's sketch normal for the end condition)
-   and features.cpp apex_tangent_loft, called in loft_impl after ThruSections for a wire -> point loft with Tangent at
-   the point and a free start: each lateral face's surface swapped for columns [Q, (Q+B2)/2, B2, P], B2 = P - m/3 *
-   (P - Q) projected into the point's plane, u and the v range kept, side edges = new UIso. Volume 370667 mm³ vs live
-   370677.72 (T1 features_a::a_loft_to_a_sketch_point_tangent_to_its_plane, live's geometry) but BRepCheck says the
-   lateral face is UnorientableShape (status 27) because its wire is NotClosed in the face (status 28; no edge error;
-   with or without the SameParameter / tolerance reset: NOSHAPE_APEX_NO_SP), so it falls back to the cone (274568).
-   Next: BRepCheck_Wire::Closed2d at the apex (the degenerate edge's pcurve ends vs the seams' on a v-degree-3
-   surface; compare ThruSections' face), or build the faces fresh; then remove the debug prints (NOSHAPE_LOFT_DEBUG). (b) c2-loft-guide-curves-wave-washer f6 "Loft path with more than two profiles is not
-   supported yet" (solid_a.rs opts.path, 2 sections only): not started. Done and queued 11-16: psui's failed-Shell error shapes, then FeatureState::error_parts (parts of the result an
-   error is about, highlighted in place; error_mesh keeps the ghosts), the corner break
-   taking a side whole (c2-sm-side-cuts-tab 7 -> 13/18, next a Hole), Offset surface sheets touching at a corner as one
-   (hem-plus feature 3; its Derived 1 still 6/12/8 vs live 14/36/24). Impeller: blend's chamfer fix (12b25c47e) moves
-   the first difference to Fillet 3 (blend's); Move face 1 / Delete face 2 speed after that.
+0. Impeller Move face 1 (In flight), then Delete face 2's time on live's input; blend has Fillet 29 (0.9 ms -> 4.8 s
+   failure) and Fillet 3. Left from 11-16's asks: c2-sm-hem-plus Derived 1 6/12/8 vs live 14/36/24 (after Offset
+   surface 1, now one sheet); c2-sm-side-cuts-tab's next difference is a Hole (13/18 after the corner break).
 1. Knife's dish vertex: asked live in REQUESTS.md (11-16 01:32) for the face's surface type and its edges / vertices;
    then retry core-pole-v2 (Parked above) on what live says.
 2. qa's speed list (P0), what is mine: c2-valve-config Extrude 3 `prism_until.split` 131 ms (a logo up to one revolved
