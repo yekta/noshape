@@ -8059,11 +8059,12 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         refs.extend(parse_refs(&refs_in_configuration(studio["refs"].as_str().unwrap_or_default(), first_encoded.as_deref())));
         let features = studio["features"].as_array().map(Vec::as_slice).unwrap_or_default();
         // Its sketches' bodies at the final state (live 2267, `<element>.sketches.json`): their regions, edges and
-        // points, under live's own lines. A sketch region refs.jsonl calls a FACE (refsx.js writes a sketch body's face
-        // so: asm-tvc-mount studio 41b795's Extrude 1) is that region, with the parameters live evaluated it for.
+        // points, under live's own lines. A sketch region refs.jsonl names (refsx.js wrote a sketch body's face as a FACE
+        // before 11-16 01:1x: asm-tvc-mount studio 41b795's Extrude 1) is the sketches file's region, its area and sketch
+        // with it, with the parameters live evaluated it for (asm-suspension 805e29's Extrude 1 ring).
         let sketch_refs = refs_from_sketches(&studio["sketchBodies"], features);
         let regions: HashMap<&str, &LiveRef> = sketch_refs.iter().filter(|(_, r)| r.kind == "SKETCH_REGION").map(|((_, id), r)| (id.as_str(), r)).collect();
-        for ((_, id), r) in refs.iter_mut().filter(|(_, r)| r.kind == "FACE") {
+        for ((_, id), r) in refs.iter_mut().filter(|(_, r)| r.kind == "FACE" || r.kind == "SKETCH_REGION") {
             if let Some(region) = regions.get(id.as_str()) {
                 let (parameters, query) = (std::mem::take(&mut r.parameters), r.query);
                 *r = (*region).clone();
