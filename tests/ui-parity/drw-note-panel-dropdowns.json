@@ -1,0 +1,256 @@
+{
+ "name": "drw-note-panel-dropdowns",
+ "about": "block-drawing: a note \"MATRIX\" being typed; each Note editor dropdown opened and closed again by a second click (font, line spacing, horizontal alignment, list, vertical alignment, note order, insert symbol, insert drawing property, insert sheet reference property), then \u2713",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Note): live2 exploration live/feel/panel-explore/px-note-* (Escape on an open dropdown closes the whole editor)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Note"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     60,
+     40
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "type",
+   "text": "MATRIX"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Noto Sans ( Note )"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Noto Sans ( Note )"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Line spacing"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Line spacing"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Horizontal alignment"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Horizontal alignment"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "List"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "List"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Vertical alignment"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Vertical alignment"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Note order"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Note order"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Insert symbol"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Insert symbol"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Insert drawing property"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Insert drawing property"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Insert sheet reference property"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Insert sheet reference property"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  }
+ ]
+}
