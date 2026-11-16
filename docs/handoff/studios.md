@@ -65,7 +65,7 @@ Builds and crate tests on the Mac:
   fill it.
 - The Mac target (~/agents/studios/target there) must stay under 20 GB (lead 11-15: the Mac folder's cap is 180 GB).
   tools/tiers/prune-target.py reads /proc and fails on macOS, so between builds delete target/debug/deps
-  (`ssh mac 'rm -rf ~/agents/studios/target/debug/deps'`) once `du -sh` passes ~15 GB.
+  and target/debug/incremental (16 of 24 GB on 11-16) once `du -sh` passes ~15 GB.
 
 App build on vibe6:
 ```
