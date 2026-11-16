@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 07:47 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 08:39 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
@@ -13,25 +13,24 @@ docs/DECISIONS.md (read first; it wins over anything here).
   ring's split sides don't exist in ours: it fails ("Could not offset ...", 8 s in the reblend's defeature) and Delete
   face 2 defeatures a part live never has. Turning the fuse's unify off changes nothing there. blend (thread 0e6e9942) tells me when
   27-29 match; then recheck from Extrude impellerraum (the probe now prints a sketch's regions: NOSHAPE_PROBE_SKETCH).
-- **Gate running (core-trace, core-tooluni aa92b1899):** an Add whose tool misses its merge scope (eval.rs "fuse
-  merged nothing" branch) unifies the tool (`unified_tool`) as Parasolid's union returns it: asm's welding 9bdeb5
-  Extrude 4 7/15/10 -> live 6/12/8, m9b 8/24 -> 24/24. NEW keeps split faces (live's impeller Extrude 6 does). T1
-  features_a::an_add_that_misses_its_part_makes_a_part_whose_collinear_sides_are_one_face. Pair on vibe5: base suite
-  (~/agents/core-keep/ab/base) running; the branch side is a detached runner (~/tmp/core/tu-branch.sh), result + diff
-  in vibe5 ~/tmp/core/tu-done.txt. Land if only m9b-like changes (the branch commit is in core-trace, branch core-tooluni).
-- **Gate next (core-bis, core-patdir 983f7463c):** a surface extrude's cylinders keep the sweep's frame (op_prism: a
-  sheet's cylinders reframed to z = +d, origin at the sketch, circles seated at +d's x), as live core/q-cylframe
-  (sheet z +1 origin 0 x +x; solid z -1 from the far cap x -x): dx's c2-loft-guide-curves-driven-pattern 6 -> 7/11
-  (next: Curve pattern 1's path, dx's cdaa70c84). T1 features_a::a_surface_extrudes_cylinder_keeps_the_sweeps_frame.
-  Binaries vibe5 ~/agents/core-keep/ab2/{base,branch}; pair after the tool-unify one (slot), then land.
-- **Queued 3e6f86dc (core-oc, core-next):** pulled_face's bend strips run on past a bend's end only over a pull's
-  square of the wall (sheetmetal.rs `clear`): c2-sm-side-cuts-tab Corner break 3 (the floor round Flange 2's tab was cut
-  in two) 16 -> 17/18; the other 13 sheet metal docs unchanged. T2 sheetmetal_std::a_corner_break_keeps_the_plate_
-  past_a_flanges_bend_line. (Hole 13's mate connector origin from live's subFeature refs: asm's 5966c1029, 13 -> 16.)
-- **Next: c2-sm-side-cuts-tab Mirror 1** (3 parts vs live 1, 84 faces vs 126): std mirror.fs smPattern's union of the
-  definitions is right (Surface:9 over y -75..75) but the rebuild leaves the mirrored tab a separate solid and drops
-  most mirrored walls: the mirrored half's bend JOINT attributes likely lost through the pattern / opBoolean in our FS
-  host. Trace: NOSHAPE_FS_TRACE, ops `F*.smPattern.*`.
+- **Pairs queued on vibe5 (one slot job, ~/tmp/core/ab-both.sh; results + diffs in vibe5
+  ~/agents/core-keep/abres/done.txt, "DONE" at the end):** a snapshot without c2-config-parts-screws (bool's
+  split-check hang; the lead killed the 06:47 base run on it).
+  - ab (core-trace, branch core-tooluni aa92b1899): an Add whose tool misses its merge scope (eval.rs "fuse merged
+    nothing") unifies the tool (`unified_tool`) as Parasolid's union: asm's welding 9bdeb5 Extrude 4 7/15/10 -> live
+    6/12/8, m9b 8/24 -> 24/24. NEW keeps split faces (live's impeller Extrude 6 does). T1 features_a::an_add_that_
+    misses_its_part_makes_a_part_whose_collinear_sides_are_one_face. Land if only m9b-like changes.
+  - ab2 (core-bis, branch core-patdir 983f7463c): a surface extrude's cylinders keep the sweep's frame (op_prism: a
+    sheet's cylinders reframed z = +d, origin at the sketch), as live core/q-cylframe: dx's c2-loft-guide-curves-
+    driven-pattern 6 -> 7/11 (next there: Curve pattern 1's path, dx's cdaa70c84). T1 features_a::a_surface_extrudes_
+    cylinder_keeps_the_sweeps_frame. Land, then tell dx.
+- **Queued 87c2e1e7 (core-oc):** remap_attributes(changed, merged): a union's consumed tool body's attributes follow
+  its entities into the result; where an entity merged with the target's, only the target's are kept (std's
+  assignSMAttributesToNewOrSplitEntities throws on two definition attributes). c2-sm-side-cuts-tab Mirror 1 17 ->
+  18/18 (matches to the end); other 13 sheet metal docs unchanged. T2 sheetmetal_std::a_mirrored_flange_beside_a_
+  merged_plate_keeps_its_bend (also failed before: the merged y = 30 bend held both halves' attributes).
+- Landed 11-16 08:23: 3178c98b, pulled_face's bend strip runs on past a bend's end only where the wall reaches no
+  further out than the bend's line (`clear` on the outer side only; the first try 3e6f86dc broke qa4_s1's slot).
 - **Handed off 11-16:** c2-config-parts-screws memory (14.8 GB): Revolve 9's unify (usd_kept_volume -> OCCT UnifyFaces)
   on the invalid body Sweep 1's OCCT fallback left: bool takes Sweep 1's cut, bool2 the unify bound.
 - **Parked: knife Revolve 1's 19th vertex (branch core-pole-v2 in core-bis, not landed).** Our sphere's pole there sits
@@ -70,7 +69,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Next, in order
 0. Impeller Move face 1 / Delete face 2 after blend's Fillet 3 / 28 / 29 (In flight). Left from 11-16's asks: c2-sm-hem-plus Derived 1 6/12/8 vs live 14/36/24 (after Offset
-   surface 1, now one sheet); c2-sm-side-cuts-tab's next difference is a Hole (13/18 after the corner break).
+   surface 1, now one sheet); c2-sm-rocker-enclosure-body moved 9 -> 15/28 between runs (A/B it before crediting).
 1. Knife's dish vertex: asked live in REQUESTS.md (11-16 01:32) for the face's surface type and its edges / vertices;
    then retry core-pole-v2 (Parked above) on what live says.
 2. qa's speed list (P0), what is mine: c2-valve-config Extrude 3 `prism_until.split` 131 ms (a logo up to one revolved
