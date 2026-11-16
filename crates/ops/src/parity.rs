@@ -776,6 +776,20 @@ impl<'a> Translator<'a> {
         Ok(self.connector_candidates(inference, origin)?.into_iter().filter(|(_, p)| *p == part).map(|(id, _)| id).collect())
     }
 
+    /// Of `edges` (near `origin`, m), the one whose line or circle axis runs along `z`, when only one does.
+    fn edge_along(&mut self, edges: &[String], origin: [f64; 3], z: [f64; 3]) -> Option<String> {
+        if edges.len() < 2 {
+            return None;
+        }
+        let r = self.call("query_entities", json!({ "kind": "edges", "near": mm(origin), "limit": 50 })).ok()?;
+        let z = glam::DVec3::from(z).normalize();
+        let along: Vec<String> = r["edges"].as_array()?.iter().filter(|e| e["id"].as_str().is_some_and(|id| edges.iter().any(|x| x == id))).filter(|e| f3(&e["direction"]).or_else(|| f3(&e["axis"])).or_else(|| f3(&e["axis"]["direction"])).is_some_and(|d| glam::DVec3::from(d).normalize().dot(z).abs() > 0.999)).filter_map(|e| e["id"].as_str().map(str::to_string)).collect();
+        match along.as_slice() {
+            [one] => Some(one.clone()),
+            _ => None,
+        }
+    }
+
     /// The part (body id) entity `of` is on.
     fn part_of_entity(&mut self, of: &str) -> Option<String> {
         let r = self.call("query_entities", json!({ "kind": "faces", "of": [of], "limit": 1 })).ok()?;
@@ -8267,7 +8281,12 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     // The edge of the face's part whose midpoint is at live's point; else the second id's (named at
                     // the feature live read it after, not always ours at the end: Fastened 18's read another edge).
                     let part = face.as_deref().and_then(|f| t.part_of_entity(f));
-                    let at_live = connector_origins.get(key).zip(part.clone()).and_then(|(o, part)| t.connector_candidates(point, *o).ok()?.into_iter().find(|(_, p)| *p == part).map(|(id, _)| id));
+                    // (Of two there, the one along live's Z: asm-tvc-mount's Parallel 1 on the Rough PCB.)
+                    let at_live = connector_origins.get(key).zip(part.clone()).and_then(|(o, part)| {
+                        let here: Vec<String> = t.connector_candidates(point, *o).ok()?.into_iter().filter(|(_, p)| *p == part).map(|(id, _)| id).collect();
+                        let along = connector_z.get(key).and_then(|z| t.edge_along(&here, *o, *z));
+                        along.or_else(|| here.into_iter().next())
+                    });
                     // (A centre only at live's point when it is known: a face's centre may be its centroid.)
                     let by_second = !(point == "CENTER" && connector_origins.contains_key(key));
                     // (A point's is a vertex: asm-infento-subs' Planar 15, the crank's corner, not the face's centroid.)
