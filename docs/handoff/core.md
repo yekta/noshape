@@ -1,24 +1,28 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-15 22:50 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 01:45 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
-- **core-bis, branch core-pole** (ee2b83779): a sphere's / revolved face's pole is a vertex where the face has a boundary
-  (knife Revolve 1 dish: HANDLE 19 vertices as live; knife 46 -> 51/52). T1 seam::a_spherical_dish_keeps_its_pole_vertex;
-  g++-13 ok. Suite pair running detached on vibe5 (started 22:15): ~/tmp/core/g/run-pbase.log then run-pole.log (base =
-  core-cache at core-bis's merge-base). Every document whose vertex count changes: check against live; then land.
-- **core-trace, branch core-a2seam** (94c560fc3): shown_topology: an edge that is INTERNAL in every face holding it
-  (bounds none: the Boolean's piece of a hole's old seam; rust_boolean.cpp and OCCT's builder both leave such edges) is
-  no edge; the arc it split joins (asm's a2e4a2 Extrude 5: 32/74/42 -> live's 32/72/40). T1
-  seam::an_edge_inside_a_face_is_not_an_edge (fixture tests/data/seam/a2e4a2-extrude5.brep); g++-13 ok. Suite pair
-  detached on vibe7 (waiting in its slot behind qa's ui-parity): run-a2base.log (core-rmx detached at c1af60ab5) then
-  run-a2seam.log. Don't touch core-trace / core-rmx sources on vibe7 till it ends. The probe stays uncommitted in
-  core-trace (crates/ops/tests/parity.rs; copy /root/core-scratch/bodies-probe.patch, now also faces with edge indices
-  and NOSHAPE_PROBE_TAB).
-- Landed 11-15: 654611f6f / 8e3d52063 (Hole rays, curved-face loft), 52433a3d2 (no-change note), 348b6e241 (offset of
-  faces retried in mm when OCCT's comes back empty: 5d8bc1 Kerf), 9012904e (Shell by regions: rough volume check, convex
-  pockets; bool's gate clean, its 98-document suite identical per document).
+- **Queued 9c9f2481** (core-bis): shown_topology: an edge INTERNAL in every face holding it (bounds none: a Boolean's
+  piece of a hole's old seam; rust_boolean.cpp and OCCT's builder both leave such edges) is no edge, the arc it split
+  one (asm's a2e4a2 Extrude 5: 32/74/42 -> live's 32/72/40). T1 seam::an_edge_inside_a_face_is_not_an_edge (fixture
+  tests/data/seam/a2e4a2-extrude5.brep). vibe5 pair: no suite document changes (asm told).
+- **Queued 85db0f89** (core-oc, core-routing): an interpolated Routing curve without derivatives is opFitSpline's fit
+  (centripetal knots, natural ends; shared `curves::fit_spline_edge`, the FS host's opFitSpline calls it too): psui's
+  routing-curve-new-edit-reedit 91.903 -> 91.693 mm, closed 134.227 as live. No suite document has a std Routing curve.
+- **Parked: knife Revolve 1's 19th vertex (branch core-pole-v2 in core-bis, not landed).** Our sphere's pole there sits
+  where live's vertex is, (114.5, 0, -12.56), inside the dish. "Pole shown where the face has a boundary" regressed
+  cf-box-dovetail-joint, prize-wheel-tim, cf-surface-pattern; "boundary not only circles round the pole's axis" still
+  regresses prize-wheel-tim's knob (our sphere's poles lie on a horizontal axis, (±4.9, 0, 24.5): our sphere frame,
+  not live's) and cf-surface-pattern (259 -> 344 vertices). Needs live's surface type of the knife's dish
+  (SPHERE or a spun B-spline: Parasolid may keep a vertex where a spun profile meets the axis) before another try.
+- Probe (uncommitted, /root/core-scratch/bodies-probe.patch): ops parity::bodies_after_feature_probe
+  (NOSHAPE_PROBE_DOC = a copy WITH its -wal / -shm, NOSHAPE_PROBE_AFTER, NOSHAPE_PROBE_OUT, NOSHAPE_PROBE_PART,
+  NOSHAPE_PROBE_TAB): bodies as .brep, a part's faces (surface, edge indices), edges and vertices with shown flags.
+  Saved documents' part names are Part N, not live's.
+- Landed 11-15: 654611f6f / 8e3d52063, 52433a3d2, 348b6e241 (Kerf: offset retried in mm when empty), 9012904e (Shell by
+  regions: rough check, convex pockets).
 
 ## Waiting on others
 - **GearLab 90f78b:** with ae8b7f751 plus asm's unlanded 93346d03d (custom features with a `def` map; std 1777/1793)
@@ -41,10 +45,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-1. Land core-pole and core-a2seam after their pairs.
+1. Knife's dish vertex: asked live in REQUESTS.md (11-16 01:47) for the face's surface type and its edges / vertices;
+   then retry core-pole-v2 (Parked above) on what live says.
 2. qa's speed list (P0), what is mine: c2-valve-config Extrude 3 `prism_until.split` 131 ms (a logo up to one revolved
    dome face: OCCT's splitter, 26 face-face intersections; OBB and a (u, v) patch of the dome tried 11-15, no gain; a
-   projection-built extrude would be a big change for ~100 ms; valve's other time is bool's / bool2's); c2-rings-loft Shell 2
+   projection-built extrude would be a big change for ~100 ms; valve's other time is bool's / bool2's); c2-rings-loft: Circular pattern 1 913 ms vs live
+   767: its 51 prism_until calls (302 ms) seem to run in parallel, bool's Boolean (892 ms) is the path; Shell 2
    `regions.tubes` 55-65 ms (Common of the solid with the hole tubes + fuse) and prism_until (~35 ms a call up to a
    1 m² cylinder face). Not mine there: rings Shell 1 (bool's quadrics), Circular patterns and Extrude 5 / housing
    Rotieren 1 (bool's Rust Boolean), Fillet 1 / Chamfer 1 (blend). The suite's per-feature part checks cost seconds of
