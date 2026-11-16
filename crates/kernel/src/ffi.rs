@@ -712,6 +712,9 @@ pub(crate) mod ffi {
         ) -> Result<OpOut>;
         fn op_defeature(s: &OcShape, faces: &OcShapeList) -> Result<OpOut>;
         fn op_offset_faces(s: &OcShape, faces: &OcShapeList, offsets: &[f64]) -> Result<OpOut>;
+        fn op_offset_solid(s: &OcShape, faces: &OcShapeList, distances: &[f64], face_budget: u32) -> Result<OpOut>;
+        /// Each face's distance and reached tolerance from this thread's last op_offset_solid, or where it failed.
+        fn last_offset_report() -> String;
         fn op_round_tool(a: P3, d: P3, u0: P3, u1: P3, half: f64, knots: &[f64], mults: &[i32], radii: &[f64], along: &[f64]) -> Result<OpOut>;
         fn op_offset_shape(s: &OcShape, offset: f64, join: u8) -> Result<OpOut>;
         fn op_sew(shapes: &OcShapeList, tol: f64, make_solid: bool) -> Result<OpOut>;

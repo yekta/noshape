@@ -22,6 +22,7 @@ mod instances;
 mod measure_replay;
 mod mesh_import;
 mod mesh_repair;
+mod offset;
 mod perf;
 mod planar_mesh;
 mod projection;
