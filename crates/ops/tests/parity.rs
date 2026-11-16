@@ -3038,7 +3038,9 @@ fn an_assembly_is_rebuilt_as_lives() {
         prop("Name", json!("Pin")), prop("Part number", json!("PN-1")), prop("Description", json!("Turned")), prop("Material", json!({ "displayName": "Steel ", "libraryName": "Onshape Material Library" })),
         { "name": "Vendor", "value": "Not the user's", "propertySource": 1 }] }] } } });
     with_bom["liveBom"] = json!({ "root": { "bom": { "bomTable": { "items": [{ "itemSource": { "indentLevel": 0 }, "name": "Pin", "quantity": 2, "partNumber": "PN-1", "description": "Turned", "material": { "displayName": "Steel " } }] } } } });
-    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-meta.noshape"), &with_bom, &[("E1".into(), with_meta, off_parts.clone())]);
+    // (Live's wire part, a Helix's "Curve 1", is no part of ours: it doesn't rename ours.)
+    let with_curve = json!([{ "partId": "JHD", "name": "Part 1", "bodyType": "solid" }, { "partId": "JiD", "name": "Curve 1", "bodyType": "wire" }]);
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-meta.noshape"), &with_bom, &[("E1".into(), with_meta, with_curve)]);
     assert_eq!((r.bom_matching, r.bom_rows), (1, 1), "{r:?}");
     // Live's Revolute in error with its connectors unresolved (red in its dialog, or its tooltip's message), ours
     // solving it: a live defect, counted as live (docs/DECISIONS.md 11-15); without either a difference.

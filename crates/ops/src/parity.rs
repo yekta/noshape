@@ -8077,7 +8077,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let fits_of = |p: &Value| -> Vec<String> {
             volume_band(p).map(|(lo, hi)| ours_parts.iter().filter(|(_, v)| *v >= lo * (1.0 - 1e-6) && *v <= hi * (1.0 + 1e-6)).map(|(n, _)| n.clone()).collect()).unwrap_or_default()
         };
-        let listed: Vec<&Value> = parts.as_array().into_iter().flatten().filter(|p| p["partId"].is_string() && p["name"].is_string()).collect();
+        // (Not live's wire parts, a Helix's "Curve 1": none of ours is a solid of them, and no BOM row.)
+        let listed: Vec<&Value> = parts.as_array().into_iter().flatten().filter(|p| p["partId"].is_string() && p["name"].is_string() && p["bodyType"] != "wire").collect();
         let fitting: Vec<String> = listed.iter().flat_map(|p| fits_of(p)).collect();
         // Off in volume, ours at live's centroid (within 1 mm, its volume within 5 %): asm-infento-subs' "7\" Wheel asm",
         // our Composite part 4, 0.3 % off.
