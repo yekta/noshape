@@ -87,9 +87,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
   one per wall (6 faces; ours 10: a face per path edge). **Committed b173dc5bb (core-oc, NOT in the vibe7 pair):
   join_collinear_lines joins a sweep path's lines along one line into one edge (first piece's source)**: Main pipe's
   faces = live (only its box differs, the take-back). T1 features_a::a_sweep_along_collinear_lines_has_one_side_face.
-- **Landing plan:** the vibe7 pair covers 1357fddb1..bcaf5ffdb. 97b778e7d and b173dc5bb need a second full pair
-  (base bcaf5ffdb, branch HEAD) before landing; land the six from a worktree at bcaf5ffdb (core-trace) if the second
-  pair isn't done when the first comes back clean.
+- **Committed d2605e45d (core-oc): a pattern / Mirror with Add joins surface copies to the seeds' and merge scope's
+  surfaces they touch** (bshared.rs join_surface split out of surface_result; pattern.rs, only when every copy is a
+  surface; copies touching nothing keep the old push): c2-surf-workshop-singularities 2 -> 5/15 (Mirror 3 one sheet
+  as live). Next there: "Loft with bad singularity" ERROR. T1 features_a::a_mirrored_surface_added_joins_the_surface_it_meets.
+- **Landing plan:** the vibe7 pair covers 1357fddb1..bcaf5ffdb. The second pair (97b778e7d + b173dc5bb + d2605e45d vs
+  bcaf5ffdb) runs on vibe5, restarted 19:36 UTC: ~/agents/core-keep/p2pair.sh -> p2res (own src copy p2src, target
+  p2target, base files p2base; src and target removed at the end). Land all nine when both are clean; or the six from
+  a worktree at bcaf5ffdb (core-trace) if the second isn't done when the first comes back clean.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
