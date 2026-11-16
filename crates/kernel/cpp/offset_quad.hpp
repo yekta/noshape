@@ -5,6 +5,7 @@
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <GeomAbs_SurfaceType.hxx>
 #include <Geom_BSplineCurve.hxx>
+#include <Geom_BSplineSurface.hxx>
 #include <Geom_Surface.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <ShapeAnalysis_Surface.hxx>
@@ -62,4 +63,10 @@ bool     solve3_damped(const Surf* s[3], gp_XYZ& x, double scale);
 bool     solve3(const Surf* s[3], gp_XYZ& x, double scale);
 bool     solve_all(const std::vector<const Surf*>& s, gp_XYZ& x, double scale);
 bool     solve_line(const Surf& s, const gp_XYZ& o, const gp_XYZ& d, gp_XYZ& x, double scale);
+// A B-spline surface run on past all four sides by `len`, in its own parameters: by its end spans' polynomials
+// (continued) or along its tangents (linear_extension); null where a side can't be.
+occ::handle<Geom_BSplineSurface> continued_u(const occ::handle<Geom_BSplineSurface>& bs, double len, bool at_end);
+occ::handle<Geom_BSplineSurface> continued(const occ::handle<Geom_BSplineSurface>& bs, double len);
+occ::handle<Geom_BSplineSurface> linear_u(const occ::handle<Geom_BSplineSurface>& bs, double len, bool at_end);
+occ::handle<Geom_BSplineSurface> linear_extension(const occ::handle<Geom_BSplineSurface>& bs, double len);
 } // namespace noshape::quad

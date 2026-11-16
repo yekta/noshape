@@ -3796,7 +3796,7 @@ bool march_offsets(const Surf* S[2], const TopoDS_Edge& e, const TopoDS_Face F[2
   // where two offsets meet at a small angle needed more than eight, c2-rings-loft's Shell 1).
   for (int round = 0; round < 12; ++round)
   {
-    if (!fit(out))
+    if (noshape_should_break() != 0 || !fit(out))
       return false;
     std::vector<Pt> next = {pts.front()};
     bool            added = false;
@@ -4883,9 +4883,6 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
   bld.Range(ne, nf, a, b);
   return true;
 }
-} // namespace quad
-
-namespace {
 
 // `bs` continued past its start (or end) in u by `len` (measured along the surface), as its end span's polynomial runs
 // on (Parasolid's continuation: live 1799, a flaring vase's outward wall). The clamped end knot moves out by δ and the
@@ -4998,7 +4995,7 @@ occ::handle<Geom_BSplineSurface> continued(const occ::handle<Geom_BSplineSurface
 // `bs` (not rational, clamped in u) run on past u's start or end (`at_end`) by `len` along its tangent there, in its own
 // parameters: S(u_end, v) + (u - u_end) S_u(u_end, v), the line as a piece of u's degree joined at a knot of that
 // multiplicity (its parameters kept). Null where it can't be.
-static occ::handle<Geom_BSplineSurface> linear_u(const occ::handle<Geom_BSplineSurface>& bs, double len, bool at_end)
+occ::handle<Geom_BSplineSurface> linear_u(const occ::handle<Geom_BSplineSurface>& bs, double len, bool at_end)
 {
   if (bs->IsURational() || bs->IsVRational() || bs->IsUPeriodic())
     return nullptr;
@@ -5070,7 +5067,7 @@ static occ::handle<Geom_BSplineSurface> linear_u(const occ::handle<Geom_BSplineS
 
 // `bs` run on past all four of its sides by `len` along its tangents, in its own parameters (live's: an impeller inlet's
 // offset past its face is S(u, 1) + (v - 1) S_v(u, 1) to 2e-14 m, live 2482); null where a side can't be.
-static occ::handle<Geom_BSplineSurface> linear_extension(const occ::handle<Geom_BSplineSurface>& bs, double len)
+occ::handle<Geom_BSplineSurface> linear_extension(const occ::handle<Geom_BSplineSurface>& bs, double len)
 {
   occ::handle<Geom_BSplineSurface> s = occ::down_cast<Geom_BSplineSurface>(bs->Copy());
   for (int side = 0; side < 4 && !s.IsNull(); ++side)
@@ -5083,6 +5080,10 @@ static occ::handle<Geom_BSplineSurface> linear_extension(const occ::handle<Geom_
   }
   return s;
 }
+
+} // namespace quad
+
+namespace {
 
 // `tangent_ext`: free-form faces' offsets extended past their edges along their tangents, not by their own polynomials;
 // `continued_any` set where a face's polynomials were, `why` to the reason it failed.
@@ -5251,10 +5252,10 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         try
         {
           // Its own polynomials run on (live 1799); GeomLib's tangent extension where that can't be done.
-          occ::handle<Geom_BoundedSurface> ext = tangent_ext ? nullptr : continued(bs, len);
+          occ::handle<Geom_BoundedSurface> ext = tangent_ext ? nullptr : quad::continued(bs, len);
           continued_any                         = continued_any || !ext.IsNull();
           if (ext.IsNull())
-            ext = linear_extension(bs, len);
+            ext = quad::linear_extension(bs, len);
           if (ext.IsNull())
           {
             ext = occ::down_cast<Geom_BoundedSurface>(bs->Copy());
