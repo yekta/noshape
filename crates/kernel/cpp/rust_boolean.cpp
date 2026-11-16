@@ -1146,7 +1146,8 @@ struct FreeSections
   std::vector<std::optional<Moved>> moved;
   // The section `id`, built if it is a moved one.
   const std::pair<std::array<TopoDS_Face, 2>, IntTools_Curve>& curve(uint32_t id);
-  // OCCT's sections made ahead (brep_occt_ahead) or when asked for, by pair (the earlier argument's face first).
+  // OCCT's sections made ahead (brep_occt_ahead) or when asked for, by pair (the earlier argument's face first),
+  // off_shared_edges applied.
   std::map<std::array<uint32_t, 4>, std::vector<IntTools_Curve>> ahead;
 };
 
@@ -4803,6 +4804,8 @@ static std::optional<std::vector<IntTools_Curve>> sections_past_seam(const TopoD
   return std::nullopt;
 }
 
+static std::vector<IntTools_Curve> off_shared_edges(const TopoDS_Face& fa, const TopoDS_Face& fb, const std::vector<IntTools_Curve>& lines);
+
 static void occt_ahead(rust::Slice<const uint32_t> pairs)
 {
   if (t_free == nullptr || t_free->srcs == nullptr)
@@ -4837,13 +4840,14 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
     {
       if (boolean_sections(jobs[k].fa, jobs[k].fb, jobs[k].lines, fs->exact))
       {
-        jobs[k].done = true;
+        jobs[k].lines = off_shared_edges(jobs[k].fa, jobs[k].fb, jobs[k].lines);
+        jobs[k].done  = true;
         return;
       }
       jobs[k].lines.clear();
       if (std::optional<std::vector<IntTools_Curve>> first = seam_first(jobs[k].fa, jobs[k].fb))
       {
-        jobs[k].lines = std::move(*first);
+        jobs[k].lines = off_shared_edges(jobs[k].fa, jobs[k].fb, *first);
         jobs[k].done  = true;
         return;
       }
@@ -4856,7 +4860,8 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
         jobs[k].lines.push_back(refined_section(ic, jobs[k].fa, jobs[k].fb));
       if (std::optional<std::vector<IntTools_Curve>> past = sections_past_seam(jobs[k].fa, jobs[k].fb, jobs[k].lines))
         jobs[k].lines = std::move(*past);
-      jobs[k].done = true;
+      jobs[k].lines = off_shared_edges(jobs[k].fa, jobs[k].fb, jobs[k].lines);
+      jobs[k].done  = true;
     }
     catch (const Standard_Failure&)
     {
@@ -5107,12 +5112,16 @@ static rust::String occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_ar
     {
       return rust::String("OCCT's section failed");
     }
+    lines = off_shared_edges(fa, fb, lines);
   }
   // (Kept for the Boolean's later rounds (boolean_with: again with vertices merged), whose input faces are these.)
   else if (made != t_free->ahead.end())
     lines = made->second;
   else if (boolean_sections(fa, fb, lines, t_free->exact))
+  {
+    lines = off_shared_edges(fa, fb, lines);
     t_free->ahead.emplace(swap ? std::array<uint32_t, 4>{b_arg, b_face, a_arg, a_face} : std::array<uint32_t, 4>{a_arg, a_face, b_arg, b_face}, lines);
+  }
   else
   {
     lines.clear();
@@ -5140,9 +5149,9 @@ static rust::String occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_ar
     {
       return rust::String("OCCT's section failed");
     }
+    lines = off_shared_edges(fa, fb, lines);
     t_free->ahead.emplace(swap ? std::array<uint32_t, 4>{b_arg, b_face, a_arg, a_face} : std::array<uint32_t, 4>{a_arg, a_face, b_arg, b_face}, lines);
   }
-  lines = off_shared_edges(fa, fb, lines);
   for (const IntTools_Curve& ic : lines)
   {
     const occ::handle<Geom_Curve> c = ic.Curve();
