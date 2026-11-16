@@ -5743,8 +5743,14 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
   else if (!apart.empty() && !stuck_pairs().all_known(apart) && BRepCheck_Analyzer(s0).IsValid())
   {
     const KernelTimer timer("unify.reordered");
-    GProp_GProps      v0;
-    BRepGProp::VolumeProperties(r, v0);
+    // (The volumes only for a try with fewer faces: c2-valve-config's Extrude 2, its tries' integrals of the body's
+    // revolved B-spline faces were most of the unify.)
+    std::optional<double> v0;
+    auto volume = [](const TopoDS_Shape& x) {
+      GProp_GProps g;
+      BRepGProp::VolumeProperties(x, g);
+      return g.Mass();
+    };
     for (int k = 1; k <= 3 && cylinder_faces_apart(r); ++k)
     {
       const TopoDS_Shape sk = faces_reordered(s0, k);
@@ -5753,9 +5759,11 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
       HHist              hk = copy(before);
       bool               ck = false;
       const TopoDS_Shape rk = unify_seams_in(sk, hk, sc, clean != nullptr ? &ck : nullptr);
-      GProp_GProps       vk;
-      BRepGProp::VolumeProperties(rk, vk);
-      if (face_count(rk) < face_count(r) && std::abs(vk.Mass() - v0.Mass()) <= 1e-9 * std::abs(v0.Mass()) && BRepCheck_Analyzer(rk).IsValid())
+      if (face_count(rk) >= face_count(r))
+        continue;
+      if (!v0)
+        v0 = volume(r);
+      if (std::abs(volume(rk) - *v0) <= 1e-9 * std::abs(*v0) && BRepCheck_Analyzer(rk).IsValid())
       {
         r    = rk;
         hist = hk;
