@@ -1022,6 +1022,14 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
   if (concave)
   try
   {
+    // (A cone, sphere or torus of the part's never lies on the block's planes: a piece of the block's cut is bounded
+    // by it, so a pocket face isn't a plane or cylinder, known without the cut: c2-bottle-split's Shell 1.)
+    for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
+    {
+      const GeomAbs_SurfaceType k = BRepAdaptor_Surface(TopoDS::Face(e.Current()), false).GetType();
+      if (k == GeomAbs_Cone || k == GeomAbs_Sphere || k == GeomAbs_Torus)
+        return no("a concave edge (a pocket face isn't a plane or cylinder)");
+    }
     const KernelTimer                      timer("regions.pockets");
     std::vector<std::pair<gp_Pnt, gp_Dir>> hs;
     std::vector<gp_Pnt>                    verts;
@@ -4296,12 +4304,13 @@ protected:
   }
 
 private:
-  // Edge / face pairs where the face is a free-form face's offset and they share a vertex (an offset edge ending on its
-  // neighbour's offset): the edge walked from that vertex, its foot on the offset found in the face's own parameters
+  // Edge / face pairs where the face isn't a plane and they share a vertex (an offset edge ending on its neighbour's
+  // offset): the edge walked from that vertex, its foot on the offset found in the face's own parameters
   // (Gauss-Newton, each from the last, the first the vertex's own place on the face), the signed distance watched;
   // apart when, inside the face's bounds and past two steps from the vertex, it stays beyond half a step (a tenth of
   // the wall) and never changes sign. Else OCCT's check as before (c2-rings-loft's Shell 1: 164 such pairs, 350 ms of
-  // OCCT's edge / face intersections on one thread, one 73 ms).
+  // OCCT's edge / face intersections on one thread, one 73 ms; c2-bottle-split's Shell 1: a rim's arcs ending on its
+  // rounds, a quarter of the Shell).
   void drop_clear_offset_pairs()
   {
     if (!(apart_ > 0))
@@ -4323,7 +4332,7 @@ private:
         const TopoDS_Face&              f = TopoDS::Face(t1 == TopAbs_FACE ? myDS->Shape(n1) : myDS->Shape(n2));
         TopLoc_Location                 l;
         const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f, l);
-        if (g.IsNull() || !l.IsIdentity() || (occ::down_cast<Geom_OffsetSurface>(g).IsNull() && !free_form(g)))
+        if (g.IsNull() || !l.IsIdentity() || GeomAdaptor_Surface(g).GetType() == GeomAbs_Plane)
           continue;
         ps.push_back({k, i});
       }
@@ -4380,22 +4389,6 @@ private:
     for (const Pair& p : ps)
       drop[(size_t)p.list][(size_t)p.at] = p.clear;
     remove(drop);
-  }
-
-  // A surface other than a plane, cylinder, cone, sphere or torus (their pairs are OCCT's quick ones).
-  static bool free_form(const occ::handle<Geom_Surface>& g)
-  {
-    switch (GeomAdaptor_Surface(g).GetType())
-    {
-      case GeomAbs_Plane:
-      case GeomAbs_Cylinder:
-      case GeomAbs_Cone:
-      case GeomAbs_Sphere:
-      case GeomAbs_Torus:
-        return false;
-      default:
-        return true;
-    }
   }
 
   static bool edge_clear_of_offset(const TopoDS_Edge& e, const TopoDS_Face& face, const BRepTopAdaptor_FClass2d& cls, double step)
@@ -4673,6 +4666,22 @@ private:
           return;
       }
       l.apart = true;
+    }, serial_);
+    // (A plane's pairs still open by their exact distance, past `apart_` as by_distance's: meshing the plane at a
+    // twentieth of the wall cost more, c2-bottle-split's Shell 1: its rim's edges in its bottom's and top's planes, a
+    // fifth of the Shell.)
+    OSD_Parallel::For(0, static_cast<int>(left.size()), [&](int j) {
+      Left& l = left[(size_t)j];
+      if (l.apart || surface_of[(size_t)l.face].GetType() != GeomAbs_Plane || noshape_should_break() != 0)
+        return;
+      try
+      {
+        BRepExtrema_DistShapeShape d(shapes[(size_t)l.shape], faces[(size_t)set_face[(size_t)l.face]]);
+        l.apart = d.IsDone() && d.NbSolution() > 0 && d.Value() > apart_;
+      }
+      catch (const Standard_Failure&)
+      {
+      }
     }, serial_);
     // (Only the faces of the pairs still open meshed.)
     std::vector<char> needed(set_face.size(), 0);
