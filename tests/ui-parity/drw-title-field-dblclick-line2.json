@@ -1,0 +1,41 @@
+{
+ "name": "drw-title-field-dblclick-line2",
+ "about": "Title block TITLE line 2 double-clicked: the Note editor on line 2 only",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Title block field): live2 exploration live/feel/title-line-edit",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "sheet_point": [
+     230,
+     37
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  }
+ ]
+}

@@ -1,0 +1,52 @@
+{
+ "name": "drw-title-field-edit-note",
+ "about": "Title block TITLE line 1 \u203a right-click \u203a Edit note\u2026: the inline Note editor (font, text height, flag notes, border shape)",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Title block field): live2 exploration live/feel/title-line-edit",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     230,
+     42
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit note..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  }
+ ]
+}

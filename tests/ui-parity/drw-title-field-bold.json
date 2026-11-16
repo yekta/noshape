@@ -1,0 +1,63 @@
+{
+ "name": "drw-title-field-bold",
+ "about": "Title block TITLE line 1 double-clicked, text selected, Bold, \u2713: line 1 bold, others unchanged",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Title block field): live2 exploration live/feel/title-line-edit",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "sheet_point": [
+     230,
+     42
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "toggle": "Bold"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  }
+ ]
+}

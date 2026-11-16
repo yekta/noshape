@@ -1,0 +1,53 @@
+{
+ "name": "drw-title-field-rmb",
+ "about": "Title block TITLE line 1 right-clicked: field menu rows, then Move to \u25b8 (Title block disabled)",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Title block field): live2 exploration live/feel/title-line-edit",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     230,
+     42
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Move to"
+   },
+   "ms": 900
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  }
+ ]
+}

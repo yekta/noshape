@@ -1,0 +1,32 @@
+{
+ "name": "drw-title-field-select",
+ "about": "Title block TITLE line 1 clicked: only that line's field is selected",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Title block field): live2 exploration live/feel/title-line-edit",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     230,
+     42
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  }
+ ]
+}
