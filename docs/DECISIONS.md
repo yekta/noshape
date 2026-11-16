@@ -71,6 +71,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-15 Build hosts: bool2 and bool build and gate on vibe5; the Mac's one slot is for crate tests and short builds, never
   a 45-min hold. Light checks (5 app runs, a quit check) don't take ~/bin/slot.
 - 11-16 Gate builds (single-unit LTO, ~10 GB) also go through ~/bin/slot (SLOT_MIN_GB=12): earlyoom killed two on vibe5.
+- 11-16 Every ~/bin/slot job runs under `timeout` sized to its expected length (a model suite ≤2 h). A run stuck on one
+  document (100 % CPU, no progress) is killed by its owner, the document skipped and its owner told: two runs held the
+  vibe5 and vibe6 slots 1.5 h each on c2-config-parts-screws' Split hang.
 - 11-16 Long runs (gates, suite pairs, A/Bs) read a snapshot of the corpus taken at their start (`cp -al ~/parity/models
   ~/tmp/<agent>/models-<run>`; the 10-min sync replaces files, so hard links keep the old data), never the live tree:
   bool's 02:05 refs update turned a clean gate FAIL.
