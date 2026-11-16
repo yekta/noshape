@@ -870,7 +870,8 @@ impl<'a> Translator<'a> {
             // A sketch's plane: live's planar face (its edges split the sketch's regions, as live's), else a face on
             // live's sketch frame, live's other bodies besides it.
             let made = match self.context_bodies(oid) {
-                Ok((ids, false)) if sketch => self.in_context_face(f["featureId"].as_str().unwrap_or("")).map(|plane| [vec![plane], ids].concat()),
+                // (Points only: the sketch's plane is none of them, its own.)
+                Ok((ids, false)) if sketch && !self.context_points_only(oid) => self.in_context_face(f["featureId"].as_str().unwrap_or("")).map(|plane| [vec![plane], ids].concat()),
                 Err(e) if sketch => {
                     if self.context_entities.iter().any(|l| l["subFeature"] == oid) {
                         step.problems.push(format!("its in-context entity: {e}"));
@@ -973,8 +974,10 @@ impl<'a> Translator<'a> {
             let edges: Vec<&Value> = of.iter().copied().filter(|l| l["kind"] == "EDGE").collect();
             let faces: Vec<&Value> = of.iter().copied().filter(|l| l["kind"] == "FACE").collect();
             let planar = matches!(faces.as_slice(), [f] if f["surfaceType"] == "PLANE");
-            // A point body: its vertex (asm-keyboard-pattern 2bb133's Plane 1 goes through one).
-            if of.iter().any(|l| l["kind"] == "BODY" && l["bodyType"] == "POINT") {
+            // A point body: its vertex (asm-keyboard-pattern 2bb133's Plane 1 goes through one); a body of vertices only
+            // whatever live's bodyType says (a66ca5's Sketch 3: "?").
+            let vertices_only = of.iter().any(|l| l["kind"] == "VERTEX") && !of.iter().any(|l| l["kind"] == "EDGE" || l["kind"] == "FACE");
+            if vertices_only || of.iter().any(|l| l["kind"] == "BODY" && l["bodyType"] == "POINT") {
                 let mut vertices: Vec<noshape_kernel::Shape> = of.iter().filter(|l| l["kind"] == "VERTEX").filter_map(|l| noshape_kernel::make_vertex(glam::DVec3::from(f3(&l["point"])?)).ok()).collect();
                 match vertices.len() {
                     0 => problems.push(format!("body {body}: no vertex")),
@@ -1024,6 +1027,12 @@ impl<'a> Translator<'a> {
             Ok(_) => Vec::new(),
             Err(e) => vec![format!("in-context entities not deleted: {e}")],
         }
+    }
+
+    /// Whether in-context sub-feature `sub`'s bodies (live's context.jsonl) are all points.
+    fn context_points_only(&self, sub: &str) -> bool {
+        let lines: Vec<&Value> = self.context_entities.iter().filter(|l| l["subFeature"] == sub).collect();
+        !lines.is_empty() && lines.iter().all(|l| l["kind"] == "VERTEX" || (l["kind"] == "BODY" && l["bodyType"] != "WIRE" && l["bodyType"] != "SHEET" && l["bodyType"] != "SOLID"))
     }
 
     /// An Import feature: live's file imported as the Import dialog does (a
@@ -7707,24 +7716,27 @@ fn onshape_id_value(id: &str) -> u128 {
 }
 
 /// Live's metadata of part `pid` (a studio's `partMetadata`) in `configuration` (an instance's fullConfiguration), else
-/// at the default.
-fn metadata_item<'v>(metadata: &'v Value, configuration: Option<&str>, pid: &str) -> Option<&'v Value> {
+/// at the default; whether it is that configuration's.
+fn metadata_item<'v>(metadata: &'v Value, configuration: Option<&str>, pid: &str) -> Option<(&'v Value, bool)> {
     let configs = &metadata["configurations"];
-    let at = configuration.and_then(|c| configs.get(c)).or_else(|| configs.get("default")).or_else(|| metadata.get("defaultConfiguration"));
-    at?["items"].as_array()?.iter().find(|i| i["partId"] == pid)
+    let own = configuration.and_then(|c| configs.get(c));
+    let at = own.or_else(|| configs.get("default")).or_else(|| metadata.get("defaultConfiguration"));
+    at?["items"].as_array()?.iter().find(|i| i["partId"] == pid).map(|i| (i, own.is_some() || configuration.is_none_or(|c| c == "default")))
 }
 
 /// The properties of live's metadata `item` the user set (`propertySource` 3; a feature's, as custDesc's, come from
 /// the feature) on our part `id`: name, part number, description, revision, vendor, project, product line, titles,
-/// Exclude from all BOMs and the material (a library's by name, else a custom one with live's density). The errors.
-fn set_metadata(t: &mut Translator, id: &str, item: &Value) -> Vec<String> {
+/// Exclude from all BOMs and the material (a library's by name, else a custom one with live's density); the name only
+/// when `own_configuration`. The errors.
+fn set_metadata(t: &mut Translator, id: &str, item: &Value, own_configuration: bool) -> Vec<String> {
     let mut errors = Vec::new();
     let user: Vec<&Value> = item["properties"].as_array().into_iter().flatten().filter(|p| p["propertySource"] == 3 && !p["value"].is_null()).collect();
     let mut args = json!({ "tab": t.tab, "part": id });
     for p in &user {
         let field = match p["name"].as_str().unwrap_or("") {
-            // (A name a feature gives, as the nut's custDesc, isn't the user's: kept as ours builds it.)
-            "Name" => "name",
+            // (A name a feature gives, as the nut's custDesc, isn't the user's: kept as ours builds it; another
+            // configuration's name isn't this one's.)
+            "Name" if own_configuration => "name",
             "Description" => "description",
             "Part number" => "part_number",
             "Revision" => "revision",
@@ -8135,15 +8147,16 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     {
                         res.untranslated.push(format!("{element}: part {pid} not renamed \"{live}\": {e}"));
                     }
+                    let standard = levels.iter().flat_map(|l| l.instances.iter()).any(|i| i["elementId"] == element.as_str() && i["partId"] == pid && i["isStandardContent"] == true);
                     // The properties the user set on it (live's metadata), as the Properties dialog and the Material
-                    // panel set them: its BOM's part number, description, material.
-                    if let Some(item) = metadata_item(&studio["partMetadata"], configuration.as_deref(), pid) {
-                        for e in set_metadata(&mut t, id, item) {
+                    // panel set them: its BOM's part number, description, material. (Not standard content's: its content
+                    // feature names it per size, asm-pattern-std's screws.)
+                    if let Some((item, own)) = metadata_item(&studio["partMetadata"], configuration.as_deref(), pid).filter(|_| !standard) {
+                        for e in set_metadata(&mut t, id, item, own) {
                             res.untranslated.push(format!("{element}: part {pid}'s {e}"));
                         }
                     }
                     // A standard content part has its component's material (our catalogue's default, as live's BOM).
-                    let standard = levels.iter().flat_map(|l| l.instances.iter()).any(|i| i["elementId"] == element.as_str() && i["partId"] == pid && i["isStandardContent"] == true);
                     if let Some(spec) = p["name"].as_str().filter(|_| standard).and_then(standard_spec_by_part_name)
                         && let Err(e) = t.call("part_set_material", json!({ "tab": t.tab, "parts": [id], "material": spec.material() }))
                     {
