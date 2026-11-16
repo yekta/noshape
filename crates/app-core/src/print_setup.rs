@@ -80,7 +80,7 @@ pub fn panel<V: 'static>(state: &PrintPanel, view: &Entity<V>, on: fn(&mut V, Ac
             .hover(|d| d.bg(pal.panel_hover))
             .child(label)
     };
-    let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }];
+    let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }];
     // (Esc: the studio's Cancel closes the panel first.)
     v_flex()
         .id("print-setup")

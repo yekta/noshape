@@ -190,12 +190,12 @@ mod tests {
     #[test]
     fn icons_with_faces_are_opaque_inside() {
         use gpui_kit::{DevicePixels, SvgRenderer, SvgSize, size};
-        // Live leaves these insides see-through too (a sketch shape's inside, a table's cells, a mate's gaps), or
-        // their art isn't closed there.
-        const SEE_THROUGH: [&str; 18] = [
+        // Live leaves these insides see-through too (a sketch shape's inside, a table's cells, a mate's gaps, a hole
+        // through a part), or their art isn't closed there.
+        const SEE_THROUGH: [&str; 19] = [
             "aligned-rectangle", "bezier", "center-rectangle", "circle", "configuration-visibiliity", "cylindrical",
-            "drawing-cutlist-table", "drawing-polygon", "ellipse", "featurescript-table", "frame-trim", "hole-diameter",
-            "hole-table", "hole-tap-clearance", "hole-tapped-depth", "realign-mate-dialog", "revolute",
+            "drawing-cutlist-table", "drawing-hole-table", "drawing-polygon", "ellipse", "featurescript-table", "frame-trim",
+            "hole-diameter", "hole-table", "hole-tap-clearance", "hole-tapped-depth", "realign-mate-dialog", "revolute",
             "sheet-metal-make-joint",
         ];
         let r = SvgRenderer::new(std::sync::Arc::new(super::AppAssets));

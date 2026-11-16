@@ -266,8 +266,7 @@ pub fn panel<V: 'static>(
         .w(px(600.))
         .bg(gpui_kit::rgb(0xf5f5f5))
         .text_color(pal.text)
-        // 0 5px 10px; GPUI blurs twice as far as CSS.
-        .shadow(shadow(5., 5.))
+        .shadow(shadow(5., 10.))
         // Dropping a toolbar tool here takes it out of the toolbar.
         .on_drop(cx.listener(move |this, d: &ToolDrag, _, cx| {
             if let Some(c) = field(this) {
@@ -342,7 +341,7 @@ pub fn panel<V: 'static>(
                 .pt(px(6.))
                 .px(px(3.))
                 .bg(gpui_kit::rgb(0xffffff))
-                .shadow(shadow(0., 0.5))
+                .shadow(shadow(0., 1.))
                 .child(div().flex_1().p(px(5.)).text_size(px(14.)).font_weight(FontWeight::BOLD).line_height(px(21.)).child("Tools"))
                 .child(div().w(px(198.)).mt(px(1.)).mr(px(3.)).child(Input::new(&c.search).small().h(px(30.)).text_size(px(14.)).pl(px(5.)))),
         )
@@ -353,7 +352,7 @@ pub fn panel<V: 'static>(
                 .pt(px(6.))
                 .px(px(3.))
                 .bg(gpui_kit::rgb(0xffffff))
-                .shadow(shadow(0., 0.5))
+                .shadow(shadow(0., 1.))
                 .child(div().pl(px(7.)).child(crate::os_ui::checkbox("tb-show-all", "Show items already in toolbar", show_all).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(c) = field(this) {
                         c.show_all = !c.show_all;

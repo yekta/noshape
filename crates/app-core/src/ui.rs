@@ -152,6 +152,11 @@ pub fn user_tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut 
     }
 }
 
+/// Live's tooltip shadow (feel/shadows: `.tooltip`, `0 1px 2px rgba(0,0,0,.2)`).
+fn tooltip_shadow() -> Vec<BoxShadow> {
+    vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(1.)), blur_radius: px(2.), spread_radius: px(0.), inset: false }]
+}
+
 fn styled_tooltip(tip: Tooltip, text: SharedString, window: &mut Window, cx: &mut App) -> AnyView {
     {
         let pal = p();
@@ -160,7 +165,7 @@ fn styled_tooltip(tip: Tooltip, text: SharedString, window: &mut Window, cx: &mu
             .text_color(pal.text)
             .border_0()
             .rounded(px(0.))
-            .shadow_sm()
+            .shadow(tooltip_shadow())
             .px(px(7.))
             .pt(px(4.))
             .pb(px(3.))
@@ -317,7 +322,7 @@ impl Render for RichTooltip {
         // Placed in window coordinates (`anchored`), so gpui's pointer-based
         // tooltip origin doesn't matter. Tooltips are drawn outside the
         // window's element tree, so the UI font is set here.
-        let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }];
+        let shadow = tooltip_shadow();
         let title = div().px(px(4.)).h(px(26.)).flex().items_center().bg(pal.tooltip).font_weight(FontWeight::MEDIUM).whitespace_nowrap().child(self.title.clone());
         let body = if self.expanded {
             v_flex()
@@ -479,7 +484,7 @@ impl Render for PlacedTooltip {
             }
         }
         let pal = p();
-        let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }];
+        let shadow = tooltip_shadow();
         let a = self.anchor;
         let h = px(26.);
         let measured = self.width.clone();
@@ -1502,6 +1507,17 @@ mod tests {
     // `super::*` brings gpui's `test` attribute (via gpui_kit), which would
     // shadow the built-in one and expand forever.
     use super::*;
+
+    #[::core::prelude::v1::test]
+    fn box_shadow_blur_is_css() {
+        // CSS blurs a shadow with a Gaussian of half its blur radius; vendored gpui's shaders take the sigma
+        // (vendor/gpui-pre/NOSHAPE.md). Live's values are written as they are: no halving at the call sites.
+        let dialog = BoxShadow::new(px(0.), px(5.), hsla(0., 0., 0., 0.2)).blur_radius(px(10.));
+        assert_eq!(dialog.blur_sigma(), px(5.));
+        let pressed = &pressed_shadow()[0];
+        assert!(pressed.inset);
+        assert_eq!((pressed.offset, pressed.blur_radius, pressed.blur_sigma()), (point(px(0.), px(1.)), px(1.), px(0.5)));
+    }
 
     #[::core::prelude::v1::test]
     fn failing_custom_feature_icon_is_outlined_red() {

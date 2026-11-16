@@ -43,16 +43,8 @@ pub(crate) fn popover_ring(cx: &App) -> Hsla {
 /// Callers animating a surface in pass a rising `strength`; a resting surface
 /// passes `1.0`.
 ///
-/// The two blurred layers use Tailwind's radii **halved**, which is the
-/// conversion CSS requires and not a taste adjustment. CSS defines a box
-/// shadow's blur radius as twice the gaussian's standard deviation, while GPUI's
-/// shader takes the field as the deviation itself (`gaussian(y, sigma)`).
-/// Copying Tailwind's `6px` and `4px` across therefore spreads the shadow over
-/// twice the distance, which is why [`Styled::shadow_md`] reads as a wide grey
-/// haze next to a browser's compact one.
-///
-/// Measured against shadcn's own render, this lands within a luminance step of
-/// it the whole way down the falloff.
+/// The blurred layers are Tailwind's `shadow-md` as written: gpui's `BoxShadow::blur_sigma` converts a CSS blur
+/// radius to the shader's deviation.
 ///
 /// The ring is taken as a colour rather than read from the theme here so that an
 /// animation can hold it across frames, where no `App` is in hand.
@@ -66,10 +58,10 @@ pub(crate) fn popover_shadow(ring: Hsla, strength: f32) -> Vec<BoxShadow> {
             .blur_radius(px(0.))
             .spread_radius(px(1.)),
         BoxShadow::new(px(0.), px(4.), ink)
-            .blur_radius(px(3.))
+            .blur_radius(px(6.))
             .spread_radius(px(-1.)),
         BoxShadow::new(px(0.), px(2.), ink)
-            .blur_radius(px(2.))
+            .blur_radius(px(4.))
             .spread_radius(px(-2.)),
     ]
 }
@@ -81,15 +73,15 @@ pub(crate) fn popover_shadow(ring: Hsla, strength: f32) -> Vec<BoxShadow> {
 /// a real 1px border rather than the translucent ring it puts on a popup, so
 /// there is no ring layer here. Its corner radius is left to the caller.
 ///
-/// The radii are Tailwind's halved, for the reason [`popover_shadow`] explains.
+/// The radii are Tailwind's `shadow-lg` as written.
 pub(crate) fn toast_shadow(strength: f32) -> Vec<BoxShadow> {
     let ink = hsla(0., 0., 0., SURFACE_SHADOW_INK * strength.clamp(0., 1.));
     vec![
         BoxShadow::new(px(0.), px(10.), ink)
-            .blur_radius(px(7.5))
+            .blur_radius(px(15.))
             .spread_radius(px(-3.)),
         BoxShadow::new(px(0.), px(4.), ink)
-            .blur_radius(px(3.))
+            .blur_radius(px(6.))
             .spread_radius(px(-4.)),
     ]
 }
@@ -104,19 +96,13 @@ pub(crate) fn toast_shadow(strength: f32) -> Vec<BoxShadow> {
 /// wide one, and a wide one would read as grime against the trough wall rather
 /// than as lift.
 ///
-/// The radii are Tailwind's halved, for the reason [`popover_shadow`] explains:
-/// CSS defines a box shadow's blur radius as twice the gaussian's standard
-/// deviation, while GPUI's shader takes the field as the deviation itself
-/// (`gaussian(y, sigma)`). Copying Tailwind's `3px` and `2px` across therefore
-/// spreads the shadow over twice the distance, which is why
-/// [`Styled::shadow_sm`] leaves a haze around a 24px pill where shadcn draws a
-/// compact line.
+/// The radii are Tailwind's `shadow-sm` as written.
 pub(crate) fn raised_shadow() -> Vec<BoxShadow> {
     let ink = hsla(0., 0., 0., SURFACE_SHADOW_INK);
     vec![
-        BoxShadow::new(px(0.), px(1.), ink).blur_radius(px(1.5)),
+        BoxShadow::new(px(0.), px(1.), ink).blur_radius(px(3.)),
         BoxShadow::new(px(0.), px(1.), ink)
-            .blur_radius(px(1.))
+            .blur_radius(px(2.))
             .spread_radius(px(-1.)),
     ]
 }

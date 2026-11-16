@@ -4431,15 +4431,14 @@ impl Render for FeatureDialog {
             .key_context("FeatureDialog")
             .track_focus(&self.focus)
             // Onshape feature dialog frame (§3.9): 220 px, white at 95%, no
-            // border or radius, shadow 0 5px 10px rgba(0,0,0,.2) (GPUI blurs
-            // twice as far as CSS: half the radius).
+            // border or radius, shadow 0 5px 10px rgba(0,0,0,.2).
             .relative()
             // Live (behaviours "ui2 (10-24 09:10)"): 220 px in every language
             // until the user drags the right edge (remembered per type).
             .w(self.width.unwrap_or(px(220.)))
             .max_h(px(720.))
             .bg(pal.dialog_bg)
-            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
             .text_color(pal.text)
             // Live registers feature dialogs with its panel layout manager:
             // moved panels snap to their edges too.

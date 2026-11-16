@@ -2781,7 +2781,7 @@ impl PartStudioView {
                     .px(px(6.))
                     .pt(px(4.))
                     .gap(px(4.))
-                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
+                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                     .child(crate::os_ui::param_row("Units", units))
                     .child(origin)
                     .child(diag_help()),

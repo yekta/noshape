@@ -201,7 +201,7 @@ impl DrawingEditor {
                 tool("dr-bomtable", "drawing-bom", "BOM table", is_table(TableTool::Bom), table(TableTool::Bom)),
                 tool("dr-revtable", "revision-table", "Revision table", is_table(TableTool::Revision), table(TableTool::Revision)),
                 tool("dr-cutlist", "drawing-cutlist-table", "Cut list table", is_table(TableTool::CutList), table(TableTool::CutList)),
-                tool("dr-holetable", "hole-table", "Hole table", is_table(TableTool::Hole), table(TableTool::Hole)),
+                tool("dr-holetable", "drawing-hole-table", "Hole table", is_table(TableTool::Hole), table(TableTool::Hole)),
                 tool("dr-customtable", "drawing-custom-table", "Custom table", is_table(TableTool::Custom), table(TableTool::Custom)),
             ],
             vec![

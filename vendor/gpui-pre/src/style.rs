@@ -390,6 +390,12 @@ impl BoxShadow {
         self.inset = true;
         self
     }
+
+    /// NOSHAPE PATCH: the Gaussian sigma the shadow shaders blur with. `blur_radius` means what CSS's does, and CSS
+    /// blurs with a standard deviation of half the blur radius (upstream passes the radius as the sigma).
+    pub fn blur_sigma(&self) -> Pixels {
+        self.blur_radius * 0.5
+    }
 }
 
 /// How to handle whitespace in text

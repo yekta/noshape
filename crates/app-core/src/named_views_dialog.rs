@@ -71,7 +71,7 @@ pub fn render<V: 'static>(props: Props, input: &Entity<InputState>, key: &'stati
     // Live part-studio/75 (measured): until a name is typed the "+" is
     // #aeaeae in a #ddd border; enabled #999 in #aaa (dom/panel-named-views).
     let (add_color, add_border) = if empty_name { (gpui_kit::rgb(0xaeaeae), gpui_kit::rgb(0xdddddd)) } else { (gpui_kit::rgb(0x999999), gpui_kit::rgb(0xaaaaaa)) };
-    let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }];
+    let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }];
     let esc = view.clone();
     v_flex()
         .id("named-views")

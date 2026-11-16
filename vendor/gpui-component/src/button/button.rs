@@ -37,9 +37,8 @@ impl From<Pixels> for ButtonRounded {
 }
 
 /// NOSHAPE PATCH: Onshape's pressed toolbar button shadow.
-// CSS `inset 0 1px 1px`: gpui's blur_radius is the Gaussian sigma, half of CSS's blur radius.
 pub fn pressed_inset_shadow() -> gpui::BoxShadow {
-    gpui::BoxShadow { color: gpui::hsla(0., 0., 0., 0.247), offset: gpui::point(gpui::px(0.), gpui::px(1.)), blur_radius: gpui::px(0.5), spread_radius: gpui::px(0.), inset: true }
+    gpui::BoxShadow { color: gpui::hsla(0., 0., 0., 0.247), offset: gpui::point(gpui::px(0.), gpui::px(1.)), blur_radius: gpui::px(1.), spread_radius: gpui::px(0.), inset: true }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

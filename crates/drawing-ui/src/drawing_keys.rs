@@ -157,7 +157,7 @@ pub const SHORTCUT_CATALOGUE: [(&str, &str, Act); 65] = [
     ("Callout", "callout", |e, _, cx| e.set_tool(Tool::Balloon { anchor: None }, cx)),
     ("Table", "table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::General, view: None, origin: None }, cx)),
     ("Insert BOM", "drawing-bom", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Bom, view: None, origin: None }, cx)),
-    ("Hole table", "hole-table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Hole, view: None, origin: None }, cx)),
+    ("Hole table", "drawing-hole-table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Hole, view: None, origin: None }, cx)),
     ("Revision table", "revision-table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Revision, view: None, origin: None }, cx)),
     ("Custom table", "drawing-custom-table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Custom, view: None, origin: None }, cx)),
     ("2 point linear centerline", "centerline", |e, _, cx| e.set_tool(Tool::Centerline { first: None }, cx)),

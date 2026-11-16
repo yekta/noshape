@@ -845,7 +845,7 @@ impl PartStudioView {
                 .w(px(220.))
                 .h(px(if faces.is_some() { 431. } else { 400. }))
                 .bg(with_alpha(gpui_kit::rgb(0xffffff), 0.95))
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .text_color(pal.text)
                 .child(
                     h_flex()

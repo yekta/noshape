@@ -1539,6 +1539,13 @@ impl Render for PopupMenu {
             .on_action(cx.listener(Self::dismiss))
             .on_mouse_down_out(cx.listener(Self::on_mouse_down_out))
             .popover_style(cx)
+            // NOSHAPE PATCH: Onshape's toolbar dropdown (live feel/shadows): 1 px #ccc, radius 3, 0 5px 10px .2.
+            .when(self.tool_list, |this| {
+                this.border_1()
+                    .border_color(gpui::rgb(0xcccccc))
+                    .rounded(px(3.))
+                    .shadow(vec![gpui::BoxShadow::new(px(0.), px(5.), gpui::hsla(0., 0., 0., 0.2)).blur_radius(px(10.))])
+            })
             .text_color(cx.theme().popover_foreground)
             .relative()
             .when(self.shift_x != px(0.), |this| this.left(self.shift_x))
