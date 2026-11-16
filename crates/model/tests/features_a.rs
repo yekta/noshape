@@ -225,6 +225,40 @@ fn a_loft_to_a_sketch_point_tangent_to_its_plane() {
     assert!(near(bb.max.z, 0.1016, 1e-7), "{bb:?}");
 }
 
+/// The same dome from a part's face, added to the part (live c2-loft-paths-guides Loft 1 from Extrude 1's top face):
+/// its side face stays valid (a reversed face's seam got its two pcurves swapped: "unorientable", the cone's 274568
+/// mm³), and its apex is a vertex.
+#[test]
+fn a_loft_from_a_parts_face_to_a_point_tangent_to_its_plane() {
+    let mut t = T::new();
+    let mut base = noshape_sketch::Sketch::new();
+    base.add_circle(DVec2::ZERO, 0.0508);
+    let s1 = t.sketch(Reference::Plane(DatumPlane::Front), base);
+    let r1 = t.regions(s1)[0].clone();
+    t.add("extrude", &[("entities", q(vec![r1])), ("depth", e("20 in")), ("symmetric", ParamValue::Bool(true))]);
+    let res = t.ok();
+    let b = &res.context.bodies[0];
+    let top = b.shape.faces().iter().position(|f| f.is_planar() && f.centroid().is_ok_and(|c| c.y > 0.25)).expect("the top face");
+    let top = Reference::Face((*b.faces[top]).clone());
+    let pl = t.add("cPlane", &[("entities", q(vec![top.clone()])), ("cplaneType", en("OFFSET")), ("offset", e("4 in"))]);
+    let mut sk = noshape_sketch::Sketch::new();
+    let id = sk.add_point(DVec2::new(0.0, -0.0127));
+    let tip = Reference::SketchEntity { sketch: t.sketch(Reference::FeaturePlane(pl), sk), entity: id.0 };
+    let item = |r: Reference| {
+        let mut v = ParamValues::default();
+        v.set("sheetProfileEntities", q(vec![r]));
+        v
+    };
+    t.add("loft", &[("sheetProfilesArray", ParamValue::Array(vec![item(top), item(tip)])), ("endCondition", en("TANGENT_TO_PROFILE")), ("endMagnitude", e("1")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+    let res = t.ok();
+    let cylinder = std::f64::consts::PI * 50.8 * 50.8 * 508.0;
+    let v = total_volume(&res.context) * 1e9 - cylinder;
+    assert!((v - 370677.72).abs() < 3875.5, "loft volume {v} mm³");
+    let shown = res.context.bodies[0].shape.shown_topology().unwrap();
+    let count = |f: &[bool]| f.iter().filter(|s| **s).count();
+    assert_eq!((res.context.bodies[0].faces.len(), count(&shown.edges), count(&shown.vertices)), (3, 2, 1), "live 3/2/1: the dome's apex is a vertex");
+}
+
 #[test]
 fn loft_between_squares() {
     let mut t = T::new();

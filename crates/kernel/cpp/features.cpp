@@ -2411,16 +2411,17 @@ static bool apex_tangent_loft(const TopoDS_Shape& loft, const gp_Pnt& P, const g
   std::vector<PCurve> pcurves;
   for (const auto& u : faces)
   {
-    ShapeIMap edges;
-    TopExp::MapShapes(u.face, TopAbs_EDGE, edges);
+    const TopoDS_Face face = TopoDS::Face(u.face.Oriented(TopAbs_FORWARD)); // (UpdateEdge ignores a face's orientation)
+    ShapeIMap         edges;
+    TopExp::MapShapes(face, TopAbs_EDGE, edges);
     for (int i = 1; i <= edges.Extent(); ++i)
     {
       TopoDS_Edge e = TopoDS::Edge(edges(i));
       double      pf, pl;
       e.Orientation(TopAbs_FORWARD);
-      PCurve p{e, u.face, BRep_Tool::CurveOnSurface(e, u.face, pf, pl), {}, pf, pl};
-      if (BRep_Tool::IsClosed(e, u.face))
-        p.reversed = BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Reversed()), u.face, pf, pl);
+      PCurve p{e, face, BRep_Tool::CurveOnSurface(e, face, pf, pl), {}, pf, pl};
+      if (BRep_Tool::IsClosed(e, face))
+        p.reversed = BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Reversed()), face, pf, pl);
       pcurves.push_back(p);
     }
   }

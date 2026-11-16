@@ -941,8 +941,8 @@ bool is_seam(const TopoDS_Edge& e, const NCollection_List<TopoDS_Shape>* faces)
 // Onshape's (Parasolid's) edges and vertices among OCCT's: seams and
 // degenerated edges (a sphere's poles) aren't edges there; a vertex is one if
 // it ends a shown edge that isn't closed, has no edge (a point), or is a
-// cone's apex (live: a drill tip is a vertex; a cylinder's circles, a ring's
-// and a sphere have none). Flags in MapShapes order, the edges' then the
+// cone's or a B-spline face's apex (live: a drill tip is a vertex; a cylinder's
+// circles, a ring's and a sphere have none). Flags in MapShapes order, the edges' then the
 // vertices'.
 // Made once per shape from its cached ancestor maps (the naming made the
 // edge / vertex -> face ones): the display asked twice a regeneration, each
@@ -1297,7 +1297,11 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       }
       if (!shown && !anyEdge)
         for (uint32_t k = vf.first[(size_t)i - 1]; k < vf.first[(size_t)i] && !shown; ++k)
-          shown = BRepAdaptor_Surface(TopoDS::Face(fm((int)vf.second[k] + 1)), false).GetType() == GeomAbs_Cone;
+        {
+          // A B-spline face drawn to a point keeps it (live c2-loft-paths-guides' Loft 1: a dome to a sketch point, 3/2/1).
+          const GeomAbs_SurfaceType t = BRepAdaptor_Surface(TopoDS::Face(fm((int)vf.second[k] + 1)), false).GetType();
+          shown = t == GeomAbs_Cone || t == GeomAbs_BSplineSurface || t == GeomAbs_BezierSurface;
+        }
       out.push_back(shown ? 1 : 0);
     }
   });

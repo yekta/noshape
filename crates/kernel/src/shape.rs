@@ -306,7 +306,7 @@ impl Shape {
     /// Which edges and vertices Onshape's (Parasolid's) topology has, in
     /// MapShapes order: OCCT's seams and degenerated edges aren't edges there,
     /// and a vertex is one only if it ends a shown open edge, has no edge, or
-    /// is a cone's apex (a cylinder has 3 faces, 2 edges and no vertex).
+    /// is a cone's or a B-spline face's apex (a cylinder has 3 faces, 2 edges and no vertex).
     /// Whether any solid of the shape is inside out (its faces' normals pointing in: a negative volume).
     pub fn has_inside_out_solid(&self) -> bool {
         ffi::shape_inside_out(self.raw()).unwrap_or(false)
