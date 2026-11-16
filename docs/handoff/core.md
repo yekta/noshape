@@ -90,11 +90,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - **Committed d2605e45d (core-oc): a pattern / Mirror with Add joins surface copies to the seeds' and merge scope's
   surfaces they touch** (bshared.rs join_surface split out of surface_result; pattern.rs, only when every copy is a
   surface; copies touching nothing keep the old push): c2-surf-workshop-singularities 2 -> 5/15 (Mirror 3 one sheet
-  as live). Next there: "Loft with bad singularity" ERROR. T1 features_a::a_mirrored_surface_added_joins_the_surface_it_meets.
+  as live). Next there: "Loft with bad singularity" ERROR: a guided SURFACE loft from a sketch curve to a point (a
+  guide's end), start Normal to profile, guides Normal to guide + Match tangent to Extrude 1's cap edge; live makes
+  one singular patch (Problem loft 1/3/3). Guided loft to a point: a loft_guided item, not started.
+  T1 features_a::a_mirrored_surface_added_joins_the_surface_it_meets.
 - **Landing plan:** the vibe7 pair covers 1357fddb1..bcaf5ffdb. The second pair (97b778e7d + b173dc5bb + d2605e45d vs
   bcaf5ffdb) runs on vibe5, restarted 19:36 UTC: ~/agents/core-keep/p2pair.sh -> p2res (own src copy p2src, target
   p2target, base files p2base; src and target removed at the end). Land all nine when both are clean; or the six from
   a worktree at bcaf5ffdb (core-trace) if the second isn't done when the first comes back clean.
+- c2-surf-workshop-manualblend Sweep 2: Sketch 5's CONCENTRIC rejected by the translator (skasm's handoff). Not core's.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the

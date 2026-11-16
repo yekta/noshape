@@ -42,6 +42,9 @@ only when a line here points there).
   Layout moved), and live re-solves it onto JPg. With no sketches.json for that document, the translator takes the
   move back ("moved the geometry by up to 18.798 mm ... taken back"), so our tube runs 18.8 mm off live's. A solve
   that lands an external COINCIDENT exactly on live's recorded refs point could count as `closer`.
+- c2-surf-workshop-manualblend Sweep 2 (11/19): Sketch 5's circle (the profile, on Plane 3) has its CONCENTRIC
+  rejected ("constraints left to the solved geometry: 1 CONCENTRIC rejected"), so it stays where stored, ~100 mm
+  from the path (our Curve 2 matches live's); our swept surface lands at x 67–95 mm, live's at −61…−26.
 
 ## In flight
 - Landing 2026-11-16 01:57: a sheet metal entity is labelled after the feature that made its definition entity as
