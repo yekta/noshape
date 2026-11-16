@@ -4,23 +4,24 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-16 01:44 UTC.
+Updated 11-16 02:50 UTC.
 
 ## In flight
-- Queued to land: 566b1015 (Shell self-interference filter: an edge's points against the face's own parameter patch of
-  a cylinder / cone / sphere / ring torus, closed form, before meshing; c2-bottle-split Shell 1 33 -> 18 ms). Gate
-  578353275 clean (CHECK knurls only; replay 0 new; suite 124 docs, 78 -> 78, 969/1182); hats/dock 12/12 SAME.
-- Gating (retry; the first build was SIGTERMed at 01:42, vibe5 load 39, as 578353275's at 22:33): fa8a800ef (worktree bool-hat, branch bool-impeller-sliver): quadric_across in rust_boolean.cpp: an
-  extrusion against a cylinder across its direction or a sphere, per ruling A w^2 + B w + C = 0, two branches; runs
-  within the extrusion's heights and the other face's box (bisected between samples, 32 a profile span), cut where the
-  angle passes the surface's OWN seam (raw ElSLib angle crossing 2 pi, as OCCT cuts its curves; cutting at the face's
-  box start instead made rings-loft non-manifold), angles of each piece on its middle's turn. Declines (OCCT's): a run
-  ending where the branches meet (tangent ruling), a run across a profile knot (interpolation crawls past kinks).
-  c2-rings-loft 8f262543bbeb781c (Extrude 5's cut): 13 cylinder x extrusion pairs ours, same counts / volume. T1
-  bool_patterns::a_spline_prism_cut_by_a_cylinder_across_it_and_by_a_ball_as_occt; a_rings_wedge... (78cd8309) guards the
-  seam rule. Then hats/dock (udoc-ab.sh in bool-split: point it at the branch) and land.
-- Impeller f15 done: known live difference (DECISIONS 6ea431265), LIVE_SLIVER_EDGES in crates/ops/tests/parity.rs
-  (landed 2f4bad67; impeller 15 -> 24/48). dx added f24's split vertex to the same table (DECISIONS bb69638d4).
+- Queued to land: 56a9528b (566b10155 re-queued 01:5x: it had dropped out of the queue, neither landed nor failed; Shell
+  self-interference filter, closed-form distance from a cylinder / cone / sphere / ring torus patch before meshing;
+  c2-bottle-split Shell 1 33 -> 18 ms). Gate 578353275 clean; hats/dock 12/12 SAME.
+- Gating (retry, built 01:57, running): fa8a800ef (worktree bool-hat, branch bool-impeller-sliver): quadric_across, an
+  extrusion against a cylinder across its direction or a sphere, per ruling A w^2 + B w + C = 0; runs within the heights
+  and the other face's box, cut where the angle passes the other surface's OWN seam (as OCCT); declines at tangent
+  rulings and across profile knots. c2-rings-loft 8f262543 (Extrude 5): 13 pairs ours, same counts / volume. Then
+  hats/dock (/root/bool-hat-scratch/udoc-ab.sh, in bool-split: point its final `git switch` at the branch) and land.
+- Next to gate (after fa8a800ef; branch bool-cp2-ahead in bool-split, 2 commits on d0948a91b):
+  3a3249cbc moved_pair returns None where the uncopied face is free-form (clear_inside always refuses those, so the
+  pairs were sectioned one at a time on the main thread after the moved curves; now they go in the parallel ahead
+  batch): c2-rings-loft CP2 fuse 86892e9b ~10 % faster in 6 of 6 interleaved rounds, 103/261 and volume the same.
+  e5c584e35 off_shared_edges applied inside the ahead jobs (the map holds lines with it applied; seeded lines get it
+  at fetch): housing Rotieren 1 4361c232 ~10 % faster (3 of 4 rounds), CP2 also 3 of 4; same counts / volume. g++-13 ok.
+- Impeller f15 and f24: known live differences (DECISIONS 6ea431265, bb69638d4; LIVE_SLIVER_EDGES, landed 2f4bad67).
 
 ## Parked (branches / diffs, not landing as they are)
 - Plane x B-spline marcher + our own least-squares fit (branch bool-free-sections-wip: 71efdd87e, f6c77c748, ...):
@@ -48,19 +49,14 @@ Updated 11-16 01:44 UTC.
   Tangent contacts stay OCCT's (lead 11-15); likewise housing's 4 cylinder x revolution pairs (20-27 ms each, none).
 
 ## Next, in order
-1. qa's list (docs/handoff/qa.md "Speed"), mine: knife Split 4 profiled (Split Face's projections: OCCT's plane x
-   B-spline sections 10-15 ms each, a 1 mm line along the blade's edge to BRepProj ~20 ms: no exact lever); bottle
-   Shell done (566b1015), Split no single lever (our Boolean ~7 ms warm), Revolve 2 not ours (its fuse 4 ms); cf-lighten
-   and c2-sm-louver now at or under live. rings-loft (11-16 01:00, vibe5 loaded): Shell 1 540 / 235, Circular pattern 2
-   309 / 201 (fuse 86892e9b, 8 tools, torus x plane ours), Extrude 5 260 / 39 (cut 8f262543: quadric_across gating; its
-   16 torus x extrusion pairs finding none still OCCT's ~35 ms: a quartic a ruling, "none" needs a proof), Extrude 3 117
-   / 32 (cut 5d782946: bspline x plane 12 pairs + bspline x cylinder 6 OCCT's). Recorded vibe5 ~/tmp/bool/rl.
-   CP2's fuse 86892e9b: 98 torus x plane sections made SYNCHRONOUSLY on the main thread (nurbs_pair: moved sections
-   "reach the face's boundary" -> occt_sections(actual pair), never in the ahead batch, which dedups by moved_pair).
-   Lever: a second ahead round for those fallbacks (needs the pairing loop split in two) or prefetching actual pairs
-   (costs CPU where symmetry works). c2-housing-draft Rotieren 1 (4361c232e43fc0c1, core 11-16: .brep 65 ms): main thread
-   waits on the ahead batch (its 4 near-tangent cylinder x revolution pairs, OCCT 20-27 ms each, parked), then
-   off_shared_edges per fetched pair (an early return for empty pairs measured nothing), regions, C2 intersections.
+1. qa's list (docs/handoff/qa.md "Speed"), mine: knife Split 4 (no exact lever: OCCT's plane x B-spline sections and a
+   1 mm line to BRepProj), bottle Shell (566b1015) / Split (no single lever), cf-lighten and c2-sm-louver at or under
+   live, CP2 and housing Rotieren 1 (bool-cp2-ahead above). Housing's other cuts: 6e0cb4e02a2efe47 (~7 ms quiet)
+   is half OCCT's cylinder x cylinder walk (IntCyCy + WLApprox + PSO tolerance). Own cyl x cyl sections parked:
+   /root/bool-scratch/parked-cyl-cyl.diff (quadric_across over a Ruled view) matches OCCT's curves but not its
+   splits: OCCT breaks its lines at 12 critical points (CriticalPointsComputing) and re-joins some (JoinWLines:
+   IsSeamOrBound, CheckArgumentsToJoin); probe cases in notes-snap.txt. Matching both exactly is the work left.
+   CP2 remainder: its 8 tool cuts run in parallel (rust_fuse_trimmed), then the fuse; nothing single.
 2. c2-rings-loft Shell 1 (~510-590 ms, live 235): repair 251 (traces 95, split 78, crossings 26, joins 17),
    self-interference 67 (its EF time in ~23 pairs on free-form faces; quadric pairs are cheap), edges 44, check 35,
    thin 34. Points with no square foot: OCCT's global search found none wherever a Newton search from the own 25 x 25
@@ -95,13 +91,15 @@ cf-snap-hook 866 / 274 (suite run 18:5x); c2-bottle-split Split 1 ~12 ms in rele
   (bool2's ff43a8c95). A crates/brep or Boolean change needs a clean gate and identical results end to end.
 - Land: `NOSHAPE_LAND_QUEUE_HOST=vibe5 NOSHAPE_LAND_HOSTS="vibe5 vibe3" tools/tiers/land.sh` after
   `git diff --stat $(git merge-base HEAD origin/main) HEAD`; `tools/tiers/land.sh --status`.
-- g++-13: /root/bool-scratch/gcc13-split.sh <file.cpp...> (bool-split's tree on vibe5).
+- g++-13: /root/bool-scratch/gcc13-split.sh / gcc13-hat.sh <file.cpp> (name only, e.g. rust_boolean.cpp).
+- A/B binaries: /root/bool-scratch/kb5.sh <worktree> <name> (kernel release test binary to vibe5 ~/tmp/bool/<name>).
 - Private documents (hats, dock): vibe5 ~/agents/bool-keep/private (mode 700); compare main vs branch with
   /root/bool-hat-scratch/udoc-ab.sh (copies in ~/tmp/bool/udoc, deleted after).
 - Probes (xprobe.rs): probe_case_timed (PROBE_CORPUS, PROBE_CASE, PROBE_RUNS; NOSHAPE_SAMPLE_OUT samples all runs),
   probe_case_sample (PROBE_ONLY rust/occt, PROBE_SAMPLE), probe_case_unify, probe_shell_dump (PROBE_DUMP=vibe7
   ~/agents/bool-keep/rl/shell-9; NOSHAPE_SHELL_DEBUG for stage times), probe_split_dump, probe_project_dump.
-- Profiles: vibe5 ~/agents/profile-funcs.py, ~/tmp/bool/pu.py (inclusive under a function); vibe7 ~/tmp/bool/c2
+- Profiles: vibe5 ~/agents/bool-keep/pu.py <log> [stack filter] [n] (inclusive and self; SAMPLE_WALL=1 logs need a
+  filter such as probe_case_timed), ~/agents/profile-funcs.py; vibe7 ~/tmp/bool/c2
   pu.py, callers.py (caller chains), lines.py / lines2.py (shell.cpp stage buckets).
 - Recordings: NOSHAPE_RECORD_BOOLEANS=<dir> on a parity run (ops binary, NOSHAPE_PARITY_MODELS=vibe5
   ~/tmp/bool/ab/models, NOSHAPE_PARITY_ONLY=<doc>). Corpora: vibe5 ~/agents/bool-corpora, ~/agents/bool-keep,
