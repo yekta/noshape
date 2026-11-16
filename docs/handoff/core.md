@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 03:44 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 03:55 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
@@ -50,9 +50,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. Asked of me 11-16, left: dx's lofts: c2-loft-paths-guides f4 (face -> sketch point, TANGENT_TO_PROFILE: a point
-   profile takes its sketch's plane) and c2-loft-guide-curves-wave-washer f6 ("Loft path with more than two profiles is
-   not supported yet"; vibe5 ~/tmp/dx/savelf). Done and queued 11-16: psui's failed-Shell error shapes, the corner break
+0. Asked of me 11-16, left: dx's lofts. c2-loft-paths-guides Loft 1 (face -> sketch point, TANGENT_TO_PROFILE):
+   branch core-loftpt in core-oc (cc42f4faf, WIP, not for landing) gives point profiles their sketch's normal, but the
+   kernel loft drops end conditions at a point section (features.cpp loft_impl: `natural` is off with a vertex section),
+   so the T1 a_loft_to_a_sketch_point_tangent_to_its_plane gets the pyramid (4000 mm³): needs natural_loft to take an
+   apex with a tangent plane (live: a dome, +370678 mm³ on the r 50.8 cylinder). The document's other cause is dx's
+   (Sketch 2 on the cylinder top, not Plane 1; told). c2-loft-guide-curves-wave-washer f6 "Loft path with more than two
+   profiles is not supported yet" (solid_a.rs, opts.path with 2 sections only): mine, not started. Done and queued 11-16: psui's failed-Shell error shapes, the corner break
    taking a side whole (c2-sm-side-cuts-tab 7 -> 13/18, next a Hole), Offset surface sheets touching at a corner as one
    (hem-plus feature 3; its Derived 1 still 6/12/8 vs live 14/36/24). Impeller: blend's chamfer fix (12b25c47e) moves
    the first difference to Fillet 3 (blend's); Move face 1 / Delete face 2 speed after that.
