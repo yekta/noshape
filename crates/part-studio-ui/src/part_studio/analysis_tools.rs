@@ -564,6 +564,11 @@ impl PartStudioView {
                 }
                 text.push("Comb size".into());
             }
+            // Live analysis-thickness (Professional): its one field.
+            ToolKind::Thickness => {
+                text.push("Parts to analyze".into());
+                chips(&mut text, &t.selection);
+            }
             _ => return None,
         }
         Some(json!({ "kind": "panel", "title": t.kind.title(), "text": text, "fields": fields }))

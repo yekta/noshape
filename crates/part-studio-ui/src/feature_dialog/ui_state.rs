@@ -255,9 +255,21 @@ impl FeatureDialog {
                     let shown = self.shown_items(s.id, values.array(s.id).len());
                     if boxed && !shown.is_empty() {
                         let inner: Vec<Value> = shown.iter().filter(|k| !self.closed_items.contains(&format!("{}.{k}", s.id))).flat_map(|k| self.item_fields(s.id, *k, specs)).collect();
-                        let first = inner.iter().find(|f| f["kind"] == "number").map(|f| f["text"].clone()).unwrap_or(Value::Null);
                         let state = if self.field_error(s.id).is_some() { "error" } else { "ok" };
-                        fields.push(json!({ "label": label, "kind": "number", "text": first, "focused": false, "state": state }));
+                        // Its first field a selection (a point on a vertex, live routing-curve-new-edit-reedit): a
+                        // selection of the shown item's title and that field's chips.
+                        match inner.iter().find(|f| f["kind"] == "number" || f["kind"] == "query") {
+                            Some(f) if f["kind"] == "query" => {
+                                let title = match (s.item_template, values.array(s.id).get(shown[0])) {
+                                    (Some(t), Some(it)) => self.item_label(t, it, specs, s.id, shown[0]),
+                                    _ => format!("{} {}", capitalize(item_label), shown[0] + 1),
+                                };
+                                let mut items = vec![Value::from(title)];
+                                items.extend(f["items"].as_array().cloned().unwrap_or_default());
+                                fields.push(json!({ "label": label, "kind": "query", "items": items, "active": false, "state": state }));
+                            }
+                            f => fields.push(json!({ "label": label, "kind": "number", "text": f.map_or(Value::Null, |f| f["text"].clone()), "focused": false, "state": state })),
+                        }
                         fields.extend(inner);
                         continue;
                     }
