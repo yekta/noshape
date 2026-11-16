@@ -8635,7 +8635,9 @@ static bool fillet_square_corner(const TopoDS_Shape& s, const TopoDS_Edge& e, do
   return true;
 }
 
-// Whether a blend's result has a sliver: a new face narrower than a twentieth of the radius across its size.
+// Whether a blend's result has a sliver: a new face narrower than a twentieth of the radius across its size. (Each area
+// to 1% first, exact only near the limit: a free-form face's exact area took ~5 ms, c2-hunting-knife's Fillet 6 15 of its
+// 20 ms.)
 static bool blend_slivers(const TopoDS_Shape& input, const TopoDS_Shape& r, double radius)
 {
   ShapeIMap old;
@@ -8646,9 +8648,16 @@ static bool blend_slivers(const TopoDS_Shape& input, const TopoDS_Shape& r, doub
       continue;
     Bnd_Box b;
     BRepBndLib::Add(x.Current(), b);
+    const double limit = 0.05 * radius * std::sqrt(b.SquareExtent());
+    GProp_GProps rough;
+    BRepGProp::SurfaceProperties(x.Current(), rough, 1e-2);
+    if (rough.Mass() > 1.1 * limit)
+      continue;
+    if (rough.Mass() < 0.9 * limit)
+      return true;
     GProp_GProps g;
     BRepGProp::SurfaceProperties(x.Current(), g);
-    if (g.Mass() < 0.05 * radius * std::sqrt(b.SquareExtent()))
+    if (g.Mass() < limit)
       return true;
   }
   return false;
