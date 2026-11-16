@@ -9,36 +9,33 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-15 23:37 UTC.
+Updated 2026-11-16 00:47 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-- aaa63901d (committed, not queued: waits for the full drawing run on vibe5, ~/tmp/studios/drw288, task queued behind
-  ~/bin/slot; don't rebuild ~/tmp/studios/noshape there until it ends):
-  - a projected view's View orientation ▸ (Top, Left, Right, Front, Back, Bottom, Isometric; its own greyed, no
-    checks) turns its base so that it shows the pick, the family following (`views::reoriented_base`,
-    `set_base_frame`; op drawing_view_display orientation on a projected view; e2e drawing_view_menu_edits; take
-    drw-view-orientation-projected from live2's vo-probe)
-  - the sheet's right-click menu opens with its top 35 px above the pointer, left edge 1 px right (live2 rmb-probe);
-    panel and list menus keep +2 px below
-  - what a menu row leaves hovered under the pointer, and Align views' view and target, read lit with the `new`
-    marker (only the 11-15 recorder reads them): drw-view-align-horizontally / -vertically match
-- Checked on 18 menu takes (vibe5): no regressions.
-
-Landed 23:11: af25fdb0 as 0876332a; c1e1a6e5 (drawing matrix + handoff) queued 23:13.
+Committed, not queued: waits for the full drawing run on vibe5 (~/tmp/studios/drw288, task queued behind bool's gate
+via ~/bin/slot; don't rebuild ~/tmp/studios/noshape on vibe5 until it ends). Then land.sh.
+- aaa63901d View orientation ▸ on a projected view (turns its base; op drawing_view_display orientation on a
+  projected view; e2e drawing_view_menu_edits; take drw-view-orientation-projected); the sheet's menu 35 px above
+  the pointer (live2 rmb-probe); what a menu row / Align views leaves lit reads with the `new` marker.
+- a102bdfea a title field right-clicked with something selected joins it (rows both have, the field's Add leader,
+  Move to only with notes).
+- c2e26a173 TITLE's lines pick each on its own, from its text up to the line above (lead 11-16, DECISIONS
+  76780c8c5); after a menu a view reads lit only within 6.5 px of its box; ui-parity `excluded` (README) marks a
+  left-out cloud feature's difference: drw-note-move-to-title-block s8.
+- ae7e870ff the sheet's menu that fits shows row 2 hovered, one moved up to fit none (all 11 menus of live2's 11-15
+  takes). Checked on vibe6 (newest binary): drw-datum-copy-paste, -surface-finish-flip, -view-align-horizontally,
+  -view-orientation-projected and 5 more match.
+- Previous full run (vibe5, before c2e26a173 / ae7e870ff): 282 of 288.
 
 ## Waiting on others
-- live2 (asked 23:20): which points near the title block's TITLE field highlight it (x 230, y 36-48 mm). live2's
-  rmb-probe: (230, 40) is the TITLE field; a right-click there adds it to the selection and the menu is the field's
-  plus the selection's (datum: Copy, Paste as table, Add leader | Clear selection, Zoom to fit, Delete; note: + Move
-  to; dimension: no Copy; view: as datum). Ours treats (230, 40) as empty sheet: our TITLE cell is its row only.
-- live2: panel takes for Drawing properties, Hole table, Title block (asked 23:15).
-- drw-note-move-to-title-block s8: decision asked of the lead. Live's note menu is one row and a separator taller
-  (Add comment, cloud), so when it shifts up to fit the window its Move to ▸ Title block row sits ~30 px higher than
-  ours and the pointer ends on Front's edge in live, 31 px under it in ours.
+- live2: panel takes for Drawing properties, Hole table, Title block (asked 11-15 23:15).
+- TITLE's lines as separate fields in the data (title1/2/3 each its own field: its own highlight band, Edit note on
+  that line): ours keeps one "Title" field with three lines; only the pick areas are per line. Next if the lead
+  wants the rest of "copy live's structure".
 
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;
