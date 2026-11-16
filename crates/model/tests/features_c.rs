@@ -2671,6 +2671,18 @@ fn mate_connector_frame_order_as_live() {
     let mut e = Studio::new();
     e.add("mateConnector", |p| p.set("originQuery", q(Reference::Origin)));
     assert_eq!(e.last_status(), (FeatureStatus::Error, "Cannot determine owner of mate connector.".to_string()));
+    // Owned by a sketch (its point picked as the owner, as asm-keyboard-pattern's 7f71cc): the sketch's body owns it.
+    let mut k = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pt = sk.add_point(DVec2::new(mm(5.0), mm(3.0)));
+    let sid = k.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let at = Reference::SketchEntity { sketch: sid, entity: pt.0 };
+    k.add("mateConnector", move |p| {
+        p.set("originQuery", q(at.clone()));
+        p.set("ownerPart", q(at));
+    });
+    let r = k.ok();
+    assert_eq!(r.context.connector_owners.iter().map(|(_, b)| b.clone()).collect::<Vec<_>>(), [noshape_model::reference::sketch_body_id(sid)]);
 }
 
 /// Live (qa5 "sm loft", SML1): Sheet metal loft, Add, from a 60 × 40 × 2

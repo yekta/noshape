@@ -329,7 +329,7 @@ pub fn mate_connector(ev: &mut EvalCtx) -> FResult<()> {
             let one = std::slice::from_ref(&origin_ref);
             ev.resolve_faces(one).first().map(|x| x.0).or_else(|| ev.resolve_edges(one).first().map(|x| x.0)).or_else(|| (ev.ctx.bodies.len() == 1).then_some(0))
         };
-        let unknown = if owner.is_empty() { !ev.params.bool("legacyNoOwner") && inferred().is_none() } else { ev.resolve_bodies(owner).is_empty() };
+        let unknown = if owner.is_empty() { !ev.params.bool("legacyNoOwner") && inferred().is_none() } else { ev.resolve_bodies(owner).is_empty() && sketch_owner(owner).is_none() };
         if unknown {
             return crate::regen::eval::err_at(&["ownerPart"], "Cannot determine owner of mate connector.");
         }
@@ -345,13 +345,25 @@ pub fn mate_connector(ev: &mut EvalCtx) -> FResult<()> {
         let picked = ev.resolve_bodies(ev.query("ownerPart")).first().copied();
         let one = std::slice::from_ref(&origin_ref);
         let owner = picked.or_else(|| ev.resolve_faces(one).first().map(|x| x.0)).or_else(|| ev.resolve_edges(one).first().map(|x| x.0)).or_else(|| (ev.ctx.bodies.len() == 1).then_some(0));
-        if let Some(bi) = owner {
-            let id = ev.ctx.bodies[bi].id.clone();
+        // A sketch picked as the owner: its body (live: a connector on a sketch an assembly inserts).
+        let id = match (picked, sketch_owner(ev.query("ownerPart"))) {
+            (None, Some(sketch)) => Some(crate::reference::sketch_body_id(sketch)),
+            _ => owner.map(|bi| ev.ctx.bodies[bi].id.clone()),
+        };
+        if let Some(id) = id {
             ev.ctx.connector_owners.push((reference.clone(), id));
         }
     }
     ev.ctx.connectors.push(Connector { reference, name, origin: cs.origin, x: cs.x, z: cs.z });
     Ok(())
+}
+
+/// The sketch an owner query picks (a sketch's entity, region or the sketch itself).
+fn sketch_owner(owner: &[Reference]) -> Option<crate::reference::FeatureId> {
+    owner.iter().find_map(|r| match r {
+        Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::SketchCurveEnd { sketch, .. } | Reference::SketchBody { sketch, .. } | Reference::Sketch(sketch) => Some(*sketch),
+        _ => None,
+    })
 }
 
 /// Construction point on an edge (normalized parameter) or at coordinates.
