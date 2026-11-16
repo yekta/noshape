@@ -6907,7 +6907,9 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_groups(const TopoDS_Shap
     return std::nullopt;
   try
   {
-    const double v0  = volume_props(input).Mass();
+    // (The input's volume only once a group's round builds: an integral over the whole part, 2.2 s of
+    // c2-impeller-loft's failing Fillet Stevenrohr zum Halter, whose first group fails in 5 ms.)
+    std::optional<double> v0;
     TopoDS_Shape cur = input;
     HHist        cur_h;
     for (const std::vector<size_t>& idx : groups)
@@ -6923,7 +6925,11 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_groups(const TopoDS_Shap
       rounded = exact_vertex_blends(rounded, corners);
       if (!corners.IsNull())
         h = compose(input, h, corners);
-      if (!valid_shape(rounded) || !(volume_props(rounded).Mass() < v0))
+      if (!valid_shape(rounded))
+        return std::nullopt;
+      if (!v0)
+        v0 = volume_props(input).Mass();
+      if (!(volume_props(rounded).Mass() < *v0))
         return std::nullopt;
       BRepAlgoAPI_Common cm; // (not the two-shape constructor: it builds at once)
       ShapeList          args, tools;
