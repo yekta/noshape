@@ -19,7 +19,9 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   STEP's tessellated solid no longer reads back as part + composite; 81ae5cce0 x_t / ACIS export (seam-line edge used
   once kept: c2-housing-draft; SweptToElementary null swept surface on a sphere / torus: cf-snap-hook); b75687eb8
   suite reads live.obj.zip, ACIS held to live's x_t import, OBJ / 3MF to its STL import.
-  live2: 4 docs final (rings-loft, extension-spring, housing-draft, sm-louver); translations quota 429 until ~18:36,
+  live2 PAUSED until ~11-17 10:15 (lead 13:3x: don't message paused agents; requests into REQUESTS.md: the 13:31
+  addition there asks live-self "ACIS" + hex-bookcase JT/RHINO/PVZ). live2: 4 docs final (rings-loft,
+  extension-spring, housing-draft, sm-louver); translations quota 429 until ~18:36,
   STL until ~18:45; timer 18:50: hex-bookcase first (+ JT / RHINO / PVZ, live-export-results.json: what live writes
   for a mesh part), then the other 5, then all 10 live.stl + live-self STL.
   Landed 11-16 pm: 2ddc1b649 drawing DXF layout + 2 viewports per sheet, $TILEMODE 0; f184f26ae tangent edges by
@@ -36,9 +38,12 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
      e9facf060 (closed intersection curve: vertex at the closing end takes the curve's start: edges / vertices then
      = live), 476fcd5e2 (per-face tube for a blend across its periodic (ellipse) spine's start: Extruded ring then
      260 faces + four 5-face pieces, volume wrong). Earlier try (periodic tube, reverted): faces = live, edges 916.
-  2. Our x_t of cf-snap-hook: the body as our reader builds it has 36 free edges (9 per hook) before healing, which
-     then splits it into 13 sheets; prepared shape on the writer side is valid with no free edges. Live's import of
-     ours (after 18:50) says writer or reader.
+  2. Our x_t of cf-snap-hook: FIXED on my branch (local commit "Parasolid export: circle arcs become one ring edge
+     only where every face ... has them as a loop"; xt.cpp whole_ring): whole_ring merged a disc's two rim arcs into
+     a ring while the torus beside kept the arcs in a longer loop -> unshared -> 36 free edges -> 13 sheets. Now one
+     solid 136/324/200, 72217.749 mm³ (model 72217.763). g++-13 not yet checked. NOT LANDED: needs a T1 test that
+     fails without it (two fused half-cylinders didn't reproduce: fuse merges them); build a disc whose rim is two
+     arcs beside a torus face holding them in a longer loop, or a small BREP fixture of one hook tip.
   3. Our SAT: cf-sheet-metal-model-plus's suite export (139 faces; the CLI's export of the same doc 121, reads back
      fine) reads back as 0 parts with no error (import drops invalid bodies silently); motor-mount-jack 24/26/2 for
      16/24/0; cf-hose-routing 22/44/24 for 12/12/0; cf-o-ring Part 3 read back as another ring (names?). A placed or
