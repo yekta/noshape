@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 01:45 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 01:32 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
@@ -45,7 +45,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-1. Knife's dish vertex: asked live in REQUESTS.md (11-16 01:47) for the face's surface type and its edges / vertices;
+1. Knife's dish vertex: asked live in REQUESTS.md (11-16 01:32) for the face's surface type and its edges / vertices;
    then retry core-pole-v2 (Parked above) on what live says.
 2. qa's speed list (P0), what is mine: c2-valve-config Extrude 3 `prism_until.split` 131 ms (a logo up to one revolved
    dome face: OCCT's splitter, 26 face-face intersections; OBB and a (u, v) patch of the dome tried 11-15, no gain; a
