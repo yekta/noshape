@@ -68,6 +68,9 @@ pub mod viewport {
     pub const DEBUG_MAGENTA: u32 = 0xff2bc1;
     pub const DEBUG_MAGENTA_POINT: u32 = 0xe224e3;
     pub const ERROR_FILL_ALPHA: f32 = 0.60;
+    /// A failed feature's part of the result (live feedback-gaps 5, a failed Shell): [`ERROR`] at 25 % over its own
+    /// shading.
+    pub const ERROR_PART_ALPHA: f32 = 0.25;
     /// Construction plane fill (`--os-construction-plane-ambient-color`
     /// #cedbe5 at 20 %), drawn unlit: one plane over white reads `#f5f8fa`,
     /// three stacked `#e7edf2` (live).

@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-16 03:56 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-16 04:44 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -38,32 +38,31 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
 
-- Landed 11-16 03:41 (c525abd8): flat view bend centre lines dashed 10 / 10 / 5 / 10 px (`LineSegment::CENTER_LINE`
-  = 512), the flat bend hover (`FlatViewEvent::BendHover`, `ui.sm_flat_hover`; sheet metal matrix 12 / 12), sketch
-  pattern labels as live sketch-gaps2 / 3 (`pattern_label_wpp`: px at the tool's start zoom, then model-fixed).
-- Queued 03:55 (03b36ca6): the sketch 2D manipulator as live editing-gaps3 (`transform_anchor`: the lowest end or
-  centre; `PatternHandle::MoveX` / `MoveY`; `XF_*` px constants; checked in a vibe6 shot); `sketch_transform`'s pivot
-  defaults to the same point (AGENT_API.md regenerated); snaps matrix 60 / 62 (spline rows: across the through-point
-  and the curve live reaches 8–12 px, its spline's shape unrecorded: gaps, not chased).
-- Failed preview (live feedback-gaps 5): with core's ce0e6ae8 ours is the whole part red, in the ghost style
-  (`scene_builder::error_geometry`: flat rgb(123,30,36) at 60 %, edges 3.5 px). Live (fb5-failed3.png vs our
-  /root/psui-scratch/fb5/sf/08.png): the part's own shading + rgb(189,48,57) at α 0.25 (solved per channel from the
-  top and front faces), edges 5 px. Asked core 04:10 for FeatureState to list which error shapes are result
-  bodies (error_parts beside error_mesh); then: those parts tinted 25 % + 5 px red edges, the rest stay ghosts.
-- routing-curve-new-edit-reedit: 19 / 19 (11-16 03:30). doc-tab-rename-escape, sketch-constraint-refusals match.
-- Open feel gaps: the tooltip fade-out (needs vendored gpui's tooltip lifecycle: a timed WaitingForHide with an
-  opacity the tooltip view reads; gpui's tooltip tests expect an instant hide; left), the view cube knob size vs
-  live's 3 px hover map, a woken model edge's perpendicular (live sketch-gaps 1c: needs a slanted model edge in the
-  snaps bench), the flat bend click colours (zone rgb(214,151,30), outline rgb(255,169,10): ours the selection
-  colour), an open circular pattern's angle label (live has none), live's angle / factor boxes' place on the triad.
+- Landed 11-16: c525abd8 (flat bend dash and hover, pattern labels), f2029e2a (the sketch 2D manipulator as live
+  editing-gaps3: `transform_anchor`, `PatternHandle::MoveX` / `MoveY`, `XF_*`; `sketch_transform`'s default pivot),
+  876f6e61 (snaps: spline rows, 2 gaps: live reaches 8–12 px across a spline, its shape unrecorded).
+- Queued 04:25 (dd13425c): model edges wake after a 60 ms rest and give PERPENDICULAR through a line's start (live
+  sketch-gaps 1c; `woken_edge`, `WOKEN_EDGE` sentinel retargeted by `link_woken_edge` when the view uses the edge;
+  `model_lines` filled in `model_snap`); snaps matrix 63 / 65 with a triangle prism bench (`triangle_part`,
+  `Pt::SlantMid` / `SlantPerp`, `Lit::Slant`). A woken model edge's parallel isn't measured live: not offered.
+- Queued with this handoff: a failed feature's parts of the result (core's `FeatureState::error_parts`, 601df0ac)
+  drawn as live feedback-gaps 5: their shading under rgb(189,48,57) at 25 %, edges 5 px (`error_geometry(…,
+  ghost: false)`, `ERROR_PART_ALPHA`); vibe6 shot /root/psui-scratch/fb5/sf2/08.png: top (162,156,176) = live,
+  front (124,107,120) vs (125,107,120), edges 5 px.
+- Open feel gaps: the tooltip fade-out (vendored gpui's tooltip lifecycle; gpui's tooltip tests expect an instant
+  hide; left), the view cube knob size vs live's 3 px hover map, the flat bend click colours (zone rgb(214,151,30),
+  outline rgb(255,169,10); needs a flat-view click target in the runner), an open circular pattern's angle label
+  (live has none), where live's triad angle / factor boxes sit.
 - end-cap-profile-circle step 3: matches on a quiet host; under load our Faces field keeps focus a moment. Low.
 - tab-new-edit-reedit: decision asked of the lead (11-15 23:50): the click lands ~1.1 px from Flange 1's wall;
   known (sub-pixel camera) or retarget onto the wall live hit.
-- Mac target ~20 GB: prune-target.py, and drop debug/incremental dirs idle > 90 min (it was 11 GB).
+- Mac target ~20 GB: prune-target.py, and drop debug/incremental dirs idle > 90 min.
+- Scratch: /root/psui-scratch/fb5/run.sh runs one one-off scenario (--scenarios ~/tmp/psui/fb5s --all, shots per
+  step); scenario files there: shell-fail.json, sm-flat.json, triad.json.
 
 ## Queued to land
 
-- 03b36ca6 (2D manipulator, spline snap rows). This handoff goes with the failed-preview result.
+- dd13425c (model edge waking); the error-parts highlight with this handoff.
 
 ## Waiting on others
 
@@ -85,9 +84,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Next, in order
 
-1. The failed preview's highlight once core lists the error parts; the flat bend click colours (needs a flat-view
-   click target in the runner); a slanted model edge in the snaps
-   bench for the woken edge's perpendicular; the tab pick per the lead's answer.
+1. The flat bend click colours (a flat-view click target in the runner first); the tab pick per the lead's answer;
+   live's triad angle / factor boxes (ask live where they sit).
 2. Rerun after the others' fixes land: boundary-surface-new-edit-reedit (core 658bef9d), the gussets and end-caps
    (skasm), sketch pattern takes (skasm 58a0bd16 + linear), context-create-version-update (live2's retake).
 3. Older open items (11-06 to 11-08 "Next, in order" in the archive): doc-tab-rename-escape (5 / 5) and

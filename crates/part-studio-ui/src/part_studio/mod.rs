@@ -1513,9 +1513,15 @@ impl PartStudioView {
         // A failed Feature pattern shows the instances it couldn't make, and
         // its inputs keep the usual selection colors (the user's live shot
         // 2026-10-23: the seed wall orange, the instances red).
-        let error_mesh = self.edit.as_ref().filter(|_| failing).and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id)).and_then(|s| s.error_mesh.clone());
+        let failed_state = self.edit.as_ref().filter(|_| failing).and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id));
+        let error_mesh = failed_state.and_then(|s| s.error_mesh.clone());
         if let Some(m) = &error_mesh {
-            extra.extend(scene_builder::error_geometry(m, self.gpu.uploader()));
+            extra.extend(scene_builder::error_geometry(m, true, self.gpu.uploader()));
+        }
+        // Its parts of the result (a failed Shell's part) highlighted in place (live feedback-gaps 5).
+        let error_parts = failed_state.map(|s| s.error_parts.clone()).unwrap_or_default();
+        for b in self.display.bodies.iter().filter(|b| !b.hidden && error_parts.contains(&b.id)) {
+            extra.extend(scene_builder::error_geometry(&b.mesh, false, self.gpu.uploader()));
         }
         // Debug geometry of the open feature (Helix profiles, FeatureScript debug()).
         if let Some(st) = self.edit.as_ref().and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id))
