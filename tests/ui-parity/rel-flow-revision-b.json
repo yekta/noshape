@@ -1,0 +1,165 @@
+{
+ "name": "rel-flow-revision-b",
+ "about": "doc-versions: Part 1 released at A (PN-0021, R1), then Extrude 2 suppressed, Part 1 \u203a Release\u2026 again: revision B offered, released as R2; Revision history lists B and A, Versions and history both releases",
+ "area": "studios",
+ "source": "studios 11-16 (lead: release management as full flows; Professional account: a company-owned start, live2 COMPANYOWNED=1, managed workflows on)",
+ "start": "doc-versions",
+ "recordable": true,
+ "config_files": {
+  "release_settings.json": {
+   "managed_workflows": true
+  }
+ },
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Release\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 5000
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Part number:Part 1"
+   }
+  },
+  {
+   "do": "type",
+   "text": "PN-0021"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Release name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "R1"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Release notes"
+   }
+  },
+  {
+   "do": "type",
+   "text": "First release"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Release"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 20000
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Suppress"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Release\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 5000
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Release name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "R2"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Release notes"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Second release"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Release"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 20000
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Revision history\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  }
+ ]
+}

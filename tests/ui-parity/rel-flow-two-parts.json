@@ -1,0 +1,117 @@
+{
+ "name": "rel-flow-two-parts",
+ "about": "doc-versions: Part 1 \u203a Release\u2026, Add to Release\u2026 \u203a Part 2 ticked \u203a Add, part numbers PN-0031 / PN-0032, Release: one release R1 with both parts at A; Versions and history after",
+ "area": "studios",
+ "source": "studios 11-16 (lead: release management as full flows; Professional account: a company-owned start, live2 COMPANYOWNED=1, managed workflows on)",
+ "start": "doc-versions",
+ "recordable": true,
+ "config_files": {
+  "release_settings.json": {
+   "managed_workflows": true
+  }
+ },
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Release\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 5000
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add to Release\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Part 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Part number:Part 1"
+   }
+  },
+  {
+   "do": "type",
+   "text": "PN-0031"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Part number:Part 2"
+   }
+  },
+  {
+   "do": "type",
+   "text": "PN-0032"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Release name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "R1"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Release notes"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Two parts"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Release"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 20000
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  }
+ ]
+}

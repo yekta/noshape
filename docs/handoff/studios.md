@@ -9,25 +9,25 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-16 08:48 UTC (restarted on a new account 07:27 from the 06:27 handoff).
+Updated 2026-11-16 09:08 UTC (restarted on a new account 07:27 from the 06:27 handoff).
 
 ## In flight
 
-Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
-- Queued 03d18275 (08:45): view drag as live2's feel followUp F4 (`dragged_view_positions` / `drag_view` in crates/drawing
-  moves.rs; op `drawing_view_move` + e2e + example + AGENT_API.md; interaction-feel rows 97/106/111) and the centermark
-  reading (dx 11-16): runner `centermarks_unread` + ours' own `expect` "centermarks" counts (README "Known reader
-  limit: centermarks"); a selected centermark reads lit for the 11-15 recorder (EDGE+); Esc ends the after-menu
-  hovered-view reading. Green: drawing 236, drawing-ui 39, e2e + coverage, 52/52 view takes, centermark takes 9/10.
-- Uncommitted: Esc in Align centermark also clears the selection (drw-centermark-align s8); building + the 10
-  centermark takes on vibe6 (logs/cm3.log). Also uncommitted: coverage "manual capture" items (lead 11-16): the 4
-  items live's recorder can't read (FS Ctrl-hover cursor; quick tab switcher hover + mouse-up; Print… pop-up toast;
-  shortcuts with focus on the top bar) carry `manual` in tools/ui-parity/universe/*.json; covered once
-  `manual.test` names our GPUI test matching live2's capture (REQUESTS 08:47, live/feel/manual-4).
-- qa's 1116-0032 misses and not-run takes in my areas: 16/16 match on today's build (vibe6 ~/tmp/studios/qa16).
-- Asked live2 (REQUESTS 07:57): the drawing box select's exact rule (row 106 ≠).
+Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Lead 11-16 queue: (1) versions, branches and merge
+as full flows against live; (2) speed in my areas vs PLAN 2.7 and live.
+- (1) Versions / release takes: 154 exist (46 merge / compare / restore / branch, 22 rel-*), all matched 01:30-02:30.
+  New full flows (committed with this handoff): ver-flow-branch-version-merge, ver-flow-merge-same-feature,
+  rel-flow-revision-b, rel-flow-two-parts; asked live2 (REQUESTS 09:06). Ours runs the first three end to end;
+  rel-flow-two-parts stops at "Part 2" (ours' Add Items tree opens collapsed; live2 to say how live's opens).
+  Approve / reject: not capturable with one account (live2 11-14).
+- (2) Speed: perfrun.py on vibe6 (~/agents/studios-keep/perf-1116.log; fixtures ~/tmp/studios/perf from
+  /root/studios-scratch/bin/mkperf.py, + drw30.noshape: the 30-feature part with a 4-view drawing). Live's numbers:
+  behaviours.md "speed: studios" (1)-(4), "speed: studios, part 2", "speed: drawings" (tab switch 1.6-2.7 s, version
+  Open 3.7 s, back to Main 4.1 s, other workspace 4.6 s, Compare 7.1 s, VS 200 vars 5.3 s, drawing open 3.2-3.7 s).
+- Queued 3e8dec24 (08:57; carries 03d18275 view drag + centermark): not landed yet at 09:04.
+- Asked live2: the box-select sweep (07:57), the 4 manual captures (08:47), the 4 flow takes (09:06).
 - Row 97 ≠: a centerline over a view edge, live's click takes the view, ours the centerline (GPU pick bias); P3.
-- Full drawing run (306 takes) waits in vibe6's slot; it uses ~/tmp/studios/noshape.
+- Full drawing run (306 takes) waits in vibe6's slot.
 
 ## Queued to land
 - Landed 08:12 as db04b19b: the panel fixes, Styles on a dimension, Create Drawing names, runner rules.

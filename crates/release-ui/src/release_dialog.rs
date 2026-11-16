@@ -540,8 +540,11 @@ impl Render for AddItemsDialog {
                     if open {
                         for (k, it) in parts.into_iter().enumerate() {
                             let on = is_picked(&self.picked, &it);
+                            // (Read as live's checkbox rows: "boolean" fields by name.)
+                            let name = it.name.clone();
                             tree = tree.child(
                                 h_flex()
+                                    .map(|d| crate::ui_script::mark(d, move || format!("checkbox:{name}")))
                                     .id(SharedString::from(format!("add-part-{}-{k}", tab.0)))
                                     .h(px(42.))
                                     .pl(px(34.))
@@ -559,8 +562,10 @@ impl Render for AddItemsDialog {
                 Entry::Tab(it, icon) => {
                     let on = is_picked(&self.picked, &it);
                     let tab = it.tab;
+                    let name = it.name.clone();
                     tree = tree.child(
                         h_flex()
+                            .map(|d| crate::ui_script::mark(d, move || format!("checkbox:{name}")))
                             .id(SharedString::from(format!("add-tab-{}", tab.0)))
                             .h(px(42.))
                             .pl(px(34.))
