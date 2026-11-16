@@ -3010,10 +3010,26 @@ fn import_options_and_errors() {
     // Onshape keeps such a zip as a file tab and reports it as not translated.
     let r = call(&mut ctx, "import_files", json!({ "files": [zip.to_str().unwrap()] }));
     assert!(r["errors"][0].as_str().unwrap().contains("was not translated"), "{r}");
-    // So is an OBJ export's zip (.obj + .mtl): live's MTL message (qa OBJ-ZIP-MSG).
-    let z = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "OBJ", "file": scratch("obj_zip").to_str().unwrap() }));
-    let r = call(&mut ctx, "import_files", json!({ "files": [z["file"].as_str().unwrap()] }));
-    assert!(r["errors"][0].as_str().unwrap().ends_with("was not translated. Translation is not supported for MTL (.mtl) files."), "{z} {r}");
+    // An OBJ export's zip (.obj + .mtl) comes back as its parts, named by their groups and coloured by their
+    // materials (Onshape refuses it with its MTL message, qa OBJ-ZIP-MSG: a refusal, not a target; lead 11-16).
+    let model = call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }));
+    let z = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "OBJ", "file": scratch("obj_zip").to_str().unwrap(), "units": "Millimeter" }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [z["file"].as_str().unwrap()], "mesh_unit": "Millimeter", "appearances": true }));
+    assert!(r["errors"].as_array().is_none_or(|e| e.is_empty()), "{z} {r}");
+    let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap_or_else(|| panic!("{r}"))["name"].as_str().unwrap().to_string();
+    let back = call(&mut ctx, "query_parts", json!({ "tab": studio }));
+    let parts = |q: &Value| {
+        let mut v: Vec<(String, f64, String)> = q["parts"].as_array().unwrap().iter().map(|p| (p["name"].as_str().unwrap().to_string(), num(&p["surface_area"]), p["color"].as_str().unwrap_or("").to_string())).collect();
+        v.sort_by(|a, b| a.0.cmp(&b.0));
+        v
+    };
+    let (model, back) = (parts(&model), parts(&back));
+    assert_eq!(model.iter().map(|p| &p.0).collect::<Vec<_>>(), back.iter().map(|p| &p.0).collect::<Vec<_>>(), "{back:?}");
+    let rgb = |h: &str| (0..3).map(|i| u8::from_str_radix(&h[1 + 2 * i..3 + 2 * i], 16).unwrap() as i32).collect::<Vec<_>>();
+    for (m, b) in model.iter().zip(&back) {
+        assert!((m.1 - b.1).abs() <= 0.02 * m.1, "{m:?} {b:?}");
+        assert!(rgb(&m.2).iter().zip(rgb(&b.2)).all(|(x, y)| (x - y).abs() <= 1), "{m:?} {b:?}");
+    }
     let e = try_call(&mut ctx, "import_files", json!({ "files": ["/tmp/nope.xyz"] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("files[0]"));
     let e = try_call(&mut ctx, "import_files", json!({ "files": ["/tmp/definitely-missing.step"] })).unwrap_err();

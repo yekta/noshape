@@ -256,6 +256,8 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         _ => shapes.into_iter().map(|s| (s, None)).collect(),
     };
     let appearances = ev.bool("importAppearances");
+    // An OBJ export's zip: its parts' colours are its materials' (ops' read_obj_zip).
+    let obj_zip = ev.params.text("foreignId").to_ascii_lowercase().ends_with(".zip");
     let up = ev.bool("yAxisIsUp");
     let mut tools = Vec::new();
     // Per tool: its name, colour and faces' colours (sub-shapes of it).
@@ -279,9 +281,10 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             let children = s.children();
             let pieces = if s.shape_type() == ShapeType::Compound && !children.is_empty() && children.iter().all(|c| c.shape_type() == ShapeType::Compound) { children } else { vec![s] };
             for piece in pieces {
-                // The file's part name (PVZ) goes to the part's solid.
+                // The file's part name (PVZ) goes to the part's solid; an OBJ zip's material colour too.
                 let solids = piece.solids();
-                looks.extend(solids.iter().map(|_| Look { name: part.name.clone(), ..Look::default() }));
+                let color = if obj_zip { part.color } else { None };
+                looks.extend(solids.iter().map(|_| Look { name: part.name.clone(), color, ..Look::default() }));
                 tools.extend(solids);
                 let open: Vec<k::Shape> = piece.children().into_iter().filter(|c| c.shape_type() == ShapeType::Shell).collect();
                 if !open.is_empty() {
