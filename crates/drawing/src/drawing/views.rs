@@ -2667,10 +2667,33 @@ struct ProjBody<'a> {
     edge_map: Option<HashMap<usize, usize>>,
 }
 
+/// An edge on a B-spline (or another curve) that is a circle or ellipse arc to within a micrometre (a loft's profile
+/// circles, a cut's ellipses): Parasolid keeps those exact, so live's drawing writes them as ARC / ELLIPSE where the
+/// view shows them so; a free-form curve stays a SPLINE (c2-rings-loft: ARC 30 for live's 89, ELLIPSE 15 for 62).
+fn on_a_conic(e: &Shape, t0: f64, t1: f64) -> bool {
+    const N: usize = 48;
+    let Ok(pts) = (0..=N).map(|i| e.point_at(t0 + (t1 - t0) * i as f64 / N as f64)).collect::<Result<Vec<_>, _>>() else { return false };
+    let c = pts.iter().copied().sum::<DVec3>() / pts.len() as f64;
+    let mut n = DVec3::ZERO;
+    for w in pts.windows(2) {
+        n += (w[0] - c).cross(w[1] - c);
+    }
+    let Some(n) = n.try_normalize() else { return false };
+    let tol = 1e-6;
+    if pts.iter().any(|p| (*p - c).dot(n).abs() > tol) {
+        return false;
+    }
+    let x = n.any_orthonormal_vector();
+    let y = n.cross(x);
+    let flat: Vec<[f64; 2]> = pts.iter().map(|p| [(*p - c).dot(x), (*p - c).dot(y)]).collect();
+    let closed = pts[0].distance(pts[N]) <= tol;
+    crate::drawing::cad_fit::fit_curve(&flat, closed, tol).is_some()
+}
+
 fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &BodyTopo) -> Option<ModelEdge> {
     let e = body.shape.sub_shape(ShapeType::Edge, edge_index).ok()?;
     let info = e.edge_info().ok()?;
-    let freeform = !matches!(info.curve, Curve::Line { .. } | Curve::Circle { .. } | Curve::Ellipse { .. });
+    let freeform = !matches!(info.curve, Curve::Line { .. } | Curve::Circle { .. } | Curve::Ellipse { .. }) && !on_a_conic(&e, info.first_param, info.last_param);
     let geom = match info.curve {
         Curve::Line { .. } => EdgeGeom::Line { a: frame.project(info.start), b: frame.project(info.end) },
         Curve::Circle { center, axis, radius, .. } => {
@@ -3822,6 +3845,20 @@ fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A circle as a B-spline edge is a conic (its projection an ARC / ELLIPSE, as live's exact circle); a free-form
+    /// spline isn't.
+    #[test]
+    fn a_bspline_circle_is_a_conic_a_freeform_spline_is_not() {
+        let circle = noshape_kernel::make_circle(DVec3::new(0.01, 0.0, 0.0), DVec3::new(0.0, 0.3, 1.0).normalize(), 0.004).unwrap();
+        let bs = noshape_kernel::make_bspline_edge(&circle.edge_bspline().unwrap()).unwrap();
+        let i = bs.edge_info().unwrap();
+        assert!(!matches!(i.curve, Curve::Circle { .. }), "{:?}", i.curve);
+        assert!(on_a_conic(&bs, i.first_param, i.last_param));
+        let free = noshape_kernel::make_bspline(&[DVec3::ZERO, DVec3::new(0.01, 0.004, 0.0), DVec3::new(0.02, -0.003, 0.0), DVec3::new(0.03, 0.0, 0.0)], None, &[0.0, 1.0], &[4, 4], 3, false).unwrap();
+        let j = free.edge_info().unwrap();
+        assert!(!on_a_conic(&free, j.first_param, j.last_param));
+    }
 
     /// Centermarks: a hole whole or in pieces, a radial hole's half bore; not a quarter round, nor c2-sm-louver's two
     /// quarter bends on one axis (exchange suite: 24 CENTERMARKS lines in ours, live none).
