@@ -4220,3 +4220,31 @@ skasm meanwhile; I'll list what I change here before landing.
   (Feature 13 "External thread 1" also differs, status only: ours OK, live INFO "Exact match for thread size not found.")
 - Repro: the source alone as a document: a models dir holding a link to that derived dir (vibe5:
   /home/ngyekta/blend-scratch/models/fan-source), NOSHAPE_PARITY_MODELS=<that dir> parity_models.
+
+## Moved from the handoff 11-16 22:40 (landed)
+- **Landed b4c6b38c:** hole Up to next ends the shaft at the deepest exit round its rim (+1 µm when deeper
+  than the axis's), as the host's opHole full_exit: asm-tvc-mount 7bc9d8 Hole 10/12/3 -> live 8/8/0 (model copy vibe5
+  ~/agents/core-keep/m7b, 8 -> 19/120; next there Extrude 5's Inner Ring 11/27/18 vs 10/24/16, asm's withdrawn item).
+  T1 features_a::a_hole_up_to_next_into_a_bore_leaves_no_web_beside_it. Feature 22 (same kind) needs asm's unlanded arc fix.
+- Landed fa68e206: translator rule narrowed: 55552e704's whole-region rule (impeller 24 -> 26) turned
+  c2-sm-rocker-enclosure-body 15 -> 9/28 (landed without a suite pair: my error); now only when another of the
+  feature's queries names the same whole region (`shares_whole_region`). Release pair vibe7 (screws out): only rocker
+  changed, 1190 -> 1196/1585. asm handoff note updated.
+- Landed 198c2b6d: rolled walls (a cylinder WALL without a BEND between two walls) develop in the flat at
+  kFactorRolled: c2-sm-tablet-stand 3 -> 6/16; T2 sheetmetal_std::an_extruded_arc_is_a_rolled_wall_in_the_flat.
+- Landed b0e98fa3: Move face on an active sheet metal part runs std's moveFace (sheetMetalAwareMoveFace;
+  std_route.rs `moves_active_sheet_metal`): c2-sm-tablet-stand 6 -> 12/16 (only corpus document with it). T2
+  sheetmetal_std::moving_a_sheet_metal_end_face_keeps_its_walls_and_bend_apart (fails without: 10 vs 14 faces).
+- Landed bb61a968 (lead cherry-picks it onto v0.4.55): Rib takes the ribbed part with its history chained (bool's
+  suggestion), no second fuse. Was: c2-parting-line-draft-parting-line Rib 1 / 2 0.9 -> 7 s
+  since this morning (vibe7 same-host A/B, binaries ~/agents/core-keep/tr/{morning,base}): Rib's merge fuse (part ∪
+  ribbed part) is declined "a shared shape OCCT may keep or remake" and OCCT takes 3.5 s. Cases vibe5
+  ~/agents/core-keep/plcase. Fusing a copy of the part made Rib 2 decline "a point near two vertices" (reverted).
+  The chained history names faces as the fuse did (13 rib tests pass).
+- Landed 11-16: 3178c98b (bend strip runs on only where the wall stays inside the bend line), 03a052cf (union tool
+  attributes follow, target's kept on merges: side-cuts-tab 18/18), 747c2bf0d (ScopeRule 18: a sketch on a face of
+  a part a Transform moved is in the face's frame moved with it; Derived / imported parts keep theirs: hem-plus 6/6;
+  live fan-blade-sweep's Sketch 2 shows a Derived part's x is its source's), 806ae96f7 (tool unify), 7bc8e345a
+  (sheet cylinder frame; dx told).
+- Landed 11-15: 654611f6f / 8e3d52063, 52433a3d2, 348b6e241 (Kerf: offset retried in mm when empty), 9012904e (Shell by
+  regions: rough check, convex pockets).

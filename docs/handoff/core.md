@@ -4,23 +4,10 @@ Updated 11-16 18:15 UTC. History (dated notes up to 11-15 14:48): docs/handoff/a
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
-- **Landed b4c6b38c:** hole Up to next ends the shaft at the deepest exit round its rim (+1 µm when deeper
-  than the axis's), as the host's opHole full_exit: asm-tvc-mount 7bc9d8 Hole 10/12/3 -> live 8/8/0 (model copy vibe5
-  ~/agents/core-keep/m7b, 8 -> 19/120; next there Extrude 5's Inner Ring 11/27/18 vs 10/24/16, asm's withdrawn item).
-  T1 features_a::a_hole_up_to_next_into_a_bore_leaves_no_web_beside_it. Feature 22 (same kind) needs asm's unlanded arc fix.
-- Landed fa68e206: translator rule narrowed: 55552e704's whole-region rule (impeller 24 -> 26) turned
-  c2-sm-rocker-enclosure-body 15 -> 9/28 (landed without a suite pair: my error); now only when another of the
-  feature's queries names the same whole region (`shares_whole_region`). Release pair vibe7 (screws out): only rocker
-  changed, 1190 -> 1196/1585. asm handoff note updated.
 - Impeller Extrude 4 model side: closed, nothing to fix. The 12 mm² sliver alone never meets the offset wall: even its
   surface over all of its own bounds only grazes the prism at the sketch plane (replayed dump vibe5
   ~/agents/core-keep/e4dump/prism_until-10, experiment patch /root/core-scratch/uptowiden-exp.patch). Live's Extrude 4
   is the whole region, which we match (impeller 27/48 on main after blend's d7f9264c9; first difference Fillet 3).
-- Landed 198c2b6d: rolled walls (a cylinder WALL without a BEND between two walls) develop in the flat at
-  kFactorRolled: c2-sm-tablet-stand 3 -> 6/16; T2 sheetmetal_std::an_extruded_arc_is_a_rolled_wall_in_the_flat.
-- Landed b0e98fa3: Move face on an active sheet metal part runs std's moveFace (sheetMetalAwareMoveFace;
-  std_route.rs `moves_active_sheet_metal`): c2-sm-tablet-stand 6 -> 12/16 (only corpus document with it). T2
-  sheetmetal_std::moving_a_sheet_metal_end_face_keeps_its_walls_and_bend_apart (fails without: 10 vs 14 faces).
 - **Committed in core-oc 8deb8156c (rebased on main 18:10; with 1357fddb1 split-face attributes and 11f1335b9
   untrimmed cylinder split), all three in one release pair: a point on an elementary face is classified with its
   parameters moved by whole periods into the face's** (geom.cpp classify_periodic; g++-13 OK). tablet-stand's rolled
@@ -47,12 +34,6 @@ docs/DECISIONS.md (read first; it wins over anything here).
   whole_cylinder; the pieces unified): c2-rib-wrap 4 -> 10/18 (Split 1: 2 parts, the disc 3 faces as live). T1
   features_b::an_untrimmed_cylinder_face_splits_off_its_whole_disc. Next there: Wrap 1 (3.8 mm³; its sketch text's
   ascent dimension untranslated). Land both (one commit each) when the pair shows nothing worse.
-- Landed bb61a968 (lead cherry-picks it onto v0.4.55): Rib takes the ribbed part with its history chained (bool's
-  suggestion), no second fuse. Was: c2-parting-line-draft-parting-line Rib 1 / 2 0.9 -> 7 s
-  since this morning (vibe7 same-host A/B, binaries ~/agents/core-keep/tr/{morning,base}): Rib's merge fuse (part ∪
-  ribbed part) is declined "a shared shape OCCT may keep or remake" and OCCT takes 3.5 s. Cases vibe5
-  ~/agents/core-keep/plcase. Fusing a copy of the part made Rib 2 decline "a point near two vertices" (reverted).
-  The chained history names faces as the fuse did (13 rib tests pass).
 - c2-surf-workshop-britatap Touch screen split (4/22): our projected split curve (BRepProj section, a degree 7
   B-spline) ends 0.116 mm from the face's corner along the rim, where the sketch edge ends exactly; live ends it on
   the corner (2/6/5 vs ours 2/7/6). Kernel projection precision at a tangent end; parked.
@@ -181,11 +162,6 @@ docs/DECISIONS.md (read first; it wins over anything here).
   ring's split sides don't exist in ours: it fails ("Could not offset ...", 8 s in the reblend's defeature) and Delete
   face 2 defeatures a part live never has. Turning the fuse's unify off changes nothing there. blend (thread 0e6e9942) tells me when
   27-29 match (blend's Fillet 3 needs f24c11cc on main to measure); then recheck from Extrude impellerraum (the probe now prints a sketch's regions: NOSHAPE_PROBE_SKETCH).
-- Landed 11-16: 3178c98b (bend strip runs on only where the wall stays inside the bend line), 03a052cf (union tool
-  attributes follow, target's kept on merges: side-cuts-tab 18/18), 747c2bf0d (ScopeRule 18: a sketch on a face of
-  a part a Transform moved is in the face's frame moved with it; Derived / imported parts keep theirs: hem-plus 6/6;
-  live fan-blade-sweep's Sketch 2 shows a Derived part's x is its source's), 806ae96f7 (tool unify), 7bc8e345a
-  (sheet cylinder frame; dx told).
 - Extrude 33 (asm-pattern-std 36b90f) P0: 150 ms on main (debug, loaded vibe5); re-time once asm's Boolean feature
   pattern fix lands (Linear pattern 1 still errors upstream).
 - **Handed off 11-16:** c2-config-parts-screws memory (14.8 GB): Revolve 9's unify (usd_kept_volume -> OCCT UnifyFaces)
@@ -201,8 +177,6 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (NOSHAPE_PROBE_DOC = a copy WITH its -wal / -shm, NOSHAPE_PROBE_AFTER, NOSHAPE_PROBE_OUT, NOSHAPE_PROBE_PART,
   NOSHAPE_PROBE_TAB): bodies as .brep, a part's faces (surface, edge indices), edges and vertices with shown flags.
   Saved documents' part names are Part N, not live's.
-- Landed 11-15: 654611f6f / 8e3d52063, 52433a3d2, 348b6e241 (Kerf: offset retried in mm when empty), 9012904e (Shell by
-  regions: rough check, convex pockets).
 
 ## Waiting on others
 - **c2-sm-rocker-enclosure-body 15/28 (stable now):** Extrude 6's pocket is ~2 mm off live's and differently shaped
