@@ -123,6 +123,25 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (104.36, 0, -27.20): the sphere seam's end), both hidden by the seam-join rule. Live's ring RvBB (81.385 mm) has its
   arc-length midpoint exactly on the first, so live keeps one vertex, at the sphere seam's end. Rule unknown (a
   Parasolid sphere has no seam); a live capture of a dome revolved onto a swept handle would settle it.
+- **IN FLIGHT (lead 11-16 ~22:10): free-form offset, one kernel `offset_solid` that bool's Shell can call too.**
+  Design: every face moved by its own distance (0: stays on its surface, trimmed/extended to meet moved neighbours).
+  Surfaces = quad::Surf (shell.cpp; already per-surface `d`, 0 allowed; free-form = Geom_OffsetSurface + foot search);
+  edges = quad::march_offsets between the two faces' Surfs from the new end vertices (3D curve + both pcurves, same
+  parameter); vertices = quad::solve3 / solve_all of the faces round each vertex; faces = their new wires on the offset
+  (or base) surface; sewn, checked, volume. No topology change (a face vanishing, edges crossing): reported, the
+  caller keeps its fallback. Limit: a deterministic work budget per face (march steps / halvings), reported by face,
+  never a wall clock (DECISIONS 11-15). API sketch (sent to bool):
+    std::optional<OffsetSolid> offset_solid(const TopoDS_Shape& solid, const std::vector<double>& face_dist,
+                                            int face_budget, OffsetReport& why);   // C++, crates/kernel/cpp/offset.cpp
+    k::offset_solid(shape, &distances, budget) -> Result<OpResult>                  // Rust; error names the face
+  Steps (each landed alone, release pair + bool's gate where crates/kernel shell.cpp is touched):
+    1. quad's declarations (Surf, OffsetRun, foot, solve3*, march_offsets, make-a-Surf-for-a-face) moved from
+       shell.cpp into crates/kernel/cpp/offset_quad.hpp, no behaviour change (bool told).
+    2. offset.cpp offset_solid for solids whose faces all keep their topology; kernel T1 tests: a box with one face
+       moved (exact), a cylinder boss, a B-spline face (fit-spline extrude) moved 0.2 mm vs its Geom_OffsetSurface.
+    3. Boolean offset (basic.rs) and Move face Offset use it for free-form faces before OCCT; fan-blade Boolean 2
+       measured against live (87773.636 mm³, 56/143/88).
+    4. bool's Shell may call it for its inner walls (bool decides).
 - c2-fan-blade-sweep Boolean 2 (48/53, parked; lead: core's): Subtract with Offset 0.2 mm on 6 picked tool faces
   (11 per tool after the pattern copies: the sweep's free-form thread flanks among them). basic.rs offsets only analytic
   faces (else the tool as is), so ours removes 54.7 mm³ less (56/139/84 vs live 56/143/88). OCCT's offset_faces on them,
