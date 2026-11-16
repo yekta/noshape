@@ -2890,7 +2890,9 @@ impl Ctx<'_> {
             // the family's first.)
             let k = *self.canonical.get(&(fo, fam, self.faces[ftool].index)).unwrap_or(&0);
             let (c, rc) = *self.families[fam].get(k)?;
-            if !self.kept_by(fo, &r) {
+            // (A free-form face is never clear of the moved curves (clear_inside): the pair's own sections, asked
+            // for ahead with the rest.)
+            if !self.kept_by(fo, &r) || matches!(self.faces[fo].s, Surf::Nurbs { .. }) {
                 return None;
             }
             let (o, t) = ((self.faces[fo].arg, self.faces[fo].index), (c as u32, self.faces[ftool].index));
