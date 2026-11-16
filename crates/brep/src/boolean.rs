@@ -333,7 +333,7 @@ struct GFace {
     grid: std::sync::OnceLock<(Vec<(DVec2, DVec3)>, free::Nearest)>,
     /// Points' parameters found so far ([`Self::uv_of`]: most are asked for again).
     uvs: std::sync::Mutex<HashMap<[u64; 3], DVec2>>,
-    patches: std::sync::OnceLock<free::Patches>,
+    patches: std::sync::OnceLock<std::sync::Arc<free::Patches>>,
     /// A Bézier face's surface in pieces, each its control points (holding it).
     hulls: std::sync::OnceLock<Option<Vec<free::Hull>>>,
     /// Its NURBS surface's Bézier patches, one per span each way (free::apart), made once.
@@ -3866,7 +3866,7 @@ impl Ctx<'_> {
                         if !free::ray_meets(p, r, g.lo, g.hi) {
                             continue;
                         }
-                        for (uv, t) in free::ray_hits(ns, g.patches.get_or_init(|| free::grouped(g)), g.uvbox, p, r) {
+                        for (uv, t) in free::ray_hits(ns, g.patches.get_or_init(|| free::cached_grouped(g)), g.uvbox, p, r) {
                             // Grazing it: another ray.
                             let d = ns.derivs(uv.x, uv.y);
                             if d[1].cross(d[2]).normalize_or_zero().dot(r).abs() < 1e-3 {

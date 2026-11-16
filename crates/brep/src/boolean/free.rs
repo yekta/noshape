@@ -194,6 +194,124 @@ pub(super) struct Patches {
 
 const GROUP: usize = 16;
 
+/// [`grouped`] of a face, made once for its surface's data and parameter box while they are used again: a part's
+/// faces go through one Boolean after another unchanged (c2-hunting-knife's blade, ~50 ms of its regeneration made
+/// again). Keyed by the data itself, bit for bit (no pointer, no hash alone), least recently used dropped past
+/// [`PATCH_CACHE_BYTES`].
+pub(super) fn cached_grouped(g: &GFace) -> std::sync::Arc<Patches> {
+    let Some(ns) = g.ns.as_deref() else { return std::sync::Arc::new(grouped(g)) };
+    let key = surface_key(ns, g.uvbox);
+    if let Some(p) = PATCH_CACHE.lock().ok().and_then(|mut c| c.get(&key)) {
+        return p;
+    }
+    let p = std::sync::Arc::new(grouped(g));
+    if let Ok(mut c) = PATCH_CACHE.lock() {
+        c.put(key, p.clone());
+    }
+    p
+}
+
+/// The patch cache's bound: its keys' and patches' bytes.
+const PATCH_CACHE_BYTES: usize = 64 << 20;
+
+static PATCH_CACHE: std::sync::Mutex<PatchCache> = std::sync::Mutex::new(PatchCache { map: None, tick: 0, bytes: 0 });
+
+/// A cached face's patches, when last used, and its bytes.
+struct CacheEntry {
+    patches: std::sync::Arc<Patches>,
+    used: u64,
+    bytes: usize,
+}
+
+struct PatchCache {
+    map: Option<HashMap<Vec<u64>, CacheEntry>>,
+    tick: u64,
+    bytes: usize,
+}
+
+impl PatchCache {
+    fn get(&mut self, key: &[u64]) -> Option<std::sync::Arc<Patches>> {
+        self.tick += 1;
+        let e = self.map.as_mut()?.get_mut(key)?;
+        e.used = self.tick;
+        Some(e.patches.clone())
+    }
+
+    fn put(&mut self, key: Vec<u64>, p: std::sync::Arc<Patches>) {
+        let size = 8 * key.len() + p.bytes();
+        if size > PATCH_CACHE_BYTES / 4 {
+            return;
+        }
+        self.tick += 1;
+        let map = self.map.get_or_insert_with(HashMap::default);
+        while self.bytes + size > PATCH_CACHE_BYTES {
+            let Some(old) = map.iter().min_by_key(|e| e.1.used).map(|e| e.0.clone()) else { break };
+            if let Some(e) = map.remove(&old) {
+                self.bytes -= e.bytes;
+            }
+        }
+        if let Some(e) = map.insert(key, CacheEntry { patches: p, used: self.tick, bytes: size }) {
+            self.bytes -= e.bytes;
+        }
+        self.bytes += size;
+    }
+}
+
+/// A free-form surface's data and a parameter box, every number's bits.
+fn surface_key(ns: &FreeSurface, uv: [f64; 4]) -> Vec<u64> {
+    let mut k: Vec<u64> = uv.iter().map(|x| x.to_bits()).collect();
+    let v3 = |k: &mut Vec<u64>, v: DVec3| k.extend([v.x.to_bits(), v.y.to_bits(), v.z.to_bits()]);
+    let curve = |k: &mut Vec<u64>, c: &NurbsCurve| {
+        k.extend([c.degree as u64, c.knots.len() as u64, c.poles.len() as u64, c.weights.len() as u64]);
+        k.extend(c.knots.iter().chain(&c.weights).map(|x| x.to_bits()));
+        for &q in &c.poles {
+            v3(k, q);
+        }
+    };
+    match ns {
+        FreeSurface::Nurbs(s) => {
+            k.extend([0, s.udegree as u64, s.vdegree as u64, s.nu as u64, s.nv as u64, s.uknots.len() as u64, s.vknots.len() as u64, s.weights.len() as u64]);
+            k.extend(s.uknots.iter().chain(&s.vknots).chain(&s.weights).map(|x| x.to_bits()));
+            for &q in &s.poles {
+                v3(&mut k, q);
+            }
+        }
+        FreeSurface::Torus { o, x, y, z, major, minor } => {
+            k.push(1);
+            for v in [*o, *x, *y, *z] {
+                v3(&mut k, v);
+            }
+            k.extend([major.to_bits(), minor.to_bits()]);
+        }
+        FreeSurface::Sphere { o, x, y, z, r } => {
+            k.push(2);
+            for v in [*o, *x, *y, *z] {
+                v3(&mut k, v);
+            }
+            k.push(r.to_bits());
+        }
+        FreeSurface::Extrusion { c, d } => {
+            k.push(3);
+            curve(&mut k, c);
+            v3(&mut k, *d);
+        }
+        FreeSurface::Revolution { c, o, a } => {
+            k.push(4);
+            curve(&mut k, c);
+            v3(&mut k, *o);
+            v3(&mut k, *a);
+        }
+    }
+    k
+}
+
+impl Patches {
+    /// Its bytes, about.
+    fn bytes(&self) -> usize {
+        std::mem::size_of::<Self>() + self.all.iter().map(|p| std::mem::size_of::<Patch>() + 24 * p.pts.len()).sum::<usize>() + 48 * self.groups.len()
+    }
+}
+
 /// [`patches`] with their runs' boxes.
 pub(super) fn grouped(g: &GFace) -> Patches {
     let all = patches(g);
