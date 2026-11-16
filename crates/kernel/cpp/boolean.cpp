@@ -10403,7 +10403,8 @@ OpOut op_unify_edges(const OcShape& s)
 // centre, normal, major axis direction, major and minor radius), rebuilt on it on the same vertices with their
 // pcurves anew: a blend's contact curves built as B-splines where they are conics (c2-hunting-knife's Fillet 3: a
 // rolling ball between a plane and a cylinder touches each along an ellipse, as live's). The shape unchanged where the
-// result isn't valid.
+// result isn't valid: the faces around the edges and widened vertices checked (`s` valid, the rest as it was; the whole
+// solid's check took 4 of the 6 ms here on c2-hunting-knife's Fillet 3).
 OpOut op_canonical_edges(const OcShape& s, rust::Slice<const double> pts, rust::Slice<const double> conics, double tol)
 {
   std::vector<gp_Pnt> at;
@@ -10509,7 +10510,25 @@ OpOut op_canonical_edges(const OcShape& s, rust::Slice<const double> pts, rust::
   if (!any)
     return make_result({s.shape}, s.shape, nullptr);
   const TopoDS_Shape out = rs->Apply(s.shape);
-  if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+  if (out.IsNull())
+    return make_result({s.shape}, s.shape, nullptr);
+  ShapeIMap changed;
+  for (TopAbs_ShapeEnum k : {TopAbs_EDGE, TopAbs_VERTEX})
+    for (TopExp_Explorer x(s.shape, k); x.More(); x.Next())
+      if (rs->IsRecorded(x.Current().Oriented(TopAbs_FORWARD)))
+        changed.Add(rs->Value(x.Current().Oriented(TopAbs_FORWARD)));
+  TopoDS_Compound around;
+  B.MakeCompound(around);
+  for (TopExp_Explorer f(out, TopAbs_FACE); f.More(); f.Next())
+  {
+    bool touched = false;
+    for (TopAbs_ShapeEnum k : {TopAbs_EDGE, TopAbs_VERTEX})
+      for (TopExp_Explorer x(f.Current(), k); x.More() && !touched; x.Next())
+        touched = changed.Contains(x.Current());
+    if (touched)
+      B.Add(around, f.Current());
+  }
+  if (!BRepCheck_Analyzer(around).IsValid())
     return make_result({s.shape}, s.shape, nullptr);
   return make_result({s.shape}, out, rs->History().get());
 }
