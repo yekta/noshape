@@ -333,16 +333,21 @@ impl<'a> Translator<'a> {
         for c in doc["configuration"]["configurationParameters"].as_array().into_iter().flatten() {
             self.config_input(c);
         }
-        // Live regenerates in its current configuration: its configuration variables' values there (cf-sheet-metal-
-        // model-plus's #asdf, 5 mm where its default is 15: Sketch 3's distance to it).
+        // Live's lines are at the configuration its sketches were fetched at, when that is recorded (sketches.json's
+        // capturedConfiguration, every input at its default: c2-config-parts-pulleys at 24 teeth, its workspace at
+        // 26); else at the current one: its configuration variables' values there (cf-sheet-metal-model-plus's #asdf,
+        // 5 mm where its default is 15: Sketch 3's distance to it).
         let variables: Vec<&str> = doc["configuration"]["configurationParameters"].as_array().into_iter().flatten().filter(|c| c["btType"].as_str().is_some_and(|t| t.starts_with("BTMConfigurationParameterQuantity"))).filter_map(|c| c["parameterId"].as_str()).collect();
-        let current: serde_json::Map<String, Value> = doc["configuration"]["currentConfiguration"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter(|v| v["btType"].as_str().is_some_and(|t| t.starts_with("BTMParameterQuantity")))
-            .filter_map(|v| Some((v["parameterId"].as_str().filter(|id| variables.contains(id))?.to_string(), json!(v["expression"].as_str()?))))
-            .collect();
+        let current: serde_json::Map<String, Value> = match doc["sketchBodies"]["capturedConfiguration"].as_str() {
+            Some(captured) => captured.split(';').filter_map(|kv| kv.split_once('=')).filter(|(k, _)| variables.contains(k)).map(|(k, v)| (k.to_string(), json!(v))).collect(),
+            None => doc["configuration"]["currentConfiguration"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|v| v["btType"].as_str().is_some_and(|t| t.starts_with("BTMParameterQuantity")))
+                .filter_map(|v| Some((v["parameterId"].as_str().filter(|id| variables.contains(id))?.to_string(), json!(v["expression"].as_str()?))))
+                .collect(),
+        };
         if !current.is_empty()
             && let Err(e) = self.call("config_activate", json!({ "tab": self.tab, "values": current }))
         {

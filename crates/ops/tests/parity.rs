@@ -1734,6 +1734,36 @@ fn a_list_configuration_and_its_configured_values_are_built() {
     assert!((volume(&mut t) - pi * 100.0 * 30.0).abs() < 1e-3, "Long: Ø20 × 30 mm");
 }
 
+/// Live's lines are at the configuration its sketches were fetched at (sketches.json's capturedConfiguration, the
+/// inputs' defaults), not the workspace's current one: a configuration variable takes the captured value
+/// (c2-config-parts-pulleys at 24 teeth, its workspace at 26).
+#[test]
+fn a_configuration_variable_takes_the_captured_configurations_value() {
+    let doc = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"], "queryString": "query=qCompressed(1.0,\"%B5$QueryM4S…TopplaneOp…\",id);" }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.005, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "#Len" }] }
+    ], "configuration": {
+        "configurationParameters": [{ "btType": "BTMConfigurationParameterQuantity-1826", "parameterId": "Len", "quantityType": "LENGTH",
+            "rangeAndDefault": { "units": "millimeter", "defaultValue": 20, "minValue": 1, "maxValue": 100 } }],
+        "currentConfiguration": [{ "btType": "BTMParameterQuantity-147", "parameterId": "Len", "expression": "30 mm" }] },
+      "sketchBodies": { "capturedConfiguration": "Len=20 mm", "sketches": [] } });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("captured-configuration.noshape"), &doc, Default::default()).unwrap();
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok"), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+    }
+    let volume = t.call("query_parts", json!({})).unwrap()["parts"][0]["volume"].as_f64().unwrap();
+    assert!((volume - std::f64::consts::PI * 25.0 * 20.0).abs() < 1e-3, "{volume} mm³: Ø10 × 20 mm, live's captured 20 mm, not the workspace's 30");
+}
+
 /// A refs.jsonl line names every parameter live evaluated it for: one (`parameter`) or several (`parameters`, when two
 /// of a feature's queries name the same entity: Delete part's entities and nonCompositeEntities, an extrude's two end
 /// faces up to one face); each of those parameters gets it.
