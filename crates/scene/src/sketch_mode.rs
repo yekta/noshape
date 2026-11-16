@@ -915,6 +915,9 @@ const CIRCULAR_ANGLE_TEXT_AT: f64 = 0.64;
 /// triad: arrows' gap 8 + shaft 60 then the head; the square 20–45; the rotation ring 108 out on X; the scale head
 /// from (60, 60) on the diagonal, 30 long). Handles are screen-sized; no shafts are drawn.
 const XF_ARROW_BASE_PX: f64 = 68.0;
+/// The arrows' shafts start 8 px from the anchor (live editing-gaps3) and take a click 6 px either side.
+const XF_ARROW_GAP_PX: f64 = 8.0;
+const XF_ARROW_SHAFT_REACH_PX: f64 = 6.0;
 const XF_ARROW_HEAD_PX: f64 = 28.0;
 const XF_ARROW_HALF_W_PX: f64 = 11.0;
 const XF_SQUARE_PX: (f64, f64) = (20.0, 45.0);
@@ -5084,9 +5087,21 @@ impl SketchEditor {
             PatternHandle::Rotate | PatternHandle::Center if self.tool == Tool::Transform => 11.0,
             _ => 9.0,
         };
+        // An arrow is grabbed along its shaft too (live editing-gaps3: 8 px from the anchor, 60 px long; a click on it
+        // leaves the selection as it is, sketch-entity-copy-paste).
+        let m = self.pattern_center + self.xf_offset;
+        let shaft = |q: DVec2| {
+            let d = (q - m).try_normalize().unwrap_or(DVec2::X);
+            let (a, len) = (m + d * self.world_per_px * XF_ARROW_GAP_PX, self.world_per_px * (XF_ARROW_BASE_PX - XF_ARROW_GAP_PX));
+            let along = (p - a).dot(d).clamp(0.0, len);
+            (p - (a + d * along)).length() / XF_ARROW_SHAFT_REACH_PX
+        };
         self.pattern_handles(sk)
             .into_iter()
-            .map(|(h, q)| (h, (q - p).length() / reach(h)))
+            .map(|(h, q)| match h {
+                PatternHandle::MoveX | PatternHandle::MoveY => (h, ((q - p).length() / reach(h)).min(shaft(q))),
+                _ => (h, (q - p).length() / reach(h)),
+            })
             .filter(|x| x.1 <= self.world_per_px)
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|x| x.0)
@@ -8826,6 +8841,9 @@ mod tests {
         assert!(near(at(&ed, &d, PatternHandle::Rotate), v(108., 0.)), "the rotation ring 108 px along X");
         assert!(near(at(&ed, &d, PatternHandle::Scale), v(1., 1.).normalize() * 99.85), "the scale head from (60, 60) px");
         assert_eq!(ed.handle_at(&d.sketch, v(90., 4.) * px), Some(PatternHandle::MoveX), "a press on the X head takes it");
+        assert_eq!(ed.handle_at(&d.sketch, v(40., 3.) * px), Some(PatternHandle::MoveX), "and one on its shaft, over the line");
+        assert_eq!(ed.handle_at(&d.sketch, v(3., 40.) * px), Some(PatternHandle::MoveY), "the Y shaft too");
+        assert_eq!(ed.handle_at(&d.sketch, v(40., 9.) * px), None, "6 px either side of a shaft");
         ed.drag_handle(&d.sketch.clone(), PatternHandle::MoveX, v(82. + 50., 30.) * px);
         assert!(near(ed.xf_offset / px, v(50., 0.)), "the X arrow moves along X only: {}", ed.xf_offset / px);
         ed.drag_handle(&d.sketch.clone(), PatternHandle::Center, mm(5., 5.));

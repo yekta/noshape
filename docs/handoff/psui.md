@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-16 13:31 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-16 15:33 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -49,10 +49,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Landed 12:42 (99dea19f): box shadows blur as CSS (`BoxShadow::blur_sigma`, vendor/gpui-pre/NOSHAPE.md, test
   `ui::tests::box_shadow_blur_is_css`), halved call sites back to CSS, toolbar lists and tooltips with live's shadows;
   hole-table / drawing-hole-table, configuration, import-foreign icons. Crops /root/psui-scratch/shadows.
-- Queued: 547b4db1 (ui-parity: free-click readouts within one screen pixel on the sketch plane, doubled for two-click
-  measures, lead 11-16; `pixel_on_plane`; README), 04e40652 (toolbar dropdowns: 180 px with border, icon cell 2 px
-  in, rows with chips 35 px; measured equal to live menus/ps-dropdown-01 within 1 px).
-- Running 13:20: full psui shards on vibe6 (/home/ngyekta/tmp/psui/full1116, psui-names.txt): take the next miss.
+- Landed: d75fd4d1 (free-click readouts within one screen pixel on the sketch plane, doubled for two-click
+  measures; `pixel_on_plane`; README), b752d3ad (toolbar dropdowns 180 px, icon 2 px in, rows with chips 35 px).
+- In flight (qa 11-16 regression, sketch-entity-copy-paste step 12: the click after a paste deselected the copy since
+  f2029e2a moved the manipulator to the lowest end): the arrows' shafts take a click (8 px out, 60 long, 6 px either
+  side; `XF_ARROW_GAP_PX`, `XF_ARROW_SHAFT_REACH_PX`). A first try (paste the lowest key point onto the pointer,
+  aeaf3a9e) failed the editing matrix: live pastes the copy's centre under the pointer (editing-gaps3 paste case).
+- Queued in vibe6's slot (behind asm / blend / qa runs): full psui shards (systemd unit psui-shards locally,
+  /root/psui-scratch/run-shards.sh; log full1116.log; out /home/ngyekta/tmp/psui/full1116).
 - Paused until ~10:15 UTC 11-17: asm, skasm, bool2, studios, live, live2. Don't message them (it wakes them): write
   into onshape-research/live/REQUESTS.md or their handoffs. Waiting there: live/live2's tool-list box model request
   (now measured from menus/ps-dropdown-*; can be dropped).
