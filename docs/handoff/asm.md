@@ -4,7 +4,7 @@ Area: crates/assembly, crates/assembly-ui, the assembly ops in crates/ops and th
 scenarios, the assembly parity suite (`parity_assemblies`) and the parity translator (crates/ops/src/parity.rs) for
 the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: docs/DECISIONS.md.
 
-## State (2026-11-16 02:10 UTC)
+## State (2026-11-16 02:55 UTC)
 
 ### In flight
 - Worktree /root/projects/noshape-wt/asm (detached on 93346d03 = landed fd98e8a6), on top (none landed):
@@ -16,18 +16,28 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
     studios loaded, "TRACE use"; 03a724ef connectors on sketch instances, refsx FACE -> sketch region; f4ced170
     vertex-only in-context bodies as points, no metadata for standard content, names only at the own configuration;
     4d6bf0ef found:false refs lines skipped; cfbcf646 second-id connector edge along live's Z; 236dbeca live's wire
-    parts out of part matching (hand-drill's "Curve 1" renamed Gearbox Housing etc.); 4fb33441 a sub-feature's query
-    by its text first, refs only when the text finds nothing (hand-drill 9fbc05's second Spur gear sat on another
-    circle of the same length: 67 -> 50/67 mates at s57).
-- Binary s63 = HEAD 4fb33441. Queued on vibe6 (~/bin/slot, behind qa's ui-parity): hd.sh (s63 hand-drill +
-  keyboard, cfg/s63-*.log) and the gate's full assembly run (g49/run.sh, ops-s49 = s63, full/s49.log, "ASM-DONE" in
-  g49/status). Model gate done: clean (only c2-surf-workshop-boundary/split differ, data refetch); no model document
-  has subFeature refs; clamp-guillem (found:false lines) 25/25 at base29 and s63.
-- Then: compare full/s49 to full/base29.sum per corpus (base29 ran on the old refs: hand-drill 67/67, corexy 11/11,
-  pattern-std 31/40, robotic-arm 40/40, tvc-mount 5/11 mates); land; SCORE.md "Assemblies" row.
+    parts out of part matching (hand-drill's "Curve 1"); 4fb33441 a sub-feature's query by its text first, refs only
+    when the text finds nothing (hand-drill 9fbc05's second Spur gear: 67 -> 50/67 mates at s57); 8be59657 an instance
+    with partId "" (live can't resolve it) a live defect, not counted; bbbf7e98 standard content named with its thread
+    length ("… x 60 x 36") found in our catalogue (material); e050e97a **model-core refgeom.rs**: a Mate connector
+    owned by a sketch -> the sketch's body (core told; keyboard 7f71cc / a66ca5); d171c160 traces for untranslated
+    mate ends and sketch-instance entity misses.
+- Binary s66 = HEAD d171c160 (built on vibe5, the lead's build host until 04:05). Queued on vibe6 behind qa's
+  ui-parity in ~/bin/slot: hd.sh (hand-drill + keyboard, cfg/s63-*.log, binary file ops-s63 = s66) and the gate's
+  full assembly run (g49/run.sh, ops-s49 = s66, full/s49.log, "ASM-DONE" in g49/status). If the full run hasn't
+  started by 04:05, run it on vibe7 instead. Model gate: clean; no model document has subFeature refs or the owner
+  error; clamp-guillem (found:false) 25/25 at base29 and s63.
+- Then: compare full/s49 to full/base29.sum per corpus (base29 = old refs: hand-drill 67/67, corexy 11/11, pattern-std
+  31/40, robotic-arm 40/40, tvc-mount 5/11 mates); land (rebase onto main: dx's 19afd619 STEP names -> rescore corexy
+  BOM; dx's planeOp-before-refs change, which I dropped from mine); SCORE.md "Assemblies" row (last 11-08).
 - Single corpora: keyboard s59 25/25, 1/2 mates, 16/16 BOM; pattern-std s59 161/162, 67/76 mates, 11/17 BOM;
   hand-drill s57 40/41, 50/67 (fixed since), 17/20 BOM; tvc-mount s57 41/43, 6/11; corexy s57 56/62, 7/7.
-- dx's ce4f5ec6 (queued): STEP names (corexy BOM: rescore after) and composites kept in the suite's part list.
+- Asked live / live2 (REQUESTS 02:2x-02:4x): pattern-std 36b90f sketch refs (done, 622 lines: PROJECTED unused 27 ->
+  10, several sketches then try metre moves and are taken back); scissor-lift b7e3814f lines / mass (done); ISO 4762 /
+  DIN 912 thread lengths and names (P2, live's queue; our rule gives 30 at M12x60, live 36, names "… x 60 x 36").
+- pattern-std's 9 Fastened mates on AR-S1 / AR-S2 (studio 36b90f, parts off live's volume) were in base29 too.
+- keyboard: 6 mates "connectors not translated" (sketch instance ends, pattern-instance paths?): d171c160's trace
+  will tell in the next keyboard run.
 - vibe7 idle 01:30-04:05 (lead); my runs and builds on vibe6.
 - keyboard left: sketch-instance mates (connectors on the instance's wire edges), 7f71cc / a66ca5 Mate connector
   owned by a sketch (refgeom.rs owner check, model-core).
