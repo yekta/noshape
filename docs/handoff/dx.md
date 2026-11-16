@@ -22,16 +22,29 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   live2: 4 docs final (rings-loft, extension-spring, housing-draft, sm-louver); translations quota 429 until ~18:36,
   STL until ~18:45; timer 18:50: hex-bookcase first (+ JT / RHINO / PVZ, live-export-results.json: what live writes
   for a mesh part), then the other 5, then all 10 live.stl + live-self STL.
-  Our imports of live's files (vibe5 debug CLI, ~/tmp/dx/hx2): extension-spring, housing-draft, sm-louver match
-  live-self in x_t / STEP / IGES. c2-rings-loft: x_t refused ("a curve of the file could not be rebuilt": an edge
-  on a closed non-periodic intersection curve got a decreasing range); fix on my branch e9facf060 (WIP, NOT landed:
-  then Extruded ring imports 280/762/508, live 273/762/508, 2463 mm³ for 440.76: its 6 blend ('other') faces come in
-  as 13 B-splines, 153 mm² short -> the reader's blend rebuild is next). rings-loft STEP / IGES: ours = live's
-  model; live's own imports are off it (not targets).
-  Our x_t read back by our reader: cf-snap-hook 13 surface bodies (volume 0; ACIS right), rings-loft Part 1 303 mm³
-  for 440.77, housing-draft 37/82/46 for 36/79/44 (volume right). Live's verdict (live-ours) after 18:50.
-  Runs: vibe6 slot ticket exch.sh (06:45; ops-ex md5 5ed15b0ced26, data snapshot ~/agents/dx-keep/exl: predates
-  the 11:xx fixes, rebuild the binary before it starts if possible). Own pre-runs ~/tmp/dx/ex2.log, ex3.log (35/38).
+  Landed 11-16 pm: 2ddc1b649 drawing DXF layout + 2 viewports per sheet, $TILEMODE 0; f184f26ae tangent edges by
+  geometry (hlr.cpp seam_edges value 2, normals within 1e-4 rad); 7c4ea1412 conics >= 8 points (fit to ARC/ELLIPSE).
+  Queued: 9b990bab auto centermarks on full circles only (cylinder_ends TAU); e6953ff5 STEP/IGES offsets + linear
+  extrusions -> B-surfaces (io.cpp step_bsurfaces).
+  vibe6 run (exch-1116, 08:50 binary): ours imports live's 58/74, live imports ours 46/48, ours reads ours 108/117,
+  times at or under live's 48/48 (rings-loft STEP import 2.5 s, live 16.1).
+  Open, ranked:
+  1. c2-rings-loft live.x_t refused by our reader. Branch WIP e9facf060 (closed intersection curve: vertex at the
+     closing end takes the curve's start; then it imports, edges / vertices = live) + 04a062cdb (blend tube periodic
+     round a periodic (ellipse) spine: faces 280 -> 273 = live, but edges 762 -> 916, area 1874 for 1193: the faces'
+     trimming on the periodic tube is next). Neither lands alone (a wrong part is worse than the refusal).
+  2. Our STEP / IGES of rings-loft Part 1: 2 closed "extruded" faces (B-splines now) still read back too big (with
+     p-curves too: -198.9 mm³; ACIS / x_t, which split closed faces first, are right). Next: split closed faces for
+     STEP / IGES as exchange_prepared does, or find what OCCT's STEP / IGES writer does with their seam.
+  3. Our x_t of cf-snap-hook reads back as 13 sheets in our reader (prepared shape valid, no free edges; pieces round
+     each hook tip: split B-surfaces of revolution with a pole, tori, a 2 mm disc). Live's verdict after 18:50 says
+     writer or reader.
+  4. Drawings: SPLINE where live has ARC / ELLIPSE (our model edges are B-splines where live's are exact conics);
+     sm-louver 126 bend lines still Visible not TANGENT (likely tangent edges on the silhouette); live's 2 empty
+     ANNOTATION_TEXT MTEXTs (artefact, skipped).
+  5. SAT: live's SAT of sm-louver splits two cylinders (40 faces in the file); asked live2 for live's own SAT import
+     (live-self "ACIS") at 18:50. Possible 1-shot exact-HLR nondeterminism: one rings-loft DXF export had 693 lines
+     (normally 936) under load.
 - P0 (lead 07:0x): c2-config-parts-screws hung regeneration (Split 3, FACE split by 6 projected sketch curves):
   bool's split_by_edges_on_faces (af0a1713d) ran GeomAPI_ExtremaCurveCurve (math_GlobOptMin) on each tool pair forever.
   Fix 979de111a (local): pairs other than lines / circles decide on ends (within tol: no(), as before) and polylines
