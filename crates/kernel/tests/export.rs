@@ -2068,6 +2068,21 @@ fn offsets_of_a_periodic_bsurface_round_trip_through_parasolid() {
     assert!((a - want).abs() < 1e-4 * want, "{a} vs {want}");
 }
 
+/// The same Shell walls through ACIS: written as B-surfaces there (kept as offsets for Parasolid only, their face
+/// range past the basis's made SAT fail: c2-rings-loft's ours.sat "V parameters out of range"). The approximation
+/// loses 0.17 % of the area (open: ACIS offset surfaces).
+#[test]
+fn offset_walls_export_to_acis() {
+    let walls = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts/rings-loft-shell-walls.brep")).unwrap();
+    let want = surface_properties(&walls).unwrap().mass;
+    let path = std::env::temp_dir().join(format!("noshape-sat-walls-{}.sat", std::process::id()));
+    write_acis(&path, std::slice::from_ref(&walls), LengthUnit::Meter).unwrap();
+    let back = read_acis_parts(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    let a: f64 = back.iter().map(|p| surface_properties(&p.shape).unwrap().mass).sum();
+    assert!((a - want).abs() < 5e-3 * want, "{a} vs {want}");
+}
+
 /// A draft's cone face OCCT cut in two at its seam (shown as one face), with the four faces round it: written as one
 /// face, its rims one arc each (Parasolid has no seam), as shown: c2-housing-draft's Part 1 read back 37/82/46 for
 /// its 36/79/44.

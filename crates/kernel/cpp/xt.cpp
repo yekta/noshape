@@ -2286,10 +2286,11 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splin
     for (TopExp_Explorer ee(ef.Current(), TopAbs_EDGE); ee.More() && keep_spun && !occ::down_cast<Geom_SurfaceOfRevolution>(fs).IsNull(); ee.Next())
       keep_spun = !BRep_Tool::Degenerated(TopoDS::Edge(ee.Current()));
   }
-  // (Extrusions of ellipses and splines stay: XT swept surfaces, exact. The others are written as B-surfaces. Offset
-  // surfaces stay too, written as Parasolid's OFFSET_SURF over their basis's B-surface: approximated, the edges along
-  // them came out tolerant with curves on them that no longer fit; c2-rings-loft's Shell walls read back 303 mm³ for 441.)
-  r = ShapeCustom::ConvertToBSpline(r, false, !keep_spun, false, false);
+  // (Extrusions of ellipses and splines stay: XT swept surfaces, exact. The others are written as B-surfaces. For XT
+  // (`periodic_splines`) offset surfaces stay too, written as Parasolid's OFFSET_SURF over their basis's B-surface:
+  // approximated, the edges along them came out tolerant with curves on them that no longer fit; c2-rings-loft's Shell
+  // walls read back 303 mm³ for 441. ACIS and JT, which share this, take them as B-surfaces: rings-loft's SAT failed.)
+  r = ShapeCustom::ConvertToBSpline(r, false, !keep_spun, !periodic_splines, false);
   if (periodic_splines)
     r = offsets_restored(r);
   bool split = false;
