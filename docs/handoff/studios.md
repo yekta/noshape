@@ -9,31 +9,28 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-16 05:02 UTC.
+Updated 2026-11-16 06:12 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-- LANDED 05:02 as 547a769e: the TITLE split (TITLE = "Title", "Title 2", "Title 3", `TITLE_KEYS`; old
-  drawings and saved templates split a three-line Title on load: `Drawing::upgrade_title_lines`; e2e
-  drawing_title_block_fields, drawing_title_lines_from_an_old_file); Drawing properties (live2 drw-dprops-*: dual
-  precision 0.12 metric / 0.123 inch, `mark_first` dropdowns); TITLE's pick areas as live2's drw-title-field-* (a
-  line's own text ± 0.15 pitch first, then live's area above it, up to 2 pitches over its centre, the lower line's
-  where two overlap, over the block's FormatLine picks); the Note panel's toggles and Drawing properties' rows marked
-  for UI scripts; drawing_matrix.py ignores a hole table dump's hidden texts. Full drawing run on that binary (vibe7
-  04:00): 290/294, the rest known (centermark x2, two takes without a recording); the later fixes: 39 title / note /
-  dprops takes match on vibe6.
-- Queued 05:02: a box on the empty sheet starts past 7 px (`BOX_START_PX`, live2
-  drw-feel-q (a)); GPUI a_box_on_the_empty_sheet_starts_past_7_px; 5 drag takes match.
+- Landed today: 547a769e (TITLE split, Drawing properties, title-field picks, 05:02), 79a35df0 (box past 7 px,
+  05:17).
+- Queued 06:12: 2e6aa396d hole tables as live2's drw-hole-table-* (Split Hole table below: the part goes under the first,
+  3 mm apart, left selected; Esc keeps a selected hole table; Bring to front / Send to back offered; a cell's menu
+  Size ▸ / Resize... | Copy, Rows Equally over a merged cell, Esc closes the Cell panel too (`OsMenu::after_escape`);
+  run.py strips live's "NoteContextMenus" separators). Table takes on vibe6: 49/50; drw-hole-table-cell-bold s12 is
+  live's state read before its Cell panel showed (it shows at s12 in -cell-rmb), left.
+- Live's reader reads a selected hole table's lines inside a view's box as EDGE <view> (live2 05:1x shots); ours'
+  reader does the same, so no runner rule is needed.
 
 Areas (11-16 01:30-02:30, vibe5): Feature Studio 116/116 takes, versions/history/release 154/154, documents/tabs/
 start/prefs 285/285 (SCORE.md's 97.8 / 98.2 / 98.4 are from 11-11..13).
 
 ## Waiting on others
-- live2: 5 drw-hole-table-* takes (rmb + Move to, cell-panel, cell-rmb, cell-bold, split), queued to land by live2;
-  then Hatch region / Note panel / Hole callout explorations (asked 03:30).
+- live2: Hatch region / Note panel / Hole callout explorations (asked 03:30), then their takes.
 
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;
@@ -53,10 +50,9 @@ start/prefs 285/285 (SCORE.md's 97.8 / 98.2 / 98.4 are from 11-11..13).
   the code before taking an item from it.
 
 ## Next, in order
-1. live2's 5 hole-table takes when on main: run them (vibe6 ~/agents/studios-keep/shards-names.sh), fix.
-2. Refresh docs/parity/drawing-matrix.md (drawing_matrix.py --run ~/tmp/studios/drw288 on vibe7 + our menus).
-3. Hatch region, Note panel, Hole/thread callout takes as live2 records them.
-4. interaction-feel.md's remaining "?" rows (Drawings: a projected view's drag axis, asked; the centerline case).
+1. Refresh docs/parity/drawing-matrix.md (drawing_matrix.py --run on a fresh full drawing run + our menus).
+2. Hatch region, Note panel, Hole/thread callout takes as live2 records them.
+3. interaction-feel.md's remaining "?" rows (Drawings: a projected view's drag axis, asked; the centerline case).
 
 ## How to run
 
