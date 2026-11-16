@@ -2192,7 +2192,13 @@ impl<'a> Translator<'a> {
                 let mut ids = Vec::new();
                 let mut missed = Vec::new();
                 for (n, q) in queries.iter().enumerate() {
-                    match self.query(k, q) {
+                    // (A sub-feature's query by its text first, live's ids where that finds nothing: asm-hand-drill-pinslot
+                    // 9fbc05's second Spur gear centred on Extrude 1's cap edge, not a circle of its length elsewhere.)
+                    let by_text = (self.sub_feature.is_some() && !texts[n].is_empty() && q["queryString"] == "")
+                        .then(|| p["queries"][n].clone())
+                        .and_then(|original| self.query(k, &original).ok())
+                        .filter(|found| !found.is_empty());
+                    match by_text.map(Ok).unwrap_or_else(|| self.query(k, q)) {
                         Ok(found) => {
                             if per_query && texts[n].contains("importOp") && texts[n].contains("IMPORT") && !found.is_empty() {
                                 self.import_bodies.insert(texts[n].clone(), found.clone());
