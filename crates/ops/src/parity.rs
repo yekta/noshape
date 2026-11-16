@@ -2579,6 +2579,15 @@ impl<'a> Translator<'a> {
         {
             return Ok(vec![p.to_string()]);
         }
+        // A Plane feature's plane (`dummyQuery(id+"F….planeOp", …)`, or packed: `DUMMY` of "F….planeOp"): ours, before any
+        // line's geometry (live's refs read it as the plane body's face: c2-loft-guide-curves-wave-washer's Sketch 2 on
+        // Plane 1).
+        let plane_op = text.split("id+\"").nth(1).and_then(|r| r.split(".planeOp\"").next()).filter(|f| !f.contains('"')).map(str::to_string);
+        if let Some(fid) = plane_op.or_else(|| packed_strings_of(text).iter().find_map(|s| s.strip_suffix(".planeOp").map(str::to_string)))
+            && let Some(ours) = self.feature_ids.get(&fid)
+        {
+            return Ok(vec![format!("fplane:{ours}")]);
+        }
         // Not placed just before feature k (live's line after a sketch has no
         // bodies): where an earlier line has them all (an id names one entity).
         let k = if !ids.is_empty() && !ids.iter().all(|id| self.refs.contains_key(&(k, id.clone()))) {
@@ -2670,21 +2679,9 @@ impl<'a> Translator<'a> {
                 return Ok(by_creator);
             }
         }
-        // A Plane feature's plane (`dummyQuery(id+"F….planeOp", …)`).
-        if let Some(fid) = text.split("id+\"").nth(1).and_then(|r| r.split(".planeOp\"").next()).filter(|f| !f.contains('"'))
-            && let Some(ours) = self.feature_ids.get(fid)
-        {
-            return Ok(vec![format!("fplane:{ours}")]);
-        }
         // The Origin, packed (`DUMMY` of "Origin.pointOp": c2-housing-draft's Bohrung 1, its in-feature mate connector).
         if ids.is_empty() && packed_strings_of(text).iter().any(|s| s == "Origin.pointOp") {
             return Ok(vec!["origin".into()]);
-        }
-        // A Plane feature's plane, packed (`DUMMY` of "F….planeOp").
-        if let Some(fid) = packed_strings_of(text).iter().find_map(|s| s.strip_suffix(".planeOp").map(str::to_string))
-            && let Some(ours) = self.feature_ids.get(&fid)
-        {
-            return Ok(vec![format!("fplane:{ours}")]);
         }
         // A Composite part feature's part (`DUMMY` BODY created by "F….opCreateCompositePart": asm-infento-subs' studio
         // 1dc32b, Transform 16 / 17 / 23 / 24 / 46 and Mirror 4 move composite parts): ours of that feature.

@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-16 02:25 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-16 02:40 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -15,15 +15,30 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   is watertight, and each part's |ΔV| / area against live's import of its own STL is ≤ 0.01 mm (stl_within_deviation;
   test stl_deviation_measures_watertightness_and_distance). cf-sheet-metal-model-plus now passes (vertices within
   0.0233 mm, mean 0.0010 mm): its exchange row 4/4. (Its mesh is ~1 µm inside on curved faces: BRepMesh, P3.)
-- 1dc32b without live's refs (vibe6 st1dc-refs.sh: R with, N without; ~/tmp/dx/st1dc-{R,N}.log): R 17/349 (Composite
-  part 2, fixed by ce4f5ec6); N still running at 01:54.
-- corpus3 (live's 26: c2-surf-intro-*, c2-surf-workshop-*, c2-rib-wrap, c2-sm-tablet-stand, c2-sm-rocker-enclosure-*;
-  REST features.json + refs): queued in vibe6's slot behind blend (corpus3.sh, build L; ~/tmp/dx/corpus3.{out,log,sum}).
+- 1dc32b alone (vibe6, build L): with and without live's refs both 17/349 (first difference Composite part 2: fixed
+  by 19afd619, rerun). Without refs, the region fix makes Fillet 5 / Chamfer 3 / Extrude 34 report themselves
+  ("SWEPT_EDGE: revolve FFYqzMxs3svxNXq_31.holeBodies.* was not built", "CAP_EDGE … no entity", "region …: its curves
+  were not translated") instead of silently mapping to regions; live's refs cover them.
+- Next translator piece (mine, not started): a Hole's internal bodies (`<hole>.holeBodies.*`, revolves of std's profile
+  sketch: `start_line_<n>`, `cbore_…`/`csink_…` prefixes, hole.fs sketchPoly / setupTrackingLineIds): their SWEPT_EDGE /
+  SWEPT_FACE and INTERSECT vertices. Cases: 74d3d6 Plane 1 (Sketch 15), 1dc32b Fillet 5 (refs cover it).
+- Plane feature planes before refs (committed, not landed): a `….planeOp` query (plain or packed DUMMY) maps to our
+  plane before any refs geometry (live's all-feature refs read it as the plane body's face, which by_geometry can't
+  find: c2-loft-guide-curves-wave-washer 2 -> 6/7). Gate: vibe6 corpus3.sh A/B (A build L, B build P md5 5e1d31c239eb)
+  over corpus3 + live's newer corpora (~/tmp/dx/corpus3-{A,B}.{log,sum,untr}, out corpus3.out), queued in the slot
+  since before 01:41 behind blend; land if SUM-SAME but for the planeOp documents improving. Then sort corpus3's first
+  differences to owners.
 - Second search (live, by sets): c2-parting-line-draft-tutorial 3/3; c2-parting-line-draft-parting-line 5/17, Draft 1
   (PARTING_LINE TWO_SIDED 20/20°) removes 154234 mm³ for live's 45232, inputs match: sent to core (by 02:00); save vibe6
   ~/tmp/dx/savepl. c2-sm-hem-plus: sheetMetalStart / sheetMetalHem are custom (Feature Studios da39db76…,
-  e5262684…) not fetched + its Derived source: asked live. c2-sm-side-cuts-tab: no live.jsonl on vibe6 yet (asked).
-  Loft sets and 7 config-parts (gears / bevels dropped: private studios) to come.
+  e5262684…) not fetched + its Derived source: asked live. c2-sm-side-cuts-tab 7/18: Corner break 1 (FILLET r 21 on two corners 42 mm apart, a full round; vertices = live's
+  refs) fails in sheetmetal::corner_break: core (via blend). c2-sm-hem-plus 4/6 (custom features 2/2 with live's
+  studios): Derived 1 differs because its source's Offset surface 1 makes 3 bodies for live's one: core; live fixes its
+  "surface" bodyType in the derived lines.
+  Lofts: helix-sweep 4/4, lofted-basic 6/6; wave-washer 6/7 with the plane fix (Loft 1: a loft path with more than
+  two profiles, ours unsupported: core); paths-guides 4/29 (Loft 1 to a sketch point with TANGENT_TO_PROFILE: ours
+  "Only planar profiles…": core; save vibe5 ~/tmp/dx/savelf); driven-pattern refetch pending. 7 config-parts to come
+  (gears / bevels dropped: private studios).
 
 ## Queued to land
 - ce4f5ec6 STEP part names (asm-corexy) + Composite kind (queued 01:44). Landed 11-16: 866bd5ad region fix (EDGE/VERTEX queries never regions) + impeller f24 split vertex in
