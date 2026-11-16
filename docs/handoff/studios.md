@@ -9,29 +9,28 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-16 07:49 UTC (restarted on a new account 07:27 from the 06:27 handoff).
+Updated 2026-11-16 08:55 UTC (restarted on a new account 07:27 from the 06:27 handoff).
 
 ## In flight
 
-Worktree /root/projects/noshape-wt/studios, branch studios-0811a, rebased on a82e01df. 656f5c31 committed (panel fixes);
-uncommitted on top: Create Drawing names (sources `button:<label>`, standards `tab:<x>`, custom choices `button:cd-*`,
-lists `dropdown:cd-*`, tiles) + ours_on in drw-create-drawing-{filters,custom-lists}; Styles panel on a dimension read as
-live (text, 3 selects + checkboxes as fields; lists `dropdown:<value>`, `field:Text gap`; Show dimension line only on
-radial dims; Enter in Text gap hands the keys back to the sheet); runner rules `panel_list_over_view`, `late_dialog`, a
-failed live drawing read still a drawing step.
-- 23 panel takes (21 of live2's + Styles ×2 + Create Drawing ×2 + hole callout retake): 18/23 at 07:40; with the
-  fixes since all but Styles dimension s29 (Esc, fixed, rerunning: logs/st2.log) match in reruns/compare-only.
-- Mac clippy5 (drawing-ui) running; then commit, land.
-- TITLE line-edit (live/feel/title-line-edit, 02:33): covered by 547a769e's TITLE split; drw-title-field-* 5/5.
-- Feel readings: box past 7 px landed 79a35df0; extension line foot → dimension: annotation-first bias, matrix row =.
-- Full drawing run (306 takes) still waits in vibe6's slot; it uses ~/tmp/studios/noshape (today's build).
-- Runner A/B on drwall-992 (250 older results): old and new run.py both 168 match, no line changed.
+Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
+- Landing now: view drag as live2's feel followUp F4 (`dragged_view_positions` / `drag_view` in crates/drawing
+  moves.rs; op `drawing_view_move` + e2e + example + AGENT_API.md; interaction-feel rows 97/106/111) and the centermark
+  reading (dx 11-16): runner `centermarks_unread` + ours' own `expect` "centermarks" counts (README "Known reader
+  limit: centermarks"); a selected centermark reads lit for the 11-15 recorder (EDGE+); Esc ends the after-menu
+  hovered-view reading. Green: drawing 236, drawing-ui 39, e2e + coverage, 52/52 view takes, centermark takes 9/10.
+- Held back (unbuilt, /root/studios-scratch/align-esc.txt): Esc in Align centermark also clears the selection
+  (drw-centermark-align s8: live reads nothing lit). Re-apply, build on vibe6, run logs/cm.txt's 10 takes, land.
+- Asked live2 (REQUESTS 07:57): the drawing box select's exact rule (row 106 ≠).
+- Row 97 ≠: a centerline over a view edge, live's click takes the view, ours the centerline (GPU pick bias); P3.
+- Full drawing run (306 takes) waits in vibe6's slot; it uses ~/tmp/studios/noshape.
 
 ## Queued to land
-- Nothing queued. Landed today: 547a769e (05:02), 79a35df0 (05:17), c2d47005 (06:18).
+- Landed 08:12 as db04b19b: the panel fixes, Styles on a dimension, Create Drawing names, runner rules.
 
 ## Waiting on others
-- live2: Hatch region / Note panel / Hole callout explorations (asked 03:30), then their takes.
+- live2: re-recording Move to sheet / Replicate (6 takes from 11-07 read no dialog), then Datum target, Table, Custom
+  table, Export Drawing, Weld symbol, GTOL, Ordinate, MBD status, Reference manager, Sheets panel; the box-select sweep.
 
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;
@@ -53,7 +52,8 @@ failed live drawing read still a drawing step.
 ## Next, in order
 1. Refresh docs/parity/drawing-matrix.md (drawing_matrix.py --run on a fresh full drawing run + our menus).
 2. live2's re-recorded matrix takes as they land (Move to sheet / Replicate first).
-3. interaction-feel.md's remaining "?" rows (Drawings: a projected view's drag axis, asked; the centerline case).
+3. The next drw-* / studio miss in qa's latest ui-parity run (lead 08:50), then the Variable / Feature Studio items.
+4. Box select's rule once live2 sweeps it (interaction-feel row 106).
 
 ## How to run
 
@@ -127,6 +127,8 @@ Runner (tools/ui-parity/run.py), what it knows about live's takes:
   - a hole callout's export text: count and diameter only (`hole_callout_export_text`)
   - a take's `live_defects` steps (DECISIONS 11-15)
   - a live EDGE read while a list a drawing panel opened lies over a view (`panel_list_over_view`)
+  - a panel live shows a step late after a failed drawing read (`late_dialog`)
+  - a take's centermarks where a wait changes live's count (`centermarks_unread`: dx 11-16, drw-centermark[-align])
 - Live's selection reader: more than 60 px of selection colour inside a view's box reads EDGE. A finished line to
   line angular or max/min dimension stays selected after Esc; other dimensions don't.
 

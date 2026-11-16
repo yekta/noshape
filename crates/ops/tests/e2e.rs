@@ -4905,6 +4905,35 @@ fn assembly_configurations() {
     assert_eq!(l["configured"][0]["param"], "suppressed", "{l}");
 }
 
+/// Dragging a view (live2 feel/drawing.json followUp F4): the views aligned with it follow across their axes only, and a
+/// projected view dragged across its axis takes its parent along.
+#[test]
+fn drawing_view_move_takes_the_aligned_views_along() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "view-move.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let last = |r: &Value| r["views"].as_array().unwrap().last().unwrap()["id"].clone();
+    let front = last(&call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "position": [100, 150] })));
+    let top = last(&call(&mut ctx, "drawing_projected_view", json!({ "drawing": tab, "parent": front, "position": [100, 260] })));
+    let right = last(&call(&mut ctx, "drawing_projected_view", json!({ "drawing": tab, "parent": front, "position": [260, 150] })));
+    let at = |r: &Value, id: &Value| {
+        let p = r["views"].as_array().unwrap().iter().find(|v| v["id"] == *id).unwrap()["position"].clone();
+        [num(&p[0]), num(&p[1])]
+    };
+    let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).abs() < 1e-6 && (a[1] - b[1]).abs() < 1e-6;
+    // Front dragged (+40, -20): Top follows in x only, Right in y only.
+    let r = call(&mut ctx, "drawing_view_move", json!({ "drawing": tab, "view": front, "by": [40, -20] }));
+    assert!(near(at(&r, &front), [140.0, 130.0]) && near(at(&r, &top), [140.0, 260.0]) && near(at(&r, &right), [260.0, 130.0]), "{}", r["views"]);
+    // Right dragged 40 down (and 10 along): Front goes down with it, Top stays.
+    let r = call(&mut ctx, "drawing_view_move", json!({ "drawing": tab, "view": right, "by": [10, -40] }));
+    assert!(near(at(&r, &right), [270.0, 90.0]) && near(at(&r, &front), [140.0, 90.0]) && near(at(&r, &top), [140.0, 260.0]), "{}", r["views"]);
+    let e = try_call(&mut ctx, "drawing_view_move", json!({ "drawing": tab, "view": front, "by": [0, 0] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("by"), "{}", e.to_json());
+    let e = try_call(&mut ctx, "drawing_view_move", json!({ "drawing": tab, "view": 999, "by": [5, 0] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"), "{}", e.to_json());
+}
+
 /// The Insert view panel's options: a sketch view, simplification, model
 /// annotations, sketch appearances.
 #[test]

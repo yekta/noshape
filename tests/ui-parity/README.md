@@ -106,6 +106,17 @@ result line saying "excluded feature": the lead decides. Name what it is in `why
 
     "excluded": [{"from_step": 8, "why": "live's menu has Add comment (cloud) …"}]
 
+### Known reader limit: centermarks (studios, 11-16)
+
+Live's drawing reader lists a view's centermarks only some of the time: on block-plate's hole it reads 1, 1, 1, then 0
+over a plain 2 s wait, and 0, 1, 0, 1 after (live2 drw-centermark-align; drw-centermark reads one before any is
+placed). Where a wait changes live's count, the take's centermarks aren't compared (run.py `centermarks_unread`), and
+ours is checked against its own expected count instead, an `expect` entry per step:
+
+    "expect": [{"after": 3, "centermarks": 0, "live": "dx q-centermark: the Single mark placed on the automatic one goes on Esc"}]
+
+A miss fails the take ("expect differs").
+
 ### ours_on (studios, 11-16)
 
 A step live's runner can only aim at a screen point (`{"px": [x, y]}`: a control without a label, valid for the

@@ -5,7 +5,7 @@ pub use noshape_model_data::drawing::{links, sheet, note, weld, tb_lang, sheet_s
 
 pub mod build;
 mod moves;
-pub use moves::ViewMoves;
+pub use moves::{ViewMoves, drag_view, dragged_view_positions};
 pub use tables::CadTables;
 pub use clipboard::{DrawingClipboard, SheetPaste};
 pub use mbd::ModelAnnotations;

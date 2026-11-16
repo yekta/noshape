@@ -96,6 +96,8 @@ impl DrawingEditor {
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
         self.projection_parent_lit = false;
         self.aligned = None;
+        // (Nor is the view under the pointer lit any more after a menu: live2 drw-centermark-align s8.)
+        self.menu_closed_at = None;
         // A hole table following the pointer after ✓: Esc leaves it there (live 2131).
         if self.hole_table_placing() {
             self.place_hole_table(cx);
@@ -1367,24 +1369,10 @@ impl DrawingEditor {
                 self.drag = Drag::Pan { last_px: lp };
                 self.redraw(cx);
             }
-            Drag::MoveViews { start, orig, constraint, .. } => {
-                let mut d = sub(self.cursor, start);
-                if let Some((axis, _)) = constraint {
-                    let t = dot(d, axis);
-                    d = [axis[0] * t, axis[1] * t];
-                }
+            Drag::MoveViews { start, view, .. } => {
                 let mut dr = self.drawing.clone();
                 if let Some(s) = dr.sheets.get_mut(self.sheet) {
-                    for (id, p) in &orig {
-                        if let Some(v) = s.view_mut(*id) {
-                            v.position = [p[0] + d[0], p[1] + d[1]];
-                        }
-                    }
-                    // Notes and callouts grouped with a moved view, or attached
-                    // to its geometry, go along (help A20).
-                    for a in s.annotations.iter_mut().filter(|a| a.moves_with_view().is_some_and(|v| orig.iter().any(|(o, _)| *o == v))) {
-                        a.position = [a.position[0] + d[0], a.position[1] + d[1]];
-                    }
+                    noshape_model::drawing::drag_view(s, view, sub(self.cursor, start));
                 }
                 self.set_preview(Some(dr), cx);
             }
@@ -1956,27 +1944,8 @@ impl DrawingEditor {
         }
         let sheet = &self.drawing.sheets[self.sheet];
         match sel {
-            // (Live: a view moves by its edges too.)
-            Sel::View(id) | Sel::Edge(id, _) => {
-                // Move the view with all views derived from it; a projected
-                // (or section/auxiliary) view slides along its alignment axis.
-                // Views with "Suppress alignment with parent" stay where they are.
-                let ids: Vec<ViewId> = sheet.descendants(id).into_iter().filter(|v| !v.is_ghost() && (*v == id || !sheet.view(*v).is_some_and(|x| x.unaligned))).collect();
-                let orig = ids.iter().filter_map(|v| sheet.view(*v).map(|x| (*v, x.position))).collect();
-                let prot = sheet.parent_of(id).map(|p| views::view_rotation(sheet, p)).unwrap_or(0.0);
-                // A view linked to a parent on another sheet moves freely (live x (5)).
-                let unaligned = sheet.view(id).is_some_and(|v| v.unaligned) || sheet.linked_parent(id).is_some();
-                let constraint = match &sheet.view(id).map(|v| v.kind.clone()).filter(|_| !unaligned) {
-                    Some(ViewKind::Projected { .. }) => views::projected_direction(sheet, id).filter(|d| d[0] == 0.0 || d[1] == 0.0).map(|d| views::rotate2(d, prot)).map(|d| (d, d)),
-                    Some(ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) => views::section_cut(sheet, id).map(|c| views::rotate2(c.toward_view, prot)).map(|d| (d, d)),
-                    Some(ViewKind::Auxiliary { edge_dir, .. }) => {
-                        let n = norm([-edge_dir[1], edge_dir[0]]);
-                        Some((n, n))
-                    }
-                    _ => None,
-                };
-                Drag::MoveViews { start, orig, constraint, fresh }
-            }
+            // (Live: a view moves by its edges too; the views aligned with it follow: `dragged_view_positions`.)
+            Sel::View(id) | Sel::Edge(id, _) => Drag::MoveViews { start, view: id, fresh },
             Sel::Annotation(aid) => match self.built.as_ref().and_then(|b| b.resolved.annotations.iter().find(|a| a.id == aid).cloned()) {
                 Some(a) if !matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. }) => Drag::MoveAnnotation { start, orig: a },
                 _ => Drag::None,

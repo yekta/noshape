@@ -247,3 +247,80 @@ impl ViewMoves for Drawing {
         Ok(map)
     }
 }
+
+/// How a view follows its parent's move.
+enum Follow {
+    /// Aligned with it along `axis` (unit, sheet): only the move across the axis.
+    Across([f64; 2]),
+    /// The whole move (an isometric, a detail view).
+    Whole,
+    /// Not at all ("Suppress alignment with parent", a parent on another sheet).
+    Stays,
+}
+
+fn follow(sheet: &Sheet, id: ViewId) -> Follow {
+    let Some(v) = sheet.view(id) else { return Follow::Stays };
+    if v.unaligned || sheet.linked_parent(id).is_some() {
+        return Follow::Stays;
+    }
+    let turn = sheet.parent_of(id).map(|p| views::view_rotation(sheet, p)).unwrap_or(0.0);
+    let axis = match &v.kind {
+        ViewKind::Projected { .. } => views::projected_direction(sheet, id).filter(|d| d[0] == 0.0 || d[1] == 0.0).map(|d| views::rotate2(d, turn)),
+        ViewKind::Section { .. } | ViewKind::AlignedSection { .. } => views::section_cut(sheet, id).map(|c| views::rotate2(c.toward_view, turn)),
+        ViewKind::Auxiliary { edge_dir, .. } => {
+            let n = [-edge_dir[1], edge_dir[0]];
+            let l = n[0].hypot(n[1]);
+            (l > 1e-12).then(|| [n[0] / l, n[1] / l])
+        }
+        _ => None,
+    };
+    axis.map_or(Follow::Whole, Follow::Across)
+}
+
+fn across(m: [f64; 2], axis: [f64; 2]) -> [f64; 2] {
+    let t = m[0] * axis[0] + m[1] * axis[1];
+    [m[0] - axis[0] * t, m[1] - axis[1] * t]
+}
+
+/// Where the views of a sheet go when view `id` is dragged by `d` (sheet mm), as live (live2 feel/drawing.json
+/// followUp F4): a view aligned with its parent follows the parent's move only across its axis (Front dragged: Top
+/// follows in x, Right in y), and a view dragged across its axis takes its parent along (Right dragged down moves Front
+/// down, Top staying). Returns each moved view with its new position.
+pub fn dragged_view_positions(sheet: &Sheet, id: ViewId, d: [f64; 2]) -> Vec<(ViewId, [f64; 2])> {
+    fn go(sheet: &Sheet, v: ViewId, m: [f64; 2], from: Option<ViewId>, moved: &mut Vec<(ViewId, [f64; 2])>) {
+        if m[0].hypot(m[1]) < 1e-12 || sheet.view(v).is_none() || moved.iter().any(|(x, _)| *x == v) {
+            return;
+        }
+        moved.push((v, m));
+        for c in sheet.views.iter().map(|x| x.id).filter(|c| sheet.parent_of(*c) == Some(v) && Some(*c) != from && !c.is_ghost()) {
+            match follow(sheet, c) {
+                Follow::Across(axis) => go(sheet, c, across(m, axis), Some(v), moved),
+                Follow::Whole => go(sheet, c, m, Some(v), moved),
+                Follow::Stays => {}
+            }
+        }
+        if let (Some(p), Follow::Across(axis)) = (sheet.parent_of(v).filter(|p| Some(*p) != from && !p.is_ghost()), follow(sheet, v)) {
+            go(sheet, p, across(m, axis), Some(v), moved);
+        }
+    }
+    let mut moved = Vec::new();
+    go(sheet, id, d, None, &mut moved);
+    moved.into_iter().filter_map(|(v, m)| sheet.view(v).map(|x| (v, [x.position[0] + m[0], x.position[1] + m[1]]))).collect()
+}
+
+/// Drag view `id` by `d` (sheet mm): the views as [`dragged_view_positions`], with the notes and callouts grouped with a
+/// moved view or attached to its geometry (help A20).
+pub fn drag_view(sheet: &mut Sheet, id: ViewId, d: [f64; 2]) {
+    let mut moved: Vec<(ViewId, [f64; 2])> = Vec::new();
+    for (v, p) in dragged_view_positions(sheet, id, d) {
+        if let Some(x) = sheet.view_mut(v) {
+            moved.push((v, [p[0] - x.position[0], p[1] - x.position[1]]));
+            x.position = p;
+        }
+    }
+    for a in sheet.annotations.iter_mut() {
+        if let Some((_, m)) = a.moves_with_view().and_then(|v| moved.iter().find(|(x, _)| *x == v)) {
+            a.position = [a.position[0] + m[0], a.position[1] + m[1]];
+        }
+    }
+}

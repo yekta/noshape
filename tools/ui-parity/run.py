@@ -1101,6 +1101,14 @@ def compare(live, ours, whole_document=True):
         nx = steps[i + 1]
         if (nx.get("do") or {}).get("do") == "wait" and isinstance((nx.get("state") or {}).get("undo"), dict):
             late_undo[f"step {st.get('step')}"] = nx["state"]["undo"]
+    # A wait never adds or removes a centermark: where live's count changes over one, its reader lists the take's
+    # centermarks only some of the time (the plate's hole: 1, 1, 1, 0 after a plain wait, 0, 1, 0, 1 in live2
+    # drw-centermark-align; one read before any was placed in drw-centermark), so they aren't compared there.
+    def centermarks(st):
+        anns = ((st.get("state") or {}).get("drawing") or {}).get("annotations")
+        return sum(1 for x in anns if isinstance(x, dict) and x.get("kind") == "centermark") if isinstance(anns, list) else None
+    counts = [centermarks(st) for st in steps]
+    centermarks_unread = any((st.get("do") or {}).get("do") == "wait" and None not in (counts[i - 1], counts[i]) and counts[i - 1] != counts[i] for i, st in enumerate(steps) if i > 0)
     # A panel live shows only by the wait after a click whose drawing it failed to read (live2 drw-hole-table-cell-bold
     # s12: "translation failed", the Cell popup at s13): its next state's panel, ours shown at once.
     late_dialog = {}
@@ -1425,6 +1433,11 @@ def compare(live, ours, whole_document=True):
         recorder_form(b, live)
         panel_fields_unread(a, b, str(live.get("recorded") or ""))
         panel_list_over_view(a, b)
+        if centermarks_unread:
+            for side in (a, b):
+                dr = (side or {}).get("drawing")
+                if isinstance(dr, dict) and isinstance(dr.get("annotations"), list):
+                    dr["annotations"] = [x for x in dr["annotations"] if not (isinstance(x, dict) and x.get("kind") == "centermark")]
         select_unread(a, b, step)
         document_loading(a, b)
         hole_callout_export_text(a, b)
@@ -1466,6 +1479,11 @@ def check_expect(scenario, ours):
             checks.append(("text", f.get("text") == e["text"], f.get("text")))
         if "list" in e:
             checks.append(("list", lst.get("rows") == e["list"] and lst.get("highlighted") == e.get("highlighted", lst.get("highlighted")), lst))
+        # Our own count of placed centermarks where live's reader can't be compared (README "Drawings": centermarks).
+        if "centermarks" in e:
+            anns = (st.get("drawing") or {}).get("annotations") or []
+            n = sum(1 for x in anns if isinstance(x, dict) and x.get("kind") == "centermark")
+            checks.append(("centermarks", n == e["centermarks"], n))
         if "popup" in e:
             name = next((f.get("text") for f in dialog.get("fields", []) if f.get("label") == "Name"), None)
             checks.append(("popup", dialog.get("title") == e["popup"] and name == e.get("name", name), dialog.get("title")))
@@ -1540,6 +1558,10 @@ def main():
             live_rec["steps"] = [s for s in live_rec.get("steps", []) if s.get("step", 0) < cut]
         note = "" if cut is None else f", live defect from step {cut} not compared" if cut == defect else f", excluded feature from step {cut} not compared"
         m, n, first = compare(live_rec, ours, whole)
+        # Ours' own expected values where live's reader can't be compared (the `centermarks` entries): a miss fails.
+        own = check_expect({"expect": [e for e in scenario.get("expect") or [] if "centermarks" in e]}, ours)
+        if own and first is None:
+            first = ("expect", "", "as expected", own[0])
         steps_ok, steps_all = steps_ok + m, steps_all + n
         if first is None:
             score += 1

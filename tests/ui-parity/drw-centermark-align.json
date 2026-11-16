@@ -62,5 +62,22 @@
    "do": "key",
    "key": "Escape"
   }
+ ],
+ "expect": [
+  {
+   "after": 2,
+   "centermarks": 1,
+   "live": "dx q-centermark: a Single mark placed on a hole's automatic centermark shows while picked and goes on Esc (the automatic one isn't an annotation)"
+  },
+  {
+   "after": 3,
+   "centermarks": 0,
+   "live": "dx q-centermark: a Single mark placed on a hole's automatic centermark shows while picked and goes on Esc (the automatic one isn't an annotation)"
+  },
+  {
+   "after": 8,
+   "centermarks": 0,
+   "live": "dx q-centermark: a Single mark placed on a hole's automatic centermark shows while picked and goes on Esc (the automatic one isn't an annotation)"
+  }
  ]
 }

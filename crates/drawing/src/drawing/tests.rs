@@ -5558,3 +5558,26 @@ fn title_lines_pick_over_the_template_lines() {
         assert!(!matches!(b.hit([x, 42.0], 1.6).and_then(|k| b.picks.get(k as usize)), Some(PickTarget::TitleField(_))), "({x}, 42)");
     }
 }
+
+#[test]
+fn a_dragged_view_takes_its_aligned_family_as_live() {
+    // live2 feel/drawing.json followUp F4: Front, Top above it, Right beside it, an isometric off its corner.
+    let mut sheet = Sheet::default();
+    let projected = |id: u64, direction: [f64; 2], position: [f64; 2]| DrawingView { id: ViewId(id), kind: ViewKind::Projected { parent: ViewId(1), direction: Some(direction) }, position, ..Default::default() };
+    sheet.views = vec![base_view(1, TabId(1), ViewOrientation::Front, [80.0, 80.0]), projected(2, [0.0, 1.0], [80.0, 160.0]), projected(3, [1.0, 0.0], [200.0, 80.0]), projected(4, [1.0, 1.0], [200.0, 160.0])];
+    let moved = |sheet: &Sheet, id: u64, d: [f64; 2]| {
+        let mut m = super::dragged_view_positions(sheet, ViewId(id), d);
+        m.sort_by_key(|(v, _)| v.0);
+        m.into_iter().map(|(v, p)| (v.0, [(p[0] * 1e6).round() / 1e6, (p[1] * 1e6).round() / 1e6])).collect::<Vec<_>>()
+    };
+    // Front dragged (+40, -20): Top follows by +40 in x only, Right by -20 in y only, the isometric by both.
+    assert_eq!(moved(&sheet, 1, [40.0, -20.0]), vec![(1, [120.0, 60.0]), (2, [120.0, 160.0]), (3, [200.0, 60.0]), (4, [240.0, 140.0])]);
+    // Right dragged 40 down (and 10 along): Front goes down with it, Top stays, the isometric follows Front.
+    assert_eq!(moved(&sheet, 3, [10.0, -40.0]), vec![(1, [80.0, 40.0]), (3, [210.0, 40.0]), (4, [200.0, 120.0])]);
+    // Top dragged along its axis only: alone.
+    assert_eq!(moved(&sheet, 2, [0.0, 15.0]), vec![(2, [80.0, 175.0])]);
+    // With its alignment suppressed, Right moves alone; Front's move leaves it.
+    sheet.views[2].unaligned = true;
+    assert_eq!(moved(&sheet, 3, [0.0, -40.0]), vec![(3, [200.0, 40.0])]);
+    assert_eq!(moved(&sheet, 1, [0.0, -20.0]).iter().map(|x| x.0).collect::<Vec<_>>(), vec![1, 4]);
+}

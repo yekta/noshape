@@ -431,24 +431,27 @@ impl DrawingEditor {
         // reader counts its orange pixels there, more than 60 an EDGE of that view (2402: drw-bom-* EDGE Isometric
         // under a selected BOM table). Only while nothing else is going on: a tool or a panel takes the highlight
         // (drw-dimension-foreshorten, Edit hatch region in drw-hatch-edit; BOM table properties keeps it,
-        // drw-bom-table-properties); a centermark's thin lines don't count (drw-centermark-align).
+        // drw-bom-table-properties). A centermark's or centerline's thin lines count only for the 11-15 recorder (live2
+        // drw-centermark-align s5-s7: the right-clicked automatic centermark; older readers counted a pixel short).
         // (Placing a revision callout keeps its table lit: live2 drw-revision-callout-add; so does an open dimension
         // palette: live2 drw-hcallout-override, a callout in Top's box read EDGE Top while its Edit... palette is open.)
         if let Some(b) = self.built.as_ref().filter(|_| matches!(self.tool, Tool::Select | Tool::RevisionCallout { .. }) && self.panel.is_none() && self.hatch_dlg.is_none()) {
             let thin = |id: u64| sheet.annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. } | AnnotationKind::CircleCenterline { .. }));
             // A selected hole callout is orange only behind its text (live q-escsel: its leader stays black).
             let callout_lines = self.hole_callout_selection_picks();
-            let lit = |pick: u32| {
+            let lit_as = |pick: u32, thin_ones: bool| {
                 let Some(p) = b.picks.get(pick as usize) else { return false };
                 self.selection.iter().any(|s| match (s, p) {
                     // A table with cells picked is orange only in them (live2 drw-revision-cell-*: no view's box reads it).
                     (Sel::Table(a), PickTarget::Table(t)) => a == t && self.cell_sel.is_none_or(|c| c.table != *a),
                     (Sel::Hatch(a), PickTarget::Hatch(t)) => a == t,
-                    (Sel::Annotation(a), PickTarget::Annotation(t)) => a == t && !thin(*a),
+                    (Sel::Annotation(a), PickTarget::Annotation(t)) => a == t && thin(*a) == thin_ones,
+                    (Sel::AutoCentermark(v, k), PickTarget::AutoCentermark { view, center }) => thin_ones && v == view && k == center,
                     (Sel::Sketch(a), PickTarget::SketchEntity(t)) => a == t,
                     _ => false,
                 })
             };
+            let lit = |pick: u32| lit_as(pick, false);
             // A selected view's orange inside another view's box counts there too (live2 2442: the Detail view placed
             // over Top's box, right-clicked, is orange all over, its frame, boundary and edges: EDGE Top and EDGE
             // Detail), a view with an edge picked included.
@@ -474,6 +477,17 @@ impl DrawingEditor {
                 }
                 if px > 60.0 {
                     selection.push(("EDGE".into(), self.ui_view_name(v.id)));
+                    continue;
+                }
+                for l in b.geometry.lines.iter().filter(|l| lit_as(l.pick, true)) {
+                    for w in l.points.windows(2) {
+                        if inside([(w[0][0] + w[1][0]) / 2.0, (w[0][1] + w[1][1]) / 2.0]) {
+                            px += (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]) * self.zoom;
+                        }
+                    }
+                }
+                if px > 60.0 {
+                    selection.push(("EDGE+".into(), self.ui_view_name(v.id)));
                 }
             }
             // A view hovered under the pointer where a menu row was clicked: live lights it at once, its 11-15 reader

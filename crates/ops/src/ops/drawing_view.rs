@@ -116,6 +116,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "view_move",
+            summary: "Drag a view on its sheet",
+            description: "Drag `view` by `by` (sheet mm, [dx, dy]), as a drag in the sheet: the views aligned with it follow, each only across its alignment axis (Front dragged: Top follows in x, Right in y), a view dragged across its axis takes its parent along (Right dragged down moves Front down), an isometric or detail view follows its parent whole, and one with \"Suppress alignment with parent\" stays; the notes and callouts attached to a moved view go along. One edit (\"Move view\"). Replies with the sheet (`views` with their positions).",
+            fields: with(common(), vec![req("by", point(), "The drag, sheet mm [dx, dy].")]),
+            mutates: true,
+            destructive: false,
+            run: view_move,
+        },
+        Op {
+            group: "drawing",
             verb: "view_linestyle",
             summary: "Adjust linestyle of model edges in a view",
             description: "View menu › Adjust linestyle… (live drawing/443–446): the model edges of `view` at `edges` (points on them, sheet mm) get Linestyle `linestyle` (solid, phantom, center, dashed, dotted; default solid), Dashes `dashes` (scale, default 1; not for solid), Thickness `thickness` (mm, one of 0.13–2.00; default 0.35) and `color` ([r, g, b] 0–255; default the drawing's); `revert` instead puts them back to the drawing properties. One edit (\"Adjust linestyle\").",
@@ -737,6 +747,20 @@ fn view_show_hide(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     out["hidden_parts"] = json!(src.map(|s| v.hidden_parts.iter().filter_map(|b| s.context.bodies.iter().find(|x| &x.id == b).map(|x| x.name.clone())).collect::<Vec<_>>()));
     out["hidden_edges"] = json!(v.hidden_edges.len());
     Ok(out.into())
+}
+
+fn view_move(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = od(ctx, a)?;
+    let t = target(od, a)?;
+    let id = view_arg(&t, a, "view")?;
+    let by = pt_arg(a, "by")?;
+    if !(by[0].is_finite() && by[1].is_finite()) || by[0].hypot(by[1]) < 1e-9 {
+        return Err(OpError::param("by", "a drag other than [0, 0]"));
+    }
+    let mut d = t.d.clone();
+    noshape_model::drawing::drag_view(&mut d.sheets[t.sheet], id, by);
+    commit(od, t.tab, t.sheet, d, "Move view")?;
+    Ok(reply(od, t.tab, t.sheet, false)?.into())
 }
 
 // ------------------------------------------------------------ sheets

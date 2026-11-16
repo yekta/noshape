@@ -341,6 +341,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("drawing_pin_reference", &[r##"{"drawing": "Part 1 Drawing 1", "view": 1}"##, r##"{"drawing": "Part 1 Drawing 1", "view": 1, "pin": false}"##]),
     ("drawing_update_references", &[r##"{"drawing": "Part 1 Drawing 1"}"##, r##"{"drawing": "Part 1 Drawing 1", "document": "Bracket library", "version": "V1"}"##]),
     ("drawing_open_feature_studio", &[r##"{"drawing": "Part 1 Drawing 1", "table": 3}"##]),
+    ("drawing_view_move", &[r##"{"drawing": "Part 1 Drawing 1", "view": 1, "by": [40, -20]}"##]),
     ("drawing_view_linestyle", &[r##"{"drawing": "Part 1 Drawing 1", "view": 3, "edges": [[190, 175]], "linestyle": "phantom", "thickness": 0.5}"##]),
     ("drawing_insert_cad", &[r##"{"drawing": "Part 1 Drawing 1", "file": "/tmp/border.dxf"}"##]),
     ("drawing_sketch", &[r##"{"drawing": "Part 1 Drawing 1", "tool": "line", "picks": [[20, 20], [80, 20]]}"##]),
