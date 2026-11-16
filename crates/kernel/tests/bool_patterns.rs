@@ -1331,6 +1331,17 @@ fn a_b_spline_edge_past_its_curves_end_unifies() {
     assert!((v - w).abs() <= 1e-9 * w.abs(), "volume {v} against {w}");
 }
 
+/// c2-config-parts-screws' Revolve 9 (tests/data/unify): the unify of a thread left invalid by Sweep 1's cut. USD's
+/// wire through its faces never closed and grew to 15 GB; bounded by work (OCCT patch 0032), the unify returns the
+/// shape as it came, at once.
+#[test]
+fn a_wire_that_never_closes_leaves_the_unify_its_input() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/thread-wire-never-closes.brep");
+    let s = k::read_brep(&path).expect("the thread");
+    let u = k::unify_same_domain(&s).expect("unified").shape;
+    assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge)));
+}
+
 /// Shell's fuse of 38 slabs (1b121fc3), our result (tests/data/unify): walls on one cylinder in faces of one frame
 /// that USD leaves apart (its result depending on the faces' order and wires' starts). Merged after it as those whose
 /// frames differ: OCCT's counts (32 faces, 77 edges), valid (it stopped at 33 / 80 on ours).

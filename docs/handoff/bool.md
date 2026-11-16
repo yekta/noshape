@@ -4,20 +4,29 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-16 15:28 UTC.
+Updated 11-16 17:23 UTC.
 
 ## In flight
-- dx's P0 fix 979de111a: gate (vibe7) reviewed 14:40, none of the 10 changed documents worse; dx landing it.
-- Gating on vibe5 (gate began 14:09 after the dx gate): e5c584e35 (branch bool-cp2-ahead in bool-split: CP2 moved pairs on free-form faces in the ahead
-  batch; off_shared_edges in the ahead jobs; ~10 % on rings CP2 and housing Rotieren 1), then 31dbff530 (branch
-  bool-cyl-merge: merge_cylinder_groups for a sector whose frame is far along the axis: host on the nearer frame,
-  curves mapped exactly where projection misses, volume in one call (+ adaptive) only where a frame is far;
-  asm-pattern-std Extrude 11 16/40/26 -> live 14/36/24, T1 an_extrusions_cylinder_sectors_merge_with_the_parts_own_as_live)
-  chained by unit bool-after-cp2-gate. Each: hats/dock (udoc-ab.sh <commit>) then land; tell asm when 31dbff530 lands.
-- Landed 11-16: a8b8f1851 (Shell filter), a2952b329 (extrusion x quadric sections).
-- Reported, not mine: c2-impeller-loft 26 -> 24/48 (Extrude 4) is not a2952b329 (own sections off: same) nor
-  1b2bbee3f (reverted: same); blend has the remaining candidates. c2-config-parts-screws: Revolve 9's USD memory
-  (bool2's patch 0032); Sweep 1's band 0.45 um off the cylinder (sweep accuracy; decision with the lead).
+- P0 c2-config-parts-screws memory: what grows is OCCT's UnifySameDomain wire loop (IntUnifyFaces /
+  ReconstructMissedSeam) in Revolve 9's unify of the thread Sweep 1 left invalid; not the Rust Boolean (every Boolean of
+  the doc goes OCCT's way, all results invalid: the sweep's band is 0.45 um off its cylinder). The memory budget (half
+  the machine, 4-16 GB) tripped at ~14.5 GB growth wherever it was next polled, hence dx's 14.8 GB "in sections_ahead".
+  Fix: bool2's OCCT patch 0032 (wire loop bounded by work, break hook polled; op_unify keeps its input) + 0031, both
+  cherry-picked on main in bool-hat, branch bool-screws-mem (4694fe512, f752ba60f) + T1
+  bool_patterns::a_wire_that_never_closes_leaves_the_unify_its_input (tests/data/unify/thread-wire-never-closes.brep,
+  Revolve 9's dumped input, 40 KB). Dump replay: 0032 10 faces kept in 106 ms; stock OCCT past 2 GB in seconds.
+  Staged libs: vibe5 ~/agents/bool2-keep/occt-0032, Mac ~/noshape-host/occt-0032. Identity check: unit bool2-oc32b
+  (/root/bool2-scratch/oc32-cmp.out, ends OC32-DONE); its B binary lacks dx's Split hang fix, killed its screws run
+  17:19 after 85 min. Then: lead installs the libs on every host, then land.sh from bool-hat.
+- Sweep 1 accuracy (the invalid thread): not a Boolean fix; with the lead (sweep owner).
+- Gates on vibe5: 31dbff530 (cylinder merge, asm-pattern-std Extrude 11 -> live 14/36/24) waiting for the slot; then
+  e5c584e35 again (unit bool-after-cyl-gate: its 12:13 run timed out behind bool2's stuck slot). Each: hats/dock
+  (udoc-ab.sh <commit>) then land; tell asm (handoff note) when 31dbff530 lands.
+- core's tablet-stand Extrude 1 (vibe5 ~/agents/core-keep/tsrec/a): 7b08434da3624636 is a sheet cut by two plane-face
+  tools (coplanar slot faces on the sheet's two walls); the bend cylinder's strip has no tool face, so the strip is
+  lost earlier: the commons before it (3d8db0a4..., d294ca6b... target 8 faces -> 0) of the slot solid with the sheet
+  solids. Next: which common should give the cylinder strip (tangent to the tool's start face).
+- Landed 11-16: a8b8f1851 (Shell filter), a2952b329 (extrusion x quadric sections); dx's 979de111a (gate reviewed).
 
 ## Parked (branches / diffs, not landing as they are)
 - Plane x B-spline marcher + our own least-squares fit (branch bool-free-sections-wip: 71efdd87e, f6c77c748, ...):
