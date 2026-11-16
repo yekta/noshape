@@ -142,6 +142,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
     3. DONE as 87c383316 (core-offset): basic.rs Subtract with Offset calls offset_solid for non-analytic picked
        faces (OFFSET_FACE_BUDGET 20000), T1 features_a::subtract_with_offset_moves_a_tools_spline_face. fan-blade
        Boolean 2: volume = live's now, 57/142/86 vs live 56/143/88 (before 56/139/84, 54.7 mm3 off); 736 ms.
+       Speed (lead 23:00: first lever before topology): 661df0163 offsets the tools on all threads under the
+       caller's stop state (k::stop_state / with_stop_state): Boolean 2 736 -> 624 ms on vibe5 vs live 364 ms
+       (live.jsonl per_feature_ms; 81 ms with plain tools). Rest = subtract vs offset-surface tools: OCCT build
+       340 ms + fast path declining after 90-110 ms (sent to bool 23:05); B-spline approx of flanks no help.
        Needs a release pair (model-core) before landing; land 1+2+2b once bool's gate passes (bool gating since
        22:40), then 3 after its pair. Next: the +1 face / -1 edge / -2 vertex difference vs live.
     4. bool's Shell may call it for its inner walls (bool decides).
