@@ -168,7 +168,9 @@ fn broken_loop(wire: &Shape, v: DVec3, how: Break) -> FResult<Option<Shape>> {
         Break::Fillet(r) => r / (theta * 0.5).tan(),
         Break::Chamfer(w) => w,
     };
-    if reach >= prev.distance(v) - TOL || reach >= next.distance(v) - TOL {
+    // A side may be taken whole: two breaks of half its length meet on it (c2-sm-side-cuts-tab's Corner break 1: R21 on
+    // a 42 mm edge, live OK).
+    if reach > prev.distance(v) + TOL || reach > next.distance(v) + TOL {
         return err("The corner break is larger than the corner's sides");
     }
     let (p1, p2) = (v + d1 * reach, v + d2 * reach);
@@ -183,9 +185,13 @@ fn broken_loop(wire: &Shape, v: DVec3, how: Break) -> FResult<Option<Shape>> {
     let mut out: Vec<Shape> = Vec::with_capacity(edges.len() + 1);
     for (j, e) in edges.iter().enumerate() {
         if j == *e1 {
-            out.push(k::make_line(*prev, p1).map_err(fe)?);
+            if prev.distance(p1) > TOL {
+                out.push(k::make_line(*prev, p1).map_err(fe)?);
+            }
         } else if j == *e2 {
-            out.push(k::make_line(p2, *next).map_err(fe)?);
+            if p2.distance(*next) > TOL {
+                out.push(k::make_line(p2, *next).map_err(fe)?);
+            }
         } else {
             out.push(e.clone());
         }

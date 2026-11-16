@@ -532,6 +532,31 @@ fn corner_break_fillets_a_free_corner() {
     assert!((flat.area() * 1e6 - expected / 2.0).abs() < 1e-4, "flat area {}", flat.area() * 1e6);
 }
 
+/// Corner breaks of half a side each take that side whole, their arcs meeting on it (live c2-sm-side-cuts-tab's Corner
+/// break 1: R21 on a 42 mm edge): both corners of a 60 × 10 × 2 plate's end at R5.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn corner_breaks_of_half_a_side_meet_on_it() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 10.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("3 mm"));
+    });
+    let r = s.ok();
+    let corners = vec![vertex_at(&r, DVec3::new(60.0, 0.0, 2.0)), vertex_at(&r, DVec3::new(60.0, 10.0, 2.0))];
+    s.add("sheetMetalCornerBreak", |p| {
+        p.set("entities", ParamValue::Query(corners));
+        p.set("blendType", en("FILLET"));
+        p.set("radius", expr("5 mm"));
+    });
+    let r = s.ok();
+    let expected = 60.0 * 10.0 * 2.0 - 2.0 * (25.0 - std::f64::consts::PI * 25.0 / 4.0) * 2.0;
+    assert!((volume_mm3(&r) - expected).abs() < 1e-6, "{} mm³ vs {expected}", volume_mm3(&r));
+}
+
 /// A Fillet R 5 of both corners of a sheet metal part's 10 mm wide end (std: corner breaks) meet: the end is one
 /// half-round, both corners off (live config-assembly 08590a's Fillet 2 on the arm: 32 faces before and after, 32.19 mm³
 /// less at 3 mm).
