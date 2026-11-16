@@ -20,9 +20,12 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
     instance with partId "" a live defect; standard content named with its thread length found in our catalogue;
     **model-core refgeom.rs**: a Mate connector owned by a sketch -> the sketch's body (core told); traces for
     untranslated mate ends; **model-data / assembly**: a partly threaded screw named "… x L x b" (live 02:50).
-- Binaries (vibe6 ~/agents/asm-keep/bin): s67 = HEAD 31ba7ca6, base30 = main a2952b32 (same base, for A/Bs of a corpus
+- Since the rebase: 83e390d7 a connector on a patterned instance read without the pattern's id live puts first in its
+  path (pattern-std 24, scissor-lift 13, bjr-config 5, keyboard 2 such paths); 591fdd87 an Origin connector a mate
+  holds built as for an Origin Mate connector feature (keyboard's Fastened 1).
+- Binaries (vibe6 ~/agents/asm-keep/bin): s69 = HEAD 591fdd87, base30 = main a2952b32 (same base, for A/Bs of a corpus
   that moves). Queued on vibe6 behind qa's ui-parity in ~/bin/slot: hd.sh (hand-drill + keyboard, cfg/s63-*.log,
-  file ops-s63 = s67) and the gate's full assembly run (g49/run.sh, ops-s49 = s67, full/s49.log, "ASM-DONE" in
+  file ops-s63 = s69) and the gate's full assembly run (g49/run.sh, ops-s49 = s69, full/s49.log, "ASM-DONE" in
   g49/status). If it hasn't started by 04:05, run it on vibe7. `python3 ~/agents/asm-keep/cmp.py full/base29.sum
   full/s49.log` lists per corpus base -> new.
 - Then: compare full/s49 to full/base29.sum per corpus (base29 = old refs: hand-drill 67/67, corexy 11/11, pattern-std
