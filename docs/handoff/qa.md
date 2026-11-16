@@ -55,6 +55,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - QUIT-ABORT-DOCK: verified fixed (80e16e42d); guarded by the nightly and rel-published.
 - f197 Fillet 1 vs 0.4.51 was core's 1ac08e247 (reverted on v0.4.52's branch); 0.4.52 baseline is clean.
 
+## Expected userdocs differences (not regressions)
+- dock "E2 - C Stand" E2 Govde 1345 / 3103 / 1759 (was 3104 / 1760, volume 62443.95 the same) from core's ee16972d8 (shown
+  topology hides edges internal to a face; DECISIONS e677ec1c0). Expected in every compat / release check against a release
+  without it; drop this line once the baseline release has it.
+
 ## Tools
 - userdocs.py <cliA> <tagA> <cliB> <tagB> <doc>...: fresh 600 copies in ~/tmp/qa/ud-<pid>, per Part Studio feature status /
   message and parts (faces, edges, vertices, volume); prints SAME / DIFF. Uses store/sig.py + bin/nscli.py.
