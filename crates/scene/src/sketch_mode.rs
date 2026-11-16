@@ -672,6 +672,10 @@ pub struct SketchEditor {
     pub xf_offset: DVec2,
     pub xf_angle: f64,
     pub xf_scale: f64,
+    /// Where the scale factor's box stays once its drag ends (live editing-gaps4: where the pointer left it).
+    xf_scale_box: Option<DVec2>,
+    /// A rotate / scale drag just ended: the view opens its value box for typing (live: its text selected).
+    pub xf_released: Option<PatternHandle>,
     /// First fillet arc of the current fillet session (later fillets are equal to it).
     fillet_session: Option<EntityId>,
     /// Fillet/chamfer preview is isolated from the document until Enter.
@@ -899,6 +903,14 @@ const PATTERN_DIM_PX: f64 = 99.8;
 const PATTERN_LABEL_HALF_PX: f64 = 15.0;
 /// A circular pattern's "3x" (live sketch-gaps3): 0.4 × the seed's radius beyond the seed, in the model.
 const CIRCULAR_LABEL_BEYOND: f64 = 0.4;
+/// A circular pattern's handle arc (live sketch-gaps4): 1.2 × the seed's radius, from the seed to the last instance,
+/// ~4 px light blue, its open arrow ~20 px on past the end along the arc; below 360° an angle dimension (black, filled
+/// arrowheads) at 1.4 × the radius, its text ~0.64 of the way along (one take: 115° into 180°).
+const CIRCULAR_HANDLE_AT: f64 = 1.2;
+const CIRCULAR_HANDLE_COLOR: [u8; 4] = [0x86, 0xa5, 0xcc, 0xff];
+const CIRCULAR_RAY_COLOR: [u8; 4] = [0x55, 0x83, 0xb8, 0xff];
+const CIRCULAR_ARROW_STEM_PX: f64 = 20.0;
+const CIRCULAR_ANGLE_TEXT_AT: f64 = 0.64;
 /// The sketch 2D manipulator (Transform, a paste), px from its anchor along its X / Y (live editing-gaps3, the client's
 /// triad: arrows' gap 8 + shaft 60 then the head; the square 20–45; the rotation ring 108 out on X; the scale head
 /// from (60, 60) on the diagonal, 30 long). Handles are screen-sized; no shafts are drawn.
@@ -911,6 +923,13 @@ const XF_RING_R_PX: f64 = 9.0;
 const XF_SCALE_BASE_PX: f64 = 84.85;
 const XF_SCALE_HEAD_PX: f64 = 30.0;
 const XF_SCALE_HALF_W_PX: f64 = 16.0;
+/// The rotate / scale value boxes' centres (75 × 26 px; live editing-gaps4, sketch x right, y up): rotate during its
+/// drag off the pointer, after it off the anchor; scale off the pointer, then left where the drag ended (or off the
+/// anchor).
+const XF_ROTATE_BOX_FROM_POINTER: (f64, f64) = (60.5, 16.0);
+const XF_ROTATE_BOX_AFTER: (f64, f64) = (162.5, 87.0);
+const XF_SCALE_BOX_FROM_POINTER: (f64, f64) = (45.5, -47.0);
+const XF_SCALE_BOX_AFTER: (f64, f64) = (138.5, 46.0);
 /// The line shader's dash-dot period (`fs_line`, style 4) in pixels.
 const DASH_DOT_PERIOD_PX: f64 = 16.0;
 
@@ -977,6 +996,17 @@ fn push_hollow_arrow(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, start: DVec2, d
 fn push_hollow(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, pts: Vec<DVec2>) {
     for (color, width) in [(MANIPULATOR_OUTLINE, 3.0), ([0xff, 0xff, 0xff, 0xff], 1.2)] {
         wide.push((pts.clone(), color, width));
+    }
+}
+
+/// [`push_hollow_arrow`] in another outline colour (a circular pattern's handle, live sketch-gaps4: light blue).
+fn push_hollow_arrow_in(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, start: DVec2, dir: DVec2, px: f64, stem_px: f64, outline: [u8; 4]) {
+    let base = start + dir * px * stem_px;
+    let apex = base + dir * px * OFFSET_ARROW_HEAD_PX;
+    let half = dir.perp() * px * OFFSET_ARROW_HEAD_W_PX * 0.5;
+    for (color, width) in [(outline, 3.0), ([0xff, 0xff, 0xff, 0xff], 1.2)] {
+        wide.push((vec![start, base], color, width));
+        wide.push((vec![base + half, apex, base - half, base + half], color, width));
     }
 }
 
@@ -1370,6 +1400,8 @@ impl SketchEditor {
             xf_offset: DVec2::ZERO,
             xf_angle: 0.0,
             xf_scale: 1.0,
+            xf_scale_box: None,
+            xf_released: None,
             fillet_session: None,
             pending_corner: None,
             pending_corner_pid: None,
@@ -1567,6 +1599,7 @@ impl SketchEditor {
             self.xf_offset = DVec2::ZERO;
             self.xf_angle = 0.0;
             self.xf_scale = 1.0;
+            self.xf_scale_box = None;
             self.set_tool(Tool::Select);
             return true;
         }
@@ -4484,6 +4517,12 @@ impl SketchEditor {
         }
         self.press = None;
         self.drag_origin = None;
+        if let Some(DragState::Handle(h @ (PatternHandle::Rotate | PatternHandle::Scale))) = &self.drag {
+            self.xf_released = Some(*h);
+            if *h == PatternHandle::Scale {
+                self.xf_scale_box = self.cursor.map(|c| c + DVec2::new(XF_SCALE_BOX_FROM_POINTER.0, XF_SCALE_BOX_FROM_POINTER.1) * self.world_per_px);
+            }
+        }
         let out = match self.drag.take() {
             Some(DragState::Pending { entity, .. }) => {
                 if let Some(pos) = self.selection.iter().position(|e| *e == entity) {
@@ -4761,6 +4800,7 @@ impl SketchEditor {
                     self.xf_offset = DVec2::ZERO;
                     self.xf_angle = 0.0;
                     self.xf_scale = 1.0;
+                    self.xf_scale_box = None;
                 }
                 self.selection.clear();
                 EditOutcome::changed()
@@ -4828,7 +4868,9 @@ impl SketchEditor {
                 out.push((PatternHandle::Center, self.pattern_center));
                 if let Some((r, a0)) = self.circular_arm(sk) {
                     let (step, _) = self.circular_step();
-                    out.push((PatternHandle::CircularAngle, self.pattern_center + DVec2::from_angle(a0 + self.circular_angle) * (r + px * 18.0)));
+                    if let Some((base, t)) = self.circular_arrow(sk) {
+                        out.push((PatternHandle::CircularAngle, base + t * px * (CIRCULAR_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX * 0.5)));
+                    }
                     out.push((PatternHandle::CircularCount, self.pattern_center + DVec2::from_angle(a0 + step) * (r - px * 18.0).max(r * 0.5)));
                 }
             }
@@ -4937,17 +4979,29 @@ impl SketchEditor {
                 if !full
                     && let Some((r, a0)) = self.circular_arm(sk)
                 {
-                    let mid = DVec2::from_angle(a0 + self.circular_angle * 0.5);
-                    out.push((PatternHandle::CircularAngle, self.pattern_center + mid * (r + px * 34.0), self.circular_angle));
+                    let at = DVec2::from_angle(a0 + self.circular_angle * CIRCULAR_ANGLE_TEXT_AT);
+                    out.push((PatternHandle::CircularAngle, self.pattern_center + at * r * (1.0 + CIRCULAR_LABEL_BEYOND), self.circular_angle));
                 }
             }
             Tool::Transform if !self.selection.is_empty() => {
                 let m = self.pattern_center + self.xf_offset;
+                // Live editing-gaps4 (one take each): the boxes' centres, during a drag off the pointer, after it off
+                // the anchor (rotate) or where the drag left it (scale).
+                let dragging = |h: PatternHandle| matches!(self.drag, Some(DragState::Handle(d)) if d == h);
+                let off = |o: (f64, f64)| DVec2::new(o.0, o.1) * px;
                 if self.xf_angle.abs() > 1e-12 {
-                    out.push((PatternHandle::Rotate, m + DVec2::from_angle(self.xf_angle) * px * (XF_RING_AT_PX + 34.0), self.xf_angle));
+                    let at = match self.cursor.filter(|_| dragging(PatternHandle::Rotate)) {
+                        Some(c) => c + off(XF_ROTATE_BOX_FROM_POINTER),
+                        None => m + off(XF_ROTATE_BOX_AFTER),
+                    };
+                    out.push((PatternHandle::Rotate, at, self.xf_angle));
                 }
                 if (self.xf_scale - 1.0).abs() > 1e-12 {
-                    out.push((PatternHandle::Scale, m + DVec2::from_angle(self.xf_angle + PI * 0.25) * px * ((XF_SCALE_BASE_PX + XF_SCALE_HEAD_PX) * self.xf_scale + 22.0), self.xf_scale));
+                    let at = match self.cursor.filter(|_| dragging(PatternHandle::Scale)) {
+                        Some(c) => c + off(XF_SCALE_BOX_FROM_POINTER),
+                        None => self.xf_scale_box.unwrap_or(m + off(XF_SCALE_BOX_AFTER)),
+                    };
+                    out.push((PatternHandle::Scale, at, self.xf_scale));
                 }
             }
             _ => {}
@@ -4986,6 +5040,20 @@ impl SketchEditor {
         let d = c - self.pattern_center;
         let r = d.length();
         (r > self.world_per_px * 4.0).then(|| (r, d.to_angle()))
+    }
+
+    /// A circular pattern's handle arc: its radius and its start and end angles (the seed's and the last instance's).
+    fn circular_handle_arc(&self, sk: &Sketch) -> Option<(f64, f64, f64)> {
+        let (r, a0) = self.circular_arm(sk)?;
+        let (step, _) = self.circular_step();
+        Some((r * CIRCULAR_HANDLE_AT, a0, a0 + step * (self.circular_count.max(2) - 1) as f64))
+    }
+
+    /// The handle arc's arrow: its base (the arc's end) and the way it points (on along the arc).
+    fn circular_arrow(&self, sk: &Sketch) -> Option<(DVec2, DVec2)> {
+        let (rr, a0, a1) = self.circular_handle_arc(sk)?;
+        let base = self.pattern_center + DVec2::from_angle(a1) * rr;
+        Some((base, DVec2::from_angle(a1).perp() * (a1 - a0).signum()))
     }
 
     /// Angle between circular instances and whether the pattern is a full circle.
@@ -5085,12 +5153,12 @@ impl SketchEditor {
                 let d = p - (self.pattern_center + self.xf_offset);
                 if d.length() > px * 3.0 {
                     let mut a = d.to_angle();
-                    // Snap to whole 15 degree steps near them.
+                    // Snap to whole 15 degree steps near them; else whole degrees (live editing-gaps4: "20 deg").
                     let step = 15f64.to_radians();
                     if (a / step - (a / step).round()).abs() * step < 2f64.to_radians() {
                         a = (a / step).round() * step;
                     }
-                    self.xf_angle = a;
+                    self.xf_angle = a.to_degrees().round().to_radians();
                 }
             }
             PatternHandle::Scale => {
@@ -6245,13 +6313,37 @@ impl SketchEditor {
                         poly(&[q - DVec2::X * r, q + DVec2::X * r], guide_color, false);
                         poly(&[q - DVec2::Y * r, q + DVec2::Y * r], guide_color, false);
                     }
+                    // Live sketch-gaps4: the handle arc and its open arrow; below 360° the rays and the angle dimension.
                     PatternHandle::CircularAngle => {
-                        if let Some((r, a0)) = self.circular_arm(&data.sketch) {
-                            let rr = r + px * 18.0;
-                            let n = ((self.circular_angle.abs() / TAU * 96.0).ceil() as usize).clamp(4, 96);
-                            let pts: Vec<DVec2> = (0..=n).map(|i| self.pattern_center + DVec2::from_angle(a0 + self.circular_angle * i as f64 / n as f64) * rr).collect();
-                            poly(&pts, guide_color, true);
-                            poly(&[self.pattern_center, self.pattern_center + DVec2::from_angle(a0) * rr], guide_color, true);
+                        let c = self.pattern_center;
+                        if let (Some((rr, a0, a1)), Some((base, t))) = (self.circular_handle_arc(&data.sketch), self.circular_arrow(&data.sketch)) {
+                            let arc = |r: f64, from: f64, to: f64| -> Vec<DVec2> {
+                                let n = (((to - from).abs() / TAU * 96.0).ceil() as usize).clamp(4, 96);
+                                (0..=n).map(|i| c + DVec2::from_angle(from + (to - from) * i as f64 / n as f64) * r).collect()
+                            };
+                            wide.push((arc(rr, a0, a1), CIRCULAR_HANDLE_COLOR, 4.0));
+                            push_hollow_arrow_in(&mut wide, base, t, px, CIRCULAR_ARROW_STEM_PX, CIRCULAR_HANDLE_COLOR);
+                            if !self.circular_step().1 {
+                                let ra = rr / CIRCULAR_HANDLE_AT * (1.0 + CIRCULAR_LABEL_BEYOND);
+                                let end = a0 + self.circular_angle;
+                                let ink = [0x00, 0x00, 0x00, 0xff];
+                                let mut segs = Vec::new();
+                                for a in [a0, end] {
+                                    let u = DVec2::from_angle(a);
+                                    wide.push((vec![c, c + u * rr], CIRCULAR_RAY_COLOR, 2.0));
+                                    segs.push([c + u * rr, c + u * (ra + px * 6.0)]);
+                                }
+                                let pts = arc(ra, a0, end);
+                                for w in pts.windows(2) {
+                                    segs.push([w[0], w[1]]);
+                                }
+                                let way = (end - a0).signum();
+                                arrow(&mut segs, c + DVec2::from_angle(a0) * ra, -DVec2::from_angle(a0).perp() * way, px);
+                                arrow(&mut segs, c + DVec2::from_angle(end) * ra, DVec2::from_angle(end).perp() * way, px);
+                                for sg in segs {
+                                    wide.push((vec![sg[0], sg[1]], ink, 1.0));
+                                }
+                            }
                         }
                     }
                     // The 2D manipulator (live editing-gaps2 / 3): grey double outlines, no lines to the anchor.
@@ -6281,7 +6373,7 @@ impl SketchEditor {
                     }
                     _ => {}
                 }
-                if matches!(h, PatternHandle::LinearStep | PatternHandle::LinearSecondStep | PatternHandle::LinearCount | PatternHandle::LinearSecondCount) || self.tool == Tool::Transform {
+                if matches!(h, PatternHandle::LinearStep | PatternHandle::LinearSecondStep | PatternHandle::LinearCount | PatternHandle::LinearSecondCount | PatternHandle::CircularAngle) || self.tool == Tool::Transform {
                     continue;
                 }
                 let size = if active == Some(h) { 13.0 } else { 10.0 };
@@ -8653,6 +8745,12 @@ mod tests {
         ed.selection = vec![circle];
         ed.pattern_center = v(0.0, 0.0);
         assert!((label(&ed, &d) - v(0.014, 0.07)).length() < 1e-9, "{:?}", label(&ed, &d));
+        // Below 360°: the angle on its dimension arc at 1.4 × the radius, ~0.64 of the way (live sketch-gaps4).
+        assert!(ed.pattern_value_labels(&d.sketch).is_empty(), "no angle at 360°");
+        ed.set_pattern_value(PatternHandle::CircularAngle, PI);
+        let (r, a0) = (v(0.01, 0.05).length(), v(0.01, 0.05).to_angle());
+        let at = ed.pattern_value_labels(&d.sketch)[0].1;
+        assert!((at - DVec2::from_angle(a0 + PI * 0.64) * r * 1.4).length() < 1e-9, "{at:?}");
         let _ = &mut d;
     }
 

@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-16 04:44 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-16 06:50 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -39,30 +39,30 @@ docs/DECISIONS.md (read first; it wins over anything here).
 ## In flight
 
 - Landed 11-16: c525abd8 (flat bend dash and hover, pattern labels), f2029e2a (the sketch 2D manipulator as live
-  editing-gaps3: `transform_anchor`, `PatternHandle::MoveX` / `MoveY`, `XF_*`; `sketch_transform`'s default pivot),
-  876f6e61 (snaps: spline rows, 2 gaps: live reaches 8–12 px across a spline, its shape unrecorded).
-- Queued 04:25 (dd13425c): model edges wake after a 60 ms rest and give PERPENDICULAR through a line's start (live
-  sketch-gaps 1c; `woken_edge`, `WOKEN_EDGE` sentinel retargeted by `link_woken_edge` when the view uses the edge;
-  `model_lines` filled in `model_snap`); snaps matrix 63 / 65 with a triangle prism bench (`triangle_part`,
-  `Pt::SlantMid` / `SlantPerp`, `Lit::Slant`). A woken model edge's parallel isn't measured live: not offered.
-- Queued with this handoff: a failed feature's parts of the result (core's `FeatureState::error_parts`, 601df0ac)
-  drawn as live feedback-gaps 5: their shading under rgb(189,48,57) at 25 %, edges 5 px (`error_geometry(…,
-  ghost: false)`, `ERROR_PART_ALPHA`); vibe6 shot /root/psui-scratch/fb5/sf2/08.png: top (162,156,176) = live,
-  front (124,107,120) vs (125,107,120), edges 5 px.
+  editing-gaps3), 876f6e61 (snaps: spline rows, 2 gaps), eddc37d6 (model edges wake after a 60 ms rest and give
+  PERPENDICULAR through a line's start: `woken_edge`, `WOKEN_EDGE` retargeted by `link_woken_edge`; snaps matrix
+  63 / 65, triangle prism bench), 6b39d104 (a failed feature's parts of the result highlighted as live: core's
+  `error_parts`, `error_geometry(…, ghost: false)`; shot matches live's colours and 5 px edges).
+- Queued with this handoff: a clicked flat bend as live sheetmetal-gaps2 (`selected_zone`: fill rgb(214,151,30)
+  and edge (255,169,10) measured equal to live in a vibe6 shot; `{"flat_bend": n, "frac": f}` scenario target, ours
+  only); live sketch-gaps4 / editing-gaps4: the circular pattern's handle arc (1.2 r, open arrow) and, below 360°,
+  its angle dimension (1.4 r, text ~0.64 along: one take), and the Transform's 75 × 26 value boxes ("20 deg", 8
+  decimals; off the pointer while dragging; opened for typing after; `XF_*_BOX_*`, `xf_released`; one take each).
+- skasm fixed the sheet metal part colour in their tree (std's thickened plate and definition surface burned colours
+  0 and 1; `Context::reuse_colours_from`), landing after their suite (~2 h from 06:50): then our flat view reads as
+  live's light blue; recheck /root/psui-scratch/fb5 sm-click then.
 - Open feel gaps: the tooltip fade-out (vendored gpui's tooltip lifecycle; gpui's tooltip tests expect an instant
-  hide; left), the view cube knob size vs live's 3 px hover map, the flat bend click colours (zone rgb(214,151,30),
-  outline rgb(255,169,10); needs a flat-view click target in the runner), an open circular pattern's angle label
-  (live has none), where live's triad angle / factor boxes sit.
+  hide; left), the view cube knob size vs live's 3 px hover map, a woken model edge's parallel (not measured live).
 - end-cap-profile-circle step 3: matches on a quiet host; under load our Faces field keeps focus a moment. Low.
 - tab-new-edit-reedit: decision asked of the lead (11-15 23:50): the click lands ~1.1 px from Flange 1's wall;
   known (sub-pixel camera) or retarget onto the wall live hit.
 - Mac target ~20 GB: prune-target.py, and drop debug/incremental dirs idle > 90 min.
 - Scratch: /root/psui-scratch/fb5/run.sh runs one one-off scenario (--scenarios ~/tmp/psui/fb5s --all, shots per
-  step); scenario files there: shell-fail.json, sm-flat.json, triad.json.
+  step); scenario files in fb5/: shell-fail.json, sm-flat.json, triad.json, sm-click.json (copy one to vibe6 fb5s/).
 
 ## Queued to land
 
-- dd13425c (model edge waking); the error-parts highlight with this handoff.
+- 4a228915 (flat bend click) and the gaps4 commit, with this handoff.
 
 ## Waiting on others
 
@@ -84,8 +84,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Next, in order
 
-1. The flat bend click colours (a flat-view click target in the runner first); the tab pick per the lead's answer;
-   live's triad angle / factor boxes (ask live where they sit).
+1. Recheck the flat view's colours after skasm's colour fix; the tab pick per the lead's answer; a clockwise circular
+   pattern (live drags either way; ours sweeps counter-clockwise only: check before changing).
 2. Rerun after the others' fixes land: boundary-surface-new-edit-reedit (core 658bef9d), the gussets and end-caps
    (skasm), sketch pattern takes (skasm 58a0bd16 + linear), context-create-version-update (live2's retake).
 3. Older open items (11-06 to 11-08 "Next, in order" in the archive): doc-tab-rename-escape (5 / 5) and

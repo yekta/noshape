@@ -231,6 +231,16 @@ enum OptKind {
 }
 
 /// Unit of an on-canvas pattern / transform value (`None`: an instance count).
+/// A Transform value box's text (live editing-gaps4): the rotation in degrees ("20 deg"), the scale factor to 8
+/// decimals ("1.28916351").
+fn transform_value_text(h: crate::sketch_mode::PatternHandle, v: f64) -> String {
+    if h == crate::sketch_mode::PatternHandle::Scale {
+        return format!("{v:.8}");
+    }
+    let deg = v.to_degrees();
+    if (deg - deg.round()).abs() < 1e-9 { format!("{} deg", deg.round()) } else { format!("{} deg", (deg * 1e4).round() / 1e4) }
+}
+
 fn pattern_value_dim(h: crate::sketch_mode::PatternHandle) -> Option<Dim> {
     use crate::sketch_mode::PatternHandle as H;
     match h {
@@ -1067,6 +1077,11 @@ impl PartStudioView {
                 }
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_up(data, p)) {
                     self.apply_outcome(out, window, cx);
+                }
+                // A rotate / scale drag's value box is left open for typing, its text selected (live editing-gaps4).
+                if let Some(h) = self.sketch.as_mut().and_then(|ed| ed.xf_released.take()) {
+                    let v = self.sketch.as_ref().map_or(0.0, |ed| if h == crate::sketch_mode::PatternHandle::Rotate { ed.xf_angle } else { ed.xf_scale });
+                    self.open_count_edit(h, transform_value_text(h, v), window, cx);
                 }
                 true
             }
@@ -3381,10 +3396,41 @@ impl PartStudioView {
         }
         for (h, at, d) in ed.pattern_value_labels(&data.sketch) {
             let Some((x, y)) = project(at) else { continue };
+            // The Transform's rotation and scale: Onshape's quantity input, 75 × 26 px (live editing-gaps4).
+            let transform = matches!(h, crate::sketch_mode::PatternHandle::Rotate | crate::sketch_mode::PatternHandle::Scale);
             if let Some((eh, st)) = &count_edit
                 && *eh == h
             {
-                out.push(div().absolute().left(px(x - 40.)).top(px(y - 12.)).w(px(80.)).occlude().child(Input::new(st).xsmall()).into_any_element());
+                let w = if transform { 75. } else { 80. };
+                out.push(div().absolute().left(px(x - w * 0.5)).top(px(y - 13.)).w(px(w)).occlude().child(Input::new(st).xsmall()).into_any_element());
+                continue;
+            }
+            if transform {
+                let text = transform_value_text(h, d);
+                out.push(
+                    div()
+                        .id(SharedString::from(format!("sk-xf-{h:?}")))
+                        .absolute()
+                        .left(px(x - 37.5))
+                        .top(px(y - 13.))
+                        .w(px(75.))
+                        .h(px(26.))
+                        .px(px(6.))
+                        .flex()
+                        .items_center()
+                        .justify_end()
+                        .bg(rgb(0xffffff))
+                        .border_1()
+                        .border_color(p().accent)
+                        .text_size(px(13.33))
+                        .text_color(rgb(0x333333))
+                        .cursor_text()
+                        .occlude()
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_count_edit(h, text.clone(), window, cx)))
+                        .child(transform_value_text(h, d))
+                        .into_any_element(),
+                );
                 continue;
             }
             let dim = pattern_value_dim(h).unwrap_or(Dim::UNITLESS);
