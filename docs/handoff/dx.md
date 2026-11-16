@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-16 02:13 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-16 02:25 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -9,14 +9,12 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land: tell asm.
 
 ## In flight (uncommitted in the dx worktree, branch dx-bosdxf)
-- Exchange STL rows by area / volume (DECISIONS 7210b453e), landing 02:13: the suite's STL export sets
-  min_facet_width 0.0254 (live's REST has no floor that binds; Medium's 0.254 floored ours at 0.17 mm). After live's
-  re-import (02:08): radijator and cf-spur-gear STL rows match (vibe5 exch-stl2/3.log, build M). Left: sheet-metal-plus
-  "Sheet Metal Up to Part": ours.stl 10135.5 mm³, live's own STL 10147.2, model 10148.1; our model is right (x_t row
-  matches, our model has vertices at (-8 / -10, 75.15, -17.03)), but our STL never reaches that corner (live's STL
-  vertex there is 2.24 mm from our mesh; /root/dx-scratch/bin/stldev.py): a face dropped or collapsed in our export
-  mesh there, also with Medium's floor (pre-existing). Next: find that face (our ours.x_t imported on vibe6
-  ~/tmp/dx/q/smp.noshape) and why tessellate_export loses it.
+- Exchange STL rows (DECISIONS 7210b453e, fdc24d65f): queued 587c9765 (02:13) exports our STL with min facet 0.0254
+  (no floor that binds, as live's REST); radijator and cf-spur-gear match after live's 02:08 re-import. Landing 02:25:
+  an STL row off live's bands passes when every vertex of live's mesh is within 0.12 mm (Medium's chord) of ours, ours
+  is watertight, and each part's |ΔV| / area against live's import of its own STL is ≤ 0.01 mm (stl_within_deviation;
+  test stl_deviation_measures_watertightness_and_distance). cf-sheet-metal-model-plus now passes (vertices within
+  0.0233 mm, mean 0.0010 mm): its exchange row 4/4. (Its mesh is ~1 µm inside on curved faces: BRepMesh, P3.)
 - 1dc32b without live's refs (vibe6 st1dc-refs.sh: R with, N without; ~/tmp/dx/st1dc-{R,N}.log): R 17/349 (Composite
   part 2, fixed by ce4f5ec6); N still running at 01:54.
 - corpus3 (live's 26: c2-surf-intro-*, c2-surf-workshop-*, c2-rib-wrap, c2-sm-tablet-stand, c2-sm-rocker-enclosure-*;

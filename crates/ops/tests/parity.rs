@@ -859,6 +859,17 @@ fn exchange_round_trip() {
                     diff.clear();
                 }
             }
+            // An STL off live's volume or area bands passes on its deviation (DECISIONS fdc24d65f): every vertex of
+            // live's own mesh within live's chord of ours, ours watertight, each part's mean deviation (|ΔV| / area) from
+            // live's import of its own STL (the model as an STL holds it: a part inside another that one's hollow) at
+            // most 0.01 mm (cf-sheet-metal-model-plus: 11.6 mm³ under over 11,639 mm², live's vertices within 0.023 mm).
+            if format == "STL"
+                && !diff.is_empty()
+                && let Some(why) = stl_within_deviation(&dir.join("live.stl"), &file, &read, &live)
+            {
+                println!("{name}: live imports ours.stl: off live's bands, within its deviation ({why})");
+                diff.clear();
+            }
             exports_ok += usize::from(diff.is_empty());
             println!("{name}: live imports ours.{ext}: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
         }
@@ -884,6 +895,115 @@ fn splits_no_more(held: &[PartState], own: &[PartState], read: &[PartState]) -> 
     let counts = h.iter().zip(&o).zip(&r).all(|((h, o), r)| between(h.faces, r.faces, o.faces) && between(h.edges, r.edges, o.edges) && between(h.vertices, r.vertices, o.vertices));
     let as_held: Vec<PartState> = r.iter().zip(&h).map(|(r, h)| PartState { faces: h.faces, edges: h.edges, vertices: h.vertices, face_types: h.face_types.clone(), edge_types: h.edge_types.clone(), ..r.clone() }).collect();
     counts && differences(&h, &as_held).is_empty()
+}
+
+/// Live's default STL chordal tolerance (its Export dialog's Medium, mm): how far live's own mesh may lie from ours.
+const LIVE_STL_CHORD_MM: f64 = 0.12;
+/// The largest mean deviation (|ΔV| / area, mm) of an STL part from its model (DECISIONS fdc24d65f).
+const STL_MEAN_DEVIATION_MM: f64 = 0.01;
+
+/// A binary STL's triangles (its file units).
+fn stl_triangles(path: &Path) -> Option<Vec<[[f64; 3]; 3]>> {
+    let b = std::fs::read(path).ok()?;
+    let n = u32::from_le_bytes(b.get(80..84)?.try_into().ok()?) as usize;
+    let f = |o: usize| f32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]]) as f64;
+    (b.len() >= 84 + 50 * n).then(|| (0..n).map(|i| std::array::from_fn(|v| std::array::from_fn(|c| f(84 + 50 * i + 12 + 12 * v + 4 * c)))).collect())
+}
+
+/// Every edge of the mesh in exactly two triangles, once each way.
+fn stl_watertight(t: &[[[f64; 3]; 3]]) -> bool {
+    let key = |p: &[f64; 3]| p.map(|c| (c * 1e5).round() as i64);
+    let mut edges: std::collections::HashMap<([i64; 3], [i64; 3]), i32> = std::collections::HashMap::new();
+    for tri in t {
+        for k in 0..3 {
+            *edges.entry((key(&tri[k]), key(&tri[(k + 1) % 3]))).or_default() += 1;
+        }
+    }
+    edges.iter().all(|(&(a, b), &n)| n == 1 && edges.get(&(b, a)) == Some(&1))
+}
+
+/// The distance from `p` to triangle `t` (closest point, Ericson's regions).
+fn point_triangle_distance(p: [f64; 3], t: &[[f64; 3]; 3]) -> f64 {
+    let sub = |a: [f64; 3], b: [f64; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    let at = |a: [f64; 3], d: [f64; 3], s: f64| [a[0] + d[0] * s, a[1] + d[1] * s, a[2] + d[2] * s];
+    let [a, b, c] = *t;
+    let (ab, ac, ap) = (sub(b, a), sub(c, a), sub(p, a));
+    let (d1, d2) = (dot(ab, ap), dot(ac, ap));
+    let q = if d1 <= 0.0 && d2 <= 0.0 {
+        a
+    } else {
+        let bp = sub(p, b);
+        let (d3, d4) = (dot(ab, bp), dot(ac, bp));
+        let cp = sub(p, c);
+        let (d5, d6) = (dot(ab, cp), dot(ac, cp));
+        let (vc, vb, va) = (d1 * d4 - d3 * d2, d5 * d2 - d1 * d6, d3 * d6 - d5 * d4);
+        if d3 >= 0.0 && d4 <= d3 {
+            b
+        } else if d6 >= 0.0 && d5 <= d6 {
+            c
+        } else if vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
+            at(a, ab, d1 / (d1 - d3))
+        } else if vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
+            at(a, ac, d2 / (d2 - d6))
+        } else if va <= 0.0 && d4 - d3 >= 0.0 && d5 - d6 >= 0.0 {
+            at(b, sub(c, b), (d4 - d3) / ((d4 - d3) + (d5 - d6)))
+        } else {
+            let den = va + vb + vc;
+            at(at(a, ab, vb / den), ac, vc / den)
+        }
+    };
+    let d = sub(p, q);
+    dot(d, d).sqrt()
+}
+
+/// Live's STL against ours by deviation (DECISIONS fdc24d65f): `Some(what held)` when every vertex of live's mesh lies
+/// within [`LIVE_STL_CHORD_MM`] of ours, ours is watertight, and each part live read from ours (`read`, by volume) is
+/// within [`STL_MEAN_DEVIATION_MM`] of live's read of its own STL (`model`) by volume per area.
+fn stl_within_deviation(live: &Path, ours: &Path, read: &[PartState], model: &[PartState]) -> Option<String> {
+    let (theirs, mine) = (stl_triangles(live)?, stl_triangles(ours)?);
+    if !stl_watertight(&mine) || read.len() != model.len() {
+        return None;
+    }
+    let by_volume = |v: &[PartState]| {
+        let mut v: Vec<PartState> = v.to_vec();
+        v.sort_by(|a, b| a.volume.unwrap_or(0.0).total_cmp(&b.volume.unwrap_or(0.0)));
+        v
+    };
+    let mut mean = 0.0f64;
+    for (r, m) in by_volume(read).iter().zip(&by_volume(model)) {
+        let (Some(rv), Some(mv), Some(ma)) = (r.volume, m.volume, m.area) else { return None };
+        mean = mean.max((rv - mv).abs() / ma * 1e3);
+    }
+    if mean > STL_MEAN_DEVIATION_MM {
+        return None;
+    }
+    let tol = LIVE_STL_CHORD_MM;
+    let boxes: Vec<([f64; 3], [f64; 3])> = mine.iter().map(|t| (std::array::from_fn(|c| t.iter().map(|p| p[c]).fold(f64::INFINITY, f64::min) - tol), std::array::from_fn(|c| t.iter().map(|p| p[c]).fold(f64::NEG_INFINITY, f64::max) + tol))).collect();
+    let mut worst = 0.0f64;
+    let mut seen = std::collections::HashSet::new();
+    for p in theirs.iter().flatten().filter(|p| seen.insert(p.map(|c| (c * 1e5).round() as i64))) {
+        let d = mine.iter().zip(&boxes).filter(|(_, (lo, hi))| (0..3).all(|c| lo[c] <= p[c] && p[c] <= hi[c])).map(|(t, _)| point_triangle_distance(*p, t)).fold(f64::INFINITY, f64::min);
+        if d > tol {
+            return None;
+        }
+        worst = worst.max(d);
+    }
+    Some(format!("live's vertices within {worst:.4} mm of ours, watertight, mean deviation {mean:.4} mm"))
+}
+
+/// A closed tetrahedron is watertight, one face less is not; a point's distance to a triangle is to its face, edge
+/// or corner, whichever is nearest.
+#[test]
+fn stl_deviation_measures_watertightness_and_distance() {
+    let (o, x, y, z) = ([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]);
+    let tet = vec![[o, y, x], [o, x, z], [o, z, y], [x, y, z]];
+    assert!(stl_watertight(&tet));
+    assert!(!stl_watertight(&tet[..3]));
+    let t = [o, x, y];
+    assert!((point_triangle_distance([0.2, 0.2, 0.5], &t) - 0.5).abs() < 1e-12, "above the face");
+    assert!((point_triangle_distance([0.5, -1.0, 0.0], &t) - 1.0).abs() < 1e-12, "beside an edge");
+    assert!((point_triangle_distance([2.0, 0.0, 0.0], &t) - 1.0).abs() < 1e-12, "past a corner");
 }
 
 /// Live's import of its own export, each part's volume and area held to its model's (its Parasolid import) where the
