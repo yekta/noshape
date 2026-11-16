@@ -94,7 +94,7 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | Dimension line / extension line, centerline, centermark arm | 6 px, not 8 (D1; extension 4 / 6 at zoom B) | 7 px (`SELECT_LINE_REACH_PX`, `hit_reach`) | – | = |
 | Dimension / note text | 8 px outside the text box, not 10 (D1) | 9 px outside the box (`SELECT_TEXT_REACH_PX`, `text_box_distance`) | – | = |
 | Note leader | 10 px, not 12; lights the note (D1) | 11 px for its stroke and node (`leader_hit`) | – | = |
-| Priority: annotation vs view | an extension line's foot on a view edge lights the dimension; a centerline over a view edge lights both and a click takes the view (D2) | annotation first (−2.5 px bias); the centerline case takes the centerline | – | ? (one reading; the extension-line click took nothing) |
+| Priority: annotation vs view | an extension line's foot on a view edge lights the dimension and a click selects it (3 of 3, live2 drw-feel-q (b)); a centerline over a view edge lights both and a click takes the view (D2) | annotation first (−2.5 px bias); the centerline case takes the centerline | – | = (the centerline case: ? one reading) |
 | Snap reach (Dimension tool, Note leader) | 7 px, not 9, for vertices and circle centres; 5 px along an edge; constant in px (D3) | 8 px (`SNAP_REACH_PX`) | GPUI `a_views_vertex_snaps_within_8_px_on_screen` (7 snaps, 9 doesn't) | = |
 | Snap marker, dimension tools | a filled 10 px disc rgb(216,165,102) for every kind, none in Select, none for a midpoint (D3) | the same (`SnapMark::Disc`), also the Dimension tool's sticky centre dots (bm 4062) | – | = |
 | Snap marker, Note tool | a hollow square ~15 px rgb(255,130,63) round the vertex (bm 26796, C11 (a)) | the same (`SnapMark::Box`) | – | = |
@@ -107,7 +107,7 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | Box select with modifiers | none adds; Shift: nothing changes (F3) | adds; Shift does nothing | the same test | = |
 | Click, Ctrl + click, Shift + click | all toggle the item: add if unselected, remove if selected (D6) | toggle (`select_click`) | – | = |
 | Click vs drag | a view or a dimension moves from 5 px (4 is a click), a note from 8 (6 is a click); no hold needed (D5) | 4 px past the press for views and dimensions, 7 for notes (`drag_threshold_px`) | – | = |
-| Box on empty sheet | shows by 12 px, not seen at ≤ 8 (D5, inconclusive below) | 3 px | – | ? |
+| Box on empty sheet | shows past 7 px from the press: none at 3–7 px along an axis or (4, 4) px, a box at 8 px and at (5, 5) px; D5's "none at ≤ 8" was a late repaint (live2 drw-feel-q (a)) | past 7 px (`BOX_START_PX`) | GPUI `a_box_on_the_empty_sheet_starts_past_7_px` | = |
 | Dragging a projected view | follows its parent's axis (bm 13993); live2 saw a projected Top move freely (F4) | locked to the axis (`MoveViews`) | – | ? (asked) |
 | Dragging a view near another's alignment | no snap at 16 down to 1 px, Shift or not (F4) | none (built 11-13, removed on live2's answer) | – | = |
 | Double-click | the OS's (live2's Linux: 400 ms, 2 px); a dimension's palette only within ~200 ms and 3 px (live2 11-13) | the OS's (GPUI's Linux constant: 400 ms, 5 px); a dimension's palette within 200 ms and 3 px (`quick_double_click`) | `a_dimensions_palette_needs_a_quick_close_double_click` | = (Linux distance 5 vs 2 px: GPUI's constant) |

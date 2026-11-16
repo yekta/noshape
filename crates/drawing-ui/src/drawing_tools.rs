@@ -1337,7 +1337,10 @@ impl DrawingEditor {
                             if e.modifiers.alt {
                                 self.alt_duplicate(pick, start, cx);
                             }
-                            self.start_drag(pick, start)
+                            match self.start_drag(pick, start) {
+                                Drag::SelectBox { .. } if len(sub(lp, start_px)) <= BOX_START_PX => self.drag.clone(),
+                                d => d,
+                            }
                         }
                     }
                 }
@@ -2819,6 +2822,9 @@ pub fn quick_double_click(gap: std::time::Duration, dist_px: f32) -> bool {
 /// How far (screen px) placement inference holds the pointer on another item's x or y (live2 feel/drawing.json D4: a
 /// note within 7 px of a dimension text's line snaps, 9 doesn't).
 const INFER_REACH_PX: f64 = 8.0;
+/// A box select shows once the pointer is more than this far from the press (live2 drw-feel-q (a): none at 7 px
+/// along an axis or 5.7 px diagonally, a box at 8 px and at 7.07 px diagonally).
+const BOX_START_PX: f64 = 7.0;
 
 #[cfg(test)]
 mod note_preview_tests {

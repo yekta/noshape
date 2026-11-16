@@ -472,6 +472,37 @@ fn click_sheet(cx: &mut TestAppContext, window: AnyWindowHandle, editor: &Entity
     draw(cx, window);
 }
 
+/// Live2 drw-feel-q (a): a press on the empty sheet shows its box only past 7 px from the press: none at 7 px along
+/// an axis, a box at (5, 5) px (7.07).
+#[gpui::test]
+fn a_box_on_the_empty_sheet_starts_past_7_px(cx: &mut TestAppContext) {
+    use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "box-start");
+    real_sheet(cx, window, &editor);
+    let empty = empty_sheet_point(cx, window, &editor);
+    let at = cx.update(|cx| {
+        let e = editor.read(cx);
+        let l = e.sheet_to_local(empty);
+        e.bounds.origin + Point::new(px(l[0] as f32), px(l[1] as f32))
+    });
+    let boxing = |cx: &mut TestAppContext, dx: f32, dy: f32| {
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+            let position = at + Point::new(px(dx), px(dy));
+            e.on_mouse_move(&MouseMoveEvent { position, pressed_button: Some(MouseButton::Left), modifiers: Modifiers::default() }, w, cx);
+            matches!(e.drag, crate::drawing_view::Drag::SelectBox { .. })
+        }))
+        .unwrap()
+    };
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false }, w, cx);
+    }))
+    .unwrap();
+    assert!(!boxing(cx, 4.0, 4.0), "5.7 px: no box");
+    assert!(!boxing(cx, 7.0, 0.0), "7 px: no box");
+    assert!(boxing(cx, 5.0, 5.0), "7.07 px: a box");
+}
+
 /// Live2 drw-view-copy-paste-keys: after Ctrl+C the next click on the empty sheet keeps the selection (it marks where
 /// Ctrl+V pastes); a click there after that clears it, as always.
 #[gpui::test]
