@@ -4876,6 +4876,23 @@ impl<'a> Translator<'a> {
         Ok((id, row["status"].as_str().unwrap_or("Ok").to_string(), row["message"].as_str().map(str::to_string)))
     }
 
+    /// The entity of `instance` (in assembly `tab`) whose implicit connector of `inference` lies at `origin` (its
+    /// source's coordinates, metres), as ours places the instance now: a sketch instance's wire edge or vertex.
+    fn instance_entity_at(&mut self, tab: &str, instance: &str, inference: &str, origin: [f64; 3]) -> Option<String> {
+        let list = self.call("assembly_list", json!({ "tab": tab })).ok()?;
+        let k = per_unit(&list["units"]);
+        let occ = list["occurrences"].as_array()?.iter().find(|o| o["path"] == instance).or_else(|| list["instances"].as_array()?.iter().find(|i| i["name"] == instance))?;
+        let r = occ["rotation"].as_array()?;
+        let q = glam::DQuat::from_xyzw(r[0].as_f64()?, r[1].as_f64()?, r[2].as_f64()?, r[3].as_f64()?);
+        let t = glam::DVec3::new(occ["translation"][0].as_f64()? * k, occ["translation"][1].as_f64()? * k, occ["translation"][2].as_f64()? * k);
+        let world = q * glam::DVec3::from(origin) + t;
+        let (kind, key) = connector_kind(inference);
+        let found = self.call("assembly_entities", json!({ "tab": tab, "instance": instance, "kind": kind, "near": mm(world.to_array()), "limit": 20 })).ok()?;
+        let ku = per_unit(&found["units"]);
+        let at = |e: &Value| (0..3).map(|i| e[key][i].as_f64().map_or(f64::INFINITY, |c| (c * ku - world[i]).abs())).fold(0.0, f64::max);
+        found[kind].as_array()?.iter().filter(|e| at(e) <= 1e-6).find_map(|e| e["id"].as_str().map(str::to_string))
+    }
+
     /// An assembly mate connector argument's Z and origin in its part's coordinates (metres), as ours places it now.
     fn connector_frame_local(&mut self, tab: &str, c: &Value) -> Option<(glam::DVec3, glam::DVec3)> {
         self.connector_frame_of(tab, c, false)
@@ -7959,10 +7976,21 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let mut refs = studio["live"].as_array().map(|lines| refs_from_bodies(lines)).unwrap_or_default();
         // Live's evaluated references (`<element>.refs.jsonl`, as a model's refs.jsonl) win over them.
         refs.extend(parse_refs(&refs_in_configuration(studio["refs"].as_str().unwrap_or_default(), first_encoded.as_deref())));
-        // Its sketches' bodies at the final state (live 2267, `<element>.sketches.json`): their regions, edges and
-        // points, under live's own lines.
         let features = studio["features"].as_array().map(Vec::as_slice).unwrap_or_default();
-        for (key, r) in refs_from_sketches(&studio["sketchBodies"], features) {
+        // Its sketches' bodies at the final state (live 2267, `<element>.sketches.json`): their regions, edges and
+        // points, under live's own lines. A sketch region refs.jsonl calls a FACE (refsx.js writes a sketch body's face
+        // so: asm-tvc-mount studio 41b795's Extrude 1) is that region, with the parameters live evaluated it for.
+        let sketch_refs = refs_from_sketches(&studio["sketchBodies"], features);
+        let regions: HashMap<&str, &LiveRef> = sketch_refs.iter().filter(|(_, r)| r.kind == "SKETCH_REGION").map(|((_, id), r)| (id.as_str(), r)).collect();
+        for ((_, id), r) in refs.iter_mut().filter(|(_, r)| r.kind == "FACE") {
+            if let Some(region) = regions.get(id.as_str()) {
+                let (parameters, query) = (std::mem::take(&mut r.parameters), r.query);
+                *r = (*region).clone();
+                r.parameters = parameters;
+                r.query = query;
+            }
+        }
+        for (key, r) in sketch_refs {
             refs.entry(key).or_insert(r);
         }
         let mut t = match Translator::open_in(ctx, &name, studio, refs) {
@@ -8146,6 +8174,17 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         };
         for (key, (path, inference, q), choices) in here {
             let path_end = instance_at(&key.0, path);
+            // On a sketch the assembly inserts (live's type "Feature"): found on our instance's wire body once it is
+            // inserted and placed, at live's point (asm-keyboard-pattern's Fastened 2 / 3, Slider 4).
+            if path_end.is_some_and(|i| i["type"] == "Feature") {
+                match connector_origins.get(key) {
+                    Some(o) => {
+                        entities.insert(key.clone(), format!("sketch-at:{},{},{}", o[0], o[1], o[2]));
+                    }
+                    None => res.untranslated.push(format!("mate connector {}: on a sketch instance, live's point unknown", key.1)),
+                }
+                continue;
+            }
             if choices != active {
                 let values: serde_json::Map<String, Value> = choices.iter().map(|(n, v)| (n.clone(), json!(v))).collect();
                 if let Err(e) = t.call("config_activate", json!({ "tab": t.tab, "reset": true, "values": values })) {
@@ -8465,6 +8504,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                         return Some((json!({ "instance": path_names(path)?, "reference": format!("implicit:centroid:{edge}"), "align": entities.get(&key)? }), inf.clone(), None, None));
                     }
                     let mut c = json!({ "instance": path_names(path)?, "entity": entities.get(&key)? });
+                    if let Some(at) = c["entity"].as_str().and_then(|e| e.strip_prefix("sketch-at:")) {
+                        let o: Vec<f64> = at.split(',').filter_map(|x| x.parse().ok()).collect();
+                        let instance = c["instance"].as_str()?.to_string();
+                        c["entity"] = json!(placer.instance_entity_at(&l.tab, &instance, inf, [*o.first()?, *o.get(1)?, *o.get(2)?])?);
+                    }
                     if let Some(i) = inference(inf) {
                         c["inference"] = json!(i);
                     }
