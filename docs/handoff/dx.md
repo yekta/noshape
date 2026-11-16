@@ -1,87 +1,50 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-16 08:43 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-16 14:49 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
 visuals, the parity translator (crates/ops/src/parity.rs) for my studios. The drawing UI is studios' (11-12).
 Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc1 are mine; isaac-ball (3c5c58,
-1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land: tell asm.
+1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
+Reduced mode until ~11-17 10:15: asm, skasm, bool2, studios, live, live2 paused: never message them; requests go to
+/root/onshape-research/live/REQUESTS.md or their handoff.
+Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
-## In flight (uncommitted in the dx worktree, branch dx-bosdxf)
-- Data exchange (lead 08:0x): (1) 10 corpus docs x every format + a drawing vs live's exports, (2) re-import live's
-  STEP / x_t, (3) times vs live's translations; fix largest gaps first, one line per landing. Requested from live2
-  (REQUESTS 08:05): c2-rings-loft, c2-extension-spring, c2-housing-draft, c2-sm-louver, c2-variable-fillet-faceblend,
-  c2-duct-multipart, c2-bottle-split, cf-snap-hook, clamp-guillem, c2-hex-bookcase-derived -> /root/parity/exchange/<doc>/
-  live.{step,igs,x_t,sat,stl,obj,3mf}, live-times.json, live-self.json, live-drawing.{pdf,dxf,dwg}, drawing.json.
-  Landed 11-16: 503d5a2a6 suite (ACIS / OBJ / 3MF, times, drawing leg); 4d5ba3177 OBJ zip import; ad4a3517e mesh
-  part -> planar facets for x_t / ACIS / IGES / JT / Rhino / PVZ (each crashed; STEP keeps TESSELLATED_SOLID) + a
-  STEP's tessellated solid no longer reads back as part + composite; 81ae5cce0 x_t / ACIS export (seam-line edge used
-  once kept: c2-housing-draft; SweptToElementary null swept surface on a sphere / torus: cf-snap-hook); b75687eb8
-  suite reads live.obj.zip, ACIS held to live's x_t import, OBJ / 3MF to its STL import.
-  live2 PAUSED until ~11-17 10:15 (lead 13:3x: don't message paused agents; requests into REQUESTS.md: the 13:31
-  addition there asks live-self "ACIS" + hex-bookcase JT/RHINO/PVZ). live2: 4 docs final (rings-loft,
-  extension-spring, housing-draft, sm-louver); translations quota 429 until ~18:36,
-  STL until ~18:45; timer 18:50: hex-bookcase first (+ JT / RHINO / PVZ, live-export-results.json: what live writes
-  for a mesh part), then the other 5, then all 10 live.stl + live-self STL.
-  Landed 11-16 pm: 2ddc1b649 drawing DXF layout + 2 viewports per sheet, $TILEMODE 0; f184f26ae tangent edges by
-  geometry (hlr.cpp seam_edges value 2, normals within 1e-4 rad); 7c4ea1412 conics >= 8 points (fit to ARC/ELLIPSE);
-  4058e93e (13:22): revert of 4e46ad1a6 (full-circle centermarks broke e2e::a_radial_hole_gets_its_centermark: the
-  queue ran drawing tests only; main RED 13:08 until the watcher's b752d3ad2 run), centermarks not where only quarter
-  rounds share an axis (views.rs centermarked()), STEP / IGES offsets + extrusions -> B-surfaces and a face past its
-  closed B-surface's seam cut to its range (io.cpp step_bsurfaces: rings-loft Part 1 STEP 440.81, IGES 441.11, model
-  440.77). Before any drawing land: full ops e2e (memory drawing-changes-run-ops-e2e).
-  vibe6 run (exch-1116, 08:50 binary): ours imports live's 58/74, live imports ours 46/48, ours reads ours 108/117,
-  times at or under live's 48/48 (rings-loft STEP import 2.5 s, live 16.1).
-  Open, ranked:
-  1. c2-rings-loft live.x_t refused by our reader (clean refusal; keep it until a fix is right). Branch WIP:
-     e9facf060 (closed intersection curve: vertex at the closing end takes the curve's start: edges / vertices then
-     = live), 476fcd5e2 (per-face tube for a blend across its periodic (ellipse) spine's start: Extruded ring then
-     260 faces + four 5-face pieces, volume wrong). Earlier try (periodic tube, reverted): faces = live, edges 916.
-  2. Our x_t of cf-snap-hook: FIXED on my branch (local commit "Parasolid export: circle arcs become one ring edge
-     only where every face ... has them as a loop"; xt.cpp whole_ring): whole_ring merged a disc's two rim arcs into
-     a ring while the torus beside kept the arcs in a longer loop -> unshared -> 36 free edges -> 13 sheets. Now one
-     solid 136/324/200, 72217.749 mm³ (model 72217.763). g++-13 not yet checked. NOT LANDED: needs a T1 test that
-     fails without it (two fused half-cylinders didn't reproduce: fuse merges them); build a disc whose rim is two
-     arcs beside a torus face holding them in a longer loop, or a small BREP fixture of one hook tip.
-  3. Our SAT: cf-sheet-metal-model-plus's suite export (139 faces; the CLI's export of the same doc 121, reads back
-     fine) reads back as 0 parts with no error (import drops invalid bodies silently); motor-mount-jack 24/26/2 for
-     16/24/0; cf-hose-routing 22/44/24 for 12/12/0; cf-o-ring Part 3 read back as another ring (names?). A placed or
-     revolved torus alone round-trips fine.
-  4. Drawings: SPLINE where live has ARC / ELLIPSE (rings-loft ARC 30 / 89, ELLIPSE 15 / 62; our model edges are
-     B-splines where live's are conics; exact_edges covers plane / extrusion cuts only); sm-louver 117 of 243 bend
-     lines on TANGENT_LINES (drawing tangents on the silhouette as tangent: louver 173 but the spring 22 for 15:
-     rejected); live's 2 empty ANNOTATION_TEXT MTEXTs (artefact, skipped).
-  5. SAT of live: sm-louver's file splits two cylinders (40 faces); live2 asked for live-self "ACIS" at 18:50.
-     Possible exact-HLR nondeterminism: one rings-loft DXF export once had 693 lines (normally ~936).
-- P0 (lead 07:0x): c2-config-parts-screws hung regeneration (Split 3, FACE split by 6 projected sketch curves):
-  bool's split_by_edges_on_faces (af0a1713d) ran GeomAPI_ExtremaCurveCurve (math_GlobOptMin) on each tool pair forever.
-  Fix 979de111a (local): pairs other than lines / circles decide on ends (within tol: no(), as before) and polylines
-  (GCPnts quasi-uniform, defl max(tol, 1e-3 box), farther than tol + 4·defl: skip) before Extrema; lines / circles keep
-  Extrema (IsParallel exact). screws alone 4 s, 27/63 (next Sweep 1's path untranslated). g++-13 kernel build OK.
-  bool gates it with priority (vibe5, after its 07:30 gate); land when SAME, then drop screws from
-  tests/parity-models/unscored.json (skip 63cebe3c, checking 07:08). Repro: vibe5 ~/tmp/dx/mscrews/screws-x. Remove
-  vibe5 ~/agents/dx/target-g13 after. bool gates 979de111a on vibe7 after qa's speed A/B.
-- Helix path (cdaa70c84, local, asked asm): DUMMY BODY of `….opHelix` / `….opFitSpline` = our feature's body before
-  refs (screws Sweep 1, driven-pattern Curve pattern 1). With it screws' Sweep 1 runs and blows to 14.8 GB (earlyoom;
-  under ulimit -v 6 GB 3.6 s, 6/5/1 vs live 8/14/8): core: bool's Rust Boolean (sections_ahead) in Sweep 1's
-  REMOVE, sent to bool. asm OK, with a guard (no VERTEX / EDGE strings: fit_spline_vertex_from_query's); asm runs
-  hand-drill-pinslot / bjr-config 5e35bf with my binary. Keep screws in unscored.json until both fixed.
-- vibe5 gate B binary swapped 07:2x to ops-hx (07:2x, then ops-hx2 md5 10ffc0749fe5 with the helix guard: plane fix + hole + helix + kernel split fix; A still
-  ops-gA = main 8269d9b37). A difference in the gate may come from any of the four.
-- Exchange STL rows (DECISIONS 7210b453e, fdc24d65f): landed (aeef3f77 min facet 0.0254; 678d030f deviation check:
-  live's vertices within 0.12 mm of ours, watertight, |ΔV| / area ≤ 0.01 mm; cf-sheet-metal-model-plus 4/4).
-- 1dc32b alone: build O (03:04) 17/349, first difference Composite part 2's centroid only (fixed by 612b09e6). Rerun
-  with build T (vibe5 ~/agents/dx-keep/ops-T md5 b56e35317c46, all local commits) queued in vibe5's slot behind
-  config-parts. Without refs (build L) the region fix makes Fillet 5 / Chamfer 3 / Extrude 34 report themselves
-  instead of mapping to regions; live's refs cover them.
-- vibe7 reserved for qa (~/.slot-quiet) till after 06:30+; my runs moved to vibe5 (lead: gate keeps its FIFO place
-  behind core's / blend's speed A/Bs; land the plane fix as soon as it's green). vibe5 queue 06:34, detached (setsid):
-  gate-tr.sh A/B ~/agents/dx-keep/ops-gA (a8e1d11e3dee) / ops-gB (e6cf176f7145) tag pl -> ~/tmp/dx/gate-tr-pl.out; then
-  studios-gB.sh (1dc32b st1dc-R.log, 74d3d6 st74-gB.log) -> ~/tmp/dx/studios-gB.out; then cfgparts.sh ops-gB gB.
-  The plane fix also clears asm-hand-drill-pinslot's 16 overdefined mates (asm: studio 4ece4b Plane 3 offset from Plane
-  2's planeOp, refs read it as a plane-body face; add to the land note). After landing: rerun paths-guides and wave
-  washer alone, send core both Loft 1 lines (core's 09c11d4f / 7d5e9394).
+## In flight: data exchange (lead 08:0x)
+Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.
+Largest gaps first, one line per landing. Data /root/parity/exchange/<doc>/ (live.*, live-self.json, live-times.json,
+live-drawing.dxf); suite parity::exchange_round_trip (dx-keep/bin/exch.sh). live2's timer (18:50 UTC) fetches the
+rest of set 2 (hex-bookcase first + JT / RHINO / PVZ, then the other 5, then all 10 live.stl + live-self STL); REQUESTS
+13:31 asks live-self "ACIS" too. Then rerun the whole suite (vibe6, ~/bin/slot, timeout) and rank again.
+Last full run (exch-1116, 08:50 binary): ours imports live's 58/74, live imports ours 46/48, ours reads ours 108/117,
+times at or under live's 48/48.
+Landed 11-16: 503d5a2a6 suite; 4d5ba3177 OBJ zip import; ad4a3517e mesh part -> planar facets (x_t / ACIS / IGES /
+JT / Rhino / PVZ crashed); 81ae5cce0 x_t seam-line + SweptToElementary fixes; b75687eb8 suite file / key fallbacks;
+2ddc1b649 DXF layouts + 2 viewports; f184f26ae tangent edges by geometry; 7c4ea1412 short arcs as conics; 4058e93e
+centermarks not on bends + STEP / IGES offsets as B-surfaces (rings-loft 440.81 mm³); 99d57322 x_t ring edge only
+where every face has the arcs as a loop (cf-snap-hook one solid); 03467fc8 ACIS import keeps the file's edge range
+where projection misses (cf-sheet-metal-model-plus' SAT: Part 1 was inside out -> import failed; now 10148.89 mm³,
+live 10147.18); b777cbd1 the screws Split hang fix (bool's gate clean).
+Queued: b3f549eb import_files reports a failed Import feature in `errors` (was 0 parts, no error).
+Open, ranked:
+1. c2-rings-loft live.x_t refused by our reader (clean refusal; keep until a fix is right). Branch dx-bosdxf WIP:
+   e9facf060 (closed intersection curve: vertex at the closing end takes the curve's start: edges / vertices = live),
+   476fcd5e2 (per-face tube for a blend across its periodic spine's start: 260 faces + four 5-face pieces, wrong).
+2. Our SAT, other docs (rerun the suite first: 03467fc8 may cover them): motor-mount-jack 24/26/2 for 16/24/0;
+   cf-hose-routing 22/44/24 for 12/12/0; cf-o-ring Part 3 read back as another ring (names?).
+3. Drawings: SPLINE where live has ARC / ELLIPSE (rings-loft ARC 30 / 89, ELLIPSE 15 / 62: model edges B-splines where
+   live's are conics; exact_edges covers plane / extrusion cuts only); sm-louver 117 of 243 bend lines on TANGENT_LINES.
+4. SAT of live: sm-louver's file splits two cylinders (40 faces); waits on live-self "ACIS".
+   Possible exact-HLR nondeterminism: one rings-loft DXF export once had 693 lines (normally ~936).
+   housing-draft x_t reads back 37/82/46 for 36/79/44; rings-loft own x_t Part 1 303 mm³.
+- c2-config-parts-screws: hang fixed (b777cbd1), still in tests/parity-models/unscored.json: with the helix path
+  (d19054198) Sweep 1 runs and grows to 14.8 GB in bool's Rust Boolean (sections_ahead) of its REMOVE (bool has it).
+  Score it once fixed. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
+- core 14:1x: c2-loft-guide-curves-driven-pattern 7/11 after their 7bc8e345; next Curve pattern 1 "Select a path to
+  pattern along." although the helix / fit-spline path translation is on main (d19054198): find why (mine).
+
+## Other in flight
 - config-parts (vibe5 07:4x, ops-hx2, screws skipped; ~/tmp/dx/cfgparts-hx2.log): linear-rail 19/26, links 10/35, nuts
   8/17, pulleys 9/22, sprockets 10/24, standoffs 11/32. Landed 69b8e51c (Any variable = string), 5ee5d266 (std 736).
   Queued 16c51e2a (expressions compare strings: `"text"` where a value is expected, string variables via
@@ -123,15 +86,6 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   two profiles, ours unsupported: core); paths-guides 4/29 (Loft 1 to a sketch point with TANGENT_TO_PROFILE: ours
   "Only planar profiles…": core; save vibe5 ~/tmp/dx/savelf); driven-pattern refetch pending. 7 config-parts to come
   (gears / bevels dropped: private studios).
-
-## Queued to land
-- Nothing queued. Landed 11-16 11:xx: translator gate (vibe5 model suite A main 8269d9b37 vs B: 1127 -> 1178/1585,
-  82/126 docs both, custom-feature compile failures 6 -> 0, none down; ~/tmp/dx/gate-pl-{A,B}.log) as
-  093044179..036be2acf (plane, hole faces, helix path, sketch keep). Exchange fixes (see In flight).
-- Local, waiting: 979de111a kernel split hang fix (bool's gate on vibe7); e9facf060 x_t closed-curve edge (WIP).
-- Core: wave-washer Loft 1 "more than two profiles" (their 09c11d4f, not in gate B) and paths-guides Loft 1
-  "Only planar profiles…" sent 09:0x; rerun both on main and resend if they differ.
-- asm's 25-commit parity.rs stack: whoever lands second rebases (Translator constructor's `Ok(Self { … })`).
 
 ## Open: my studios (studio-alone runs, vibe7)
 - bjr-config 5d8bc1: 107/124 at Manufacture=false (23:42, live's retaken lines). First difference Extrude 55 "vanity
@@ -186,21 +140,10 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   a configured part). Run them alone once in, sort first differences to owners.
 
 ## Next, in order
-1. P0 979de111a: land when bool's vibe7 gate says SAME (also g++-13 OK); then drop screws from unscored.json once bool's
-   sections_ahead blow-up (Sweep 1 REMOVE) is fixed.
-2. vibe5 gate (plane fix + hole faces + helix path, B ops-gB = ops-hx2): land b4ef875a6, df3ded3f0, cdaa70c84 (+ its
-   fixup) when SAME but for improvements; note asm's hand-drill 7 -> 16/24, scissor-lift fed22d 6 -> 28/60; tell core
-   and rerun wave washer / paths-guides alone, send core both Loft 1 lines.
-3. Sort the gate's B log first differences (corpus3 + corpus4 docs) to owners; translation ones mine.
-4. config-parts after live's sketches refetch (defaultValue configuration); standoffs' 4.8 s regen (Revolve 2, Boolean 2)
-   to core / bool once its geometry matches.
-5. Drawing ui-parity (qa 1116-0032 on f14f85a8, /root/qa-scratch/suites/…/uip): its drw-* misses are fixed since
-   (studios: fdba14d66 insert-view, e90138db1 datum-copy-paste, 64c87479f projected View orientation, title-block
-   lines) but drw-centermark / -align: live's recorder reads the plate's annotations erratically (align: 1,1,1,0,0,1,0,1
-   on one state; hide-auto-centermarks 0), and ours drops a Single mark over an automatic one on Esc (studios'
-   60c111a68, live dx/q-centermark): not changed; for studios / live2 (paused till 11-17 07:00). Recheck on qa's next run.
-6. Exchange suite (vibe6 queue, ops-gB, ~/tmp/dx/exch-1116.log): rank remaining exchange misses.
-7. 1dc32b / 74d3d6 (vibe5 studios-gB.sh after the gate); impeller after blend's f26 / f27.
+1. Curve pattern 1 path (driven-pattern, above): translator, mine.
+2. After live2's 18:50 fetch: exchange suite rerun with a main binary; rank and fix.
+3. rings-loft live.x_t reader (Open 1); drawing conics (Open 3).
+4. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## How to run
 - Builds and crate tests on the Mac: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo test -p <crate> …` (one slot).
