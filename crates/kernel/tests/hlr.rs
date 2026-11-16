@@ -218,3 +218,24 @@ fn the_wave_springs_exact_views_finish() {
         assert!(exact.iter().any(|e| e.visibility == Visibility::Visible) && exact.iter().any(|e| e.visibility == Visibility::Hidden));
     }
 }
+
+/// An extruded slot's straight sides run tangentially into its round ends: those edges are tangent edges by geometry
+/// (Onshape's drawings put them on TANGENT_LINES), though no fillet set OCCT's continuity flag on them (live exchange
+/// suite: c2-sm-louver's bends, c2-extension-spring).
+#[test]
+fn tangent_edges_by_geometry_are_smooth() {
+    use std::f64::consts::FRAC_PI_2;
+    let slot = [
+        Segment2d::Line { a: DVec2::new(0.0, -5.0), b: DVec2::new(30.0, -5.0) },
+        Segment2d::Arc { center: DVec2::new(30.0, 0.0), radius: 5.0, start_angle: -FRAC_PI_2, end_angle: FRAC_PI_2 },
+        Segment2d::Line { a: DVec2::new(30.0, 5.0), b: DVec2::new(0.0, 5.0) },
+        Segment2d::Arc { center: DVec2::new(0.0, 0.0), radius: 5.0, start_angle: FRAC_PI_2, end_angle: 3.0 * FRAC_PI_2 },
+    ];
+    let face = make_face_2d(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), &slot, &[]).unwrap();
+    let solid = extrude(&face, DVec3::new(0.0, 0.0, 10.0)).unwrap().shape;
+    for exact in [true, false] {
+        let edges = project_hlr(&solid, DVec3::new(-1.0, -2.0, -1.5), DVec3::Z, exact).unwrap();
+        let smooth = edges.iter().filter(|e| e.visibility == Visibility::Visible && e.class == EdgeClass::Smooth).count();
+        assert!(smooth >= 2, "exact={exact}: {}", dump(&edges));
+    }
+}

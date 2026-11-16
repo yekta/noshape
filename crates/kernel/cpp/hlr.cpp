@@ -5,6 +5,7 @@
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
+#include <Geom2d_Curve.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRep_Builder.hxx>
@@ -57,10 +58,11 @@ struct Emitter
   const ShapeIMap&  srcEdges;
   const CurveIndex& curves;
   double            defl;
-  // Source edges that are a face's seam (by source index).
+  // Per source edge: 1 a face's seam (no edge), 2 tangent between its two faces (seam_edges).
   const std::vector<char>* seams = nullptr;
 
-  bool seam(int src) const { return seams && src >= 0 && (size_t)src < seams->size() && (*seams)[src]; }
+  bool seam(int src) const { return seams && src >= 0 && (size_t)src < seams->size() && (*seams)[src] == 1; }
+  bool tangent(int src) const { return seams && src >= 0 && (size_t)src < seams->size() && (*seams)[src] == 2; }
 
   void emit_points(const std::vector<gp_Pnt2d>& pts, bool visible, uint8_t cls, int source)
   {
@@ -169,6 +171,46 @@ static bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b)
   }
 }
 
+// Whether two faces meet tangentially along `e` (their outward normals within 1e-4 rad at three points of it), by
+// geometry: Onshape draws such an edge as a tangent edge whatever made it (a sheet metal bend, a sweep, an import;
+// only our fillets set OCCT's continuity flag: live's drawings put c2-sm-louver's 243 bend lines on TANGENT_LINES).
+static bool tangent_along(const TopoDS_Edge& e, const TopoDS_Face& a, const TopoDS_Face& b)
+{
+  double f, l;
+  if (BRep_Tool::Degenerated(e) || BRep_Tool::Curve(e, f, l).IsNull())
+    return false;
+  const auto normal = [&e](const TopoDS_Face& F, double t, gp_Vec& n) {
+    double                          pf, pl;
+    const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, F, pf, pl);
+    if (pc.IsNull())
+      return false;
+    const gp_Pnt2d       uv = pc->Value(t);
+    BRepAdaptor_Surface  s(F, false);
+    gp_Pnt               p;
+    gp_Vec               du, dv;
+    s.D1(uv.X(), uv.Y(), p, du, dv);
+    n = du.Crossed(dv);
+    if (n.Magnitude() <= 1e-12)
+      return false;
+    n.Normalize();
+    if (F.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    return true;
+  };
+  int compared = 0;
+  for (const double w : {0.25, 0.5, 0.75})
+  {
+    const double t = f + (l - f) * w;
+    gp_Vec       na, nb;
+    if (!normal(a, t, na) || !normal(b, t, nb))
+      continue;
+    if (na.Angle(nb) > 1e-4)
+      return false;
+    ++compared;
+  }
+  return compared > 0;
+}
+
 // Edges that aren't edges in Onshape's topology: a face's own seam, and an
 // edge between two faces of one surface (Parasolid keeps such a face whole;
 // live 1857: no line across pipeflange-steven's fillets).
@@ -192,6 +234,8 @@ std::vector<char> seam_edges(const TopoDS_Shape& shape, const ShapeIMap& src)
     }
     if (faces.size() == 2 && !faces[0].IsSame(faces[1]) && same_surface(faces[0], faces[1]))
       out[(size_t)i - 1] = 1;
+    else if (!out[(size_t)i - 1] && faces.size() == 2 && !faces[0].IsSame(faces[1]) && tangent_along(e, faces[0], faces[1]))
+      out[(size_t)i - 1] = 2;
   }
   return out;
 }
@@ -280,14 +324,14 @@ void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool 
         continue;
       // A face's seam counts as smooth even without its continuity flag.
       const int  src    = src_of(ie);
-      const bool smooth = edf.Rg1Line() || em.seam(src);
+      const bool smooth = edf.Rg1Line() || em.seam(src) || em.tangent(src);
       bool       todraw;
       if (typ == 2)
         todraw = itf.Internal(); // silhouettes computed by the outliner
       else if (typ == 3)
         // A face's own seam isn't a tangent edge (Parasolid's periodic faces
         // have none; live 1857 draws no line there).
-        todraw = edf.Rg1Line() && !edf.RgNLine() && !itf.OutLine() && !em.seam(src);
+        todraw = ((edf.Rg1Line() && !edf.RgNLine()) || em.tangent(src)) && !itf.OutLine() && !em.seam(src);
       else if (typ == 4)
         todraw = edf.RgNLine() && !itf.OutLine();
       else
@@ -624,11 +668,11 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
     }
     else if (src < 0)
       cls = outl ? CLS_OUTLINE : CLS_SHARP;
-    else if ((reg1 || em.seam(src)) && outl)
+    else if ((reg1 || em.seam(src) || em.tangent(src)) && outl)
       cls = CLS_OUTLINE;
     else if (regn || em.seam(src))
       cls = CLS_SEAM;
-    else if (reg1)
+    else if (reg1 || em.tangent(src))
       cls = CLS_SMOOTH;
     HLRAlgo_EdgeIterator it;
     double               sta, end;
