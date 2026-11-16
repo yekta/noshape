@@ -2700,7 +2700,7 @@ std::optional<Extruded> bspline_extruded(const TopoDS_Face& f, const occ::handle
     {
       t[(size_t)j] = gp_Vec(P(1, 1), P(1, j)).Dot(D) / D.SquareMagnitude();
       for (int i = 1; i <= ni && ok; ++i)
-        ok = (gp_Vec(P(i, 1), P(i, j)) - D * t[(size_t)j]).Magnitude() <= tol && (!s->IsURational() && !s->IsVRational() || std::abs(W(i, j) - W(i, 1)) <= 1e-12 * W(i, 1));
+        ok = (gp_Vec(P(i, 1), P(i, j)) - D * t[(size_t)j]).Magnitude() <= tol && ((!s->IsURational() && !s->IsVRational()) || std::abs(W(i, j) - W(i, 1)) <= 1e-12 * W(i, 1));
     }
     if (!ok)
       continue;
