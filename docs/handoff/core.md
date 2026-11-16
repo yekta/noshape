@@ -102,8 +102,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - c2-surf-intro-examples Fill 1 (5/13, parked): 4 G0 boundary edges (2 fit splines, 2 sketch splines; they match
   live's lengths). fair_g1_fill returns nothing for them, so OCCT's plate (MakeFilling) balloons: 61911 mm², box to
   x 198 mm; live 23827.4. A Coons patch (GeomFill_BSplineCurves, CoonsStyle) gives 23669.5 (-0.66 %: outside the
-  band), box inside the boundary's. Next: why fair_g1_fill declines all-G0 loops, or a plate sanity check (surface
-  box far outside the boundary's) falling back to Coons.
+  band), box inside the boundary's. fair_g1_fill declines because the edges share no vertices: ConnectEdgesToWires
+  rebuilds them and the IsSame lookup (at < 0) fails. Matching by midpoint (/root/core-scratch/fair-fill-midpoint.patch)
+  makes the fair fill run: 22754.7 (-4.5 %). Live's box bulges past the boundary (y -19..157.6 vs 0..152.4), so
+  neither is Parasolid's G0 fill; needs a live capture of a plain 4-edge G0 fill (area, a mid-surface point) first.
 - c2-surf-workshop-split Boundary surface 1 (6/12, parked): 2x2 profiles, defaults; ours 3803.55 mm², live 3762.61
   (+1.1 %). It goes through k::fill_surface (op_fill) but not its plate: a Coons branch for 4 G0 edges placed first
   changed nothing (edge count != 4 or Coons declined; not chased). Experimental coons_fill saved in
