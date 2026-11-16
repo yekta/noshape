@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-16 02:40 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-16 08:43 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -9,19 +9,81 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land: tell asm.
 
 ## In flight (uncommitted in the dx worktree, branch dx-bosdxf)
-- Exchange STL rows (DECISIONS 7210b453e, fdc24d65f): queued 587c9765 (02:13) exports our STL with min facet 0.0254
-  (no floor that binds, as live's REST); radijator and cf-spur-gear match after live's 02:08 re-import. Landing 02:25:
-  an STL row off live's bands passes when every vertex of live's mesh is within 0.12 mm (Medium's chord) of ours, ours
-  is watertight, and each part's |ΔV| / area against live's import of its own STL is ≤ 0.01 mm (stl_within_deviation;
-  test stl_deviation_measures_watertightness_and_distance). cf-sheet-metal-model-plus now passes (vertices within
-  0.0233 mm, mean 0.0010 mm): its exchange row 4/4. (Its mesh is ~1 µm inside on curved faces: BRepMesh, P3.)
-- 1dc32b alone (vibe6, build L): with and without live's refs both 17/349 (first difference Composite part 2: fixed
-  by 19afd619, rerun). Without refs, the region fix makes Fillet 5 / Chamfer 3 / Extrude 34 report themselves
-  ("SWEPT_EDGE: revolve FFYqzMxs3svxNXq_31.holeBodies.* was not built", "CAP_EDGE … no entity", "region …: its curves
-  were not translated") instead of silently mapping to regions; live's refs cover them.
-- Next translator piece (mine, not started): a Hole's internal bodies (`<hole>.holeBodies.*`, revolves of std's profile
-  sketch: `start_line_<n>`, `cbore_…`/`csink_…` prefixes, hole.fs sketchPoly / setupTrackingLineIds): their SWEPT_EDGE /
-  SWEPT_FACE and INTERSECT vertices. Cases: 74d3d6 Plane 1 (Sketch 15), 1dc32b Fillet 5 (refs cover it).
+- Data exchange (lead 08:0x): (1) 10 corpus docs x every format + a drawing vs live's exports, (2) re-import live's
+  STEP / x_t, (3) times vs live's translations; fix largest gaps first, one line per landing. Requested from live2
+  (REQUESTS 08:05): c2-rings-loft, c2-extension-spring, c2-housing-draft, c2-sm-louver, c2-variable-fillet-faceblend,
+  c2-duct-multipart, c2-bottle-split, cf-snap-hook, clamp-guillem, c2-hex-bookcase-derived -> /root/parity/exchange/<doc>/
+  live.{step,igs,x_t,sat,stl,obj,3mf}, live-times.json, live-self.json, live-drawing.{pdf,dxf,dwg}, drawing.json.
+  Landed 11-16: 503d5a2a6 suite (ACIS / OBJ / 3MF, times, drawing leg); 4d5ba3177 OBJ zip import; ad4a3517e mesh
+  part -> planar facets for x_t / ACIS / IGES / JT / Rhino / PVZ (each crashed; STEP keeps TESSELLATED_SOLID) + a
+  STEP's tessellated solid no longer reads back as part + composite; 81ae5cce0 x_t / ACIS export (seam-line edge used
+  once kept: c2-housing-draft; SweptToElementary null swept surface on a sphere / torus: cf-snap-hook); b75687eb8
+  suite reads live.obj.zip, ACIS held to live's x_t import, OBJ / 3MF to its STL import.
+  live2: 4 docs final (rings-loft, extension-spring, housing-draft, sm-louver); translations quota 429 until ~18:36,
+  STL until ~18:45; timer 18:50: hex-bookcase first (+ JT / RHINO / PVZ, live-export-results.json: what live writes
+  for a mesh part), then the other 5, then all 10 live.stl + live-self STL.
+  Our imports of live's files (vibe5 debug CLI, ~/tmp/dx/hx2): extension-spring, housing-draft, sm-louver match
+  live-self in x_t / STEP / IGES. c2-rings-loft: x_t refused ("a curve of the file could not be rebuilt": an edge
+  on a closed non-periodic intersection curve got a decreasing range); fix on my branch e9facf060 (WIP, NOT landed:
+  then Extruded ring imports 280/762/508, live 273/762/508, 2463 mm³ for 440.76: its 6 blend ('other') faces come in
+  as 13 B-splines, 153 mm² short -> the reader's blend rebuild is next). rings-loft STEP / IGES: ours = live's
+  model; live's own imports are off it (not targets).
+  Our x_t read back by our reader: cf-snap-hook 13 surface bodies (volume 0; ACIS right), rings-loft Part 1 303 mm³
+  for 440.77, housing-draft 37/82/46 for 36/79/44 (volume right). Live's verdict (live-ours) after 18:50.
+  Runs: vibe6 slot ticket exch.sh (06:45; ops-ex md5 5ed15b0ced26, data snapshot ~/agents/dx-keep/exl: predates
+  the 11:xx fixes, rebuild the binary before it starts if possible). Own pre-runs ~/tmp/dx/ex2.log, ex3.log (35/38).
+- P0 (lead 07:0x): c2-config-parts-screws hung regeneration (Split 3, FACE split by 6 projected sketch curves):
+  bool's split_by_edges_on_faces (af0a1713d) ran GeomAPI_ExtremaCurveCurve (math_GlobOptMin) on each tool pair forever.
+  Fix 979de111a (local): pairs other than lines / circles decide on ends (within tol: no(), as before) and polylines
+  (GCPnts quasi-uniform, defl max(tol, 1e-3 box), farther than tol + 4·defl: skip) before Extrema; lines / circles keep
+  Extrema (IsParallel exact). screws alone 4 s, 27/63 (next Sweep 1's path untranslated). g++-13 kernel build OK.
+  bool gates it with priority (vibe5, after its 07:30 gate); land when SAME, then drop screws from
+  tests/parity-models/unscored.json (skip 63cebe3c, checking 07:08). Repro: vibe5 ~/tmp/dx/mscrews/screws-x. Remove
+  vibe5 ~/agents/dx/target-g13 after. bool gates 979de111a on vibe7 after qa's speed A/B.
+- Helix path (cdaa70c84, local, asked asm): DUMMY BODY of `….opHelix` / `….opFitSpline` = our feature's body before
+  refs (screws Sweep 1, driven-pattern Curve pattern 1). With it screws' Sweep 1 runs and blows to 14.8 GB (earlyoom;
+  under ulimit -v 6 GB 3.6 s, 6/5/1 vs live 8/14/8): core: bool's Rust Boolean (sections_ahead) in Sweep 1's
+  REMOVE, sent to bool. asm OK, with a guard (no VERTEX / EDGE strings: fit_spline_vertex_from_query's); asm runs
+  hand-drill-pinslot / bjr-config 5e35bf with my binary. Keep screws in unscored.json until both fixed.
+- vibe5 gate B binary swapped 07:2x to ops-hx (07:2x, then ops-hx2 md5 10ffc0749fe5 with the helix guard: plane fix + hole + helix + kernel split fix; A still
+  ops-gA = main 8269d9b37). A difference in the gate may come from any of the four.
+- Exchange STL rows (DECISIONS 7210b453e, fdc24d65f): landed (aeef3f77 min facet 0.0254; 678d030f deviation check:
+  live's vertices within 0.12 mm of ours, watertight, |ΔV| / area ≤ 0.01 mm; cf-sheet-metal-model-plus 4/4).
+- 1dc32b alone: build O (03:04) 17/349, first difference Composite part 2's centroid only (fixed by 612b09e6). Rerun
+  with build T (vibe5 ~/agents/dx-keep/ops-T md5 b56e35317c46, all local commits) queued in vibe5's slot behind
+  config-parts. Without refs (build L) the region fix makes Fillet 5 / Chamfer 3 / Extrude 34 report themselves
+  instead of mapping to regions; live's refs cover them.
+- vibe7 reserved for qa (~/.slot-quiet) till after 06:30+; my runs moved to vibe5 (lead: gate keeps its FIFO place
+  behind core's / blend's speed A/Bs; land the plane fix as soon as it's green). vibe5 queue 06:34, detached (setsid):
+  gate-tr.sh A/B ~/agents/dx-keep/ops-gA (a8e1d11e3dee) / ops-gB (e6cf176f7145) tag pl -> ~/tmp/dx/gate-tr-pl.out; then
+  studios-gB.sh (1dc32b st1dc-R.log, 74d3d6 st74-gB.log) -> ~/tmp/dx/studios-gB.out; then cfgparts.sh ops-gB gB.
+  The plane fix also clears asm-hand-drill-pinslot's 16 overdefined mates (asm: studio 4ece4b Plane 3 offset from Plane
+  2's planeOp, refs read it as a plane-body face; add to the land note). After landing: rerun paths-guides and wave
+  washer alone, send core both Loft 1 lines (core's 09c11d4f / 7d5e9394).
+- config-parts (vibe5 07:4x, ops-hx2, screws skipped; ~/tmp/dx/cfgparts-hx2.log): linear-rail 19/26, links 10/35, nuts
+  8/17, pulleys 9/22, sprockets 10/24, standoffs 11/32. Landed 69b8e51c (Any variable = string), 5ee5d266 (std 736).
+  Queued 16c51e2a (expressions compare strings: `"text"` where a value is expected, string variables via
+  VariableScope::get_text / ctx.fs_variables; nuts' `#name2 == "Nyloc" ? …`) and 8d3a0ec2 (a configuration checkbox is
+  a variable: sprockets' #Default_Thickness, pulleys' #Flanges). Left: live's sketches.json is at the workspace's
+  current configuration: refetched at defaultValue 07:39 (sketches.json capturedConfiguration). But live.jsonl's
+  per-feature lines are at the current configuration (nuts: Extrude 1 41.569 mm³ = M2 hex; final "M4 Nyloc" 31.406,
+  REST at M4 148.47): asked live 07:5x to retake lines at defaultValue. Rerun (ops-cp, current branch) then: linear-rail
+  19, links 10, nuts 8, pulleys 9, sprockets 11, standoffs 11 (~/tmp/dx/cfgparts-cp.log). live: screws 34 / links 28 refs absent at
+  the default configuration, standoffs Hole 2 ERROR in live.
+- driven-pattern 6/11: f6 Linear pattern 1 direction from Extrude 1's cylinder face: ours axis -z (origin at top), live
+  +z: sent to core 06:35 (vibe5 ~/tmp/dx/qdp, mode 700).
+- blend: impeller f26 matches on its 12b25c47e (not landed); f27 Fillet 3 next (blend). core: side-cuts-tab Corner break
+  fix queued (7 -> 13/18).
+- Hole internal bodies (committed 48a5ef471, asm OK, lands after the plane fix with its own corpus A/B): a SWEPT_FACE of
+  `<hole>.holeBodies.*.opRevolve` maps to our Hole's faces by geometry (hole.fs' `core_line_2` THROUGH_FACE: narrowest
+  cylinders; `start_line_2` counterbore wall: widest), every location (hole_body_faces in named_faces); a three-face
+  INTERSECT vertex resolves sides through named_faces and common_vertex intersects the sets (gate: this also lets
+  loft side sets in). TRACE lines "TRACE INTERSECT side / faces". 74d3d6 Plane 1 (vibe5 st74.sh, builds Q/S): all three
+  sides translate (bore = Hole 8's cylinder, right), but no common vertex: our Multi angle joint sits near y 560 mm,
+  live's centroid (20.3, 80.0, -4.7) mm, and our bore stops at the hexagon pocket (x 18) where live's crosses the
+  Extrude 18 slot (y 560 ± 0.9): upstream placement (live's fetch of 74d3d6 is incomplete: 53 lines from Transform 16
+  unfetched). Not mine until upstream matches. Not done: SWEPT_EDGE of holeBodies (1dc32b Fillet 5, refs cover it),
+  start_line_1 (cbore floor vs csink cone).
 - Plane feature planes before refs (committed, not landed): a `….planeOp` query (plain or packed DUMMY) maps to our
   plane before any refs geometry (live's all-feature refs read it as the plane body's face, which by_geometry can't
   find: c2-loft-guide-curves-wave-washer 2 -> 6/7). Gate: vibe6 corpus3.sh A/B (A build L, B build P md5 5e1d31c239eb)
@@ -29,8 +91,8 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   since before 01:41 behind blend; land if SUM-SAME but for the planeOp documents improving. Then sort corpus3's first
   differences to owners.
 - Second search (live, by sets): c2-parting-line-draft-tutorial 3/3; c2-parting-line-draft-parting-line 5/17, Draft 1
-  (PARTING_LINE TWO_SIDED 20/20°) removes 154234 mm³ for live's 45232, inputs match: sent to core (by 02:00); save vibe6
-  ~/tmp/dx/savepl. c2-sm-hem-plus: sheetMetalStart / sheetMetalHem are custom (Feature Studios da39db76…,
+  (PARTING_LINE TWO_SIDED 20/20°): core's fix queued (the ruled sheet runs past the curve's ends; 367243.7 mm³, live
+  367268.5): 9/17, next Extrude 2 surface 12113.30 mm² vs live 12115.66 (core's). c2-sm-hem-plus: sheetMetalStart / sheetMetalHem are custom (Feature Studios da39db76…,
   e5262684…) not fetched + its Derived source: asked live. c2-sm-side-cuts-tab 7/18: Corner break 1 (FILLET r 21 on two corners 42 mm apart, a full round; vertices = live's
   refs) fails in sheetmetal::corner_break: core (via blend). c2-sm-hem-plus 4/6 (custom features 2/2 with live's
   studios): Derived 1 differs because its source's Offset surface 1 makes 3 bodies for live's one: core; live fixes its
@@ -41,10 +103,13 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   (gears / bevels dropped: private studios).
 
 ## Queued to land
-- ce4f5ec6 STEP part names (asm-corexy) + Composite kind (queued 01:44). Landed 11-16: 866bd5ad region fix (EDGE/VERTEX queries never regions) + impeller f24 split vertex in
-  LIVE_SLIVER_EDGES (DECISIONS bb69638d4; impeller 26/48); d55b1643 configured suppression (5d8bc1 107/124 at
-  Manufacture=false, asm-bjr-config 127/137 occurrences 25/25 mates). 11-15: c1af60ab STL rule; 104e822e imported
-  Feature Studios; bb0641ba region faces cache; a2212ff2 qContainsPoint box skip; 3073e7d8 draft propagation.
+- Nothing queued. Landed 11-16 11:xx: translator gate (vibe5 model suite A main 8269d9b37 vs B: 1127 -> 1178/1585,
+  82/126 docs both, custom-feature compile failures 6 -> 0, none down; ~/tmp/dx/gate-pl-{A,B}.log) as
+  093044179..036be2acf (plane, hole faces, helix path, sketch keep). Exchange fixes (see In flight).
+- Local, waiting: 979de111a kernel split hang fix (bool's gate on vibe7); e9facf060 x_t closed-curve edge (WIP).
+- Core: wave-washer Loft 1 "more than two profiles" (their 09c11d4f, not in gate B) and paths-guides Loft 1
+  "Only planar profiles…" sent 09:0x; rerun both on main and resend if they differ.
+- asm's 25-commit parity.rs stack: whoever lands second rebases (Translator constructor's `Ok(Self { … })`).
 
 ## Open: my studios (studio-alone runs, vibe7)
 - bjr-config 5d8bc1: 107/124 at Manufacture=false (23:42, live's retaken lines). First difference Extrude 55 "vanity
@@ -99,21 +164,21 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   a configured part). Run them alone once in, sort first differences to owners.
 
 ## Next, in order
-1. STEP names + composite kind: landed? (`land.sh --status`); asm rescores corexy's BOM; rerun 1dc32b alone.
-2. corpus3's run: first differences to owners (translation ones mine).
-3. 1dc32b: composite rerun; refs R/N comparison (does the region fix make Chamfer 4 / Fillet 5 resolve unaided?);
-   Fillet 3 once blend lands Chamfer 3.
-4. c2-impeller-loft 26/48: f24's split vertex is a known live difference (DECISIONS bb69638d4, in LIVE_SLIVER_EDGES).
-   First difference f26 "Chamfer Stevenrohr Halterung" (OFFSET_ANGLE 3.5 mm 20°): inputs match; blend: ours cuts back
-   to x=1.5 too, but its end edge is OCCT's 3.5012 mm B-spline 6 µm off the top line (y 2.616 vs 2.6104), a separate
-   edge (+2 edges/vertices); live's end edge is the line itself. blend's fix (exact straight end edges merged with the
-   collinear line) is queued. f27 Fillet 3
-   fails from it. Translation matches through f27; later translation notes (Sketch Bohrung Flansch dims, Fillet KsZB,
-   Sketch Bohrung Ansaugflansch OFFSET).
-5. 74d3d6 Sketch 15: its plane (Plane 1) now reports "INTERSECT: SWEPT_FACE: revolve FOxgtrMDqncXEjd_7.holeBodies.*
-   was not built" (a Hole's internal revolve faces aren't named by ours; no live geometry for RJCk / RJCc / RJCY): ask
-   live for those refs once Extrude 4 (core) matches.
-6. 5d8bc1: nothing of mine before Extrude 55 (bool / core).
+1. P0 979de111a: land when bool's vibe7 gate says SAME (also g++-13 OK); then drop screws from unscored.json once bool's
+   sections_ahead blow-up (Sweep 1 REMOVE) is fixed.
+2. vibe5 gate (plane fix + hole faces + helix path, B ops-gB = ops-hx2): land b4ef875a6, df3ded3f0, cdaa70c84 (+ its
+   fixup) when SAME but for improvements; note asm's hand-drill 7 -> 16/24, scissor-lift fed22d 6 -> 28/60; tell core
+   and rerun wave washer / paths-guides alone, send core both Loft 1 lines.
+3. Sort the gate's B log first differences (corpus3 + corpus4 docs) to owners; translation ones mine.
+4. config-parts after live's sketches refetch (defaultValue configuration); standoffs' 4.8 s regen (Revolve 2, Boolean 2)
+   to core / bool once its geometry matches.
+5. Drawing ui-parity (qa 1116-0032 on f14f85a8, /root/qa-scratch/suites/…/uip): its drw-* misses are fixed since
+   (studios: fdba14d66 insert-view, e90138db1 datum-copy-paste, 64c87479f projected View orientation, title-block
+   lines) but drw-centermark / -align: live's recorder reads the plate's annotations erratically (align: 1,1,1,0,0,1,0,1
+   on one state; hide-auto-centermarks 0), and ours drops a Single mark over an automatic one on Esc (studios'
+   60c111a68, live dx/q-centermark): not changed; for studios / live2 (paused till 11-17 07:00). Recheck on qa's next run.
+6. Exchange suite (vibe6 queue, ops-gB, ~/tmp/dx/exch-1116.log): rank remaining exchange misses.
+7. 1dc32b / 74d3d6 (vibe5 studios-gB.sh after the gate); impeller after blend's f26 / f27.
 
 ## How to run
 - Builds and crate tests on the Mac: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo test -p <crate> …` (one slot).
@@ -142,7 +207,7 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 - vibe7 → vibe6 scp fails: relay through /root/dx-scratch/bin-relay. Host ~/tmp is pruned after 6-12 h: keep scripts
   and binaries in ~/agents/dx-keep.
 - Agent ids (message_agent needs them full): core 6692ae35-758a-4442-81c8-29f67be2e21a,
-  asm 28d8f565-94b2-4f19-9946-51740c12fad5, blend 2e21b490-fe92-4d07-add2-54a85a9e3145, bool
+  asm 75d6886b-30b5-45c0-b789-a6730354be97, blend 0e6e9942-0713-46c1-ae55-132fbbb4a14b, bool
   c25aee1d-f0a9-4fab-ac99-acca645c81c7, live b89af730-e8c6-4234-b83e-00a9e1ba6acc, live2
   c42ce02b-3429-4294-861b-ccbc6cbb41d2, studios 08f83230-1122-4c3c-a185-edf9f225d834, skasm
   a09d30a7-95db-42d1-8f2d-946c6fb8f232.
