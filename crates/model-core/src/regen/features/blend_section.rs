@@ -619,10 +619,12 @@ fn trimmed_run_on(shape: &Shape, supports: [usize; 2], (tool, names): (Shape, Ve
     use rayon::prelude::*;
     let body_faces = shape.faces();
     let legacy = k::kernel_legacy();
+    // (A run-on vertex on the face first: its distance to the grind face took 6 ms of c2-hunting-knife's Fillet 2.)
+    let touches = |f: &Shape, p: &Shape| p.vertices().iter().any(|v| k::distance(v, f).is_ok_and(|d| d.distance <= tol)) || k::distance(f, p).is_ok_and(|d| d.distance <= tol);
     let met: Vec<bool> = body_faces
         .par_iter()
         .enumerate()
-        .map(|(i, f)| !supports.contains(&i) && near_box(f) && k::with_kernel_legacy(legacy.clone(), || run_on.iter().any(|p| k::distance(f, p).is_ok_and(|d| d.distance <= tol))))
+        .map(|(i, f)| !supports.contains(&i) && near_box(f) && k::with_kernel_legacy(legacy.clone(), || run_on.iter().any(|p| touches(f, p))))
         .collect();
     for (i, f) in body_faces.iter().enumerate() {
         if !met[i] {

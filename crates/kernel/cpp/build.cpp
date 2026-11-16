@@ -33,6 +33,7 @@
 #include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom_Plane.hxx>
 #include <BRepTools.hxx>
+#include <OSD_Parallel.hxx>
 #include <ShapeAnalysis_Surface.hxx>
 #include <gp_Dir2d.hxx>
 #include <BSplCLib.hxx>
@@ -1416,14 +1417,22 @@ std::unique_ptr<OcShape> extend_face_over(const OcShape& on, rust::Slice<const d
     fail_invalid("the face is not a B-spline");
   double u0, u1, v0, v1;
   bs->Bounds(u0, u1, v0, v1);
-  // Each side's need: the farthest point whose nearest surface point is on that side's boundary.
-  ShapeAnalysis_Surface sas(bs);
-  double                need[4] = {0, 0, 0, 0};
-  const double          eu = 1e-6 * (u1 - u0), ev = 1e-6 * (v1 - v0);
-  for (size_t i = 0; i < pts.size(); i += 3)
+  // Each side's need: the farthest point whose nearest surface point is on that side's boundary. (The points' nearest
+  // surface points in parallel, a projector a run of them: 114 took 9.4 ms one after another on c2-hunting-knife's
+  // Fillet 2.)
+  const size_t          np = pts.size() / 3, runs = std::min<size_t>(np, 8);
+  std::vector<gp_Pnt2d> uvs(np);
+  OSD_Parallel::For(0, (int)runs, [&](int r) {
+    ShapeAnalysis_Surface sas(bs);
+    for (size_t k = (size_t)r * np / runs; k < ((size_t)r + 1) * np / runs; ++k)
+      uvs[k] = sas.ValueOfUV(gp_Pnt(pts[3 * k], pts[3 * k + 1], pts[3 * k + 2]), Precision::Confusion());
+  });
+  double       need[4] = {0, 0, 0, 0};
+  const double eu = 1e-6 * (u1 - u0), ev = 1e-6 * (v1 - v0);
+  for (size_t k = 0; k < np; ++k)
   {
-    const gp_Pnt   q(pts[i], pts[i + 1], pts[i + 2]);
-    const gp_Pnt2d uv = sas.ValueOfUV(q, Precision::Confusion());
+    const gp_Pnt   q(pts[3 * k], pts[3 * k + 1], pts[3 * k + 2]);
+    const gp_Pnt2d uv = uvs[k];
     const double   d  = q.Distance(bs->Value(uv.X(), uv.Y()));
     if (uv.X() <= u0 + eu)
       need[0] = std::max(need[0], d);
