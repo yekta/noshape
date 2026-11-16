@@ -134,9 +134,17 @@ docs/DECISIONS.md (read first; it wins over anything here).
     std::optional<OffsetSolid> offset_solid(const TopoDS_Shape& solid, const std::vector<double>& face_dist,
                                             int face_budget, OffsetReport& why);   // C++, crates/kernel/cpp/offset.cpp
     k::offset_solid(shape, &distances, budget) -> Result<OpResult>                  // Rust; error names the face
+  bool's requirements (11-16 22:2x): (1) face_dist along the face's outward normal, TopAbs_REVERSED applied; (2) faces
+  to remove (NaN distance): result open, neighbours' walls ending at the rim's offset (Shell needs it); (3) an OpResult
+  with history (Modified face -> its offset, Generated for new walls/edges); (4) poll noshape_should_break in every
+  march loop besides face_budget; (5) report the tolerance reached per face; (6) parallel workers take their own
+  copies of Geom surfaces (a shared converted B-spline raced in bool's test). bool switches by_quadrics' inner walls
+  to it once it matches on the Shell corpora; by_quadrics stays the one direct Shell builder. bool gates step 1.
   Steps (each landed alone, release pair + bool's gate where crates/kernel shell.cpp is touched):
-    1. quad's declarations (Surf, OffsetRun, foot, solve3*, march_offsets, make-a-Surf-for-a-face) moved from
-       shell.cpp into crates/kernel/cpp/offset_quad.hpp, no behaviour change (bool told).
+    1. DONE as 148d531e6 (branch core-offset, worktree core-trace): Surf, OffsetRun and the first quad block's
+       declarations in crates/kernel/cpp/offset_quad.hpp; both quad blocks out of the anonymous namespace
+       (noshape::quad). g++-15/13 build, 473 kernel tests. bool gating it (sent 22:3x); land from core-trace when
+       bool says pass. (The make-a-Surf-for-a-face helper stays in by_quadrics: offset.cpp writes its own.)
     2. offset.cpp offset_solid for solids whose faces all keep their topology; kernel T1 tests: a box with one face
        moved (exact), a cylinder boss, a B-spline face (fit-spline extrude) moved 0.2 mm vs its Geom_OffsetSurface.
     3. Boolean offset (basic.rs) and Move face Offset use it for free-form faces before OCCT; fan-blade Boolean 2
