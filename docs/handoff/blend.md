@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-16 05:12 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-16 08:40 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -9,32 +9,27 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## In flight
 
-- Landed b106b424 (20:33): chamferair, balljump, chordnear, ballnear, unifycand. Core told; vibe6 gate targets gone.
-- Dock tab B scale-first: commit 20c8533d4 in blend6 (on main 84f94ad8a; g++-13 OK): short_step_beside fires only
-  where exactly one rounded edge ends at a step under r / 4 (Halka Round, two rounds meeting at a 10 um line, excluded:
-  its as-is round is kept and scaled-first cost it +20 ms). Log-mode suite (old trigger): 98 docs, the trigger fired on
-  2 fillets, both "as-is not kept"; never on a kept one. Dock tab B with scale-first: every fillet's part identical
-  (faces/edges/vertices, volume, area) to log mode; Rib Round Dizi ~270 -> ~160 ms, Rib Round 1 ~150 -> ~130 (vibe6
-  at load 15: candidates). Rib Dip R 1 / Dizi don't fire (their as-is round thrown away too: a wider trigger later).
-  qa's userdocs.py on vibe5 (green 84f94ad8a = base vs my CLI): hat15, hat15b, hat8, dock and the 47 ticket docs all
-  SAME (log userdocs-sf.log). Still queued on vibe6 (unit blend-seq-sf, bin/seq-sf.sh; behind asm's s49 in the slot):
-  model pair blend2 (main) vs blend6 (suite-sf-*: every suite doc, corner-break's 42 faces), then the assemblies
-  (asm-sf-{base,new}.log). Land if all identical.
-
-- c2-impeller-loft feature 26 "Chamfer Stevenrohr Halterung": commit 12b25c47e (blend3, on main 6acd980f6): the rim
-  chamfer cut's end edge (OCCT's B-spline, 1.7e-3 rad / 6 um off the side line over 3.5 mm) joins the line as one line
-  on its extension (join_edges_at's max_turn: the far vertex moved onto it, the pcurve kept in the line's period; the
-  unify's concatenation threw "Courbes non jointives"). 33/88/56 -> live's 33/86/54; kernel T1
-  blend::a_straight_section_turned_off_a_line_joins_it_on_the_lines_extension. Pair blend-base (main) vs blend3 on
-  vibe7 (suite-imp-*, flag imp-pair.done). Core and dx
-  told. join_edges_at is in boolean.cpp but only blends call it (bool's gate not needed: no Boolean path changes).
-- qa P0 (11-16): impeller "Fillet Stevenrohr zum Halter" fails in 4.76 s on v0.4.53 (0.9 ms on v0.4.48, where the
-  chamfer before it failed). fillet_by_groups integrated the input's volume (2.2 s) before its first group failed in
-  5 ms: commit 29c1841df (blend3, on 12b25c47e) takes it lazily, same results; the v0.4.53 input's replay 2.60 s ->
-  346 ms. With 12b25c47e the fillet's input differs (282 ms). Both commits in the vibe7 pair (unit blend-seq-v7,
-  bin/seq-v7.sh: impeller pair, then scale-first's new suite and assemblies); g++-13 OK for 12b25c47e (rerun for
-  29c1841df before landing). qa told.
-- side-cuts-tab Corner break 1: core's (queued by core 03:2x).
+- Speed branch `blend-samples` in blend5 (on 3178c98b5; g++-13 check running, log g13-b5.log):
+  - e3f5d1a32: op_fillet / op_chamfer hold one ChFi3d::SamplesScope (patch 0029's) for the whole op, outside
+    run_budgeted (its jump skips destructors). robot-relations a4e419 (ma4, asm's Mac copy ~/noshape-host/asm-models/mr,
+    copy on vibe6 ~/agents/blend-keep/models-ab/ma4): Fillet 1's MakeFillet::Add spent ~a third in IsTangentFaces'
+    adaptors; regeneration 83 -> 70 ms Mac release (live 78; cross-session hint).
+  - 7ce936eab: rolling balls: tools' faces named in parallel (6.4 -> 2 ms), lies_on's samples once per tool face
+    (8 -> 6.2 ms), each part face's classifier kept. Knife Fillet 5 41 -> 32 ms, Fillet 3 81 -> 76 (Mac release hints).
+  - Identical by construction; still needs the release suite pair (below) and the A/B.
+- knife Fillet 5 (P0 from qa): Mac release, same binary, toggle on Fillet 5 only: rolling balls 40 ms vs OCCT's
+  round 7 ms, but OCCT's drops the knife 46 -> 32 of 52 matching (its round in several faces; ours is live's 3 + 5
+  tori). So not sent back to OCCT. Breakdown now (32 ms): OCCT's try 5 (needed to see the split), ball tools 6.6
+  (3 lofts), naming 2, direct build 15.3 (lies_on 6.2: OCCT FClass2d's slow path on face 13's boundary; pairs 2.6,
+  part faces 2.5, solid 1.6), conic contacts 1.7. Live's Fillet 5 time asked of live (REQUESTS 08:06).
+- vibe6 sequence (release, timeout 5400, corpus snapshot; bin/suite-rel.sh): units blend-seq-imp2 (base blend8 at
+  3178c98b5 -> suite-r-base.log, then blend3 706404cab impeller chamfer join -> suite-r-imp.{log,cmp}), blend-seq-sf2
+  (blend6 4b2f94289 scale-first -> suite-r-sf.cmp), blend-seq-ss2 (blend5 -> suite-r-ss.cmp), then blend-ab-speed
+  (A blend8 / B blend5 alternating x3 on knife + ma4 in vibe6's slot -> ab-speed.log). Flags r-*.done, ab-speed.done.
+  The 06:42 debug pair was killed by the lead (c2-config-parts-screws hang, skipped on main by e37bfc9c).
+- Land when the cmps are identical: blend3 (impeller chamfer join; core/dx told earlier), blend6 (scale-first; also
+  its assemblies, asm-one.sh, not yet rerun), blend5 (after the A/B).
+- Debug-only edits in blend10 (ZZ_T timers, ZZ_NO_BALLS=<feature name> toggle): never land; `git checkout` them.
 
 ## Open questions / waiting
 
