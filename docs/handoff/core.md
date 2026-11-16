@@ -98,10 +98,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
   c2-hunting-knife's Fillet 5 a face more, 46 -> 32/52; face_contains_point keeps the shift, tablet-stand 16/16;
   verified by debug runs). Both pairs carry the old change: vibe7's branch will show hunting-knife worse (and any other
   doc the projection touched): recheck each doc vibe7 marks worse with HEAD (.ts3.sh <doc>) before landing.
-- **Landing plan:** the vibe7 pair covers 1357fddb1..bcaf5ffdb. The second pair (97b778e7d + b173dc5bb + d2605e45d vs
-  bcaf5ffdb) runs on vibe5, restarted 19:36 UTC: ~/agents/core-keep/p2pair.sh -> p2res (own src copy p2src, target
-  p2target, base files p2base; src and target removed at the end). Land all nine when both are clean; or the six from
-  a worktree at bcaf5ffdb (core-trace) if the second isn't done when the first comes back clean.
+- **Landing plan:** both pairs' binaries are built; the suites run as suites-only scripts with `~/bin/slot timeout 7000`
+  (the timeout no longer counts the slot wait, which killed nothing yet but would have): vibe7
+  ~/agents/core-keep/spsuites.sh -> spres (sp/base = main 18:10, sp/branch = 1357fddb1..bcaf5ffdb; queued behind
+  qa's suites-rest since 21:45), vibe5 ~/agents/core-keep/p2suites.sh -> p2res (p2bin/base = bcaf5ffdb,
+  p2bin/branch = + 97b778e7d b173dc5bb d2605e45d; queued behind bool's gate jobs). Land all ten (with bd8b5f74f) when
+  both are clean and every doc vibe7 marks worse is rechecked with HEAD.
 - c2-surf-workshop-manualblend Sweep 2: Sketch 5's CONCENTRIC rejected by the translator (skasm's handoff). Not core's.
 - c2-surf-intro-examples Fill 1 (5/13, parked): 4 G0 boundary edges (2 fit splines, 2 sketch splines; they match
   live's lengths). fair_g1_fill returns nothing for them, so OCCT's plate (MakeFilling) balloons: 61911 mm², box to
