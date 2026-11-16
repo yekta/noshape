@@ -4166,7 +4166,8 @@ static void keep_vertices_added(const TopoDS_Shape& out, const std::vector<TopoD
 }
 
 // Whether a closed solid's faces face into it: at the middle of a face, a point just off it along its normal is in the
-// solid. By rays (noshape's classifier: parity, no orientation), two faces agreeing; none when no two clean ones do.
+// solid and one just off it the other way is not. By rays (noshape's classifier: parity, no orientation), two faces
+// agreeing; none when no two clean ones do (a solid thinner than the step: both points out).
 // (Its signed volume told it before: ~40% of a lofted chamfer's tool, c2-hunting-knife's Chamfer 1.)
 static std::optional<bool> faces_face_in(const TopoDS_Shape& solid)
 {
@@ -4194,10 +4195,10 @@ static std::optional<bool> faces_face_in(const TopoDS_Shape& solid)
     n.Normalize();
     if (f.Orientation() == TopAbs_REVERSED)
       n.Reverse();
-    const TopAbs_State st = rays.Perform(q.Translated(n * (1e-4 * size)));
-    if (st == TopAbs_IN)
+    const TopAbs_State ahead = rays.Perform(q.Translated(n * (1e-5 * size))), behind = rays.Perform(q.Translated(n * (-1e-5 * size)));
+    if (ahead == TopAbs_IN && behind == TopAbs_OUT)
       ++in;
-    else if (st == TopAbs_OUT)
+    else if (ahead == TopAbs_OUT && behind == TopAbs_IN)
       ++out;
   }
   if (in + out < 2 || (in > 0 && out > 0))
