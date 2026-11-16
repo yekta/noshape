@@ -2423,8 +2423,13 @@ impl<'a> Translator<'a> {
             {
                 return text;
             }
+            // Not the ids' regions where the face the sketch is on splits them (their keys hold imprinted segments,
+            // from 2^31): the text's whole region, as live extrudes it (c2-impeller-loft's Extrude 4: two pieces split
+            // by the target's own imprint fail up to it; the whole matches live).
+            let imprinted = |ids: &[String]| ids.iter().any(|id| id.rsplit_once(':').is_some_and(|(_, keys)| keys.split(',').skip(1).any(|k| k.parse::<u64>().is_ok_and(|v| v >= 1 << 31))));
             if let Ok(found) = self.query_with(k, q, true)
                 && !found.is_empty()
+                && !(imprinted(&found) && text.as_ref().is_ok_and(|t| !t.is_empty() && !imprinted(t)))
             {
                 return Ok(found);
             }

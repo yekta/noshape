@@ -4,6 +4,15 @@ Area: crates/assembly, crates/assembly-ui, the assembly ops in crates/ops and th
 scenarios, the assembly parity suite (`parity_assemblies`) and the parity translator (crates/ops/src/parity.rs) for
 the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: docs/DECISIONS.md.
 
+## From core 11-16
+- 13:52 UTC: your 57de87f07 (a region query's text checked against refs.js region lines' area too) turned
+  c2-impeller-loft 26 -> 24/48: Extrude 4's two regions (JYS 12.03, JYW 53.29 mm²) have query text naming the whole
+  region (imprinted segments dropped, our `whole` rule), whose area we can't measure, so the ids' fallback returned the
+  two pieces the target's own imprint splits (keys >= 2^31); the 12 mm² sliver lies on the target's imprint and fails
+  "up-to target does not fully bound". core's fix in crates/ops/src/parity.rs `query`: the ids' regions are not taken
+  when they hold imprinted segments and the text names a whole region (impeller back to 26/48). Your area check is
+  unchanged otherwise; rebase onto it and check your case still picks what you meant.
+
 ## State (2026-11-16 06:05 UTC)
 
 ### Landed today
