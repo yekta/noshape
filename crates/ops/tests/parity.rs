@@ -2840,7 +2840,7 @@ fn parity_assemblies() {
         let mut studios = Vec::new();
         for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().filter_map(|e| e.ok()) {
             let file = e.file_name().to_string_lossy().to_string();
-            let Some(element) = file.strip_suffix(".json").filter(|s| !s.ends_with(".parts") && !s.ends_with(".mass") && !s.ends_with(".sketches")) else { continue };
+            let Some(element) = file.strip_suffix(".json").filter(|s| !s.ends_with(".parts") && !s.ends_with(".mass") && !s.ends_with(".sketches") && !s.ends_with(".metadata")) else { continue };
             // Live's per-feature lines (<element>.live.jsonl, live's layout, 1842).
             let live: Vec<Value> = std::fs::read_to_string(dir.join("studios").join(format!("{element}.live.jsonl"))).map(|t| t.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some()).collect()).unwrap_or_default();
             // Its parts: <element>.parts.json, else the last state of live's lines (a suppressed feature's line lists
@@ -2887,6 +2887,11 @@ fn parity_assemblies() {
                 features["contextEntities"] = t.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).collect();
             }
             // Live's frames of its in-feature mate connectors (live 2632: `{ "connectors": { sub id: frame } }`).
+            // Its parts' properties as the user set them (live's GET /metadata per configuration: `{ "configurations":
+            // { <fullConfiguration>: { "items": [...] } } }`).
+            if let Some(m) = read(&dir.join("studios").join(format!("{element}.metadata.json"))) {
+                features["partMetadata"] = m;
+            }
             if let Some(c) = read(&dir.join("studios").join(format!("{element}.connectors.json"))) {
                 features["connectorFrames"] = c["connectors"].clone();
             }
@@ -3019,6 +3024,15 @@ fn an_assembly_is_rebuilt_as_lives() {
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-bom3.noshape"), &with_bom, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
     assert_eq!((r.bom_matching, r.bom_rows), (0, 1), "{r:?}");
     assert!(r.differences.iter().any(|d| d.starts_with("BOM row 1 ")), "{r:?}");
+    // The properties the user set on the part (live's metadata): its row's part number, description and material.
+    let prop = |name: &str, value: Value| json!({ "name": name, "value": value, "propertySource": 3 });
+    let mut with_meta = off_studio.clone();
+    with_meta["partMetadata"] = json!({ "configurations": { "default": { "items": [{ "partId": "JHD", "properties": [
+        prop("Part number", json!("PN-1")), prop("Description", json!("Turned")), prop("Material", json!({ "displayName": "Steel ", "libraryName": "Onshape Material Library" })),
+        { "name": "Vendor", "value": "Not the user's", "propertySource": 1 }] }] } } });
+    with_bom["liveBom"] = json!({ "root": { "bom": { "bomTable": { "items": [{ "itemSource": { "indentLevel": 0 }, "name": "Part 1", "quantity": 2, "partNumber": "PN-1", "description": "Turned", "material": { "displayName": "Steel " } }] } } } });
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-meta.noshape"), &with_bom, &[("E1".into(), with_meta, off_parts.clone())]);
+    assert_eq!((r.bom_matching, r.bom_rows), (1, 1), "{r:?}");
     // Live's Revolute in error with its connectors unresolved (red in its dialog, or its tooltip's message), ours
     // solving it: a live defect, counted as live (docs/DECISIONS.md 11-15); without either a difference.
     let mut defect = asm.clone();

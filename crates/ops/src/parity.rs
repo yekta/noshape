@@ -7657,6 +7657,63 @@ fn onshape_id_value(id: &str) -> u128 {
     id.chars().fold(0u128, |n, c| n.saturating_mul(64).saturating_add(B.find(c).unwrap_or(0) as u128))
 }
 
+/// Live's metadata of part `pid` (a studio's `partMetadata`) in `configuration` (an instance's fullConfiguration), else
+/// at the default.
+fn metadata_item<'v>(metadata: &'v Value, configuration: Option<&str>, pid: &str) -> Option<&'v Value> {
+    let configs = &metadata["configurations"];
+    let at = configuration.and_then(|c| configs.get(c)).or_else(|| configs.get("default")).or_else(|| metadata.get("defaultConfiguration"));
+    at?["items"].as_array()?.iter().find(|i| i["partId"] == pid)
+}
+
+/// The properties of live's metadata `item` the user set (`propertySource` 3; a feature's, as custDesc's, come from
+/// the feature) on our part `id`: part number, description, revision, vendor, project, product line, titles, Exclude
+/// from all BOMs and the material (a library's by name, else a custom one with live's density). The errors.
+fn set_metadata(t: &mut Translator, id: &str, item: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    let user: Vec<&Value> = item["properties"].as_array().into_iter().flatten().filter(|p| p["propertySource"] == 3 && !p["value"].is_null()).collect();
+    let mut args = json!({ "tab": t.tab, "part": id });
+    for p in &user {
+        let field = match p["name"].as_str().unwrap_or("") {
+            "Description" => "description",
+            "Part number" => "part_number",
+            "Revision" => "revision",
+            "Vendor" => "vendor",
+            "Project" => "project",
+            "Product line" => "product_line",
+            "Title 1" => "title1",
+            "Title 2" => "title2",
+            "Title 3" => "title3",
+            "Exclude from all BOMs" => "exclude_from_bom",
+            _ => continue,
+        };
+        args[field] = p["value"].clone();
+    }
+    if args.as_object().is_some_and(|a| a.len() > 2)
+        && let Err(e) = t.call("part_set_properties", args)
+    {
+        errors.push(format!("properties: {e}"));
+    }
+    if let Some(m) = user.iter().find(|p| p["name"] == "Material").map(|p| &p["value"])
+        && let Some(name) = m["displayName"].as_str()
+    {
+        let library = json!({ "tab": t.tab, "parts": [id], "material": name });
+        if t.call("part_set_material", library).is_err() {
+            // (Live's density property, kg/m³ or lb/in³.)
+            let dens = m["properties"].as_array().into_iter().flatten().find(|q| q["name"] == "DENS" || q["name"] == "DENSITY");
+            let value = dens.and_then(|q| q["value"].as_str()?.parse::<f64>().ok()).map(|v| if dens.is_some_and(|q| q["units"] == "lb/in^3") { v * 27_679.904_7 } else { v });
+            match value {
+                Some(density) => {
+                    if let Err(e) = t.call("part_set_material", json!({ "tab": t.tab, "parts": [id], "material": name, "density": density })) {
+                        errors.push(format!("material {name}: {e}"));
+                    }
+                }
+                None => errors.push(format!("material {name}: not in our library and no density")),
+            }
+        }
+    }
+    errors
+}
+
 pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(String, Value, Value)]) -> AssemblyResult {
     // NOSHAPE_PARITY_TRACE: each step on stderr with the seconds since the start (to find a hang).
     let started = std::time::Instant::now();
@@ -8005,6 +8062,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         // (Our part named as live's where ours still has its default name: a name is the part's, not a feature's; a
         // part a feature names, as the nut's custDesc per size, keeps it.)
         let default_name = |n: &str| n.strip_prefix("Part ").is_some_and(|k| k.parse::<u32>().is_ok());
+        // (Its metadata at the configuration its first instance has.)
+        let configuration = levels.iter().flat_map(|l| l.instances.iter()).find(|i| i["elementId"] == element.as_str()).and_then(|i| i["fullConfiguration"].as_str()).map(str::to_string);
         for (p, ours) in listed.iter().zip(chosen) {
             if let (Some(pid), Some(ours)) = (p["partId"].as_str(), ours) {
                 if let Some((.., id)) = solids.iter().find(|(n, _, id)| *n == ours || *id == ours) {
@@ -8013,6 +8072,13 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                         && let Err(e) = t.call("part_rename", json!({ "tab": t.tab, "part": id, "name": live }))
                     {
                         res.untranslated.push(format!("{element}: part {pid} not renamed \"{live}\": {e}"));
+                    }
+                    // The properties the user set on it (live's metadata), as the Properties dialog and the Material
+                    // panel set them: its BOM's part number, description, material.
+                    if let Some(item) = metadata_item(&studio["partMetadata"], configuration.as_deref(), pid) {
+                        for e in set_metadata(&mut t, id, item) {
+                            res.untranslated.push(format!("{element}: part {pid}'s {e}"));
+                        }
                     }
                     // A standard content part has its component's material (our catalogue's default, as live's BOM).
                     let standard = levels.iter().flat_map(|l| l.instances.iter()).any(|i| i["elementId"] == element.as_str() && i["partId"] == pid && i["isStandardContent"] == true);
@@ -8676,7 +8742,8 @@ fn compare_bom(placer: &mut Translator, asm: &Value, sub_names: &HashMap<String,
             return;
         }
     };
-    let text = |v: &Value| v.as_str().map(str::to_string).unwrap_or_else(|| if v.is_null() { String::new() } else { v.to_string() });
+    // (Trimmed: live keeps a library name's trailing space, "Nylon ", its panel doesn't show it.)
+    let text = |v: &Value| v.as_str().map(|s| s.trim().to_string()).unwrap_or_else(|| if v.is_null() { String::new() } else { v.to_string() });
     // (No material: live's API gives "", its BOM panel "- None -", as ours.)
     let material = |v: &Value| Some(text(v)).filter(|t| !t.is_empty()).unwrap_or_else(|| "- None -".into());
     // (A subassembly's row: no material in either; ours leaves the cell empty.)
