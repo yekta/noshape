@@ -31,6 +31,8 @@
 #include <Geom2dAPI_Interpolate.hxx>
 #include <Precision.hxx>
 #include <GeomAPI_ExtremaCurveCurve.hxx>
+#include <GeomAdaptor_Curve.hxx>
+#include <GCPnts_QuasiUniformDeflection.hxx>
 #include <BOPAlgo_BuilderFace.hxx>
 #include <BOPTools_AlgoTools2D.hxx>
 #include <ShapeAnalysis_Curve.hxx>
@@ -9696,6 +9698,68 @@ occ::handle<Geom2d_Curve> curve_on(const TopoDS_Edge& e, const TopoDS_Face& face
   return dev <= 10 * tol ? c2 : nullptr;
 }
 
+// A curve's points from f to l, its chords within about `defl` of it (GCPnts' quasi-uniform deflection; ends included).
+static std::vector<gp_Pnt> chord_points(const occ::handle<Geom_Curve>& c, double f, double l, double defl)
+{
+  std::vector<gp_Pnt>           out;
+  GeomAdaptor_Curve             ad(c, f, l);
+  GCPnts_QuasiUniformDeflection pts(ad, defl, f, l);
+  if (pts.IsDone() && pts.NbPoints() >= 2)
+    for (int k = 1; k <= pts.NbPoints(); ++k)
+      out.push_back(pts.Value(k));
+  else
+    for (int k = 0; k <= 64; ++k)
+      out.push_back(c->Value(f + (l - f) * k / 64));
+  return out;
+}
+
+// A line or circle (under any trims): OCCT's extremum between two of them is analytic (Extrema_ExtElC).
+static bool elementary(occ::handle<Geom_Curve> c)
+{
+  while (const auto t = occ::down_cast<Geom_TrimmedCurve>(c))
+    c = t->BasisCurve();
+  return !occ::down_cast<Geom_Line>(c).IsNull() || !occ::down_cast<Geom_Circle>(c).IsNull();
+}
+
+// The least distance between segments p0p1 and q0q1 (Ericson, Real-Time Collision Detection 5.1.9).
+static double segment_distance(const gp_Pnt& p0, const gp_Pnt& p1, const gp_Pnt& q0, const gp_Pnt& q1)
+{
+  const gp_Vec d1(p0, p1), d2(q0, q1), r(q0, p0);
+  const double a = d1.SquareMagnitude(), e = d2.SquareMagnitude(), f = d2.Dot(r);
+  double       s = 0, t = 0;
+  if (a <= 1e-300 && e <= 1e-300)
+    return p0.Distance(q0);
+  if (a <= 1e-300)
+    t = std::clamp(f / e, 0.0, 1.0);
+  else
+  {
+    const double c = d1.Dot(r);
+    if (e <= 1e-300)
+      s = std::clamp(-c / a, 0.0, 1.0);
+    else
+    {
+      const double b = d1.Dot(d2), den = a * e - b * b;
+      s = den > 1e-300 ? std::clamp((b * f - c * e) / den, 0.0, 1.0) : 0.0;
+      t = (b * s + f) / e;
+      if (t < 0)
+        t = 0, s = std::clamp(-c / a, 0.0, 1.0);
+      else if (t > 1)
+        t = 1, s = std::clamp((b - c) / a, 0.0, 1.0);
+    }
+  }
+  return gp_Pnt(p0.XYZ() + s * d1.XYZ()).Distance(gp_Pnt(q0.XYZ() + t * d2.XYZ()));
+}
+
+// The least distance between two polylines.
+static double polyline_distance(const std::vector<gp_Pnt>& p, const std::vector<gp_Pnt>& q)
+{
+  double best = RealLast();
+  for (size_t i = 0; i + 1 < p.size(); ++i)
+    for (size_t k = 0; k + 1 < q.size(); ++k)
+      best = std::min(best, segment_distance(p[i], p[i + 1], q[k], q[k + 1]));
+  return best;
+}
+
 // One shape's faces split by edges lying on them (each on one face; c2-hunting-knife's Split 4: four rings round its
 // handle, each closed on its face's seam): each edge cut where it meets its face's boundary, the boundary edges cut
 // there, and each face touched made again from its edges by OCCT's BuilderFace, as OCCT's splitter does after finding
@@ -9808,7 +9872,7 @@ bool split_by_edges_on_faces(const TopoDS_Shape& shape, const std::vector<TopoDS
     }
   if (on.empty())
     return no(__LINE__);
-  // (No two cross or touch but at a vertex they share.)
+  // (No two cross or touch, at a vertex they share too: OCCT's splitter there.)
   for (size_t i = 0; i < on.size(); ++i)
     for (size_t k = i + 1; k < on.size(); ++k)
     {
@@ -9816,7 +9880,18 @@ bool split_by_edges_on_faces(const TopoDS_Shape& shape, const std::vector<TopoDS
         continue;
       double                        f1, l1, f2, l2;
       const occ::handle<Geom_Curve> a = BRep_Tool::Curve(on[i].edge, f1, l1), c = BRep_Tool::Curve(on[k].edge, f2, l2);
-      GeomAPI_ExtremaCurveCurve     ex(a, c, f1, l1, f2, l2);
+      // Other than lines and circles: ends within tol, or polylines farther apart than tol and their chords' sag,
+      // decide before OCCT's global extremum, which never ends on some pairs (c2-config-parts-screws' Split 3).
+      if (!elementary(a) || !elementary(c))
+      {
+        const gp_Pnt a0 = a->Value(f1), a1 = a->Value(l1), c0 = c->Value(f2), c1 = c->Value(l2);
+        if (std::min({a0.Distance(c0), a0.Distance(c1), a1.Distance(c0), a1.Distance(c1)}) <= tol)
+          return no(__LINE__);
+        const double defl = std::max(tol, 1e-3 * std::sqrt(std::max(tool_boxes[i].SquareExtent(), tool_boxes[k].SquareExtent())));
+        if (polyline_distance(chord_points(a, f1, l1, defl), chord_points(c, f2, l2, defl)) > tol + 4 * defl)
+          continue;
+      }
+      GeomAPI_ExtremaCurveCurve ex(a, c, f1, l1, f2, l2);
       if (ex.Extrema().IsParallel())
         return no(__LINE__);
       for (int n = 1; n <= ex.NbExtrema(); ++n)
