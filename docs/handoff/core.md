@@ -79,7 +79,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   c2-hunting-knife's Fillet 5 a face more, 46 -> 32/52; face_contains_point keeps the shift, tablet-stand 16/16;
   verified by debug runs). Both pairs carry the old change: vibe7's branch will show hunting-knife worse (and any other
   doc the projection touched): recheck each doc vibe7 marks worse with HEAD (.ts3.sh <doc>) before landing.
-- **vibe5 pair (97b778e7d, b173dc5bb, d2605e45d) CLEAN 23:2x: 1247 -> 1250 (singularities 2 -> 5, cpcurves
+- **vibe5 pair (97b778e7d, b173dc5bb, d2605e45d) CLEAN 22:45: 1247 -> 1250 (singularities 2 -> 5, cpcurves
   Main pipe topology = live's), nothing worse. vibe7 pair (six) still running.**
 - **Landing plan:** both pairs' binaries are built; the suites run as suites-only scripts with `~/bin/slot timeout 7000`
   (the timeout no longer counts the slot wait, which killed nothing yet but would have): vibe7
