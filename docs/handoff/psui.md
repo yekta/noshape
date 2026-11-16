@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-15 23:48 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-16 01:40 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -38,29 +38,29 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
 
-- qa P0 (dock tab B first open 7-10 s): cause found and fixed (f8e38653, queued with this handoff): the tab's hover
-  card (app tab_thumbs.rs) regenerated B in full with fine meshes beside the view's own opening (the pointer rests on
-  the tab before the click). Now it takes the open view's display, else regenerates with coarse meshes, stopped by any
-  view regeneration of the document (`start_thumbnail::picture_job_started`). A/B on vibe6, 3 alternating pairs, load
-  3-9 (candidates): tabToB settle base 6240 / 5568 / 6486 ms, fix 3535 / 5777 / 3650. Left: B's preview regeneration
-  (2.2-2.6 s, 75 features) and the refine (Part 1's 285k-triangle fine mesh, 0.3 s idle, up to 2 s under load) before
-  "settled"; the coarse model shows at the preview. Repro: tabab.sh / tabab-ab.sh (scratch) via rb.sh on vibe6 with a
-  mode-700 dock copy (scp -3 from vibe5 ~/lead-private/dock.noshape to /home/ngyekta/tmp/psui/priv; the scripts' EXIT
-  trap deletes it). Gotchas: start Xvfb by PID (a pgrep -f pattern matches the script's own command line); a file put
-  back by rb.sh's rsync keeps its older mtime, so touch it or cargo keeps the stale build.
-- end-cap-profile-circle step 3: ours keeps the Faces field focused after the face click until the regeneration;
-  live drops focus at the click (Mirror's Faces drops it at the click in both). Not found yet: next, a logged run.
-- tab-new-edit-reedit: live's click at (30, 35, 2) lands ~1.1 px (0.3 mm at 0.275 mm/px) on Flange 1's wall; ours on
-  the plate's top. Decision asked of the lead: known (sub-pixel camera) or retarget the click onto the wall live hit.
-- live (b89af730) asked 11-15 23:10 for the feel rows without live numbers (snaps, Measure midpoint window, Fields
-  wheel / Tab / New variable, list insertion line, Feedback, tooltip fade, view cube reach): fold its
-  live/feel/<area>-gaps.json into the matrices when it answers.
+- Landing (01:40): fields-gaps (bare "#" highlights nothing, Tab moves on; Create variable 4 px right of the field,
+  top-aligned; wheel row), midpoint dwell 60 ms (was 250), Thickness panel state, Routing curve point-on-vertex state,
+  late Undo rule (runner + README), "Edit thickness analysis…", the version-update toast, the drag ring's fill. Checked:
+  fields matrix 14 / 14, coverage, clippy (Mac); 8 / 8 affected scenarios on vibe6 (thickness ×3,
+  context-create-version-update, the "#" variable takes). boundary-surface-new-edit-reedit matches on main (18 / 18).
+- routing-curve-new-edit-reedit: core's 85db0f89 (centripetal spline: 91.693 / 134.227 mm) + my Points reading
+  (57ea09fd): rerun once both are on main.
+- live's feel gaps (live/feel/*-gaps.json, 11-16): folded into interaction-feel.md (fields rows in the matrix; measure,
+  list, chrome, feedback in the "not yet" rows). Open: the tooltip fade-out (ours vanishes at once: vendored gpui drops
+  it on leave), the failed preview's edge width (ours 3.5 px, live ~5: side by side first), the view cube knob size
+  vs live's 3 px hover map, sketch snap rows (sketch-gaps: no intersection snap on crossing lines, midpoint 6-9 px,
+  spline through-points 7-9 px, a model edge wakes after 60 ms then perpendicular 7-9 px) into the snaps matrix.
+- end-cap-profile-circle step 3: matches on a quiet host; under load our Faces field keeps focus a moment after the
+  click (live drops it at once). Load-sensitive, low priority.
+- tab-new-edit-reedit: decision asked of the lead (11-15 23:50): the click lands ~1.1 px from Flange 1's wall
+  (0.3 mm at 0.275 mm/px); known (sub-pixel camera) or retarget onto the wall live hit.
+- Mac: prune-target.py runs on macOS; a stale incremental build once broke app-core's link (undefined `.llvm.*`
+  symbol): `cargo clean -p noshape-app-core -p noshape-part-studio-ui` fixed it.
 
 ## Queued to land
 
-- f8e38653 hover card fix, 4195ec4d prune-target objects, this handoff (23:48).
-- Landed 11-15: c5b7e380 (dropdown P1: lists out of the flow, live's corners; fields matrix 11 / 11), acdf09d2.
-- Mac target 42 -> 14 GB (lead 11-15): prune-target.py now runs on macOS and removes stale codegen-unit objects.
+- The 6 commits above (01:40).
+- Landed 11-16: f14f85a8 (dock hover-card fix 74bcd957, prune objects, handoff).
 
 ## Waiting on others
 
@@ -82,7 +82,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Next, in order
 
-1. end-cap-profile-circle focus (logged run); the tab pick per the lead's answer; fold live's feel numbers in.
+1. Rerun routing-curve when core's 85db0f89 lands; sketch-gaps rows into the snaps matrix; the failed preview side
+   by side; the tab pick per the lead's answer.
 2. Rerun after the others' fixes land: boundary-surface-new-edit-reedit (core 658bef9d), the gussets and end-caps
    (skasm), sketch pattern takes (skasm 58a0bd16 + linear), context-create-version-update (live2's retake).
 3. Older open items (11-06 to 11-08 "Next, in order" in the archive) were not re-verified this session; check them
