@@ -231,13 +231,40 @@ pub fn variable(ev: &mut EvalCtx) -> FResult<()> {
         "NUMBER" => noshape_units::Quantity::new(ev.real("numberValue")?, Dim::UNITLESS),
         _ => {
             let text = ev.params.text("anyValue").to_string();
+            // A string (c2-config-parts' configured part names, `"mm MGN9 Linear Rail"`) is a FeatureScript value, not
+            // a quantity: what a custom feature's getVariable reads.
+            if let Some(s) = string_literal(&text) {
+                ev.ctx.variables.remove(&name);
+                ev.ctx.fs_variables.insert(name, noshape_featurescript::Value::str(s));
+                return Ok(());
+            }
             let scope_vars = ev.ctx.variables.clone();
             let scope = noshape_units::LayeredScope { inner: &scope_vars, outer: ev.outer_vars };
             noshape_units::evaluate(&text, &scope).map_err(|e| crate::regen::eval::FeatureError::new(format!("{text}: {e}")))?
         }
     };
+    ev.ctx.fs_variables.remove(&name);
     ev.ctx.variables.insert(name, q);
     Ok(())
+}
+
+/// A FeatureScript string literal's text (`"a \"b\""` is `a "b"`), else None.
+fn string_literal(text: &str) -> Option<String> {
+    let inner = text.trim().strip_prefix('"')?.strip_suffix('"')?;
+    let mut out = String::new();
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => out.push(match chars.next()? {
+                'n' => '\n',
+                't' => '\t',
+                e => e,
+            }),
+            '"' => return None,
+            c => out.push(c),
+        }
+    }
+    Some(out)
 }
 
 pub fn delete_bodies(ev: &mut EvalCtx) -> FResult<()> {

@@ -3652,6 +3652,39 @@ export const cubeOfT = defineFeature(function(context is Context, id is Id, defi
     assert!((total_volume(&r) - 0.007f64.powi(3)).abs() < 1e-12, "{}", total_volume(&r));
 }
 
+/// A Variable of type Any set to a string (c2-config-parts' configured part names, `"mm MGN9 Linear Rail"`) is that
+/// string to a later custom feature's getVariable (live: Part Number reads it), not an expression error.
+#[test]
+fn a_string_variable_is_a_string_to_get_variable() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Cube of name" }
+export const cubeOfName = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        const v = getVariable(context, "pn");
+        if (!(v is string))
+            throw regenError("pn is " ~ toString(v));
+        const d = length(v) * millimeter;
+        fCuboid(context, id + "box", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(d, d, d) });
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let mut v = ps.new_feature("assignVariable", &fx.units).unwrap();
+    v.params.set("name", ParamValue::Text("pn".into()));
+    v.params.set("variableType", ParamValue::Enum("ANY".into()));
+    v.params.set("anyValue", ParamValue::Text(r#""M4 \"x\"""#.into()));
+    ps.features.push(v);
+    let f = ps.new_feature(&fx.ty("cubeOfName"), &fx.units).unwrap();
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    // `M4 "x"`: 6 characters.
+    assert!((total_volume(&r) - 0.006f64.powi(3)).abs() < 1e-12, "{}", total_volume(&r));
+}
+
 /// FS-FEATURE-LIST-RERUN (dx's FeatureScript corpus, cf-parameter-pattern): a FeatureList parameter's functions re-run
 /// the picked features under std applyPattern, with the variables set at the time and each instance's transform;
 /// the picked sketch is solved again for each instance. FS-FEATURE-LIST-NONDETERMINISTIC: in the feature list's order
