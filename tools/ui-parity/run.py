@@ -590,14 +590,47 @@ def placed_alike(a, b):
                 y["transform"] = ta
 
 
-def click_placed_readouts(a, b, mm_per_px):
-    """A measure readout (mm) of sketch points placed by free clicks: live's camera after Sketch on a plane sits at a
-    sub-pixel offset of its own, so the same pixel lands up to a pixel away in the model. Within one pixel (live's
-    mmPerPixel at that step) ours reads as live's; a whole-mm value on either side (snapped or typed) stays exact
-    (README "Comparison", lead 11-15)."""
+PLANE_NORMALS = {"Top": (0.0, 0.0, 1.0), "Front": (0.0, 1.0, 0.0), "Right": (1.0, 0.0, 0.0)}
+
+
+def sketch_plane_normal(steps):
+    """The normal of the default plane the scenario sketches on (`{"plane": "Top"}`), or None (a face, none)."""
+    for st in steps:
+        on = (st.get("do") or {}).get("on")
+        if isinstance(on, dict) and on.get("plane") in PLANE_NORMALS:
+            return PLANE_NORMALS[on["plane"]]
+    return None
+
+
+def pixel_on_plane(camera, normal):
+    """How far one screen pixel moves a click on the sketch plane, in mm: the larger of the screen's two axes projected
+    along the view onto the plane (an orthographic camera; a plane seen at a slant stretches one axis). Without a
+    plane or a usable camera, the camera's mmPerPixel."""
+    mm = (camera or {}).get("mmPerPixel")
+    d, u = (camera or {}).get("direction"), (camera or {}).get("up")
+    if not mm or not normal or not (isinstance(d, list) and isinstance(u, list) and len(d) == len(u) == 3):
+        return mm
+    dot = lambda p, q: sum(x * y for x, y in zip(p, q))
+    r = (d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0])
+    dn = dot(d, normal)
+    if abs(dn) < 0.05:
+        return mm
+    def onto(s):
+        k = dot(s, normal) / dn
+        return mm * sum((x - k * y) ** 2 for x, y in zip(s, d)) ** 0.5
+    return max(onto(r), onto(u))
+
+
+def click_placed_readouts(a, b, pixel):
+    """A measure readout (mm) of sketch points placed by free clicks (`pixel`: one screen pixel on the sketch plane in
+    mm, [`pixel_on_plane`]): live's camera after Sketch on a plane sits at a
+    sub-pixel offset of its own, so the same pixel lands up to a pixel away in the model. Within one screen pixel on
+    the sketch plane per click (live's camera at that step; the larger axis where the plane is seen at a slant),
+    doubled for a measure between two clicks (all of these: lengths, distances, a diameter), ours reads as live's; a
+    whole-mm value on either side (snapped or typed) stays exact (README "Comparison", lead 11-15, 11-16)."""
     ra = ((a or {}).get("measure") or {}).get("readout")
     rb = ((b or {}).get("measure") or {}).get("readout")
-    if not (mm_per_px and isinstance(ra, list) and isinstance(rb, list)):
+    if not (pixel and isinstance(ra, list) and isinstance(rb, list)):
         return
     for x, y in zip(ra, rb):
         if not (isinstance(x, dict) and isinstance(y, dict) and x.get("units") == "mm" == y.get("units")):
@@ -607,7 +640,7 @@ def click_placed_readouts(a, b, mm_per_px):
         except (TypeError, ValueError):
             continue
         free = all(abs(v - round(v)) > 0.0005 for v in (u, w))
-        if free and abs(u - w) <= mm_per_px:
+        if free and abs(u - w) <= 2 * pixel:
             y["value"] = x.get("value")
 
 
@@ -1132,9 +1165,10 @@ def compare(live, ours, whole_document=True):
         if rest:
             resting.add(f"step {s.get('step')}")
     free_clicks = any(isinstance((st.get("do") or {}).get("on"), dict) and "sketch_point" in st["do"]["on"] for st in steps)
+    plane_normal = sketch_plane_normal(steps)
     native_open = False
     for name, a, b, failed, t, step in pairs:
-        mm_per_px = (((a or {}).get("camera") or {}).get("mmPerPixel") if free_clicks else None)
+        pixel = pixel_on_plane((a or {}).get("camera"), plane_normal) if free_clicks else None
         if failed:
             if first is None:
                 first = (name, ".step", "ok", f"failed: {failed}")
@@ -1443,7 +1477,7 @@ def compare(live, ours, whole_document=True):
         hole_callout_export_text(a, b)
         view_frame_late(a, b, step)
         placed_alike(a, b)
-        click_placed_readouts(a, b, mm_per_px)
+        click_placed_readouts(a, b, pixel)
         cloud_menu(a, b)
         menu_badges(a, b)
         d = first_difference(a, b)
