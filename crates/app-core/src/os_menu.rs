@@ -397,6 +397,12 @@ impl OsMenu {
         }
     }
 
+    /// Its rows' and separators' height inside the 1 px border (as [`OsMenu::hover_at`] lays them out).
+    pub fn content_height(&self) -> f32 {
+        let (row, sep) = (self.row_height.unwrap_or(ROW_H), 1. + 2. * self.sep_margin);
+        2. + self.items.iter().map(|i| if matches!(i, OsMenuItem::Separator) { sep } else { row }).sum::<f32>()
+    }
+
     pub fn list_no_icons(mut self) -> Self {
         self.plain = true;
         self

@@ -178,8 +178,15 @@ pub fn open_drawing_menu(position: Point<Pixels>, menu: Entity<crate::os_menu::O
 
 /// The sheet's right-click menu: its top 35 px above the pointer and its left edge 1 px right of it, so the pointer is
 /// on its second row, at any height (live2 feel/rmb-probe: five pointer heights, s7 of drw-datum-copy-paste).
+/// Where it fits there, its second row shows hovered, the pointer resting on it; a menu moved up to fit the window
+/// has none (live2 11-15 takes: eight menus at the pointer with row 2 lit, three moved with none).
 pub fn open_canvas_menu(position: Point<Pixels>, menu: Entity<crate::os_menu::OsMenu>, window: &mut Window, cx: &mut App) {
-    crate::os_menu::open(position + point(px(1.), px(-35.)), menu, window, cx);
+    let at = position + point(px(1.), px(-35.));
+    let fits = f32::from(at.y) + menu.read(cx).content_height() <= f32::from(window.viewport_size().height);
+    if fits {
+        menu.update(cx, |m, _| m.hover_at(px(35.)));
+    }
+    crate::os_menu::open(at, menu, window, cx);
 }
 
 /// [`fill_menu`] for Onshape's right-click menus ([`crate::os_menu`]).
