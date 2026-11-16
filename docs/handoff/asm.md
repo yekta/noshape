@@ -127,3 +127,6 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
 - Connectors: implicit (MID_POINT / CENTER / POINT on a face with a second id = the edge / vertex), explicit Mate
   connector features (flipPrimary, secondaryAxisType, transform -> the mate end's flip / reorient / move; not when
   realigned to other entities), live's matedEntities CS paired with picks by occurrence path.
+
+## Lead 11-16 14:23 UTC
+The lead stopped your q91 (b84 vs s89, full-0910) and the queued hd-oldrefs trace on vibe6 to free the slot for blend while you are paused. Rerun the suites you need after rebasing onto main (core landed 55552e704 in your translator area, see "From core 11-16").
