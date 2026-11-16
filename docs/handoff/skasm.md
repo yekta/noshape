@@ -24,6 +24,13 @@ only when a line here points there).
   VERTEX resolution then falls back to the nearest vertex anywhere (`pick(&r, "vertices")`). The constraint seems to
   have no effect (the rectangles stay as stored). Live's point probably wants a fixed point at live's position when
   nothing of ours is there. Loft 1 itself (four profiles round a closed path) is core's once the profiles are right.
+- c2-config-parts-links Extrude 1 (10/35; parts 3.2 mm across, live 5): Sketch 1 is stored at Pitch 03B (p 5 mm)
+  and live solves it at 05B (p 8 mm, sketches.json). Our dimensions do reach live's points except the two waist arcs
+  (h5M8JHVkSHwo, U0aWy9P0xf2C: tangent to both circles, through the waist point at (4, ±2.6625) mm). Live keeps the
+  large concave arcs (centre (4, ∓8.57), r 5.91, as stored); our solve jumps to the small convex ones (centre
+  (4, ∓1.82), r 0.84). Off live by 6.75 mm instead of 3.35 before, so the translator takes the edits back and the
+  stored 5 mm sketch stays. A solve that keeps the branch (step large dimension changes, or keep each arc's side of
+  its chord as stored) would fix it. Seen with a temporary eprintln in off_live_points (per-point live vs ours).
 
 ## In flight
 - Landing 2026-11-16 01:57: a sheet metal entity is labelled after the feature that made its definition entity as

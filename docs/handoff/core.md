@@ -72,6 +72,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   places sections by the spine's parameter instead. Next item there.
   Mirror 1 times swing 0.3-1.7 s on loaded vibe5 runs; check on the Mac / in the pair before calling it.
   T1 features_a::a_path_loft_of_two_slots_has_one_side_face.
+- c2-config-parts-links (10/35, largest gap after paths-guides): Sketch 1's solve flips its waist arcs to the other
+  tangent branch when p goes 5 -> 8 mm, so the translator keeps the stored 5 mm sketch. Solver: in skasm's handoff
+  11-16. Not core's.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
