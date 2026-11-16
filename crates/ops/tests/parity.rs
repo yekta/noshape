@@ -739,8 +739,14 @@ fn exchange_round_trip() {
         let volume = |v: &[PartState]| v.iter().filter_map(|p| p.volume).sum::<f64>();
         let xt = (!selfs["PARASOLID"].is_null()).then(|| parts_from_live_import(&selfs["PARASOLID"], false));
         // `ours`: what live's import of our file is held to (an STL of live's off its model by over 1 %: the model's).
+        // (No own import of ACIS, OBJ or 3MF: its Parasolid's or its STL's, the same model and mesher.)
         let expected = |format: &str, ours: bool| -> Option<Vec<PartState>> {
-            let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], mesh(format)))?;
+            let key = match format {
+                "ACIS" if selfs[format].is_null() => "PARASOLID",
+                "OBJ" | "3MF" if selfs[format].is_null() => "STL",
+                f => f,
+            };
+            let own = (!selfs[key].is_null()).then(|| parts_from_live_import(&selfs[key], mesh(format)))?;
             match &xt {
                 // (Live's import of ours: held to the model; where live's own import is off it, as close as that, a
                 // quarter more (live reads its own 32-tooth gear's STEP 9.7 mm³ over its model, ours 10.7; its IGES of
@@ -759,10 +765,8 @@ fn exchange_round_trip() {
         };
         // Live's files in ours.
         for (format, ext) in FORMATS {
-            let file = dir.join(format!("live.{ext}"));
-            if !file.is_file() {
-                continue;
-            }
+            // (Live's OBJ is a zip of its .obj and .mtl.)
+            let Some(file) = [format!("live.{ext}"), format!("live.{ext}.zip")].into_iter().map(|f| dir.join(f)).find(|f| f.is_file()) else { continue };
             imports += 1;
             let started = std::time::Instant::now();
             let ours = import(&scratch(&format!("{name}-import-{ext}.noshape")), &file);
