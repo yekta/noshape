@@ -1068,6 +1068,13 @@ def compare(live, ours, whole_document=True):
             if isinstance(anns, list):
                 later.append([x["text"].replace("%%c", "⌀") if isinstance(x.get("text"), str) else x.get("text") for x in anns if isinstance(x, dict)])
         late_texts[f"step {st.get('step')}"] = later
+    # Each step's next live Undo / Redo when that next step only waits: live's history answers after its server's round
+    # trip (Create version and update in assembly: Undo on only once the wait is over, context-create-version-update).
+    late_undo = {}
+    for i, st in enumerate(steps[:-1]):
+        nx = steps[i + 1]
+        if (nx.get("do") or {}).get("do") == "wait" and isinstance((nx.get("state") or {}).get("undo"), dict):
+            late_undo[f"step {st.get('step')}"] = nx["state"]["undo"]
     for i, st in enumerate(steps[:-1]):
         m = (steps[i + 1].get("state") or {}).get("message")
         if isinstance(m, str):
@@ -1366,6 +1373,8 @@ def compare(live, ours, whole_document=True):
         if isinstance(a, dict) and isinstance(b, dict) and a.get("message") is None and b.get("message") and late_message.get(name) == b.get("message"):
             a["message"] = b["message"]
         texts_late(a, b, late_texts.get(name))
+        if isinstance(a, dict) and isinstance(b, dict) and a.get("undo") != b.get("undo") and late_undo.get(name) == b.get("undo"):
+            a["undo"] = b["undo"]
         old_dimension_pick(a, b, str(live.get("recorded") or ""))
         recorder_form(b, live)
         panel_fields_unread(a, b, str(live.get("recorded") or ""))

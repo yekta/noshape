@@ -635,7 +635,7 @@ line's or circle's length in the sketch value box, or its dimension before a val
 isn't the list's). A measure readout in mm of sketch points placed by free `sketch_point` clicks is equal within one
 pixel (live's `camera.mmPerPixel` at that step; lead 11-15): live's camera after Sketch on a plane sits at a sub-pixel
 offset of its own, so the same pixel lands up to a pixel away in its model. A whole-mm value on either side (a snapped
-or typed one) stays exact (`click_placed_readouts`). Live's root row reading "<name> Copy 1" (its runner opens a copy) is read as "<name>". Live's
+or typed one) stays exact (`click_placed_readouts`). Undo / Redo before a step that only waits is compared with live's at that wait: live's history answers after its server's round trip (context-create-version-update), ours at once. Live's root row reading "<name> Copy 1" (its runner opens a copy) is read as "<name>". Live's
 menus lose the rows of cloud features noshape leaves out ("Add comment", "Create task…"); a menu that lost one is a row shorter, so it
 may fit where live's had to move under the still pointer: its highlighted row isn't compared (face-rclick-menu).
 
