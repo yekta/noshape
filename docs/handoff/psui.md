@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-16 08:59 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-16 12:27 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -46,11 +46,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
   `SEE_THROUGH` allowlist of 18 where live is see-through too). Buttons as live2's toolbar-states + live's addendum:
   pressed #EAEAEA + inset, active hovered flat #DFDFDF (sketch group #CECECE), ⌄ hover tool #EAEAEA / arrow #D7D7D7,
   ⌄ open #D7D7D7 + inset, search highlight border 2 px. Vendored gpui-component Button: `pressed_inset`, `flat_hover`.
-- Queued 08:58: 85cb3816, the inset blur as gpui sigma 0.5 (CSS 1 px; measured rows 185 / 226, sides 225 vs live
-  182 / 228 / 228) and five more icons filled. Crops /root/psui-scratch/toolbar-states (ours-*-4x beside live-strip).
-- All our other BoxShadows pass CSS blur as gpui's sigma (twice as soft as live): asked the lead (08:59).
-- Icons left apart from live: import-foreign (thin gaps by the arrow, as live's near enough); configuration,
-  parallel, tangent, hole-table are different art from live's. Scripts: /root/psui-scratch/iconfill.
+- Landed 09:23: 85cb3816 (inset blur, five more icons).
+- Queued 12:25: 6b16ed19 (lead 09:00 decision). Vendored gpui takes `blur_radius` as CSS's (`BoxShadow::blur_sigma`
+  = half, window.rs both shadow paths; vendor/gpui-pre/NOSHAPE.md; test `ui::tests::box_shadow_blur_is_css`). Halved
+  call sites back to CSS values (eight 0 5px 5px → 10px, toolbar_customize, gpui-component styled.rs Tailwind
+  shadows, the pressed inset). Toolbar lists (PopupMenu `tool_list`): 1 px #ccc, radius 3, 0 5px 10px .2. Tooltips
+  (`ui::tooltip_shadow`, all three paths): 0 1px 2px .2. Measured against live feel/shadows within 1 grey level:
+  /root/psui-scratch/shadows (sxs-*.png, README). Icons: new hole-table (Part Studio panel) after live's, the old art
+  as drawing-hole-table (drawing toolbar, faces filled); configuration and import-foreign faces as live.
+- Our Fillet list is ~189 px wide, live's 180: not yet looked at.
+- parallel / tangent already match live's sketch-parallel / sketch-tangent buttons (the check compared mate icons).
 - skasm's sheet metal colour fix (`Context::reuse_colours_from`) lands after their suite: then recheck our flat view
   colours with fb5 sm-click.json.
 - tab-new-edit-reedit: decision asked of the lead (11-15 23:50; click ~1.1 px from Flange 1's wall).
@@ -63,7 +68,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Queued to land
 
-- 85cb3816 (inset blur, five icons); this handoff.
+- 6b16ed19 (shadows, icons); this handoff.
 
 ## Waiting on others
 
@@ -86,11 +91,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
 ## Next, in order
 
 1. Recheck the flat view's colours after skasm's colour fix; the tab pick per the lead's answer.
-2. sketch-linear-pattern-click-commit readout (9.618 vs 10.110): check it is the ±1 px free-click case before
-   leaving it.
+2. The Fillet list's width (ours 189, live 180).
 3. Older open items (11-06 to 11-08 "Next, in order" in the archive): check against a rerun before picking any up.
 
 ## Open decisions
 
-- Asked 08:59: halve every BoxShadow's blur app-wide (gpui reads it as sigma; CSS blur = 2 sigma)?
-- Older: none pending. (11-15: ±1 px on free-click readouts, granted; Mirror lost click as live defect, granted.)
+- Asked 12:27: sketch-linear-pattern-click-commit's Diameter (live 9.618 / ours 10.110) is a free click. Live's
+  whole-pixel second click (Δ 15, 5 px from its first, snapped to the origin) lands up to half a pixel off, and in the
+  take's iso view one px is 0.275 mm across but 0.55 mm deep on Top; a diameter doubles the radius' error. Count
+  ±1 px as the pixel's footprint on the sketch plane (mmPerPixel / |view · normal|) and twice for a Diameter?
