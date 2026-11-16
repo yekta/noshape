@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-16 03:25 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-16 03:56 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -38,33 +38,32 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
 
-- Queued 11-16 03:25 (this handoff): flat view bend centre lines dashed 10 / 10 / 5 / 10 px (`LineSegment::CENTER_LINE`
-  = 512, shaders.wgsl; checked in a vibe6 shot: 5 on / 10 off / 10 on / 10 off, 35 px); a hovered flat bend zone
-  lights its bend in both views, not its table row (`FlatViewEvent::BendHover`, `ui.sm_flat_hover`; sheet metal matrix
-  12 / 12); sketch pattern labels as live sketch-gaps2 / 3 (black on opaque canvas-colour boxes, ~100 px off at the
-  zoom the tool started at then model-fixed, circular 3x at 1.4 × the seed radius).
-- Sketch 2D manipulator (Transform tool and a paste's triad): live editing-gaps3 (live/feel/editing-gaps3.json) is in:
-  anchor = the selection's lowest key point (endpoints and centres; min Y then min X), same for paste and Transform;
-  handles screen-constant (arrows gap 8 + shaft 60 px; square 20–45 px; rotation ring 108 px along +X with an angle
-  box; scale triangle on the diagonal from (60, 60) px, head 30, factor box; the origin ring moves the triad only).
-  Ours: bbox centre, no X / Y arrows, move square at (14, 14) px, rotate 70 px, scale 45 px at 45°. Next: redraw it.
-- Failed preview (live feedback-gaps 5): core queued "a failed Shell puts its whole input part on ev.error_shapes"
-  (T1 features_a::a_failed_shell_shows_its_part_as_the_error). Once on main: edge widths side by side (ours 3.5 px,
-  live ~5) with /root/psui-scratch/fb5/run.sh (one-off scenario via --scenarios, shots per step; swap sm-flat for
-  shell-fail).
-- routing-curve-new-edit-reedit: core's 41c146a8 (centripetal) and my Points reading are on main: rerun.
-- Open feel gaps: the tooltip fade-out (vendored gpui drops it on leave), the view cube knob size vs live's 3 px hover
-  map, sketch-gaps snap rows into the snaps matrix (spline through-points 7-9 px; a model edge wakes after 60 ms then
-  perpendicular 7-9 px), the flat bend click colours (zone fill rgb(214,151,30), outline rgb(255,169,10): ours the
-  selection colour), an open circular pattern's angle label (live has none).
+- Landed 11-16 03:41 (c525abd8): flat view bend centre lines dashed 10 / 10 / 5 / 10 px (`LineSegment::CENTER_LINE`
+  = 512), the flat bend hover (`FlatViewEvent::BendHover`, `ui.sm_flat_hover`; sheet metal matrix 12 / 12), sketch
+  pattern labels as live sketch-gaps2 / 3 (`pattern_label_wpp`: px at the tool's start zoom, then model-fixed).
+- Queued 03:55 (03b36ca6): the sketch 2D manipulator as live editing-gaps3 (`transform_anchor`: the lowest end or
+  centre; `PatternHandle::MoveX` / `MoveY`; `XF_*` px constants; checked in a vibe6 shot); `sketch_transform`'s pivot
+  defaults to the same point (AGENT_API.md regenerated); snaps matrix 60 / 62 (spline rows: across the through-point
+  and the curve live reaches 8–12 px, its spline's shape unrecorded: gaps, not chased).
+- Failed preview (live feedback-gaps 5): with core's ce0e6ae8 ours is the whole part red, in the ghost style
+  (`scene_builder::error_geometry`: flat rgb(123,30,36) at 60 %, edges 3.5 px). Live (fb5-failed3.png vs our
+  /root/psui-scratch/fb5/sf/08.png): the part's own shading + rgb(189,48,57) at α 0.25 (solved per channel from the
+  top and front faces), edges 5 px. Asked core 04:10 for FeatureState to list which error shapes are result
+  bodies (error_parts beside error_mesh); then: those parts tinted 25 % + 5 px red edges, the rest stay ghosts.
+- routing-curve-new-edit-reedit: 19 / 19 (11-16 03:30). doc-tab-rename-escape, sketch-constraint-refusals match.
+- Open feel gaps: the tooltip fade-out (needs vendored gpui's tooltip lifecycle: a timed WaitingForHide with an
+  opacity the tooltip view reads; gpui's tooltip tests expect an instant hide; left), the view cube knob size vs
+  live's 3 px hover map, a woken model edge's perpendicular (live sketch-gaps 1c: needs a slanted model edge in the
+  snaps bench), the flat bend click colours (zone rgb(214,151,30), outline rgb(255,169,10): ours the selection
+  colour), an open circular pattern's angle label (live has none), live's angle / factor boxes' place on the triad.
 - end-cap-profile-circle step 3: matches on a quiet host; under load our Faces field keeps focus a moment. Low.
 - tab-new-edit-reedit: decision asked of the lead (11-15 23:50): the click lands ~1.1 px from Flange 1's wall;
   known (sub-pixel camera) or retarget onto the wall live hit.
-- Mac target: 20 GB after prune-target.py + dropping incremental dirs idle > 90 min (debug/incremental was 11 GB).
+- Mac target ~20 GB: prune-target.py, and drop debug/incremental dirs idle > 90 min (it was 11 GB).
 
 ## Queued to land
 
-- 65c83b06 flat view dash + bend hover, 161a18dc pattern labels, this handoff.
+- 03b36ca6 (2D manipulator, spline snap rows). This handoff goes with the failed-preview result.
 
 ## Waiting on others
 
@@ -86,8 +85,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Next, in order
 
-1. Rerun routing-curve (on main); the 2D manipulator as live editing-gaps3; the failed preview side by side once
-   core's Shell error part lands; sketch-gaps rows into the snaps matrix; the tab pick per the lead's answer.
+1. The failed preview's highlight once core lists the error parts; the flat bend click colours (needs a flat-view
+   click target in the runner); a slanted model edge in the snaps
+   bench for the woken edge's perpendicular; the tab pick per the lead's answer.
 2. Rerun after the others' fixes land: boundary-surface-new-edit-reedit (core 658bef9d), the gussets and end-caps
    (skasm), sketch pattern takes (skasm 58a0bd16 + linear), context-create-version-update (live2's retake).
 3. Older open items (11-06 to 11-08 "Next, in order" in the archive): doc-tab-rename-escape (5 / 5) and
