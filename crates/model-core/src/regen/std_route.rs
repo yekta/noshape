@@ -224,6 +224,7 @@ sheet_metal_aware! {
     sm_mirror => "mirror", crate::regen::features::pattern::mirror, "mirror.fs", "mirror", patterns_active_sheet_metal;
     sm_fillet => "fillet", crate::regen::features::detail::fillet, "fillet.fs", "fillet", blends_active_sheet_metal;
     sm_chamfer => "chamfer", crate::regen::features::detail::chamfer, "chamfer.fs", "chamfer", blends_active_sheet_metal;
+    sm_move_face => "moveFace", crate::regen::features::direct::move_face, "moveFace.fs", "moveFace", moves_active_sheet_metal;
 }
 
 /// A core feature std runs only beside active sheet metal (otherwise its native evaluator, as before: reusable).
@@ -275,6 +276,17 @@ fn blends_active_sheet_metal(ev: &EvalCtx) -> bool {
     let refs = ev.query("entities");
     let active = |i: usize| ev.ctx.sheet_metal.get(&ev.ctx.bodies[i].id).is_some_and(|d| d.active);
     ev.resolve_edges(refs).into_iter().chain(ev.resolve_faces(refs)).any(|(b, _)| active(b))
+}
+
+/// A Move face of an active sheet metal part's faces: std's sheetMetalAwareMoveFace offsets the model's definition
+/// faces, so the part is rebuilt from the model with its walls' and bends' faces kept apart (c2-sm-tablet-stand's
+/// Move face 1: a tab's end moved 0.1 mm onto its neighbour's).
+fn moves_active_sheet_metal(ev: &EvalCtx) -> bool {
+    if !ev.ctx.sheet_metal.values().any(|d| d.active) {
+        return false;
+    }
+    let active = |i: usize| ev.ctx.sheet_metal.get(&ev.ctx.bodies[i].id).is_some_and(|d| d.active);
+    ev.resolve_faces(ev.query("moveFaces")).into_iter().any(|(b, _)| active(b))
 }
 
 /// The built-in feature type std's feature `name` stands for (Transform: fTransform), else `name`.

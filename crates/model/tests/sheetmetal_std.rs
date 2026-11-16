@@ -987,6 +987,48 @@ fn an_extruded_arc_is_a_rolled_wall_in_the_flat() {
     assert!((size.x.max(size.y) - want).abs() < 1e-3 && (size.x.min(size.y) - 18.0).abs() < 1e-3, "flat {size:?}, want {want} × 18");
 }
 
+/// Move face on an active sheet metal part runs std's sheet metal aware Move face: the model's end edge moves and
+/// the part is rebuilt from it, its walls' and bend's side faces kept apart (the native offset merged the coplanar
+/// ones: c2-sm-tablet-stand's Move face 1, 17 faces vs live 20).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn moving_a_sheet_metal_end_face_keeps_its_walls_and_bend_apart() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(0.0, 0.0), (40.0, 0.0), (40.0, 30.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    let curves = [sk.add_line_between(p[0], p[1]).unwrap(), sk.add_line_between(p[1], p[2]).unwrap()];
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("EXTRUDE"));
+        pv.set("sketchCurves", ParamValue::Query(curves.iter().map(|e| Reference::SketchEntity { sketch, entity: e.0 }).collect()));
+        pv.set("depth", expr("18 mm"));
+        pv.set("thickness", expr("3 mm"));
+        pv.set("radius", expr("3 mm"));
+    });
+    let r = s.ok();
+    let body = &r.context.bodies[part(&r)];
+    let faces = body.shape.faces();
+    let end = faces.iter().position(|f| f.is_planar() && f.centroid().is_ok_and(|c| c.x.abs() < 1e-9)).expect("the end face at x = 0");
+    let before = (faces.len(), volume_mm3(&r));
+    let end = Reference::Face((*body.faces[end]).clone());
+    s.add("moveFace", |pv| {
+        pv.set("moveFaces", ParamValue::Query(vec![end]));
+        pv.set("moveFaceType", en("OFFSET"));
+        pv.set("offsetDistance", expr("1 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(r.display.features.last().map(|f| f.status), Some(FeatureStatus::Ok), "{:?}", r.display.features.last().map(|f| &f.message));
+    let body = &r.context.bodies[part(&r)];
+    let lo = body.shape.bounding_box(true).unwrap().min;
+    assert_eq!(body.shape.faces().len(), before.0);
+    assert!((volume_mm3(&r) - before.1 - 54.0).abs() < 1e-3, "volume {} -> {}", before.1, volume_mm3(&r));
+    assert!((lo.x * 1e3 + 1.0).abs() < 1e-4, "x from {}", lo.x * 1e3);
+}
+
 /// A 60 × 40 plate (Thicken 2 mm, bend radius `radius` mm).
 fn plate(radius: &str) -> Studio {
     let mut s = Studio::new();
