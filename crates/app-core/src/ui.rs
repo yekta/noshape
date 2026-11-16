@@ -225,7 +225,7 @@ fn caret_variant(cx: &App) -> ButtonCustomVariant {
 /// Onshape's pressed toolbar button (a running tool, an open dropdown arrow): `inset 0 1px 1px rgba(0,0,0,0.247)`
 /// over #eaeaea (live toolbar-states 11-16).
 pub fn pressed_shadow() -> Vec<BoxShadow> {
-    vec![BoxShadow { color: hsla(0., 0., 0., 0.247), offset: point(px(0.), px(1.)), blur_radius: px(1.), spread_radius: px(0.), inset: true }]
+    vec![gpui_kit::component::button::pressed_inset_shadow()]
 }
 
 /// Search tools' "Highlight tool in toolbar" on a toolbar button (live: `#fcda7f`, a 2 px `#fab601` border; the
