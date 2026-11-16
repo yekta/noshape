@@ -1436,6 +1436,35 @@ fn offset_curve_move_boundary_mutual_trim() {
 }
 
 /// Mesh parts in booleans and splits (live G35/G35-retry): a split by a plane
+/// Split part by a cylinder face, Use trimmed off: the cylinder's whole surface splits (c2-rib-wrap's Split 1 by
+/// the part's own round lobe): the disc it closes off is a part of 3 faces (live 3/2/0), the rest the other.
+#[test]
+fn an_untrimmed_cylinder_face_splits_off_its_whole_disc() {
+    let block = noshape_kernel::make_box_corners(DVec3::new(-0.02, 0.0, 0.0), DVec3::new(0.02, 0.03, 0.01)).unwrap();
+    let lobe = noshape_kernel::make_cylinder(&noshape_kernel::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 0.01, 0.01, std::f64::consts::TAU).unwrap();
+    let fused = noshape_kernel::boolean(noshape_kernel::BooleanOp::Fuse, &[block], &[lobe], &Default::default()).unwrap();
+    let part = noshape_kernel::unify_same_domain(&fused.shape).unwrap().shape;
+    let brep = String::from_utf8(part.to_brep_bytes().unwrap()).unwrap();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let fi = b.shape.faces().iter().position(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).expect("the lobe");
+    let (id, face) = (b.id.clone(), Reference::Face((*b.faces[fi]).clone()));
+    s.add("splitPart", move |p| {
+        p.set("targets", ParamValue::Query(vec![Reference::Body(id)]));
+        p.set("tool", ParamValue::Query(vec![face]));
+        p.set("useTrimmed", ParamValue::Bool(false));
+    });
+    let r = s.ok();
+    let mut parts: Vec<(usize, f64)> = r.context.bodies.iter().map(|b| (b.shape.faces().len(), b.shape.volume().unwrap() * 1e9)).collect();
+    parts.sort_by(|a, b| a.1.total_cmp(&b.1));
+    let disc = std::f64::consts::PI * 100.0 * 10.0;
+    assert_eq!(parts.len(), 2, "{parts:?}");
+    assert_eq!(parts[0].0, 3, "{parts:?}");
+    assert!((parts[0].1 - disc).abs() < 1e-3 && (parts[1].1 - (12000.0 - disc / 2.0)).abs() < 1e-3, "{parts:?}");
+}
+
 /// gives two MIXED parts (the mesh face plus a planar cap), a translation
 /// keeps an all-mesh part, a union with a B-rep part gives one MIXED part.
 #[test]

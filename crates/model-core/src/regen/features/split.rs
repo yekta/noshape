@@ -54,6 +54,12 @@ fn resolve_tool(ev: &EvalCtx, r: &Reference, trimmed: bool) -> FResult<Tool> {
                 return plane_tool(pl);
             }
             let faces = rebrand(ev, vec![b.faces[fi].clone()]);
+            // Untrimmed, a cylinder splits as its whole surface (c2-rib-wrap's Split 1 by the part's own round lobe:
+            // live cuts the disc it closes off out of the part).
+            let f = match f.face_surface() {
+                Ok(k::Surface::Cylinder { origin, axis, x_dir, radius }) if !trimmed => whole_cylinder(ev, &f, origin, axis, x_dir, radius)?,
+                _ => f,
+            };
             Ok(Tool { names: names_for(&f, faces), shape: f, plane: None, body: None })
         }
         _ => {
@@ -61,6 +67,21 @@ fn resolve_tool(ev: &EvalCtx, r: &Reference, trimmed: bool) -> FResult<Tool> {
             plane_tool(kernel_plane(&frame))
         }
     }
+}
+
+/// The whole cylinder of `face`'s surface across the model, facing as `face` does.
+fn whole_cylinder(ev: &EvalCtx, face: &Shape, origin: DVec3, axis: DVec3, x_dir: DVec3, radius: f64) -> FResult<Shape> {
+    let (axis, ext) = (axis.normalize(), ev.model_extent() * 2.0);
+    let c = ev.ctx.bounds().map(|(a, b)| (a + b) * 0.5).unwrap_or(origin);
+    let base = origin + axis * ((c - origin).dot(axis) - ext);
+    let solid = k::make_cylinder(&k::Plane::new(base, axis, x_dir), radius, 2.0 * ext, std::f64::consts::TAU)?;
+    let Some(side) = solid.faces().into_iter().find(|s| matches!(s.face_surface(), Ok(k::Surface::Cylinder { .. }))) else { return Ok(face.clone()) };
+    let p = face.centroid()?;
+    let same = match (face_normal_near(face, p), face_normal_near(&side, p)) {
+        (Some((_, a)), Some((_, b))) => a.dot(b) >= 0.0,
+        _ => true,
+    };
+    Ok(if same { side } else { side.reversed()? })
 }
 
 /// Centroid of a piece (volume, area or length weighted).
@@ -162,6 +183,9 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     let tool = resolve_tool(ev, tool_ref, ev.bool("useTrimmed"))?;
+    // A whole cylinder's pieces: the faces left on one surface are one face, as Parasolid's (c2-rib-wrap's disc: its
+    // lobe and the cut are one cylinder, 3 faces).
+    let whole_cylinder = !ev.bool("useTrimmed") && matches!(tool_ref, Reference::Face(_)) && matches!(tool.shape.face_surface(), Ok(k::Surface::Cylinder { .. }));
     let both = ev.bool("keepBothSides");
     let front = ev.bool("keepFront");
     let mut changed = false;
@@ -178,6 +202,16 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         let mut pieces: Vec<(f64, DVec3, NamedShape)> = pieces_of(&res.shape, &face_names, target.kind, ev.feature)
             .into_iter()
             .filter(|p| !p.shape.is_null())
+            .map(|p| {
+                if !whole_cylinder {
+                    return Ok(p);
+                }
+                let un = k::unify_same_domain(&p.shape)?;
+                let names = ev.name_result(&[&p.names], &un.history, &un.shape, &BTreeMap::new(), None);
+                Ok(NamedShape { names: names_for(&un.shape, names), shape: un.shape })
+            })
+            .collect::<FResult<Vec<NamedShape>>>()?
+            .into_iter()
             .map(|p| {
                 let c = piece_center(&p.shape);
                 (side_of(&tool, c), c, p)
