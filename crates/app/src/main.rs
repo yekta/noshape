@@ -49,6 +49,7 @@ mod workspace_protection;
 mod doc_panels;
 mod shortcuts;
 mod smoke;
+mod soak;
 mod ui_script;
 mod tab_manager;
 mod tab_thumbs;
@@ -560,6 +561,8 @@ fn main() {
             if cx.windows().is_empty() {
                 files::show_start_window(cx);
             }
+        } else if let (Some(cycles), Some(p)) = (soak::cycles(), path.clone()) {
+            soak::start(p, cycles, gpu.clone(), cx);
         } else if path.is_some() || args.iter().any(|a| a.starts_with("--demo")) {
             let path = path.clone().unwrap_or_else(files::new_document_path);
             let initial = if args.iter().any(|a| a == "--demo-drawing-full") {

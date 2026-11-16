@@ -139,6 +139,11 @@ fn as_flat_mut(v: &mut [[f32; 3]]) -> &mut [f32] {
 }
 
 
+/// How many faces' display meshes the mesh cache keeps for [`tessellate`]'s deflections (tests).
+pub fn mesh_cache_faces(linear_deflection: f64, angular_deflection: f64) -> usize {
+    ffi::mesh_cache_faces(linear_deflection, angular_deflection)
+}
+
 /// Tessellate a shape with BRepMesh_IncrementalMesh (existing triangulations
 /// that are already fine enough are reused) and copy everything into flat
 /// buffers in a single bridge call.

@@ -622,3 +622,23 @@ fn an_o_ring_revolved_from_a_disc_meshes_here_as_a_torus() {
     assert!(kinds.iter().all(|k| k.starts_with("Ok(Torus")), "a torus: {kinds:?}");
     assert_hose_meshes_here(&ring);
 }
+
+/// The display mesh cache lets go of faces no shape refers to any more (a closed document's, an edit's replaced
+/// ones): 200 boxes meshed one after another at two deflections (a view's and a thumbnail's: each face a key in two
+/// sets), each box dropped, leave at most a few hundred faces in each, not their 1200 (lead 11-16: each open of a
+/// 30-feature part kept ~2 MB here until the app quit). Deflections no other test uses: another test's meshes may
+/// push these sets out (fewer faces then, never more).
+#[test]
+fn the_mesh_cache_drops_faces_no_shape_keeps() {
+    let sets = [(0.123_457 * MM, 0.314_159), (0.654_321 * MM, 0.271_828)];
+    for i in 0..200 {
+        let b = make_box_corners(DVec3::new(i as f64, 0.0, 0.0) * MM, DVec3::new(i as f64 + 1.0, 1.0, 1.0) * MM).unwrap();
+        for (lin, ang) in sets {
+            tessellate(&b, lin, ang, false).unwrap();
+        }
+    }
+    for (lin, ang) in sets {
+        let kept = mesh_cache_faces(lin, ang);
+        assert!(kept <= 300, "{kept} faces kept of 1200, all of them gone with their boxes");
+    }
+}

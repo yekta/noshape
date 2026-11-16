@@ -3,6 +3,8 @@
 #include <BRepBuilderAPI_Copy.hxx>
 #include <mutex>
 #include <optional>
+#include <unordered_map>
+#include <unordered_set>
 #include "internal.hpp"
 #include "planar_cdt.hpp"
 
@@ -1106,7 +1108,88 @@ struct MeshSet
   NCollection_DataMap<TopoDS_Shape, RustFace, TopTools_ShapeMapHasher>                     rust; // noshape's mesher's
   EdgeCache                                                                                   edges;
   size_t                                                                                        nodes = 0;
+  // Faces kept after the last drop_unreferenced.
+  size_t kept = 0;
 };
+
+// Cache keys by TShape: how many of the sets' keys hold each face or edge.
+using KeyCounts = std::unordered_map<const Standard_Transient*, int>;
+
+template <class Map>
+void count_keys(const Map& map, KeyCounts& held)
+{
+  for (typename Map::Iterator it(map); it.More(); it.Next())
+    ++held[it.Key().TShape().get()];
+}
+
+// The faces or edges only cache keys hold (a closed document's, an edit's replaced ones: no shape can meet them
+// again), decided before any goes (each one dropped frees its others).
+std::unordered_set<const Standard_Transient*> only_held(const KeyCounts& held)
+{
+  std::unordered_set<const Standard_Transient*> dead;
+  for (const auto& [t, n] : held)
+    if (t->GetRefCount() == n)
+      dead.insert(t);
+  return dead;
+}
+
+// The entries of `map` keyed by `dead` shapes go; their nodes (`nodes` of a value) summed.
+template <class Map, class Nodes>
+size_t drop_keys(Map& map, const std::unordered_set<const Standard_Transient*>& dead, Nodes nodes)
+{
+  std::vector<TopoDS_Shape> keys;
+  for (typename Map::Iterator it(map); it.More(); it.Next())
+    if (dead.count(it.Key().TShape().get()) != 0)
+      keys.push_back(it.Key());
+  size_t n = 0;
+  for (const TopoDS_Shape& s : keys)
+  {
+    n += nodes(map.Find(s));
+    map.UnBind(s);
+  }
+  return n;
+}
+
+// The sets' faces and edges no shape refers to any more, dropped once `m`'s faces have doubled since the last time
+// (lead 11-16: each open of a 30-feature part kept its ~2 MB of faces and meshes here until the app quit). A face is
+// a key in each set that meshed it (the display's deflections and a thumbnail's): all sets are looked at together.
+void drop_unreferenced(std::deque<MeshSet>& sets, MeshSet& m)
+{
+  const size_t n = (size_t)(m.faces.Extent() + m.rust.Extent());
+  if (n <= std::max<size_t>(256, 2 * m.kept))
+    return;
+  KeyCounts faces;
+  for (const MeshSet& s : sets)
+  {
+    count_keys(s.faces, faces);
+    count_keys(s.rust, faces);
+  }
+  const auto dead_faces = only_held(faces);
+  for (MeshSet& s : sets)
+  {
+    const size_t gone = drop_keys(s.faces, dead_faces, [](const occ::handle<Poly_Triangulation>& t) { return t.IsNull() ? (size_t)0 : (size_t)t->NbNodes(); }) +
+                        drop_keys(s.rust, dead_faces, [](const RustFace& r) { return (size_t)(r.n1 - r.n0); });
+    s.nodes -= std::min(s.nodes, gone);
+    s.kept = (size_t)(s.faces.Extent() + s.rust.Extent());
+  }
+  // (After the faces: their edges are free of them now.)
+  KeyCounts edges;
+  for (const MeshSet& s : sets)
+    for (const auto& e : s.edges.maps)
+      count_keys(e, edges);
+  const auto dead_edges = only_held(edges);
+  for (MeshSet& s : sets)
+    for (auto& e : s.edges.maps)
+      drop_keys(e, dead_edges, [](const EdgeCache::Poly&) { return (size_t)0; });
+  if (std::getenv("NOSHAPE_MESH_DEBUG"))
+    std::fprintf(stderr, "mesh cache: %zu faces, %zu kept\n", n, m.kept);
+}
+
+std::deque<MeshSet>& mesh_sets()
+{
+  static std::deque<MeshSet> sets;
+  return sets;
+}
 
 MeshSet* mesh_set(double lin, double ang)
 {
@@ -1116,20 +1199,30 @@ MeshSet* mesh_set(double lin, double ang)
   }();
   if (off)
     return nullptr;
-  static std::deque<MeshSet> sets;
+  std::deque<MeshSet>& sets = mesh_sets();
   for (MeshSet& m : sets)
     if (m.ang == ang && std::abs(m.lin - lin) <= 0.01 * lin)
     {
       if (m.nodes > 20000000)
-        m = MeshSet{lin, ang, {}, {}, {}, 0};
+        m = MeshSet{lin, ang, {}, {}, {}, 0, 0};
+      drop_unreferenced(sets, m);
       return &m;
     }
-  sets.push_front(MeshSet{lin, ang, {}, {}, {}, 0});
+  sets.push_front(MeshSet{lin, ang, {}, {}, {}, 0, 0});
   while (sets.size() > 3)
     sets.pop_back();
   return &sets.front();
 }
 } // namespace
+
+size_t mesh_cache_faces(double lin, double ang)
+{
+  std::lock_guard<std::shared_mutex> lock(mesh_mutex());
+  for (const MeshSet& m : mesh_sets())
+    if (m.ang == ang && std::abs(m.lin - lin) <= 0.01 * lin)
+      return (size_t)(m.faces.Extent() + m.rust.Extent());
+  return 0;
+}
 
 // How many parts BRepMesh meshes at once outside the mesh lock (each in parallel inside: 36 NIST parts at once
 // summed 45 s of BRepMesh against 9 s one at a time, yet sooner). NOSHAPE_MESH_CONCURRENT=<n>; by default no

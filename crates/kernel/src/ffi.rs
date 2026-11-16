@@ -824,6 +824,7 @@ pub(crate) mod ffi {
             min_size: f64,
         ) -> Result<UniquePtr<OcMesh>>;
         fn mesh_counts(m: &OcMesh) -> Result<MeshCounts>;
+        fn mesh_cache_faces(lin: f64, ang: f64) -> usize;
         fn mesh_fill(
             m: &OcMesh,
             positions: &mut [f32],

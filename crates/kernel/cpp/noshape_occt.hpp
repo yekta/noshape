@@ -1060,6 +1060,8 @@ std::unique_ptr<OcShape> project_normal(const OcShape& curves, const OcShape& ta
 std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, bool relative,
                                      bool parallel, bool exact, double min_size);
 MeshCounts              mesh_counts(const OcMesh& m);
+// The display mesh cache's faces at deflections (lin, ang) (tests).
+size_t                  mesh_cache_faces(double lin, double ang);
 void mesh_fill(const OcMesh& m, rust::Slice<float> positions, rust::Slice<float> normals,
                rust::Slice<uint32_t> indices, rust::Slice<uint32_t> face_ranges,
                rust::Slice<float> edge_points, rust::Slice<uint32_t> edge_ranges,

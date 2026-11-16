@@ -191,14 +191,20 @@ pub fn call(port: u16, token: &str, tool: &str, args: &Value) -> Result<OpOutput
 
 // ------------------------------------------------------------ server
 
-/// A document served to the CLI / MCP: dropping it removes the discovery file.
+/// A document served to the CLI / MCP: dropping it removes the discovery file and ends its thread (a closed
+/// document's port, thread and request channel stayed until the app quit: lead 11-16, open/close cycles).
 pub struct Server {
     info: PathBuf,
+    port: u16,
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl Drop for Server {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.info);
+        self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        // Wakes the thread's accept.
+        let _ = TcpStream::connect_timeout(&(std::net::Ipv4Addr::LOCALHOST, self.port).into(), Duration::from_secs(1));
     }
 }
 
@@ -257,8 +263,13 @@ pub fn serve(path: &Path, requests: impl Fn(Request) + Send + 'static) -> std::i
     let tmp = dir().join(format!("{}-{}.tmp", std::process::id(), &token()[..12]));
     std::fs::write(&tmp, serde_json::to_vec(&json!({ "port": port, "token": tok, "pid": std::process::id(), "path": path.to_string_lossy() })).expect("json"))?;
     std::fs::rename(&tmp, &info)?;
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let stopped = stop.clone();
     std::thread::Builder::new().name("noshape-live".into()).spawn(move || {
         for stream in listener.incoming().flatten() {
+            if stopped.load(std::sync::atomic::Ordering::SeqCst) {
+                break;
+            }
             let mut line = String::new();
             let Ok(mut s) = stream.try_clone() else { continue };
             if BufReader::new(stream).read_line(&mut line).is_err() {
@@ -279,7 +290,7 @@ pub fn serve(path: &Path, requests: impl Fn(Request) + Send + 'static) -> std::i
             let _ = s.write_all(format!("{reply}\n").as_bytes());
         }
     })?;
-    Ok(Server { info })
+    Ok(Server { info, port, stop })
 }
 
 // ------------------------------------------------------------ forwarding
@@ -336,5 +347,23 @@ mod tests {
         }
         assert_eq!(b64_encode(b"Man"), "TWFu");
         assert_eq!(b64_encode(b"Ma"), "TWE=");
+    }
+
+    /// A closed document's server lets go of everything: its discovery file, its port, its thread and what that
+    /// thread held (the app's request channel).
+    #[test]
+    fn a_dropped_server_ends_its_thread() {
+        let path = std::env::temp_dir().join(format!("noshape-live-drop-{}.noshape", std::process::id()));
+        let (tx, rx) = std::sync::mpsc::channel::<()>();
+        let server = serve(&path, move |_| {
+            let _ = &tx;
+        })
+        .unwrap();
+        let (port, info) = (server.port, server.info.clone());
+        assert!(info.exists());
+        drop(server);
+        assert!(!info.exists());
+        assert_eq!(rx.recv_timeout(Duration::from_secs(5)), Err(std::sync::mpsc::RecvTimeoutError::Disconnected), "the thread's request handler is dropped");
+        assert!(TcpStream::connect_timeout(&(std::net::Ipv4Addr::LOCALHOST, port).into(), Duration::from_secs(1)).is_err(), "the port is closed");
     }
 }

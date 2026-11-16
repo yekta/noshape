@@ -293,7 +293,7 @@ fn document_window_options(cx: &App) -> WindowOptions {
     }
 }
 
-fn open_session_window(session: session::Session, gpu: Gpu, cx: &mut App) -> anyhow::Result<(AnyWindowHandle, Entity<workspace::Workspace>)> {
+pub(crate) fn open_session_window(session: session::Session, gpu: Gpu, cx: &mut App) -> anyhow::Result<(AnyWindowHandle, Entity<workspace::Workspace>)> {
     noshape_render::perf::milestone("window: opening");
     let (handle, ws) = crate::os_menu::open_window(document_window_options(cx), cx, move |window, cx| {
         noshape_render::perf::milestone("window: created");
