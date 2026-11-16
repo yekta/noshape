@@ -3060,6 +3060,12 @@ fn an_assembly_is_rebuilt_as_lives() {
     lost["rootAssembly"]["occurrences"].as_array_mut().unwrap().push(json!({ "path": ["IC"], "fixed": false, "transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }));
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-lost.noshape"), &lost, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
     assert_eq!((r.occurrences_matching, r.occurrences, r.live_defects.len()), (2, 2, 1), "{r:?}");
+    // A connector on a patterned instance: live's path starts with the pattern's id, its occurrence's doesn't.
+    let mut patterned = asm.clone();
+    patterned["rootAssembly"]["patterns"] = json!([{ "id": "PAT1" }]);
+    patterned["features"]["features"][0]["mateConnectors"][1]["parameters"][0]["queries"][0]["path"] = json!(["PAT1", "IB"]);
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-patterned.noshape"), &patterned, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert_eq!((r.mates_matching, r.mates), (1, 1), "{r:?}");
     // A place the Revolute doesn't allow: freed there, ours solves it back
     // onto the mate, 10 mm.
     let mut off = asm.clone();

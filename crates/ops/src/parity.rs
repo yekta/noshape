@@ -7825,6 +7825,14 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         }
     };
     let mut res = AssemblyResult::default();
+    // Live's assembly patterns: a connector on a patterned instance has the pattern's id first in its path, its
+    // occurrence doesn't (asm-keyboard-pattern's Slider 1 / Planar 1 on "Omron D2FC-F-7N v2 <3>").
+    let patterns: HashSet<&str> = std::iter::once(&asm["rootAssembly"])
+        .chain(asm["rootAssembly"]["subAssemblies"].as_array().into_iter().flatten())
+        .flat_map(|a| a["patterns"].as_array().into_iter().flatten().chain(a["parametricInstances"].as_array().into_iter().flatten()))
+        .filter_map(|p| p["id"].as_str())
+        .collect();
+    let path_of = |v: &Value| -> Vec<String> { ids(v).into_iter().skip_while(|id| patterns.contains(id.as_str())).collect() };
     let call = |ctx: &mut Ctx, tool: &str, args: Value| -> Result<Value, String> {
         let op = registry::by_tool_name(tool).ok_or_else(|| format!("no tool {tool}"))?;
         registry::run(ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
@@ -7889,7 +7897,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 let Some(q) = origin.and_then(|p| p["queries"].as_array()).and_then(|q| q.first()) else { continue };
                 let query = json!({ "queryString": q["entityQuery"], "deterministicIds": q["deterministicIds"], "second": q["secondDeterministicId"] });
                 if let Some(id) = mc["featureId"].as_str() {
-                    connectors.insert((l.element.clone(), id.to_string()), (ids(&q["path"]), q["inferenceType"].as_str().unwrap_or("").to_string(), query));
+                    connectors.insert((l.element.clone(), id.to_string()), (path_of(&q["path"]), q["inferenceType"].as_str().unwrap_or("").to_string(), query));
                     if let Some(own) = connector_params(mc) {
                         connector_own.insert((l.element.clone(), id.to_string()), own);
                     }
@@ -8551,7 +8559,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     }
                     // A Part Studio's Mate connector on an instance: ours there.
                     if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMPartStudioMateConnectorQuery")) {
-                        let path = ids(&q["path"]);
+                        let path = path_of(&q["path"]);
                         let ours = element_at(&l.element, &path).and_then(|e| studio_features.get(&e)).and_then(|f| f.get(id))?;
                         return Some((json!({ "instance": path_names(&path)?, "reference": format!("mc:{}.0", ours.trim_start_matches("mc:")) }), String::new(), None, None));
                     }
