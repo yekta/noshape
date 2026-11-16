@@ -9,6 +9,8 @@ use crate::regen::eval::NO_GEOMETRY_CHANGE;
 
 /// The seconds OCCT's face offset of an offset Subtract's tool may take.
 const OFFSET_DEADLINE_S: f64 = 2.0;
+/// The most points k::offset_solid marches along one face's edges.
+const OFFSET_FACE_BUDGET: u32 = 20_000;
 
 /// Live's info for an Intersect of parts that only touch.
 const TOUCHING_INTERSECT: &str = "The parts either do not intersect or are totally contained.";
@@ -89,12 +91,16 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
                     continue;
                 }
                 let shapes: Vec<k::Shape> = faces.iter().filter_map(|&f| b.shape.sub_shape(k::ShapeType::Face, f).ok()).collect();
-                // (OCCT's face offset of planes, cylinders, cones, spheres and tori, within a time limit; else the tool
-                // as it is, as before Offset was taken here: a thread's free-form flanks, c2-fan-blade-sweep's Boolean 2,
-                // failed after 32 s, and took 4 s with the limit.)
+                // (OCCT's face offset of planes, cylinders, cones, spheres and tori, within a time limit; free-form faces
+                // as their exact offsets (k::offset_solid: OCCT's failed after 32 s on c2-fan-blade-sweep's thread
+                // flanks); else the tool as it is.)
                 let analytic = shapes.iter().all(|f| matches!(f.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. })));
-                let res = analytic.then(|| k::with_deadline(OFFSET_DEADLINE_S, || k::offset_faces(&b.shape, &shapes, offset)).0);
-                let Some(res) = res.and_then(|r| r.ok()).filter(|r| r.shape.is_valid() && r.shape.count(k::ShapeType::Solid) > 0) else {
+                let res = if analytic {
+                    k::with_deadline(OFFSET_DEADLINE_S, || k::offset_faces(&b.shape, &shapes, offset)).0.ok()
+                } else {
+                    k::offset_solid(&b.shape, &shapes, &[offset], OFFSET_FACE_BUDGET).inspect_err(|e| log::debug!("boolean: {e}: {}", k::last_offset_report())).ok()
+                };
+                let Some(res) = res.filter(|r| r.shape.is_valid() && r.shape.count(k::ShapeType::Solid) > 0) else {
                     log::debug!("boolean: the tools' faces not offset (OCCT's offset failed)");
                     tools.push(NamedShape { shape: b.shape.clone(), names });
                     continue;
