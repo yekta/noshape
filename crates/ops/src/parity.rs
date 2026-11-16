@@ -1268,7 +1268,11 @@ impl<'a> Translator<'a> {
 
     /// Feature `f` added after features 0 … k−1: its id, status and message.
     fn feature(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String, Option<String>), String> {
-        let (ty, mut params) = if f["featureType"] == "importDerived" { self.derived_params(k, f, problems)? } else { self.feature_params(k, f, problems)? };
+        let (ty, mut params) = match f["featureType"].as_str() {
+            Some("importDerived") => self.derived_params(k, f, problems)?,
+            Some("derivedMirror") => self.derived_mirror_params(f, problems)?,
+            _ => self.feature_params(k, f, problems)?,
+        };
         // Its in-feature mate connectors, by their placeholders in its selections.
         for v in params.values_mut() {
             self.place_sub_features(v);
@@ -1300,6 +1304,21 @@ impl<'a> Translator<'a> {
         };
         let st = &r["feature_status"];
         Ok((r["feature"].as_str().unwrap_or("").to_string(), st["status"].as_str().unwrap_or("").to_string(), st["message"].as_str().map(str::to_string)))
+    }
+
+    /// A Derived mirror's (the one feature of an assembly Mirror's "<Part Studio>-Mirrored" studio): its source Part
+    /// Studio, built in a tab of ours as a Derived's (asm-corexy's fc2fa8 / 9e085d, "Part 1-Mirrored").
+    fn derived_mirror_params(&mut self, f: &Value, problems: &mut Vec<String>) -> Result<(String, Map<String, Value>), String> {
+        let studio = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "partStudio").cloned().unwrap_or(Value::Null);
+        let namespace = studio["namespace"].as_str().unwrap_or("");
+        let element = namespace.split("::").find_map(|s| s.strip_prefix('e')).ok_or_else(|| format!("Derived mirror: no source element in {namespace:?}"))?.to_string();
+        if !self.derived_built.contains_key(&element) {
+            let built = self.derived_source(&element, problems)?;
+            self.derived_built.insert(element.clone(), built);
+        }
+        let mut params = Map::new();
+        params.insert("partStudio".into(), json!(self.derived_built[&element].0));
+        Ok(("derivedMirror".into(), params))
     }
 
     /// A Derived feature's parameters: its source Part Studio (`buildFunction`'s element, fetched beside the
@@ -8018,7 +8037,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         }
         // A Derived from another studio the assembly fetched (asm-tvc-mount's Derived 2 takes 41b795's parts, fetched
         // as an instance's studio, not as the Derived's source): that one as its source.
-        for f in studio["features"].as_array().cloned().into_iter().flatten().filter(|f| f["featureType"] == "importDerived") {
+        for f in studio["features"].as_array().cloned().into_iter().flatten().filter(|f| f["featureType"] == "importDerived" || f["featureType"] == "derivedMirror") {
             for p in f["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"] == "buildFunction" || p["parameterId"] == "partStudio") {
                 let Some(source) = p["namespace"].as_str().and_then(|n| n.split("::").find_map(|x| x.strip_prefix('e'))) else { continue };
                 if source == element || !studio["derivedSources"][source].is_null() {

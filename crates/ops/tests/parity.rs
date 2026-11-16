@@ -1666,6 +1666,23 @@ fn a_derived_sketch_is_brought_in_and_its_regions_found() {
     assert_eq!(p.status.as_deref(), Some("Ok"), "{:?} {:?}", p.message, p.problems);
 }
 
+/// An assembly Mirror's "<Part Studio>-Mirrored" studio: its one Derived mirror takes the source Part Studio (fetched
+/// beside it) and mirrors its parts through its Top plane, named "<part>-Mirrored" (asm-corexy's fc2fa8 / 9e085d).
+#[test]
+fn a_derived_mirror_mirrors_its_source() {
+    let (source, live, refs) = block_model();
+    let mirror = json!({ "btType": "BTMFeature-134", "featureType": "derivedMirror", "featureId": "derivedFeature", "name": "Derived mirror", "parameters": [
+        { "btType": "BTMParameterReferencePartStudio-3302", "parameterId": "partStudio", "namespace": "e0c79ad99a48b2ad4f5e01a78::mmicro" }] });
+    let doc = json!({ "features": [mirror], "derivedSources": { "0c79ad99a48b2ad4f5e01a78": { "doc": source, "live": live, "refs": refs } } });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("derived-mirror.noshape"), &doc, Default::default()).unwrap();
+    let d = t.step(0);
+    assert_eq!(d.status.as_deref(), Some("Ok"), "{:?} {:?}", d.message, d.problems);
+    let parts = t.call("query_parts", json!({})).unwrap();
+    let names: Vec<&str> = parts["parts"].as_array().unwrap().iter().filter_map(|p| p["name"].as_str()).collect();
+    assert!(!names.is_empty() && names.iter().all(|n| n.ends_with("-Mirrored")), "{parts}");
+}
+
 /// A sketch constraint to model geometry live no longer finds (its external query empty): ours points at nothing
 /// too, so the sketch is live's WARNING "Some external references are missing." (clamp-guillem's Boceto 6,
 /// train-joe's Sketch 2), its geometry where it was.
