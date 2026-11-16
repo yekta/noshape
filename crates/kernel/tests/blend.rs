@@ -1884,3 +1884,24 @@ fn a_chamfer_keeps_a_kept_split_of_a_cylinder() {
     assert!(out.is_valid());
     assert_eq!(walls(&out), 2, "the kept split through the chamfer");
 }
+
+#[test]
+fn a_straight_section_turned_off_a_line_joins_it_on_the_lines_extension() {
+    setup();
+    // A rim chamfer's end (c2-impeller-loft's Chamfer Stevenrohr Halterung): a 55.97 mm line, then a straight 3.5 mm
+    // B-spline section turned 6 um off it; live has one 59.47 mm line.
+    let p = |x: f64, y: f64| DVec3::new(x, y, 0.0) * MM;
+    let section = make_bspline(&[p(55.97, 0.0), p(59.47, 0.006)], None, &[0.0, 1.0], &[2, 2], 1, false).unwrap();
+    let edges = [make_line(p(0.0, 0.0), p(55.97, 0.0)).unwrap(), section, make_line(p(59.47, 0.006), p(59.47, 5.0)).unwrap(), make_line(p(59.47, 5.0), p(0.0, 5.0)).unwrap(), make_line(p(0.0, 5.0), p(0.0, 0.0)).unwrap()];
+    let face = make_face(&Plane::xy(), &make_wire(&edges).unwrap(), &[]).unwrap();
+    assert_eq!(face.count(ShapeType::Edge), 5);
+    let kept = join_edges_at(&face, &[p(55.97, 0.0)], 1e-7, 1e-4).unwrap();
+    assert_eq!(kept.shape.count(ShapeType::Edge), 5, "turned by 1.7e-3 rad: not joined within 1e-4");
+    let joined = join_edges_at(&face, &[p(55.97, 0.0)], 1e-7, 5e-3).unwrap();
+    assert!(joined.shape.is_valid());
+    assert_eq!(joined.shape.count(ShapeType::Edge), 4);
+    let long = (0..4).map(|i| joined.shape.sub_shape(ShapeType::Edge, i).unwrap().edge_info().unwrap()).find(|e| (e.length / MM - 59.47).abs() < 1e-3);
+    let long = long.expect("one 59.47 mm edge");
+    let Curve::Line { origin, direction } = long.curve else { panic!("{:?}", long.curve) };
+    assert!(origin.y.abs() < 1e-12 && direction.y.abs() < 1e-12, "on the line's extension: {origin} {direction}");
+}

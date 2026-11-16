@@ -1228,7 +1228,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     // A face extended to meet the round: its old edge and the new piece running on from it one edge, as live's.
     if !refaced.is_empty() {
         let corners: Vec<DVec3> = refaced.iter().flat_map(|(i, _)| faces[*i].vertices()).filter_map(|v| v.vertex_point().ok()).collect();
-        let joined = k::join_edges_at(&shape, &corners, scale * 1e-7)?;
+        let joined = k::join_edges_at(&shape, &corners, scale * 1e-7, 1e-4)?;
         names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &joined.history, &joined.shape, &BTreeMap::new(), None);
         shape = joined.shape;
     }
@@ -2683,6 +2683,26 @@ pub fn rim_chamfer_cut(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: k::Ch
         return Ok(false);
     }
     let names = ev.name_result(&[&cut.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    // Where the chain stops, the line between the side faces runs on along the cut's straight section (live: one line;
+    // c2-impeller-loft's Chamfer Stevenrohr Halterung, the cut's section 6 um off it over 3.5 mm).
+    let mut ends: Vec<DVec3> = Vec::new();
+    for &x in edges {
+        let i = shape.sub_shape(ShapeType::Edge, x)?.edge_info()?;
+        for p in [i.start, i.end] {
+            match ends.iter().position(|q| q.distance(p) <= scale * 1e-7) {
+                Some(k) => {
+                    ends.remove(k);
+                }
+                None => ends.push(p),
+            }
+        }
+    }
+    let joined = k::join_edges_at(&un.shape, &ends, scale * 1e-7, 5e-3)?;
+    if joined.shape.count(ShapeType::Edge) < un.shape.count(ShapeType::Edge) && joined.shape.is_valid() {
+        let names = ev.name_result(&[&crate::regen::eval::names_for(&un.shape, names)], &joined.history, &joined.shape, &BTreeMap::new(), None);
+        ev.replace_body(bi, joined.shape, names);
+        return Ok(true);
+    }
     ev.replace_body(bi, un.shape, names);
     Ok(true)
 }

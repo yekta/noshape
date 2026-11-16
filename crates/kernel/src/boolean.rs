@@ -462,8 +462,6 @@ pub fn unify_edges(shape: &Shape) -> Result<OpResult> {
     Ok(OpResult::from_ffi(ck(ffi::op_unify_edges(shape.raw()))?))
 }
 
-/// Edges between the same two faces joined where they meet tangentially at a vertex within `tol` of one of `points`
-/// (their curves concatenated: a line and the B-spline section running on from it), every other vertex kept.
 /// Edges between two faces shorter than `len` with their middle within `len` of one of `points` collapsed into one
 /// vertex at their middle (its tolerance reaching both old ends), as Parasolid leaves a blend's sliver end; the shape
 /// unchanged where the result isn't valid.
@@ -492,9 +490,13 @@ pub fn canonical_edges(shape: &Shape, points: &[DVec3], conics: &[Conic], tol: f
     Ok(OpResult::from_ffi(ck(ffi::op_canonical_edges(shape.raw(), &flat, &cs, tol))?))
 }
 
-pub fn join_edges_at(shape: &Shape, points: &[DVec3], tol: f64) -> Result<OpResult> {
+/// Edges between the same two faces joined where they meet tangentially at a vertex within `tol` of one of `points`
+/// (their curves concatenated: a line and the B-spline section running on from it), every other vertex kept. A straight
+/// section turned from the line by more than 1e-4 rad, up to `max_turn`, is put on the line's extension, its far
+/// vertex's tolerance reaching where it was.
+pub fn join_edges_at(shape: &Shape, points: &[DVec3], tol: f64, max_turn: f64) -> Result<OpResult> {
     let flat: Vec<f64> = points.iter().flat_map(|p| [p.x, p.y, p.z]).collect();
-    Ok(OpResult::from_ffi(ck(ffi::op_join_edges_at(shape.raw(), &flat, tol))?))
+    Ok(OpResult::from_ffi(ck(ffi::op_join_edges_at(shape.raw(), &flat, tol, max_turn))?))
 }
 
 /// A sheet's free edges split where an up-to `target`'s seam crossed them joined into one edge again, through a

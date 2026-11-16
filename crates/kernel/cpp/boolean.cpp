@@ -10505,7 +10505,7 @@ OpOut op_collapse_short_edges(const OcShape& s, rust::Slice<const double> pts, d
 
 // Edges between the same two faces joined where they meet tangentially at a vertex near one of `pts`, their curves
 // concatenated (a line and the B-spline section running on from it); every other vertex kept.
-OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double tol)
+OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double tol, double max_turn)
 {
   require_non_null(s.shape, "shape");
   if (pts.size() % 3 != 0)
@@ -10525,6 +10525,7 @@ OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double t
   TopExp::MapShapesAndUniqueAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
   occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
   bool                           straightened = false;
+  std::vector<TopoDS_Vertex>     moved;
   for (int i = 1; i <= vs.Extent(); ++i)
   {
     const NCollection_List<TopoDS_Shape>* es = free[i] ? ve.Seek(vs(i)) : nullptr;
@@ -10539,16 +10540,77 @@ OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double t
     TopoDS_Vertex b0, b1;
     TopExp::Vertices(b, b0, b1);
     const gp_Pnt p0 = BRep_Tool::Pnt(b0), p1 = BRep_Tool::Pnt(b1);
-    if (p0.Distance(p1) <= tol || gp_Vec(p0, p1).Angle(gp_Vec(ca.Line().Direction())) > 1e-4 && gp_Vec(p0, p1).Angle(-gp_Vec(ca.Line().Direction())) > 1e-4)
+    if (p0.Distance(p1) <= tol)
       continue;
-    const gp_Lin chord(p0, gp_Dir(gp_Vec(p0, p1)));
-    const double dev = std::max(tol, BRep_Tool::Tolerance(b));
-    bool         straight = true;
+    const double turn = std::min(gp_Vec(p0, p1).Angle(gp_Vec(ca.Line().Direction())), gp_Vec(p0, p1).Angle(-gp_Vec(ca.Line().Direction())));
+    if (turn > std::max(1e-4, max_turn))
+      continue;
+    // Turned by more than 1e-4 (up to `max_turn`): put on the line's own extension, its far end the projection of the
+    // section's, a new far vertex's tolerance reaching where it was (a rim chamfer's tool run on along a wall,
+    // c2-impeller-loft's Chamfer Stevenrohr Halterung: 6 um off over 3.5 mm; live's line runs on). The section must lie
+    // within that of the line, else within its tolerance of its chord.
+    const bool    turned = turn > 1e-4;
+    const bool    at0    = b0.IsSame(vs(i));
+    const gp_Pnt  away   = at0 ? p1 : p0;
+    const gp_Lin  along  = ca.Line();
+    const gp_Pnt  on     = ElCLib::Value(ElCLib::Parameter(along, away), along);
+    const double  reach  = turned ? away.Distance(on) : 0.0;
+    const gp_Lin  chord  = turned ? along : gp_Lin(p0, gp_Dir(gp_Vec(p0, p1)));
+    const double  dev    = std::max({tol, BRep_Tool::Tolerance(b), 1.01 * reach});
+    bool          straight = true;
     for (int k = 1; k < 16 && straight; ++k)
       straight = chord.Distance(cb.Value(cb.FirstParameter() + (cb.LastParameter() - cb.FirstParameter()) * k / 16.0)) <= dev;
     const NCollection_List<TopoDS_Shape>* fs = ef.Seek(b);
     if (!straight || fs == nullptr)
       continue;
+    if (turned)
+    {
+      // One line from the line's other end to the new far vertex, in the line's sense, in place of both.
+      const TopoDS_Vertex& vold = at0 ? b1 : b0;
+      TopoDS_Vertex        vfar;
+      BRep_Builder().MakeVertex(vfar, on, BRep_Tool::Tolerance(vold) + dev);
+      TopoDS_Vertex a0, a1;
+      TopExp::Vertices(TopoDS::Edge(a.Oriented(TopAbs_FORWARD)), a0, a1);
+      const bool          ends_here = a1.IsSame(vs(i));
+      const TopoDS_Vertex v0 = ends_here ? TopoDS::Vertex(a0.Oriented(TopAbs_FORWARD)) : vfar;
+      const TopoDS_Vertex v1 = ends_here ? vfar : TopoDS::Vertex(a1.Oriented(TopAbs_FORWARD));
+      gp_Lin              L  = along;
+      if (ElCLib::Parameter(L, BRep_Tool::Pnt(v1)) < ElCLib::Parameter(L, BRep_Tool::Pnt(v0)))
+        L.Reverse();
+      BRepBuilderAPI_MakeEdge mk(new Geom_Line(L), v0, v1, ElCLib::Parameter(L, BRep_Tool::Pnt(v0)), ElCLib::Parameter(L, BRep_Tool::Pnt(v1)));
+      const NCollection_List<TopoDS_Shape>* fa = ef.Seek(a);
+      if (!mk.IsDone() || fa == nullptr)
+        continue;
+      TopoDS_Edge        line  = mk.Edge();
+      const TopoDS_Edge  af    = TopoDS::Edge(a.Oriented(TopAbs_FORWARD));
+      const TopoDS_Vertex other = ends_here ? a0 : a1;
+      const double        etol  = std::max(dev, BRep_Tool::Tolerance(a));
+      for (NCollection_List<TopoDS_Shape>::Iterator f(*fa); f.More(); f.Next())
+      {
+        const TopoDS_Face face = TopoDS::Face(f.Value());
+        ShapeFix_Edge().FixAddPCurve(line, face, false, dev);
+        // (A projection onto a periodic surface may land a period away from the line's own pcurve.)
+        double                          p0, p1, q0, q1;
+        const occ::handle<Geom2d_Curve> pa = BRep_Tool::CurveOnSurface(af, face, p0, p1);
+        const occ::handle<Geom2d_Curve> pl = BRep_Tool::CurveOnSurface(line, face, q0, q1);
+        if (pa.IsNull() || pl.IsNull())
+          continue;
+        const occ::handle<Geom_Surface> S  = BRep_Tool::Surface(face);
+        const gp_Pnt2d                  ua = pa->Value(BRep_Tool::Parameter(other, af, face));
+        const gp_Pnt2d                  ul = pl->Value(BRep_Tool::Parameter(other, line, face));
+        const double du = S->IsUPeriodic() ? std::round((ua.X() - ul.X()) / S->UPeriod()) * S->UPeriod() : 0.0;
+        const double dv = S->IsVPeriodic() ? std::round((ua.Y() - ul.Y()) / S->VPeriod()) * S->VPeriod() : 0.0;
+        if (du != 0.0 || dv != 0.0)
+          BRep_Builder().UpdateEdge(line, occ::down_cast<Geom2d_Curve>(pl->Translated(gp_Vec2d(du, dv))), face, etol);
+      }
+      BRep_Builder().UpdateEdge(line, etol);
+      rs->Replace(vold.Oriented(TopAbs_FORWARD), vfar);
+      rs->Replace(a.Oriented(TopAbs_FORWARD), line);
+      rs->Remove(b);
+      moved.push_back(vfar);
+      straightened = true;
+      continue;
+    }
     BRepBuilderAPI_MakeEdge mk(TopoDS::Vertex(b0.Oriented(TopAbs_FORWARD)), TopoDS::Vertex(b1.Oriented(TopAbs_FORWARD)));
     if (!mk.IsDone())
       continue;
@@ -10564,6 +10626,8 @@ OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double t
   for (int i = 1; i <= vs.Extent(); ++i)
     if (!free[i])
       u.KeepShape(vs(i));
+  for (const TopoDS_Vertex& v : moved)
+    u.KeepShape(v);
   keep_marked_edges(u, in);
   u.Build();
   carry_kept_marks(in, u);

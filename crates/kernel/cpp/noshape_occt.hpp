@@ -1029,7 +1029,7 @@ OpOut op_unify(const OcShape& s);
 MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic);
 OpOut op_join_edges(const OcShape& s);
 OpOut op_unify_edges(const OcShape& s);
-OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double tol);
+OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double tol, double max_turn);
 OpOut op_collapse_short_edges(const OcShape& s, rust::Slice<const double> pts, double len);
 OpOut op_canonical_edges(const OcShape& s, rust::Slice<const double> pts, rust::Slice<const double> conics, double tol);
 OpOut op_join_target_seam_splits(const OcShape& sheet, const OcShape& target);

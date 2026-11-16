@@ -783,7 +783,7 @@ pub(crate) mod ffi {
         fn merge_same_surface_faces(s: &OcShape, periodic: bool) -> Result<MergedFaces>;
         fn op_join_edges(s: &OcShape) -> Result<OpOut>;
         fn op_unify_edges(s: &OcShape) -> Result<OpOut>;
-        fn op_join_edges_at(s: &OcShape, pts: &[f64], tol: f64) -> Result<OpOut>;
+        fn op_join_edges_at(s: &OcShape, pts: &[f64], tol: f64, max_turn: f64) -> Result<OpOut>;
         fn op_collapse_short_edges(s: &OcShape, pts: &[f64], len: f64) -> Result<OpOut>;
         fn op_canonical_edges(s: &OcShape, pts: &[f64], conics: &[f64], tol: f64) -> Result<OpOut>;
         fn op_join_target_seam_splits(sheet: &OcShape, target: &OcShape) -> Result<OpOut>;
