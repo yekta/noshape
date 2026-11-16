@@ -22,6 +22,10 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-16 Menu rows for left-out cloud features (Add comment, Share, …) are not drawn or reserved; a take step that differs
   only by such a row is marked a known difference (excluded feature).
 
+- 11-16 Sketch fuzz (830 cases): live calling a line with redundant constraints fully defined (s8, s10, s11) is a live
+  defect, not a target. Where free geometry settles after a drag (s1 …) is parked: listed as known, not counted, until a
+  general rule for live's drag model is found (no per-case rules).
+
 ## Geometry and speed
 - 11-07 Every crates/brep or Boolean change passes bool's gate: every corpus + parity56 at 0 OCCT differences.
 - 11-14 A faster path lands only if results are identical end to end (topology and feature status in every suite
