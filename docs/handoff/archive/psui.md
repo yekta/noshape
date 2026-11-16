@@ -2580,3 +2580,34 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 - Coincident edges pick the first drawn (line-pick depth Greater): the earlier part, as live at a mitred frame corner.
 - Sketch patterns: two constraints each in scenarios; a white-space accept ends the tool.
 - Runner: `live_defects`, `click_placed_readouts` (±1 px), per-take window heights (studios).
+
+## 2026-11-16 06:50 handoff "In flight" (moved 08:17)
+
+## In flight
+
+- Landed 11-16: c525abd8 (flat bend dash and hover, pattern labels), f2029e2a (the sketch 2D manipulator as live
+  editing-gaps3), 876f6e61 (snaps: spline rows, 2 gaps), eddc37d6 (model edges wake after a 60 ms rest and give
+  PERPENDICULAR through a line's start: `woken_edge`, `WOKEN_EDGE` retargeted by `link_woken_edge`; snaps matrix
+  63 / 65, triangle prism bench), 6b39d104 (a failed feature's parts of the result highlighted as live: core's
+  `error_parts`, `error_geometry(…, ghost: false)`; shot matches live's colours and 5 px edges).
+- Queued with this handoff: a clicked flat bend as live sheetmetal-gaps2 (`selected_zone`: fill rgb(214,151,30)
+  and edge (255,169,10) measured equal to live in a vibe6 shot; `{"flat_bend": n, "frac": f}` scenario target, ours
+  only); live sketch-gaps4 / editing-gaps4: the circular pattern's handle arc (1.2 r, open arrow) and, below 360°,
+  its angle dimension (1.4 r, text ~0.64 along: one take), and the Transform's 75 × 26 value boxes ("20 deg", 8
+  decimals; off the pointer while dragging; opened for typing after; `XF_*_BOX_*`, `xf_released`; one take each).
+- skasm fixed the sheet metal part colour in their tree (std's thickened plate and definition surface burned colours
+  0 and 1; `Context::reuse_colours_from`), landing after their suite (~2 h from 06:50): then our flat view reads as
+  live's light blue; recheck /root/psui-scratch/fb5 sm-click then.
+- Open feel gaps: the tooltip fade-out (vendored gpui's tooltip lifecycle; gpui's tooltip tests expect an instant
+  hide; left), the view cube knob size vs live's 3 px hover map, a woken model edge's parallel (not measured live).
+- end-cap-profile-circle step 3: matches on a quiet host; under load our Faces field keeps focus a moment. Low.
+- tab-new-edit-reedit: decision asked of the lead (11-15 23:50): the click lands ~1.1 px from Flange 1's wall;
+  known (sub-pixel camera) or retarget onto the wall live hit.
+- Mac target ~20 GB: prune-target.py, and drop debug/incremental dirs idle > 90 min.
+- Scratch: /root/psui-scratch/fb5/run.sh runs one one-off scenario (--scenarios ~/tmp/psui/fb5s --all, shots per
+  step); scenario files in fb5/: shell-fail.json, sm-flat.json, triad.json, sm-click.json (copy one to vibe6 fb5s/).
+
+## Queued to land
+
+- 4a228915 (flat bend click) and the gaps4 commit, with this handoff.
+
