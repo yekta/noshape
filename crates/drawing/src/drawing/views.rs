@@ -2804,7 +2804,14 @@ fn cylinder_ends(shapes: &[Shape], frame: &ViewFrame) -> Vec<([f64; 2], f64)> {
             }
         }
     }
-    groups.into_iter().filter(|g| angular_coverage(&g.2) >= std::f64::consts::PI - 1e-6).map(|g| (g.0, g.1)).collect()
+    groups.into_iter().filter(|g| centermarked(&g.2)).map(|g| (g.0, g.1)).collect()
+}
+
+/// Whether cylinders seen end-on (their angular intervals) get a centermark: all the way round together (a hole in
+/// pieces), or one of them half way at least (a radial hole's bore through a boss, live 1857); not quarter rounds,
+/// nor two of them on one axis (c2-sm-louver's bends: live marks none).
+fn centermarked(iv: &[(f64, f64)]) -> bool {
+    angular_coverage(iv) >= std::f64::consts::TAU - 1e-6 || iv.iter().any(|(a, b)| b - a >= std::f64::consts::PI - 1e-6)
 }
 
 /// Total angle covered by a set of angular intervals (radians, union,
@@ -3815,6 +3822,18 @@ fn sketch_geometry(id: ViewId, ctx: &Context, feature: &crate::FeatureId, frame:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Centermarks: a hole whole or in pieces, a radial hole's half bore; not a quarter round, nor c2-sm-louver's two
+    /// quarter bends on one axis (exchange suite: 24 CENTERMARKS lines in ours, live none).
+    #[test]
+    fn centermarks_go_on_holes_not_on_bends() {
+        use std::f64::consts::{FRAC_PI_2, PI, TAU};
+        assert!(centermarked(&[(0.0, TAU)]));
+        assert!(centermarked(&[(0.0, PI), (PI, TAU)]));
+        assert!(centermarked(&[(3.0 * FRAC_PI_2, 5.0 * FRAC_PI_2)]));
+        assert!(!centermarked(&[(0.0, FRAC_PI_2)]));
+        assert!(!centermarked(&[(3.0 * FRAC_PI_2, TAU), (0.0, FRAC_PI_2)]));
+    }
 
     /// Live drw-crop-spline (dx 11-15): a spline crop through points on a block's bottom and top edges keeps those
     /// edges between its crossings and draws the profile where it runs through the block: two arcs; a profile wholly
