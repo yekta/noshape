@@ -532,6 +532,20 @@ fn enclose_body() {
     assert!(near(total_volume(&res.context), 2.0 * 8e-6, 1e-6));
 }
 
+/// A failed Shell marks the whole part (live feedback-gaps item 5: every edge red, faces tinted; std's shelled body is
+/// the error entity): a 10 mm block hollowed 20 mm fails with the block's 6 faces as error geometry.
+#[test]
+fn a_failed_shell_shows_its_part_as_the_error() {
+    let mut t = T::new();
+    let (_, x) = t.block(0.0, 0.0, 0.01, 0.01, "10 mm");
+    let part = body_ref(&BodyId { feature: x, index: 0 });
+    t.add("shell", &[("isHollow", b(true)), ("parts", q(vec![part])), ("thickness", e("20 mm"))]);
+    let res = t.regen();
+    let st = res.display.features.last().unwrap();
+    assert_eq!(st.status, FeatureStatus::Error);
+    assert_eq!(st.error_mesh.as_ref().expect("error geometry").face_ranges.len(), 6);
+}
+
 /// Enclose of a hollowed part is its cavity, not the part again with the cavity filled (cf-lighten's Lighten encloses
 /// its shelled tools to get their insides, live): a 20 mm block hollowed 2 mm encloses a 16 mm cube.
 #[test]
