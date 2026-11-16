@@ -1,34 +1,36 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 04:48 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 05:23 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
-- **Impeller speed P0 (qa 11-16 04:40):** Delete face 2 3.9 -> 26.4 s from v0.4.48 to v0.4.53 (release A/B beside
-  asm's full7 on vibe7: a hint only; qa reruns it quiet). Cause upstream and correct: Chamfer 26 now builds (Error ->
-  Ok, as live), so OCCT's Defeaturing gets a bigger part (trimming faces 13.2 s, FF 6.4 s, EF 6.1 s, 6 removals).
-  The real gap: our Move face 1 (OFFSET #flanschRandbreite of 4 faces of Part 2, Extrude 6's ring, 21/57/38,
-  2337.5 -> 11762.3 mm³ in live, topology kept) fails "Could not offset selected faces as requested." after 8 s in
-  op_defeature: it takes "Reapply fillet" (detail_a::blends_to_reapply -> reblend), so something on the ring reads as
-  a fillet. Delete face 2 then picks Move face's SPLIT faces, so on live's input it removes other faces. Probing our
-  Part 2 after Extrude 6 (core-trace, branch core-imp-mf = main + probe patch; vibe5). qa told.
-- **Queued 7d5e9394 (core-oc, core-apex):** a loft from a profile to a sketch point, Tangent to profile at the point,
-  arrives in the point's plane (features.cpp apex_tangent_loft: each lateral face's columns [Q, (Q+B2)/2, B2, P],
-  B2 = P - m/3 (P - Q) in the plane; solid_a.rs Section.point_normal). The NotClosed was UpdateEdge giving the apex's
-  degenerate edge's new pcurve the range [0, 1]: its range is set back. 370666.7 mm³ vs live 370677.7, whose own band
-  is ±3875.5 (T1 features_a::a_loft_to_a_sketch_point_tangent_to_its_plane). dx to rerun c2-loft-paths-guides and
-  c2-loft-guide-curves-wave-washer once its Sketch 2 plane fix (e7e19bfa6) is on main.
+- **Impeller speed P0 (qa 11-16 04:40): waiting on blend.** Delete face 2 3.9 -> 26.4 s from v0.4.48 to v0.4.53
+  (release A/B beside asm's full7: a hint; qa reruns it quiet). Chamfer 26 now builds (Error -> Ok, as live), so OCCT's
+  Defeaturing gets a bigger part (trimming faces 13.2 s, FF 6.4 s, EF 6.1 s). Root: Part 1 differs from Fillet 28 on
+  (ours 34/89 vs live 35/100; Fillet 29 fails, live 39/111; both hang on Fillet 3 (27), blend's next item), so the face
+  "Sketch Stroemungskanal" is imprinted on differs: our sketch's circles are split (4 regions) but Extrude impellerraum
+  adds 3 faces (live 20) and Extrude 6's ring is 4 faces (live 21, same 2337 mm³). Move face 1's 4 SWEPT_FACEs of the
+  ring's split sides don't exist in ours: it fails ("Could not offset ...", 8 s in the reblend's defeature) and Delete
+  face 2 defeatures a part live never has. Turning the fuse's unify off changes nothing there. blend tells me when
+  27-29 match; then recheck from Extrude impellerraum (the probe now prints a sketch's regions: NOSHAPE_PROBE_SKETCH).
+- **Gate running (core-trace, core-tooluni aa92b1899):** an Add whose tool misses its merge scope (eval.rs "fuse
+  merged nothing" branch) unifies the tool (`unified_tool`) as Parasolid's union returns it: asm's welding 9bdeb5
+  Extrude 4 7/15/10 -> live 6/12/8, m9b 8/24 -> 24/24. NEW keeps split faces (live's impeller Extrude 6 does). T1
+  features_a::an_add_that_misses_its_part_makes_a_part_whose_collinear_sides_are_one_face. Suite pair on vibe5
+  (/root/core-scratch/gate-tooluni.sh, log beside it): land if only m9b-like changes.
 - Landed 11-16: 41c146a8 (Routing curve fit), 48beead66 (parting-line draft), ee16972d8 (INTERNAL edges hidden; DECISIONS
   e677ec1c0), ce0e6ae8 + 601df0ac (failed Shell: error shapes, FeatureState::error_parts), c2fd0ca7 (corner break
   takes a side whole), 7629ea25 (Offset surface sheets at a corner as one), 09c11d4f (path loft through middle
-  profiles: c2-loft-guide-curves-wave-washer Loft 1).
+  profiles: c2-loft-guide-curves-wave-washer Loft 1), f7a8d4d0 (loft to a sketch point, Tangent to profile: a dome in the
+  point's plane; dx reruns paths-guides and wave-washer once its Sketch 2 plane fix is on main).
 - **Parked: knife Revolve 1's 19th vertex (branch core-pole-v2 in core-bis, not landed).** Our sphere's pole there sits
   where live's vertex is, (114.5, 0, -12.56), inside the dish. "Pole shown where the face has a boundary" regressed
   cf-box-dovetail-joint, prize-wheel-tim, cf-surface-pattern; "boundary not only circles round the pole's axis" still
   regresses prize-wheel-tim's knob (our sphere's poles lie on a horizontal axis, (±4.9, 0, 24.5): our sphere frame,
   not live's) and cf-surface-pattern (259 -> 344 vertices). Needs live's surface type of the knife's dish
   (SPHERE or a spun B-spline: Parasolid may keep a vertex where a spun profile meets the axis) before another try.
-- Probe (uncommitted, /root/core-scratch/bodies-probe.patch): ops parity::bodies_after_feature_probe
+- Probe (uncommitted, /root/core-scratch/bodies-probe.patch): ops parity::bodies_after_feature_probe (+ NOSHAPE_PROBE_SKETCH: a
+  sketch's regions)
   (NOSHAPE_PROBE_DOC = a copy WITH its -wal / -shm, NOSHAPE_PROBE_AFTER, NOSHAPE_PROBE_OUT, NOSHAPE_PROBE_PART,
   NOSHAPE_PROBE_TAB): bodies as .brep, a part's faces (surface, edge indices), edges and vertices with shown flags.
   Saved documents' part names are Part N, not live's.
@@ -56,8 +58,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. Impeller Move face 1 (In flight), then Delete face 2's time on live's input; blend has Fillet 29 (0.9 ms -> 4.8 s
-   failure) and Fillet 3. Left from 11-16's asks: c2-sm-hem-plus Derived 1 6/12/8 vs live 14/36/24 (after Offset
+0. Impeller Move face 1 / Delete face 2 after blend's Fillet 3 / 28 / 29 (In flight). Left from 11-16's asks: c2-sm-hem-plus Derived 1 6/12/8 vs live 14/36/24 (after Offset
    surface 1, now one sheet); c2-sm-side-cuts-tab's next difference is a Hole (13/18 after the corner break).
 1. Knife's dish vertex: asked live in REQUESTS.md (11-16 01:32) for the face's surface type and its edges / vertices;
    then retry core-pole-v2 (Parked above) on what live says.
