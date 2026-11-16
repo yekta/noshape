@@ -31,6 +31,12 @@ only when a line here points there).
   (4, ∓1.82), r 0.84). Off live by 6.75 mm instead of 3.35 before, so the translator takes the edits back and the
   stored 5 mm sketch stays. A solve that keeps the branch (step large dimension changes, or keep each arc's side of
   its chord as stored) would fix it. Seen with a temporary eprintln in off_live_points (per-point live vs ours).
+- The other c2-config-parts documents stop at a sketch the translator takes back too, where the stored geometry is
+  another configuration's (core's 97b778e7d, queued: they're now built at sketches.json's capturedConfiguration, the
+  defaults live's lines are at): pulleys Sketch 2 (after the solve only qW2yvEmz0tbj.end, the free end of a
+  construction mirror line, sits 0.2 mm off live's: 1.09 -> 0.20 mm, but `closer` wants <= 1e-6), linear-rail
+  Sketch 2 (1.92 -> 0.30 mm), standoffs Sketch 3 (2.38 -> 3.29 mm), sprockets Sketch 3. A `closer` that ignores free
+  construction points (or compares only points the regions use) would likely keep pulleys' and linear-rail's.
 
 ## In flight
 - Landing 2026-11-16 01:57: a sheet metal entity is labelled after the feature that made its definition entity as

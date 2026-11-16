@@ -33,7 +33,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - **Pair (six core-oc commits: 1357fddb1, 11f1335b9, 8deb8156c, 3ce19f704, 3ace68b3f, bcaf5ffdb): vibe7
   ~/agents/core-keep/sppair.sh -> spres (merge-base d29b5ee81 files in core-keep/base, branch copies core-keep/branch;
   started 18:33 UTC, the last two synced in before its build). Land all six when it shows nothing worse (save the
-  probe patch first).** (1357fddb1): opSplitFace keeps a split face's attributes on
+  probe patch first; 97b778e7d sits on top, see below: land.sh would take it too, so land the six from a branch at
+  bcaf5ffdb or after a config-docs check).** (1357fddb1): opSplitFace keeps a split face's attributes on
   every piece** (host ops.rs op_split_face; Parasolid's). std Bend's imprint split the wall and dropped its WALL
   attribute, so c2-sm-rocker-enclosure-sm's Extrude 1 read "Removal destroys sheet metal part" (eachSheetStillExists
   found no WALL face): 6 -> 8/14; 14 sheet metal docs otherwise unchanged. T1
@@ -75,6 +76,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - c2-config-parts-links (10/35, largest gap after paths-guides): Sketch 1's solve flips its waist arcs to the other
   tangent branch when p goes 5 -> 8 mm, so the translator keeps the stored 5 mm sketch. Solver: in skasm's handoff
   11-16. Not core's.
+- **Committed 97b778e7d (core-oc, NOT in the vibe7 pair): the translator builds configured documents at
+  sketches.json's capturedConfiguration (the defaults live's lines are at) instead of currentConfiguration** (only the 7
+  c2-config-parts docs record it; cf-sheet-metal-model-plus, without it, keeps current). Debug run of the 6 (screws
+  out): every score as before (pulleys' Sketch 1 now kept; the rest stop at take-backs, in skasm's handoff). T1
+  parity::a_configuration_variable_takes_the_captured_configurations_value. Land after the six, with those 6 docs as
+  its pair.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
