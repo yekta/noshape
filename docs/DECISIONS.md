@@ -43,6 +43,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-16 A vertex live leaves splitting one edge into two pieces of the same curve (no new geometry; e.g. impeller f24's
   split 47 µm from a corner) is a known live difference when the faces match, the volume is within tolerance and no
   later feature references it. Record it with its measurements in the suite's known-differences table.
+- 11-16 An edge that lies inside a face and bounds no face (an INTERNAL leftover, e.g. a hole's old seam) is never shown
+  or counted: Parasolid keeps none (a2e4a2 live 32/72/40). A user-document count that drops only by such edges, with
+  the same volume and faces, is a fix, not a regression (dock E2 Govde 3104/1760 → 3103/1759).
 - 11-15 Edges live adds only inside a sub-micron near-tangent sliver (Parasolid's tolerance choices, e.g. impeller f15)
   are a known live difference when ours is the exact intersection and no later feature references them; chase
   them only if a later feature or a selection depends on them.
