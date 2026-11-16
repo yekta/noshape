@@ -2360,9 +2360,9 @@ fn a_partial_flange_with_a_tear_relief_has_no_flat_collision() {
     }
 }
 
-/// Live (skasm-q1627, ui-parity sm-box): a sheet metal face or vertex is labelled after the feature that first made
-/// its definition entity, not the last one to change it: after Flange 2, the plate's top still reads Sheet metal
-/// model 1, Flange 2's wall Flange 2, Flange 1's vertices Flange 1.
+/// Live (skasm-q1627 / q2202, ui-parity sm-box): a sheet metal face, edge or vertex is labelled after the feature that
+/// made its definition entity as it is now: after Flange 2, the plate's top still reads Sheet metal model 1, Flange 2's
+/// wall Flange 2, Flange 1's vertices, bend 1 and the corners where the flanges meet Flange 1.
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn sheet_metal_entities_are_labelled_after_their_definition_entitys_feature() {
@@ -2384,10 +2384,13 @@ fn sheet_metal_entities_are_labelled_after_their_definition_entitys_feature() {
     let owner = |e: &Reference| r.context.sheet_metal.values().find_map(|d| d.label_owners.iter().find(|(x, _)| x == e).map(|(_, f)| *f));
     assert_eq!(owner(&face_at(&r, DVec3::new(30.0, 21.0, 2.0))), Some(model), "the plate's top");
     assert_eq!(owner(&face_at(&r, DVec3::new(62.0, 21.0, 14.5))), Some(flanges[1]), "Flange 2's outer wall");
-    // Flange 1's wall's corner vertex, away from Flange 2. (The bend and the vertices where the flanges meet read
-    // Flange 1 in live, Sheet metal model 1 here: whether std's identity tracking follows an edge a boolean merges,
-    // REQUESTS 22:02.)
     assert_eq!(owner(&vertex_at(&r, DVec3::new(0.0, -2.0, 25.0))), Some(flanges[0]), "Flange 1's top corner");
+    // Bend 1 and the corner vertices where the flanges meet: their definition entities are the plate's edge and
+    // corner as Flange 1's boolean joined them to the flange, new entities of Flange 1's (live skasm-q2202).
+    let s2 = std::f64::consts::SQRT_2;
+    assert_eq!(owner(&face_at(&r, DVec3::new(30.0, 2.0 - s2, 4.0 - s2))), Some(flanges[0]), "bend 1");
+    assert_eq!(owner(&vertex_at(&r, DVec3::new(60.0, -2.0, 4.0))), Some(flanges[0]), "corner (60, -2, 4)");
+    assert_eq!(owner(&vertex_at(&r, DVec3::new(60.0, 0.0, 4.0))), Some(flanges[0]), "corner (60, 0, 4)");
 }
 
 /// Live (skasm-q1627, sm-box after Flange 2): two flanges added one after the other on adjacent edges. Flange 2's bend

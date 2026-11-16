@@ -2504,6 +2504,12 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 *o = super::wrap_name(o, marker, feature);
             }
         }
+        // Each definition entity's owner: kept while its name stands (unchanged since the last feature), else this
+        // feature, which made it as it is now (live skasm-q2202: the plate edge Flange 1's boolean joins to the flange
+        // is a new entity of Flange 1's, its association attribute kept).
+        let before: std::collections::HashMap<&Reference, FeatureId> = st.ctx.sheet_metal.get(&part_id).map(|d| d.def_owners.iter().map(|(r, f)| (r, *f)).collect()).unwrap_or_default();
+        data.def_owners = dfaces.iter().chain(dedges).chain(dverts).map(|r| (r.clone(), before.get(r).copied().unwrap_or(feature))).collect();
+        drop(before);
         st.ctx.sheet_metal.insert(part_id.clone(), Arc::new(data));
         match flat {
             Some(mut f) => {
@@ -2527,15 +2533,10 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         links.extend(vertices.iter().enumerate().filter_map(|(v, d)| Some((Reference::Vertex((*part.vertices.get(v)?.clone()).clone()), def_ref(d)?))));
         // All read before any is added (each addition drops the attributes' index).
         let assoc: Vec<Vec<Value>> = links.iter().map(|(_, from)| associations(&st, from)).collect();
-        // Each entity's label: the feature whose transient id its definition entity's association carries (the one
-        // that first made it, live skasm-q1627).
-        let owners: Vec<(Reference, FeatureId)> = links
-            .iter()
-            .zip(&assoc)
-            .filter(|((to, _), _)| !matches!(to, Reference::Body(_)))
-            .filter_map(|((to, _), attrs)| Some((to.clone(), attrs.iter().find_map(|a| st.transient_feature(&a.get("attributeId").as_str()?))?)))
-            .collect();
+        // Each entity's label: its definition entity's owner.
         if let Some(d) = st.ctx.sheet_metal.get_mut(&part_id) {
+            let owner: std::collections::HashMap<&Reference, FeatureId> = d.def_owners.iter().map(|(r, f)| (r, *f)).collect();
+            let owners: Vec<(Reference, FeatureId)> = links.iter().filter(|(to, _)| !matches!(to, Reference::Body(_))).filter_map(|(to, from)| Some((to.clone(), *owner.get(from)?))).collect();
             Arc::make_mut(d).label_owners = owners;
         }
         for ((to, _), attrs) in links.into_iter().zip(assoc) {

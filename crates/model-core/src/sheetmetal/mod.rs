@@ -361,10 +361,14 @@ pub struct SheetMetalData {
     pub rips: Vec<Rip>,
     /// Form outlines and relief cutouts shown in the flat pattern.
     pub marks: Vec<FlatMark>,
-    /// The feature a face, edge or vertex of the part is labelled after ("Face of Flange 1"): the one that first made
-    /// its definition entity (live skasm-q1627: not the last to change it). From the entity's association attribute.
+    /// The feature a face, edge or vertex of the part is labelled after ("Face of Flange 1"): its definition entity's
+    /// owner ([`Self::def_owners`]).
     #[serde(default)]
     pub label_owners: Vec<(crate::reference::Reference, FeatureId)>,
+    /// Each definition entity's owner: the feature that made it as it is now (live skasm-q1627 / q2202: kept while a
+    /// later feature leaves it unchanged; the plate edge a flange's boolean joins is Flange 1's).
+    #[serde(default)]
+    pub def_owners: Vec<(crate::reference::Reference, FeatureId)>,
 }
 
 /// A sheet metal model's joints over all its parts: the Sheet metal table
@@ -454,6 +458,7 @@ impl SheetMetalData {
             rips: Vec::new(),
             marks: Vec::new(),
             label_owners: Vec::new(),
+            def_owners: Vec::new(),
         }
     }
 

@@ -1,9 +1,15 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-16 01:47 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
+Updated 2026-11-16 01:57 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
 only when a line here points there).
 
 ## In flight
+- Landing 2026-11-16 01:57: a sheet metal entity is labelled after the feature that made its definition entity as
+  it is now (SheetMetalData.def_owners: a definition entity keeps its owner while its name stands, else the current
+  feature takes it; live skasm-q2202: identity tracking gives 0 for the plate edge Flange 1's boolean joins, its
+  association attribute is kept, but it is a new entity JVB of Flange 1's). Replaces decoding association attribute
+  ids (transient_feature / Context.fs_transient_bases removed). sheetmetal_std's labels T2 now asserts bend 1 and the
+  corners (60, -2, 4) / (60, 0, 4) read Flange 1; 86 sheet metal tests pass.
 - Landing 2026-11-16 01:3x: Use / measure / pierce / planes take another sketch's spline, ellipse and conic
   (measure.rs resolve_shapes via helpers_a::curve_segment; was lines and arcs only, "That geometry can't be used in
   this sketch"), and the translator lands a spline Use by its first / last points. Tests: e2e
@@ -19,9 +25,6 @@ only when a line here points there).
   (-5.0442, -12.1140) mm): the model geometry before it differs (feature not traced), not the translator.
 
 ## Waiting on others
-- live2: identity tracking through a sheet boolean (22:02: live labels bend 1 and the corner
-  vertices (60, -2, 4) / (60, 0, 4) after Flange 1, ours after Sheet metal model 1 because our tracking follows the
-  plate edge to the merged bend edge, so std's assignSMAttributesToNewOrSplitEntities keeps its old association).
 - psui (4d0a82b2-8fc7-43e6-b45d-bd8cb225741e): told 20:3x the tab row is a pick difference (live hit Flange 1's wall).
 - dx: cf-spur-gear's per-host Sketch 2 failure = the near-singular sketch 62893b1ed takes back (told 21:3x).
 - Not mine (handed): knife / impeller geometry (core); fan-blade Boolean 2, gamma / wire-clip Boolean 2, shaped-flange
@@ -37,11 +40,12 @@ only when a line here points there).
   Flange 1 … Mirror 1): needs a contact rule, not an area check.
 
 ## Next, in order
-1. The tracking answer (22:02): if Onshape's tracking drops a merged edge, make ours do the same (custom host query.rs
-   tracking), check the 8 sheet metal suite documents + T2s, and restore the corner-vertex asserts in
-   sheetmetal_std::sheet_metal_entities_are_labelled_after_their_definition_entitys_feature.
-2. Dropped sketch constraints (74 over the 87 documents of 23:11), largest documents first (lead 2026-11-16).
-3. Fuzz closed (DECISIONS 11-16): live_fuzz::live_matches now fails on any counted difference; 801 of 801 counted
+1. Dropped sketch constraints (74 over the 87 documents of 2026-11-15 23:11), largest documents first (lead
+   2026-11-16): fan-blade-sweep (13, "its sketch entity not translated": rectangles' .bottom/.top sides, fillet arcs'
+   visualSharp points), hex-bookcase-derived (21: 9 clip COINCIDENTs taken back as over-defining; its mesh Uses are
+   dx's), knife 8, valve-config 7, duct-multipart 6, impeller-loft 5. Trace running: vibe6 unit skasm-fan-0148
+   (/root/skasm-scratch/fan-hex.log).
+2. Fuzz closed (DECISIONS 11-16): live_fuzz::live_matches now fails on any counted difference; 801 of 801 counted
    match. Not counted: 29 live defects (23 live can't solve; 6 with redundant constraints where live calls
    under-defined curves fully defined: s5 s6 s8 s10 s11 s14) and 29 cases whose under-defined geometry settles
    elsewhere (FUZZ_SETTLES=1 lists them). "under?" in live's capture (too faint, no black / red) reads as under.

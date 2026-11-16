@@ -412,9 +412,6 @@ impl FsContext {
         ctx.fs_variables = st.variables.clone();
         ctx.fs_transients = st.persistent.clone();
         ctx.fs_transient_next = st.transient_base + st.transient_ids.len();
-        if !st.transient_ids.is_empty() && !ctx.fs_transient_bases.iter().any(|(f, b)| *f == st.feature && *b == st.transient_base) {
-            ctx.fs_transient_bases.push((st.feature, st.transient_base));
-        }
         ctx
     }
 
@@ -425,18 +422,6 @@ impl FsContext {
 }
 
 impl CtxState {
-    /// The feature that handed out transient id `id` ("JAB": a base-26 count over the regeneration; or a transient
-    /// query as text, std's association attribute ids): this one or an earlier custom feature
-    /// ([`Context::fs_transient_bases`]).
-    pub fn transient_feature(&self, id: &str) -> Option<FeatureId> {
-        let id = id.rsplit("transientId : ").next()?.split(|c: char| !c.is_ascii_alphanumeric()).next()?;
-        let n = id.strip_prefix('J')?.bytes().try_fold(0usize, |n, c| c.is_ascii_uppercase().then(|| n * 26 + (c - b'A') as usize))?;
-        if n >= self.transient_base {
-            return (n < self.transient_base + self.transient_ids.len()).then_some(self.feature);
-        }
-        self.ctx.fs_transient_bases.iter().rev().find(|(_, b)| *b <= n).map(|(f, _)| *f)
-    }
-
     /// Transient id string of an entity (stable within this evaluation).
     /// Every attribute: (entity, `{ name, attribute }`), in the order they were set.
     pub fn attributes(&self) -> &[(Reference, Value)] {
