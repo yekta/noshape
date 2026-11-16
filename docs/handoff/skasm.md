@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-16 01:31 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
+Updated 2026-11-16 01:44 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
 only when a line here points there).
 
 ## In flight
@@ -40,9 +40,9 @@ only when a line here points there).
 1. The tracking answer (22:02): if Onshape's tracking drops a merged edge, make ours do the same (custom host query.rs
    tracking), check the 8 sheet metal suite documents + T2s, and restore the corner-vertex asserts in
    sheetmetal_std::sheet_metal_entities_are_labelled_after_their_definition_entitys_feature.
-2. Fuzz P2 (61 of 830 open, list /root/skasm-scratch/fz/p2-2325.txt): s8 / s10 / s11 are live's status with redundant
-   constraints (a floating line "fully"), not targets; the rest are free placement and drag rules (s1: live's drag
-   leaves the dragged corner off its target) that per-case rules didn't converge on. Decision asked of the lead.
+2. Fuzz parked (DECISIONS 11-16): live_fuzz::live_matches reports s8 / s10 / s11 as live defects (LIVE_DEFECTS) and
+   leaves the drags of s1 / s5 / s6 / s14 uncounted (DRAG_SETTLE) until a general rule for live's drag model; no
+   per-case rules. 770 of 827 counted match; the other 57 are base-solve placement (23 of them live unsolved).
 
 ## Current numbers
 - Model suite 2026-11-16 00:01 vibe6 (suite-2354.log): 80/111 documents, 1019/1292 features (24 documents new to the
@@ -51,7 +51,7 @@ only when a line here points there).
   shaped-flange 809 / 1026, overcut-dogbone 210 / 270, hem 65 / 95. All four are faster than live; the suite's slower
   figures were host load.
 - Exchange: model-plus STEP / IGES import in live as 58/151/94 (6f5b151e snap_coplanar); dx "live imports ours" 43/48.
-- Sketch fuzz vs live: 769 of 830; probes 20 11/11, probes 11 s236 open.
+- Sketch fuzz vs live: 770 of 827 counted (3 live defects); probes 20 11/11, probes 11 s236 open.
 
 ## Hosts and rules (mine; DECISIONS.md has the general ones)
 - Builds and crate tests on the Mac: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c '…'` (one slot; rb.sh keeps file
