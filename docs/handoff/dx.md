@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-16 19:20 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-16 21:35 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -14,9 +14,10 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.
 Largest gaps first, one line per landing. Data /root/parity/exchange/<doc>/ (live.*, live-self.json, live-times.json,
-live-drawing.dxf); suite parity::exchange_round_trip (dx-keep/bin/exch.sh). live2's timer (18:50 UTC) fetches the
-rest of set 2 (hex-bookcase first + JT / RHINO / PVZ, then the other 5, then all 10 live.stl + live-self STL); REQUESTS
-13:31 asks live-self "ACIS" too. Then rerun the whole suite (vibe6, ~/bin/slot, timeout) and rank again.
+live-drawing.dxf); suite parity::exchange_round_trip (dx-keep/bin/exch.sh). live2's 18:50 fetch of the
+rest of set 2 failed (HTTP 401 on every doc; only variable-fillet's STEP / IGES came): REQUESTS line 3328 (21:04) asks
+for a rerun after re-authenticating (live2 paused until ~11-17 10:15). Full suite rerun x1116n (vibe6, main 57885ecc
+binary incl. 4dd88057, all 17 docs, snapshot ~/tmp/dx/exs, log ~/tmp/dx/exch-x1116n.log, started 21:28): rank from it.
 Last full run (exch-1116, 08:50 binary): ours imports live's 58/74, live imports ours 46/48, ours reads ours 108/117,
 times at or under live's 48/48.
 Landed 11-16: 503d5a2a6 suite; 4d5ba3177 OBJ zip import; ad4a3517e mesh part -> planar facets (x_t / ACIS / IGES /
@@ -26,14 +27,17 @@ centermarks not on bends + STEP / IGES offsets as B-surfaces (rings-loft 440.81 
 where every face has the arcs as a loop (cf-snap-hook one solid); 03467fc8 ACIS import keeps the file's edge range
 where projection misses (cf-sheet-metal-model-plus' SAT: Part 1 was inside out -> import failed; now 10148.89 mm³,
 live 10147.18); b777cbd1 the screws Split hang fix (bool's gate clean).
-Queued: b3f549eb import_files reports a failed Import feature in `errors` (was 0 parts, no error).
+b3f549eb (landed): import_files reports a failed Import feature in `errors` (was 0 parts, no error).
 Landed 11-16 pm: 5acd8e11 curve pattern along a 3D path in the corrected Frenet frame (driven-pattern Curve pattern 1:
 instances 50 -> 2-4 µm off live, still 7/11: ours are exact screw copies of the seed, live's not quite: helix geometry?);
 de3fb725 live's rings-loft x_t imports (periodic tube both ways, blend SP-curves not p-curves; Extruded ring 273 faces,
 440.79 mm³ / 1193.08 mm² as live; 766/510 edges/vertices for 762/508 = the two ring faces' seams; no T1 test: the only
 reproducer is live's 1 MB file, exchange suite covers it); e3109d3c drawings: B-spline edges on a circle / ellipse to
-1 µm drawn as conics (rings-loft ELLIPSE 15 -> 96, live 95). Queued 4fd6bad2: an exact view whose shape loads no
-edges (OCCT Update swallows the failure, at random in one of a sheet's parallel views) retries, then goes polygonal.
+1 µm drawn as conics (rings-loft ELLIPSE 15 -> 96, live 95). 46ee2df2: an exact view whose shape loads no edges
+(OCCT Update swallows the failure, at random in one of a sheet's parallel views) retries, then goes polygonal.
+654ffaf5: x_t export writes offset surfaces as OFFSET_SURF over their basis's B-surface and puts each fin's SP-curve in
+the period of the B-surface's range as written (rings-loft Part 1 read back 302.72 -> 440.65 mm³, 440.77; T1
+export::offsets_of_a_periodic_bsurface_round_trip_through_parasolid).
 Open, ranked:
 1. Drawings: rings-loft ARC 40 for live's 91: in the isometric view live writes ARCs (r 0.02-0.13 in) where ours are
    ELLIPSEs of ratios 0.34-0.82 (/root/dx-scratch/rl: ours-drawing.dxf, live-drawing.dxf; region (6,6)); TANGENT
@@ -42,12 +46,11 @@ Open, ranked:
    shows up in timings.
 2. Our SAT, other docs (rerun the suite first: 03467fc8 may cover them): motor-mount-jack 24/26/2 for 16/24/0;
    cf-hose-routing 22/44/24 for 12/12/0; cf-o-ring Part 3 read back as another ring (names?).
-3. Our own rings-loft x_t reads back 275/776/517 with a wrong box (y -12.35 for -12, z -13.04 for -11.25): writer or
-   reader on our periodic tubes. housing-draft x_t reads back 37/82/46 for 36/79/44.
+3. Our own rings-loft x_t: volume fixed (654ffaf5); still 275 faces for 273 (check box in x1116n). housing-draft x_t reads back 37/82/46 for 36/79/44.
 4. SAT of live: sm-louver's file splits two cylinders (40 faces); waits on live-self "ACIS".
 - c2-config-parts-screws: hang fixed (b777cbd1), still in tests/parity-models/unscored.json: Sweep 1's 14.8 GB
   Boolean is bool's P0 (lead 11-16). Score it once fixed. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
-- Next after these: exchange suite rerun once live2's 18:50 fetch is in (vibe6, ~/bin/slot, timeout, main binary).
+- Exchange suite x1116n running (above); set 2 again when live2 refetches.
 
 ## Other in flight
 - config-parts (vibe5 07:4x, ops-hx2, screws skipped; ~/tmp/dx/cfgparts-hx2.log): linear-rail 19/26, links 10/35, nuts
@@ -146,8 +149,8 @@ Open, ranked:
 
 ## Next, in order
 1. Curve pattern 1 path (driven-pattern, above): translator, mine.
-2. After live2's 18:50 fetch: exchange suite rerun with a main binary; rank and fix.
-3. rings-loft live.x_t reader (Open 1); drawing conics (Open 3).
+2. Rank x1116n's gaps and fix the largest; set 2 after live2's refetch.
+3. Drawing conics in the iso view (Open 1).
 4. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## How to run
@@ -168,7 +171,8 @@ Open, ranked:
   one regenerates without newer fixes. Tools: feature_list, feature_get, feature_edit, feature_rollback,
   query_parts, query_entities, sketch_get, export_parts; `batch` file of {"tool","args"} lines.
 - Gates for custom-host changes: dx-keep/bin/gate-rf.sh (all 47 cf models, A then B, scores diffed).
-- Exchange suite: dx-keep/bin/exch.sh (NOSHAPE_EXCHANGE=~/parity/exchange, parity::exchange_round_trip).
+- Exchange suite (vibe6): `cp -a ~/parity/exchange ~/tmp/dx/exs` (the suite writes ours.* there), then
+  `~/bin/slot timeout 6000 ~/agents/dx-keep/bin/exch.sh x <tag> ~/tmp/dx/exs` (log ~/tmp/dx/exch-<tag>.log).
   /root/dx-scratch/bin/stlinfo.py <stl>: triangles, box.
 - Drawing exports: /root/dx-scratch/exprun.sh <out> <scenario…> (EXPHOST=vibe7; builds the app on the host, runs
   ui-parity, compares with tools/drawing-export/compare.py against /root/parity/ui/live).
