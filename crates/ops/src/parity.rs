@@ -1004,7 +1004,11 @@ impl<'a> Translator<'a> {
                 }
                 continue;
             }
-            let made = if planar { context_face(faces[0], &edges).map(|f| (true, f)) } else { Err(String::new()) };
+            let made = match faces.as_slice() {
+                _ if planar => context_face(faces[0], &edges).map(|f| (true, f)),
+                [f] if f["surfaceType"] == "CYLINDER" => context_cylinder(&edges).map(|f| (true, f)),
+                _ => Err(String::new()),
+            };
             match made.or_else(|_| context_wire(&edges).map(|w| (false, w))) {
                 Ok(shape) => shapes.push(shape),
                 Err(e) => problems.push(format!("body {body}: {e}")),
@@ -6380,6 +6384,25 @@ fn context_face(face: &Value, edges: &[&Value]) -> Result<noshape_kernel::Shape,
 }
 
 /// Live's in-context edges (context.jsonl EDGE lines) as one compound of 3D edges.
+/// A context.jsonl cylindrical face from its two edges, coaxial full circles of one radius (corexy 771e5f's pulleys
+/// a Belt goes round).
+fn context_cylinder(edges: &[&Value]) -> Result<noshape_kernel::Shape, String> {
+    use glam::DVec3;
+    use noshape_kernel as k;
+    let v3 = |v: &Value| f3(v).map(DVec3::from);
+    let circle = |e: &&Value| {
+        let full = e["curveType"] == "CIRCLE" && v3(&e["start"])?.distance(v3(&e["end"])?) < 1e-9;
+        full.then_some((v3(&e["center"])?, e["radius"].as_f64()?))
+    };
+    let [Some((a, r)), Some((b, r2))] = [edges.first().and_then(circle), edges.get(1).and_then(circle)] else { return Err("a cylinder not bounded by two full circles".into()) };
+    let (axis, h) = ((b - a).normalize_or_zero(), a.distance(b));
+    if edges.len() != 2 || (r - r2).abs() > 1e-9 || h < 1e-9 {
+        return Err("a cylinder not bounded by two coaxial circles".into());
+    }
+    let solid = k::make_cylinder(&k::Plane::from_normal(a, axis), r, h, std::f64::consts::TAU).map_err(|e| e.to_string())?;
+    solid.sub_shapes(k::ShapeType::Face).into_iter().find(|f| !f.is_planar()).ok_or_else(|| "no cylindrical face".into())
+}
+
 fn context_wire(edges: &[&Value]) -> Result<noshape_kernel::Shape, String> {
     use glam::DVec3;
     use noshape_kernel as k;
@@ -7675,7 +7698,7 @@ fn instance_config_values(i: &Value) -> Vec<(String, f64, String)> {
 /// The standard content item live names `name` ("Hex socket head cap screw M3x0.50 x 8", without " <n>"): the first
 /// catalogue component, size and length whose part name it is (for an instance whose Part Studio live didn't fetch).
 pub fn standard_spec_by_part_name(name: &str) -> Option<noshape_model::assembly::standard::StandardSpec> {
-    use noshape_model::assembly::standard::{CATALOGUE, StandardSpec};
+    use noshape_model::assembly::standard::{CATALOGUE, StandardSpec, THREAD_LENGTH};
     for c in CATALOGUE.iter() {
         for size in c.size_names() {
             let Some(row) = c.size(size) else { continue };
@@ -7691,9 +7714,17 @@ pub fn standard_spec_by_part_name(name: &str) -> Option<noshape_model::assembly:
             }
             let lengths = spec.size_row().map(|s| c.lengths(s)).unwrap_or_default();
             for l in lengths {
-                spec.length = Some(l);
+                spec.length = Some(l.clone());
+                spec.params.remove(THREAD_LENGTH);
                 if spec.part_name() == name {
                     return Some(spec);
+                }
+                // Another Thread length ("… M12x1.75 x 60" fully threaded where the default is 36).
+                for t in spec.size_row().map(|s| c.thread_lengths(s, &l)).unwrap_or_default() {
+                    spec.params.insert(THREAD_LENGTH.into(), t);
+                    if spec.part_name() == name {
+                        return Some(spec);
+                    }
                 }
             }
         }
@@ -7702,7 +7733,7 @@ pub fn standard_spec_by_part_name(name: &str) -> Option<noshape_model::assembly:
     let (head, thread) = name.rsplit_once(" x ")?;
     thread.parse::<f64>().ok()?;
     let mut spec = standard_spec_by_part_name(head).filter(|s| s.length.is_some())?;
-    spec.params.insert(noshape_model::assembly::standard::THREAD_LENGTH.into(), thread.to_string());
+    spec.params.insert(THREAD_LENGTH.into(), thread.to_string());
     Some(spec)
 }
 

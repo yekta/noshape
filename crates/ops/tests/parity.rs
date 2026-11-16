@@ -3812,8 +3812,10 @@ fn standard_content_is_found_by_its_part_name() {
     }
     assert!(standard_spec_by_part_name("Hex socket head cap screw M3x0.50 x 7.3").is_none());
     // Threaded partly: live's thread length after the length (asm-pattern-std's screws).
-    let spec = standard_spec_by_part_name("Hex socket head cap screw M12x1.75 x 60 x 36").expect("a partly threaded screw");
-    assert_eq!((spec.length.as_deref(), spec.params.get("Thread length").map(String::as_str)), (Some("60"), Some("36")));
+    for (name, thread) in [("Hex socket head cap screw M12x1.75 x 60 x 36", "36"), ("Hex socket head cap screw M12x1.75 x 60", "60"), ("Hex head bolt grade A & B M12x1.75 x 60", "60")] {
+        let spec = standard_spec_by_part_name(name).unwrap_or_else(|| panic!("{name}: not found"));
+        assert_eq!((spec.length.as_deref(), spec.thread_length().as_deref(), spec.part_name().as_str()), (Some("60"), Some(thread), name));
+    }
 }
 
 /// Live's sketch bodies at a studio's final state (`<element>.sketches.json`, live 2267) are references from their
@@ -3943,6 +3945,34 @@ fn an_extrude_of_an_in_context_face_extrudes_lives_face() {
     let parts = p["parts"].as_array().cloned().unwrap_or_default();
     assert_eq!(parts.len(), 1, "{p}");
     assert!((parts[0]["volume"].as_f64().unwrap() - 12.0 * 8.0 * 9.0).abs() < 1e-3, "{p}");
+}
+
+/// A cylindrical face of the assembly's (its in-context sub-feature, asm-corexy 771e5f's pulleys a Belt goes round):
+/// live's face rebuilt from its two circles, thickened as a 1 mm tube 7.6 mm long round a 6 mm radius.
+#[test]
+fn an_in_context_cylinder_face_is_rebuilt_from_its_circles() {
+    let q = |id: &str, v: Value| json!({ "btType": "BTMParameterQuantity-147", "parameterId": id, "expression": v });
+    let thicken = json!({ "btType": "BTMFeature-134", "featureType": "thicken", "featureId": "FT", "name": "Thicken 1", "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "operationType", "enumName": "NewBodyOperationType", "value": "NEW" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "deterministicIds": ["JHC"], "queryString": "", "entityType": "FACE", "featureId": "FSUB" }] },
+        q("thickness1", json!("1 mm")), q("thickness2", json!("0 mm"))],
+        "subFeatures": [{ "btType": "BTMFeature-134", "featureType": "importForeign", "featureId": "FSUB", "parameters": [{ "btType": "BTMParameterBoolean-144", "parameterId": "isInContext", "value": true }] }] });
+    let circle = |id: &str, z: f64| json!({ "subFeature": "FSUB", "body": "JHD", "id": id, "kind": "EDGE", "curveType": "CIRCLE", "axis": [0, 0, -1], "center": [0.25, 0.2487, z], "radius": 0.006, "start": [0.244, 0.2487, z], "end": [0.244, 0.2487, z], "mid": [0.256, 0.2487, z] });
+    let features = json!({ "features": [thicken], "contextEntities": [
+        { "subFeature": "FSUB", "body": "JHD", "id": "JHD", "kind": "BODY", "bodyType": "SHEET" },
+        { "subFeature": "FSUB", "body": "JHD", "id": "JHC", "kind": "FACE", "surfaceType": "CYLINDER", "area": 2.0 * std::f64::consts::PI * 0.006 * 0.0076 },
+        circle("JHB", 0.0444), circle("JHF", 0.052)] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("in-context-cylinder.noshape"), &features, Default::default()).unwrap();
+    let s = t.step(0);
+    assert!(s.ours.is_some() && s.problems.is_empty() && s.status.as_deref() == Some("Ok"), "{:?} {:?} {:?}", s.status, s.message, s.problems);
+    t.finish();
+    let p = t.call("query_parts", json!({})).unwrap();
+    let parts = p["parts"].as_array().cloned().unwrap_or_default();
+    assert_eq!(parts.len(), 1, "{p}");
+    let v = parts[0]["volume"].as_f64().unwrap();
+    let tube = |r1: f64, r2: f64| std::f64::consts::PI * (r2 * r2 - r1 * r1) * 7.6;
+    assert!((v - tube(6.0, 7.0)).abs() < 1e-3 || (v - tube(5.0, 6.0)).abs() < 1e-3, "{p}");
 }
 
 /// A Point-Plane through a point of the assembly's (its in-context sub-feature a point body, asm-keyboard-pattern
