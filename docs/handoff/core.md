@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 02:43 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 03:44 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
@@ -50,15 +50,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. Asked of me 11-16 (in this order): psui's failed Shell marks its input body as the error entity (ev.error_shapes;
-   live feel/feedback-gaps.json item 5, /root/psui-scratch/fb5/shell-fail.json); dx's c2-sm-hem-plus feature 3 Offset
-   surface 1 on 7 sheet-metal faces gives 3 bodies, live one sewn 7/24/18 sheet 10216.46 mm² (vibe5 ~/tmp/dx/mhem/
-   hem-src, NOSHAPE_PARITY_MODELS=$HOME/tmp/dx/mhem); blend's c2-sm-side-cuts-tab feature 7 Corner break 1 FILLET R21
-   on a 42 mm edge fails before any blend op (sheetmetal::corner_break refuses radius = half the edge?; vibe5
-   ~/tmp/dx/savesct); dx's lofts: c2-loft-paths-guides f4 (face -> sketch point, TANGENT_TO_PROFILE: a point profile
-   takes its sketch's plane) and c2-loft-guide-curves-wave-washer f6 ("Loft path with more than two profiles is not
-   supported yet"; vibe5 ~/tmp/dx/savelf). Impeller Move face 1 / Delete face 2 speed waits on blend's chamfer at feature
-   26 (ours drifts to 37 faces vs live 59 by Extrude impellerraum).
+0. Asked of me 11-16, left: dx's lofts: c2-loft-paths-guides f4 (face -> sketch point, TANGENT_TO_PROFILE: a point
+   profile takes its sketch's plane) and c2-loft-guide-curves-wave-washer f6 ("Loft path with more than two profiles is
+   not supported yet"; vibe5 ~/tmp/dx/savelf). Done and queued 11-16: psui's failed-Shell error shapes, the corner break
+   taking a side whole (c2-sm-side-cuts-tab 7 -> 13/18, next a Hole), Offset surface sheets touching at a corner as one
+   (hem-plus feature 3; its Derived 1 still 6/12/8 vs live 14/36/24). Impeller: blend's chamfer fix (12b25c47e) moves
+   the first difference to Fillet 3 (blend's); Move face 1 / Delete face 2 speed after that.
 1. Knife's dish vertex: asked live in REQUESTS.md (11-16 01:32) for the face's surface type and its edges / vertices;
    then retry core-pole-v2 (Parked above) on what live says.
 2. qa's speed list (P0), what is mine: c2-valve-config Extrude 3 `prism_until.split` 131 ms (a logo up to one revolved
