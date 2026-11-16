@@ -24,12 +24,12 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   path (pattern-std 24, scissor-lift 13, bjr-config 5, keyboard 2 such paths); 591fdd87 an Origin connector a mate
   holds built as for an Origin Mate connector feature (keyboard's Fastened 1); f87eaa46 a Derived mirror's source
   studio built and mirrored (corexy fc2fa8 / 9e085d).
-- Binaries (vibe6 ~/agents/asm-keep/bin): s70 = HEAD f87eaa46, base30 = main a2952b32 (same base, for A/Bs of a corpus
-  that moves). Queued on vibe6 behind qa's ui-parity in ~/bin/slot: hd.sh (hand-drill + keyboard, cfg/s63-*.log,
-  file ops-s63 = s70) and the gate's full assembly run (g49/run.sh, ops-s49 = s70, full/s49.log, "ASM-DONE" in
-  g49/status). If it hasn't started by 04:05, run it on vibe7. `python3 ~/agents/asm-keep/cmp.py full/base29.sum
-  full/s49.log` lists per corpus base -> new.
-- Then: compare full/s49 to full/base29.sum per corpus (base29 = old refs: hand-drill 67/67, corexy 11/11, pattern-std
+- Binaries (~/agents/asm-keep/bin on vibe5/6/7): s70 = HEAD f87eaa46, base30 = main a2952b32 (same base, for A/Bs of
+  a corpus that moves). Full assembly run: **vibe7** ~/agents/asm-keep/full7.sh (s70 over ~/parity/models) queued in
+  ~/bin/slot behind studios' shards since 04:07; log full/s70v7.log, "ASM-DONE" in full7.status. (vibe6's g49 asm run
+  was cancelled before it started: it set no NOSHAPE_PARITY_ASSEMBLIES, and the default /root/parity/models is
+  unreadable there.) hd.sh (hand-drill + keyboard, cfg/s63-*.log, file ops-s63 = s70) still queued on vibe6 behind qa.
+- Then: compare full/s70v7.log to full/base29.sum (cmp.py) per corpus (base29 = old refs: hand-drill 67/67, corexy 11/11, pattern-std
   31/40, robotic-arm 40/40, tvc-mount 5/11 mates); land (rebase onto main: dx's 19afd619 STEP names -> rescore corexy
   BOM; dx's planeOp-before-refs change, which I dropped from mine); SCORE.md "Assemblies" row (last 11-08).
 - Single corpora: keyboard s59 25/25, 1/2 mates, 16/16 BOM; pattern-std s59 161/162, 67/76 mates, 11/17 BOM;
