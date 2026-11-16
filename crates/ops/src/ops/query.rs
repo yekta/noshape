@@ -187,7 +187,8 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let mut v = json!({
                 "id": refs::body_id(&b.id),
                 "name": d.map(|d| d.name.clone()).unwrap_or_else(|| b.name.clone()),
-                "kind": format!("{:?}", b.kind),
+                // A Composite part is its own kind, as live's (its members are parts of their own).
+                "kind": if b.composite.is_some() { "Composite".to_string() } else { format!("{:?}", b.kind) },
                 // (Pieces of one face OCCT split at its surface's seam: one face.)
                 "faces": (0..b.faces.len()).filter(|&i| face_pieces(b, &shown, i).first() == Some(&i)).count(),
                 // Onshape's topology: no seams, no vertices on full circles.

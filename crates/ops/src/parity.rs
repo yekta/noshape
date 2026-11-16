@@ -6834,12 +6834,15 @@ pub fn parts_from_query(r: &Value) -> Vec<PartState> {
                 "Solid" => "solid",
                 "Surface" => "sheet",
                 "Curve" | "Wire" => "wire",
+                "Composite" => "composite",
                 o => o,
             }
             .to_string(),
-            faces: p["faces"].as_u64().unwrap_or(0),
-            edges: p["edges"].as_u64().unwrap_or(0),
-            vertices: p["vertices"].as_u64().unwrap_or(0),
+            // Live's fetch reads no topology of a composite part (its members have it: asm-infento-subs 1dc32b's Large
+            // wheel asm, 0/0/0).
+            faces: p["faces"].as_u64().filter(|_| p["kind"] != "Composite").unwrap_or(0),
+            edges: p["edges"].as_u64().filter(|_| p["kind"] != "Composite").unwrap_or(0),
+            vertices: p["vertices"].as_u64().filter(|_| p["kind"] != "Composite").unwrap_or(0),
             volume: p["volume"].as_f64().map(|v| v * k * k * k),
             area: p["surface_area"].as_f64().map(|a| a * k * k),
             volume_band: None,
@@ -7682,7 +7685,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         // doesn't carry ("Housing" here is our "Part 1"); such a part is ours by its only part or its volume band.
         let queried = t.call("query_parts", json!({})).ok();
         let k = queried.as_ref().map_or(1.0, |q| per_unit(&q["units"]));
-        let queried: Vec<&Value> = queried.iter().flat_map(|q| q["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid")).collect();
+        // (A composite part is placed as one too: asm-infento-subs' 7" Wheel asm on Composite part 4.)
+        let queried: Vec<&Value> = queried.iter().flat_map(|q| q["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid" || p["kind"] == "Composite")).collect();
         let solids: Vec<(String, f64, String)> = queried.iter().filter_map(|p| Some((p["name"].as_str()?.to_string(), p["volume"].as_f64().unwrap_or(0.0) * k * k * k, p["id"].as_str()?.to_string()))).collect();
         let ours_parts: Vec<(String, f64)> = solids.iter().map(|(n, v, _)| (n.clone(), *v)).collect();
         // Their centroids (m).
@@ -8433,6 +8437,19 @@ mod tests {
         let inputs = choice_inputs(&features, instances.iter());
         assert_eq!(inputs.len(), 1);
         assert_eq!((&inputs[0]["parameterId"], &inputs[0]["defaultValue"]), (&json!("Manufacture"), &json!(false)));
+    }
+
+    /// A composite part is live's "composite" with no topology of its own (asm-infento-subs 1dc32b's Large wheel asm:
+    /// live 0/0/0), its volume kept.
+    #[test]
+    fn a_composite_part_reads_as_lives() {
+        let r = json!({ "units": { "length": "m" }, "parts": [
+            { "name": "Large wheel asm", "kind": "Composite", "faces": 436, "edges": 1264, "vertices": 820, "volume": 0.0034 },
+            { "name": "Tyre", "kind": "Solid", "faces": 6, "edges": 12, "vertices": 8, "volume": 0.001 } ] });
+        let parts = parts_from_query(&r);
+        assert_eq!((parts[0].body_type.as_str(), parts[0].faces, parts[0].edges, parts[0].vertices), ("composite", 0, 0, 0));
+        assert_eq!(parts[0].volume, Some(0.0034));
+        assert_eq!((parts[1].body_type.as_str(), parts[1].faces), ("solid", 6));
     }
 
     /// A curved face's normal in live's refs (its tangent plane's) is no filter for planar faces of ours; a plane's is.

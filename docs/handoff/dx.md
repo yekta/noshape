@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-16 00:12 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-16 01:41 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -8,22 +8,29 @@ visuals, the parity translator (crates/ops/src/parity.rs) for my studios. The dr
 Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc1 are mine; isaac-ball (3c5c58,
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land: tell asm.
 
-## In flight
-- Configured suppression (live's `BTMSuppressionStateConfigured`), queued 921e815d (checking since 23:49): a feature's own
-  suppression is its value at the input's default (`suppressed_by_default`; live's `suppressed` is the feature's flag
-  whatever the configuration), each configuration's set by config_configure "suppressed"; `choice_inputs` makes inputs
-  from configured suppressions; a studio's default is the configuration live's lines were taken at
-  (`__liveConfiguration`); the report counts such a step as suppressed (its add's status isn't compared, no "failed
-  to run"). Checked: 5d8bc1 alone at Manufacture=false 107/124 (was 89 against the true lines), Kerf suppressed as
-  live (~/tmp/dx/st5d8.log, vibe7); c2-extension-spring A/B 12/12 both; asm no objection. Post-land check
-  done: asm-bjr-config with build I 127/137 occurrences, 25/25 mates (was 126/137, 21/22), no Kerf difference. Corpora
-  with configured suppressions: asm-bjr-config, asm-config-assembly, asm-xdev-subs (asm's full run), c2-extension-spring.
-- 5d8bc1's first difference stays Extrude 55 "vanity plate front" 369/955/601, live 365/943/593 (bool / core, parked).
+## In flight (uncommitted in the dx worktree, branch dx-bosdxf)
+- STEP import names (asm's find, asm-corexy BOM 21/27), landing 01:41: FreeCAD's STEP (one product, its solids by several
+  SHAPE_REPRESENTATION_RELATIONSHIPs) comes through XDE as components named by their link "=>[0:1:1:2]"; ours named the
+  parts so, live by the product ("Pulley_GT2-6mm-20T_bore_5_001" ×3). crates/kernel/cpp/io.cpp `own_name()` takes XDE's
+  made-up names ("=>[…]" links, type names "SOLID" …) as none (collect + walk_tree), so the product's name is used. Test export::a_products_solids_by_representation_relationships_take_its_name
+  (face-colour.step reshaped as FreeCAD's). Mac: before "=>[0:1:1:2]"…, then "SOLID"…, now "Pulley" ×3; kernel export:: 36/36, ops import 30/30.
+- Composite part kind (landing 01:41, asm ok; the assembly suite's part list keeps composites, asm's 7" Wheel asm on
+  Composite part 4): `query_parts` gives a composite "Composite" (was its BodyKind, Solid); the suite reads it as
+  live's "composite" with 0/0/0 topology (parts_from_query; test a_composite_part_reads_as_lives). 1dc32b alone
+  (vibe6, build L): 17/349, first difference Composite part 2 "Large wheel asm": "a solid body, live composite",
+  436/1264/820 vs 0/0/0, centroid x -0.009 vs -0.004 mm (see whether that remains once kind/counts match).
+- 1dc32b without live's refs (vibe6 ~/agents/dx-keep/bin/st1dc-refs.sh: R with, N without; ~/tmp/dx/st1dc-{R,N}.log):
+  does the region fix let Chamfer 4 / Fillet 5 resolve without refs? N was running at 01:30.
+- corpus3 (live's 26: c2-surf-intro-*, c2-surf-workshop-*, c2-rib-wrap, c2-sm-tablet-stand, c2-sm-rocker-enclosure-*;
+  REST features.json + refs): queued in vibe6's slot (corpus3.sh, build L; ~/tmp/dx/corpus3.{out,log,sum}). Then sort
+  first differences to owners. Live's second search (answered by 01:33): parting-line draft, hem plus + side-cuts tab, loft
+  paths/guides, loft guide curves, configurable parts (configured studios only).
 
 ## Queued to land
-- 921e815d configured suppression (checking since 23:49); c2-impeller-loft's split vertex in LIVE_SLIVER_EDGES (00:05). Landed today (latest first): c1af60ab exchange STL 15° over 500 faces + mesh hold; 104e822e assembly studios take their imported Feature Studios (Kerf compiles);
-  bb0641ba region faces kept per sketch; a2212ff2 qContainsPoint box skip; 3073e7d8 draft tangent propagation;
-  drawing exports 84 / 84 (revision table, note shoulder, splines, jog).
+- Nothing. Landed 11-16: 866bd5ad region fix (EDGE/VERTEX queries never regions) + impeller f24 split vertex in
+  LIVE_SLIVER_EDGES (DECISIONS bb69638d4; impeller 26/48); d55b1643 configured suppression (5d8bc1 107/124 at
+  Manufacture=false, asm-bjr-config 127/137 occurrences 25/25 mates). 11-15: c1af60ab STL rule; 104e822e imported
+  Feature Studios; bb0641ba region faces cache; a2212ff2 qContainsPoint box skip; 3073e7d8 draft propagation.
 
 ## Open: my studios (studio-alone runs, vibe7)
 - bjr-config 5d8bc1: 107/124 at Manufacture=false (23:42, live's retaken lines). First difference Extrude 55 "vanity
@@ -74,27 +81,20 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   a configured part). Run them alone once in, sort first differences to owners.
 
 ## Next, in order
-1. Configured suppression: landed? (`land.sh --status`); then asm-bjr-config's post-land check (vibe5).
-2. c2-impeller-loft 26/48 (build L, run on vibe7 by 00:05, ~/tmp/dx/impL.log): f24's split vertex is a known live
-   difference (lead, DECISIONS bb69638d4; LIVE_SLIVER_EDGES Part 3 from Extrude 4, Part 1 from Boolean 1, both OTHER,
-   1 edge / 1 vertex; live keeps it to f47). First difference f26 "Chamfer Stevenrohr Halterung" (OFFSET_ANGLE 3.5 mm
-   20°) Part 1 33/88/56, live 33/86/54: inputs match live's (3 edges, same lengths); live moves Part 3's top lines from
-   x=5 to x=1.5 (55.97 -> 59.47 mm), ours don't: blend (its Distance-1 face rule, after 1dc32b's Chamfer 3; it runs
-   f26 against that fix next); f27 Fillet 3 fails from it. Translation matches through f27. Save: vibe7
-   ~/tmp/dx/saveimp (copy before batches). Its translation notes (Sketch Bohrung Flansch dims, Fillet KsZB, Sketch
-   Bohrung Ansaugflansch OFFSET) come later in the doc.
-3. (5d8bc1: nothing of mine before Extrude 55.)
-4. 74d3d6 Sketch 15 = the general derivedFrom fix (below): its plane is Plane 1, whose three points
-   (imprint INTERSECT VERTEX queries, no live geometry) all became one region (`region_from_query` read any query
-   naming SKETCH_ENTITY + FACE + TOPOLOGY + IMPRINT as a region), so Sketch 15 had no plane (the 49.98 mm move).
-5. 1dc32b: Fillet 3 once blend lands Chamfer 3.
-6. The general derivedFrom / ORIGINAL_DEPENDENCY fix, step 1 landing 00:12: `region_from_query` refuses an EDGE /
-   VERTEX query (test an_imprint_vertex_is_not_a_region). Gate (vibe6, A = build I, B = J): all 98 documents' scores
-   SAME, untranslated lines SAME but for re-synced custom namespaces (live's 3 c2-surf-workshop corpora arrived between
-   A and B: run alone A/B, SAME). 74d3d6's Plane 1 now says why it can't map ("INTERSECT: SWEPT_FACE: revolve
-   FOxgtrMDqncXEjd_7.holeBodies.* was not built": a Hole's internal revolve faces aren't named by ours; no live
-   geometry for RJCk / RJCc / RJCY): ask live for those refs once Extrude 4 matches. Next: 1dc32b's Chamfer 4 /
-   Fillet 5 without live's refs (do they resolve right now?).
+1. STEP names + composite kind: landed? (`land.sh --status`); asm rescores corexy's BOM; rerun 1dc32b alone.
+2. corpus3's run: first differences to owners (translation ones mine).
+3. 1dc32b: composite rerun; refs R/N comparison (does the region fix make Chamfer 4 / Fillet 5 resolve unaided?);
+   Fillet 3 once blend lands Chamfer 3.
+4. c2-impeller-loft 26/48: f24's split vertex is a known live difference (DECISIONS bb69638d4, in LIVE_SLIVER_EDGES).
+   First difference f26 "Chamfer Stevenrohr Halterung" (OFFSET_ANGLE 3.5 mm 20°): inputs match; blend: not its side
+   rule, the run-out at the chain's ends (live runs past the spline end vertices (5, ±2.61, -43.106) and cuts Part 3's
+   top lines back to x=1.5; OCCT stops there), queued after its scale-first land and infento Chamfer 3. f27 Fillet 3
+   fails from it. Translation matches through f27; later translation notes (Sketch Bohrung Flansch dims, Fillet KsZB,
+   Sketch Bohrung Ansaugflansch OFFSET).
+5. 74d3d6 Sketch 15: its plane (Plane 1) now reports "INTERSECT: SWEPT_FACE: revolve FOxgtrMDqncXEjd_7.holeBodies.*
+   was not built" (a Hole's internal revolve faces aren't named by ours; no live geometry for RJCk / RJCc / RJCY): ask
+   live for those refs once Extrude 4 (core) matches.
+6. 5d8bc1: nothing of mine before Extrude 55 (bool / core).
 
 ## How to run
 - Builds and crate tests on the Mac: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo test -p <crate> …` (one slot).
