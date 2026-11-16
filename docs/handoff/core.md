@@ -30,8 +30,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   T1 kernel core::a_cylinder_face_across_its_seam_contains_its_points. A notch test across a rolled wall (/root/core-scratch/rolled-notch-test-wip.patch) still fails
   "Subtractive tool must cut all the way through ... rolled wall": std wants 2 cap faces per trimmed piece, ours has
   more (the caps split at the seam?).
-- **Pair: vibe7 ~/agents/core-keep/sppair.sh -> spres (base files ops.rs / split.rs / geom.cpp .base there; queued
-  behind qa's ui-parity since 17:00, restarted 18:00). Land the three when it shows nothing worse.** (1357fddb1): opSplitFace keeps a split face's attributes on
+- **Pair (all four core-oc commits incl. 3ce19f704 below): vibe7 ~/agents/core-keep/sppair.sh -> spres (merge-base
+  d29b5ee81 files in core-keep/base, branch copies core-keep/branch; restarted 18:33 UTC, queued in vibe7's slot).
+  Land the four when it shows nothing worse.** (1357fddb1): opSplitFace keeps a split face's attributes on
   every piece** (host ops.rs op_split_face; Parasolid's). std Bend's imprint split the wall and dropped its WALL
   attribute, so c2-sm-rocker-enclosure-sm's Extrude 1 read "Removal destroys sheet metal part" (eachSheetStillExists
   found no WALL face): 6 -> 8/14; 14 sheet metal docs otherwise unchanged. T1
@@ -53,11 +54,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - c2-surf-workshop-britatap Touch screen split (4/22): our projected split curve (BRepProj section, a degree 7
   B-spline) ends 0.116 mm from the face's corner along the rim, where the sketch edge ends exactly; live ends it on
   the corner (2/6/5 vs ours 2/7/6). Kernel projection precision at a tangent end; parked.
-- **Lofts (mine, from dx's list):** c2-loft-paths-guides Loft 1 (dome to a sketch point, f7a8d4d00) falls back to the
-  cone in the document: built from a part's face (Front-plane circle, symmetric extrude) the dome's side face is
-  "unorientable" (its wire breaks after the seam: the degenerate apex edge isn't reached). Repro test + debug:
-  /root/core-scratch/loft-apex-face-wip.patch (features_a::a_loft_from_a_parts_face_to_a_point_tangent_to_its_plane; the
-  WIP dumps each side-face edge, last run hit a compile error not yet read).
+- **Committed in core-oc 3ce19f704 (in the pair): paths-guides Loft 1 dome from a part's face** (features.cpp
+  apex_tangent_loft read the seam's pcurves through the REVERSED side face, UpdateEdge wrote them back swapped:
+  "unorientable", cone fallback) + a B-spline face's apex is a shown vertex (common.cpp shown_topology, as cone apexes):
+  c2-loft-paths-guides 4 -> 8/29 (Loft 1 3/2/1 as live). T1 features_a::a_loft_from_a_parts_face_to_a_point_tangent_to_its_plane.
+  Next there: Loft 2 ERROR (guided loft, "Could not create loft ...").
+- **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: 4 profiles along a closed path; live closes it (4/4/0, 2080.8 mm³). WIP
   /root/core-scratch/loft-closed-path-wip.patch closes it round the path but comes out −11279 mm³: two profiles sit
   83 mm off the 26 mm ring, so MakePipeShell's carried sections twist. c2-surf-workshop-pipe: guided loft of more than
