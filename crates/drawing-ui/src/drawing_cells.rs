@@ -189,10 +189,18 @@ impl DrawingEditor {
         let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned() else { return out };
         if let Some(split) = cell.and_then(|(r, _)| te::split_at(t, &l, r)) {
             let l = l.clone();
+            // A hole table's part split off is left selected (live2 drw-hole-table-split s14: its frame and grips lit).
+            let hole = matches!(t.kind, TableKind::Hole { .. });
             out.push(MenuEntry::item(te::split_label(&t.kind), move |t, _, cx| {
+                let mut part = None;
                 t.edit_sheet("Split table", cx, |s| {
-                    te::split_table(s, id, &l, split);
+                    part = te::split_table(s, id, &l, split);
                 });
+                if let Some(p) = part.filter(|_| hole) {
+                    t.cell_sel = None;
+                    t.selection = vec![Sel::Table(p)];
+                    t.redraw(cx);
+                }
             }));
         }
         if t.rows.is_some_and(|r| r[0] > 0) {

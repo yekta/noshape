@@ -198,7 +198,8 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
                 let act = act.clone();
                 // Live keeps the selection through these (drw-view-zoom-to-fit, -copy-paste, drw-callout-group-view,
                 // -remove-from-group, drw-view-hide-auto-centermarks, drw-dimension-foreshorten 11-15).
-                let keeps = matches!(label.as_ref(), "Copy" | "Paste" | "Zoom to fit" | "Group" | "Remove from group" | "Hide auto centermarks" | "Show all" | "Remove foreshorten");
+                // (Split Hole table below: the part split off, live2 drw-hole-table-split.)
+                let keeps = matches!(label.as_ref(), "Copy" | "Paste" | "Zoom to fit" | "Group" | "Remove from group" | "Hide auto centermarks" | "Show all" | "Remove foreshorten" | "Split Hole table below");
                 let paste = label.as_ref() == "Paste";
                 let handler: crate::os_ui::ClickHandler = Rc::new(move |_, window, cx| {
                     let act = act.clone();

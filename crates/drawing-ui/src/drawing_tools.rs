@@ -301,6 +301,12 @@ impl DrawingEditor {
             self.redraw(cx);
             return;
         }
+        // A selected hole table stays selected (live2 drw-hole-table-rmb s18, -split s16: its frame still read lit).
+        let sheet = self.current_sheet();
+        let hole = |s: &Sel| matches!(s, Sel::Table(id) if sheet.table(*id).is_some_and(|t| matches!(t.kind, TableKind::Hole { .. })));
+        if !self.selection.is_empty() && self.selection.iter().all(hole) {
+            return;
+        }
         self.selection.clear();
         self.redraw(cx);
     }
@@ -2082,7 +2088,23 @@ impl DrawingEditor {
         let entries = self.context_menu_entries(pick, cx);
         let ed = cx.entity();
         // Onshape's right-click menu (os_menu: 12 px text, a drawing's 23.5 px rows).
-        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m.drawing_context(), &entries, &ed, window, cx));
+        // Esc on a table cell's menu closes the Cell panel too and clears the selection (live2 drw-hole-table-cell-rmb
+        // s20: nothing read lit after it).
+        let cell = self.cell_sel.is_some().then(|| ed.downgrade());
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| {
+            let m = match cell {
+                Some(ed) => m.after_escape(move |_, cx| {
+                    ed.update(cx, |t, cx| {
+                        t.cell_sel = None;
+                        t.selection.clear();
+                        t.redraw(cx);
+                    })
+                    .ok();
+                }),
+                None => m,
+            };
+            fill_os_menu(m.drawing_context(), &entries, &ed, window, cx)
+        });
         if !menu.read(cx).is_empty() {
             self.frame_menu = Some(menu.downgrade());
             crate::drawing_view::open_canvas_menu(position, menu, window, cx);

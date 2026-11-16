@@ -290,7 +290,8 @@ impl DrawingEditor {
         out.push(MenuEntry::Submenu("Move to".into(), layers));
         // The table list is the stacking order. Live drawing/289, live2 REQUESTS 11-14 00:48: greyed only with no
         // other annotation-layer object on its sheet (views don't count): a table placed on a sheet of views alone.
-        let alone = sheet.tables.len() == 1 && sheet.annotations.is_empty() && sheet.images.is_empty();
+        // (A hole table's tags are objects of their own: live2 drw-hole-table-rmb, both offered.)
+        let alone = sheet.tables.len() == 1 && sheet.annotations.is_empty() && sheet.images.is_empty() && !matches!(t.kind, TableKind::Hole { .. });
         out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_table(id, true, cx)).disabled(alone));
         out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_table(id, false, cx)).disabled(alone));
         // A separator before a Switch to… row only (live2 dom/context-menus-drawing-2.txt: a plain table's Move to

@@ -1954,6 +1954,7 @@ impl DrawingEditor {
                 let cell = self.built.as_ref().and_then(|b| b.table_layout(id)).and_then(|l| l.cell_at(self.cursor));
                 self.revision_table_entries(id, cell)
             }
+            (TableKind::Hole { .. }, Some(cs)) => self.hole_cell_entries(&t, cs),
             (_, Some(cs)) => self.cell_size_entries(&t, cs),
             (_, None) => self.data_table_entries(id, cx),
         }

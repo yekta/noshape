@@ -7889,6 +7889,10 @@ fn hole_table_sizes_are_the_hole_callouts() {
     let rows = part["rows"].as_array().unwrap();
     assert_eq!(rows.len(), 2, "{part}");
     assert!(rows[0][3].as_str().is_some_and(|s| s.contains("6,6")) && rows[0][4] == "3", "{part}");
+    // Under the first part, its left edge in line (live2 drw-hole-table-split).
+    let first = tables.as_array().unwrap().iter().find(|t| t["id"] == ht["table"]).cloned().unwrap();
+    let (p, f) = (&part["position"], &first["position"]);
+    assert!((p[0].as_f64().unwrap() - f[0].as_f64().unwrap()).abs() < 1e-6 && p[1].as_f64().unwrap() < f[1].as_f64().unwrap(), "{first} / {part}");
 }
 
 

@@ -386,7 +386,19 @@ impl DrawingEditor {
         let Some(l) = self.built.as_ref().and_then(|b| b.table_layout(id)).cloned() else { return Vec::new() };
         let widths: Vec<f64> = l.xs.windows(2).map(|w| w[1] - w[0]).collect();
         let heights: Vec<f64> = l.ys.windows(2).skip(l.title as usize).map(|w| w[0] - w[1]).collect();
-        let (cols, rows): (Vec<usize>, Vec<usize>) = (cs.cols().filter(|c| *c < widths.len()).collect(), cs.rows().filter(|r| *r < heights.len()).collect());
+        // A merged cell counts with every row and column it spans (live2 drw-hole-table-cell-rmb: a hole size's cell
+        // over three rows offers Rows Equally).
+        let (mut cols, mut rows): (Vec<usize>, Vec<usize>) = (cs.cols().collect(), cs.rows().collect());
+        for m in l.merges.iter().filter(|m| cs.rows().any(|r| cs.cols().any(|c| m.contains(r, c)))) {
+            rows.extend(m.row..m.row + m.rows);
+            cols.extend(m.col..m.col + m.cols);
+        }
+        for v in [&mut cols, &mut rows] {
+            v.sort_unstable();
+            v.dedup();
+        }
+        cols.retain(|c| *c < widths.len());
+        rows.retain(|r| *r < heights.len());
         let (l1, l2, c1, r1) = (l.clone(), l.clone(), cols.clone(), rows.clone());
         let size = vec![
             MenuEntry::item("Columns Equally", move |t, _, cx| {

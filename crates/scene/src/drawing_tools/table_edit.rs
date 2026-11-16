@@ -159,8 +159,8 @@ pub fn split_label(k: &TableKind) -> &'static str {
         TableKind::Bom { .. } => "Split BOM table below",
         // Help (cut_list_table): "Split cut list table below".
         TableKind::CutList { .. } => "Split cut list table below",
-        // Help (drawing_hole_table): "Split hole table above/below".
-        TableKind::Hole { .. } => "Split hole table below",
+        // Live2 drw-hole-table-split: "Split Hole table below".
+        TableKind::Hole { .. } => "Split Hole table below",
         _ => "Split table below",
     }
 }
@@ -190,7 +190,8 @@ pub fn split_at(t: &Table, l: &TableLayout, r: usize) -> Option<usize> {
 }
 
 /// Split … below: the rows after `split` go to a new part beside this one
-/// (to the right, else to the left). Returns its id.
+/// (to the right, else to the left); a hole table's goes under it, 3 mm
+/// apart, its left edge in line (live2 drw-hole-table-split s15). Returns its id.
 pub fn split_table(s: &mut Sheet, id: u64, l: &TableLayout, split: usize) -> Option<u64> {
     let orig = s.table(id)?.clone();
     let [a, b] = shown_rows(&orig, l);
@@ -199,9 +200,19 @@ pub fn split_table(s: &mut Sheet, id: u64, l: &TableLayout, split: usize) -> Opt
     let mut second = orig;
     second.id = nid;
     second.rows = Some([split, b]);
-    let (sw, _) = s.size.size_mm();
-    let right_edge = l.xs.last().copied().unwrap_or(0.0) + width + 6.0;
-    second.position[0] += if right_edge <= sw { width + 6.0 } else { -(width + 6.0) };
+    let head = l.title as usize + 1;
+    let cut = l.ys.get(head + split.saturating_sub(a)).copied();
+    if let (TableKind::Hole { bottom_to_top: false, .. }, Some(cut), Some(&top), Some(&bottom), Some(&head_y)) = (&second.kind, cut, l.ys.first(), l.ys.last(), l.ys.get(head)) {
+        let new_top = cut - 3.0;
+        second.position[1] = match second.corner {
+            TableCorner::TopLeft | TableCorner::TopRight => new_top,
+            TableCorner::BottomLeft | TableCorner::BottomRight => new_top - (top - head_y) - (cut - bottom),
+        };
+    } else {
+        let (sw, _) = s.size.size_mm();
+        let right_edge = l.xs.last().copied().unwrap_or(0.0) + width + 6.0;
+        second.position[0] += if right_edge <= sw { width + 6.0 } else { -(width + 6.0) };
+    }
     if let Some(x) = s.table_mut(id) {
         x.rows = Some([a, split]);
     }

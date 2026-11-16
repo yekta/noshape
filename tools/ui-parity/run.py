@@ -488,8 +488,9 @@ def normalize_live(state):
                 f["value"] = re.sub(r"∅ ?", "⌀", f["value"])
     lst = (state or {}).get("list")
     # Live's recorder from 2026-11-15.2 reads a drawing's context menu (its "RmbMenu", live2 drw-surface-finish-flip)
-    # with the separators as "" rows and a check flag a row; ours leaves separators out and has no checks there.
-    if isinstance(lst, dict) and lst.get("name") == "RmbMenu":
+    # with the separators as "" rows and a check flag a row; ours leaves separators out and has no checks there. A table
+    # cell's menu is its "NoteContextMenus" (live2 drw-hole-table-cell-rmb).
+    if isinstance(lst, dict) and lst.get("name") in ("RmbMenu", "NoteContextMenus"):
         rows = lst.get("rows") or []
         keep = [i for i, r in enumerate(rows) if r != ""]
         hl = lst.get("highlighted")
