@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-16 01:41 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-16 01:54 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -30,9 +30,13 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   on G37's block the first fin matches G30 only 4/6 ((a) front, (e) right fail), our class rule 6/6. Fits all: class
   order when both faces are one feature's, else the forward fin (left face) (G30 (i) too). Needs Parasolid's edge
   direction, which our OCCT edges needn't share. Decision asked of the lead. Parked: parked/ch3-alias-rule.patch.
-- c2-impeller-loft feature 26 (dx, OFFSET_ANGLE 3.5 mm / 20 deg): our chain is linked (edge 81 the circle, 16 / 19 the
-  splines) and puts the width on feature 24's faces 2 / 3 as live; the difference is elsewhere (how width / angle reach
-  the kernel, or the build). Next after the above.
+- c2-impeller-loft feature 26 "Chamfer Stevenrohr Halterung" (dx; OFFSET_ANGLE 3.5 mm / 20 deg, a chain spline 16 -
+  circle 81 - spline 19 on the x = 5 face): now the document's first difference on main: ours 33/88/56, live 33/86/54
+  (two more edges and vertices, one per chain end), then Fillet 3 / Fillet Stevenrohr zum Halter fail. Our side pick
+  is live's (OCCT distance-angle, reference faces 2, 3, 28). Live's chamfer runs out past the chain's end vertices
+  (5, +-2.61, -43.106), cutting the top lines back to x = 1.5; ours stops there with a stub. Debug patch
+  parked/imp-d1-debug.patch. Next: the run-out at a chain end that meets a corner (G7's section run-out, for a
+  distance-angle chain).
 - isaac-ball 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63): 14 line edges, R 4.5; face 21 has a 9 mm strip:
   full rounds across it (live one half cylinder each, face 21 split 618.32 + 216.00). checked_blend's hair-smaller
   retry leaves a 9e-9 m neck in face 21. Branch `blend-necks` d6de0d70f (blend4): necks cut (all, at the part's scale
