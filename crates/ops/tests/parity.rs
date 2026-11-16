@@ -2,7 +2,7 @@
 //! rebuilt feature by feature and compared with live after each feature.
 
 use noshape_ops::Ctx;
-use noshape_ops::parity::{PartState, Translator, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, model_topology, refs_from_bodies, refs_from_sketches, standard_spec_by_part_name, within_edge_tolerance};
+use noshape_ops::parity::{PartState, Translator, add_sketch_refs, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, model_topology, refs_from_bodies, refs_from_sketches, standard_spec_by_part_name, within_edge_tolerance};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -319,9 +319,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     let mut all = refs_from_bodies(live);
     all.extend(parse_refs(refs));
     // Live's sketch bodies at the final state (sketches.json, live 2267) under both.
-    for (key, r) in refs_from_sketches(&features["sketchBodies"], features["features"].as_array().map(Vec::as_slice).unwrap_or_default()) {
-        all.entry(key).or_insert(r);
-    }
+    add_sketch_refs(&mut all, &features["sketchBodies"], features["features"].as_array().map(Vec::as_slice).unwrap_or_default());
     let mut t = match Translator::open(&mut ctx, &path, features, all) {
         Ok(t) => t,
         Err(e) => {
@@ -3833,6 +3831,13 @@ fn live_sketch_bodies_are_the_sketches_regions() {
     assert_eq!(refs[&(2, "JFN".to_string())].measure, Some(0.055));
     assert_eq!(refs[&(2, "JFE".to_string())].point, Some([0.0, -0.055, 0.0]));
     assert!(refs.keys().all(|(k, _)| *k == 2), "{:?}", refs.keys());
+    // A refs.js line naming that region (SKETCH_REGION, no area) takes the sketches file's region and area, keeping the
+    // parameter live evaluated it for; the file's other bodies come under it.
+    let mut all = parse_refs(r#"{"index":0,"id":"JGC","kind":"SKETCH_REGION","bodyType":"SKETCH","parameter":"entities"}"#);
+    add_sketch_refs(&mut all, &file, &features);
+    let region = &all[&(0, "JGC".to_string())];
+    assert_eq!((region.sketch_file, region.measure, region.parameters.as_slice()), (true, Some(0.005), ["entities".to_string()].as_slice()));
+    assert!(all.contains_key(&(2, "JFN".to_string())));
 }
 
 /// P1 CANCEL-LATENCY over the corpus (T2 probe): each Part Studio of each `.noshape` in NOSHAPE_CANCEL_DOCS (a dir,

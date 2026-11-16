@@ -1433,9 +1433,7 @@ impl<'a> Translator<'a> {
         // (Another studio built in the same session: our queries read go.)
         self.query_cache.clear();
         // (Its sketches' bodies, when fetched with it: an assembly's studio.)
-        for (key, r) in refs_from_sketches(&doc["sketchBodies"], doc["features"].as_array().map(Vec::as_slice).unwrap_or_default()) {
-            refs.entry(key).or_insert(r);
-        }
+        add_sketch_refs(&mut refs, &doc["sketchBodies"], doc["features"].as_array().map(Vec::as_slice).unwrap_or_default());
         let mut t = Translator::open_in(&mut *self.ctx, &name, &doc, refs)?;
         for (e, tab) in parent_studios {
             t.studios.entry(e).or_insert(tab);
@@ -6743,6 +6741,26 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
 /// Live's sketch bodies at a studio's final state (`<element>.sketches.json`: `sketches`, each a sketch feature's
 /// `featureId` and its SKETCH `bodies`, faces / edges / vertices as bodydetails') as references from each sketch's
 /// feature on: its faces the sketch's regions.
+/// Live's sketch bodies at the final state (`sketches.json`, live 2267: regions, edges, points) under live's own refs
+/// lines. A sketch region a refs line names (refs.js's SKETCH_REGION since 11-16 01:1x, refsx.js's FACE before:
+/// asm-tvc-mount studio 41b795's Extrude 1) is the sketches file's region, its area and sketch with it, with the
+/// parameters live evaluated it for (asm-suspension 805e29's Extrude 1 ring).
+pub fn add_sketch_refs(refs: &mut HashMap<(usize, String), LiveRef>, sketch_bodies: &Value, features: &[Value]) {
+    let sketch_refs = refs_from_sketches(sketch_bodies, features);
+    let regions: HashMap<&str, &LiveRef> = sketch_refs.iter().filter(|(_, r)| r.kind == "SKETCH_REGION").map(|((_, id), r)| (id.as_str(), r)).collect();
+    for ((_, id), r) in refs.iter_mut().filter(|(_, r)| r.kind == "FACE" || r.kind == "SKETCH_REGION") {
+        if let Some(region) = regions.get(id.as_str()) {
+            let (parameters, query) = (std::mem::take(&mut r.parameters), r.query);
+            *r = (*region).clone();
+            r.parameters = parameters;
+            r.query = query;
+        }
+    }
+    for (key, r) in sketch_refs {
+        refs.entry(key).or_insert(r);
+    }
+}
+
 pub fn refs_from_sketches(file: &Value, features: &[Value]) -> HashMap<(usize, String), LiveRef> {
     let mut out = HashMap::new();
     for s in file["sketches"].as_array().into_iter().flatten() {
@@ -8089,23 +8107,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         // Live's evaluated references (`<element>.refs.jsonl`, as a model's refs.jsonl) win over them.
         refs.extend(parse_refs(&refs_in_configuration(studio["refs"].as_str().unwrap_or_default(), first_encoded.as_deref())));
         let features = studio["features"].as_array().map(Vec::as_slice).unwrap_or_default();
-        // Its sketches' bodies at the final state (live 2267, `<element>.sketches.json`): their regions, edges and
-        // points, under live's own lines. A sketch region refs.jsonl names (refsx.js wrote a sketch body's face as a FACE
-        // before 11-16 01:1x: asm-tvc-mount studio 41b795's Extrude 1) is the sketches file's region, its area and sketch
-        // with it, with the parameters live evaluated it for (asm-suspension 805e29's Extrude 1 ring).
-        let sketch_refs = refs_from_sketches(&studio["sketchBodies"], features);
-        let regions: HashMap<&str, &LiveRef> = sketch_refs.iter().filter(|(_, r)| r.kind == "SKETCH_REGION").map(|((_, id), r)| (id.as_str(), r)).collect();
-        for ((_, id), r) in refs.iter_mut().filter(|(_, r)| r.kind == "FACE" || r.kind == "SKETCH_REGION") {
-            if let Some(region) = regions.get(id.as_str()) {
-                let (parameters, query) = (std::mem::take(&mut r.parameters), r.query);
-                *r = (*region).clone();
-                r.parameters = parameters;
-                r.query = query;
-            }
-        }
-        for (key, r) in sketch_refs {
-            refs.entry(key).or_insert(r);
-        }
+        // Its sketches' bodies at the final state (live 2267, `<element>.sketches.json`).
+        add_sketch_refs(&mut refs, &studio["sketchBodies"], features);
         let mut t = match Translator::open_in(ctx, &name, studio, refs) {
             Ok(t) => t,
             Err(e) => {
