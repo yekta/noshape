@@ -4926,7 +4926,12 @@ impl<'a> Translator<'a> {
         let found = self.call("assembly_entities", json!({ "tab": tab, "instance": instance, "kind": kind, "near": mm(world.to_array()), "limit": 20 })).ok()?;
         let ku = per_unit(&found["units"]);
         let at = |e: &Value| (0..3).map(|i| e[key][i].as_f64().map_or(f64::INFINITY, |c| (c * ku - world[i]).abs())).fold(0.0, f64::max);
-        found[kind].as_array()?.iter().filter(|e| at(e) <= 1e-6).find_map(|e| e["id"].as_str().map(str::to_string))
+        let hit = found[kind].as_array()?.iter().filter(|e| at(e) <= 1e-6).find_map(|e| e["id"].as_str().map(str::to_string));
+        if hit.is_none() && std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+            let nearest = found[kind].as_array().into_iter().flatten().map(at).fold(f64::INFINITY, f64::min);
+            eprintln!("TRACE sketch-at {instance} {inference}: no {kind} at {:?} mm (nearest {:.6} mm of {})", world * 1e3, nearest * 1e3, found[kind].as_array().map_or(0, Vec::len));
+        }
+        hit
     }
 
     /// An assembly mate connector argument's Z and origin in its part's coordinates (metres), as ours places it now.
@@ -8617,6 +8622,10 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 }));
             }
             let [Some(a), Some(b)] = ends.as_slice() else {
+                for q in par("mateConnectorsQuery").and_then(|p| p["queries"].as_array()).into_iter().flatten() {
+                    let key = (l.element.clone(), q["featureId"].as_str().unwrap_or_default().to_string());
+                    trace(&format!("{name}: end {} {}: path {:?}, entity {:?}", key.1, q["btType"], connectors.get(&key).map(|c| path_names(&c.0)), entities.get(&key)));
+                }
                 res.untranslated.push(format!("{name}: its connectors not translated"));
                 continue;
             };
