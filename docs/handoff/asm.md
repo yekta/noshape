@@ -33,7 +33,8 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   a66ca5). dx takes corexy's STEP part names ("=>[0:1:1:2]" link names, io.cpp): rescore corexy's BOM when it lands.
 - keyboard left: 2bb133 Sketch 2's Use entities on the derived sketch ("clicks didn't complete a line": was Derived
   1 unplaced, s52 places it), Extrude 3, Chamfer 2, Transform 1; 46fe1d Extrude 3; df4a26 Extrude 2 / 3; 7f71cc's Mate
-  connector 1 "Cannot determine owner".
+  connector 1 "Cannot determine owner" (its ownerPart is a sketch's wire body, which live accepts; ours
+  resolve_bodies has no sketch bodies: refgeom.rs owner check, model-core).
 - dx landed / lands configured suppressions and e541cc55 (region_from_query: EDGE / VERTEX queries aren't regions);
   tell dx if an asm-* studio moves in the full run.
 
