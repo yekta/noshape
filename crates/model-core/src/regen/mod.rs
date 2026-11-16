@@ -597,6 +597,10 @@ impl Regenerator {
             let input = ctx.clone();
             let body_reads = reusable.then(|| Arc::new(context::BodyReads::default()));
             evaluated.push(f.id);
+            // (The kernel profile from the feature's start: what a caller did between features isn't the feature's.)
+            if kernel_profiling() {
+                noshape_kernel::kernel_profile_mark("");
+            }
             let ft = Instant::now();
             let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
             if let Some(msg) = expr_error.take() {
