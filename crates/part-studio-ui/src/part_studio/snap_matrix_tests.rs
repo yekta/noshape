@@ -20,6 +20,10 @@ enum Pt {
     Origin,
     /// The centre of a cylinder's top face (its round edge's centre; the "pin" Part Studio).
     PinCentre,
+    /// The triangle's hypotenuse's middle; a point this many px from the start along the hypotenuse's normal (the
+    /// probe then moves along the hypotenuse, `dir.0`'s sign the way).
+    SlantMid,
+    SlantPerp(f64),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -41,6 +45,8 @@ enum Lit {
     /// Another (finished) sketch's line, from C(-100, 60) to C(0, 100): its end there, the line.
     OtherPoint,
     OtherCurve,
+    /// The triangle's hypotenuse (a slanted model edge).
+    Slant,
 }
 
 struct Row {
@@ -173,6 +179,13 @@ fn rows() -> Vec<Row> {
         // Waking. A sketch line snapped onto gives PARALLEL through the start (and PERPENDICULAR): 150 px long, 2 px
         // off parallel snaps, 3 doesn't.
         Row { rest: &[C(20., 0.)], ..row("wake/sketch-line/parallel", Tool::Line, SLANTED_LINE, Some(C(-150., -100.)), (C(-150. + 150. * 0.2425, -100. + 150. * 0.9701), (0.9701, -0.2425)), (2., Some(3.)), &["PARALLEL"]) },
+        // A model edge rested on 130 ms wakes (live sketch-gaps 1c: 60 ms): a line from a start then takes PERPENDICULAR
+        // to it, a line zone 7–9 px either side (the triangle's hypotenuse, its
+        // middle rested on; 150 px out from the start, across the zone both ways).
+        Row { rest: &[Pt::SlantMid], rest_lit: Lit::Slant, ..row("wake/model-edge/perpendicular/one-side", Tool::Line, &[], Some(S), (Pt::SlantPerp(150.), (1., 0.)), (6.5, Some(8.5)), &["PERPENDICULAR"]) },
+        // Not rested on: asleep, no perpendicular.
+        Row { rest_lit: Lit::Slant, not: &["PERPENDICULAR"], ..row("wake/model-edge/asleep", Tool::Line, &[], Some(S), (Pt::SlantPerp(150.), (1., 0.)), (0., None), &[]) },
+        Row { rest: &[Pt::SlantMid], rest_lit: Lit::Slant, ..row("wake/model-edge/perpendicular/other-side", Tool::Line, &[], Some(S), (Pt::SlantPerp(150.), (-1., 0.)), (6.5, Some(8.5)), &["PERPENDICULAR"]) },
         // A circle snapped onto gives the two tangent lines from the start (here 120 px along one, 2 px off it).
         Row { rest: &[C(130., 0.)], ..row("wake/circle/tangent-line", Tool::Line, CIRCLE, Some(C(-60., -120.)), (C(-60. + 120. * 0.5548, -120. + 120. * 0.8320), (0.8320, -0.5548)), (2., Some(6.)), &["TANGENT"]) },
         // Per tool: a circle's radius point takes coincident points and tangent points only: no midpoint, no curve.
@@ -253,6 +266,9 @@ struct Bench {
     edge_pick: u32,
     /// Another sketch's line end at C(0, 100) and the line (the "other" Part Studio).
     other_picks: (u32, u32),
+    slant_pick: u32,
+    /// The hypotenuse's ends on screen.
+    slant_ends: Option<(DVec2, DVec2)>,
 }
 
 impl Bench {
@@ -273,8 +289,8 @@ impl Bench {
         cx.update_window(window, |_, w, _| w.set_scale_factor(scale)).unwrap();
         let frame = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().frame);
         // The face's corners in the sketch, and its corner vertex's and bottom edge's pick ids.
-        let (lo, hi, vertex, edge) = match top {
-            None => (DVec2::new(0.005, 0.0), DVec2::new(0.055, 0.04), 0, 0),
+        let (lo, hi, vertex, edge, (slant, slant_ends)) = match top {
+            None => (DVec2::new(0.005, 0.0), DVec2::new(0.055, 0.04), 0, 0, (0, None)),
             Some(_) => cx.update(|cx| {
                 let v = view.read(cx);
                 let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
@@ -293,7 +309,21 @@ impl Bench {
                     .position(|pl| pl.iter().all(|p| (p[2] - top_z).abs() < 1e-7 && (local(p).y - lo.y).abs() < 1e-6))
                     .and_then(|ei| picks.ids_for(&b.edge_refs[ei]).first().copied())
                     .unwrap_or(0);
-                (lo, hi, vertex, edge)
+                // A straight top edge along neither axis (the triangle's hypotenuse).
+                let slant = b
+                    .mesh
+                    .edges
+                    .iter()
+                    .position(|pl| {
+                        let (Some(a), Some(z)) = (pl.first().map(local), pl.last().map(local)) else { return false };
+                        pl.iter().all(|p| (p[2] - top_z).abs() < 1e-7) && (a.x - z.x).abs() > 1e-6 && (a.y - z.y).abs() > 1e-6
+                    })
+                    .map(|ei| {
+                        let pl = &b.mesh.edges[ei];
+                        (picks.ids_for(&b.edge_refs[ei]).first().copied().unwrap_or(0), Some((local(&pl[0]), local(&pl[pl.len() - 1]))))
+                    })
+                    .unwrap_or((0, None));
+                (lo, hi, vertex, edge, slant)
             }),
         };
         let mid = (lo + hi) * 0.5;
@@ -314,6 +344,7 @@ impl Bench {
         let quarter = screen(cx, DVec2::new(lo.x + (hi.x - lo.x) * 0.25, lo.y));
         let edge_mid = screen(cx, DVec2::new((lo.x + hi.x) * 0.5, lo.y));
         let origin = screen(cx, DVec2::ZERO);
+        let slant_ends = slant_ends.map(|(a, z)| (screen(cx, a), screen(cx, z)));
         let ex = (screen(cx, mid + DVec2::X * 1e-3) - centre).normalize();
         let ey = (screen(cx, mid + DVec2::Y * 1e-3) - centre).normalize();
         let size = (screen(cx, hi) - corner).abs();
@@ -329,7 +360,7 @@ impl Bench {
             let pick = |entity: u32| v.built.as_ref().unwrap().picks.ids_for(&Reference::SketchEntity { sketch: sk.feature, entity }).first().copied().unwrap_or(0);
             (end.map_or(0, |p| pick(p.entity)), sk.curves.first().map_or(0, |c| pick(c.entity)))
         });
-        Self { window, view: view.clone(), centre, corner, quarter, edge_mid, origin, ex, ey, vertex_pick: vertex, edge_pick: edge, other_picks }
+        Self { window, view: view.clone(), centre, corner, quarter, edge_mid, origin, ex, ey, vertex_pick: vertex, edge_pick: edge, slant_pick: slant, slant_ends, other_picks }
     }
 
     /// The probe's sketch cancelled: the Part Studio as it was, for the next probe.
@@ -347,7 +378,14 @@ impl Bench {
             Pt::EdgeMid => self.edge_mid,
             Pt::Origin => self.origin,
             Pt::PinCentre => self.centre,
+            Pt::SlantMid => self.slant_ends.map_or(self.centre, |(a, z)| (a + z) * 0.5),
+            Pt::SlantPerp(d) => self.at(S) + self.slant_dir().perp() * d * if self.slant_dir().perp().dot(self.centre - self.at(S)) < 0.0 { -1.0 } else { 1.0 },
         }
+    }
+
+    /// The hypotenuse's direction on screen.
+    fn slant_dir(&self) -> DVec2 {
+        self.slant_ends.and_then(|(a, z)| (z - a).try_normalize()).unwrap_or(DVec2::X)
     }
 
     /// Screen px along `dir` (x right, y up on the sketch).
@@ -458,6 +496,7 @@ fn probe(cx: &mut TestAppContext, studios: &Studios, r: &Row, scale: f32, off: f
     let on_model = !other && (r.lit != Lit::Nothing || r.rest_lit != Lit::Nothing || matches!(r.at, Pt::Corner | Pt::EdgeQuarter | Pt::EdgeMid));
     let b = match (other, on_model) {
         _ if matches!(r.at, Pt::PinCentre) => Bench::open(cx, studios.pin.0, &studios.pin.1, Some(&studios.pin.2), scale),
+        _ if r.rest_lit == Lit::Slant => Bench::open(cx, studios.tri.0, &studios.tri.1, Some(&studios.tri.2), scale),
         (true, _) => Bench::open(cx, studios.other.0, &studios.other.1, None, scale),
         (_, true) => Bench::open(cx, studios.block.0, &studios.block.1, Some(&studios.block.2), scale),
         _ => Bench::open(cx, studios.plain.0, &studios.plain.1, None, scale),
@@ -476,6 +515,7 @@ fn probe(cx: &mut TestAppContext, studios: &Studios, r: &Row, scale: f32, off: f
         Lit::Edge => Some(b.edge_pick),
         Lit::OtherPoint => Some(b.other_picks.0),
         Lit::OtherCurve => Some(b.other_picks.1),
+        Lit::Slant => Some(b.slant_pick),
     };
     for p in r.rest {
         let q = b.at(*p);
@@ -488,7 +528,11 @@ fn probe(cx: &mut TestAppContext, studios: &Studios, r: &Row, scale: f32, off: f
     let before = b.constraints(cx).len();
     let old = entity_ids(cx, &b);
     let target = b.at(r.at);
-    let at = target + b.along(r.dir) * off;
+    let way = match r.at {
+        Pt::SlantPerp(_) => b.slant_dir() * r.dir.0.signum(),
+        _ => b.along(r.dir),
+    };
+    let at = target + way * off;
     // A drag: the point under its start, moved in steps onto the probe (live's drags snap on release).
     let dragged = r.drag_from.and_then(|f| {
         let from = b.at(f);
@@ -568,9 +612,21 @@ fn probe(cx: &mut TestAppContext, studios: &Studios, r: &Row, scale: f32, off: f
 
 /// A cylinder (a circle on Top extruded) and its top face, as `block_part` makes a block.
 fn pin_part(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>, Reference) {
-    let (window, view) = sketch_with(cx, name, Tool::Circle);
-    click(cx, window, &view, (575., 350.));
-    click(cx, window, &view, (650., 350.));
+    extruded_part(cx, name, Tool::Circle, &[(575., 350.), (650., 350.)])
+}
+
+/// A right triangle on Top extruded (legs 160 and 120 window px along x and y: its hypotenuse along (-0.8, 0.6)), and
+/// its top face, whose centre lies on the hypotenuse.
+fn triangle_part(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>, Reference) {
+    extruded_part(cx, name, Tool::Line, &[(500., 400.), (660., 400.), (500., 280.), (500., 400.)])
+}
+
+/// A sketch on Top drawn with `tool` by window clicks, extruded; the part's top face.
+fn extruded_part(cx: &mut TestAppContext, name: &str, tool: Tool, clicks: &[(f64, f64)]) -> (AnyWindowHandle, Entity<PartStudioView>, Reference) {
+    let (window, view) = sketch_with(cx, name, tool);
+    for &c in clicks {
+        click(cx, window, &view, c);
+    }
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             v.finish_sketch(w, cx);
@@ -592,7 +648,7 @@ fn pin_part(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Par
     wait_until(cx, window, |cx| view.read(cx).context.as_ref().is_some_and(|c| !c.bodies.is_empty()));
     let top = cx.update(|cx| {
         let v = view.read(cx);
-        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the pin");
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
         let top_z = b.mesh.positions.iter().map(|p| p[2]).fold(f32::MIN, f32::max);
         // The flat face highest up.
         b.face_refs
@@ -618,6 +674,8 @@ struct Studios {
     other: (AnyWindowHandle, Entity<PartStudioView>),
     /// A cylinder (a circle extruded) and its top face.
     pin: (AnyWindowHandle, Entity<PartStudioView>, Reference),
+    /// A right triangle extruded (a slanted model edge) and its top face.
+    tri: (AnyWindowHandle, Entity<PartStudioView>, Reference),
 }
 
 /// The matrix at a device pixel ratio of 1 and 2: every row's snap at live's "snaps up to" and none at its "not
@@ -644,7 +702,8 @@ fn the_sketch_snaps_matrix_matches_live(cx: &mut TestAppContext) {
         draw(cx, other.0);
         wait_until(cx, other.0, |cx| other.1.read(cx).sketch.is_none() && !other.1.read(cx).ui_busy() && !other.1.read(cx).display.sketches.is_empty());
         let pin = pin_part(cx, "snaps-pin");
-        Studios { block: (window, view, top), plain, other, pin }
+        let tri = triangle_part(cx, "snaps-tri");
+        Studios { block: (window, view, top), plain, other, pin, tri }
     };
     let mut report = Vec::new();
     let mut wrong = Vec::new();

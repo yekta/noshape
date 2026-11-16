@@ -263,7 +263,7 @@ a line crossing a curve near the pointer gives the crossing with both constraint
 point → H + V through it; a sketch line → parallel + perpendicular through the start; a model edge → perpendicular;
 a circle → the two tangent lines from the start; a spline → nothing. Shift: no snapping. In-plane model entities only.
 
-**Matched: 60 / 62** (11-16 03:36 UTC: three spline rows from live2's sketch-snaps reachZoomA / B, the through-point along matched, across and the curve gaps; 59 / 59 at 01:57 with sketch-gaps' crossing row; 55 / 55 at 11-13 06:02 UTC). Probes: a point 6.5 px straight out snaps, 8.5 doesn't; 9.5 / 11.5 diagonally;
+**Matched: 63 / 65** (11-16 04:23 UTC: three woken model edge rows (live sketch-gaps 1c), matched once model edges wake; 60 / 62 at 03:36 with three spline rows from live2's sketch-snaps reachZoomA / B, the through-point along matched, across and the curve gaps; 59 / 59 at 01:57 with sketch-gaps' crossing row; 55 / 55 at 11-13 06:02 UTC). Probes: a point 6.5 px straight out snaps, 8.5 doesn't; 9.5 / 11.5 diagonally;
 a band 6.5 / 8.5 across (live's own takes vary by a pixel with where its target sits in its pixel).
 
 | Row (tool / target / inference) | Live | Ours (where) | Status |
@@ -291,7 +291,8 @@ a band 6.5 / 8.5 across (live's own takes vary by a pixel with where its target 
 | 3 point arc, third point | coincident points (and its chord's midpoint) only | the same | = |
 | Drags: a free end onto a point (straight, diagonally), a midpoint, a circle's rim; no H / V | 7–9 / 6, not 8 / ≤ 6; COINCIDENT / MIDPOINT on release | the squares and bands (`point_drop_target`; points were an 8.5 px circle) | = (fixed) |
 | Line end / a spline's through-point (along); across it; its curve between points | 7 px along, then on the curve; 8–9 px across; the curve 12, not 14 | the square (7.5) and band (7.5): along =, across and the curve stop at 7.5 | = / ≠ / ≠ (live's spline shape isn't recorded: a wider spline zone or its tessellation's chords?) |
-| Not yet in the matrix | a woken model edge's perpendicular (live sketch-gaps 1c: the edge wakes after a 60 ms rest, then PERPENDICULAR through the start 7–9 px either side: needs a slanted model edge, the block's are level with the start's H / V) | – | – |
+| Woken model edge / a perpendicular through the start (live sketch-gaps 1c) | a straight model edge wakes after a 60 ms rest (not 0 or 30); then PERPENDICULAR through the start, a line zone 7–9 px either side (not an angle), the edge used | woke nothing (model edges never woke); now `SketchEditor::woken_edge` (`EDGE_WAKE_REST` 60 ms, `woken_edge_perpendicular`, the click uses the edge: `link_woken_edge`); the bench's triangle prism (`triangle_part`) | = (fixed) |
+| Not yet in the matrix | a woken model edge's parallel (not measured live) | – | – |
 
 ## Feature list and Parts list (matrix)
 

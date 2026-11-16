@@ -409,6 +409,11 @@ pub struct GlyphInfo {
 const INFERENCE_PX: f64 = 7.5;
 /// How long the pointer rests on a point before it counts for alignment while drawing (live2 "feel (sketch)" (1)).
 const ACQUIRE_REST: std::time::Duration = std::time::Duration::from_millis(100);
+/// How long the pointer rests on a model edge before it wakes (live sketch-gaps 1c: 60 ms did, 30 didn't).
+const EDGE_WAKE_REST: std::time::Duration = std::time::Duration::from_millis(60);
+/// Stands for the woken model edge in an inference's constraints until the click uses the edge
+/// ([`SketchEditor::link_woken_edge`]).
+pub const WOKEN_EDGE: EntityId = EntityId(u32::MAX - 1);
 /// How far the pointer moves from a press, on screen, before the press is a drag (live2 "feel (sketch)" (5): a drag
 /// starts at about 5 px on an end point or a line, whatever the time; less is a click).
 const DRAG_START_PX: f64 = 5.0;
@@ -563,6 +568,9 @@ pub struct SketchEditor {
     pub external_snap: Option<ExternalSnap>,
     /// The centres of the model's circular edges in the sketch's plane (the view fills it once a sketch is open).
     pub model_centres: std::sync::OnceLock<Vec<(DVec2, noshape_model::reference::Reference)>>,
+    /// The model's straight edges in the sketch's plane: each one's reference, a point on it and its direction (the
+    /// view fills it once a sketch is open; a woken one gives a perpendicular).
+    pub model_lines: std::sync::OnceLock<Vec<(noshape_model::reference::Reference, DVec2, DVec2)>>,
     pub selection: Vec<EntityId>,
     pub selected_constraints: Vec<ConstraintId>,
     /// Hovered sketch entity (from the viewport pick).
@@ -705,6 +713,13 @@ pub struct SketchEditor {
     pub woken: Vec<EntityId>,
     /// The point the pointer is near while drawing, and since when: it wakes once rested on for [`ACQUIRE_REST`].
     acquiring: Option<(EntityId, std::time::Instant)>,
+    /// The straight model edge the pointer is on while drawing, and since when ([`EDGE_WAKE_REST`]); the edge snapped
+    /// since the last move.
+    edge_acquiring: Option<(noshape_model::reference::Reference, std::time::Instant)>,
+    edge_seen: Option<noshape_model::reference::Reference>,
+    /// The model edge woken last: a point on it and its direction in the sketch (live sketch-gaps 1c: a line from a
+    /// start then offers PERPENDICULAR to it).
+    pub woken_edge: Option<(noshape_model::reference::Reference, DVec2, DVec2)>,
     /// Press position of a drawing tool (press-drag-release placement).
     press: Option<DVec2>,
     /// Line tool temporarily drawing a tangent arc (Shift+A or hovering
@@ -1292,6 +1307,7 @@ impl SketchEditor {
             inference: None,
             external_snap: None,
             model_centres: std::sync::OnceLock::new(),
+            model_lines: std::sync::OnceLock::new(),
             selection: Vec::new(),
             selected_constraints: Vec::new(),
             hover: None,
@@ -1374,6 +1390,9 @@ impl SketchEditor {
             otf_typing: false,
             woken: Vec::new(),
             acquiring: None,
+            edge_acquiring: None,
+            edge_seen: None,
+            woken_edge: None,
             press: None,
             tangent_mode: false,
             left_chain_end: false,
@@ -1447,6 +1466,8 @@ impl SketchEditor {
         self.otf_typing = false;
         self.woken.clear();
         self.acquiring = None;
+        self.edge_acquiring = None;
+        self.woken_edge = None;
         self.press = None;
         self.tangent_mode = false;
         // Live shows no hint for a sketch tool (behaviours "qa (2026-10-28,
@@ -1621,6 +1642,10 @@ impl SketchEditor {
             screen: self.screen_metric(),
         };
         let mut all = noshape_sketch::infer(sk, p, &ctx);
+        if let Some(i) = self.woken_edge_perpendicular(p, anchor) {
+            all.push(i);
+            all.sort_by(|x, y| x.priority.cmp(&y.priority).then(x.distance.total_cmp(&y.distance)));
+        }
         // A circle's radius point takes coincident points only (live/feel/sketch-snaps.json "toolNotes": coincident
         // points and tangent points; no midpoints, no curves, no horizontal / vertical).
         if self.radius_point() {
@@ -1835,6 +1860,19 @@ impl SketchEditor {
             {
                 self.wake(c);
             }
+            // A model edge wakes once rested on (live sketch-gaps 1c), the pointer on it until this move.
+            let seen = self.edge_seen.take();
+            match self.edge_acquiring.take() {
+                Some((r, since)) if seen.as_ref() == Some(&r) => {
+                    if now.duration_since(since) >= EDGE_WAKE_REST
+                        && let Some(Some((a, dir))) = self.model_lines.get().map(|l| l.iter().find(|l| l.0 == r).map(|l| (l.1, l.2)))
+                    {
+                        self.woken_edge = Some((r.clone(), a, dir));
+                    }
+                    self.edge_acquiring = Some((r, since));
+                }
+                _ => {}
+            }
             // (The hover only while it is still within reach: one left from an earlier place isn't rested on here,
             // sketch-trim-drag's ends aligned with the previous line's end clicked before the tool was restarted.)
             let reach = self.world_per_px * 9.0;
@@ -1996,6 +2034,12 @@ impl SketchEditor {
     pub fn apply_external_snap(&mut self, snap: ExternalSnap) {
         if !self.tool.draws() || (self.radius_point() && matches!(snap, ExternalSnap::Edge { .. })) {
             return;
+        }
+        if let ExternalSnap::Edge { reference, .. } = &snap {
+            self.edge_seen = Some(reference.clone());
+            if self.edge_acquiring.as_ref().is_none_or(|(r, _)| r != reference) {
+                self.edge_acquiring = Some((reference.clone(), std::time::Instant::now()));
+            }
         }
         let strong = self.inference.as_ref().is_some_and(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center));
         if strong {
@@ -2162,6 +2206,44 @@ impl SketchEditor {
             }
         }
         self.external_snap = None;
+    }
+
+    /// The woken model edge's perpendicular through the anchor (live sketch-gaps 1c): a line zone as wide as the
+    /// horizontal's (7–9 px either side 60 mm out), not an angle; nothing for a level or plumb edge (the horizontal and
+    /// vertical give it).
+    fn woken_edge_perpendicular(&self, p: DVec2, anchor: Option<DVec2>) -> Option<Inference> {
+        let (a, (_, _, dir)) = (anchor?, self.woken_edge.as_ref()?);
+        if dir.x.abs() < 1e-9 || dir.y.abs() < 1e-9 || !matches!(self.tool, Tool::Line) {
+            return None;
+        }
+        let n = dir.perp();
+        let u = if (p - a).dot(n) < 0.0 { -n } else { n };
+        let foot = a + u * (p - a).dot(u);
+        let seen = self.screen_metric().map_or((p - foot).length(), |m| m.len(p - foot));
+        (seen <= self.world_per_px * INFERENCE_PX && (foot - a).length() > self.world_per_px * INFERENCE_PX).then(|| Inference {
+            kind: InferenceKind::Perpendicular,
+            position: foot,
+            entity: None,
+            reference: Some(a),
+            constraints: vec![AutoConstraint::PerpendicularTo(WOKEN_EDGE)],
+            distance: seen,
+            priority: 2,
+        })
+    }
+
+    /// The click takes the woken model edge's perpendicular: the edge is used in the sketch as `id`.
+    pub fn link_woken_edge(&mut self, id: EntityId) {
+        if let Some(inf) = &mut self.inference {
+            for c in &mut inf.constraints {
+                *c = retarget_auto(*c, WOKEN_EDGE, id);
+            }
+        }
+    }
+
+    /// The inference about to be clicked needs the woken model edge used.
+    pub fn needs_woken_edge(&self) -> Option<&noshape_model::reference::Reference> {
+        let i = self.inference.as_ref()?;
+        i.constraints.contains(&AutoConstraint::PerpendicularTo(WOKEN_EDGE)).then(|| self.woken_edge.as_ref().map(|w| &w.0))?
     }
 
     /// Link an external snap (model vertex) to a fixed sketch point before a

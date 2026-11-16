@@ -502,6 +502,9 @@ impl PartStudioView {
     /// circular model edge's centre in the plane, lit or not (live: a CONCENTRIC point, below the coincident points
     /// and above the curves).
     fn model_snap(&self, cursor: DVec2, vp: &Viewport) -> Option<ExternalSnap> {
+        if let Some(ed) = &self.sketch {
+            ed.model_lines.get_or_init(|| model_straight_edges(&self.display, &ed.frame));
+        }
         let lit = self.hover.as_ref().and_then(|r| self.model_snap_of(r, cursor, vp));
         if matches!(lit, Some(ExternalSnap::Vertex { .. } | ExternalSnap::Edge { midpoint: true, .. })) {
             return lit;
@@ -1008,6 +1011,13 @@ impl PartStudioView {
                     && let Some(ed) = &mut self.sketch
                 {
                     ed.link_edge_snap(id);
+                }
+                // A perpendicular to a woken model edge uses the edge (live sketch-gaps 1c).
+                if let Some(r) = self.sketch.as_ref().filter(|s| s.tool.draws()).and_then(|s| s.needs_woken_edge().cloned())
+                    && let Some(id) = self.external_entity(&r, false, true, cx)
+                    && let Some(ed) = &mut self.sketch
+                {
+                    ed.link_woken_edge(id);
                 }
                 let (shift, dbl) = (modifiers.shift || modifiers.control, *click_count >= 2);
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_down(data, p, hovered, shift, dbl)) {
@@ -5356,6 +5366,26 @@ fn model_circle_centres(display: &noshape_model::display::StudioDisplay, frame: 
             let r0 = (a - c).length();
             if q.iter().all(|p| ((*p - c).length() - r0).abs() <= r0 * 1e-4) {
                 out.push((c, r.clone()));
+            }
+        }
+    }
+    out
+}
+
+/// The model's straight edges lying in the sketch's plane: each one's reference, its start and direction there.
+fn model_straight_edges(display: &noshape_model::display::StudioDisplay, frame: &PlaneFrame) -> Vec<(Reference, DVec2, DVec2)> {
+    let mut out = Vec::new();
+    for b in display.bodies.iter().filter(|b| !b.hidden) {
+        for (r, pl) in b.edge_refs.iter().zip(&b.mesh.edges) {
+            let w: Vec<DVec3> = pl.iter().map(|v| DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64)).collect();
+            if w.len() < 2 || !w.iter().all(|p| (frame.to_world(frame.to_local(*p)) - *p).length() < 1e-6) {
+                continue;
+            }
+            let q: Vec<DVec2> = w.iter().map(|p| frame.to_local(*p)).collect();
+            let (a, z) = (q[0], q[q.len() - 1]);
+            let Some(dir) = (z - a).try_normalize() else { continue };
+            if q.iter().all(|p| (*p - a).perp_dot(dir).abs() <= (z - a).length() * 1e-6) {
+                out.push((r.clone(), a, dir));
             }
         }
     }
