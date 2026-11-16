@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-15 23:19 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-16 00:58 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -10,27 +10,28 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 ## In flight
 
 - Landed b106b424 (20:33): chamferair, balljump, chordnear, ballnear, unifycand. Core told; vibe6 gate targets gone.
-- Dock tab B scale-first (lead 22:25: try it; land only if identical end to end: every suite document's topology and
-  status, hats / dock, qa's 47 tickets, corner-break's 42 faces, all 24 assemblies; else keep the double build and
-  park the diff). Branch `blend-scalefirst` 18b585d5b (on main; blend6 has it): op_fillet's `short_step_beside` (an
-  edge left out, under r / 4 long, at a rounded edge's vertex) skips the as-is build in scaled_blend (identical where
-  the as-is round wouldn't have been kept; not at working scale 1). ZZ_SF_LOG=1 keeps the old flow and prints
-  "zz sf <what> predicted P kept K" per fillet: running the model suite so on vibe6 (unit blend-sf-log6, log
-  sf-log.log, flag sf-log.done). Any "predicted 1 kept 1" = a result change: narrow the predictor or park. Then the
-  dock in log mode (CLI from blend6 on vibe6, a mode-700 copy, deleted after), then the full check above.
-  Dock numbers: Mac release, tab B 518 ms; Rib Dip R 1 as-is 36 + scaled 23 ms, Rib Dip R Dizi 35 + 35; quiet vibe5:
-  ~220 of 1257 ms thrown away.
+- Dock tab B scale-first: commit 20c8533d4 in blend6 (on main 84f94ad8a; g++-13 OK): short_step_beside fires only
+  where exactly one rounded edge ends at a step under r / 4 (Halka Round, two rounds meeting at a 10 um line, excluded:
+  its as-is round is kept and scaled-first cost it +20 ms). Log-mode suite (old trigger): 98 docs, the trigger fired on
+  2 fillets, both "as-is not kept"; never on a kept one. Dock tab B with scale-first: every fillet's part identical
+  (faces/edges/vertices, volume, area) to log mode; Rib Round Dizi ~270 -> ~160 ms, Rib Round 1 ~150 -> ~130 (vibe6
+  at load 15: candidates). Rib Dip R 1 / Dizi don't fire (their as-is round thrown away too: a wider trigger later).
+  Full check queued on vibe6 (unit blend-seq-sf, bin/seq-sf.sh): CLI, model pair blend2 (main) vs blend6 (logs
+  suite-sf-*), assemblies (asm-sf-{base,new}.log). Then qa's userdocs.py on vibe5 (hats, dock, 47 tickets) with green
+  (= base) vs my CLI. Land if all identical.
 
 ## Open questions / waiting
 
-- infento 1dc32b Chamfer 3: live 3169 says Distance 1 on the cylinder at both arcs; live answered REQUESTS 22:43 (23:14,
-  live/blend/q-ch3order/out.json): the arcs' faces carry Extrude 39 / Extrude 40 ids (Rm.. / Ro..), i.e. the ADD
-  extrudes (each extrudes a Pedal face, RkC6 / RkC+, up to a face) merged their own side (the cylinder) and end cap
-  (the plane) into Extrude 38's / Transform 12's faces. Neither qAdjacent, qOwnedByBody nor qCreatedBy order explains
-  it (the two arcs, congruent under Transform 12's rotation, give opposite orders). Working idea: rank a face by the
-  latest feature among its name and its merge aliases (name_unified's), then that feature's class (cylinder = side).
-  Branch `blend-ch3` (+ `Bodies::aliases_of`, ZZ_D1 alias print, uncommitted in blend4): running 1dc32b on vibe6
-  (log ch3-alias.log) to see the aliases. Not landable yet.
+- infento 1dc32b Chamfer 3 (live 3169: 23 mm on the cylinder at both R65 arcs, by volume 87,057.04). Ruled out: a
+  merged face ranking as the later Add's (live G60: both variants on the top, as our rule), qAdjacent / qOwnedByBody /
+  shell order (the two arcs, congruent under Transform 12's rotation, come out opposite). x_t (live q-x38, read with
+  our reader + ZZ_XT_FINS debug, blend3 uncommitted): at both arcs the edge's first (forward) fin is the cylinder's;
+  on G37's block the first fin matches G30 only 4/6 ((a) front, (e) right fail), our class rule 6/6. Fits all: class
+  order when both faces are one feature's, else the forward fin (left face) (G30 (i) too). Needs Parasolid's edge
+  direction, which our OCCT edges needn't share. Decision asked of the lead. Parked: parked/ch3-alias-rule.patch.
+- c2-impeller-loft feature 26 (dx, OFFSET_ANGLE 3.5 mm / 20 deg): our chain is linked (edge 81 the circle, 16 / 19 the
+  splines) and puts the width on feature 24's faces 2 / 3 as live; the difference is elsewhere (how width / angle reach
+  the kernel, or the build). Next after the above.
 - isaac-ball 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63): 14 line edges between planes, R 4.5; face 21 is
   9 mm tall between 73 + 80 and 76 + 77: full rounds across a strip of a bigger face (live: one half cylinder each,
   face 21 split 618.32 + 216.00). Cause: checked_blend's hair-smaller retry is valid with a 9e-9 m neck left in face
