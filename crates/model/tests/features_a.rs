@@ -819,6 +819,24 @@ fn hole_tapped_cuts_its_diameter() {
     assert!(near(removed, PI * 0.00225f64.powi(2) * 0.025, 1e-3), "{removed}");
 }
 
+/// Up to next into a bore across the hole: the shaft runs to where all of it is out, not to where its axis is (the
+/// bore lies deeper beside the axis), so no web is left beside it and the tip is in the bore (live asm-tvc-mount 7bc9d8's
+/// Ø3.2 hole into a Ø29 bore: one face more, no vertices).
+#[test]
+fn a_hole_up_to_next_into_a_bore_leaves_no_web_beside_it() {
+    let mut t = T::new();
+    let (s, p) = hole_setup(&mut t);
+    let bore = t.sketch(Reference::Plane(DatumPlane::Front), circle(DVec2::new(0.03, 0.0125), 0.008));
+    let region = t.regions(bore)[0].clone();
+    t.add("extrude", &[("entities", q(vec![region])), ("operationType", en("REMOVE")), ("defaultScope", b(true)), ("endBound", en("THROUGH_ALL")), ("hasSecondDirection", b(true)), ("secondDirectionBound", en("THROUGH_ALL"))]);
+    let before = t.ok().context.bodies[0].faces.len();
+    t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p }])), ("unitsSystem", en("METRIC")), ("holeDiameterV3", e("3.2 mm")), ("endStyleV2", en("UP_TO_NEXT"))]);
+    let r = t.ok();
+    let part = &r.context.bodies[0];
+    let cones = part.shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cone { .. }))).count();
+    assert_eq!((part.faces.len(), cones), (before + 1, 0));
+}
+
 #[test]
 fn hole_up_to_next_from_part() {
     let (removed, _) = hole_with(&[("holeDiameterV3", e("8 mm")), ("endStyleV2", en("UP_TO_NEXT")), ("tipAngleStyle", en("FLAT"))]);

@@ -546,7 +546,20 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             "BLIND" => (ev.length("holeDepthV3")?, tip_len(tip_angle, r_main)),
             "THROUGH" => (hit_bodies.iter().map(|x| x.2).fold(0.0, f64::max) + r_main.max(1e-4), 0.0),
             "UP_TO_NEXT" => {
-                let next = rel.iter().flat_map(|(_, iv)| iv.iter()).map(|(_, b)| *b).fold(f64::INFINITY, f64::min);
+                let axis_next = rel.iter().flat_map(|(_, iv)| iv.iter()).map(|(_, b)| *b).fold(f64::INFINITY, f64::min);
+                let next = axis_next;
+                // Where the whole shaft is out: the deepest first exit round its rim, not the axis's (asm-tvc-mount
+                // 7bc9d8's Ø3.2 hole into a Ø29 bore: live leaves no web beside the shaft and no tip faces).
+                let (u, w) = (perp(dir), dir.cross(perp(dir)));
+                let next = (0..16)
+                    .map(|k| {
+                        let a = k as f64 * std::f64::consts::TAU / 16.0;
+                        cast(origin + (u * a.cos() + w * a.sin()) * r_main * (1.0 - 1e-6)).iter().flat_map(|(_, iv)| iv.iter()).map(|(_, b)| b - t_start).filter(|b| *b > 1e-9).fold(f64::INFINITY, f64::min)
+                    })
+                    .filter(|e| *e <= next + r_main)
+                    .fold(next, f64::max);
+                // (A hair past, so the shaft's end circle doesn't just touch the bore where it is deepest.)
+                let next = if next > axis_next + 1e-9 { next + 1e-6 } else { next };
                 // Live L61: the tip's apex is at the entity minus the offset.
                 let tip = tip_len(tip_angle, r_main);
                 (next - tip_offset - if tip_offset != 0.0 { tip } else { 0.0 }, tip)
