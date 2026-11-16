@@ -322,10 +322,14 @@ impl DrawingEditor {
                 _ => {}
             }
         }
+        // (The 11-15 recorder reads it VIEW, the whole view selected; older ones EDGE: live2 drw-insert-view-top-1to1
+        // s7 against the other Insert view takes. "+" marks what only the 11-15 recorder reads, "-" what only older
+        // ones do.)
         if let Tool::Projected { parent: Some(p) } = &self.tool
             && self.projection_parent_lit
         {
-            selection.push(("EDGE".into(), self.ui_view_name(*p)));
+            selection.push(("EDGE-".into(), self.ui_view_name(*p)));
+            selection.push(("VIEW+".into(), self.ui_view_name(*p)));
         }
         // A dimension's picked edges and a closed broken-out profile are drawn picked (live: drw-dimension-*,
         // drw-broken-out-section).
@@ -499,13 +503,14 @@ impl DrawingEditor {
         selection.sort();
         selection.dedup();
         // (A marked one goes when the same is read anyway.)
-        let plain: Vec<(String, String)> = selection.iter().filter(|(k, _)| !k.ends_with('+')).cloned().collect();
-        selection.retain(|(k, o)| k.strip_suffix('+').is_none_or(|k| !plain.iter().any(|p| p.0 == k && p.1 == *o)));
+        let plain: Vec<(String, String)> = selection.iter().filter(|(k, _)| !k.ends_with(['+', '-'])).cloned().collect();
+        selection.retain(|(k, o)| k.strip_suffix(['+', '-']).is_none_or(|k| !plain.iter().any(|p| p.0 == k && p.1 == *o)));
         let selection: Vec<Value> = selection
             .into_iter()
-            .map(|(k, o)| match k.strip_suffix('+') {
-                Some(k) => json!({ "kind": k, "owner": o, "new": true }),
-                None => json!({ "kind": k, "owner": o }),
+            .map(|(k, o)| match (k.strip_suffix('+'), k.strip_suffix('-')) {
+                (Some(k), _) => json!({ "kind": k, "owner": o, "new": true }),
+                (_, Some(k)) => json!({ "kind": k, "owner": o, "old": true }),
+                _ => json!({ "kind": k, "owner": o }),
             })
             .collect();
         json!({
