@@ -2902,6 +2902,35 @@ fn a_mesh_parts_nodes_can_be_used_in_a_sketch() {
     assert!((x2 - x).abs() < 1e-9 && (y2 - y).abs() < 1e-9);
 }
 
+/// A mesh part (an imported STL) exports to every B-rep format as its triangles' planar faces; the writers crashed on
+/// its faces' missing surface (exchange suite, c2-hex-bookcase-derived). Parasolid, IGES and ACIS read back as one
+/// solid of the mesh's volume; STEP keeps it a tessellated solid, read back as that one part (not also a composite).
+#[test]
+fn a_mesh_part_exports_to_brep_formats() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "mesh_brep");
+    let stl = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STL", "file": scratch("mesh_brep.stl").to_str().unwrap(), "units": "Millimeter" }))["file"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "import_files", json!({ "files": [stl], "keep_files": false }));
+    let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["name"].as_str().unwrap().to_string();
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": studio }));
+    let volume = num(&parts["parts"][0]["volume"]);
+    for (format, read) in [("STEP", true), ("PARASOLID", true), ("IGES", true), ("ACIS", true), ("JT", false), ("RHINO", false), ("PVZ", false)] {
+        let out = call(&mut ctx, "export_parts", json!({ "tab": studio, "format": format, "file": scratch(&format!("mesh_brep_{format}")).to_str().unwrap() }));
+        let file = out["file"].as_str().unwrap_or_else(|| panic!("{format}: {out}")).to_string();
+        if !read {
+            continue;
+        }
+        let back = call(&mut ctx, "import_files", json!({ "files": [file], "keep_files": false }));
+        let tab = back["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["name"].as_str().unwrap().to_string();
+        let q = call(&mut ctx, "query_parts", json!({ "tab": tab }));
+        let p = q["parts"].as_array().unwrap();
+        assert_eq!(p.len(), 1, "{format}: {q}");
+        assert_eq!(p[0]["kind"], "Solid", "{format}: {q}");
+        let v = num(&p[0]["volume"]);
+        assert!((v - volume).abs() < volume * 1e-6, "{format}: {v} vs the mesh's {volume}");
+    }
+}
+
 /// Every format the Import dialog takes that we can write: the block is
 /// exported in each and imported back. B-rep formats keep the volume;
 /// mesh formats come back as one mesh part.

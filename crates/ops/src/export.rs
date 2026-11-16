@@ -455,6 +455,7 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
     // Intersection edges exact where the faces allow it: a reader refits approximated ones (live's import of a sheet
     // metal part made 61 faces of its 58, PS-INEXACT-INTERSECTION-EDGES).
     let parts: Vec<(String, k::Shape, [f32; 4])> = parts.into_iter().map(|(n, sh, c)| (n, k::exact_edges(&sh).unwrap_or(sh), c)).collect();
+    let parts: Vec<(String, k::Shape, [f32; 4])> = if faceted_meshes(s.format) { parts.into_iter().map(|(n, sh, c)| (n, faceted(sh), c)).collect() } else { parts };
     // Y axis up: the model's +Z becomes +Y.
     let parts: Vec<(String, k::Shape, [f32; 4])> = if s.y_up && s.format != PartFormat::Urdf {
         parts
@@ -643,15 +644,16 @@ pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &Ass
     // Y axis up: the model's +Z becomes +Y.
     let up = if s.y_up { glam::DMat4::from_rotation_x(-std::f64::consts::FRAC_PI_2) } else { glam::DMat4::IDENTITY };
     let instances: Vec<k::StepInstance> = a.instances.iter().map(|(p, _, t)| k::StepInstance { part: *p, transform: up * *t }).collect();
+    let parts: Vec<(String, k::Shape, [f32; 4])> = a.parts.iter().map(|(n, sh, c)| (n.clone(), if faceted_meshes(s.format) { faceted(sh.clone()) } else { sh.clone() }, *c)).collect();
     // Parasolid keeps the assembly too (live: its x_t re-imports as an
     // Assembly; qa ASM-PARASOLID-FLAT), in every version.
     if s.format == PartFormat::Parasolid && !s.individual {
-        k::write_parasolid_assembly(path, &a.root, &a.parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter, parasolid_version(s))?;
+        k::write_parasolid_assembly(path, &a.root, &parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter, parasolid_version(s))?;
         return Ok(path.to_path_buf());
     }
     // IGES as subfigure instances (live 1755: re-imports as an Assembly).
     if s.format == PartFormat::Iges && !s.individual {
-        k::write_iges_assembly(path, &a.parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter)?;
+        k::write_iges_assembly(path, &parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter)?;
         return Ok(path.to_path_buf());
     }
     if s.format != PartFormat::Step || s.individual {
@@ -660,6 +662,19 @@ pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &Ass
     let shapes: Vec<k::ExportShape> = a.parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect();
     k::write_step_assembly(path, &a.root, &shapes, &instances, k::LengthUnit::Meter, &step_options(s))?;
     Ok(path.to_path_buf())
+}
+
+/// Formats whose writers take B-rep faces only: a mesh part (an imported STL) goes as its triangles' planar faces
+/// (their writers crashed on a mesh face's missing surface). STEP keeps it as a tessellated solid.
+fn faceted_meshes(f: PartFormat) -> bool {
+    !f.mesh() && !matches!(f, PartFormat::Step | PartFormat::Urdf)
+}
+
+fn faceted(sh: k::Shape) -> k::Shape {
+    if !sh.is_mesh() {
+        return sh;
+    }
+    sh.faceted().unwrap_or(sh)
 }
 
 /// The dialog's Parasolid version (live G36: "Use latest version" = 38.1).

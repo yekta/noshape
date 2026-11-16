@@ -362,6 +362,11 @@ impl Shape {
         ffi::is_mesh(self.raw())
     }
 
+    /// Its mesh faces as planar triangle faces sharing their edges (a B-rep the CAD writers take); other faces kept.
+    pub fn faceted(&self) -> Result<Shape> {
+        Shape::from_res(ffi::faceted_mesh(self.raw()))
+    }
+
     /// Whether a B-rep face carries a stored triangulation (display meshing
     /// leaves none behind; mesh bodies' faces don't count).
     pub fn has_triangulation(&self) -> bool {

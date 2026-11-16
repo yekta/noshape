@@ -286,7 +286,12 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
                 let color = if obj_zip { part.color } else { None };
                 looks.extend(solids.iter().map(|_| Look { name: part.name.clone(), color, ..Look::default() }));
                 tools.extend(solids);
-                let open: Vec<k::Shape> = piece.children().into_iter().filter(|c| c.shape_type() == ShapeType::Shell).collect();
+                // (A solid's own shell isn't an open piece: a STEP's tessellated solid read as a part and a composite.)
+                let open: Vec<k::Shape> = match piece.shape_type() {
+                    ShapeType::Shell => vec![piece.clone()],
+                    ShapeType::Compound => piece.children().into_iter().filter(|c| c.shape_type() == ShapeType::Shell).collect(),
+                    _ => Vec::new(),
+                };
                 if !open.is_empty() {
                     open_groups.push(open);
                 }

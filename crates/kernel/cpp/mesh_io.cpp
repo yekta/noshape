@@ -298,6 +298,13 @@ bool is_mesh(const OcShape& s)
   return !s.shape.IsNull() && has_mesh_faces(s.shape);
 }
 
+std::unique_ptr<OcShape> faceted_mesh(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  MeshFacets m;
+  return wrap(facet_mesh(s.shape, m));
+}
+
 std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit)
 {
   return wrap(shape_from_triangulation(read_triangulation(std::string(path.data(), path.size())), merge_limit));
