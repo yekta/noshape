@@ -362,7 +362,7 @@ entities found with `query_entities` by a point on them); `MEASURE_ROW=<part of 
 | The panel's rows hovered | a distance row: the dashed line; an X / Y / Z row: the legs dashed in X red, Y green, Z blue, zero ones left out | the line only; now the legs too (`measure_hover_lines`) | = (fixed) |
 | The panel's size | 220 × 345 with a distance and its X / Y / Z rows | 220 × 347 (6 px above the footer); now 4 px, 345 | = (fixed) |
 | A second entity hovered | no preview: the first one's readout | the same | = |
-| Not yet in the matrix | a click near an edge's middle takes its midpoint (the 9 px window and the dwell: `midpoint_target_tests`) | – | – |
+| Not yet in the matrix | a click near an edge's middle takes its midpoint: live measure-gaps (11-16) 8–9 px either side along the edge (10 px takes the edge), the mark from the first shot (~100 ms, no dwell needed); ours the 9 px window (`midpoint_target_tests`) and a 60 ms dwell (was 250; 60 ms is Onshape's hover wake, live sketch-gaps) | – | – |
 
 ## Navigation (matrix)
 
@@ -430,7 +430,7 @@ outside its map (its "client side entries").
 | Context menu flip | at the right edge its right side 1 px left of the pointer; at the bottom its bottom 4 px below it | flipped round where it opened (pointer + (0, 2)); now round the pointer (vendored gpui `anchored().flip_point`) | = (fixed) |
 | Feature list width | remembered per tab, the default 205 elsewhere | one width for every tab; now per tab (`ui::left_panel_w(tab)`, config left_panel_widths.json) | = (fixed) |
 | Toolbar dropdowns | on click only, under the toolbar at the tool group's left edge, staying open | under the caret (31 px right of the group's left); now at the group's left (vendored gpui-component `PopupMenu::shift_x`); 4 px under the buttons as live | = (fixed; checked on a runner screenshot and by a row click, no T1 test) |
-| Not yet in the matrix | the tooltip's ~100 ms fade-out | – | – |
+| Not yet in the matrix | the tooltip's fade-out: live chrome-gaps (11-16) Bootstrap's 0.15 s fade, the node gone 165–200 ms after the pointer leaves; ours disappears at once (a gap: the vendored gpui drops a tooltip on leave); the view cube: live faces and corners only (no edge targets), the bevels the hidden faces', the centre corner knob ~24 × 21 px: ours faces, the far faces' frames and corner discs (the knob's size not compared yet) | – | – |
 
 ## Look
 
@@ -579,7 +579,7 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft angle). part-studio-ui
 `fields::the_fields_matrix_matches_live` (T1, no GPU) on the block start.
 
-**Matched: 11 / 11** (11-15 20:35 UTC: the open list row added and fixed; 10 / 10 at 20:06 UTC with the right press row; 9 / 9 at 11-14 00:33 UTC; 6 / 9 at the first run).
+**Matched: 14 / 14** (11-16 00:47 UTC: live's fields-gaps rows added (wheel, Tab with a lone New variable…, Create variable's place), 2 fixed; 11 / 11 at 11-15 20:35 UTC with the open list row; 10 / 10 at 20:06 UTC with the right press row; 9 / 9 at 11-14 00:33 UTC; 6 / 9 at the first run).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -594,6 +594,9 @@ live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft an
 | Autocomplete's Esc | closes the list only | the same | = |
 | Right press (live2 11-15, dialog-number-rclick-menu) | no menu, Chrome's or Onshape's; the field takes the keyboard, all selected; one Esc cancels the dialog | the input's Cut / Copy / Paste opened and took that Esc; now no menu | = (fixed) |
 | Autocomplete open (lead P1 11-15; live2 ac-menu) | the "#" and "asin" lists overlay the rows below, which keep their rects; the list's top is the input's bottom, its right edge the input's; 5.25 px corners, no shadow, the rows fill the 1 px border | the rows below moved 2 px down (the list hung from a box in the field's column, which took its gap); the list was left-aligned, inset 1 px with square highlighted corners and a shadow; now as live | = (fixed) |
+| Wheel over the focused field (live fields-gaps 11-16) | +1 mm per notch, −1 down, Shift ×10, Ctrl ×0.1 | the same | = |
+| Tab with a lone New variable… (live fields-gaps) | nothing highlighted; Tab closes the list, the field keeps "#", the keyboard moves on | New variable… highlighted, Tab opened Create variable; now as live (`VarCompletion::highlighted`) | = (fixed) |
+| Create variable's place (live fields-gaps) | top-left ~4 px right of the field's right end, top level with the field's | 107 px right of the field's left, 12 px above its top; now as live | = (fixed) |
 | Not yet in the matrix | Ctrl+Up ×0.1 (an existing test), the wheel over a focused field, the "#" list's New variable… and its popover, Tab taking the highlighted entry | – | – |
 
 ## Feedback (matrix, Part Studio rows)

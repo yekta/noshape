@@ -4806,8 +4806,10 @@ pub(super) fn in_midpoint_window(mid: DVec2, pointer: DVec2) -> bool {
     d.x <= MIDPOINT_WINDOW_PX && d.y <= MIDPOINT_WINDOW_PX
 }
 
-/// How long a pointer resting by an armed edge's midpoint takes to snap to it.
-pub(super) const MIDPOINT_DWELL: std::time::Duration = std::time::Duration::from_millis(250);
+/// How long a pointer resting by an armed edge's midpoint takes to snap to it: live's mark shows in every shot from the
+/// first (~100 ms after arriving, live measure-gaps 11-16); 60 ms is Onshape's hover wake (a model edge in a sketch
+/// wakes at 60 ms, not at 30: live sketch-gaps).
+pub(super) const MIDPOINT_DWELL: std::time::Duration = std::time::Duration::from_millis(60);
 
 /// One hover update near an edge midpoint: (the midpoint is the target,
 /// an edge stays armed). `armed`: an edge's midpoint marker already shows;

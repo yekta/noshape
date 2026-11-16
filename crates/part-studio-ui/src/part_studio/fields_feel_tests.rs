@@ -172,6 +172,38 @@ fn rows() -> Vec<Row> {
             }
             expect((open, placed), (vec![closed.clone(), closed], vec![(px(0.), px(0.)); 2]), "(row and dialog bounds, list top − field bottom and right − right) with the '#' and 'asin' lists open")
         } },
+        Row { id: "the wheel over the focused field steps it", live: "live fields-gaps (11-16): +1 mm per notch up, −1 down, Shift ×10, Ctrl ×0.1 (10 -> 11 -> 12 -> 11 -> 21 -> 21.1 mm)", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "fl-wheel");
+            type_in(cx, window, &dialog, "depth", "10", &["enter"]);
+            let at = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("numf-depth").ok_or("no Depth field")?.center();
+            let mut got = Vec::new();
+            for (up, shift, control) in [(true, false, false), (true, false, false), (false, false, false), (true, true, false), (true, false, true)] {
+                let modifiers = Modifiers { shift, control, ..Modifiers::none() };
+                let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+                vcx.simulate_event(gpui_kit::ScrollWheelEvent { position: at, delta: gpui_kit::ScrollDelta::Lines(gpui_kit::point(0., if up { 1. } else { -1. })), modifiers, wheel_ticks: Some(gpui_kit::point(0., if up { 1. } else { -1. })), ..Default::default() });
+                got.push(depth(cx, window, &view));
+            }
+            expect(got, vec!["11 mm".to_string(), "12 mm".into(), "11 mm".into(), "21 mm".into(), "21.1 mm".into()], "Depth after wheel up, up, down, Shift+up, Ctrl+up from 10")
+        } },
+        Row { id: "autocomplete: Tab with a lone New variable… takes nothing", live: "live fields-gaps (11-16): no variables, '#' lists only New variable…, nothing highlighted; Tab closes the list, the field keeps '#', the keyboard moves on", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "fl-hash-tab");
+            type_in(cx, window, &dialog, "depth", "#", &[]);
+            let highlighted = cx.update(|cx| dialog.read(cx).ui_list()).map(|l| l["highlighted"].clone());
+            keys(cx, window, &["tab"]);
+            draw(cx, window);
+            let list = cx.update(|cx| dialog.read(cx).ui_list().is_some());
+            let popover = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("create-variable").is_some();
+            let text = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap()["dialog"]["fields"].as_array().and_then(|f| f.iter().find(|f| f["label"] == "Depth").map(|f| f["text"].clone()));
+            expect((highlighted, list, popover, text), (Some(serde_json::Value::Null), false, false, Some(serde_json::json!("#"))), "(highlighted row, list open, Create variable open, Depth's text) after '#' then Tab")
+        } },
+        Row { id: "New variable…: Create variable beside the field", live: "live fields-gaps (11-16): its top-left ~4 px right of the field's right end, its top level with the field's", gap: false, check: |cx| {
+            let (window, _view, dialog) = edit_extrude(cx, "fl-new-variable");
+            type_in(cx, window, &dialog, "depth", "#", &["enter"]);
+            draw(cx, window);
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            let (Some(f), Some(p)) = (vcx.debug_bounds("numf-depth"), vcx.debug_bounds("create-variable")) else { return Err("no Depth field or Create variable".into()) };
+            expect((p.left() - f.right(), p.top() - f.top()), (px(4.), px(0.)), "(popover left − field right, popover top − field top)")
+        } },
         Row { id: "right press: no menu, the field takes the keyboard; one Esc cancels", live: "live2 11-15 (dialog-number-rclick-menu): no menu, Chrome's or Onshape's; Depth focused, all selected; Esc closes the dialog", gap: false, check: |cx| {
             let (window, view, _dialog) = edit_extrude(cx, "fl-rpress");
             draw(cx, window);

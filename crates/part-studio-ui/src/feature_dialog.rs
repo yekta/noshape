@@ -1919,6 +1919,13 @@ impl FeatureDialog {
         // Tab accepts too (live 152: "Tab/Enter"), applies the field and keeps the keyboard there, the list closed:
         // ✓ after it commits (live behaviours "5 mm": "Tab, then ✓ commits").
         .capture_action(cx.listener(move |this, _: &crate::actions::DialogTab, window, cx| {
+            // Nothing highlighted (a lone "New variable…"): the list closes and Tab moves on, the text kept (live
+            // fields-gaps: "#" stays).
+            if open(this, &p5) && this.completion.as_ref().is_some_and(|c| c.highlighted().is_none()) {
+                this.completion = None;
+                cx.notify();
+                return;
+            }
             if open(this, &p5) {
                 cx.stop_propagation();
                 this.accept_completion(None, window, cx);
@@ -2105,6 +2112,7 @@ impl FeatureDialog {
         };
         let popup = v_flex()
             .id("create-variable")
+            .debug_selector(|| "create-variable".into())
             .occlude()
             .w(px(220.))
             .bg(gpui_kit::rgb(0xffffff))
@@ -2134,8 +2142,8 @@ impl FeatureDialog {
             .child(target)
             .child(kinds)
             .child(fields);
-        // Anchored at a zero-size box under the field: up beside it.
-        crate::ui::popup_anchor().child(deferred(anchored().offset(point(px(107.), px(-38.))).snap_to_window().child(popup)).with_priority(5)).into_any_element()
+        // Beside the field: its top-left 4 px right of the field's right end, level with its top (live fields-gaps).
+        div().absolute().top_0().right_0().size_0().child(deferred(anchored().offset(point(px(4.), px(0.))).snap_to_window().child(popup)).with_priority(5)).into_any_element()
     }
 
     /// ✓: create the variable; the field then resolves.

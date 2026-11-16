@@ -155,6 +155,8 @@ pub struct VarCompletion {
     pub range: Range<usize>,
     pub entries: Vec<Entry>,
     pub selected: usize,
+    /// ↑ / ↓ pressed: a lone "New variable…" row is highlighted from then on.
+    moved: bool,
     /// The list's scroll (the highlighted row kept in view).
     scroll: ScrollHandle,
     /// Typing `#…`: the list ends with "(x) New variable…" for this name
@@ -171,17 +173,17 @@ impl VarCompletion {
         if let Some((range, name)) = fragment(&text, cursor) {
             let matches = variable_completion(&text, cursor, variables.keys().map(String::as_str)).map(|c| c.matches).unwrap_or_default();
             let new_variable = (name.is_empty() || noshape_model::variable_table::is_identifier(&name)).then_some(name);
-            return Some(Self { key: key.to_string(), range, entries: matches.into_iter().map(Entry::Variable).collect(), selected: 0, scroll: ScrollHandle::new(), new_variable });
+            return Some(Self { key: key.to_string(), range, entries: matches.into_iter().map(Entry::Variable).collect(), selected: 0, moved: false, scroll: ScrollHandle::new(), new_variable });
         }
         let names: Vec<&str> = variables.keys().map(String::as_str).collect();
         let (range, entries) = word_entries(&text, cursor, &names, dim)?;
-        Some(Self { key: key.to_string(), range, entries, selected: 0, scroll: ScrollHandle::new(), new_variable: None })
+        Some(Self { key: key.to_string(), range, entries, selected: 0, moved: false, scroll: ScrollHandle::new(), new_variable: None })
     }
 
     /// `state.list` of the interaction parity suite: each row's first text, the highlighted one, and with the
     /// variables and units the list shows, each row's whole text (`detail`: "#width 30 mm", "max( x , y )").
     pub fn ui_state(&self, shown: Option<(&BTreeMap<String, noshape_units::Quantity>, &noshape_units::UnitPrefs)>) -> serde_json::Value {
-        let mut v = serde_json::json!({ "kind": "autocomplete", "rows": self.row_names(), "highlighted": self.selected, "disabled": [] });
+        let mut v = serde_json::json!({ "kind": "autocomplete", "rows": self.row_names(), "highlighted": self.highlighted(), "disabled": [] });
         if let Some((variables, units)) = shown {
             v["detail"] = self.row_texts(variables, units).into();
         }
@@ -236,6 +238,12 @@ impl VarCompletion {
         rows
     }
 
+    /// The highlighted row: none while "New variable…" is the only one and the arrows haven't moved (live fields-gaps:
+    /// `#` in a studio without variables highlights nothing, so Tab takes nothing), else the selected one.
+    pub fn highlighted(&self) -> Option<usize> {
+        (self.moved || !self.entries.is_empty()).then_some(self.selected)
+    }
+
     /// Rows: the entries, then "New variable…".
     fn rows(&self) -> usize {
         self.entries.len() + usize::from(self.new_variable.is_some())
@@ -250,6 +258,7 @@ impl VarCompletion {
     pub fn move_selection(&mut self, delta: isize) {
         let n = self.rows() as isize;
         if n > 0 {
+            self.moved = true;
             self.selected = (self.selected as isize + delta).clamp(0, n - 1) as usize;
             self.scroll.scroll_to_item(self.selected);
         }
@@ -301,6 +310,7 @@ impl VarCompletion {
     fn list(&self, variables: &BTreeMap<String, noshape_units::Quantity>, units: &noshape_units::UnitPrefs, on_pick: impl Fn(usize, &mut Window, &mut App) + 'static, corner: Anchor) -> AnyElement {
         let pal = p();
         let last = self.rows().saturating_sub(1);
+        let highlighted = self.highlighted();
         let (text, faint, active) = (rgb(0x333333), rgb(0x666666), rgb(0xb2ddf6));
         let on_pick = std::rc::Rc::new(on_pick);
         let names = self.row_names();
@@ -314,8 +324,8 @@ impl VarCompletion {
                 .gap(px(5.))
                 .when(i == 0, |d| d.rounded_t(px(MENU_RADIUS - 1.)))
                 .when(i == last, |d| d.rounded_b(px(MENU_RADIUS - 1.)))
-                .when(i == self.selected, |d| d.bg(active))
-                .when(i != self.selected, |d| d.hover(|d| d.bg(pal.row_hover)))
+                .when(Some(i) == highlighted, |d| d.bg(active))
+                .when(Some(i) != highlighted, |d| d.hover(|d| d.bg(pal.row_hover)))
                 .cursor_pointer()
                 .text_size(px(14.))
                 .text_color(text)
@@ -460,7 +470,7 @@ mod tests {
     /// Live: ↓ stops on the last row and ↑ on the first (no wrap); every row is in the list (9 show, more scroll).
     #[test]
     fn arrows_stop_at_the_ends() {
-        let mut c = VarCompletion { key: "k".into(), range: 0..1, entries: (0..12).map(|i| Entry::Variable(format!("v{i}"))).collect(), selected: 0, scroll: ScrollHandle::new(), new_variable: Some("v".into()) };
+        let mut c = VarCompletion { key: "k".into(), range: 0..1, entries: (0..12).map(|i| Entry::Variable(format!("v{i}"))).collect(), selected: 0, moved: false, scroll: ScrollHandle::new(), new_variable: Some("v".into()) };
         assert_eq!(c.row_names().len(), 13, "all 12 and New variable…");
         c.move_selection(-1);
         assert_eq!(c.selected, 0);
