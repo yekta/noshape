@@ -2411,6 +2411,10 @@ impl<'a> Translator<'a> {
             .sum();
         if sketch_only && let Some(want) = live_area {
             let text = self.query_text_first(k, q);
+            if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                let got = text.as_ref().ok().and_then(|f| self.regions_area(f));
+                eprintln!("TRACE regions {:?}: live {:.6} mm², the text's {:?} mm² ({:?})", ids, want * 1e6, got.map(|a| a * 1e6), text);
+            }
             if let Ok(found) = &text
                 && self.regions_area(found).is_some_and(|a| (a - want).abs() <= 1e-3 * want)
             {
