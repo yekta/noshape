@@ -90,6 +90,66 @@ pub(super) fn samples(ns: &FreeSurface, uv: [f64; 4]) -> Vec<(DVec2, DVec3)> {
     out
 }
 
+/// Points' nearest one, the first of them where several are as near: as a scan of them in order finds it, comparing
+/// `(q - p).length_squared()`. A k-d tree over them, each node its median along its range's widest axis.
+pub(super) struct Nearest {
+    pts: Vec<DVec3>,
+    /// The points' indices, each range's median at its middle, the lower half before it and the upper after.
+    order: Vec<u32>,
+    /// Each range's axis by its middle's place in `order`.
+    axis: Vec<u8>,
+}
+
+impl Nearest {
+    pub(super) fn new(pts: Vec<DVec3>) -> Self {
+        let mut order: Vec<u32> = (0..pts.len() as u32).collect();
+        let mut axis = vec![0u8; pts.len()];
+        let mut todo = vec![(0usize, pts.len())];
+        while let Some((lo, hi)) = todo.pop() {
+            if hi - lo < 2 {
+                continue;
+            }
+            let (mut a, mut b) = (DVec3::INFINITY, DVec3::NEG_INFINITY);
+            for &i in &order[lo..hi] {
+                a = a.min(pts[i as usize]);
+                b = b.max(pts[i as usize]);
+            }
+            let w = b - a;
+            let k = if w.x >= w.y && w.x >= w.z { 0 } else if w.y >= w.z { 1 } else { 2 };
+            let mid = (lo + hi) / 2;
+            order[lo..hi].select_nth_unstable_by(mid - lo, |&i, &j| pts[i as usize][k].total_cmp(&pts[j as usize][k]));
+            axis[mid] = k as u8;
+            todo.push((lo, mid));
+            todo.push((mid + 1, hi));
+        }
+        Self { pts, order, axis }
+    }
+
+    /// The nearest point's index (none of none).
+    pub(super) fn of(&self, p: DVec3) -> Option<usize> {
+        let mut best: Option<(f64, usize)> = None;
+        // (Each range with the least its points' distance can be: a coordinate's square never exceeds the distance's.)
+        let mut todo = vec![(0usize, self.pts.len(), 0.0f64)];
+        while let Some((lo, hi, least)) = todo.pop() {
+            if lo >= hi || best.is_some_and(|(bd, _)| least > bd) {
+                continue;
+            }
+            let mid = (lo + hi) / 2;
+            let i = self.order[mid] as usize;
+            let d = (self.pts[i] - p).length_squared();
+            if best.is_none_or(|(bd, bi)| d.total_cmp(&bd).then(i.cmp(&bi)).is_lt()) {
+                best = Some((d, i));
+            }
+            let k = self.axis[mid] as usize;
+            let off = p[k] - self.pts[i][k];
+            let (near, far) = if off < 0.0 { ((lo, mid), (mid + 1, hi)) } else { ((mid + 1, hi), (lo, mid)) };
+            todo.push((far.0, far.1, least.max(off * off)));
+            todo.push((near.0, near.1, least));
+        }
+        best.map(|b| b.1)
+    }
+}
+
 /// A NURBS curve's length from `t0` to `t1` (Gauss–Legendre, 4 points on each of 4 pieces a knot span it is on).
 pub(super) fn length(c: &NurbsCurve, t0: f64, t1: f64) -> f64 {
     if let Some(l) = c.length(t0, t1) {
@@ -1030,6 +1090,38 @@ fn mul_range(a: (f64, f64), b: (f64, f64)) -> (f64, f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The k-d tree's nearest point is the scan's, the first of equals included: a 41 x 23 grid on a wavy sheet with
+    /// its first row collapsed to one point (a pole) and every point of its last row twice, against 2000 points near
+    /// it, the grid's own points and points halfway between two.
+    #[test]
+    fn nearest_samples_are_the_scans() {
+        let mut pts = Vec::new();
+        for i in 0..41 {
+            for j in 0..23 {
+                let (u, v) = (i as f64 * 0.25, j as f64 * 0.5);
+                pts.push(if i == 0 { DVec3::ZERO } else { DVec3::new(u, v, (u * 1.3).sin() * (v * 0.7).cos()) });
+            }
+        }
+        let last: Vec<DVec3> = pts[pts.len() - 23..].to_vec();
+        pts.extend(last);
+        let near = Nearest::new(pts.clone());
+        let scan = |p: DVec3| pts.iter().enumerate().min_by(|a, b| (*a.1 - p).length_squared().total_cmp(&(*b.1 - p).length_squared())).map(|x| x.0);
+        let mut seed = 0x2545_f491_4f6c_dd1du64;
+        let mut rnd = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let mut qs: Vec<DVec3> = (0..2000).map(|_| DVec3::new(rnd() * 12.0 - 1.0, rnd() * 13.0 - 1.0, rnd() * 4.0 - 2.0)).collect();
+        qs.extend(pts.iter().copied());
+        qs.extend(pts.windows(2).map(|w| (w[0] + w[1]) * 0.5));
+        for q in qs {
+            assert_eq!(near.of(q), scan(q), "at {q}");
+        }
+        assert_eq!(Nearest::new(Vec::new()).of(DVec3::ZERO), None);
+    }
 
     /// Two wavy strips of three spans each, one the other's mirror (their control points ±0.1 off a plane): apart by
     /// their Bézier patches, halved while they meet, when 0.3 apart; not where they cross.

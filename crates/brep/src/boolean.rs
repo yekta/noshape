@@ -329,7 +329,8 @@ struct GFace {
     /// A free-form face's parameter box (its edges' curves on it span), (u0, u1, v0, v1).
     uvbox: [f64; 4],
     pcurves: PCurves,
-    grid: std::sync::OnceLock<Vec<(DVec2, DVec3)>>,
+    /// Its NURBS surface's samples ([`free::samples`]) and the nearest of them to a point ([`Self::uv_of`]).
+    grid: std::sync::OnceLock<(Vec<(DVec2, DVec3)>, free::Nearest)>,
     /// Points' parameters found so far ([`Self::uv_of`]: most are asked for again).
     uvs: std::sync::Mutex<HashMap<[u64; 3], DVec2>>,
     patches: std::sync::OnceLock<free::Patches>,
@@ -368,8 +369,18 @@ impl GFace {
         if let Some(uv) = self.uvs.lock().ok().and_then(|m| m.get(&key).copied()) {
             return uv;
         }
-        let grid = self.grid.get_or_init(|| free::samples(ns, self.uvbox));
-        let seed = grid.iter().min_by(|a, b| (a.1 - p).length_squared().total_cmp(&(b.1 - p).length_squared())).map_or(DVec2::ZERO, |x| x.0);
+        let (grid, near) = self.grid.get_or_init(|| {
+            let g = free::samples(ns, self.uvbox);
+            let pts = g.iter().map(|x| x.1).collect();
+            (g, free::Nearest::new(pts))
+        });
+        // (The nearest by the index, the one the scan below finds; the scan where the point isn't finite.)
+        let at = if p.is_finite() {
+            near.of(p)
+        } else {
+            grid.iter().enumerate().min_by(|a, b| (a.1.1 - p).length_squared().total_cmp(&(b.1.1 - p).length_squared())).map(|x| x.0)
+        };
+        let seed = at.map_or(DVec2::ZERO, |i| grid[i].0);
         let uv = ns.param_of(p, seed, self.uvbox).0;
         if let Ok(mut m) = self.uvs.lock() {
             m.insert(key, uv);
