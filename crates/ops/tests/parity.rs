@@ -794,11 +794,15 @@ fn exchange_round_trip() {
             let mut args = json!({ "format": format, "file": file });
             // STL as live.stl was made, REST's default tessellation: no chord limit, 5° arcs, 15° when the exported
             // parts have over 500 faces (live2 exchange-kw: 498 faces 5°, 501 15°; cf-spur-gear's 848: its Ø10
-            // keyway bore 22 segments; live 2319: clamp-hms 4,576 triangles, ours 4,568).
+            // keyway bore 22 segments; live 2319: clamp-hms 4,576 triangles, ours 4,568), and no minimum facet width
+            // that binds (radijator's r 0.92 mm arcs in 0.08 mm segments; Medium's 0.254 mm floored ours at 0.17 mm,
+            // its area 2.1 times live's error). Compared by volume and area within live's own error, not by triangles
+            // (DECISIONS 7210b453e: OCCT's 3 segments on any arc and rows on a cone, parked).
             if format == "STL" {
                 args["units"] = json!("Millimeter");
                 args["resolution"] = json!("custom");
                 args["chordal_tolerance"] = json!(100);
+                args["min_facet_width"] = json!(0.0254);
                 args["angular_deviation"] = json!(if native.iter().map(|p| p.faces).sum::<u64>() > 500 { 15 } else { 5 });
             }
             if let Err(e) = t.call("export_parts", args) {

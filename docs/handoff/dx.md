@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-16 01:41 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-16 02:13 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -9,25 +9,26 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land: tell asm.
 
 ## In flight (uncommitted in the dx worktree, branch dx-bosdxf)
-- STEP import names (asm's find, asm-corexy BOM 21/27), landing 01:41: FreeCAD's STEP (one product, its solids by several
-  SHAPE_REPRESENTATION_RELATIONSHIPs) comes through XDE as components named by their link "=>[0:1:1:2]"; ours named the
-  parts so, live by the product ("Pulley_GT2-6mm-20T_bore_5_001" ×3). crates/kernel/cpp/io.cpp `own_name()` takes XDE's
-  made-up names ("=>[…]" links, type names "SOLID" …) as none (collect + walk_tree), so the product's name is used. Test export::a_products_solids_by_representation_relationships_take_its_name
-  (face-colour.step reshaped as FreeCAD's). Mac: before "=>[0:1:1:2]"…, then "SOLID"…, now "Pulley" ×3; kernel export:: 36/36, ops import 30/30.
-- Composite part kind (landing 01:41, asm ok; the assembly suite's part list keeps composites, asm's 7" Wheel asm on
-  Composite part 4): `query_parts` gives a composite "Composite" (was its BodyKind, Solid); the suite reads it as
-  live's "composite" with 0/0/0 topology (parts_from_query; test a_composite_part_reads_as_lives). 1dc32b alone
-  (vibe6, build L): 17/349, first difference Composite part 2 "Large wheel asm": "a solid body, live composite",
-  436/1264/820 vs 0/0/0, centroid x -0.009 vs -0.004 mm (see whether that remains once kind/counts match).
-- 1dc32b without live's refs (vibe6 ~/agents/dx-keep/bin/st1dc-refs.sh: R with, N without; ~/tmp/dx/st1dc-{R,N}.log):
-  does the region fix let Chamfer 4 / Fillet 5 resolve without refs? N was running at 01:30.
+- Exchange STL rows by area / volume (DECISIONS 7210b453e), landing 02:13: the suite's STL export sets
+  min_facet_width 0.0254 (live's REST has no floor that binds; Medium's 0.254 floored ours at 0.17 mm). After live's
+  re-import (02:08): radijator and cf-spur-gear STL rows match (vibe5 exch-stl2/3.log, build M). Left: sheet-metal-plus
+  "Sheet Metal Up to Part": ours.stl 10135.5 mm³, live's own STL 10147.2, model 10148.1; our model is right (x_t row
+  matches, our model has vertices at (-8 / -10, 75.15, -17.03)), but our STL never reaches that corner (live's STL
+  vertex there is 2.24 mm from our mesh; /root/dx-scratch/bin/stldev.py): a face dropped or collapsed in our export
+  mesh there, also with Medium's floor (pre-existing). Next: find that face (our ours.x_t imported on vibe6
+  ~/tmp/dx/q/smp.noshape) and why tessellate_export loses it.
+- 1dc32b without live's refs (vibe6 st1dc-refs.sh: R with, N without; ~/tmp/dx/st1dc-{R,N}.log): R 17/349 (Composite
+  part 2, fixed by ce4f5ec6); N still running at 01:54.
 - corpus3 (live's 26: c2-surf-intro-*, c2-surf-workshop-*, c2-rib-wrap, c2-sm-tablet-stand, c2-sm-rocker-enclosure-*;
-  REST features.json + refs): queued in vibe6's slot (corpus3.sh, build L; ~/tmp/dx/corpus3.{out,log,sum}). Then sort
-  first differences to owners. Live's second search (answered by 01:33): parting-line draft, hem plus + side-cuts tab, loft
-  paths/guides, loft guide curves, configurable parts (configured studios only).
+  REST features.json + refs): queued in vibe6's slot behind blend (corpus3.sh, build L; ~/tmp/dx/corpus3.{out,log,sum}).
+- Second search (live, by sets): c2-parting-line-draft-tutorial 3/3; c2-parting-line-draft-parting-line 5/17, Draft 1
+  (PARTING_LINE TWO_SIDED 20/20°) removes 154234 mm³ for live's 45232, inputs match: sent to core (by 02:00); save vibe6
+  ~/tmp/dx/savepl. c2-sm-hem-plus: sheetMetalStart / sheetMetalHem are custom (Feature Studios da39db76…,
+  e5262684…) not fetched + its Derived source: asked live. c2-sm-side-cuts-tab: no live.jsonl on vibe6 yet (asked).
+  Loft sets and 7 config-parts (gears / bevels dropped: private studios) to come.
 
 ## Queued to land
-- Nothing. Landed 11-16: 866bd5ad region fix (EDGE/VERTEX queries never regions) + impeller f24 split vertex in
+- ce4f5ec6 STEP part names (asm-corexy) + Composite kind (queued 01:44). Landed 11-16: 866bd5ad region fix (EDGE/VERTEX queries never regions) + impeller f24 split vertex in
   LIVE_SLIVER_EDGES (DECISIONS bb69638d4; impeller 26/48); d55b1643 configured suppression (5d8bc1 107/124 at
   Manufacture=false, asm-bjr-config 127/137 occurrences 25/25 mates). 11-15: c1af60ab STL rule; 104e822e imported
   Feature Studios; bb0641ba region faces cache; a2212ff2 qContainsPoint box skip; 3073e7d8 draft propagation.
@@ -55,10 +56,14 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 ## Open: other
 - c2-impeller-loft: f15's Boolean is a known live difference (bool, DECISIONS); 24/48, see Next 2.
 - Exchange ("live imports ours") 43/48 (live re-import of the 14:51 files; the gear STL re-imported at 15° 22:0x,
-  synced). Left: hose x_t (deliberate split rings); 65-tooth STEP area -0.17 mm² (lead: left); STL rows: gear's Ø0.1
-  pin only (ours 12 triangles, live 96: Medium's min facet width; a tiny one gives the pin 92 but the gear 11,182
-  triangles for live's 9,000: parked), radijator (ours 17 % fewer triangles,
-  under 500 faces: not the angle rule; unexplored), sheet metal plus. Live's REST STL default: 5°, 15° over 500
+  synced). Left: hose x_t (deliberate split rings); 65-tooth STEP area -0.17 mm² (lead: left); STL rows (gear,
+  radijator, sheet metal plus): the suite exports Custom chord 100 / REST angle but Medium's 0.254 mm minimum facet
+  width; live's REST has none that binds (radijator r 0.92 arcs in 0.08 mm segments). Floor 0.254: radijator 4,186
+  triangles vs live 5,052; floor 0.0254: 5,338 (gear 11,124 vs 9,000). The rest is OCCT BRepMesh (analysis by 01:54,
+  /root/dx-scratch/bin/stl{faces,loops,arcs,seg,curved}.py): (1) BRepMesh_CurveTessellator's OCC287 minimum of 4 points
+  on a circle / conic (radijator's 18 2.5° arcs: 3 segments, live 1: +144 triangles); (2) the 45° cone (z 11-15) gets 3
+  rows, live 1 (+150). Parked P3, no OCCT patch (lead, DECISIONS 7210b453e): STL rows compare by area, volume and
+  deviation within live's error, not triangle counts. Live's REST STL default: 5°, 15° over 500
   exported faces (live2 /root/onshape-research/live/exchange-kw/README.md), the default chord (chord 100 in ours
   matches at 15° within 0.4 % per part); a tiny feature in a large export goes coarser (r 0.05 in a 520 mm studio,
   dx/q1137; none of our rows). Sync the hosts' live-ours*.json after every live re-import.
@@ -86,9 +91,10 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
 3. 1dc32b: composite rerun; refs R/N comparison (does the region fix make Chamfer 4 / Fillet 5 resolve unaided?);
    Fillet 3 once blend lands Chamfer 3.
 4. c2-impeller-loft 26/48: f24's split vertex is a known live difference (DECISIONS bb69638d4, in LIVE_SLIVER_EDGES).
-   First difference f26 "Chamfer Stevenrohr Halterung" (OFFSET_ANGLE 3.5 mm 20°): inputs match; blend: not its side
-   rule, the run-out at the chain's ends (live runs past the spline end vertices (5, ±2.61, -43.106) and cuts Part 3's
-   top lines back to x=1.5; OCCT stops there), queued after its scale-first land and infento Chamfer 3. f27 Fillet 3
+   First difference f26 "Chamfer Stevenrohr Halterung" (OFFSET_ANGLE 3.5 mm 20°): inputs match; blend: ours cuts back
+   to x=1.5 too, but its end edge is OCCT's 3.5012 mm B-spline 6 µm off the top line (y 2.616 vs 2.6104), a separate
+   edge (+2 edges/vertices); live's end edge is the line itself. blend's fix (exact straight end edges merged with the
+   collinear line) is queued. f27 Fillet 3
    fails from it. Translation matches through f27; later translation notes (Sketch Bohrung Flansch dims, Fillet KsZB,
    Sketch Bohrung Ansaugflansch OFFSET).
 5. 74d3d6 Sketch 15: its plane (Plane 1) now reports "INTERSECT: SWEPT_FACE: revolve FOxgtrMDqncXEjd_7.holeBodies.*
