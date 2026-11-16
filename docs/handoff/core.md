@@ -116,6 +116,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   /root/core-scratch/features-coons.cpp (full file, not a patch).
 - c2-surf-workshop-loft Loft 2: 3-profile surface loft 7e-5 off live's area (interpolation detail); skipped.
 - c2-sm-rocker-enclosure-body Extrude 6: Sketch 6 taken back by the translator (skasm's handoff 11-16). Not core's.
+- c2-hunting-knife Revolve 1 (46/52, parked): HANDLE 10/27/18, live 10/27/19. Our ring between the handle's B-spline
+  face and the dome's sphere is two equal 41 mm edges (vertices at (119.65, 0, 2.99): the B-spline's seam end, and
+  (104.36, 0, -27.20): the sphere seam's end), both hidden by the seam-join rule. Live's ring RvBB (81.385 mm) has its
+  arc-length midpoint exactly on the first, so live keeps one vertex, at the sphere seam's end. Rule unknown (a
+  Parasolid sphere has no seam); a live capture of a dome revolved onto a swept handle would settle it.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
