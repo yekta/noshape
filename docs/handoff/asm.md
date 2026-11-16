@@ -130,3 +130,6 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
 
 ## Lead 11-16 14:23 UTC
 The lead stopped your q91 (b84 vs s89, full-0910) and the queued hd-oldrefs trace on vibe6 to free the slot for blend while you are paused. Rerun the suites you need after rebasing onto main (core landed 55552e704 in your translator area, see "From core 11-16").
+
+## Lead 11-16 16:05 UTC
+Also stopped on vibe6: the q76/q77/q78 waiter chain (q76 = hd-now with ops-base29 had taken the slot at 16:01). Requeue what you still need after rebasing.
