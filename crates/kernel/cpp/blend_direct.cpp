@@ -196,27 +196,21 @@ std::unique_ptr<GeomAPI_ProjectPointOnSurf> projector(const TopoDS_Face& f)
   return p;
 }
 
-// Whether free-form face `t` (a lofted tool's side) lies on part face `g` where it covers it: of its sample points over
-// `g` near its surface (within 50 atol: farther ones are other parts of `t`), at least three and every one within `atol`,
-// normals within 0.02 rad (a loft's side spans a wall's planes and cylinders, each only approximately:
-// c2-variable-fillet-faceblend's held face blend, ~0.005 mm and ~0.009 rad off). Its largest distance in `dev`. (`gbox`:
-// `g`'s box; points off it are not projected. `pg`: a projector onto `g`'s surface, made here when null.)
-bool lies_on(const TopoDS_Face& t, const TopoDS_Face& g, const Bnd_Box& gbox, double atol, double& dev, std::unique_ptr<GeomAPI_ProjectPointOnSurf>& pg)
+// Free-form face `t`'s points for lies_on, with its du x dv there: on a 12 x 12 grid of its parameters, inside it. None
+// when `t` isn't free-form. (Once a face: made again for every part face it was tried on, with that face's classifier,
+// they took 2 of the 20 ms of c2-hunting-knife's Fillet 5.)
+std::vector<std::pair<gp_Pnt, gp_Vec>> lies_on_samples(const TopoDS_Face& t)
 {
-  const GeomAbs_SurfaceType k = BRepAdaptor_Surface(t, false).GetType();
+  std::vector<std::pair<gp_Pnt, gp_Vec>> out;
+  const GeomAbs_SurfaceType               k = BRepAdaptor_Surface(t, false).GetType();
   if (k != GeomAbs_BSplineSurface && k != GeomAbs_BezierSurface)
-    return false;
-  const TopoDS_Face               tf = TopoDS::Face(t.Oriented(TopAbs_FORWARD)), gf = TopoDS::Face(g.Oriented(TopAbs_FORWARD));
+    return out;
+  const TopoDS_Face               tf = TopoDS::Face(t.Oriented(TopAbs_FORWARD));
   double                          u0, u1, v0, v1;
   BRepTools::UVBounds(tf, u0, u1, v0, v1);
   BRepTopAdaptor_FClass2d         in_t(tf, 1e-9);
-  std::optional<BRepTopAdaptor_FClass2d> in_g;
-  const occ::handle<Geom_Surface> st = BRep_Tool::Surface(tf), sg = BRep_Tool::Surface(gf);
-  Bnd_Box                         near_g = gbox;
-  near_g.Enlarge(50 * atol);
-  constexpr int                   N    = 12;
-  int                             over = 0;
-  dev                                  = 0;
+  const occ::handle<Geom_Surface> st = BRep_Tool::Surface(tf);
+  constexpr int                   N  = 12;
   for (int a = 0; a < N; ++a)
     for (int c = 0; c < N; ++c)
     {
@@ -226,29 +220,51 @@ bool lies_on(const TopoDS_Face& t, const TopoDS_Face& g, const Bnd_Box& gbox, do
       gp_Pnt q;
       gp_Vec du, dv;
       st->D1(uv.X(), uv.Y(), q, du, dv);
-      if (near_g.IsOut(q))
-        continue;
-      if (!pg)
-        pg = projector(gf);
-      GeomAPI_ProjectPointOnSurf& pr = *pg;
-      pr.Perform(q);
-      if (!pr.IsDone() || pr.NbPoints() == 0 || pr.LowerDistance() > 50 * atol)
-        continue;
-      double ug, vg;
-      pr.LowerDistanceParameters(ug, vg);
-      if (!in_g)
-        in_g.emplace(gf, 1e-9);
-      if (in_g->Perform(gp_Pnt2d(ug, vg), false) != TopAbs_IN)
-        continue;
-      gp_Pnt qg;
-      gp_Vec dug, dvg;
-      sg->D1(ug, vg, qg, dug, dvg);
-      const gp_Vec nt = du.Crossed(dv), ng = dug.Crossed(dvg);
-      if (pr.LowerDistance() > atol || nt.Magnitude() < 1e-300 || ng.Magnitude() < 1e-300 || !gp_Dir(nt).IsParallel(gp_Dir(ng), 0.02))
-        return false;
-      dev = std::max(dev, pr.LowerDistance());
-      ++over;
+      out.emplace_back(q, du.Crossed(dv));
     }
+  return out;
+}
+
+// Whether a free-form face (its lies_on_samples `ts`: a lofted tool's side) lies on part face `g` where it covers it: of
+// its sample points over `g` near its surface (within 50 atol: farther ones are other parts of the face), at least three
+// and every one within `atol`, normals within 0.02 rad (a loft's side spans a wall's planes and cylinders, each only
+// approximately: c2-variable-fillet-faceblend's held face blend, ~0.005 mm and ~0.009 rad off). Its largest distance in
+// `dev`. (`gbox`: `g`'s box; points off it are not projected. `pg`: a projector onto `g`'s surface, `in_g` its
+// classifier, each made here when null.)
+bool lies_on(const std::vector<std::pair<gp_Pnt, gp_Vec>>& ts, const TopoDS_Face& g, const Bnd_Box& gbox, double atol, double& dev,
+             std::unique_ptr<GeomAPI_ProjectPointOnSurf>& pg, std::unique_ptr<BRepTopAdaptor_FClass2d>& in_g)
+{
+  const TopoDS_Face               gf = TopoDS::Face(g.Oriented(TopAbs_FORWARD));
+  const occ::handle<Geom_Surface> sg = BRep_Tool::Surface(gf);
+  Bnd_Box                         near_g = gbox;
+  near_g.Enlarge(50 * atol);
+  int over = 0;
+  dev      = 0;
+  for (const auto& [q, nt] : ts)
+  {
+    if (near_g.IsOut(q))
+      continue;
+    if (!pg)
+      pg = projector(gf);
+    GeomAPI_ProjectPointOnSurf& pr = *pg;
+    pr.Perform(q);
+    if (!pr.IsDone() || pr.NbPoints() == 0 || pr.LowerDistance() > 50 * atol)
+      continue;
+    double ug, vg;
+    pr.LowerDistanceParameters(ug, vg);
+    if (!in_g)
+      in_g = std::make_unique<BRepTopAdaptor_FClass2d>(gf, 1e-9);
+    if (in_g->Perform(gp_Pnt2d(ug, vg), false) != TopAbs_IN)
+      continue;
+    gp_Pnt qg;
+    gp_Vec dug, dvg;
+    sg->D1(ug, vg, qg, dug, dvg);
+    const gp_Vec ng = dug.Crossed(dvg);
+    if (pr.LowerDistance() > atol || nt.Magnitude() < 1e-300 || ng.Magnitude() < 1e-300 || !gp_Dir(nt).IsParallel(gp_Dir(ng), 0.02))
+      return false;
+    dev = std::max(dev, pr.LowerDistance());
+    ++over;
+  }
   return over >= 3;
 }
 
@@ -888,8 +904,9 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     if (dbg && !internal.IsEmpty())
       std::fprintf(stderr, "blend direct: %d faces where tools meet\n", internal.Extent());
   }
-  // (One projector per part face, made when first needed.)
+  // (One projector and one classifier per part face, made when first needed.)
   std::vector<std::unique_ptr<GeomAPI_ProjectPointOnSurf>> projectors(pfaces.Extent() + 1);
+  std::vector<std::unique_ptr<BRepTopAdaptor_FClass2d>>    classifiers(pfaces.Extent() + 1);
   for (size_t i = 0; i < tools.size(); ++i)
   {
     ShapeIMap strips;
@@ -899,6 +916,7 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
       if (internal.Contains(t))
         continue;
       bool              on = false;
+      std::optional<std::vector<std::pair<gp_Pnt, gp_Vec>>> samples;
       Bnd_Box           fb;
       BRepBndLib::Add(t, fb);
       fb.Enlarge(5e-3 * size);
@@ -907,7 +925,9 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
         double dev = 0;
         // (Only faces its box reaches: the generic same-surface test projects points, ~ms a pair.)
         bool   here = !fb.IsOut(pboxes[j]) && same_surface(t, TopoDS::Face(pfaces(j)), 10 * tol);
-        if (!here && !fb.IsOut(pboxes[j]) && lies_on(t, TopoDS::Face(pfaces(j)), pboxes[j], 1e-4 * size, dev, projectors[j]))
+        if (!here && !fb.IsOut(pboxes[j]) && !samples)
+          samples = lies_on_samples(t);
+        if (!here && !fb.IsOut(pboxes[j]) && lies_on(*samples, TopoDS::Face(pfaces(j)), pboxes[j], 1e-4 * size, dev, projectors[j], classifiers[j]))
         {
           here = true;
           approx.emplace_back(t, j, dev);

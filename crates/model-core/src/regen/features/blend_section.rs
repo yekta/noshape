@@ -889,21 +889,33 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     if ball {
         let (tools, contacts) = ball_tools(shape, &chain, &ef, &faces, spec.r1, scale)?;
         conics = contacts;
-        for (ci, tool) in tools.into_iter().enumerate() {
-            let fs = &ef[chain[ci].index];
-            let supports = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+        // Which of each tool's faces lie on its supports (generated) and which are its blend: the tools in parallel
+        // (a point on each face and a test against both supports: 6.4 of c2-hunting-knife's Fillet 5's 36 ms in turn).
+        use rayon::prelude::*;
+        let legacy = k::kernel_legacy();
+        let on_supports: Vec<Vec<bool>> = tools
+            .par_iter()
+            .enumerate()
+            .map(|(ci, tool)| {
+                k::with_kernel_legacy(legacy.clone(), || {
+                    let fs = &ef[chain[ci].index];
+                    let supports = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+                    tool.faces()
+                        .iter()
+                        .map(|f| match super::helpers_a::point_on_face(f) {
+                            Some(q) if supports.iter().any(|s| s.contains_point(q, scale * 1e-6).unwrap_or(false)) => true,
+                            Some(_) => f.is_planar(),
+                            None => false,
+                        })
+                        .collect()
+                })
+            })
+            .collect();
+        for (ci, (tool, on)) in tools.into_iter().zip(on_supports).enumerate() {
             let ename = body.edges[chain[ci].index].clone();
             let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
             let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
-            let names = tool
-                .faces()
-                .iter()
-                .map(|f| match super::helpers_a::point_on_face(f) {
-                    Some(q) if supports.iter().any(|s| s.contains_point(q, scale * 1e-6).unwrap_or(false)) => generated.clone(),
-                    Some(_) if f.is_planar() => generated.clone(),
-                    _ => blend.clone(),
-                })
-                .collect();
+            let names = on.into_iter().map(|g| if g { generated.clone() } else { blend.clone() }).collect();
             cuts.push(NamedShape::new(tool, names));
             cut_edges.push(chain[ci].index);
         }
