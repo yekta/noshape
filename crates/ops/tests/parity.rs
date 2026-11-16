@@ -687,7 +687,9 @@ fn parity_feature_studios() {
 #[test]
 #[ignore = "T2: live's exports from /root/parity/exchange (other people's work, never in the repo)"]
 fn exchange_round_trip() {
-    const FORMATS: [(&str, &str); 4] = [("STEP", "step"), ("PARASOLID", "x_t"), ("IGES", "igs"), ("STL", "stl")];
+    const FORMATS: [(&str, &str); 7] = [("STEP", "step"), ("PARASOLID", "x_t"), ("IGES", "igs"), ("ACIS", "sat"), ("STL", "stl"), ("OBJ", "obj"), ("3MF", "3mf")];
+    // Mesh formats: by their parts' volume and area, not topology.
+    let mesh = |format: &str| matches!(format, "STL" | "OBJ" | "3MF");
     let root = PathBuf::from(std::env::var("NOSHAPE_EXCHANGE").unwrap_or_else(|_| "/root/parity/exchange".into()));
     let models = PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into()));
     let only = std::env::var("NOSHAPE_PARITY_ONLY").ok();
@@ -715,31 +717,42 @@ fn exchange_round_trip() {
             .map_err(|e| format!("import failed: {e}"))
     };
     let (mut imports, mut imports_ok, mut exports, mut exports_ok, mut waiting, mut selfs_ok) = (0, 0, 0, 0, 0, 0);
+    // Our export and import times against live's translations' (live-times.json: format, "import-<format>",
+    // "drawing-<format>": seconds): (ours at or under live's, timed).
+    let (mut faster, mut timed) = (0, 0);
+    let mut time = |name: &str, what: &str, ours: f64, live: &Value| {
+        let Some(l) = live.as_f64() else { return };
+        timed += 1;
+        faster += usize::from(ours <= l);
+        println!("{name}: time {what}: ours {ours:.3} s, live {l:.3} s");
+    };
+    let (mut drawings, mut drawings_ok) = (0, 0);
     for dir in dirs {
         let name = dir.file_name().unwrap().to_string_lossy().to_string();
         if only.as_ref().is_some_and(|o| !o.split(',').any(|x| x == name)) {
             continue;
         }
         let (selfs, theirs) = (read_json(&dir.join("live-self.json")), read_json(&dir.join("live-ours.json")));
+        let times = read_json(&dir.join("live-times.json"));
         // Live's own import of a format, unless it is off from its Parasolid import's volume by over 0.1 % (live read
         // its own STEP of cf-wave-spring as 7559 mm³ for 916.5: Onshape's failure is no target): then the Parasolid's.
         let volume = |v: &[PartState]| v.iter().filter_map(|p| p.volume).sum::<f64>();
         let xt = (!selfs["PARASOLID"].is_null()).then(|| parts_from_live_import(&selfs["PARASOLID"], false));
         // `ours`: what live's import of our file is held to (an STL of live's off its model by over 1 %: the model's).
         let expected = |format: &str, ours: bool| -> Option<Vec<PartState>> {
-            let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], format == "STL"))?;
+            let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], mesh(format)))?;
             match &xt {
                 // (Live's import of ours: held to the model; where live's own import is off it, as close as that, a
                 // quarter more (live reads its own 32-tooth gear's STEP 9.7 mm³ over its model, ours 10.7; its IGES of
                 // either the same); where live fails its own file (the wave spring's STEP), the model's.)
-                Some(x) if format != "STL" && ours => Some(held_to_model(own, x, 1.25, true, false)),
-                Some(x) if format != "STL" && (volume(&own) - volume(x)).abs() > 1e-3 * volume(x).abs() => {
+                Some(x) if !mesh(format) && ours => Some(held_to_model(own, x, 1.25, true, false)),
+                Some(x) if !mesh(format) && (volume(&own) - volume(x)).abs() > 1e-3 * volume(x).abs() => {
                     println!("{name}: live's own {format} import is off ({:.3} mm³, its Parasolid's {:.3}): compared with the Parasolid's", volume(&own) * 1e9, volume(x) * 1e9);
                     Some(x.clone())
                 }
                 // (An STL mesh too, within twice live's own STL's error: the same density, its vertices elsewhere; at
                 // 15° cf-spur-gear's 65-tooth gear is 5 % under its model in live's own, 5601 mm³ for 5915.7.)
-                Some(x) if format == "STL" => Some(held_to_model(own, x, 2.0, ours, true)),
+                Some(x) if mesh(format) => Some(held_to_model(own, x, 2.0, ours, true)),
                 Some(x) => Some(held_to_model(own, x, 1.0, false, false)),
                 _ => Some(own),
             }
@@ -751,11 +764,13 @@ fn exchange_round_trip() {
                 continue;
             }
             imports += 1;
+            let started = std::time::Instant::now();
             let ours = import(&scratch(&format!("{name}-import-{ext}.noshape")), &file);
+            time(&name, &format!("import {format}"), started.elapsed().as_secs_f64(), &times[format!("import-{format}")]);
             let diff = match (ours, expected(format, false)) {
                 (Err(e), _) => vec![e],
                 (Ok(_), None) => vec!["live-self.json has no import of it".into()],
-                (Ok(ours), Some(live)) if format == "STL" => differences(&live, &mesh_counts(ours)),
+                (Ok(ours), Some(live)) if mesh(format) => differences(&live, &mesh_counts(ours)),
                 (Ok(ours), Some(live)) => {
                     let diff = differences(&live, &ours);
                     // Where live's import loses detail against its own model and ours keeps the model's: live's
@@ -799,17 +814,23 @@ fn exchange_round_trip() {
             // that binds (radijator's r 0.92 mm arcs in 0.08 mm segments; Medium's 0.254 mm floored ours at 0.17 mm,
             // its area 2.1 times live's error). Compared by volume and area within live's own error, not by triangles
             // (DECISIONS 7210b453e: OCCT's 3 segments on any arc and rows on a cone, parked).
-            if format == "STL" {
+            if mesh(format) {
                 args["units"] = json!("Millimeter");
+            }
+            if format == "STL" {
                 args["resolution"] = json!("custom");
                 args["chordal_tolerance"] = json!(100);
                 args["min_facet_width"] = json!(0.0254);
                 args["angular_deviation"] = json!(if native.iter().map(|p| p.faces).sum::<u64>() > 500 { 15 } else { 5 });
             }
+            let started = std::time::Instant::now();
             if let Err(e) = t.call("export_parts", args) {
                 println!("{name}: ours.{ext} not exported: {e}");
                 continue;
             }
+            time(&name, &format!("export {format}"), started.elapsed().as_secs_f64(), &times[format]);
+            // (OBJ comes zipped with its .mtl, as live's.)
+            let file = if !file.is_file() && file.with_extension("zip").is_file() { file.with_extension("zip") } else { file };
             exports += 1;
             // Ours read back: the same parts as the model's (an STL's mesh by volume and area).
             let back = import(&scratch(&format!("{name}-back-{ext}.noshape")), &file);
@@ -821,17 +842,17 @@ fn exchange_round_trip() {
             // face; by volume and area.)
             // (An STL as live will read it: its own mesh's parts, volume and area, against what live's import of it
             // is held to; the file live has may be older.)
-            if format == "STL"
+            if mesh(format)
                 && let (Ok(b), Some(live)) = (&back, expected(format, true))
             {
                 let d = differences(&live, &mesh_counts(b.clone()));
-                println!("{name}: ours.stl as live will read it: {}", if d.is_empty() { "matches".into() } else { d.join("; ") });
+                println!("{name}: ours.{ext} as live will read it: {}", if d.is_empty() { "matches".into() } else { d.join("; ") });
             }
             // (Within the edges' tolerance, either side's: `within_edge_tolerance`.)
             let tol = |v: &[PartState]| v.iter().filter_map(|p| p.edge_tolerance).fold(0.0f64, f64::max);
             let diff = match back {
                 Ok(b) if format == "IGES" || format == "STEP" => differences(&mesh_counts(within_edge_tolerance(&native, tol(&native).max(tol(&b)))), &mesh_counts(b)),
-                Ok(b) if format == "STL" => {
+                Ok(b) if mesh(format) => {
                     let read_by_live = (!theirs[format].is_null()).then(|| parts_from_live_import(&theirs[format], true));
                     let (a, n) = (total(&b), read_by_live.as_deref().map_or_else(|| total(&native), total));
                     if (a - n).abs() <= 1e-2 * n.abs() { Vec::new() } else { vec![format!("mesh volume {:.3} mm³, expected {:.3}", a * 1e9, n * 1e9)] }
@@ -845,12 +866,12 @@ fn exchange_round_trip() {
                 waiting += 1;
                 continue;
             };
-            let read = parts_from_live_import(&theirs[format], format == "STL");
+            let read = parts_from_live_import(&theirs[format], mesh(format));
             let mut diff = differences(&live, &read);
             // As for its files in ours: where live's import of its own file splits its model's edges or faces (its
             // IGES writer cuts each periodic face in two, its import joins them back leaving their vertices: pulley02
             // 9/10/4 for the model's 9/8/0) and live's import of ours keeps the model's, live's shortcoming.
-            if format != "STL" && !diff.is_empty() {
+            if !mesh(format) && !diff.is_empty() {
                 let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], false));
                 if let (Some(x), Some(own)) = (&xt, own)
                     && let Some(held) = model_topology(&own, x)
@@ -874,8 +895,111 @@ fn exchange_round_trip() {
             exports_ok += usize::from(diff.is_empty());
             println!("{name}: live imports ours.{ext}: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
         }
+        // A drawing of the Part Studio as live made it (Create drawing, ANSI A, its recommended views) in PDF, DXF and
+        // DWG: the DXF's entities by type and its layers against live's.
+        let live_dxf = dir.join("live-drawing.dxf");
+        if !live_dxf.is_file() {
+            continue;
+        }
+        drawings += 1;
+        let drawing = match t.call("drawing_create", json!({ "source": "Part Studio 1", "template": "ANSI_A_INCH.dwt", "suggested_views": true })).and_then(|r| r["drawing"].as_str().map(str::to_string).ok_or_else(|| format!("no drawing in {r}"))) {
+            Ok(d) => d,
+            Err(e) => {
+                println!("{name}: drawing not created: {e}");
+                continue;
+            }
+        };
+        let mut exported = true;
+        for (format, ext) in [("PDF", "pdf"), ("DXF", "dxf"), ("DWG", "dwg")] {
+            let file = dir.join(format!("ours-drawing.{ext}"));
+            let mut args = json!({ "drawing": drawing, "format": format, "file": file });
+            if format != "PDF" {
+                args["version"] = json!("2018");
+            }
+            let started = std::time::Instant::now();
+            match t.call("drawing_export", args) {
+                Ok(_) => time(&name, &format!("drawing {format}"), started.elapsed().as_secs_f64(), &times[format!("drawing-{format}")]),
+                Err(e) => {
+                    println!("{name}: ours-drawing.{ext} not exported: {e}");
+                    exported = false;
+                }
+            }
+        }
+        let diff = match (dxf_summary(&live_dxf), dxf_summary(&dir.join("ours-drawing.dxf"))) {
+            (Some(live), Some(ours)) if exported => dxf_differences(&live, &ours),
+            _ => vec!["a DXF not read".into()],
+        };
+        drawings_ok += usize::from(diff.is_empty());
+        println!("{name}: drawing DXF: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
     }
-    println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet); ours reads ours back {selfs_ok}/{exports}", exports - waiting);
+    println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet); ours reads ours back {selfs_ok}/{exports}; drawings' DXF {drawings_ok}/{drawings}; times at or under live's {faster}/{timed}", exports - waiting);
+}
+
+/// A drawing DXF read by entity type and layer (the exchange suite's drawing leg): blocks' entities counted, their
+/// BLOCK / ENDBLK markers and a polyline's VERTEX / SEQEND not; the LAYER table's names.
+#[test]
+fn a_dxf_is_summed_by_entity_type_and_layer() {
+    let dxf = ["0", "SECTION", "2", "TABLES", "0", "TABLE", "2", "LAYER", "0", "LAYER", "2", "0", "0", "LAYER", "2", "VISIBLE", "0", "ENDTAB", "0", "ENDSEC",
+        "0", "SECTION", "2", "BLOCKS", "0", "BLOCK", "8", "0", "0", "LINE", "8", "VISIBLE", "0", "ENDBLK", "0", "ENDSEC",
+        "0", "SECTION", "2", "ENTITIES", "0", "LINE", "8", "VISIBLE", "0", "CIRCLE", "8", "VISIBLE", "0", "POLYLINE", "0", "VERTEX", "0", "SEQEND", "0", "ENDSEC", "0", "EOF"]
+    .join("\n");
+    let path = scratch("summary.dxf");
+    std::fs::write(&path, dxf).unwrap();
+    let s = dxf_summary(&path).unwrap();
+    assert_eq!(s.entities.iter().map(|(k, v)| (k.as_str(), *v)).collect::<Vec<_>>(), [("CIRCLE", 1), ("LINE", 2), ("POLYLINE", 1)]);
+    assert_eq!(s.layers.iter().map(String::as_str).collect::<Vec<_>>(), ["0", "VISIBLE"]);
+    let mut other = DxfSummary { entities: s.entities.clone(), layers: s.layers.clone() };
+    other.entities.insert("LINE".into(), 3);
+    other.layers.remove("VISIBLE");
+    assert_eq!(dxf_differences(&s, &other), ["3 LINE, live 2", "layers {\"0\"}, live {\"0\", \"VISIBLE\"}"]);
+}
+
+/// A DXF's entities by type (ENTITIES and BLOCKS, but the blocks' own markers) and its layers (the LAYER table).
+#[derive(Debug, Default, PartialEq)]
+struct DxfSummary {
+    entities: std::collections::BTreeMap<String, usize>,
+    layers: std::collections::BTreeSet<String>,
+}
+
+fn dxf_summary(path: &Path) -> Option<DxfSummary> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    let mut out = DxfSummary::default();
+    let (mut section, mut table, mut record, mut i) = (String::new(), String::new(), String::new(), 0);
+    while i + 1 < lines.len() {
+        let (code, value) = (lines[i], lines[i + 1]);
+        i += 2;
+        if code == "0" {
+            record = value.to_string();
+        }
+        match (code, value) {
+            ("0", "SECTION") if i + 1 < lines.len() && lines[i] == "2" => section = lines[i + 1].to_string(),
+            ("0", "ENDSEC") => section.clear(),
+            ("0", "TABLE") if i + 1 < lines.len() && lines[i] == "2" => table = lines[i + 1].to_string(),
+            ("0", "ENDTAB") => table.clear(),
+            ("0", kind) if (section == "ENTITIES" || section == "BLOCKS") && !matches!(kind, "BLOCK" | "ENDBLK" | "SEQEND" | "VERTEX") => *out.entities.entry(kind.to_string()).or_default() += 1,
+            ("2", name) if section == "TABLES" && table == "LAYER" && record == "LAYER" => {
+                out.layers.insert(name.to_string());
+            }
+            _ => {}
+        }
+    }
+    Some(out)
+}
+
+fn dxf_differences(live: &DxfSummary, ours: &DxfSummary) -> Vec<String> {
+    let mut out = Vec::new();
+    let kinds: std::collections::BTreeSet<&String> = live.entities.keys().chain(ours.entities.keys()).collect();
+    for k in kinds {
+        let (l, o) = (live.entities.get(k).copied().unwrap_or(0), ours.entities.get(k).copied().unwrap_or(0));
+        if l != o {
+            out.push(format!("{o} {k}, live {l}"));
+        }
+    }
+    if live.layers != ours.layers {
+        out.push(format!("layers {:?}, live {:?}", ours.layers, live.layers));
+    }
+    out
 }
 
 /// Live's import of our file splitting fewer of the model's edges than its import of its own (cf-hose-routing's
@@ -1977,6 +2101,9 @@ fn a_zero_centroid_is_unknown() {
     let mut zero = sheet.clone();
     zero["parts"][0]["volume"] = json!(0.0);
     assert_eq!(live_parts(&zero)[0].volume, None);
+    let mut point = zero.clone();
+    point["parts"][0]["bodyType"] = json!("point");
+    assert_eq!(live_parts(&point)[0].volume, None);
     let mut solid = zero.clone();
     solid["parts"][0]["bodyType"] = json!("solid");
     solid["parts"][0]["volume"] = json!(1e-6);

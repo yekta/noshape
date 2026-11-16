@@ -7124,8 +7124,9 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             faces: p["faces"].as_u64().unwrap_or(0),
             edges: p["edges"].as_u64().unwrap_or(0),
             vertices: p["vertices"].as_u64().unwrap_or(0),
-            // A sheet's or wire's volume (live's 0) isn't one: ours has none (c2-sm-hem-plus' derived Offset surface 1).
-            volume: p["volume"].as_f64().filter(|_| !matches!(p["bodyType"].as_str(), Some("sheet" | "wire"))),
+            // A sheet's, wire's or point's volume (live's 0) isn't one: ours has none (c2-sm-hem-plus' derived Offset
+            // surface 1, c2-config-parts-pulleys' points).
+            volume: p["volume"].as_f64().filter(|_| !matches!(p["bodyType"].as_str(), Some("sheet" | "wire" | "point"))),
             area: p["area"].as_f64(),
             volume_band: band(&p["volume_band"]),
             volume_high: p["volume_high"].as_f64(),
