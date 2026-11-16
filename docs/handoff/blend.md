@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-16 02:23 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-16 04:03 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -21,6 +21,15 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   model pair blend2 (main) vs blend6 (suite-sf-*: every suite doc, corner-break's 42 faces), then the assemblies
   (asm-sf-{base,new}.log). Land if all identical.
 
+- c2-impeller-loft feature 26 "Chamfer Stevenrohr Halterung": commit 12b25c47e (blend3, on main 6acd980f6): the rim
+  chamfer cut's end edge (OCCT's B-spline, 1.7e-3 rad / 6 um off the side line over 3.5 mm) joins the line as one line
+  on its extension (join_edges_at's max_turn: the far vertex moved onto it, the pcurve kept in the line's period; the
+  unify's concatenation threw "Courbes non jointives"). 33/88/56 -> live's 33/86/54; kernel T1
+  blend::a_straight_section_turned_off_a_line_joins_it_on_the_lines_extension. Pair blend-base (main) vs blend3 +
+  g++-13 queued on vibe5 (unit blend-imp-pair, suite-imp-*, flag imp-pair.done; behind bool2's gate). Core and dx
+  told. join_edges_at is in boolean.cpp but only blends call it (bool's gate not needed: no Boolean path changes).
+- side-cuts-tab Corner break 1: core's (queued by core 03:2x).
+
 ## Open questions / waiting
 
 - infento 1dc32b Chamfer 3 (live 3169: 23 mm on the cylinder at both R65 arcs, by volume 87,057.04). Ruled out: a
@@ -30,18 +39,14 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   on G37's block the first fin matches G30 only 4/6 ((a) front, (e) right fail), our class rule 6/6. Fits all: class
   order when both faces are one feature's, else the forward fin (left face) (G30 (i) too). Needs Parasolid's edge
   direction, which our OCCT edges needn't share. Decision asked of the lead. Parked: parked/ch3-alias-rule.patch.
-- c2-impeller-loft feature 26 "Chamfer Stevenrohr Halterung" (dx; OFFSET_ANGLE 3.5 mm / 20 deg, a chain spline 16 -
-  circle 81 - spline 19 on the x = 5 face): now the document's first difference on main: ours 33/88/56, live 33/86/54
-  (two more edges and vertices, one per chain end), then Fillet 3 / Fillet Stevenrohr zum Halter fail. Our side pick
-  is live's (OCCT distance-angle, reference faces 2, 3, 28). Live's chamfer runs out past the chain's end vertices
-  (5, +-2.61, -43.106): its end edge on each side is the top line itself, one 59.47 mm line from x = 1.5. Ours ends
-  in OCCT's 3.5012 mm B-spline from (5, 2.61, -43.106) to (1.5, 2.616, -43.105), 6 um off the line's y = 2.6104, so
-  the 55.97 mm line and it stay two edges (the +2). Debug patch parked/imp-d1-debug.patch; doc copy vibe6
-  ~/tmp/blend/imp/imp.noshape (and vibe5 ~/tmp/blend). Built by OUR rim_chamfer_cut (OCCT's distance-angle chamfer
-  fails on the dump vibe5 ~/tmp/blend/cd/chamfer-13): the spline edge's tool face (B-spline, 6.10 mm2) lies 6 um off
-  Extrude 4's extruded wall; live's lies on it (merged: the wall / cylinder line runs on to x = 1.5). join_edges_at
-  can't straighten it (chord 1.7e-3 rad off the line). Next: rim chamfer's tool face for a non-circle rim edge exactly
-  on the wall where the wall runs along the end plane's normal. Blocks core's Move face 1 / Delete face 2 speed work.
+- c2-impeller-loft Fillet 3 (feature 27, now the first difference with 12b25c47e): CONIC R 3 rho 0.5 on the two
+  joined 59.4 mm lines at y = +-2.6104, z = -43.106; each is the lip of a lens-shaped wall: face 0 the 5.2 mm bottom
+  strip of a 9.47 mm bore (concave cylinder, axis z = -34), face 1 / 3 Extrude's surface below it, 9 deg apart.
+  frame_at's 45 deg probes all classify outside ("could not orient a face at the edge", 10 ms). With the face's own
+  normal as fallback (parked/f3-wedge-frame-wip.patch) the conic cut leaves 2 solids, 2.1 s; live removes 280 mm3,
+  33/86/54 -> 34/95/62. Fillet Stevenrohr zum Halter (29) follows from it (its edges are Fillet 3's). Probe
+  parked/zz_probe_f3.rs, dumps vibe5 ~/tmp/blend/im3 (fillet-16 = the part after the chamfer). Also: the chamfer
+  takes 684 ms (live 20).
 - isaac-ball 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63): 14 line edges, R 4.5; face 21 has a 9 mm strip:
   full rounds across it (live one half cylinder each, face 21 split 618.32 + 216.00). checked_blend's hair-smaller
   retry leaves a 9e-9 m neck in face 21. Branch `blend-necks` d6de0d70f (blend4): necks cut (all, at the part's scale
@@ -59,12 +64,8 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## Next, in order
 
-0. dx 02:25: c2-sm-side-cuts-tab feature 7 "Corner break 1" (FILLET R 21 on a 42 mm edge: a full round, the two
-   rounds meeting at its middle) fails "Failed to break selected corners."; live OK. Running it on vibe5 (sct.log) to
-   see whether it's the blend (mine) or core's sheetmetal::corner_break.
-
 1. Dock scale-first (in flight).
-2. Chamfer 3 when live answers.
+2. Impeller Fillet 3 (above); then Chamfer 3 when the lead decides.
 3. isaac-ball 3c5c58 Fillet 1: the full round across a strip (above).
 4. cf-spur-gear's opFillet blend 65-120 ms (dx); GearLab 90f78b opFillet "Failed to fillet selections." after core's
    opLoft fix (asm; no dump yet).
