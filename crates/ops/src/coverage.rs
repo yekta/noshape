@@ -536,7 +536,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Collapse selected", Op("ui_list")),
     ("partStudio:Edit section view…", Op("render_image")),
     ("partStudio:Edit sketch appearance…", Op("part_set_appearance")),
-    ("partStudio:Edit thickness analysis", Op("analysis_thickness")),
+    ("partStudio:Edit thickness analysis…", Op("analysis_thickness")),
     ("partStudio:Edit…", Op("feature_edit")),
     ("partStudio:Confirm bezier", Op("sketch_draw")),
     ("partStudio:Expand all", Op("ui_list")),

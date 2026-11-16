@@ -1341,7 +1341,7 @@ impl PartStudioView {
                         .item(tool("Draft analysis…", K::Draft));
                     // Once on, the menu edits or turns it off (Help).
                     let m = if thickness_on {
-                        m.item(crate::os_menu::OsMenuItem::new("Edit thickness analysis").on_click(move |_, w, cx| v11.update(cx, |this, cx| this.toggle_analysis_tool(K::Thickness, w, cx))))
+                        m.item(crate::os_menu::OsMenuItem::new("Edit thickness analysis…").on_click(move |_, w, cx| v11.update(cx, |this, cx| this.toggle_analysis_tool(K::Thickness, w, cx))))
                             .item(crate::os_menu::OsMenuItem::new("Turn thickness analysis off").on_click(move |_, _, cx| v10.update(cx, |this, cx| this.thickness_off(cx))))
                     } else {
                         m.item(crate::os_menu::OsMenuItem::new("Thickness analysis…").on_click(move |_, w, cx| v9.update(cx, |this, cx| this.toggle_analysis_tool(K::Thickness, w, cx))))

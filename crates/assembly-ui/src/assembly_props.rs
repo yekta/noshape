@@ -595,8 +595,14 @@ impl AssemblyView {
         let Some(key) = self.assembly(cx).and_then(|a| a.instance(instance)).and_then(|i| i.source.external_key().map(str::to_string)) else { return };
         let Some(r) = crate::derived::ExternalRef::parse(&key).filter(|r| r.path == path || std::fs::canonicalize(&r.path).ok() == std::fs::canonicalize(path).ok()) else { return };
         let new_key = crate::derived::ExternalRef { microversion: mv, ..r }.key();
+        let shown = self.assembly(cx).and_then(|a| a.instance(instance)).map(|i| i.name.clone());
         self.edit(&format!("Update to {name}"), cx, |a| noshape_ops::assembly::repoint_external(a, &key, &new_key, Some(&[instance])));
         self.ext_updates.remove(&key);
+        // Live context-create-version-update: "Version of Part 1 <1> updated to V3." (as Update all's).
+        if let Some(n) = shown {
+            self.message = Some((false, format!("Version of {n} updated to {name}.")));
+            cx.notify();
+        }
     }
 
     /// Edit in context on another document's part (live 2464): its document opens on Main, its Part Studio showing
