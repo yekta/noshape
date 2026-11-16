@@ -1,98 +1,90 @@
-# bool2: current state (11-16 06:30 UTC)
+# bool2: current state (11-16 11:32 UTC, paused by the lead until ~11-17 10:15 UTC)
 
 Second agent on noshape's own Boolean (crates/brep, crates/kernel/cpp/rust_boolean.cpp, boolean.cpp's unify). A case
 is taken only where it equals OCCT (or live, with a capture); results identical end to end (docs/DECISIONS.md 11-14).
-History: docs/handoff/archive/bool2.md. Rulings: docs/DECISIONS.md.
+History: docs/handoff/archive/bool2.md. Rulings: docs/DECISIONS.md (read it first).
 
-## In flight
-- 68c1942bd (helical unify: a cylinder group whose boundary meets the seam's line between vb and vt isn't projected;
-  Sweep 1's unify 71-77 -> 23-26 ms) queued 11-16: gate57 clean (replay 3026 -> 3026 taken, 5 -> 5 differing; suite
-  98 docs 883/935 both), hats/dock SAME against main. OCCT patch 0031's commit waits on branch bool2-oc31 (ae1731fbf).
-- OCCT patch 0031 (branch bool2-oc31, ae1731fbf; lead approved 11-15 on 0030's terms): Adaptor3d_TopolTool::
-  BSplSamplePnts evaluates its grid once (c2-impeller-loft Extrude 4's Boolean 125-160 -> 73-81 ms). Libraries staged:
-  vibe5 ~/agents/bool2-keep/occt-0031 (GCC 15 -march=x86-64, OCCT's flags incl. -DNo_Exception -DOCCT_NO_PLUGINS, no
-  ymm/vfmadd; g++-13 clean), Mac ~/noshape-host/occt-0031 (arm64, Apple clang). Done: corpora replay identical to
-  gate57's (occt31-gate.out); hats/dock A vs B SAME 12/12. Open: the suite pair. The side-by-side run
-  (occt31-suite2.out) lost B's shard s7 to its 5400 s timeout after bracket120-datenkrake (A's s7: 91 s), so 17 docs
-  had no result, and the models changed under it (137 docs). Unit bool2-s7 (/root/bool2-scratch/s7-docs.out,
-  vibe5 ~/agents/bool2-keep/s7-docs.sh) runs those 17 docs one at a time, B then A, 600 s each, on a snapshot: a hang
-  under B = find why; none = rerun the suite pair on a snapshot. Then the commit to the lead (installs), land.sh.
-  Binaries: A kernel ../target (vibe5 ~/agents/bool2/target), A ops ~/agents/bool2-gate/target/.../all-a79b487bf0dd0b06,
-  B ~/agents/bool2-keep/target-occt31; CLIs ~/agents/bool2-keep/cli-{main,a,b}.
-- gate.sh: builds through ~/bin/slot (SLOT_MIN_GB=12) landed 19afd619; the models snapshot (cp -al into
-  ~/tmp/bool-gate/models-<caller>-<sha>-<pid>, NOSHAPE_GATE_MODELS for gate-host.py, deleted at exit; DECISIONS 11-16)
-  queued add363bf from worktree /root/projects/noshape-wt/bool2-tools (branch bool2-gate-slot): remove it once landed.
-  My own suite pairs must read such a snapshot too.
-- qa's P0 helical Sweep 1 0.4.48 -> 0.4.53 2.2x slower: 0.4.53 lacks 895c8e3b (its cut declined to OCCT). vibe7
-  same run: 0.4.48 341-557 ms, 0.4.53 873-977, current + e47268f2 257-326. Told qa 11-16. Its unify (15-16 ms on vibe5:
-  usd.check 7, loop_pieces 4, patches 3) is ~20 ms over 0.4.48's on vibe7 under load (another Boolean result): low.
-- Impeller Extrude 4 with 0031 (samples): OCCT's PointDepart 16 %, BRepCheck 13 %, the rest spread.
-- core's housing unify item (11-16): CLI path Rotieren 1 unify 24-26 ms, Boolesch 1 13-24, Bohrung 1 ~10; each a USD
-  merge rejected at 4.9e-15 m³ vs 1e-9 V (borderline), three memo-hit tries + one volume (9 ms). No identical-result
-  cut without moving that threshold (needs live's counts). Reported to core.
-- Worktree /root/projects/noshape-wt/bool2 (branch bool2-chamfer), scratch /root/bool2-scratch. Uncommitted on
-  purpose: crates/kernel/tests/all.rs registers the scratch probes (`mod sampler; mod xprobe;`, copy in
-  /root/bool2-scratch/all-with-probe.rs), crates/kernel/tests/{xprobe,sampler}.rs, scratch-docs/ (qa's docs, the valve
+## Unlanded work
+- Worktree /root/projects/noshape-wt/bool2, branch bool2-chamfer, on main c899c2bcf, three commits (not queued):
+  - 7397e21db: an extrusion across a surface of revolution's axis is sectioned on noshape's own (quadric_across in
+    rust_boolean.cpp: each ruling meets the profile's radius at its height; Newton in a bracket for the height).
+  - ce7f948bd: the same across a cone's axis (own_sections' cone branch sends it to quadric_across).
+    Together: c2-valve-config Extrude 3's cut e651026a CPU 1.98 -> 0.90 s per 10 runs, 36/90/59 valid, volume 3.7e-12
+    off OCCT's; kernel tests built with g++-13 pass (463).
+  - 5e1aa70b5: unify_in's reordered tries integrate volumes only for a try that left fewer faces (valve's
+    unify.reordered 62-142 -> 17-70 ms in Extrude 1 / 2 / Circular pattern 1, 10/10 features Ok).
+  Uncommitted on purpose: crates/kernel/tests/all.rs registers the scratch probes (`mod sampler; mod xprobe;`, copy in
+  /root/bool2-scratch/all-with-probe.rs), crates/kernel/tests/{xprobe,sampler}.rs, scratch-docs/ (qa's docs, valve
   recording). Take all.rs out (`git checkout crates/kernel/tests/all.rs`) before land.sh, put it back after.
-- Section diagnostics patch: /root/bool2-scratch/valve-ahead-dbg.patch (DBG_AHEAD: each OCCT pair's time and curves;
-  DBG_CLIP: cone x cone with the bigger face clipped).
-- qa's dock P0 (tab "B - Cakil Tasi", Puck Huni 941 ms on v0.4.52): already fixed on main by bool's 7ac4debfa +
-  b27a78c40 (Puck Huni 146-250 ms on vibe5 under load). Tab B's top-10 sent to qa 11-15. Profile script: vibe5
-  ~/tmp/bool2/dock-prof.sh <cli> <tag> (mode-700 copy, deleted after; copy in /root/bool2-scratch/bin).
-- Recordings: valve vibe5 ~/agents/bool2-keep/rec-valve (52970b93111ac42b = Circular pattern 1), doc in valve-doc.
+- Worktree /root/projects/noshape-wt/bool2-oc31, branch bool2-oc31 = 7397e21db + two commits (not queued; land only
+  after the lead installs the libraries):
+  - aa137dcc7: OCCT patch 0031 (patches/occt/0031-topoltool-bspline-samples-grid.patch): Adaptor3d_TopolTool::
+    BSplSamplePnts evaluates its grid once (c2-impeller-loft Extrude 4's Boolean 125-160 -> 73-81 ms).
+  - 0938173f0: OCCT patch 0032 (patches/occt/0032-unify-wire-bound.patch): USD's IntUnifyFaces wire loop bounded by
+    work (2 (edges + removed edges) + 16 turns, break hook polled), throwing "noshape: a wire that never closes";
+    op_unify (boolean.cpp) catches only that and keeps its input. core's P0: c2-config-parts-screws Revolve 9 grew to
+    15 GB on an invalid thread; with 0032 it stays ~250 MB (the doc's later Split hang is bool's 979de111a, dx's P0).
+  Lead approved 0031 on 0030's terms (11-15); 0032 rides with it. Staged libraries (both patches): vibe5
+  ~/agents/bool2-keep/occt-0032 (= /opt/occt with patched objects in lib/libTKG3d.a and lib/libTKShHealing.a; GCC 15
+  -march=x86-64 with OCCT's flags incl. -DNo_Exception -DOCCT_NO_PLUGINS, no ymm/vfmadd; g++-13 compiles both clean),
+  Mac ~/noshape-host/occt-0032 (arm64, Apple clang with the build tree's own command). (occt-0031 dirs: 0031 only.)
 
-## Landed today (11-15)
-- 897b690f, 7eedbae5: chamfer fallback, sphere sections, trimmed conversion, unify order, near-whole circle, exact
-  boxes kept on the part, Bézier pieces for rays.
-- 895c8e3b: c2-helical-sweep's Sweep 1 cut on ours again (OCCT's 290 -> 35-60 ms): a section's end at a seam put on
-  the seam, two sections' ends at one edge with the same third face one vertex, made cylinder faces allowed past a
-  turn by their edges' tolerance; c2-valve-config's Circular pattern 1 checks only each step's made faces past the
-  first (50-75 -> 13-22 ms).
-- 4730d0c2: the end merge looks only among nearby ends (895c8e3b had made k25-15 3 % slower; level again, Mac CPU A/B).
+## Running (results land in /root/bool2-scratch)
+- Unit bool2-gate60 (gate on 5e1aa70b5 vs main c899c2bcf; built 10:37, replays/suite running): gate60.out, read with
+  `grep -E 'VERDICT|^(replay|model suite|speed)'`. Clean ("CHECK: the knurls not run" is normal on vibe5) + main
+  green -> land bool2-chamfer with land.sh (all.rs out).
+- Unit bool2-oc32b (0031+0032 identical checks, script bin/oc32-cmp.sh): oc32-cmp.out. A = ~/agents/bool2-keep/
+  {a-kern,a-ops,cli-a2} (bool2 at 7397e21db, /opt/occt), B = {b-kern,b-ops,cli-b2} (bool2-oc31, occt-0032). Corpora
+  replay + model suite side by side on a models snapshot through ~/bin/slot (queued behind gate60), then hats/dock A vs
+  B (~/tmp/bool2/udoc/run.sh; backup in ~/agents/bool2-keep/udoc-bak). Earlier, 0031 alone: replay identical to
+  gate57's, hats/dock SAME 12/12. Done when oc32-cmp.out ends with OC32-DONE: replay 0 differences, suite document by
+  document the same (c2-config-parts-screws timed out on A as on B before 0032: B may now finish it, that's 0032's
+  fix), hats/dock SAME -> tell the lead "0031+0032 identical" + both lib dirs; he installs on vibe3/5/6/7 + Mac; then
+  land.sh from the bool2-oc31 worktree (rebase on main; all.rs isn't modified there).
+- Waiters in the paused session are gone; check the units with `systemctl is-active bool2-gate60 bool2-oc32b`.
 
 ## Open decisions (with the lead)
-- Chamfer 26 builds since 897b690f; core's Delete face 2 (OCCT defeaturing) then takes 17-26 s instead of 4-7 s, the
-  impeller 29-35 s a regen instead of 20-25. Keep the chamfer and core takes Delete face 2, or hold it? Asked 11-15.
-
-## Where qa's documents stand (Mac, main at 4730d0c2, median of 3; live from qa's 08:36 run)
-- c2-helical-sweep 72 ms (live 40): Sweep 1 74 ms = Boolean 34.5 (OCCT's sections ahead 21.8) + unify 24 (of it
-  merge_cylinder_groups 17.3) + split 7.6 + pipe 2.7.
-- c2-housing-draft 71 ms (live 105).
-- c2-valve-config 267 ms (live 175): Circular pattern 1 140, Extrude 3 55, Extrude 2 46.
+- Chamfer 26 builds since 897b690f; core's Delete face 2 (OCCT defeaturing) then takes 17-26 s instead of 4-7 s.
+  Keep the chamfer and core takes Delete face 2, or hold it? Asked 11-15.
 
 ## Next items, in order
-1. OCCT patch 0031 (above): A/B, gate, decision to the lead.
-2. Valve Circular pattern 1: per step 2 cone x cone OCCT pairs (the part's small cone patches at the 2 m tool cone's
-   apex), 6-18 ms each (one 45 ms outlier); over 7 steps 200 pairs, 290 ms CPU, 9 with curves. Clipping the tool face
-   to the patch's box doesn't help (apex: all angles; 6-9 ms). The empty ones (5 cone x cone 75 ms, 21 revolution x
-   cone 41 ms, 161 extrusion x cone 53 ms) would need an exact apart test. Parked.
-3. Helical Sweep 1's Boolean: 6 OCCT pairs, cylinder x the sweep's B-spline (10 ms each, 10 helix curves) and plane
-   x B-spline (3-5 ms): exact curves, bool's plane x B-spline area. Parked.
-4. Valve Extrude 3 (e5811c1b): 23 pairs revolved B-spline profile x B-spline extrusion in OCCT's walk, ~33 ms CPU
-   each: our own revolution x extrusion section (not started).
-5. Impeller chamfer 26's cut (f37371b8, OCCT 0.9 s): the run-on tool's end-cap lens; needs the arc, the B-spline edge
-   and the strip's edge taken as one common block.
+1. Land bool2-chamfer (gate60) and the OCCT patches (after the checks + the lead's install).
+2. Impeller "Chamfer Stevenrohr Halterung" (960 ms on vibe5: op_boolean 634, OCCT's builder 332): chamfer 26's cut
+   f37371b8 declines "a piece's point on another solid's face" (boolean.rs 3885, state_at 6270-6420): the run-on
+   tool's end cap, a 0.3 mm lens across the strip (B-spline face 3) and the face its arc lies on, all within 12 um.
+   Needs the tool's arc, its B-spline edge and the body's strip/face edge taken as one common block (archive 11-15).
+3. Valve Circular pattern 1 (Boolean ~140 ms Mac): per step 2 cone x cone OCCT pairs at the 2 m tool cones' apex,
+   6-18 ms each; 200 pairs over 7 steps, 9 with curves; clipping the tool face doesn't help. Parked.
+4. Helical Sweep 1's Boolean: 6 OCCT pairs (cylinder x the sweep's B-spline, plane x B-spline): exact curves,
+   bool's plane x B-spline area. Parked. Its unify (15-16 ms) is ~20 ms over 0.4.48's (another Boolean result): low.
+5. Impeller Extrude 4 after 0031: OCCT's PointDepart 16 %, BRepCheck 13 % (samples).
 6. Sphere x B-spline (cf-surface-pattern d6500b16, 2.2 s): Rust part 1.4 s in 2D curve sampling of refitted sections.
+
+## Recent facts
+- qa's P0s: helical Sweep 1 0.4.48 -> 0.4.53 2.2x slower = 0.4.53 lacked 895c8e3b (fixed on main; vibe7 same run:
+  0.4.48 341-557 ms, 0.4.53 873-977, main 257-326). Dock tab B Puck Huni: fixed by bool's 7ac4debfa + b27a78c40.
+- core's housing unify: Rotieren 1 / Boolesch 1 / Bohrung 1 each a USD merge rejected at 4.9e-15 m^3 vs 1e-9 V
+  (borderline), three memo-hit tries + one volume: no identical-result cut without moving that threshold.
+- gate.sh landed: builds through ~/bin/slot with SLOT_MIN_GB=12 (19afd619), models snapshot per run (a2952b32).
 
 ## How to run
 - Builds, crate tests, probes: vibe5 (DECISIONS e23d34587): `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh bash -c 'export
-  CARGO_BUILD_JOBS=4; cargo test --release -p noshape-kernel --test all <f>'`. The Mac's one slot only for short crate
-  tests. rb.sh drops env prefixes: put env inside `bash -c '...'`.
-- Gate (vibe5, one of mine at a time; its replays go through ~/bin/slot there): `systemd-run --unit=bool2-gateNN
-  --collect -p WorkingDirectory=/root/projects/noshape-wt/bool2 --setenv=NOSHAPE_GATE_HOST=vibe5 --setenv=HOME=/root
-  bash -c 'bash tools/bool/gate.sh <sha> --jobs 4 > /root/bool2-scratch/gateNN.out 2>&1'`; read with
-  `grep -E 'VERDICT|^(replay|model suite|speed)'`. "CHECK: the knurls not run" is normal on vibe5. --jobs 6 got
-  rustc killed by earlyoom under load.
-- Land: clean gate + main green (`/tmp/lead/main-status`), all.rs out, `tools/tiers/land.sh`; status
-  `tools/tiers/land.sh --status`. land.sh's clippy precheck runs on the crates touched.
+  CARGO_BUILD_JOBS=4; cargo test --release -p noshape-kernel --test all <f>'`; rb.sh drops env prefixes (env inside
+  `bash -c`). The Mac's one slot only for short crate tests. Don't rb.sh from a worktree while a binary another unit
+  still needs is being built from it (rb.sh resyncs the sources).
+- Gate (vibe5, one of mine at a time): `systemd-run --unit=bool2-gateNN --collect -p WorkingDirectory=/root/projects/
+  noshape-wt/bool2 --setenv=NOSHAPE_GATE_HOST=vibe5 --setenv=HOME=/root bash -c 'bash tools/bool/gate.sh <sha> --jobs 4
+  > /root/bool2-scratch/gateNN.out 2>&1'`.
+- My own suite pairs: through ~/bin/slot on a `cp -al ~/parity/models` snapshot (NOSHAPE_GATE_MODELS for gate-host.py,
+  DECISIONS 11-16); model files change under long runs otherwise.
+- Land: clean gate + main green (`/tmp/lead/main-status`), all.rs out, `tools/tiers/land.sh`; `--status`.
 - Probes (crates/kernel/tests/xprobe.rs, `--ignored --exact xprobe::<name> --nocapture`, PROBE_CORPUS=<dir>
-  PROBE_CASE=<id>): probe_case_repeat (PROBE_N, NOSHAPE_KERNEL_PROFILE=1 for the kernel timers, PROBE_SAMPLE=<file>
-  for sampler.rs stacks -> /root/bool2-scratch/bin/samples.py, callers.py), probe_case_volumes (ours vs OCCT counts,
-  validity, volume), probe_case_small_faces, probe_case_clipped. OCCT frames in the sampler's stacks are unreliable.
-- Recordings: vibe5 ~/agents/bool2-keep/{hel-new (helical 9b68aa2b), imp-new (impeller f10ce62e, f37371b8), sp-rec
-  (sphere d6500b16, e49701dd)}, ~/tmp/bool2/rec-valve (valve d561e545, e5811c1b; ~/tmp is pruned). Record with
-  NOSHAPE_RECORD_BOOLEANS=<dir> NOSHAPE_RECORD_EXACT=1 on the CLI.
-- Doc timing (qa's repro): fresh copy of the .noshape (+ -wal/-shm) each run, `noshape-cli feature list --doc <copy>`,
-  regen_ms; median of 3. On the Mac: release CLI `cargo build --release -p noshape-cli` via rb.sh, docs synced in
-  scratch-docs/, scratch-docs/sum.py sums regen_ms. Speed claims: relative A/B in one run (DECISIONS 11-15); on vibe5
-  under load use user CPU (`/usr/bin/time -f %U`, RAYON_NUM_THREADS=1) or the Mac.
+  PROBE_CASE=<full id>): probe_case_repeat (PROBE_N, NOSHAPE_KERNEL_PROFILE=1, PROBE_SAMPLE=<file> -> vibe5
+  ~/agents/bool2-keep/samples.py, callers.py), probe_case_volumes (ours vs OCCT). DBG_AHEAD per-pair OCCT section
+  times: /root/bool2-scratch/valve-ahead-dbg.patch. NOSHAPE_OWN_SECTIONS=0 turns our own sections off for A/Bs.
+- Recordings: vibe5 ~/agents/bool2-keep/{hel-new (helical 9b68aa2b07dc2986), imp-new (impeller f10ce62e55f0fd49,
+  f37371b831c5339f), rec-valve (52970b93111ac42b pattern, e651026a9443a3b6 Extrude 3, 90654ec1c1685fff), sp-rec}.
+- Doc timing: qa's saved docs vibe5 ~/qa-parity/saved (copy + -wal/-shm each run); `noshape-cli feature list`,
+  regen_ms; under load use user CPU (`/usr/bin/time -f %U`, RAYON_NUM_THREADS=1). Private docs (hats, dock): mode-700
+  copies in ~/tmp/bool2, deleted after (udoc run.sh does it). gdb only on a child (ptrace_scope 1): `gdb -batch -ex run
+  -ex "thread apply all bt" --args ...` under `timeout -s INT`.
