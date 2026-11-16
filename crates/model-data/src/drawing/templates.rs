@@ -94,7 +94,9 @@ pub fn default_fields(style: TitleBlockStyle, inches: bool) -> Vec<(String, Stri
             ("Material", ""),
             ("Finish", ""),
             // Live: the sheet reference part's Title 1–3 (not the drawing's).
-            ("Title", "{part.title1}\n{part.title2}\n{part.title3}"),
+            ("Title", "{part.title1}"),
+            ("Title 2", "{part.title2}"),
+            ("Title 3", "{part.title3}"),
             ("Size", ""),
             // Live: the drawing's own Part number and Revision.
             ("Part number", "{drawing.number}"),

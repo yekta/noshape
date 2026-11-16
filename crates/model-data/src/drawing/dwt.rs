@@ -41,6 +41,10 @@ impl SheetTemplate {
         s.title_block = self.title_block.clone();
         s.title_style = self.title_style;
         s.title_language = self.title_language;
+        // (A template saved before TITLE's lines were fields of their own.)
+        if !matches!(s.title_style, TitleBlockStyle::Simple | TitleBlockStyle::None) {
+            s.title_block.split_title_lines();
+        }
     }
 }
 

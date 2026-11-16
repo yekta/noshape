@@ -298,7 +298,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "title_field",
             summary: "Edit a title block field: its cell's note",
-            description: "Double-click a title block cell (live qa4 round 5 s11 (4)): each field's cell is a note, editable while the formats are locked. `text` replaces field `field` (as drawing_get's `title_fields`, e.g. \"Title\", \"Drawn by\"; a key the layout lacks is added). Lines split on \\n; property codes like {part.name} expand. `explode` (the field's right-click › Explode note): the field becomes a note of its own in its cell (drawing_get's annotations; the format stops drawing it) drawn as lines in DWG / DXF exports. One edit (\"Edit title block\", or \"Explode note\" without `text`).",
+            description: "Double-click a title block cell (live qa4 round 5 s11 (4)): each field's cell is a note, editable while the formats are locked. `text` replaces field `field` (as drawing_get's `title_fields`, e.g. \"Title\", \"Drawn by\"; the ANSI / ISO block's TITLE is three fields, \"Title\", \"Title 2\", \"Title 3\", a line each; a key the layout lacks is added). Lines split on \\n; property codes like {part.name} expand. `explode` (the field's right-click › Explode note): the field becomes a note of its own in its cell (drawing_get's annotations; the format stops drawing it) drawn as lines in DWG / DXF exports. One edit (\"Edit title block\", or \"Explode note\" without `text`).",
             fields: with(
                 common(),
                 vec![

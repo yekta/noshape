@@ -3746,7 +3746,7 @@ fn drawing_title_block_fields() {
     let title = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["title_fields"].as_array().unwrap().iter().find(|f| f["field"] == "Title").cloned().expect("a Title cell");
     let t = title(&mut ctx);
     let cell: Vec<f64> = t["cell"].as_array().unwrap().iter().map(num).collect();
-    assert!(cell[2] - cell[0] > 20.0 && cell[3] - cell[1] > 5.0, "{cell:?}");
+    assert!(cell[2] - cell[0] > 20.0 && cell[3] - cell[1] > 3.0, "{cell:?}");
     // The cell's left line is a format line of its own (M1): Move to, then Delete.
     let on = json!([cell[0], (cell[1] + cell[3]) / 2.0]);
     call(&mut ctx, "drawing_format_line", json!({ "drawing": tab, "point": on, "layer": "Border zones" }));
@@ -3757,24 +3757,72 @@ fn drawing_title_block_fields() {
     assert_eq!((edits[0]["deleted"].clone(), edits[0]["layer"].clone()), (json!(true), json!("Border zones")));
     let e = try_call(&mut ctx, "drawing_format_line", json!({ "drawing": tab, "point": [140, 108], "delete": true })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("point"), "no format line mid-sheet {e:?}");
-    let value = t["value"].as_str().unwrap().to_string();
-    let lines: Vec<&str> = value.split('\n').collect();
-    assert_eq!(lines.len(), 3, "three property fields: {value}");
-    let typed = format!("{}\nQA4 PLATE\n{}", lines[0], lines[2]);
-    call(&mut ctx, "drawing_title_field", json!({ "drawing": tab, "field": "Title", "text": typed }));
+    // TITLE is three fields, a line each (live2 title-line-edit): typing into the second keeps the other two.
+    let field = |ctx: &mut Ctx, key: &str| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["title_fields"].as_array().unwrap().iter().find(|f| f["field"] == key).cloned();
+    let (one, three) = (field(&mut ctx, "Title").expect("Title")["value"].clone(), field(&mut ctx, "Title 3").expect("Title 3")["value"].clone());
+    assert!(!one.as_str().unwrap().contains('\n'), "one line: {one}");
+    call(&mut ctx, "drawing_title_field", json!({ "drawing": tab, "field": "Title 2", "text": "QA4 PLATE" }));
     assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Edit title block"));
-    let t = title(&mut ctx);
-    assert_eq!(t["value"].as_str().unwrap(), typed);
-    assert!(t["shown"].as_array().unwrap().iter().any(|l| l == "QA4 PLATE"), "{t}");
+    let t2 = field(&mut ctx, "Title 2").expect("Title 2");
+    assert_eq!(t2["value"], "QA4 PLATE");
+    assert!(t2["shown"].as_array().unwrap().iter().any(|l| l == "QA4 PLATE"), "{t2}");
+    assert_eq!((field(&mut ctx, "Title").unwrap()["value"].clone(), field(&mut ctx, "Title 3").unwrap()["value"].clone()), (one, three));
+    let cell2: Vec<f64> = t2["cell"].as_array().unwrap().iter().map(num).collect();
+    assert!(cell2[1] < cell[1], "the second line's band under the first: {cell2:?} {cell:?}");
     // Explode note (the field's menu): the field becomes a note of its own in its cell.
-    call(&mut ctx, "drawing_title_field", json!({ "drawing": tab, "field": "Title", "explode": true }));
+    call(&mut ctx, "drawing_title_field", json!({ "drawing": tab, "field": "Title 2", "explode": true }));
     assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Explode note"));
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
     let note = g["annotations"].as_array().unwrap().iter().find(|a| a["text"].as_str().is_some_and(|t| t.contains("QA4 PLATE"))).cloned().expect("the field's note");
     let p = [num(&note["position"][0]), num(&note["position"][1])];
-    assert!(p[0] > cell[0] && p[0] < cell[2] && p[1] > cell[1] && p[1] < cell[3], "{note} in {cell:?}");
-    // The format no longer draws it: the note does.
-    assert!(!g["title_fields"].as_array().unwrap().iter().any(|f| f["field"] == "Title"), "{}", g["title_fields"]);
+    assert!(p[0] > cell2[0] && p[0] < cell2[2] && p[1] > cell2[1] - 3.0 && p[1] < cell2[3] + 3.0, "{note} in {cell2:?}");
+    // The format no longer draws it: the note does; the other lines stay fields.
+    let keys: Vec<&str> = g["title_fields"].as_array().unwrap().iter().filter_map(|f| f["field"].as_str()).collect();
+    assert!(!keys.contains(&"Title 2") && keys.contains(&"Title") && keys.contains(&"Title 3"), "{keys:?}");
+}
+
+/// A drawing saved when TITLE was one field of three lines opens with a field a line, same text (lead 11-16).
+#[test]
+fn drawing_title_lines_from_an_old_file() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_title_old.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let path = call(&mut ctx, "document_info", json!({}))["path"].as_str().expect("its path").to_string();
+    call(&mut ctx, "document_close", json!({}));
+    // The drawing as an older build saved it: TITLE one field, its lines joined.
+    fn old_form(v: &mut Value) {
+        match v {
+            Value::Object(m) => {
+                if let Some(Value::Array(fields)) = m.get_mut("title_block").and_then(|t| t.get_mut("fields")) {
+                    let line = |fields: &Vec<Value>, k: &str| fields.iter().find(|f| f[0] == k).and_then(|f| f[1].as_str()).unwrap_or("").to_string();
+                    let joined = format!("{}\nOLD TWO\n{}", line(fields, "Title"), line(fields, "Title 3"));
+                    fields.retain(|f| f[0] != "Title 2" && f[0] != "Title 3");
+                    if let Some(f) = fields.iter_mut().find(|f| f[0] == "Title") {
+                        f[1] = json!(joined);
+                    }
+                }
+                m.values_mut().for_each(old_form);
+            }
+            Value::Array(a) => a.iter_mut().for_each(old_form),
+            _ => {}
+        }
+    }
+    let mut store = noshape_store::Document::open(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+    let branch = store.default_branch().unwrap();
+    let head = store.head(branch).unwrap();
+    let (name, blob) = store.read_all(head).unwrap().into_iter().find(|(n, b)| n.starts_with("tab/") && serde_json::from_slice::<Value>(b).is_ok_and(|v| v["name"] == tab)).expect("the drawing's tab");
+    let mut v: Value = serde_json::from_slice(&blob).unwrap();
+    old_form(&mut v);
+    assert!(v.to_string().contains("OLD TWO"), "rewritten");
+    store.commit(branch, &[(name, Some(serde_json::to_vec(&v).unwrap()))], "an older build's save").unwrap();
+    drop(store);
+    call(&mut ctx, "document_open", json!({ "path": path }));
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+    let value = |k: &str| g["title_fields"].as_array().unwrap().iter().find(|f| f["field"] == k).map(|f| f["value"].clone());
+    assert_eq!(value("Title 2"), Some(json!("OLD TWO")), "{}", g["title_fields"]);
+    assert!(value("Title").is_some_and(|v| !v.as_str().unwrap().contains('\n')), "{}", g["title_fields"]);
+    assert!(value("Title 3").is_some(), "{}", g["title_fields"]);
 }
 
 #[test]

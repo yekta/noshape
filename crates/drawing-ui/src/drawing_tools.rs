@@ -2154,15 +2154,16 @@ impl DrawingEditor {
                 // a note with the field's text; Delete leaves the cell empty;
                 // Explode note, Add leader, Move to and the order make the
                 // field a note of its own first (S18).
+                // (Its own layer, Title block, listed greyed: live2 title-line-edit.)
                 let layers: Vec<MenuEntry> = noshape_model::drawing::SheetLayer::FORMAT
                     .into_iter()
-                    .filter(|l| *l != noshape_model::drawing::SheetLayer::TitleBlock)
                     .chain([noshape_model::drawing::SheetLayer::Drawing])
                     .map(|l| {
                         let k = key.clone();
                         MenuEntry::item(l.name(), move |t, _, cx| {
                             t.with_field_note(&k, "Move to", cx, |s, id| s.annotations.iter_mut().filter(|a| a.id == id).for_each(|a| a.layer = l));
                         })
+                        .disabled(l == noshape_model::drawing::SheetLayer::TitleBlock)
                     })
                     .collect();
                 // With something else selected the field joins it: the rows both have, the field's Add leader, Move to

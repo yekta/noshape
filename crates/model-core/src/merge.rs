@@ -93,8 +93,10 @@ pub fn merge_part_studio(base: &PartStudio, ours: &PartStudio, theirs: &PartStud
 pub fn merge_tab_blobs(base: Option<&[u8]>, ours: Option<&[u8]>, theirs: Option<&[u8]>) -> Option<Vec<u8>> {
     let parse = |b: Option<&[u8]>| {
         let mut tab = b.and_then(|b| serde_json::from_slice::<Tab>(b).ok())?;
-        if let TabContent::PartStudio(ps) = &mut tab.content {
-            ps.upgrade_saved_params();
+        match &mut tab.content {
+            TabContent::PartStudio(ps) => ps.upgrade_saved_params(),
+            TabContent::Drawing(d) => d.upgrade_title_lines(),
+            _ => {}
         }
         Some(tab)
     };

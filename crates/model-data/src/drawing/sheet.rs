@@ -1242,26 +1242,22 @@ impl SheetGeometry {
         // Right: the (empty) top row, TITLE (three lines), SIZE / DWG NO. /
         // REV., SCALE / WEIGHT / SHEET (live: no text in the top row).
         label(self, (0.49817, 0.52179), 0.7212, tr.title, lab, (0.06049, 0.05765));
-        {
-            let v = value_of("Title", sheet.title_field("Title").unwrap_or(""));
+        // TITLE's three lines are three fields (live2 title-line-edit: each selects, highlights and edits alone), each
+        // a band across the cell, picked from its text up to the line above (live2 rmb-probe hover sweep: x 230 mm
+        // picks the first "----" from y 40 to 44, the second from 36 to 38; x 205 and 270 nothing).
+        let pitch = 0.126 * bh;
+        for (i, key) in super::TITLE_KEYS.into_iter().enumerate() {
+            let line = 0.67 - 0.126 * i as f64;
+            let v = value_of(key, sheet.title_field(key).unwrap_or(""));
             let t0 = self.texts.len();
-            // Each line picks on its own: its text and the line above it (live2 rmb-probe hover sweep: x 230 mm picks
-            // the first "----" from y 40 to 44, the second from 36 to 38; x 205 and 270 nothing).
-            let mut lines = Vec::new();
-            for (i, l) in v.split('\n').filter(|l| !l.is_empty()).enumerate() {
-                let t = self.texts.len();
-                field(self, at((0.74691, 0.75882), 0.67 - 0.126 * i as f64), 2.4 * lab, l, (0.45679, 0.43529), 0.126);
-                lines.push(t..self.texts.len());
-            }
-            let pitch = 0.126 * bh;
-            for r in &lines {
-                let pts: Vec<[f64; 2]> = self.texts[r.clone()].iter().flat_map(font::text_box).collect();
-                let (lo, hi) = pts.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
-                if lo[0] <= hi[0] {
-                    self.title_hits.push(("Title".to_string(), [lo[0] - 1.0, lo[1], hi[0] + 1.0, hi[1] + pitch]));
-                }
-            }
-            self.title_cells.push(("Title".to_string(), [px(mid), py(right_rows[2]), x1, py(right_rows[1])], t0..self.texts.len()));
+            field(self, at((0.74691, 0.75882), line), 2.4 * lab, &v, (0.45679, 0.43529), 0.126);
+            let pts: Vec<[f64; 2]> = self.texts[t0..].iter().flat_map(font::text_box).collect();
+            let (lo, hi) = pts.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
+            let c = at((0.74691, 0.75882), line);
+            let (x0, x1t) = if hi[0] - lo[0] > 0.5 { (lo[0], hi[0]) } else { (c[0] - 2.0, c[0] + 2.0) };
+            let (y0, y1t) = if hi[1] > lo[1] { (lo[1], hi[1]) } else { (c[1] - pitch / 4.0, c[1] + pitch / 4.0) };
+            self.title_hits.push((key.to_string(), [x0 - 1.0, y0, x1t + 1.0, y1t + pitch]));
+            self.title_cells.push((key.to_string(), [px(mid), c[1] - pitch / 2.0, x1, c[1] + pitch / 2.0], t0..self.texts.len()));
         }
         let small = 0.8 * lab;
         label(self, (0.4973, 0.52096), 0.30693, tr.size, small, (0.06049, 0.05765));

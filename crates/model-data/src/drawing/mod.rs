@@ -2832,6 +2832,25 @@ pub struct TitleBlock {
     pub fields: Vec<(String, String)>,
 }
 
+/// The ANSI / ISO block's TITLE lines, a field each (live2 title-line-edit).
+pub const TITLE_KEYS: [&str; 3] = ["Title", "Title 2", "Title 3"];
+
+impl TitleBlock {
+    /// A block saved with TITLE as one field of three lines: one field a line, same text.
+    pub fn split_title_lines(&mut self) {
+        if self.fields.iter().any(|(k, _)| k == TITLE_KEYS[1]) {
+            return;
+        }
+        let Some(i) = self.fields.iter().position(|(k, _)| k == TITLE_KEYS[0]) else { return };
+        let v = std::mem::take(&mut self.fields[i].1);
+        let mut lines = v.splitn(3, '\n');
+        self.fields[i].1 = lines.next().unwrap_or("").to_string();
+        for (n, key) in TITLE_KEYS[1..].iter().enumerate() {
+            self.fields.insert(i + 1 + n, (key.to_string(), lines.next().unwrap_or("").to_string()));
+        }
+    }
+}
+
 impl Default for TitleBlock {
     fn default() -> Self {
         Self {
@@ -4565,6 +4584,14 @@ impl Default for DrawingProps {
 }
 
 impl Drawing {
+    /// Saved before TITLE's lines were fields of their own (live2 title-line-edit, 11-16): split on load.
+    pub fn upgrade_title_lines(&mut self) {
+        for s in &mut self.sheets {
+            if matches!(s.title_style, TitleBlockStyle::Ansi | TitleBlockStyle::Iso | TitleBlockStyle::AnsiContinuation | TitleBlockStyle::IsoContinuation) {
+                s.title_block.split_title_lines();
+            }
+        }
+    }
     /// Weld symbols follow ANSI (else ISO): Drawing properties › Weld
     /// symbols › Standard, else the drawing's standard (its sheet size).
     pub fn weld_ansi(&self) -> bool {

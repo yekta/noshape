@@ -380,6 +380,7 @@ impl Document {
                 match &mut tab.content {
                     TabContent::PartStudio(ps) => ps.upgrade_saved_params(),
                     TabContent::Assembly(a) => a.upgrade_config_variable_ids(),
+                    TabContent::Drawing(d) => d.upgrade_title_lines(),
                     _ => {}
                 }
                 tabs.push(tab);
