@@ -4,29 +4,27 @@ Area: crates/assembly, crates/assembly-ui, the assembly ops in crates/ops and th
 scenarios, the assembly parity suite (`parity_assemblies`) and the parity translator (crates/ops/src/parity.rs) for
 the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: docs/DECISIONS.md.
 
-## State (2026-11-16 02:55 UTC)
+## State (2026-11-16 03:30 UTC)
 
 ### In flight
-- Worktree /root/projects/noshape-wt/asm (detached on 93346d03 = landed fd98e8a6), on top (none landed):
+- Worktree /root/projects/noshape-wt/asm: my 25 commits **rebased onto main a2952b32** (HEAD 31ba7ca6; the pre-rebase
+  head was 4fe1d880). dx's `__liveConfiguration` constructor change conflicted with each commit adding a Translator
+  field (resolved: dx's loop + my field list; a leftover TRACE-use conflict kept main's line). None landed:
   - 60b13cba (**decision with the lead**): `regions_by_sum` takes the closest group of live's sketch regions.
-  - 70ae7e9b in-context bodies; 154e6c65 named views no undo step; 08d6feee configured refs; 07f3351a + 0c676223 +
-    fd230597 BOM scoring; cde9262e live-defect mates; 40205609 in-context POINT bodies; 668e761a mate status from
-    mate-messages.json; f4159c6d Derived's picked sketch + regions, empty foreignId; 913fad5f sketch instances;
-    64f53b0b user-set part properties (metadata.json); e62c08ba sub-feature refs, Derived location / placement, sketch
-    studios loaded, "TRACE use"; 03a724ef connectors on sketch instances, refsx FACE -> sketch region; f4ced170
-    vertex-only in-context bodies as points, no metadata for standard content, names only at the own configuration;
-    4d6bf0ef found:false refs lines skipped; cfbcf646 second-id connector edge along live's Z; 236dbeca live's wire
-    parts out of part matching (hand-drill's "Curve 1"); 4fb33441 a sub-feature's query by its text first, refs only
-    when the text finds nothing (hand-drill 9fbc05's second Spur gear: 67 -> 50/67 mates at s57); 8be59657 an instance
-    with partId "" (live can't resolve it) a live defect, not counted; bbbf7e98 standard content named with its thread
-    length ("… x 60 x 36") found in our catalogue (material); e050e97a **model-core refgeom.rs**: a Mate connector
-    owned by a sketch -> the sketch's body (core told; keyboard 7f71cc / a66ca5); d171c160 traces for untranslated
-    mate ends and sketch-instance entity misses.
-- Binary s66 = HEAD d171c160 (built on vibe5, the lead's build host until 04:05). Queued on vibe6 behind qa's
-  ui-parity in ~/bin/slot: hd.sh (hand-drill + keyboard, cfg/s63-*.log, binary file ops-s63 = s66) and the gate's
-  full assembly run (g49/run.sh, ops-s49 = s66, full/s49.log, "ASM-DONE" in g49/status). If the full run hasn't
-  started by 04:05, run it on vibe7 instead. Model gate: clean; no model document has subFeature refs or the owner
-  error; clamp-guillem (found:false) 25/25 at base29 and s63.
+  - in-context bodies; named views no undo step; configured refs; BOM scoring; live-defect mates; in-context POINT
+    bodies; mate status from mate-messages.json; Derived's picked sketch + regions, empty foreignId; sketch instances;
+    user-set part properties (metadata.json); sub-feature refs, Derived location / placement; connectors on sketch
+    instances, refsx FACE -> sketch region; vertex-only in-context bodies as points, no metadata for standard content;
+    found:false refs lines skipped; second-id connector edge along live's Z; live's wire parts out of part matching
+    (hand-drill's "Curve 1"); a sub-feature's query by its text first (hand-drill 9fbc05's second Spur gear); an
+    instance with partId "" a live defect; standard content named with its thread length found in our catalogue;
+    **model-core refgeom.rs**: a Mate connector owned by a sketch -> the sketch's body (core told); traces for
+    untranslated mate ends; **model-data / assembly**: a partly threaded screw named "… x L x b" (live 02:50).
+- Binaries (vibe6 ~/agents/asm-keep/bin): s67 = HEAD 31ba7ca6, base30 = main a2952b32 (same base, for A/Bs of a corpus
+  that moves). Queued on vibe6 behind qa's ui-parity in ~/bin/slot: hd.sh (hand-drill + keyboard, cfg/s63-*.log,
+  file ops-s63 = s67) and the gate's full assembly run (g49/run.sh, ops-s49 = s67, full/s49.log, "ASM-DONE" in
+  g49/status). If it hasn't started by 04:05, run it on vibe7. `python3 ~/agents/asm-keep/cmp.py full/base29.sum
+  full/s49.log` lists per corpus base -> new.
 - Then: compare full/s49 to full/base29.sum per corpus (base29 = old refs: hand-drill 67/67, corexy 11/11, pattern-std
   31/40, robotic-arm 40/40, tvc-mount 5/11 mates); land (rebase onto main: dx's 19afd619 STEP names -> rescore corexy
   BOM; dx's planeOp-before-refs change, which I dropped from mine); SCORE.md "Assemblies" row (last 11-08).
