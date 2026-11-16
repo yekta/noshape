@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-16 08:40 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-16 12:53 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -29,7 +29,26 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   The 06:42 debug pair was killed by the lead (c2-config-parts-screws hang, skipped on main by e37bfc9c).
 - Land when the cmps are identical: blend3 (impeller chamfer join; core/dx told earlier), blend6 (scale-first; also
   its assemblies, asm-one.sh, not yet rerun), blend5 (after the A/B).
-- Debug-only edits in blend10 (ZZ_T timers, ZZ_NO_BALLS=<feature name> toggle): never land; `git checkout` them.
+- knife Fillet 5 target: live 9 ms (live's 11-16 capture: Fillet 1-8 8/9/10/6/9/27/7/12 ms, studio 622). Ours 32 ms Mac
+  with blend-samples; OCCT's try alone is 5. Decision asked of the lead.
+- impeller Fillet 3 (WIP in blend10, uncommitted; copy parked/imp-f3-conic-balls-wip.patch, which also holds the ZZ
+  timers, ZZ_NO_BALLS and the zz_probe_lens probe: strip those before landing): the rib under the bore is 5.2 mm wide,
+  its lips ~30 deg; live's round is a true R3 rolling ball on the curved faces (contacts y -1.524 on the bore,
+  (0.957, -46.774) on the side: ours now matches), the conic between, the two rounds meeting in a ridge. Done so far:
+  section_blend retries a conic constant-radius round as rolling balls (ball_section takes the Section: conic apex
+  where the contact tangents meet, weight rho/(1-rho)); into_face accepts a curved side by its sag (< step/5);
+  Support::Extruded (feet on a swept face moved along its direction, past where it is trimmed); a swept face's
+  section side interpolated through 9 feet (an arc was 0.04 mm / 17 deg off at the lip); lies_on classifies with
+  periodic recadre. Now both tools' sides are recognised and the direct build ends in "an invalid solid": next,
+  BRepCheck its result (ends at x 1.5 (chamfer faces) and ~55-61 (offset face), the ridge). Judge it with
+  regen_profile::dump_document on sg/imp.noshape (NOSHAPE_DUMP_AFTER="Fillet 3"; live 34/95/62, 71096.12 mm3): the
+  corpus run is blocked by asm's 57de87f07 (impeller Extrude 4 fails, core bisected; asm told).
+- Queued from asm (after the current items): asm-gearbox-std 6a912b / a470167 Fillet 2 (EDGE fillet of 2 faces' edges,
+  tangent, 0.125 in: ours 38/92/56, live 38/88/52, -12.1 mm3; repro vibe6/7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/mgb
+  NOSHAPE_PARITY_ONLY=m6a912b); asm-scissor-lift fed22d Fillet 3 (Top - Side 2 45/110/64 vs 48/116/64; Motor Mount
+  69/128/50 vs 66/121/46), then Fillets 4, 5, 15 fail (repro vibe7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/ms
+  ~/agents/dx-keep/ops-gB3, until dx's cf49196a lands).
+- Debug-only edits in blend10 (ZZ_T timers, ZZ_NO_BALLS=<feature name> toggle, ZZ_BALL / ZZ_TOOLS dumps): never land.
 
 ## Open questions / waiting
 
