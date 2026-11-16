@@ -1,9 +1,18 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 08:39 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 14:14 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
+- **Landed b4c6b38c:** hole Up to next ends the shaft at the deepest exit round its rim (+1 µm when deeper
+  than the axis's), as the host's opHole full_exit: asm-tvc-mount 7bc9d8 Hole 10/12/3 -> live 8/8/0 (model copy vibe5
+  ~/agents/core-keep/m7b, 8 -> 19/120; next there Extrude 5's Inner Ring 11/27/18 vs 10/24/16, asm's withdrawn item).
+  T1 features_a::a_hole_up_to_next_into_a_bore_leaves_no_web_beside_it. Feature 22 (same kind) needs asm's unlanded arc fix.
+- Landed 55552e704 (translator: a region query whose ids' regions hold imprinted segments, keys >= 2^31, keeps the
+  text's whole region): main's c2-impeller-loft 24 -> 26/48 (Extrude 4), caused by asm's 57de87f07 (bisected); note in
+  docs/handoff/asm.md "From core 11-16". Model side left: the 12 mm² sliver alone (its side is the target's imprint,
+  60 nm off the offset wall) fails "up-to target does not fully bound" in prism_until; a 1 µm fuzzy retry of the split
+  and extending the target didn't help; live extrudes it.
 - **Impeller speed P0 (qa 11-16 04:40): waiting on blend.** Delete face 2 3.9 -> 26.4 s from v0.4.48 to v0.4.53
   (release A/B beside asm's full7: a hint; qa reruns it quiet). Chamfer 26 now builds (Error -> Ok, as live), so OCCT's
   Defeaturing gets a bigger part (trimming faces 13.2 s, FF 6.4 s, EF 6.1 s). Root: Part 1 differs from Fillet 28 on
@@ -12,25 +21,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
   adds 3 faces (live 20) and Extrude 6's ring is 4 faces (live 21, same 2337 mm³). Move face 1's 4 SWEPT_FACEs of the
   ring's split sides don't exist in ours: it fails ("Could not offset ...", 8 s in the reblend's defeature) and Delete
   face 2 defeatures a part live never has. Turning the fuse's unify off changes nothing there. blend (thread 0e6e9942) tells me when
-  27-29 match; then recheck from Extrude impellerraum (the probe now prints a sketch's regions: NOSHAPE_PROBE_SKETCH).
-- **Pairs queued on vibe5 (one slot job, ~/tmp/core/ab-both.sh; results + diffs in vibe5
-  ~/agents/core-keep/abres/done.txt, "DONE" at the end):** a snapshot without c2-config-parts-screws (bool's
-  split-check hang; the lead killed the 06:47 base run on it).
-  - ab (core-trace, branch core-tooluni aa92b1899): an Add whose tool misses its merge scope (eval.rs "fuse merged
-    nothing") unifies the tool (`unified_tool`) as Parasolid's union: asm's welding 9bdeb5 Extrude 4 7/15/10 -> live
-    6/12/8, m9b 8/24 -> 24/24. NEW keeps split faces (live's impeller Extrude 6 does). T1 features_a::an_add_that_
-    misses_its_part_makes_a_part_whose_collinear_sides_are_one_face. Land if only m9b-like changes.
-  - ab2 (core-bis, branch core-patdir 983f7463c): a surface extrude's cylinders keep the sweep's frame (op_prism: a
-    sheet's cylinders reframed z = +d, origin at the sketch), as live core/q-cylframe: dx's c2-loft-guide-curves-
-    driven-pattern 6 -> 7/11 (next there: Curve pattern 1's path, dx's cdaa70c84). T1 features_a::a_surface_extrudes_
-    cylinder_keeps_the_sweeps_frame. Land, then tell dx.
-- **Queued 87c2e1e7 (core-oc):** remap_attributes(changed, merged): a union's consumed tool body's attributes follow
-  its entities into the result; where an entity merged with the target's, only the target's are kept (std's
-  assignSMAttributesToNewOrSplitEntities throws on two definition attributes). c2-sm-side-cuts-tab Mirror 1 17 ->
-  18/18 (matches to the end); other 13 sheet metal docs unchanged. T2 sheetmetal_std::a_mirrored_flange_beside_a_
-  merged_plate_keeps_its_bend (also failed before: the merged y = 30 bend held both halves' attributes).
-- Landed 11-16 08:23: 3178c98b, pulled_face's bend strip runs on past a bend's end only where the wall reaches no
-  further out than the bend's line (`clear` on the outer side only; the first try 3e6f86dc broke qa4_s1's slot).
+  27-29 match (blend's Fillet 3 needs f24c11cc on main to measure); then recheck from Extrude impellerraum (the probe now prints a sketch's regions: NOSHAPE_PROBE_SKETCH).
+- Landed 11-16: 3178c98b (bend strip runs on only where the wall stays inside the bend line), 03a052cf (union tool
+  attributes follow, target's kept on merges: side-cuts-tab 18/18), 747c2bf0d (ScopeRule 18: a sketch on a face of
+  a part a Transform moved is in the face's frame moved with it; Derived / imported parts keep theirs: hem-plus 6/6;
+  live fan-blade-sweep's Sketch 2 shows a Derived part's x is its source's), 806ae96f7 (tool unify), 7bc8e345a
+  (sheet cylinder frame; dx told).
+- Extrude 33 (asm-pattern-std 36b90f) P0: 150 ms on main (debug, loaded vibe5); re-time once asm's Boolean feature
+  pattern fix lands (Linear pattern 1 still errors upstream).
 - **Handed off 11-16:** c2-config-parts-screws memory (14.8 GB): Revolve 9's unify (usd_kept_volume -> OCCT UnifyFaces)
   on the invalid body Sweep 1's OCCT fallback left: bool takes Sweep 1's cut, bool2 the unify bound.
 - **Parked: knife Revolve 1's 19th vertex (branch core-pole-v2 in core-bis, not landed).** Our sphere's pole there sits
@@ -39,7 +37,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   regresses prize-wheel-tim's knob (our sphere's poles lie on a horizontal axis, (±4.9, 0, 24.5): our sphere frame,
   not live's) and cf-surface-pattern (259 -> 344 vertices). Needs live's surface type of the knife's dish
   (SPHERE or a spun B-spline: Parasolid may keep a vertex where a spun profile meets the axis) before another try.
-- Probe (uncommitted, /root/core-scratch/bodies-probe.patch): ops parity::bodies_after_feature_probe (+ NOSHAPE_PROBE_SKETCH: a
+- Probe (uncommitted, /root/core-scratch/probe-wip.patch): ops parity::bodies_after_feature_probe (+ NOSHAPE_PROBE_SKETCH: a
   sketch's regions)
   (NOSHAPE_PROBE_DOC = a copy WITH its -wal / -shm, NOSHAPE_PROBE_AFTER, NOSHAPE_PROBE_OUT, NOSHAPE_PROBE_PART,
   NOSHAPE_PROBE_TAB): bodies as .brep, a part's faces (surface, edge indices), edges and vertices with shown flags.
@@ -48,6 +46,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   regions: rough check, convex pockets).
 
 ## Waiting on others
+- **c2-sm-rocker-enclosure-body 15/28 (stable now):** Extrude 6's pocket is ~2 mm off live's and differently shaped
+  (top face 89.76 vs live 66.95 mm²) because Sketch 6 isn't translated as live: its PROJECTED constraint finds no model
+  geometry, its circular pattern isn't kept, and the solve (1.97 mm) is taken back. Sketch translation, not modelling
+  (skasm's, paused until 11-17).
 - **GearLab 90f78b:** with ae8b7f751 plus asm's unlanded 93346d03d (custom features with a `def` map; std 1777/1793)
   the loft builds; Gear Lab 1 then fails at an opFillet on the 157-face toothed solid ("Failed to fillet
   selections."): blend's. 4.3 s vs live 2.4 s, mostly 2 Booleans (1.7 s, bool's) and 1.2 M edge_point_at calls
@@ -68,8 +70,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. Impeller Move face 1 / Delete face 2 after blend's Fillet 3 / 28 / 29 (In flight). Left from 11-16's asks: c2-sm-hem-plus Derived 1 6/12/8 vs live 14/36/24 (after Offset
-   surface 1, now one sheet); c2-sm-rocker-enclosure-body moved 9 -> 15/28 between runs (A/B it before crediting).
+0. Impeller Move face 1 / Delete face 2 after blend's Fillet 3 / 28 / 29 (In flight). Left from 11-16's asks: c2-sm-rocker-enclosure-body moved 9 -> 15/28 between runs (A/B it before crediting).
 1. Knife's dish vertex: asked live in REQUESTS.md (11-16 01:32) for the face's surface type and its edges / vertices;
    then retry core-pole-v2 (Parked above) on what live says.
 2. qa's speed list (P0), what is mine: c2-valve-config Extrude 3 `prism_until.split` 131 ms (a logo up to one revolved
