@@ -263,13 +263,14 @@ a line crossing a curve near the pointer gives the crossing with both constraint
 point → H + V through it; a sketch line → parallel + perpendicular through the start; a model edge → perpendicular;
 a circle → the two tangent lines from the start; a spline → nothing. Shift: no snapping. In-plane model entities only.
 
-**Matched: 55 / 55** (11-13 06:02 UTC). Probes: a point 6.5 px straight out snaps, 8.5 doesn't; 9.5 / 11.5 diagonally;
+**Matched: 59 / 59** (11-16 01:57 UTC: live sketch-gaps' crossing row added, matched; 55 / 55 at 11-13 06:02 UTC). Probes: a point 6.5 px straight out snaps, 8.5 doesn't; 9.5 / 11.5 diagonally;
 a band 6.5 / 8.5 across (live's own takes vary by a pixel with where its target sits in its pixel).
 
 | Row (tool / target / inference) | Live | Ours (where) | Status |
 |---|---|---|---|
 | Line end / a line's end, an arc's end, an arc's / circle's centre, a point, the origin (straight, diagonal) | 7 / 9–10 px (6–8 by target); COINCIDENT, not CONCENTRIC, no alignment | the square (`infer`'s `in_point`; was an 8.5 px circle: 8 px snapped, 10 diagonally didn't) | = (fixed) |
 | Line end / a line's midpoint, an arc's midpoint | 9 px along (0.45, 0.89), 6 px straight; MIDPOINT | the square | = |
+| Line end / a line's midpoint 10.1 px from where another line crosses it (live sketch-gaps 1a) | no intersection point where sketch lines cross (on-curve to one of them); the midpoint wins wherever it is in reach: 6 px towards the crossing, the crossing line's on-curve from 7 | the same | = |
 | Line end / a line, a circle's rim (both sides) | 7, not 8; COINCIDENT | 7.5 band | = |
 | Line end / a lit model vertex (straight, diagonal) | 6–7 / 9 px; COINCIDENT (used) | the square (was 16 px round); in-plane only | = (fixed) |
 | Line end / a lit model edge (both sides) | 7, not 8; COINCIDENT (used); a direction kept where it meets the edge | the band (was 10 px); in-plane only | = (fixed) |
@@ -289,7 +290,7 @@ a band 6.5 / 8.5 across (live's own takes vary by a pixel with where its target 
 | Rectangle, second corner | the full set but no H / V through its first corner; midpoints kept | the same | = |
 | 3 point arc, third point | coincident points (and its chord's midpoint) only | the same | = |
 | Drags: a free end onto a point (straight, diagonally), a midpoint, a circle's rim; no H / V | 7–9 / 6, not 8 / ≤ 6; COINCIDENT / MIDPOINT on release | the squares and bands (`point_drop_target`; points were an 8.5 px circle) | = (fixed) |
-| Not yet in the matrix | crossing lines' midpoint; spline through-points; a woken model edge's perpendicular; the other tools live2 is still filling | – | – |
+| Not yet in the matrix | spline through-points (live: COINCIDENT to SPLINE.n.internal up to 7–9 px: the harness has no spline yet); a woken model edge's perpendicular (live sketch-gaps 1c: the edge wakes after a 60 ms rest, then PERPENDICULAR through the start 7–9 px either side: needs a slanted model edge, the block's are level with the start's H / V) | – | – |
 
 ## Feature list and Parts list (matrix)
 

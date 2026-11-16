@@ -111,6 +111,8 @@ const CIRCLE: &[Draw] = &[Draw::Circle(C(80., 0.), 50.)];
 const ARC: &[Draw] = &[Draw::Arc(C(-120., 0.), C(0., 0.), C(-60., 45.))];
 
 const POINT_P: &[Draw] = &[Draw::Point(C(-60., 70.))];
+/// A vertical line crossed 10.1 px above its midpoint by a horizontal one (live sketch-gaps 1a: X1 and X2).
+const CROSSING: &[Draw] = &[Draw::Line(C(0., -80.), C(0., 80.)), Draw::Line(C(-30., 10.1), C(130., 10.1))];
 /// live2 combo perpLine's line Lc and perpAlign's line Lw3 (its end woken), in px.
 const PERP_LINE: &[Draw] = &[Draw::Line(C(-49.86, -27.92), C(49.86, -47.87))];
 const PERP_ALIGN: &[Draw] = &[Draw::Line(C(-61.83, 35.9), C(-49.86, 35.9))];
@@ -129,6 +131,9 @@ fn rows() -> Vec<Row> {
         // (Along (0.45, 0.89): 9 px snaps, 10 doesn't.)
         Row { snaps: 8.0, not_from: Some(10.5), far: Far::Without, ..point_row("reach/line-midpoint", VERTICAL_LINE, S, C(0., 0.), (0.4472, 0.8944), false, &["MIDPOINT"]) },
         band_row("reach/line/across", VERTICAL_LINE, S, C(0., 30.), (1., 0.), &["COINCIDENT"]),
+        // A midpoint near a crossing (live sketch-gaps 1a): no intersection point; the midpoint wins wherever it is in
+        // reach (6 px towards the crossing), then the crossing line's on-curve point (7 px on, 3 px from the crossing).
+        Row { snaps: 6.0, not_from: Some(7.5), far: Far::Without, ..point_row("reach/line-midpoint/near-a-crossing", CROSSING, S, C(0., 0.), (0., 1.), false, &["MIDPOINT"]) },
         point_row("reach/arc-end/straight", ARC, S, C(0., 0.), (1., 0.), false, &["COINCIDENT"]),
         point_row("reach/arc-end/diagonal", ARC, S, C(0., 0.), (H, -H), true, &["COINCIDENT"]),
         point_row("reach/arc-centre/straight", ARC, S, C(-60., -17.5), (1., 0.), false, &["COINCIDENT"]),
