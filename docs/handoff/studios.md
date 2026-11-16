@@ -9,30 +9,23 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-16 00:47 UTC.
+Updated 2026-11-16 01:22 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-Committed, not queued: waits for the full drawing run on vibe5 (~/tmp/studios/drw288, task queued behind bool's gate
-via ~/bin/slot; don't rebuild ~/tmp/studios/noshape on vibe5 until it ends). Then land.sh.
-- aaa63901d View orientation ▸ on a projected view (turns its base; op drawing_view_display orientation on a
-  projected view; e2e drawing_view_menu_edits; take drw-view-orientation-projected); the sheet's menu 35 px above
-  the pointer (live2 rmb-probe); what a menu row / Align views leaves lit reads with the `new` marker.
-- a102bdfea a title field right-clicked with something selected joins it (rows both have, the field's Add leader,
-  Move to only with notes).
-- c2e26a173 TITLE's lines pick each on its own, from its text up to the line above (lead 11-16, DECISIONS
-  76780c8c5); after a menu a view reads lit only within 6.5 px of its box; ui-parity `excluded` (README) marks a
-  left-out cloud feature's difference: drw-note-move-to-title-block s8.
-- ae7e870ff the sheet's menu that fits shows row 2 hovered, one moved up to fit none (all 11 menus of live2's 11-15
-  takes). Checked on vibe6 (newest binary): drw-datum-copy-paste, -surface-finish-flip, -view-align-horizontally,
-  -view-orientation-projected and 5 more match.
-- Previous full run (vibe5, before c2e26a173 / ae7e870ff): 282 of 288.
+Nothing. Landed 01:21 as 65d386f7: View orientation ▸ on a projected view, the sheet's menu 35 px above the pointer
+with row 2 hovered where it fits, TITLE's per-line pick areas, a title field joining a selection's menu, the
+`excluded` ui-parity marker. Full drawing run before the last commit: 284 of 288 (left: centermark flicker x2,
+drw-insert-view-top-1to1, drw-datum-copy-paste's highlighted row, fixed by ae7e870ff and checked on vibe6).
 
 ## Waiting on others
 - live2: panel takes for Drawing properties, Hole table, Title block (asked 11-15 23:15).
+- live2 (asked 01:15): select / double-click / Edit note… on TITLE's lines: if each line opens its own editor, split
+  TITLE into one field per line (lead 01:20: migrate old files and templates on load, ops + editor follow, e2e
+  opening an old file, land separately); else keep one field with per-line pick areas.
 - TITLE's lines as separate fields in the data (title1/2/3 each its own field: its own highlight band, Edit note on
   that line): ours keeps one "Title" field with three lines; only the pick areas are per line. Next if the lead
   wants the rest of "copy live's structure".
