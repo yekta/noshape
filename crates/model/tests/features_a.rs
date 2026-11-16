@@ -1827,9 +1827,14 @@ fn feature_pattern_of_a_boolean_subtraction() {
     let solid = 0.1 * 0.02 * 0.01;
     let res = t.ok();
     assert!(near(total_volume(&res.context), solid, 1e-6), "the kept pin fills the pocket");
-    t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(cut)])), ("directionOne", q(vec![x_axis_dir()])), ("distance", e("20 mm")), ("instanceCount", e("3"))]);
+    let lp = t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(cut)])), ("directionOne", q(vec![x_axis_dir()])), ("distance", e("20 mm")), ("instanceCount", e("2"))]);
     let res = t.ok();
     assert_eq!(res.context.bodies.len(), 2, "the block and the kept pin");
+    let removed = solid + pocket - total_volume(&res.context);
+    assert!(near(removed, 2.0 * pocket, 1e-3), "{removed}");
+    // That pattern re-applied 40 mm on (36b90f's Linear pattern 6 of Linear pattern 5): its copy there too, 3 pockets.
+    t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(lp)])), ("directionOne", q(vec![x_axis_dir()])), ("distance", e("40 mm")), ("instanceCount", e("2")), ("fullFeaturePattern", b(true))]);
+    let res = t.ok();
     let removed = solid + pocket - total_volume(&res.context);
     assert!(near(removed, 3.0 * pocket, 1e-3), "{removed}");
 }

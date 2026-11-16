@@ -1137,6 +1137,10 @@ fn copy_sketches(ev: &mut EvalCtx, sketches: &[FeatureId], instances: &[Instance
 /// Feature pattern through geometry (face / part patterns of what each
 /// feature created).
 fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance]) -> FResult<()> {
+    // Re-applied by an outer pattern (its instance in `xform`): the seeds' geometry is where they made it, so each copy
+    // goes on by the outer instance too (asm-pattern-std 36b90f's Linear pattern 6 re-applies Linear pattern 5).
+    let moved: Vec<Instance> = ev.xform.map(|x| instances.iter().map(|i| Instance { code: i.code, t: k::Transform::Matrix(i.t.matrix() * x) }).collect()).unwrap_or_default();
+    let instances = if ev.xform.is_some() { &moved[..] } else { instances };
     let touching = touching_features(ev, feats);
     let mut patterned: Vec<FeatureId> = Vec::new();
     for &f in feats {
