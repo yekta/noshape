@@ -154,6 +154,8 @@ pub struct Translator<'a> {
     /// Those sketches' source tabs, where ours reads their geometry.
     sketch_tabs: HashMap<String, String>,
     first_move: Option<String>,
+    /// The sub-feature whose parameters are being translated: live's refs name them `subFeature:<id>.<parameter>`.
+    sub_feature: Option<String>,
     /// Onshape Feature Studio element id → our Feature Studio tab id.
     studios: HashMap<String, String>,
     /// What isn't translated of the document itself (configuration inputs…).
@@ -400,7 +402,7 @@ impl<'a> Translator<'a> {
                 config_defaults.entry(k.to_string()).or_insert_with(|| v.to_string());
             }
         }
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, sub_feature: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -816,7 +818,10 @@ impl<'a> Translator<'a> {
         // Construction points too (a Plane's "Edge point" on an edge at a parameter, live 2422): `{"point": …}`.
         for sub in f["subFeatures"].as_array().into_iter().flatten().filter(|s| s["featureType"] == "mateConnector" || s["featureType"] == "cPoint") {
             let mut problems = Vec::new();
-            match self.feature_params(k, sub, &mut problems) {
+            self.sub_feature = sub["featureId"].as_str().map(str::to_string);
+            let translated = self.feature_params(k, sub, &mut problems);
+            self.sub_feature = None;
+            match translated {
                 Ok((_, mut params)) => {
                     // An origin on a sketch's circle reached through what later features made of it (asm-config-assembly's
                     // Hole 1: the sheet metal model's edges derived from Sketch 1's circle, no ids to match): ours of
@@ -1236,7 +1241,7 @@ impl<'a> Translator<'a> {
 
     /// Feature `f` added after features 0 … k−1: its id, status and message.
     fn feature(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String, Option<String>), String> {
-        let (ty, mut params) = if f["featureType"] == "importDerived" { self.derived_params(f, problems)? } else { self.feature_params(k, f, problems)? };
+        let (ty, mut params) = if f["featureType"] == "importDerived" { self.derived_params(k, f, problems)? } else { self.feature_params(k, f, problems)? };
         // Its in-feature mate connectors, by their placeholders in its selections.
         for v in params.values_mut() {
             self.place_sub_features(v);
@@ -1273,7 +1278,7 @@ impl<'a> Translator<'a> {
     /// A Derived feature's parameters: its source Part Studio (`buildFunction`'s element, fetched beside the
     /// document) built in a tab of ours on first use, its parts ours of that tab's (live's part ids at the source's
     /// end state).
-    fn derived_params(&mut self, f: &Value, problems: &mut Vec<String>) -> Result<(String, Map<String, Value>), String> {
+    fn derived_params(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, Map<String, Value>), String> {
         let param = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id).cloned().unwrap_or(Value::Null);
         // (The new Derived, `newUI`: a `partStudio` reference with its own `partQuery`; the old one: `buildFunction` and
         // `parts`.)
@@ -1331,6 +1336,27 @@ impl<'a> Translator<'a> {
         let mut params = Map::new();
         params.insert("partStudio".into(), json!(tab));
         params.insert("parts".into(), json!(ours));
+        // Placed at its locations (mate connectors, often its own in-feature one), the source's origin or its mate
+        // connector by index on each (asm-keyboard-pattern's Derived 1 turns the source's sketch onto 2bb133's face).
+        let location = param("location");
+        if location["queries"].as_array().is_some_and(|q| !q.is_empty()) {
+            match self.param(k, &location) {
+                Ok(Some(v)) => {
+                    params.insert("location".into(), v);
+                }
+                Ok(None) => {}
+                Err(e) => problems.push(format!("location: {e}")),
+            }
+            // (Index −1: no base mate connector picked, the source's origin: asm-robotic-arm studio 07d06e.)
+            let index = param("mateConnectorIndex")["expression"].as_str().map(str::to_string);
+            let none = index.as_deref().is_some_and(|i| i.trim().starts_with('-'));
+            if let Some(placement) = param("placement")["value"].as_str() {
+                params.insert("placement".into(), json!(if none { "AT_ORIGIN" } else { placement }));
+            }
+            if let Some(i) = index.filter(|_| !none) {
+                params.insert("mateConnectorIndex".into(), json!(i));
+            }
+        }
         Ok(("importDerived".into(), params))
     }
 
@@ -2114,8 +2140,11 @@ impl<'a> Translator<'a> {
                 self.picked.clear();
                 let mut queries: Vec<Value> = p["queries"].as_array().cloned().unwrap_or_default();
                 // A query live's fetch names no ids for, evaluated by live for this parameter (refs.jsonl): its ids.
-                let pid = p["parameterId"].as_str().unwrap_or("");
-                let mine: Vec<(String, Option<usize>)> = self.refs.iter().filter(|((i, _), r)| *i == k && r.parameters.iter().any(|p| p == pid)).map(|((_, id), r)| (id.clone(), r.query)).collect();
+                let pid = match &self.sub_feature {
+                    Some(sub) => format!("subFeature:{sub}.{}", p["parameterId"].as_str().unwrap_or("")),
+                    None => p["parameterId"].as_str().unwrap_or("").to_string(),
+                };
+                let mine: Vec<(String, Option<usize>)> = self.refs.iter().filter(|((i, _), r)| *i == k && r.parameters.contains(&pid)).map(|((_, id), r)| (id.clone(), r.query)).collect();
                 let mut evaluated: Vec<String> = mine.iter().map(|(id, _)| id.clone()).collect();
                 evaluated.sort();
                 // Each query's own ids when live's refs say which query gave them (an import query's bodies by tag:
@@ -4723,6 +4752,9 @@ impl<'a> Translator<'a> {
                 }
                 // A Use whose model geometry isn't named: drawn after the Uses ours makes (`moved_uses`).
                 Some(s) if projected.contains_key(&eid) => {
+                    if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                        eprintln!("TRACE use {oid} {eid}: its model geometry not found: {}", projected.get(&eid).map(|(c, p)| format!("{c} {p}")).unwrap_or_default().chars().take(400).collect::<String>());
+                    }
                     let point = (s["tool"] == "point").then(|| [e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0)]);
                     unnamed_uses.push(Use { eid, reference: String::new(), shape: s, ends: end_points, point });
                 }
@@ -7666,14 +7698,16 @@ fn metadata_item<'v>(metadata: &'v Value, configuration: Option<&str>, pid: &str
 }
 
 /// The properties of live's metadata `item` the user set (`propertySource` 3; a feature's, as custDesc's, come from
-/// the feature) on our part `id`: part number, description, revision, vendor, project, product line, titles, Exclude
-/// from all BOMs and the material (a library's by name, else a custom one with live's density). The errors.
+/// the feature) on our part `id`: name, part number, description, revision, vendor, project, product line, titles,
+/// Exclude from all BOMs and the material (a library's by name, else a custom one with live's density). The errors.
 fn set_metadata(t: &mut Translator, id: &str, item: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let user: Vec<&Value> = item["properties"].as_array().into_iter().flatten().filter(|p| p["propertySource"] == 3 && !p["value"].is_null()).collect();
     let mut args = json!({ "tab": t.tab, "part": id });
     for p in &user {
         let field = match p["name"].as_str().unwrap_or("") {
+            // (A name a feature gives, as the nut's custDesc, isn't the user's: kept as ours builds it.)
+            "Name" => "name",
             "Description" => "description",
             "Part number" => "part_number",
             "Revision" => "revision",

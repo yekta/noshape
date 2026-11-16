@@ -2813,6 +2813,13 @@ fn parity_assemblies() {
             asm["liveMateMessages"] = m;
         }
         // Studios no instance uses whose sketch a Frame elsewhere takes as its profile: built too, with no parts.
+        // (Studios whose sketches the assembly inserts, "Sketch 1 <1>": built without parts, asm-keyboard-pattern's a66ca5.)
+        let sketch_sources: std::collections::HashSet<String> = std::iter::once(&asm["rootAssembly"])
+            .chain(asm["subAssemblies"].as_array().into_iter().flatten())
+            .flat_map(|l| l["instances"].as_array().into_iter().flatten())
+            .filter(|i| i["type"] == "Feature")
+            .filter_map(|i| i["elementId"].as_str().map(str::to_string))
+            .collect();
         let profile_sources: std::collections::HashSet<String> = std::fs::read_dir(dir.join("studios"))
             .into_iter()
             .flatten()
@@ -2870,7 +2877,7 @@ fn parity_assemblies() {
                 }
                 (!seen.is_empty()).then_some(Value::Array(list))
             };
-            let (Some(mut features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances).or_else(|| profile_sources.contains(element).then(|| json!([])))) else { continue };
+            let (Some(mut features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances).or_else(|| (profile_sources.contains(element) || sketch_sources.contains(element)).then(|| json!([])))) else { continue };
             if !live.is_empty() {
                 features["live"] = Value::Array(live.clone());
             }
@@ -3028,9 +3035,9 @@ fn an_assembly_is_rebuilt_as_lives() {
     let prop = |name: &str, value: Value| json!({ "name": name, "value": value, "propertySource": 3 });
     let mut with_meta = off_studio.clone();
     with_meta["partMetadata"] = json!({ "configurations": { "default": { "items": [{ "partId": "JHD", "properties": [
-        prop("Part number", json!("PN-1")), prop("Description", json!("Turned")), prop("Material", json!({ "displayName": "Steel ", "libraryName": "Onshape Material Library" })),
+        prop("Name", json!("Pin")), prop("Part number", json!("PN-1")), prop("Description", json!("Turned")), prop("Material", json!({ "displayName": "Steel ", "libraryName": "Onshape Material Library" })),
         { "name": "Vendor", "value": "Not the user's", "propertySource": 1 }] }] } } });
-    with_bom["liveBom"] = json!({ "root": { "bom": { "bomTable": { "items": [{ "itemSource": { "indentLevel": 0 }, "name": "Part 1", "quantity": 2, "partNumber": "PN-1", "description": "Turned", "material": { "displayName": "Steel " } }] } } } });
+    with_bom["liveBom"] = json!({ "root": { "bom": { "bomTable": { "items": [{ "itemSource": { "indentLevel": 0 }, "name": "Pin", "quantity": 2, "partNumber": "PN-1", "description": "Turned", "material": { "displayName": "Steel " } }] } } } });
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-meta.noshape"), &with_bom, &[("E1".into(), with_meta, off_parts.clone())]);
     assert_eq!((r.bom_matching, r.bom_rows), (1, 1), "{r:?}");
     // Live's Revolute in error with its connectors unresolved (red in its dialog, or its tooltip's message), ours
