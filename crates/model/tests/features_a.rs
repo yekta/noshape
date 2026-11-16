@@ -871,6 +871,32 @@ fn a_threads_split_face_stays_split_through_a_later_boolean() {
     assert_eq!((b.shape.faces().len(), cylinders), (6, 2));
 }
 
+/// An Add whose tool misses its merge scope still goes through the union, which leaves the tool's faces on one surface
+/// as one (live asm-welding-config 9bdeb5 Extrude 4: a region's side along four collinear sketch lines is one face, the
+/// new part 6/12/8; the lines meet another region's there).
+#[test]
+fn an_add_that_misses_its_part_makes_a_part_whose_collinear_sides_are_one_face() {
+    let mut t = T::new();
+    let (_, plate) = t.block(0.1, 0.0, 0.12, 0.02, "5 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [DVec2::new(0.0, 0.0), DVec2::new(0.0, 0.004), DVec2::new(0.0, 0.01), DVec2::new(0.02, 0.01), DVec2::new(0.02, 0.0)];
+    for i in 0..pts.len() {
+        sk.add_line(pts[i], pts[(i + 1) % pts.len()]);
+    }
+    // A smaller region beside it, meeting its left side at (0, 4 mm).
+    sk.add_line(DVec2::new(0.0, 0.004), DVec2::new(-0.01, 0.004));
+    sk.add_line(DVec2::new(-0.01, 0.004), DVec2::new(-0.01, 0.01));
+    sk.add_line(DVec2::new(-0.01, 0.01), DVec2::new(0.0, 0.01));
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let r = t.regions(s)[0].clone();
+    let x = t.extrude(r, "5 mm", "ADD");
+    t.set(x, "booleanScope", q(vec![body_ref(&BodyId { feature: plate, index: 0 })]));
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 2);
+    let made = res.context.bodies.iter().find(|b| b.shape.bounding_box(false).unwrap().max.x < 0.05).unwrap();
+    assert_eq!(made.shape.faces().len(), 6);
+}
+
 /// std externalThread.fs checkNonMatchingSize (live: c2-fan-blade-sweep's source, External thread 1 on a Ø6.8 boss,
 /// ISO M7: "Exact match for thread size not found."): the standard's size nearest the cylinder against the chosen one.
 #[test]

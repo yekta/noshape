@@ -1097,6 +1097,18 @@ impl<'a> EvalCtx<'a> {
         found
     }
 
+    /// A tool a fuse leaves apart from its part, as Parasolid's union hands it back: its faces on one surface are one
+    /// (live asm-welding-config 9bdeb5 Extrude 4: a region's side along four collinear sketch lines is one face, 6/12/8).
+    fn unified_tool(&mut self, tool: &NamedShape) -> FResult<NamedShape> {
+        let unified = k::unify_same_domain(&tool.shape)?;
+        if !unify_merged(&tool.shape, &unified.shape) {
+            return Ok(tool.clone());
+        }
+        let names = self.name_unified(&[&tool.names], tool.names.faces.clone(), &unified);
+        let mut pieces = split_solids(&unified.shape, &names, Some(self.feature));
+        Ok(if pieces.len() == 1 { pieces.swap_remove(0) } else { tool.clone() })
+    }
+
     fn fuse_named(&mut self, tools: Vec<NamedShape>) -> FResult<Vec<NamedShape>> {
         let shapes: Vec<Shape> = tools.iter().map(|t| t.shape.clone()).collect();
         let res = k::boolean(k::BooleanOp::Fuse, &shapes[..1], &shapes[1..], &k::BooleanOptions::default())?;
@@ -1218,7 +1230,8 @@ impl<'a> EvalCtx<'a> {
                 for (j, &i) in near.iter().enumerate() {
                     let name = self.ctx.alloc_part_name(target.kind);
                     let id = BodyId { feature: self.feature, index: 10_000 + (ti as u32) * 64 + 1 + j as u32 };
-                    bodies.push(Arc::new(Body::named(id, name, target.kind, tools[i].shape.clone(), tools[i].names.clone(), target.color, self.feature)));
+                    let tool = self.unified_tool(&tools[i])?;
+                    bodies.push(Arc::new(Body::named(id, name, target.kind, tool.shape, tool.names, target.color, self.feature)));
                 }
                 new_bodies.push((ti, bodies));
                 continue;
