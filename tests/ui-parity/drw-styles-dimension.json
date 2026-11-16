@@ -1,0 +1,184 @@
+{
+ "name": "drw-styles-dimension",
+ "about": "block-drawing: a dimension (1.575) selected, Styles panel (right rail): Text justification Center (Drawing) \u2192 Left, Text alignment \u2192 Align with dimension line, Font \u2192 Open Sans, first extension line hidden, Text gap 0.2. (Revert to drawing properties shows only with nothing selected.)",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Styles panel): live2 exploration live/feel/panel-explore/px-styles-*; the rail's Styles icon has no label: clicked by screen point",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      18
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "annotation": "1.575"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1904,
+     545
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Center (Drawing)"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Left"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Horizontal"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Align with dimension line"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Noto Sans"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Open Sans"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Show first extension line"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Text gap"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "0.2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}
