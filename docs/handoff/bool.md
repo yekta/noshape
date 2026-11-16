@@ -4,13 +4,13 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-16 01:37 UTC.
+Updated 11-16 01:44 UTC.
 
 ## In flight
 - Queued to land: 566b1015 (Shell self-interference filter: an edge's points against the face's own parameter patch of
   a cylinder / cone / sphere / ring torus, closed form, before meshing; c2-bottle-split Shell 1 33 -> 18 ms). Gate
   578353275 clean (CHECK knurls only; replay 0 new; suite 124 docs, 78 -> 78, 969/1182); hats/dock 12/12 SAME.
-- Gating: fa8a800ef (worktree bool-hat, branch bool-impeller-sliver): quadric_across in rust_boolean.cpp: an
+- Gating (retry; the first build was SIGTERMed at 01:42, vibe5 load 39, as 578353275's at 22:33): fa8a800ef (worktree bool-hat, branch bool-impeller-sliver): quadric_across in rust_boolean.cpp: an
   extrusion against a cylinder across its direction or a sphere, per ruling A w^2 + B w + C = 0, two branches; runs
   within the extrusion's heights and the other face's box (bisected between samples, 32 a profile span), cut where the
   angle passes the surface's OWN seam (raw ElSLib angle crossing 2 pi, as OCCT cuts its curves; cutting at the face's
@@ -55,6 +55,12 @@ Updated 11-16 01:37 UTC.
    309 / 201 (fuse 86892e9b, 8 tools, torus x plane ours), Extrude 5 260 / 39 (cut 8f262543: quadric_across gating; its
    16 torus x extrusion pairs finding none still OCCT's ~35 ms: a quartic a ruling, "none" needs a proof), Extrude 3 117
    / 32 (cut 5d782946: bspline x plane 12 pairs + bspline x cylinder 6 OCCT's). Recorded vibe5 ~/tmp/bool/rl.
+   CP2's fuse 86892e9b: 98 torus x plane sections made SYNCHRONOUSLY on the main thread (nurbs_pair: moved sections
+   "reach the face's boundary" -> occt_sections(actual pair), never in the ahead batch, which dedups by moved_pair).
+   Lever: a second ahead round for those fallbacks (needs the pairing loop split in two) or prefetching actual pairs
+   (costs CPU where symmetry works). c2-housing-draft Rotieren 1 (4361c232e43fc0c1, core 11-16: .brep 65 ms): main thread
+   waits on the ahead batch (its 4 near-tangent cylinder x revolution pairs, OCCT 20-27 ms each, parked), then
+   off_shared_edges per fetched pair (an early return for empty pairs measured nothing), regions, C2 intersections.
 2. c2-rings-loft Shell 1 (~510-590 ms, live 235): repair 251 (traces 95, split 78, crossings 26, joins 17),
    self-interference 67 (its EF time in ~23 pairs on free-form faces; quadric pairs are cheap), edges 44, check 35,
    thin 34. Points with no square foot: OCCT's global search found none wherever a Newton search from the own 25 x 25
