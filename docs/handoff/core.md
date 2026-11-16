@@ -79,6 +79,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   c2-hunting-knife's Fillet 5 a face more, 46 -> 32/52; face_contains_point keeps the shift, tablet-stand 16/16;
   verified by debug runs). Both pairs carry the old change: vibe7's branch will show hunting-knife worse (and any other
   doc the projection touched): recheck each doc vibe7 marks worse with HEAD (.ts3.sh <doc>) before landing.
+- **vibe5 pair (97b778e7d, b173dc5bb, d2605e45d) CLEAN 23:2x: 1247 -> 1250 (singularities 2 -> 5, cpcurves
+  Main pipe topology = live's), nothing worse. vibe7 pair (six) still running.**
 - **Landing plan:** both pairs' binaries are built; the suites run as suites-only scripts with `~/bin/slot timeout 7000`
   (the timeout no longer counts the slot wait, which killed nothing yet but would have): vibe7
   ~/agents/core-keep/spsuites.sh -> spres (sp/base = main 18:10, sp/branch = 1357fddb1..bcaf5ffdb; queued behind
@@ -132,14 +134,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
        its exact offset, a turned-round edge fails) + T2 probe dumped_offset_probe (NOSHAPE_OFFSET_CASE).
        NOSHAPE_OFFSET_DEBUG=/dir dumps each input (offset-N.brep + .txt face index/distance). 477 kernel tests,
        clippy clean, g++-13 builds. Refuses NaN (removed faces) and topology changes.
-    2b. NEXT: topology changes. fan-blade Boolean 2's tool (threaded shank: B-spline flanks 21-23, crest
-       cylinder pieces 11-19, end plane 2, cone 24; 11 faces moved 0.2): all vertices solve (seeded at their own
-       uv: helical flanks have a sheet a turn away; some move 1-3 mm, narrow angles), then edge 34 between crest
-       pieces 13/14 turns round: face 14 (0.0088 mm2, a 0.04 mm sliver) vanishes in the offset. Needs a vanishing
-       face's neighbours joined (by_quadrics' collapse/strip ideas). Case dump: vibe5 ~/tmp/core/offset-cases.
-    3. Boolean offset (basic.rs) calls offset_solid for non-analytic faces (patch /root/core-scratch/
-       offset-step3-basic.patch, OFFSET_FACE_BUDGET 20000); fan-blade Boolean 2 vs live (87773.636 mm3,
-       56/143/88; ours now 87828.366, 56/139/84). Release pair before landing.
+    2b. DONE as 8583db3fb (offset.cpp + tests only; bool's gate on 23f44d3d7 covers every shell.cpp change): a
+       three-sided face whose offset vanishes goes (its neighbours meet at one solved vertex); curves on faces
+       sharing one surface read by the edge's way in the face; a staying free-form face with moved corners lies on
+       its run-on surface. T1 a_corner_triangle_whose_offset_vanishes_goes. fan-blade's 4 tools offset in 0.29 s
+       each, all tolerances 1e-4 mm. Cases: vibe5 ~/tmp/core/offset-cases (probe .kp1.sh / .kp2.sh in core-trace).
+    3. DONE as 87c383316 (core-offset): basic.rs Subtract with Offset calls offset_solid for non-analytic picked
+       faces (OFFSET_FACE_BUDGET 20000), T1 features_a::subtract_with_offset_moves_a_tools_spline_face. fan-blade
+       Boolean 2: volume = live's now, 57/142/86 vs live 56/143/88 (before 56/139/84, 54.7 mm3 off); 736 ms.
+       Needs a release pair (model-core) before landing; land 1+2+2b once bool's gate passes (bool gating since
+       22:40), then 3 after its pair. Next: the +1 face / -1 edge / -2 vertex difference vs live.
     4. bool's Shell may call it for its inner walls (bool decides).
 - c2-fan-blade-sweep Boolean 2 (48/53, parked; lead: core's): Subtract with Offset 0.2 mm on 6 picked tool faces
   (11 per tool after the pattern copies: the sweep's free-form thread flanks among them). basic.rs offsets only analytic
