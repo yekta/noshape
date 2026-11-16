@@ -27,6 +27,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   general rule for live's drag model is found (no per-case rules). The same holds for where under-defined geometry
   settles in a plain solve; a case live fails to solve at all is a live defect.
 
+- 11-16 STL exports: compared by area, volume and chordal deviation within live's tolerances, not by exact triangle
+  count. OCCT BRepMesh's minimum segments per arc / rows per cone (radijator +144/+150) are parked (P3), no OCCT patch.
+
 ## Geometry and speed
 - 11-07 Every crates/brep or Boolean change passes bool's gate: every corpus + parity56 at 0 OCCT differences.
 - 11-14 A faster path lands only if results are identical end to end (topology and feature status in every suite
