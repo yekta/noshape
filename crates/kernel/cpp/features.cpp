@@ -3376,8 +3376,7 @@ static bool connect_sections(std::vector<TopoDS_Wire>& wires, const std::vector<
 // False when the sections can't be made (the wires are left as they were).
 static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& spine, int count)
 {
-  // (Profiles in between aren't placed yet.)
-  if (wires.size() != 2 || count < 1)
+  if (wires.size() < 2 || count < 1)
     return false;
   BRepOffsetAPI_MakePipeShell ps(spine);
   for (const auto& w : wires)
@@ -3414,6 +3413,19 @@ static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& sp
   const double s0 = place(wires.front()), s1 = place(wires.back());
   if (std::abs(s1 - s0) < 1e-9 * (1 + total))
     return false;
+  // Profiles in between (c2-loft-guide-curves-wave-washer): at their places on the path, among the cut sections, in
+  // the path's order from the first profile to the last.
+  std::vector<std::pair<double, TopoDS_Wire>> middle;
+  double last = s0;
+  for (size_t k = 1; k + 1 < wires.size(); ++k)
+  {
+    const double sk = place(wires[k]);
+    if ((sk - last) * (s1 - s0) <= 0 || (s1 - sk) * (s1 - s0) <= 0)
+      return false;
+    middle.emplace_back(sk, wires[k]);
+    last = sk;
+  }
+  size_t next = 0;
   std::vector<TopoDS_Wire> out{wires.front()};
   // Each section runs like the one before and starts where it does.
   auto normal_of = [](const TopoDS_Wire& w) {
@@ -3435,9 +3447,19 @@ static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& sp
     BRepTools_WireExplorer first(prev);
     return rotate_wire_start(w, BRep_Tool::Pnt(first.CurrentVertex()));
   };
+  const double gap = 1e-6 * (1 + total);
   for (int i = 1; i <= count; ++i)
   {
-    const double         s = s0 + (s1 - s0) * i / (count + 1);
+    const double s = s0 + (s1 - s0) * i / (count + 1);
+    while (next < middle.size() && (s - middle[next].first) * (s1 - s0) >= -gap)
+    {
+      const bool at = std::abs(s - middle[next].first) < gap;
+      out.push_back(align(middle[next++].second));
+      if (at)
+        break;
+    }
+    if (!out.empty() && next > 0 && std::abs(s - middle[next - 1].first) < gap)
+      continue;
     GCPnts_AbscissaPoint ap(cc, s, cc.FirstParameter());
     if (!ap.IsDone())
       return false;
@@ -3469,6 +3491,8 @@ static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& sp
     }
     out.push_back(align(best));
   }
+  while (next < middle.size())
+    out.push_back(align(middle[next++].second));
   // The end profile too (same edges, so its history is untouched).
   out.push_back(align(wires.back()));
   wires = out;

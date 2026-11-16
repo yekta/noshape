@@ -1118,9 +1118,6 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         let edges = resolve_curves(ev, ev.query("spine"))?;
         let wires = wires_from(&edges)?;
         let [spine] = wires.as_slice() else { return crate::regen::eval::err_at(&["spine"], "Loft path must be a contiguous set of curves.") };
-        if shapes.len() != 2 {
-            return err("Loft path with more than two profiles is not supported yet");
-        }
         opts.path = Some((spine.clone(), ev.integer("sectionCount")?.max(1) as usize));
     }
     // Onshape's LOFT_CONNECTION_MATCHING: every connection needs a point on

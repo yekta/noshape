@@ -506,6 +506,43 @@ fn loft_path_as_live() {
     assert!((v10 - 25128.64307495251).abs() < 5.0, "{v10}");
 }
 
+/// A loft along a path through three profiles (live c2-loft-guide-curves-wave-washer; ours was "Loft path with more
+/// than two profiles is not supported yet"): □20 at z 0, □30 at z 20, □20 at z 40 along a straight path, 5 sections:
+/// it runs through the middle square.
+#[test]
+fn a_path_loft_runs_through_a_middle_profile() {
+    let mut t = T::new();
+    let plane = |t: &mut T, z: &str| t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e(z))]);
+    let s1 = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.01, -0.01, 0.01, 0.01));
+    let p2 = plane(&mut t, "20 mm");
+    let s2 = t.sketch(Reference::FeaturePlane(p2), rect(-0.015, -0.015, 0.015, 0.015));
+    let p3 = plane(&mut t, "40 mm");
+    let s3 = t.sketch(Reference::FeaturePlane(p3), rect(-0.01, -0.01, 0.01, 0.01));
+    let mut sk = noshape_sketch::Sketch::new();
+    // Front: sketch x = X, y = Z.
+    let line = sk.add_line(DVec2::ZERO, DVec2::new(0.0, 0.04)).0;
+    let path = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let item = |r: Reference| {
+        let mut v = ParamValues::default();
+        v.set("sheetProfileEntities", q(vec![r]));
+        v
+    };
+    let (r1, r2, r3) = (t.regions(s1)[0].clone(), t.regions(s2)[0].clone(), t.regions(s3)[0].clone());
+    t.add(
+        "loft",
+        &[
+            ("sheetProfilesArray", ParamValue::Array(vec![item(r1), item(r2), item(r3)])),
+            ("addSections", b(true)),
+            ("spine", q(vec![Reference::SketchEntity { sketch: path, entity: line }])),
+            ("sectionCount", e("5")),
+        ],
+    );
+    let res = t.ok();
+    let bb = res.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.max.x, 0.015, 1e-6) && near(bb.max.z, 0.04, 1e-7), "{bb:?}");
+    assert!(total_volume(&res.context) > 0.02 * 0.02 * 0.04, "{}", total_volume(&res.context));
+}
+
 #[test]
 fn thicken_region_and_face() {
     let mut t = T::new();
