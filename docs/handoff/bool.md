@@ -4,32 +4,23 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-15 23:05 UTC.
+Updated 11-16 01:37 UTC.
 
 ## In flight
-- Landed: fd462b7a (snap hook stack) 11-15 21:23.
-- Gating: branch bool-shell-si 578353275 (Shell self-interference filter: an edge's points against the face's own
-  parameter patch of a cylinder / cone / sphere / ring torus, closed form, before meshing; c2-bottle-split Shell 1
-  33 -> 18 ms, identical output on the bottle and rings-loft shell-9). First gate run killed (rustc SIGTERM at 22:33,
-  vibe5 load 31): rerun unit bool-gate-578353275b. Hats/dock: udoc-ab.sh (its final switch set to bool-shell-si)
-  waiting for the slot. Rebase onto main at land (its base deb41792 landed as fd462b7a).
-- Core's 3315dcd6d gated clean for them (sent 22:30); they queued it.
-- c2-impeller-loft feature 15 "Boolean Flansch+Gehaeuse" (dx 11-15; mine): ours 19/53/36, live 19/56/39. Recorded
-  vibe5 ~/tmp/bool/imp/38073a30d2ffbc3e (fuse; inputs 6/16/12 + 8/18/12 = live's). Live's per-edge/vertex record:
-  ~/tmp/bool/ab/models/c2-impeller-loft/live.jsonl (feature 15: bodies[0].edges/vertices/faces). Ours before unify
-  20/57/40; the merge of the two z=0 planes (1356.9 + 3128.95 mm2) is live's too (its 4485.914 face). Missing in ours: at
-  3 places live's section on the flange's side walls (y = +-27) ends below z=0, (63.50,27,-0.35), (29.41,-27,-0.69),
-  (61.99,-27,-2.31), and a short second edge goes on to z=0; ours (edge offset x extrusion) runs to z=0 at x 63.86 /
-  30.08 / 64.34. The housing's inner top edge (offset -3 mm face x plane z=0, 243.27 mm) and the flange's top edge
-  (its extruded wall x its z=0 plane) are the same curve: the two walls meet along it (a touching, branched section
-  there). Probe: xprobe probe_case_unify (bool-hat copy) with PROBE_GONE=1, PROBE_AT=x,y,z (edges / faces near a point,
-  inputs too). Root: over part of y = +-27 the housing's offset wall and the flange's extruded wall lie in one plane;
-  live bounds that shared region by a vertical edge at x 63.50 where the flange's profile leaves y = 27 tangentially
-  (no input edge there): 45 deg edge (59.86,27,-4) -> (63.50,27,-0.35), then 0.35 mm up to z=0; ours runs the 45 deg edge
-  to (63.86,27,0) (edge 26, offset x extrusion; the same with NOSHAPE_OWN_SECTIONS=0; not one of the ahead batch's
-  curves). Fix: coincident-region bounds in our Boolean (next after the Shell filter lands). Notes:
-  /root/bool-scratch/notes-snap.txt. OCCT's own fuse is wrong (16/47/36, volume 27 mm3 off). Our unify also joins 3 input arcs live keeps
-  (probe only; the feature's own counts keep them).
+- Queued to land: 566b1015 (Shell self-interference filter: an edge's points against the face's own parameter patch of
+  a cylinder / cone / sphere / ring torus, closed form, before meshing; c2-bottle-split Shell 1 33 -> 18 ms). Gate
+  578353275 clean (CHECK knurls only; replay 0 new; suite 124 docs, 78 -> 78, 969/1182); hats/dock 12/12 SAME.
+- Gating: fa8a800ef (worktree bool-hat, branch bool-impeller-sliver): quadric_across in rust_boolean.cpp: an
+  extrusion against a cylinder across its direction or a sphere, per ruling A w^2 + B w + C = 0, two branches; runs
+  within the extrusion's heights and the other face's box (bisected between samples, 32 a profile span), cut where the
+  angle passes the surface's OWN seam (raw ElSLib angle crossing 2 pi, as OCCT cuts its curves; cutting at the face's
+  box start instead made rings-loft non-manifold), angles of each piece on its middle's turn. Declines (OCCT's): a run
+  ending where the branches meet (tangent ruling), a run across a profile knot (interpolation crawls past kinks).
+  c2-rings-loft 8f262543bbeb781c (Extrude 5's cut): 13 cylinder x extrusion pairs ours, same counts / volume. T1
+  bool_patterns::a_spline_prism_cut_by_a_cylinder_across_it_and_by_a_ball_as_occt; a_rings_wedge... (78cd8309) guards the
+  seam rule. Then hats/dock (udoc-ab.sh in bool-split: point it at the branch) and land.
+- Impeller f15 done: known live difference (DECISIONS 6ea431265), LIVE_SLIVER_EDGES in crates/ops/tests/parity.rs
+  (landed 2f4bad67; impeller 15 -> 24/48). dx added f24's split vertex to the same table (DECISIONS bb69638d4).
 
 ## Parked (branches / diffs, not landing as they are)
 - Plane x B-spline marcher + our own least-squares fit (branch bool-free-sections-wip: 71efdd87e, f6c77c748, ...):
@@ -57,14 +48,13 @@ Updated 11-15 23:05 UTC.
   Tangent contacts stay OCCT's (lead 11-15); likewise housing's 4 cylinder x revolution pairs (20-27 ms each, none).
 
 ## Next, in order
-1. qa's slower-than-live list (lead 11-15). Profiled: c2-hunting-knife Split 4 (108-174 ms): op_split ~28 ms, the
-   rest Split Face projecting sketch lines along -y onto 2 B-spline faces (project_line_along: OCCT's plane section
-   10-15 ms each, its tolerance check (GeomLib_CheckCurveOnSurface PSO) most of it; a 1 mm line along the blade's edge
-   declines to BRepProj, ~20 ms, nothing). Dumps vibe5 ~/tmp/bool/kd (NOSHAPE_DUMP_OPS; probe_project_dump,
-   probe_split_dump). c2-bottle-split Split 1: our own Boolean ~7 ms warm, spread out; Revolve 2 (25 ms, live 5): its
-   fuse 4 ms, the rest building the revolution (not ours). Dumps ~/tmp/bool/bd.
-   cf-snap-hook leftovers: offset x plane pairs (2, ~15-20 ms); our torus x plane pairs ~1 ms each; intervals_on's
-   chords ~40 % of the cut's CPU.
+1. qa's list (docs/handoff/qa.md "Speed"), mine: knife Split 4 profiled (Split Face's projections: OCCT's plane x
+   B-spline sections 10-15 ms each, a 1 mm line along the blade's edge to BRepProj ~20 ms: no exact lever); bottle
+   Shell done (566b1015), Split no single lever (our Boolean ~7 ms warm), Revolve 2 not ours (its fuse 4 ms); cf-lighten
+   and c2-sm-louver now at or under live. rings-loft (11-16 01:00, vibe5 loaded): Shell 1 540 / 235, Circular pattern 2
+   309 / 201 (fuse 86892e9b, 8 tools, torus x plane ours), Extrude 5 260 / 39 (cut 8f262543: quadric_across gating; its
+   16 torus x extrusion pairs finding none still OCCT's ~35 ms: a quartic a ruling, "none" needs a proof), Extrude 3 117
+   / 32 (cut 5d782946: bspline x plane 12 pairs + bspline x cylinder 6 OCCT's). Recorded vibe5 ~/tmp/bool/rl.
 2. c2-rings-loft Shell 1 (~510-590 ms, live 235): repair 251 (traces 95, split 78, crossings 26, joins 17),
    self-interference 67 (its EF time in ~23 pairs on free-form faces; quadric pairs are cheap), edges 44, check 35,
    thin 34. Points with no square foot: OCCT's global search found none wherever a Newton search from the own 25 x 25
