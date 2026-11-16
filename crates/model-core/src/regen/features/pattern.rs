@@ -160,20 +160,41 @@ fn circular_instances(ev: &EvalCtx) -> FResult<Indexed> {
     Ok(out)
 }
 
+/// A point of a path's edge with the curve's unit tangent and its curvature vector's direction (zero where straight),
+/// the edge's own.
+#[derive(Clone, Copy)]
+struct Sample {
+    p: DVec3,
+    t: DVec3,
+    k: DVec3,
+}
+
+impl Sample {
+    fn reversed(self) -> Self {
+        Sample { t: -self.t, ..self }
+    }
+}
+
 /// Densely sampled chained path.
 struct Path {
     pts: Vec<DVec3>,
+    /// The samples' tangents and curvature directions.
+    tk: Vec<(DVec3, DVec3)>,
     cum: Vec<f64>,
 }
 
 impl Path {
-    fn new(pts: Vec<DVec3>) -> Self {
+    fn new(samples: Vec<Sample>) -> Self {
+        let pts: Vec<DVec3> = samples.iter().map(|s| s.p).collect();
         let mut cum = vec![0.0];
         for w in pts.windows(2) {
             let l = cum.last().copied().unwrap_or(0.0) + w[0].distance(w[1]);
             cum.push(l);
         }
-        Path { pts, cum }
+        Path { pts, tk: samples.iter().map(|s| (s.t, s.k)).collect(), cum }
+    }
+    fn samples(&self) -> Vec<Sample> {
+        self.pts.iter().zip(&self.tk).map(|(&p, &(t, k))| Sample { p, t, k }).collect()
     }
     fn length(&self) -> f64 {
         *self.cum.last().unwrap_or(&0.0)
@@ -190,6 +211,39 @@ impl Path {
         let t = (self.pts[i + 1] - self.pts[i]).normalize_or_zero();
         (self.pts[i].lerp(self.pts[i + 1], f), t)
     }
+    /// The path's corrected Frenet frame (tangent, normal, binormal as columns) at arc length `s`, as a sweep along it
+    /// carries its profile (curvePattern.fs sweeps a line along the path): the normal towards the curvature, carried
+    /// over straight runs and kept from flipping, so along a helix it points at the axis.
+    fn frame_at(&self, frames: &[DQuat], s: f64) -> DQuat {
+        let n = self.pts.len();
+        let s = s.clamp(0.0, self.length());
+        let i = match self.cum.binary_search_by(|c| c.total_cmp(&s)) {
+            Ok(i) => i.min(n - 2),
+            Err(i) => i.saturating_sub(1).min(n - 2),
+        };
+        let seg = self.cum[i + 1] - self.cum[i];
+        let f = if seg > 0.0 { (s - self.cum[i]) / seg } else { 0.0 };
+        frames[i].slerp(frames[i + 1], f)
+    }
+    /// Corrected Frenet frames at the samples ([`Path::frame_at`]), from the edges' own derivatives.
+    fn frames(&self) -> Vec<DQuat> {
+        let mut out = Vec::with_capacity(self.pts.len());
+        let mut prev: Option<(DVec3, DVec3)> = None;
+        for &(t, k) in &self.tk {
+            let bend = (k - t * k.dot(t)).try_normalize();
+            let carried = prev.map(|(pt, pn)| DQuat::from_rotation_arc(pt, t) * pn);
+            let normal = match (bend, carried) {
+                (Some(b), Some(c)) if b.dot(c) < 0.0 => -b,
+                (Some(b), _) => b,
+                (None, Some(c)) => c,
+                (None, None) => t.any_orthonormal_vector(),
+            };
+            let normal = (normal - t * normal.dot(t)).try_normalize().unwrap_or_else(|| t.any_orthonormal_vector());
+            out.push(DQuat::from_mat3(&glam::DMat3::from_cols(t, normal, t.cross(normal))));
+            prev = Some((t, normal));
+        }
+        out
+    }
     /// Unit normal of the path plane if planar.
     fn plane_normal(&self) -> Option<DVec3> {
         let c = self.pts.iter().copied().sum::<DVec3>() / self.pts.len() as f64;
@@ -203,14 +257,26 @@ impl Path {
     }
 }
 
-fn sample_edge(e: &Shape) -> FResult<Vec<DVec3>> {
+fn sample_edge(e: &Shape) -> FResult<Vec<Sample>> {
     let info = e.edge_info()?;
-    let n = if matches!(info.curve, k::Curve::Line { .. }) { 1 } else { 96 };
-    (0..=n).map(|i| Ok(e.point_at(info.first_param + (info.last_param - info.first_param) * i as f64 / n as f64)?)).collect()
+    let at = |t: f64| -> FResult<Sample> {
+        let [p, d1, d2, _] = e.derivatives_at(t)?;
+        let t = d1.normalize_or_zero();
+        Ok(Sample { p, t, k: d2 - t * d2.dot(t) })
+    };
+    if matches!(info.curve, k::Curve::Line { .. }) {
+        return Ok(vec![at(info.first_param)?, at(info.last_param)?]);
+    }
+    let along = |n: usize| -> FResult<Vec<Sample>> { (0..=n).map(|i| at(info.first_param + (info.last_param - info.first_param) * i as f64 / n as f64)).collect() };
+    // At least 96 points, and one every degree the edge turns (a helix of several turns).
+    let pts = along(96)?;
+    let turn: f64 = pts.windows(2).map(|w| w[0].t.angle_between(w[1].t)).filter(|a| a.is_finite()).sum();
+    let n = (turn.to_degrees().ceil() as usize).clamp(96, 20_000);
+    if n > 96 { along(n) } else { Ok(pts) }
 }
 
 fn chain_path(edges: &[SourcedEdge]) -> FResult<Path> {
-    let mut rest: Vec<Vec<DVec3>> = edges.iter().map(|e| sample_edge(&e.shape)).collect::<FResult<_>>()?;
+    let mut rest: Vec<Vec<Sample>> = edges.iter().map(|e| sample_edge(&e.shape)).collect::<FResult<_>>()?;
     if rest.is_empty() {
         return err("Select a path to pattern along.");
     }
@@ -218,16 +284,16 @@ fn chain_path(edges: &[SourcedEdge]) -> FResult<Path> {
     let tol = 1e-6;
     // Orient the first edge towards the next one when possible.
     if let Some(next) = rest.first()
-        && let (Some(s), Some(n0), Some(n1)) = (chain.first().copied(), next.first().copied(), next.last().copied())
+        && let (Some(s), Some(n0), Some(n1)) = (chain.first().map(|s| s.p), next.first().map(|s| s.p), next.last().map(|s| s.p))
         && (s.distance(n0) < tol || s.distance(n1) < tol)
     {
-        chain.reverse();
+        chain = chain.into_iter().rev().map(Sample::reversed).collect();
     }
     while !rest.is_empty() {
-        let end = *chain.last().unwrap_or(&DVec3::ZERO);
-        let start = *chain.first().unwrap_or(&DVec3::ZERO);
+        let end = chain.last().map_or(DVec3::ZERO, |s| s.p);
+        let start = chain.first().map_or(DVec3::ZERO, |s| s.p);
         let Some((i, how)) = rest.iter().enumerate().find_map(|(i, s)| {
-            let (a, b) = (*s.first()?, *s.last()?);
+            let (a, b) = (s.first()?.p, s.last()?.p);
             if a.distance(end) < tol {
                 Some((i, 0))
             } else if b.distance(end) < tol {
@@ -242,20 +308,17 @@ fn chain_path(edges: &[SourcedEdge]) -> FResult<Path> {
         }) else {
             return crate::regen::eval::err_at(&["edges"], "Edges do not form a continuous path.");
         };
-        let mut s = rest.remove(i);
+        let s = rest.remove(i);
+        let mut s = if how % 2 == 1 { s.into_iter().rev().map(Sample::reversed).collect() } else { s };
         match how {
             0 => chain.extend(s.into_iter().skip(1)),
-            1 => {
-                s.reverse();
-                chain.extend(s.into_iter().skip(1));
-            }
+            1 => chain.extend(s.into_iter().skip(1)),
             2 => {
                 s.pop();
                 s.extend(chain);
                 chain = s;
             }
             _ => {
-                s.reverse();
                 s.pop();
                 s.extend(chain);
                 chain = s;
@@ -317,14 +380,13 @@ fn curve_instances(ev: &EvalCtx) -> FResult<(Indexed, Option<&'static str>)> {
         if closed {
             let i = path.pts.iter().enumerate().min_by(|a, b| a.1.distance(c).total_cmp(&b.1.distance(c))).map_or(0, |(i, _)| i);
             if i > 0 && i + 1 < path.pts.len() {
-                let mut pts = path.pts[i..path.pts.len() - 1].to_vec();
-                pts.extend_from_slice(&path.pts[..=i]);
+                let all = path.samples();
+                let mut pts = all[i..all.len() - 1].to_vec();
+                pts.extend_from_slice(&all[..=i]);
                 path = Path::new(pts);
             }
         } else if path.pts.last().is_some_and(|e| e.distance(c) < path.pts[0].distance(c)) {
-            let mut pts = path.pts.clone();
-            pts.reverse();
-            path = Path::new(pts);
+            path = Path::new(path.samples().into_iter().rev().map(Sample::reversed).collect());
         }
         let tol = 1e-9 + (hi - lo).length() * 1e-9;
         let start = path.pts[0];
@@ -379,6 +441,7 @@ fn curve_instances(ev: &EvalCtx) -> FResult<(Indexed, Option<&'static str>)> {
     let (p0, t0) = path.at(0.0);
     let f0 = if faces.is_empty() { None } else { Some(frame(p0, t0)?) };
     let pn = path.plane_normal();
+    let frames = if pn.is_none() { path.frames() } else { Vec::new() };
     let mut out = Vec::new();
     for i in 1..n {
         let (p, t) = path.at(spacing * i as f64);
@@ -393,7 +456,7 @@ fn curve_instances(ev: &EvalCtx) -> FResult<(Indexed, Option<&'static str>)> {
                     let a = t0.cross(t).dot(nrm).atan2(t0.dot(t));
                     DQuat::from_axis_angle(nrm, a)
                 }
-                None => DQuat::from_rotation_arc(t0, t),
+                None => path.frame_at(&frames, spacing * i as f64) * path.frame_at(&frames, 0.0).inverse(),
             };
             DMat4::from_translation(p) * DMat4::from_quat(rot) * DMat4::from_translation(-p0)
         };

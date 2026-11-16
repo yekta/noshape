@@ -336,6 +336,43 @@ fn helix_about_axis_length_and_turns() {
     assert!(!mesh.edges.is_empty() && mesh.edges.iter().any(|e| e.len() > 10), "helix has no edge polyline");
 }
 
+/// A curve pattern along a helix carries its seed as a sweep along it would (curvePattern.fs sweeps a line along the
+/// path; Onshape's frame turns with the helix): each instance is the seed screwed along the helix, a plate standing at
+/// its start radially stays radial (c2-loft-guide-curves-driven-pattern's Curve pattern 1; ours tilted the plates by
+/// the shortest turn between the tangents).
+#[test]
+fn a_curve_pattern_along_a_helix_screws_its_seed() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    rect(&mut sk, 0.008, -0.002, 0.004, 0.004);
+    let plate = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let plate = s.extrude_largest(plate, "0.2 mm");
+    let helix = s.add("helix", |p| {
+        p.set("axisType", ParamValue::Enum("AXIS".into()));
+        p.set("axis", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        p.set("startRadius", expr("10 mm"));
+        p.set("height", expr("20 mm"));
+        p.set("revolutions", expr("2"));
+    });
+    s.add("curvePattern", move |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::Body(BodyId { feature: plate, index: 0 })]));
+        p.set("edges", ParamValue::Query(vec![Reference::Body(BodyId { feature: helix, index: 0 })]));
+        p.set("instanceCount", expr("9"));
+    });
+    let r = s.ok();
+    let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| b.shape.bounding_box(true).unwrap()).collect();
+    assert_eq!(solids.len(), 9);
+    let seed = solids[0];
+    // Quarter turns, 2.5 mm up each (but the last, at the helix spline's end, where its curvature turns 0.7° off the
+    // true helix's).
+    for (i, b) in solids.iter().enumerate().take(8).skip(1) {
+        let rot = glam::DQuat::from_rotation_z(std::f64::consts::FRAC_PI_2 * i as f64);
+        let (p, q) = (rot * seed.min + DVec3::Z * 0.0025 * i as f64, rot * seed.max + DVec3::Z * 0.0025 * i as f64);
+        let (lo, hi) = (p.min(q), p.max(q));
+        assert!((b.min - lo).abs().max_element() < 1e-5 && (b.max - hi).abs().max_element() < 1e-5, "instance {i}: {b:?}, the seed screwed {lo:?} {hi:?}");
+    }
+}
+
 /// Helix › Circle takes a sketch circle as well as a model edge (its field
 /// accepts both; a sketch circle failed "Select a circle or arc.").
 #[test]
