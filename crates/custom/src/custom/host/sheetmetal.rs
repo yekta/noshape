@@ -662,7 +662,18 @@ fn pulled_face(face: &Shape, topo: &Topo, l: &Loop, n: DVec3, offset: &[f64], fr
             free(j) && (l.curved[j] || (!in_line(j) && !(free(beyond) && (short || tangent))))
         };
         let (before, after) = ((k + m - 1) % m, (k + 1) % m);
-        let (s0, s1) = (if runs_on(before, (k + m - 2) % m, l.pts[before]) { -big } else { 0.0 }, if runs_on(after, (k + 2) % m, l.pts[(k + 2) % m]) { len + big } else { len });
+        // Never over more of the wall outside the bend's line than a pull's square past the bend's end: a wall that
+        // reaches out beyond that line there keeps it (c2-sm-side-cuts-tab's floor round Flange 2's notch once its
+        // corners are broken), a wall going on along it (qa4's flange past a slot's notch) doesn't.
+        let clear = |from: f64, to: f64| -> FResult<bool> {
+            let q = [a + d * from - u * big, a + d * to - u * big, a + d * to, a + d * from];
+            let w = k::make_polyline(&q, true).map_err(|e| fe(e.to_string()))?;
+            let ext = k::make_face_from_wire(&w, true).map_err(|e| fe(e.to_string()))?;
+            let common = k::boolean(k::BooleanOp::Common, std::slice::from_ref(&base), &[ext], &k::BooleanOptions::default()).map_err(|e| fe(e.to_string()))?;
+            Ok(common.shape.area().unwrap_or(0.0) <= off * off)
+        };
+        let s0 = if runs_on(before, (k + m - 2) % m, l.pts[before]) && clear(-big, 0.0)? { -big } else { 0.0 };
+        let s1 = if runs_on(after, (k + 2) % m, l.pts[(k + 2) % m]) && clear(len, len + big)? { len + big } else { len };
         let quad = [a + d * s0 - u * big, a + d * s1 - u * big, a + d * s1 + u * off, a + d * s0 + u * off];
         let w = k::make_polyline(&quad, true).map_err(|e| fe(e.to_string()))?;
         strips.push(k::make_face_from_wire(&w, true).map_err(|e| fe(e.to_string()))?);

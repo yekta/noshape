@@ -557,6 +557,50 @@ fn corner_breaks_of_half_a_side_meet_on_it() {
     assert!((volume_mm3(&r) - expected).abs() < 1e-6, "{} mm³ vs {expected}", volume_mm3(&r));
 }
 
+/// A corner break on a plate with a flange at the tip of a tab, its other arm reaching further out than the tab's bend
+/// line: the plate keeps all of that arm, the break takes only its corner (c2-sm-side-cuts-tab's Corner break 3 cut the
+/// floor round Flange 2's tab in two).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_corner_break_keeps_the_plate_past_a_flanges_bend_line() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [(0.0, 0.0), (40.0, 0.0), (40.0, 15.0), (60.0, 15.0), (60.0, 10.0), (80.0, 10.0), (80.0, 15.0), (100.0, 15.0), (100.0, 40.0), (0.0, 40.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    for i in 0..pts.len() {
+        sk.add_line_between(pts[i], pts[(i + 1) % pts.len()]).unwrap();
+    }
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let key = r.display.sketches.iter().find(|x| x.feature == sketch).unwrap().regions[0].key.clone();
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let edges = vec![edge_at(&r, DVec3::new(70.0, 10.0, 2.0))];
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(edges));
+        p.set("distance", expr("20 mm"));
+    });
+    let r = s.ok();
+    let before = volume_mm3(&r);
+    let corner = vec![vertex_at(&r, DVec3::new(100.0, 40.0, 2.0))];
+    s.add("sheetMetalCornerBreak", |p| {
+        p.set("entities", ParamValue::Query(corner));
+        p.set("blendType", en("FILLET"));
+        p.set("radius", expr("5 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).count(), 1);
+    let expected = before - 25.0 * (1.0 - std::f64::consts::FRAC_PI_4) * 2.0;
+    assert!((volume_mm3(&r) - expected).abs() < 1e-6, "{} mm³ vs {expected}", volume_mm3(&r));
+}
+
 /// A Fillet R 5 of both corners of a sheet metal part's 10 mm wide end (std: corner breaks) meet: the end is one
 /// half-round, both corners off (live config-assembly 08590a's Fillet 2 on the arm: 32 faces before and after, 32.19 mm³
 /// less at 3 mm).
