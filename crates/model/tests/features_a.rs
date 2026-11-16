@@ -705,6 +705,26 @@ fn a_path_loft_of_two_slots_has_one_side_face() {
     assert_eq!(res.context.bodies[0].faces.len(), 3, "one side face and the two slots");
 }
 
+/// A sweep along lines that run on from each other on one line sweeps them as one edge: one side face (live
+/// c2-surf-workshop-cpcurves' Main pipe, three layout lines: one face per wall; ours one per line).
+#[test]
+fn a_sweep_along_collinear_lines_has_one_side_face() {
+    let mut t = T::new();
+    let mut c = noshape_sketch::Sketch::new();
+    c.add_circle(DVec2::ZERO, 0.005);
+    let s1 = t.sketch(Reference::Plane(DatumPlane::Top), c);
+    let mut sk = noshape_sketch::Sketch::new();
+    // Front: sketch x = X, y = Z; up the z axis in two pieces.
+    let l1 = sk.add_line(DVec2::ZERO, DVec2::new(0.0, 0.02)).0;
+    let l2 = sk.add_line(DVec2::new(0.0, 0.02), DVec2::new(0.0, 0.05)).0;
+    let path = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let r1 = t.regions(s1)[0].clone();
+    t.add("sweep", &[("profiles", q(vec![r1])), ("path", q(vec![Reference::SketchEntity { sketch: path, entity: l1 }, Reference::SketchEntity { sketch: path, entity: l2 }]))]);
+    let res = t.ok();
+    assert_eq!(res.context.bodies[0].faces.len(), 3, "one side face and two caps");
+    assert!(near(total_volume(&res.context), std::f64::consts::PI * 0.005f64.powi(2) * 0.05, 1e-6));
+}
+
 #[test]
 fn thicken_region_and_face() {
     let mut t = T::new();

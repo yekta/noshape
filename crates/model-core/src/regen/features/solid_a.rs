@@ -495,6 +495,34 @@ fn edge_tangent_near(e: &Shape, p: DVec3) -> FResult<DVec3> {
 /// Onshape's LOFT_FAILED.
 const LOFT_FAILED: &str = "Could not create loft with given information. Check profile order, guide/profile intersections or end conditions.";
 
+/// A path's lines that run on from each other along one line are one edge: Parasolid sweeps them into one face (live
+/// c2-surf-workshop-cpcurves' Main pipe, three lines of a layout: one face per wall). The joined edge keeps the first
+/// piece's source.
+fn join_collinear_lines(mut edges: Vec<SourcedEdge>) -> FResult<Vec<SourcedEdge>> {
+    let line = |e: &SourcedEdge| e.shape.edge_info().ok().filter(|i| matches!(i.curve, k::Curve::Line { .. })).map(|i| (i.start, i.end));
+    'joined: loop {
+        for i in 0..edges.len() {
+            let Some((a0, a1)) = line(&edges[i]) else { continue };
+            for j in i + 1..edges.len() {
+                let Some((b0, b1)) = line(&edges[j]) else { continue };
+                let scale = 1e-9 * (1.0 + a0.length().max(a1.length()).max(b0.length()).max(b1.length()));
+                // Their shared end, and the far ends either side of it on one line.
+                let ends = [(a0, a1, b0, b1), (a0, a1, b1, b0), (a1, a0, b0, b1), (a1, a0, b1, b0)];
+                let Some(&(shared, far_a, _, far_b)) = ends.iter().find(|(sa, _, sb, _)| sa.distance(*sb) <= scale) else { continue };
+                let (u, v) = (far_a - shared, far_b - shared);
+                if u.cross(v).length() > scale * (u.length() + v.length()) || u.dot(v) >= 0.0 {
+                    continue;
+                }
+                let joined = SourcedEdge { shape: k::make_line(far_a, far_b)?, source: edges[i].source.clone() };
+                edges.remove(j);
+                edges[i] = joined;
+                continue 'joined;
+            }
+        }
+        return Ok(edges);
+    }
+}
+
 pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     let body_type = ev.enum_("bodyType").to_string();
     // sweep.fs: the direction to lock is checked first (live: with no
@@ -516,6 +544,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     if path_edges.is_empty() {
         return crate::regen::eval::err_at(&["path"], "Select entities for sweep path.");
     }
+    let path_edges = join_collinear_lines(path_edges)?;
     let wires = wires_from(&path_edges)?;
     if wires.len() != 1 {
         // Live L13: no field is flagged.
