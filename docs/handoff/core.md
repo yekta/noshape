@@ -73,7 +73,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Mirror 1 times swing 0.3-1.7 s on loaded vibe5 runs; check on the Mac / in the pair before calling it.
   T1 features_a::a_path_loft_of_two_slots_has_one_side_face.
 - **Lofts (mine, from dx's list):**
-  c2-loft-guide-curves-wave-washer Loft 1: 4 profiles along a closed path; live closes it (4/4/0, 2080.8 mm³). WIP
+  c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
+  live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
+  closed-path WIP once skasm fixes that. 4 profiles along a closed path; live closes it (4/4/0, 2080.8 mm³). WIP
   /root/core-scratch/loft-closed-path-wip.patch closes it round the path but comes out −11279 mm³: two profiles sit
   83 mm off the 26 mm ring, so MakePipeShell's carried sections twist. c2-surf-workshop-pipe: guided loft of more than
   two profiles unsupported (a Gordon surface over n profiles: big kernel item).
