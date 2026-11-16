@@ -4,20 +4,22 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-16 04:43 UTC.
+Updated 11-16 12:35 UTC.
 
 ## In flight
-- Landed tonight: a8b8f1851 (Shell self-interference filter), a2952b32 (quadric_across: an extrusion against a cylinder
-  across its direction or a sphere, our own sections; its gate's suite FAIL was ~/parity/models rewritten mid-run, the
-  12 changed documents identical main vs branch on one model set; hats/dock 12/12 SAME).
-- Gating (unit bool-gate-e5c584e35b; the first run died on the 04:37 ~/bin/slot rewrite): branch bool-cp2-ahead in
-  bool-split, 2 commits on d0948a91b:
-  3a3249cbc moved_pair returns None where the uncopied face is free-form (clear_inside always refuses those, so the
-  pairs were sectioned one at a time on the main thread after the moved curves; now they go in the parallel ahead
-  batch): c2-rings-loft CP2 fuse 86892e9b ~10 % faster in 6 of 6 interleaved rounds, 103/261 and volume the same.
-  e5c584e35 off_shared_edges applied inside the ahead jobs (the map holds lines with it applied; seeded lines get it
-  at fetch): housing Rotieren 1 4361c232 ~10 % faster (3 of 4 rounds), CP2 also 3 of 4; same counts / volume. g++-13 ok.
-- Impeller f15 and f24: known live differences (DECISIONS 6ea431265, bb69638d4; LIVE_SLIVER_EDGES, landed 2f4bad67).
+- dx's P0 fix 979de111a (split_by_edges_on_faces' crossing check bounded; c2-config-parts-screws hung): gate on vibe7
+  (unit bool-gate-979de111a-v7b, restarted 12:14 after my chain's cap killed the first at 12:13; cap now 12 h). Verdict
+  file /root/bool-scratch/dx-gate-verdict.txt (unit bool-dx-verdict): send it to dx at once; dx lands it.
+- Gating next on vibe5: e5c584e35 (branch bool-cp2-ahead in bool-split: CP2 moved pairs on free-form faces in the ahead
+  batch; off_shared_edges in the ahead jobs; ~10 % on rings CP2 and housing Rotieren 1), then 31dbff530 (branch
+  bool-cyl-merge: merge_cylinder_groups for a sector whose frame is far along the axis: host on the nearer frame,
+  curves mapped exactly where projection misses, volume in one call (+ adaptive) only where a frame is far;
+  asm-pattern-std Extrude 11 16/40/26 -> live 14/36/24, T1 an_extrusions_cylinder_sectors_merge_with_the_parts_own_as_live)
+  chained by unit bool-after-cp2-gate. Each: hats/dock (udoc-ab.sh <commit>) then land; tell asm when 31dbff530 lands.
+- Landed 11-16: a8b8f1851 (Shell filter), a2952b329 (extrusion x quadric sections).
+- Reported, not mine: c2-impeller-loft 26 -> 24/48 (Extrude 4) is not a2952b329 (own sections off: same) nor
+  1b2bbee3f (reverted: same); blend has the remaining candidates. c2-config-parts-screws: Revolve 9's USD memory
+  (bool2's patch 0032); Sweep 1's band 0.45 um off the cylinder (sweep accuracy; decision with the lead).
 
 ## Parked (branches / diffs, not landing as they are)
 - Plane x B-spline marcher + our own least-squares fit (branch bool-free-sections-wip: 71efdd87e, f6c77c748, ...):
