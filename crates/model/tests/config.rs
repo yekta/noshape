@@ -52,6 +52,24 @@ fn configuration_variable_drives_expression() {
     assert!((bb.max.z - bb.min.z - 0.010).abs() < 1e-6, "height {}", bb.max.z - bb.min.z);
 }
 
+/// A checkbox is a variable too (c2-config-parts-sprockets' `#Default_Thickness ? #t : #Thickness`): true drives the
+/// first branch, false the second.
+#[test]
+fn configuration_checkbox_is_a_variable() {
+    let mut ps = noshape_model::demo::plate_studio();
+    ps.configuration.inputs.push(ConfigInput { id: "Thin".into(), name: "Thin".into(), kind: ConfigInputKind::Checkbox { default: true }, visible_when: None, excluded: false });
+    ps.features[1].params.set("depth", ParamValue::Expr(ExprValue::new("#Thin ? 4 mm : 9 mm")));
+    let units = UnitPrefs::default();
+    for (on, h) in [("true", 0.004), ("false", 0.009)] {
+        let mut values = ps.configuration.defaults();
+        values.0.insert("Thin".into(), on.into());
+        let r = Regenerator::new().regenerate(&ps, &values, &units, &RegenOptions::default());
+        assert!(r.display.features.iter().all(|f| f.status != noshape_model::display::FeatureStatus::Error), "{on}");
+        let bb = r.context.bodies[0].shape.bounding_box(false).unwrap();
+        assert!((bb.max.z - bb.min.z - h).abs() < 1e-6, "{on}: height {}", bb.max.z - bb.min.z);
+    }
+}
+
 #[derive(Debug)]
 struct OneStudio {
     studio: std::sync::Mutex<noshape_model::partstudio::PartStudio>,

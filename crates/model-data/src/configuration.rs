@@ -497,6 +497,11 @@ impl Configuration {
                 out.insert(name, q);
             }
         }
+        // A checkbox is a variable too, true or false (c2-config-parts-sprockets' `#Default_Thickness ? #t : #Thickness`).
+        for i in self.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::Checkbox { .. })) {
+            let on = self.value_of(values, &i.id).is_some_and(|v| v == "true");
+            out.insert(i.id.clone(), noshape_units::Quantity::unitless(if on { 1.0 } else { 0.0 }));
+        }
         out
     }
 }
