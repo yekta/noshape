@@ -99,6 +99,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   p2target, base files p2base; src and target removed at the end). Land all nine when both are clean; or the six from
   a worktree at bcaf5ffdb (core-trace) if the second isn't done when the first comes back clean.
 - c2-surf-workshop-manualblend Sweep 2: Sketch 5's CONCENTRIC rejected by the translator (skasm's handoff). Not core's.
+- c2-surf-intro-examples Fill 1 (5/13, parked): 4 G0 boundary edges (2 fit splines, 2 sketch splines; they match
+  live's lengths). fair_g1_fill returns nothing for them, so OCCT's plate (MakeFilling) balloons: 61911 mm², box to
+  x 198 mm; live 23827.4. A Coons patch (GeomFill_BSplineCurves, CoonsStyle) gives 23669.5 (-0.66 %: outside the
+  band), box inside the boundary's. Next: why fair_g1_fill declines all-G0 loops, or a plate sanity check (surface
+  box far outside the boundary's) falling back to Coons.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
