@@ -158,6 +158,28 @@ fn body_ref(id: &BodyId) -> Reference {
     Reference::Body(id.clone())
 }
 
+/// A sketch on a face of a part a Transform moved is in the face's frame from before, moved with it: its origin the
+/// world origin's projection there, 50 mm up with the part, not the projection where the face is now (live
+/// c2-sm-hem-plus's Sketch 3 on a face Transform 1 turned 30°). Saved before, the sketch stays where it was.
+#[test]
+fn a_sketch_on_a_moved_parts_face_moves_its_frame_with_it() {
+    for legacy in [false, true] {
+        let mut t = T::new();
+        t.ps.legacy_moved_face_frames = legacy;
+        t.block(0.0, 0.0, 0.02, 0.01, "10 mm");
+        let r = t.ok();
+        let part = solids(&r.context)[0].id.clone();
+        t.add("transform", &[("entities", q(vec![body_ref(&part)])), ("transformType", en("TRANSLATION_3D")), ("dz", e("50 mm"))]);
+        let r = t.ok();
+        let front = face_with_normal(solids(&r.context)[0], DVec3::NEG_Y);
+        let sketch = t.sketch(front, circle(DVec2::ZERO, 0.002));
+        let r = t.ok();
+        let frame = r.context.sketch(sketch).expect("sketch").frame;
+        let want = if legacy { DVec3::ZERO } else { DVec3::new(0.0, 0.0, 0.05) };
+        assert!(frame.origin.distance(want) < 1e-9, "legacy {legacy}: origin {:?}", frame.origin);
+    }
+}
+
 // ------------------------------------------------------------------ solid
 
 #[test]

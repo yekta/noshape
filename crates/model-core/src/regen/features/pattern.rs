@@ -2195,6 +2195,11 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
     let copy = t.is_none() || ev.bool("makeCopy");
     let t = t.unwrap_or(k::Transform::Translate(DVec3::ZERO));
     let inst = [Instance { code: 1, t }];
+    // The faces' frames move with the parts (not a stretch: its surfaces are new). Not a part from outside the studio
+    // (a Derived's, an import's): its faces' frames are its source's (live c2-fan-blade-sweep's Sketch 2 on a Derived
+    // part turned -90° has the x of the face where it is).
+    let m = (!matches!(t, k::Transform::ScaleXyz { .. })).then(|| t.matrix());
+    let placed = |ctx: &crate::regen::context::Context, from: &BodyId, m: DMat4| (!ctx.own_names.contains(from)).then(|| ctx.placements.get(from).map_or(m, |p| m * *p));
     if copy {
         let copies = copy_bodies(ev, &bodies, &inst)?;
         pattern_connectors(ev, refs, &inst);
@@ -2204,7 +2209,11 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
             let color = ev.ctx.bodies[bodies[bj]].color;
             let name = ev.ctx.alloc_part_name(kind);
             let f = ev.feature;
-            ev.ctx.bodies.push(Arc::new(Body::new(BodyId { feature: f, index: bj as u32 }, name, kind, ns.shape, ns.names.faces, color, f)));
+            let id = BodyId { feature: f, index: bj as u32 };
+            if let Some(p) = m.and_then(|m| placed(&ev.ctx, &ev.ctx.bodies[bodies[bj]].id, m)) {
+                ev.ctx.placements.insert(id.clone(), p);
+            }
+            ev.ctx.bodies.push(Arc::new(Body::new(id, name, kind, ns.shape, ns.names.faces, color, f)));
         }
         return Ok(());
     }
@@ -2232,6 +2241,9 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
         let faces: Vec<Name> = faces.into_iter().enumerate().map(|(j, n)| n.or_else(|| b.faces.get(j).cloned()).unwrap_or_else(|| Arc::new(TopoName::face(ev.feature, Role::New(j as u32))))).collect();
         let nb = Body::new(b.id.clone(), b.name.clone(), b.kind, res.shape, faces, b.color, ev.feature);
         ev.ctx.bodies[bi] = Arc::new(nb);
+        if let Some(p) = m.and_then(|m| placed(&ev.ctx, &b.id, m)) {
+            ev.ctx.placements.insert(b.id.clone(), p);
+        }
     }
     for r in conn_refs {
         if let Some(c) = ev.ctx.connectors.iter_mut().find(|c| c.reference == r) {

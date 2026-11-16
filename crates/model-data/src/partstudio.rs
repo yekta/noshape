@@ -179,13 +179,14 @@ impl Feature {
 /// edge though a stub bounding no region ends at their joint ([`PartStudio::legacy_stub_joints`]); 15, a tilted planar
 /// face's frame from its normal's largest component ([`PartStudio::legacy_tilted_face_frames`]); 16, a part pattern's
 /// Add with a merge scope merges its seeds too ([`PartStudio::legacy_pattern_seeds`]); 17, a part pattern's Remove or
-/// Intersect uses its seeds up too ([`PartStudio::legacy_remove_seeds`]); 0, older studios.
+/// Intersect uses its seeds up too ([`PartStudio::legacy_remove_seeds`]); 18, a sketch on a face of a part a Transform
+/// moved in the face's frame moved with it ([`PartStudio::legacy_moved_face_frames`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(17)
+        ScopeRule(18)
     }
 }
 
@@ -442,6 +443,10 @@ pub struct PartStudio {
     /// Circular pattern 6, std subfeatureToolsTargets): the seeds stay parts, as later features found them.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_remove_seeds: bool,
+    /// Saved with a Transform before a sketch on a moved part's face took the face's frame moved with the part
+    /// (ScopeRule < 18: the frame from the face where it is now): sketches on such faces stay where they were.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_moved_face_frames: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -685,6 +690,9 @@ impl PartStudio {
         }
         if self.scope_rule.0 < 17 && self.features.iter().any(|f| matches!(f.type_id.as_str(), "linearPattern" | "circularPattern" | "curvePattern")) {
             self.legacy_remove_seeds = true;
+        }
+        if self.scope_rule.0 < 18 && self.features.iter().any(|f| f.type_id == "transform") {
+            self.legacy_moved_face_frames = true;
         }
         self.scope_rule = ScopeRule::default();
     }

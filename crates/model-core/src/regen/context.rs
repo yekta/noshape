@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::display::{BodyKind, PlaneFrame};
 use crate::naming::{GeoKey, Name, name_edges, name_vertices};
 use crate::reference::{BodyId, FeatureId, Reference, TopoName};
-use glam::DVec3;
+use glam::{DMat4, DVec3};
 use noshape_kernel::{Shape, ShapeType};
 use noshape_units::Quantity;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -691,6 +691,9 @@ pub struct Context {
     /// The studio's part patterns' Remove and Intersect leave the seeds as they are
     /// ([`crate::partstudio::PartStudio::legacy_remove_seeds`]).
     pub legacy_remove_seeds: bool,
+    /// The studio's sketches on a moved part's faces take the frame from the face where it is now
+    /// ([`crate::partstudio::PartStudio::legacy_moved_face_frames`]).
+    pub legacy_moved_face_frames: bool,
     pub bodies: Bodies,
     pub sketches: Vec<Arc<SketchResult>>,
     /// Sketches a Derived feature brought in from its source: (the Derived
@@ -764,6 +767,10 @@ pub struct Context {
     /// Derived source's): `renumber_default_names` leaves them as they are
     /// (live, qa5 NAME3).
     pub own_names: std::collections::BTreeSet<BodyId>,
+    /// The moves Transforms made of each part since it was built (a copy's: its source's, then its own): a sketch on
+    /// one of its faces is in the face's frame from before, moved with it, as Parasolid's surfaces keep theirs (live
+    /// c2-sm-hem-plus's Sketch 3 on a face Transform 1 turned).
+    pub placements: BTreeMap<BodyId, DMat4>,
 }
 
 /// A Decal's image on a face (std decalUtils.fs `DecalData`, the "decals"
@@ -883,6 +890,7 @@ impl Context {
             legacy_edge_directions,
             legacy_pattern_seeds,
             legacy_remove_seeds,
+            legacy_moved_face_frames,
             bodies: _,
             sketches,
             derived_sketches,
@@ -913,6 +921,7 @@ impl Context {
             fs_transient_next,
             sm_births,
             own_names,
+            placements,
         } = self;
         fn same_arcs<T>(a: &[Arc<T>], b: &[Arc<T>]) -> bool {
             a.len() == b.len() && a.iter().zip(b).all(|(x, y)| Arc::ptr_eq(x, y))
@@ -926,6 +935,7 @@ impl Context {
             && *legacy_edge_directions == o.legacy_edge_directions
             && *legacy_pattern_seeds == o.legacy_pattern_seeds
             && *legacy_remove_seeds == o.legacy_remove_seeds
+            && *legacy_moved_face_frames == o.legacy_moved_face_frames
             && same_arcs(sketches, &o.sketches)
             && *derived_sketches == o.derived_sketches
             && *sketch_copies == o.sketch_copies
@@ -955,6 +965,7 @@ impl Context {
             && *fs_transient_next == o.fs_transient_next
             && *sm_births == o.sm_births
             && *own_names == o.own_names
+            && *placements == o.placements
     }
 
     pub fn body(&self, id: &BodyId) -> Option<&Arc<Body>> {

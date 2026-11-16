@@ -695,11 +695,19 @@ impl<'a> EvalCtx<'a> {
                 }
                 let (bi, fi) = *self.resolve_faces(std::slice::from_ref(r)).first()?;
                 let pl = self.face_shape(bi, fi).ok()?.face_plane().ok()??;
-                // Sketch origin on a face: world origin projected onto the face plane.
+                // Sketch origin on a face: world origin projected onto the face plane; on a part a Transform moved,
+                // the frame of the face where it was, moved with it (live c2-sm-hem-plus's Sketch 3).
                 let n = pl.unit_normal();
-                let x = self.ctx.planar_face_x(&pl);
-                let origin = n * pl.origin.dot(n);
-                Some(PlaneFrame { origin, x, y: n.cross(x), normal: n })
+                let moved = (!self.ctx.legacy_moved_face_frames).then(|| self.ctx.placements.get(&self.ctx.bodies[bi].id)).flatten();
+                let Some(m) = moved else {
+                    let x = self.ctx.planar_face_x(&pl);
+                    return Some(PlaneFrame { origin: n * pl.origin.dot(n), x, y: n.cross(x), normal: n });
+                };
+                let back = m.inverse();
+                let (o, n0) = (back.transform_point3(pl.origin), back.transform_vector3(n).normalize_or_zero());
+                let x0 = self.ctx.planar_face_x(&k::Plane::new(o, n0, back.transform_vector3(pl.unit_x())));
+                let x = m.transform_vector3(x0).normalize_or_zero();
+                Some(PlaneFrame { origin: m.transform_point3(n0 * o.dot(n0)), x, y: n.cross(x), normal: n })
             }
             Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => self.ctx.sketch(*sketch).map(|s| s.frame),
             Reference::MateConnector { .. } | Reference::Implicit { .. } => {
