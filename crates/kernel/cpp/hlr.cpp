@@ -588,16 +588,23 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
     std::atomic<bool> spent{false};
     if (bodies.size() >= kChunkedBodies && exact_chunked(em, bodies, proj, ax, spent))
       return out;
-    if (!spent)
+    // OCCT's Update swallows a failure loading the shape (HLRBRep_InternalAlgo: the shape's data left empty), seen
+    // at random in one of a sheet's views computed at once (c2-rings-loft's drawing lost a whole view): a shape with
+    // edges that loads none is loaded again, then hidden on its triangulation, never drawn empty.
+    const bool has_edges = srcEdges.Extent() > 0;
+    for (int attempt = 0; attempt < 2 && !spent; ++attempt)
     {
       ScopedWork                work(exact_work());
       occ::handle<HLRBRep_Algo> algo = new HLRBRep_Algo();
+      bool                      loaded = true;
       try
       {
         algo->Add(s.shape);
         algo->Projector(proj);
         algo->Update();
-        algo->Hide();
+        loaded = !has_edges || (!algo->DataStructure().IsNull() && algo->DataStructure()->NbEdges() > 0);
+        if (loaded)
+          algo->Hide();
       }
       catch (const Standard_Failure&)
       {
@@ -605,18 +612,19 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
           throw;
       }
       trace_work(work);
-      if (!work.w.hit)
-      {
-        occ::handle<HLRBRep_Data> DS = algo->DataStructure();
-        if (DS.IsNull())
-          return out;
-        DS->Projector().Scaled(true);
-        for (bool visible : {true, false})
-          for (int typ : {5, 2, 3, 4})
-            exact_pass(em, DS, typ, visible);
-        DS->Projector().Scaled(false);
+      if (work.w.hit)
+        break;
+      if (!loaded)
+        continue;
+      occ::handle<HLRBRep_Data> DS = algo->DataStructure();
+      if (DS.IsNull())
         return out;
-      }
+      DS->Projector().Scaled(true);
+      for (bool visible : {true, false})
+        for (int typ : {5, 2, 3, 4})
+          exact_pass(em, DS, typ, visible);
+      DS->Projector().Scaled(false);
+      return out;
     }
   }
 
