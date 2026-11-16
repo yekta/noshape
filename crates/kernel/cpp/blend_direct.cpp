@@ -5,6 +5,7 @@
 #include <OSD_Parallel.hxx>
 
 #include <chrono>
+#include <exception>
 #include <optional>
 #include <set>
 
@@ -904,42 +905,83 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
     if (dbg && !internal.IsEmpty())
       std::fprintf(stderr, "blend direct: %d faces where tools meet\n", internal.Extent());
   }
-  // (One projector and one classifier per part face, made when first needed.)
+  // Each tool face's part faces: on the same surface, or (a free-form side) lying on one, how far off. The tools in
+  // parallel, each with its own projectors and classifiers (c2-hunting-knife's Fillet 5: 6 of its 15 ms one tool after
+  // another); read below in the same order.
+  struct Lies
+  {
+    int    j;
+    bool   approx;
+    double dev;
+  };
+  std::vector<std::vector<std::vector<Lies>>> lies(tools.size());
+  std::vector<std::exception_ptr>             lies_failed(tools.size());
+  OSD_Parallel::For(0, (int)tools.size(), [&](int ti) {
+    const size_t i = (size_t)ti;
+    try
+    {
+      std::vector<std::unique_ptr<GeomAPI_ProjectPointOnSurf>> pj(pfaces.Extent() + 1);
+      std::vector<std::unique_ptr<BRepTopAdaptor_FClass2d>>    cl(pfaces.Extent() + 1);
+      for (TopExp_Explorer x(tools[i], TopAbs_FACE); x.More(); x.Next())
+      {
+        std::vector<Lies>& out = lies[i].emplace_back();
+        const TopoDS_Face  t   = TopoDS::Face(x.Current());
+        if (internal.Contains(t))
+          continue;
+        std::optional<std::vector<std::pair<gp_Pnt, gp_Vec>>> samples;
+        Bnd_Box fb;
+        BRepBndLib::Add(t, fb);
+        fb.Enlarge(5e-3 * size);
+        for (int j = 1; j <= pfaces.Extent(); ++j)
+        {
+          // (Only faces its box reaches: the generic same-surface test projects points, ~ms a pair.)
+          if (fb.IsOut(pboxes[j]))
+            continue;
+          if (same_surface(t, TopoDS::Face(pfaces(j)), 10 * tol))
+          {
+            out.push_back({j, false, 0});
+            continue;
+          }
+          if (!samples)
+            samples = lies_on_samples(t);
+          double dev = 0;
+          if (lies_on(*samples, TopoDS::Face(pfaces(j)), pboxes[j], 1e-4 * size, dev, pj[j], cl[j]))
+            out.push_back({j, true, dev});
+        }
+      }
+    }
+    catch (...)
+    {
+      lies_failed[i] = std::current_exception();
+    }
+  });
+  // (One projector per part face, made when first needed.)
   std::vector<std::unique_ptr<GeomAPI_ProjectPointOnSurf>> projectors(pfaces.Extent() + 1);
-  std::vector<std::unique_ptr<BRepTopAdaptor_FClass2d>>    classifiers(pfaces.Extent() + 1);
   for (size_t i = 0; i < tools.size(); ++i)
   {
+    // (A tool's failure where its turn came one tool after another.)
+    if (lies_failed[i])
+      std::rethrow_exception(lies_failed[i]);
     ShapeIMap strips;
+    size_t    fi = 0;
     for (TopExp_Explorer x(tools[i], TopAbs_FACE); x.More(); x.Next())
     {
       const TopoDS_Face t = TopoDS::Face(x.Current());
+      const std::vector<Lies>& found = lies[i][fi++];
       if (internal.Contains(t))
         continue;
-      bool              on = false;
-      std::optional<std::vector<std::pair<gp_Pnt, gp_Vec>>> samples;
-      Bnd_Box           fb;
-      BRepBndLib::Add(t, fb);
-      fb.Enlarge(5e-3 * size);
-      for (int j = 1; j <= pfaces.Extent(); ++j)
+      bool on = false;
+      for (const Lies& l : found)
       {
-        double dev = 0;
-        // (Only faces its box reaches: the generic same-surface test projects points, ~ms a pair.)
-        bool   here = !fb.IsOut(pboxes[j]) && same_surface(t, TopoDS::Face(pfaces(j)), 10 * tol);
-        if (!here && !fb.IsOut(pboxes[j]) && !samples)
-          samples = lies_on_samples(t);
-        if (!here && !fb.IsOut(pboxes[j]) && lies_on(*samples, TopoDS::Face(pfaces(j)), pboxes[j], 1e-4 * size, dev, projectors[j], classifiers[j]))
+        if (l.approx)
         {
-          here = true;
-          approx.emplace_back(t, j, dev);
+          approx.emplace_back(t, l.j, l.dev);
           if (dbg)
-            std::fprintf(stderr, "blend direct: tool %zu's side lies on part face %d within %.2e mm\n", i, j, dev * 1e3);
+            std::fprintf(stderr, "blend direct: tool %zu's side lies on part face %d within %.2e mm\n", i, l.j, l.dev * 1e3);
         }
-        if (here)
-        {
-          on = true;
-          if (std::find(coincident[i].begin(), coincident[i].end(), j) == coincident[i].end())
-            coincident[i].push_back(j);
-        }
+        on = true;
+        if (std::find(coincident[i].begin(), coincident[i].end(), l.j) == coincident[i].end())
+          coincident[i].push_back(l.j);
       }
       if (on)
         strips.Add(t);

@@ -704,18 +704,32 @@ pub fn partial_point(shape: &Shape, edges: &[usize], fraction: f64) -> Option<(D
 
 /// Blend `edges` of body `bi` with `spec` (see the module docs).
 pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec) -> FResult<()> {
-    sections(ev, bi, edges, spec, false)
+    sections(ev, bi, edges, spec, false, None)
+}
+
+/// A round's rolling-ball tools and contact conics ([`rolling_ball_blend`]'s), made ahead (while OCCT tries the round).
+pub struct BallTools(FResult<(Vec<Shape>, Vec<k::Conic>)>);
+
+/// [`rolling_ball_blend`]'s tools for `edges` of `shape` at radius `r`; given up once `stop` is set.
+pub fn rolling_ball_tools(shape: &Shape, edges: &[usize], r: f64, stop: &std::sync::atomic::AtomicBool) -> BallTools {
+    BallTools((|| {
+        let ef = shape.edge_faces()?;
+        let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+        let chain = chain_ordered(shape, edges, true)?;
+        ball_tools(shape, &chain, &ef, &shape.faces(), r, scale, Some(stop))
+    })())
 }
 
 /// A round of radius `r` whose sections on curved faces are exact rolling balls, one face per edge, running on past
 /// the chains' free ends until off the part (live c2-hunting-knife's Fillet 3: the tip's rolling-ball faces where
 /// OCCT's pinch, the corners' single faces trimmed by the side planes where OCCT's split in two).
-pub fn rolling_ball_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) -> FResult<()> {
+/// (`made`: its tools from [`rolling_ball_tools`] on the body as it is.)
+pub fn rolling_ball_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64, made: Option<BallTools>) -> FResult<()> {
     let spec = BlendSpec { section: Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: false, cliff: false, sides: None, overflow: false, reference: None };
-    sections(ev, bi, edges, &spec, true)
+    sections(ev, bi, edges, &spec, true, made)
 }
 
-fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball: bool) -> FResult<()> {
+fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball: bool, made: Option<BallTools>) -> FResult<()> {
     use super::sheetmetal_util::{body_named, bool_named};
     let body = ev.ctx.bodies[bi].clone();
     let shape = &body.shape;
@@ -887,7 +901,10 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     let mut refaced: Vec<(usize, Shape)> = Vec::new();
     let mut conics = Vec::new();
     if ball {
-        let (tools, contacts) = ball_tools(shape, &chain, &ef, &faces, spec.r1, scale)?;
+        let (tools, contacts) = match made {
+            Some(BallTools(made)) => made?,
+            None => ball_tools(shape, &chain, &ef, &faces, spec.r1, scale, None)?,
+        };
         conics = contacts;
         // Which of each tool's faces lie on its supports (generated) and which are its blend: the tools in parallel
         // (a point on each face and a test against both supports: 6.4 of c2-hunting-knife's Fillet 5's 36 ms in turn).
@@ -1529,7 +1546,14 @@ fn tangency_ball(shape: &Shape, ef: &[Vec<u32>], [a, b]: [&BallEdge; 2], q: DVec
 /// other edges a loft of exact ball sections (more where the edge turns). Two edges meeting share one section there
 /// (the straight edge's), so their tools meet exactly; at a free end the ball rolls on along its supports until it is
 /// off the part.
-fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shape], r: f64, scale: f64) -> FResult<(Vec<Shape>, Vec<k::Conic>)> {
+/// (`stop`: given up when set, between balls and before each loft: tools made ahead that turn out not to be needed.)
+fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shape], r: f64, scale: f64, stop: Option<&std::sync::atomic::AtomicBool>) -> FResult<(Vec<Shape>, Vec<k::Conic>)> {
+    let halt = || -> FResult<()> {
+        match stop.is_some_and(|s| s.load(std::sync::atomic::Ordering::Relaxed)) {
+            true => Err(fail("not needed")),
+            false => Ok(()),
+        }
+    };
     let near = |a: DVec3, b: DVec3| (a - b).length() < scale * 1e-9;
     let edges = chain
         .iter()
@@ -1566,6 +1590,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
         Loft(Vec<Shape>, bool, Vec<DVec3>, usize, f64),
     }
     let build = |c: &ChainEdge, e: &BallEdge| -> FResult<Ball> {
+        halt()?;
         let ends = [junction(c.start)?, junction(c.end)?];
         let outs = [-tangent_dir(c, true)?, tangent_dir(c, false)?];
         let rolls_on = |end: usize| ends[end].is_none() && !tangent_continues(shape, if end == 0 { c.start } else { c.end }, outs[end], c.index);
@@ -1691,6 +1716,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
         let (mut secs, mut starts, mut centres): (Vec<Shape>, Vec<DVec3>, Vec<DVec3>) = (Vec::new(), Vec::new(), Vec::new());
         let mut guess = at(0.0)?.0 + e.inward * r;
         for k in 0..if closed { n } else { n + 1 } {
+            halt()?;
             let f = if closed { (k as f64 / n as f64 + 0.25).fract() } else { k as f64 / n as f64 };
             let (p, t) = at(f)?;
             let (centre, touch) = rolling_ball(p, t, &e.sup, r, guess)?;
@@ -1768,6 +1794,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
         .map(|b| match b {
             Ball::Tool(t) => Ok(t),
             Ball::Loft(secs, closed, starts, n, turn) => k::with_kernel_legacy(legacy.clone(), || {
+                halt()?;
                 let tool = k::loft_tool(&secs, closed, &starts)?;
                 if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
                     eprintln!("ball loft: {} sections ({n} on the edge, turning {turn:.3}): valid {} volume {:?}", secs.len(), tool.shape.is_valid(), tool.shape.volume());

@@ -541,7 +541,25 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         let lines_overflow = !width && ev.bool("allowEdgeOverflow") && all_lines(&shapes);
         // (A round OCCT leaves in several faces is built as rolling balls below: OCCT's as built, not finished.)
         let occt = || if width { k::fillet_checked(&body.shape, &shapes, &radii) } else { k::with_blend_split_raw(|| k::fillet_checked(&body.shape, &shapes, &radii)) };
-        let first = if lines_overflow { k::without_blend_retries(occt) } else { occt() };
+        // (A round OCCT may leave in several faces: its rolling balls' tools made meanwhile on another thread, kept only
+        // if it does; c2-hunting-knife's Fillet 5 waited 5 ms on OCCT's try first.)
+        let ahead = !width && !lines_overflow && edges.len() > 1;
+        let (first, mut made) = if ahead {
+            let (shape, chain, legacy) = (&body.shape, &edges, k::kernel_legacy());
+            let stop = std::sync::atomic::AtomicBool::new(false);
+            std::thread::scope(|s| {
+                let stop = &stop;
+                let balls = s.spawn(move || k::with_kernel_legacy(legacy, || super::blend_section::rolling_ball_tools(shape, chain, radius, stop)));
+                let first = occt();
+                // (Not needed: given up at its next ball or loft.)
+                if !first.as_ref().is_ok_and(split_blends) {
+                    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+                }
+                (first, balls.join().ok())
+            })
+        } else {
+            (if lines_overflow { k::without_blend_retries(occt) } else { occt() }, None)
+        };
         let first = match first {
             Err(_) if lines_overflow && !propagate && edges.len() == 1 && super::blend_section::section_blend(ev, bi, &edges, &unpropagated(radius)).is_ok() => continue,
             Err(_) if lines_overflow && super::blend_section::section_blend(ev, bi, &edges, &super::blend_section::BlendSpec { overflow: true, ..unpropagated(radius) }).is_ok() => continue,
@@ -562,7 +580,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         // OCCT's round of an edge in several faces (a tip's pinched at its apex, a corner's split where it runs past the
         // chain's end): rolling balls, one face per edge as live's (c2-hunting-knife's Fillet 3).
         let res = if !width && split_blends(&res) {
-            match super::blend_section::rolling_ball_blend(ev, bi, &edges, radius) {
+            match super::blend_section::rolling_ball_blend(ev, bi, &edges, radius, made.take()) {
                 Ok(()) => continue,
                 Err(e) => {
                     if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
