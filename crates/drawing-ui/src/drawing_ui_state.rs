@@ -153,7 +153,10 @@ impl DrawingEditor {
         let Some(sheet) = self.drawing.sheets.get(self.sheet) else { return Vec::new() };
         let text = |id: u64| -> String {
             let Some(b) = &self.built else { return String::new() };
-            let parts: Vec<&str> = b.geometry.texts.iter().filter(|t| matches!(b.picks.get(t.pick as usize), Some(PickTarget::Annotation(x)) if *x == id)).map(|t| t.text.as_str()).collect();
+            // (A dimension's dual value, "[40.00]", isn't in live's reading: live2 drw-dprops-dual.)
+            let dim = sheet.annotations.iter().any(|a| a.id == id && a.kind.is_dimension());
+            let dual = |t: &str| dim && t.starts_with('[') && t.ends_with(']');
+            let parts: Vec<&str> = b.geometry.texts.iter().filter(|t| matches!(b.picks.get(t.pick as usize), Some(PickTarget::Annotation(x)) if *x == id)).map(|t| t.text.as_str()).filter(|t| !dual(t.trim())).collect();
             parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ")
         };
         // The ordinate group being placed is listed once the tool ends (live drw-ordinate-dimension); one being added

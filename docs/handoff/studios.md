@@ -9,30 +9,30 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-16 01:27 UTC.
+Updated 2026-11-16 03:13 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-- fdba14d6 (queued 01:27): the Projected tool's parent after Insert view reads VIEW for the 11-15 recorder, EDGE
-  for older ones (ours marks `new` / `old`; run.py keeps the one for the take's recorder): all 8 Insert view takes
-  match.
+Not queued yet, each its own land:
+1. 5bf47b679 TITLE split (lead 01:20): TITLE is three fields "Title", "Title 2", "Title 3" (`TITLE_KEYS`), a line
+   each (cell band, pick from its text up to the line above); drawings (`Drawing::upgrade_title_lines` in
+   `Document::from_blobs` and merge) and saved templates (dwt apply) split an old three-line Title on load; the
+   field's Move to lists Title block greyed. e2e drawing_title_block_fields (rewritten), drawing_title_lines_from_an_old_file.
+   Waits for the full drawing run on vibe5 (~/tmp/studios/drw288, behind bool's gates and dx in ~/bin/slot).
+2. Uncommitted, Drawing properties takes (live2 drw-dprops-*, 6): run.py ignores ours' list for a drawing panel's
+   native select opened by a click; the dual precision default is 0.12 for metric dual units, 0.123 for inches
+   (`DualDims::default_precision`, panel and format); a dimension's "[dual]" text isn't in ours' ui text (live's
+   reader reads the primary only); the panel's dropdowns register `mark_first` (live2's "0.123" is Precision's).
+   5 of 6 matched before the last fix; rerun on vibe6 (~/tmp/studios/dp2) pending.
 
-Landed 01:21 as 65d386f7: View orientation ▸ on a projected view, the sheet's menu 35 px above the pointer with row 2
-hovered where it fits, TITLE's per-line pick areas, a title field joining a selection's menu, the `excluded`
-ui-parity marker. Full drawing run before its last commit: 284 of 288. A table's Bring to front / Send to back
-already grey only with no other note, dimension or table on the sheet (live2 REQUESTS 11-14 00:48).
+Areas (11-16 01:30-02:30, vibe5): Feature Studio 116/116 takes, versions/history/release 154/154, documents/tabs/
+start/prefs 285/285 (SCORE.md's 97.8 / 98.2 / 98.4 are from 11-11..13).
 
 ## Waiting on others
-- live2: panel takes for Drawing properties, Hole table, Title block (asked 11-15 23:15).
-- live2 (asked 01:15): select / double-click / Edit note… on TITLE's lines: if each line opens its own editor, split
-  TITLE into one field per line (lead 01:20: migrate old files and templates on load, ops + editor follow, e2e
-  opening an old file, land separately); else keep one field with per-line pick areas.
-- TITLE's lines as separate fields in the data (title1/2/3 each its own field: its own highlight band, Edit note on
-  that line): ours keeps one "Title" field with three lines; only the pick areas are per line. Next if the lead
-  wants the rest of "copy live's structure".
+- live2: Hole table and Title block panel takes (lane 1, after asm's mate job).
 
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;

@@ -2343,6 +2343,12 @@ impl DualDims {
     pub fn is_default(&self) -> bool {
         *self == Self::default()
     }
+
+    /// Precision and tolerance precision when unset: 0.12 for millimetres and other metric units, 0.123 for inches
+    /// (live2 drawing-properties-panel-dump: an inch drawing's millimetre dual at 0.12; drw-dprops-dual "[40.00]").
+    pub fn default_precision(units: DimUnits) -> u8 {
+        if units.imperial() { 3 } else { 2 }
+    }
     /// The dual units of a drawing whose primary units are metric or not.
     pub fn units_for(&self, metric: bool) -> DimUnits {
         self.units.unwrap_or(if metric { DimUnits::Inch } else { DimUnits::Millimeter })

@@ -313,7 +313,7 @@ fn dual_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool) -> Opt
     }
     let du = dual_units(drawing, f);
     let tol = match &f.tolerance {
-        Tolerance::Symmetric { value: t } => format!("±{:.*}", p.dual.tolerance_precision.unwrap_or(3) as usize, t.abs() / du.meters()),
+        Tolerance::Symmetric { value: t } => format!("±{:.*}", p.dual.tolerance_precision.unwrap_or_else(|| super::DualDims::default_precision(du)) as usize, t.abs() / du.meters()),
         _ => String::new(),
     };
     Some(format!("[{}{tol}{}]", dual_value(drawing, f, value), dual_unit(drawing, f, du)))
@@ -325,9 +325,9 @@ pub fn dual_units(drawing: &Drawing, f: &DimFormat) -> super::DimUnits {
     f.dual_fmt.units.unwrap_or_else(|| drawing.props.dual.units_for(!length_units(drawing, f).imperial()))
 }
 
-/// The dual precision of `f` (unset everywhere: live's 0.123).
+/// The dual precision of `f` (unset everywhere: its units' default, [`super::DualDims::default_precision`]).
 pub fn dual_precision(drawing: &Drawing, f: &DimFormat) -> u8 {
-    f.dual_fmt.precision.or(drawing.props.dual.precision).unwrap_or(3)
+    f.dual_fmt.precision.or(drawing.props.dual.precision).unwrap_or_else(|| super::DualDims::default_precision(dual_units(drawing, f)))
 }
 
 /// Whether `f`'s dual shows its unit (the palette's eye, else Show dual unit).

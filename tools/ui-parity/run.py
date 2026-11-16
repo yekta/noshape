@@ -1191,6 +1191,11 @@ def compare(live, ours, whole_document=True):
         # A page's native <select> holding the keyboard: its open list is the OS's popup, which live's recorder can't read.
         if isinstance(a.get("focus"), dict) and a["focus"].get("tag") == "select" and a.get("list") is None:
             b["list"] = None
+        # Likewise a drawing panel's native <select> opened by a click (Drawing properties: live's focus stays on the
+        # drawing's iframe, live2 drw-dprops-*).
+        on = ((step or {}).get("on") or {}) if isinstance(step, dict) else {}
+        if isinstance(step, dict) and step.get("do") == "click" and "dropdown" in on and "pick" not in on and a.get("list") is None and (a.get("dialog") or {}).get("kind") == "drawing-panel":
+            b["list"] = None
         # A feature-style panel whose header live's recorder doesn't read (Insert Variable Studio: `title` null, so
         # its `titleState` and `ok` are defaults).
         if isinstance(a.get("dialog"), dict) and isinstance(b.get("dialog"), dict) and a["dialog"].get("kind") == "feature" and a["dialog"].get("title") is None:
