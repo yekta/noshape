@@ -239,3 +239,20 @@ fn tangent_edges_by_geometry_are_smooth() {
         assert!(smooth >= 2, "exact={exact}: {}", dump(&edges));
     }
 }
+
+/// A short arc projects to 8 points at least (it was 3 for a 10° arc), so the DXF writer fits it back to the ARC live
+/// writes, not a SPLINE (exchange suite, c2-rings-loft's drawing).
+#[test]
+fn a_short_arc_projects_to_enough_points_to_fit() {
+    let a = 10f64.to_radians();
+    let sector = [
+        Segment2d::Line { a: DVec2::ZERO, b: DVec2::new(50.0, 0.0) },
+        Segment2d::Arc { center: DVec2::ZERO, radius: 50.0, start_angle: 0.0, end_angle: a },
+        Segment2d::Line { a: DVec2::new(50.0 * a.cos(), 50.0 * a.sin()), b: DVec2::ZERO },
+    ];
+    let face = make_face_2d(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), &sector, &[]).unwrap();
+    let solid = extrude(&face, DVec3::new(0.0, 0.0, 5.0)).unwrap().shape;
+    let edges = project_hlr(&solid, DVec3::new(0.0, 0.0, -1.0), DVec3::Y, true).unwrap();
+    let arcs: Vec<usize> = edges.iter().filter(|e| e.visibility == Visibility::Visible && e.polyline.len() > 2).map(|e| e.polyline.len()).collect();
+    assert!(!arcs.is_empty() && arcs.iter().all(|n| *n >= 8), "{arcs:?}: {}", dump(&edges));
+}

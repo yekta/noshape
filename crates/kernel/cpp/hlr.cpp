@@ -98,7 +98,10 @@ struct Emitter
       }
       else
       {
-        GCPnts_TangentialDeflection d(c, 0.1, defl);
+        // A projected circle or ellipse has 8 points at least, however short: enough for the DXF writer to fit it back
+        // to an ARC / ELLIPSE as live writes it (a short piece, split where it goes hidden, was 3 points: a SPLINE).
+        const bool                  conic = c.GetType() == GeomAbs_Circle || c.GetType() == GeomAbs_Ellipse;
+        GCPnts_TangentialDeflection d(c, 0.1, defl, conic ? 8 : 2);
         for (int k = 1; k <= d.NbPoints(); ++k)
         {
           gp_Pnt p = d.Value(k);
