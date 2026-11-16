@@ -29,6 +29,8 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 
 - 11-16 STL exports: compared by area, volume and chordal deviation within live's tolerances, not by exact triangle
   count. OCCT BRepMesh's minimum segments per arc / rows per cone (radijator +144/+150) are parked (P3), no OCCT patch.
+  A row passes when every live vertex is within live's chord tolerance of ours and the mean deviation |ΔV|/area is
+  ≤ 0.01 mm (a tenth of Medium's 0.12 mm chord), watertight.
 
 ## Geometry and speed
 - 11-07 Every crates/brep or Boolean change passes bool's gate: every corpus + parity56 at 0 OCCT differences.
