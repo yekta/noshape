@@ -1990,3 +1990,26 @@ fn step_and_iges_write_offset_surfaces_as_bsurfaces() {
     assert!((v2 - v0).abs() < 1e-5 * v0, "IGES: {v2} vs {v0}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A face on a periodic extrusion across its start (half an elliptic prism, the ellipse's start in the face's middle)
+/// is written on a B-surface cut to the part it covers: converted closed but not periodic, its p-curves ran past the
+/// surface's seam and readers trimmed it wrong (c2-rings-loft's top band: Part 1 read back at 659 mm³ for 440.8).
+#[test]
+fn a_face_across_a_periodic_extrusions_start_reads_back() {
+    use glam::DVec2;
+    let dir = std::env::temp_dir().join(format!("noshape-step-seam-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let ellipse = make_face_2d(&Plane::from_normal(DVec3::ZERO, DVec3::Z), &[Segment2d::Ellipse { center: DVec2::ZERO, major_radius: 0.02, minor_radius: 0.01, rotation: 0.0 }], &[]).unwrap();
+    let prism = extrude(&ellipse, DVec3::new(0.0, 0.0, 0.01)).unwrap().shape;
+    let half = cut(&prism, &make_box_corners(DVec3::new(-0.05, -0.05, -0.01), DVec3::new(0.0, 0.05, 0.02)).unwrap()).unwrap().shape;
+    let v0 = half.volume().unwrap();
+    let step = dir.join("half.step");
+    write_step(&step, &[ExportShape { shape: half.clone(), name: None, color: None }], LengthUnit::Meter).unwrap();
+    let v1: f64 = read_step(&step, LengthUnit::Meter).unwrap().iter().map(|s| s.shape.volume().unwrap()).sum();
+    assert!((v1 - v0).abs() < 1e-5 * v0, "STEP: {v1} vs {v0}");
+    let iges = dir.join("half.igs");
+    write_iges(&iges, std::slice::from_ref(&half), LengthUnit::Meter).unwrap();
+    let v2 = read_iges(&iges, LengthUnit::Meter).unwrap().volume().unwrap();
+    assert!((v2 - v0).abs() < 1e-4 * v0, "IGES: {v2} vs {v0}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -7,6 +7,7 @@
 #include <BRepBuilderAPI_Transform.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
+#include <Geom2d_Curve.hxx>
 #include <Geom2dAPI_Interpolate.hxx>
 #include <ElSLib.hxx>
 #include <BRepAdaptor_Curve.hxx>
@@ -1147,7 +1148,55 @@ TopoDS_Shape step_bsurfaces(const TopoDS_Shape& in)
       g = t->BasisSurface();
     any = !occ::down_cast<Geom_OffsetSurface>(g).IsNull() || !occ::down_cast<Geom_SurfaceOfLinearExtrusion>(g).IsNull();
   }
-  return any ? ShapeCustom::ConvertToBSpline(in, true, false, true, false) : in;
+  if (!any)
+    return in;
+  const TopoDS_Shape out = ShapeCustom::ConvertToBSpline(in, true, false, true, false);
+  // A face that runs past its new B-surface's seam (a periodic extrusion's, converted closed but not periodic: the
+  // face's p-curves at u 6.05..6.52 on a 0..2π surface, c2-rings-loft's top band) gets the surface cut to the part it
+  // covers, in the same parameters (made periodic first), so no reader trims it across the seam.
+  BRep_Builder B;
+  for (TopExp_Explorer ef(out, TopAbs_FACE); ef.More(); ef.Next())
+  {
+    const TopoDS_Face&             F = TopoDS::Face(ef.Current());
+    TopLoc_Location                loc;
+    occ::handle<Geom_BSplineSurface> b = occ::down_cast<Geom_BSplineSurface>(BRep_Tool::Surface(F, loc));
+    if (b.IsNull())
+      continue;
+    double u0, u1, v0, v1, su0, su1, sv0, sv1;
+    BRepTools::UVBounds(F, u0, u1, v0, v1);
+    b->Bounds(su0, su1, sv0, sv1);
+    const double eps = 1e-9 * (1 + std::max(su1 - su0, sv1 - sv0));
+    const bool   pu = u0 < su0 - eps || u1 > su1 + eps, pv = v0 < sv0 - eps || v1 > sv1 + eps;
+    bool seam = false;
+    for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More() && !seam; ee.Next())
+      seam = BRep_Tool::IsClosed(TopoDS::Edge(ee.Current()), F);
+    if (seam || (!pu && !pv) || (pu && !b->IsUClosed()) || (pv && !b->IsVClosed()))
+      continue;
+    try
+    {
+      occ::handle<Geom_BSplineSurface> c = occ::down_cast<Geom_BSplineSurface>(b->Copy());
+      if (pu && !c->IsUPeriodic())
+        c->SetUPeriodic();
+      if (pv && !c->IsVPeriodic())
+        c->SetVPeriodic();
+      c->Segment(u0, u1, v0, v1);
+      std::vector<std::pair<TopoDS_Edge, occ::handle<Geom2d_Curve>>> pcurves;
+      for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More(); ee.Next())
+      {
+        double f, l;
+        const TopoDS_Edge& E = TopoDS::Edge(ee.Current());
+        pcurves.emplace_back(E, BRep_Tool::CurveOnSurface(E, F, f, l));
+      }
+      B.UpdateFace(F, c, loc, BRep_Tool::Tolerance(F));
+      for (const auto& [E, pc] : pcurves)
+        if (!pc.IsNull())
+          B.UpdateEdge(E, pc, F, BRep_Tool::Tolerance(E));
+    }
+    catch (const Standard_Failure&)
+    {
+    }
+  }
+  return out;
 }
 
 // An edge using a small part of a long B-spline writes only that part. Healing an
