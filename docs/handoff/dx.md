@@ -23,28 +23,32 @@ Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc
   STL until ~18:45; timer 18:50: hex-bookcase first (+ JT / RHINO / PVZ, live-export-results.json: what live writes
   for a mesh part), then the other 5, then all 10 live.stl + live-self STL.
   Landed 11-16 pm: 2ddc1b649 drawing DXF layout + 2 viewports per sheet, $TILEMODE 0; f184f26ae tangent edges by
-  geometry (hlr.cpp seam_edges value 2, normals within 1e-4 rad); 7c4ea1412 conics >= 8 points (fit to ARC/ELLIPSE).
-  Queued: 9b990bab auto centermarks on full circles only (cylinder_ends TAU); e6953ff5 STEP/IGES offsets + linear
-  extrusions -> B-surfaces (io.cpp step_bsurfaces).
+  geometry (hlr.cpp seam_edges value 2, normals within 1e-4 rad); 7c4ea1412 conics >= 8 points (fit to ARC/ELLIPSE);
+  4058e93e (13:22): revert of 4e46ad1a6 (full-circle centermarks broke e2e::a_radial_hole_gets_its_centermark: the
+  queue ran drawing tests only; main RED 13:08 until the watcher's b752d3ad2 run), centermarks not where only quarter
+  rounds share an axis (views.rs centermarked()), STEP / IGES offsets + extrusions -> B-surfaces and a face past its
+  closed B-surface's seam cut to its range (io.cpp step_bsurfaces: rings-loft Part 1 STEP 440.81, IGES 441.11, model
+  440.77). Before any drawing land: full ops e2e (memory drawing-changes-run-ops-e2e).
   vibe6 run (exch-1116, 08:50 binary): ours imports live's 58/74, live imports ours 46/48, ours reads ours 108/117,
   times at or under live's 48/48 (rings-loft STEP import 2.5 s, live 16.1).
   Open, ranked:
-  1. c2-rings-loft live.x_t refused by our reader. Branch WIP e9facf060 (closed intersection curve: vertex at the
-     closing end takes the curve's start; then it imports, edges / vertices = live) + 04a062cdb (blend tube periodic
-     round a periodic (ellipse) spine: faces 280 -> 273 = live, but edges 762 -> 916, area 1874 for 1193: the faces'
-     trimming on the periodic tube is next). Neither lands alone (a wrong part is worse than the refusal).
-  2. Our STEP / IGES of rings-loft Part 1: 2 closed "extruded" faces (B-splines now) still read back too big (with
-     p-curves too: -198.9 mm³; ACIS / x_t, which split closed faces first, are right). Next: split closed faces for
-     STEP / IGES as exchange_prepared does, or find what OCCT's STEP / IGES writer does with their seam.
-  3. Our x_t of cf-snap-hook reads back as 13 sheets in our reader (prepared shape valid, no free edges; pieces round
-     each hook tip: split B-surfaces of revolution with a pole, tori, a 2 mm disc). Live's verdict after 18:50 says
-     writer or reader.
-  4. Drawings: SPLINE where live has ARC / ELLIPSE (our model edges are B-splines where live's are exact conics);
-     sm-louver 126 bend lines still Visible not TANGENT (likely tangent edges on the silhouette); live's 2 empty
-     ANNOTATION_TEXT MTEXTs (artefact, skipped).
-  5. SAT: live's SAT of sm-louver splits two cylinders (40 faces in the file); asked live2 for live's own SAT import
-     (live-self "ACIS") at 18:50. Possible 1-shot exact-HLR nondeterminism: one rings-loft DXF export had 693 lines
-     (normally 936) under load.
+  1. c2-rings-loft live.x_t refused by our reader (clean refusal; keep it until a fix is right). Branch WIP:
+     e9facf060 (closed intersection curve: vertex at the closing end takes the curve's start: edges / vertices then
+     = live), 476fcd5e2 (per-face tube for a blend across its periodic (ellipse) spine's start: Extruded ring then
+     260 faces + four 5-face pieces, volume wrong). Earlier try (periodic tube, reverted): faces = live, edges 916.
+  2. Our x_t of cf-snap-hook: the body as our reader builds it has 36 free edges (9 per hook) before healing, which
+     then splits it into 13 sheets; prepared shape on the writer side is valid with no free edges. Live's import of
+     ours (after 18:50) says writer or reader.
+  3. Our SAT: cf-sheet-metal-model-plus's suite export (139 faces; the CLI's export of the same doc 121, reads back
+     fine) reads back as 0 parts with no error (import drops invalid bodies silently); motor-mount-jack 24/26/2 for
+     16/24/0; cf-hose-routing 22/44/24 for 12/12/0; cf-o-ring Part 3 read back as another ring (names?). A placed or
+     revolved torus alone round-trips fine.
+  4. Drawings: SPLINE where live has ARC / ELLIPSE (rings-loft ARC 30 / 89, ELLIPSE 15 / 62; our model edges are
+     B-splines where live's are conics; exact_edges covers plane / extrusion cuts only); sm-louver 117 of 243 bend
+     lines on TANGENT_LINES (drawing tangents on the silhouette as tangent: louver 173 but the spring 22 for 15:
+     rejected); live's 2 empty ANNOTATION_TEXT MTEXTs (artefact, skipped).
+  5. SAT of live: sm-louver's file splits two cylinders (40 faces); live2 asked for live-self "ACIS" at 18:50.
+     Possible exact-HLR nondeterminism: one rings-loft DXF export once had 693 lines (normally ~936).
 - P0 (lead 07:0x): c2-config-parts-screws hung regeneration (Split 3, FACE split by 6 projected sketch curves):
   bool's split_by_edges_on_faces (af0a1713d) ran GeomAPI_ExtremaCurveCurve (math_GlobOptMin) on each tool pair forever.
   Fix 979de111a (local): pairs other than lines / circles decide on ends (within tol: no(), as before) and polylines
