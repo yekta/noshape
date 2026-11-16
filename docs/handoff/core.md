@@ -30,9 +30,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   T1 kernel core::a_cylinder_face_across_its_seam_contains_its_points. A notch test across a rolled wall (/root/core-scratch/rolled-notch-test-wip.patch) still fails
   "Subtractive tool must cut all the way through ... rolled wall": std wants 2 cap faces per trimmed piece, ours has
   more (the caps split at the seam?).
-- **Pair (all four core-oc commits incl. 3ce19f704 below): vibe7 ~/agents/core-keep/sppair.sh -> spres (merge-base
-  d29b5ee81 files in core-keep/base, branch copies core-keep/branch; restarted 18:33 UTC, queued in vibe7's slot).
-  Land the four when it shows nothing worse.** (1357fddb1): opSplitFace keeps a split face's attributes on
+- **Pair (six core-oc commits: 1357fddb1, 11f1335b9, 8deb8156c, 3ce19f704, 3ace68b3f, bcaf5ffdb): vibe7
+  ~/agents/core-keep/sppair.sh -> spres (merge-base d29b5ee81 files in core-keep/base, branch copies core-keep/branch;
+  started 18:33 UTC, the last two synced in before its build). Land all six when it shows nothing worse (save the
+  probe patch first).** (1357fddb1): opSplitFace keeps a split face's attributes on
   every piece** (host ops.rs op_split_face; Parasolid's). std Bend's imprint split the wall and dropped its WALL
   attribute, so c2-sm-rocker-enclosure-sm's Extrude 1 read "Removal destroys sheet metal part" (eachSheetStillExists
   found no WALL face): 6 -> 8/14; 14 sheet metal docs otherwise unchanged. T1
@@ -58,7 +59,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
   apex_tangent_loft read the seam's pcurves through the REVERSED side face, UpdateEdge wrote them back swapped:
   "unorientable", cone fallback) + a B-spline face's apex is a shown vertex (common.cpp shown_topology, as cone apexes):
   c2-loft-paths-guides 4 -> 8/29 (Loft 1 3/2/1 as live). T1 features_a::a_loft_from_a_parts_face_to_a_point_tangent_to_its_plane.
-  Next there: Loft 2 ERROR (guided loft, "Could not create loft ...").
+- **Committed 3ace68b3f (in the pair): two profiles along a straight path square to both = the plain loft**
+  (features.cpp straight_path_square_to; Loft 2's path line lies past both profiles, path_sections gave up): Loft 2 =
+  live (7/13/9, 5230851 vs 5230790 mm³); 8 -> 16/29. T1 features_a::a_straight_path_square_to_two_profiles_past_them_lofts_them_plainly.
+  Three or more profiles on a straight path keep path_sections (unmeasured in live).
+- **Committed bcaf5ffdb (in the pair): a path loft merges smoothly meeting sides** (merge_tangent_sides now also when
+  `along`; live 1784's 3+-section rule): Loft 3 (two slots along an arc) 20 -> 17 faces, live 15/33/23. Left: two
+  Boolean slivers (15.6 and 0.16 mm², 0.012 mm thick) along profile 1's flat side at x=-50.8, y 68-92: the path loft's
+  surface there is a hair off Extrude 2's face (path_sections' cut sections are approximations). Next item there.
+  Mirror 1 times swing 0.3-1.7 s on loaded vibe5 runs; check on the Mac / in the pair before calling it.
+  T1 features_a::a_path_loft_of_two_slots_has_one_side_face.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: 4 profiles along a closed path; live closes it (4/4/0, 2080.8 mm³). WIP
   /root/core-scratch/loft-closed-path-wip.patch closes it round the path but comes out −11279 mm³: two profiles sit
