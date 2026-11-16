@@ -4389,7 +4389,7 @@ impl PartStudioView {
             let main = crate::ui::with_tool_tooltip(
                 SharedString::from(format!("skt-{face:?}")),
                 face.label(),
-                crate::ui::split_tool_button(SharedString::from(format!("sk-{face:?}")), face.icon(), active == face, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
+                crate::ui::sketch_split_tool_button(SharedString::from(format!("sk-{face:?}")), face.icon(), active == face, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
             );
             let main = crate::ui_script::wrap(main, || script_name("tool", face));
             let view = cx.entity();
@@ -4517,7 +4517,7 @@ impl PartStudioView {
         let main = crate::ui::with_tool_tooltip(
             SharedString::from(format!("skt-c-{key}")),
             face.label(),
-            crate::ui::split_tool_button(SharedString::from(format!("sk-c-{face:?}")), face.icon(), active == face, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
+            crate::ui::sketch_split_tool_button(SharedString::from(format!("sk-c-{face:?}")), face.icon(), active == face, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
         );
         let view = cx.entity();
         let caret = crate::ui::tool_caret(SharedString::from(format!("skm-c-{key}")), cx).dropdown_menu(move |mut menu, window, _| {

@@ -3743,7 +3743,7 @@ impl AssemblyView {
         let sep = crate::ui::tool_separator;
         // Tool search's "Highlight tool in toolbar": `#fcda7f`, border `#fab601`.
         let found = self.search_found_icon();
-        let lit = move |b: Button, icon: &str| b.when(found == Some(icon), |b| b.bg(rgb(0xfcda7f)).border_1().border_color(rgb(0xfab601)));
+        let lit = move |b: Button, icon: &str| b.when(found == Some(icon), crate::ui::search_highlight);
         // Tooltips: title (+ shortcut), then the description after a pause.
         // (A ui-parity target by its tooltip's name: `tool:Revolute mate`.)
         let rich = |id: &'static str, tip: &'static str, icon: &str, b: Button| {

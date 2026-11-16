@@ -188,21 +188,50 @@ impl Render for MenuAwareTip {
 
 /// Note: a custom variant paints only 20% of `color` at rest, so solid
 /// fills (the active tool) are set with `.bg()` on the button instead.
-fn tool_variant(cx: &App, active: bool, grouped: bool) -> ButtonCustomVariant {
+fn tool_variant(cx: &App, active: bool, _grouped: bool) -> ButtonCustomVariant {
+    tool_variant_hover(cx, active, ACTIVE_HOVER)
+}
+
+/// A running tool hovered (live toolbar-states addendum 11-16): its hover colour under a 10 % grey overlay, flat (no
+/// top shadow): #eaeaea → #dfdfdf; a sketch tool joined to its ⌄ (#d7d7d7) → #cecece.
+const ACTIVE_HOVER: u32 = 0xdfdfdf;
+const SKETCH_GROUP_ACTIVE_HOVER: u32 = 0xcecece;
+
+fn tool_variant_hover(cx: &App, active: bool, active_hover: u32) -> ButtonCustomVariant {
     let pal = p();
-    let hover = if active {
-        pal.tool_active
-    } else if grouped {
-        pal.tool_hover_group
-    } else {
-        pal.tool_hover
-    };
+    let hover: Rgba = if active { gpui_kit::rgb(active_hover) } else { pal.tool_hover };
     ButtonCustomVariant::new(cx)
         .color(gpui_kit::transparent_white())
         .foreground(pal.text.into())
         .hover(hover.into())
         .active(pal.tool_active.into())
+        .flat_hover(active)
         .shadow(false)
+}
+
+/// A split tool's dropdown arrow (live toolbar-states 11-16): hovered #d7d7d7; open #d7d7d7 with the pressed inset
+/// shadow.
+fn caret_variant(cx: &App) -> ButtonCustomVariant {
+    let pal = p();
+    ButtonCustomVariant::new(cx)
+        .color(gpui_kit::transparent_white())
+        .foreground(pal.text.into())
+        .hover(pal.tool_hover_group.into())
+        .active(pal.tool_hover_group.into())
+        .pressed_inset(true)
+        .shadow(false)
+}
+
+/// Onshape's pressed toolbar button (a running tool, an open dropdown arrow): `inset 0 1px 1px rgba(0,0,0,0.247)`
+/// over #eaeaea (live toolbar-states 11-16).
+pub fn pressed_shadow() -> Vec<BoxShadow> {
+    vec![BoxShadow { color: hsla(0., 0., 0., 0.247), offset: point(px(0.), px(1.)), blur_radius: px(1.), spread_radius: px(0.), inset: true }]
+}
+
+/// Search tools' "Highlight tool in toolbar" on a toolbar button (live: `#fcda7f`, a 2 px `#fab601` border; the
+/// user's 11-16 capture).
+pub fn search_highlight<E: Styled>(b: E) -> E {
+    b.bg(gpui_kit::rgb(0xfcda7f)).border_2().border_color(gpui_kit::rgb(0xfab601))
 }
 
 /// A 32x32 toolbar button holding a 20 px full-color icon (§3.2). Add
@@ -215,7 +244,7 @@ pub fn tool_button(id: impl Into<ElementId>, icon: &str, active: bool, cx: &App)
         .h(px(TOOL_CELL))
         .p_0()
         .rounded(px(3.))
-        .when(active, |b| b.bg(p().tool_active))
+        .when(active, |b| b.bg(p().tool_active).shadow(pressed_shadow()))
 }
 
 /// The icon half of a split tool: like [`tool_button`], but with the
@@ -227,15 +256,24 @@ pub fn split_tool_button(id: impl Into<ElementId>, icon: &str, active: bool, cx:
 
 /// [`split_tool_button`] showing `content` (a custom feature's initials) in place of an icon.
 pub fn split_tool_button_with(id: impl Into<ElementId>, content: impl IntoElement, active: bool, cx: &App) -> Button {
+    split_tool_button_hover(id, content, active, ACTIVE_HOVER, cx)
+}
+
+/// [`split_tool_button`] in the sketch toolbar: running and hovered it reads #cecece (live: Line).
+pub fn sketch_split_tool_button(id: impl Into<ElementId>, icon: &str, active: bool, cx: &App) -> Button {
+    split_tool_button_hover(id, assets::icon(icon, TOOL_ICON, cx), active, SKETCH_GROUP_ACTIVE_HOVER, cx)
+}
+
+fn split_tool_button_hover(id: impl Into<ElementId>, content: impl IntoElement, active: bool, active_hover: u32, cx: &App) -> Button {
     Button::new(id)
-        .custom(tool_variant(cx, active, true))
+        .custom(tool_variant_hover(cx, active, active_hover))
         .child(content)
         .w(px(TOOL_CELL))
         .h(px(TOOL_CELL))
         .p_0()
         .rounded(px(0.))
         .rounded_l(px(3.))
-        .when(active, |b| b.bg(p().tool_active))
+        .when(active, |b| b.bg(p().tool_active).shadow(pressed_shadow()))
 }
 
 /// A split tool: hovering either half fills both in `#d7d7d7` (live).
@@ -246,7 +284,8 @@ pub fn tool_group(name: impl Into<SharedString>, main: impl IntoElement, caret: 
     h_flex()
         .flex_none()
         .group(name)
-        .child(div().rounded_l(px(3.)).group_hover(n1, |d| d.bg(pal.tool_hover_group)).child(main))
+        // Live (toolbar-states 11-16): the group lit as one, the tool #eaeaea, its arrow #d7d7d7.
+        .child(div().rounded_l(px(3.)).group_hover(n1, |d| d.bg(pal.tool_hover)).child(main))
         .child(div().rounded_r(px(3.)).group_hover(n2, |d| d.bg(pal.tool_hover_group)).child(caret))
 }
 
@@ -611,7 +650,7 @@ pub fn text_tool_button(id: impl Into<ElementId>, icon: &str, label: impl Into<S
         .pl(px(6.))
         .pr(px(10.))
         .rounded(px(3.))
-        .when(active, |b| b.bg(p().tool_active))
+        .when(active, |b| b.bg(p().tool_active).shadow(pressed_shadow()))
 }
 
 /// A toolbar dropdown kept inside the window: it scrolls when its tools don't
@@ -628,7 +667,7 @@ pub fn fit_tool_menu(menu: gpui_kit::component::menu::PopupMenu, window: &Window
 /// triangle (`#2767ae`) there instead of the Part Studio's dark chevron.
 pub fn tool_caret_blue(id: impl Into<ElementId>, cx: &App) -> Button {
     Button::new(id)
-        .custom(tool_variant(cx, false, true))
+        .custom(caret_variant(cx))
         .child(glyph("drawing-tool-caret", 12., gpui_kit::rgb(0x2767ae)))
         .w(px(TOOL_CARET_W))
         .h(px(TOOL_CELL))
@@ -641,7 +680,7 @@ pub fn tool_caret_blue(id: impl Into<ElementId>, cx: &App) -> Button {
 pub fn tool_caret(id: impl Into<ElementId>, cx: &App) -> Button {
     let pal = p();
     Button::new(id)
-        .custom(tool_variant(cx, false, true))
+        .custom(caret_variant(cx))
         // Live: the 10 x 6 `expanded` sprite at 1:1, about 2 px thick.
         .child(glyph("tool-caret", 10., pal.text))
         .w(px(TOOL_CARET_W))

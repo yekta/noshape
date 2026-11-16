@@ -36,6 +36,11 @@ impl From<Pixels> for ButtonRounded {
     }
 }
 
+/// NOSHAPE PATCH: Onshape's pressed toolbar button shadow.
+pub fn pressed_inset_shadow() -> gpui::BoxShadow {
+    gpui::BoxShadow { color: gpui::hsla(0., 0., 0., 0.247), offset: gpui::point(gpui::px(0.), gpui::px(1.)), blur_radius: gpui::px(1.), spread_radius: gpui::px(0.), inset: true }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ButtonCustomVariant {
     color: Hsla,
@@ -43,6 +48,10 @@ pub struct ButtonCustomVariant {
     shadow: bool,
     hover: Hsla,
     active: Hsla,
+    // NOSHAPE PATCH: Onshape's pressed toolbar button (an open dropdown arrow): a 1 px inset shadow while selected.
+    pressed_inset: bool,
+    // NOSHAPE PATCH: hovered, the button drops any shadow (an Onshape running tool hovered is flat).
+    flat_hover: bool,
 }
 
 pub trait ButtonVariants: Sized {
@@ -107,7 +116,22 @@ impl ButtonCustomVariant {
             hover: cx.theme().transparent,
             active: cx.theme().transparent,
             shadow: false,
+            pressed_inset: false,
+            flat_hover: false,
         }
+    }
+
+    /// NOSHAPE PATCH: no shadow while hovered.
+    pub fn flat_hover(mut self, on: bool) -> Self {
+        self.flat_hover = on;
+        self
+    }
+
+    /// NOSHAPE PATCH: while selected (or its menu open) the button shows Onshape's pressed inset shadow
+    /// (`inset 0 1px 1px rgba(0,0,0,0.247)`).
+    pub fn pressed_inset(mut self, on: bool) -> Self {
+        self.pressed_inset = on;
+        self
     }
 
     /// Set background color, default is transparent.
@@ -612,6 +636,8 @@ impl InteractiveElement for Button {
 impl RenderOnce for Button {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let style: ButtonVariant = self.variant;
+        let pressed_inset = matches!(style, ButtonVariant::Custom(c) if c.pressed_inset);
+        let flat_hover = matches!(style, ButtonVariant::Custom(c) if c.flat_hover);
         let interactive = self.interactive();
         let hoverable = self.hoverable();
         let disabled = self.disabled;
@@ -734,6 +760,7 @@ impl RenderOnce for Button {
                     .when(interactive, |this| {
                         this.hover(|this| {
                             let hover_style = style.hovered(self.outline, cx);
+                            let this = if flat_hover { this.shadow(Vec::new()) } else { this };
                             this.bg(hover_style.bg)
                                 .border_color(hover_style.border)
                                 .text_color(hover_style.fg)
@@ -810,6 +837,7 @@ impl RenderOnce for Button {
         .styles(|styles| {
             styles
                 .selected(|style| {
+                    let style = if pressed_inset { style.shadow(vec![pressed_inset_shadow()]) } else { style };
                     style
                         .bg(selected_style.bg)
                         .border_color(selected_style.border)

@@ -412,7 +412,7 @@ debugging rows, left out. Ours binds besides live's map, in those scopes: the de
 Close window, Quit (secondary-n / o / w / q) and the dialog Tab / Enter / Shift+Enter keys live's client handles
 outside its map (its "client side entries").
 
-**Chrome: 22 / 22** (11-16 07:11 UTC: the tooltip's fade-out from chrome-gaps; 21 / 21 at 11-13 15:51 UTC, 18 / 18 at 14:01; 14:01 UTC, was 17 / 17 at 13:33 UTC; 7 / 11 at the first run, then 5 rows added: 1 / 5 matched).
+**Chrome: 22 / 22** (11-16 07:11 UTC: the tooltip's fade-out from chrome-gaps; the toolbar states row (11-16) checked by screenshot, not in the matrix; 21 / 21 at 11-13 15:51 UTC, 18 / 18 at 14:01; 14:01 UTC, was 17 / 17 at 13:33 UTC; 7 / 11 at the first run, then 5 rows added: 1 / 5 matched).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -427,6 +427,7 @@ outside its map (its "client side entries").
 | A tooltip on a drag's start | closes | the same | = |
 | Tooltip fade-in | ~150 ms | none on toolbar tooltips (only list rows' 230 ms); now 150 ms (`ui::TOOLTIP_FADE_IN`); its fade-out isn't drawn (gpui drops a tooltip at once) | = (fixed) |
 | Tooltip fade-out | Bootstrap's 0.15 s fade after the pointer leaves, the node gone 165–200 ms after (chrome-gaps 11-16) | gone at once (gpui dropped a tooltip on leave); now faded out over 150 ms (vendored gpui: `TOOLTIP_FADE_OUT`, the paint's element opacity) | = (fixed) |
+| Toolbar button states (user P1 11-16; live2 toolbar-states, live's addendum) | hover #eaeaea; a running tool #eaeaea with `inset 0 1px 1px rgba(0,0,0,0.247)`, hovered flat #dfdfdf (a sketch tool joined to its ⌄ #cecece); hovering a split tool's ⌄ lights the tool #eaeaea and the arrow #d7d7d7, an open ⌄ #d7d7d7 with the inset; Search tools' highlight #fcda7f with a 2 px #fab601 border; icons' light faces opaque white in every state | the running tool had no inset and stayed #eaeaea hovered; a split tool and its ⌄ lit #d7d7d7 together; the highlight's border 1 px; ~100 icons' light faces see-through (the yellow / grey showed through) and their greys translucent; now as live (`ui::pressed_shadow`, `caret_variant`, `search_highlight`, vendored Button `pressed_inset` / `flat_hover`; icons `data-face` underlays, app-core `icons_with_faces_are_opaque_inside`) | = (fixed) |
 | Feature dialog place, kept | every feature dialog, in every tab and session, opens where the last one was left | per tab, lost on closing; now one place (`behaviors::feature_dialog_pos`, config feature_dialog_place.json, written when a move ends) | = (fixed) |
 | A submenu (▸ row) | opens on hover with no delay (one 10 ms poll); closes ~30 ms after the pointer moves to another row | opens in the frame the row is hovered, closes in the next | = |
 | Select other size | 220 px, 24 px rows in a 90 px list; nothing found: 83 px tall | the same, but the empty dialog kept the 92 px list (149 px); now one row (`SELECT_OTHER_EMPTY_H`) | = (fixed) |

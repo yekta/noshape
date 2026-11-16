@@ -104,10 +104,27 @@ fn icon_image_inked(name: &str, size: f32, ink: Option<u32>, cx: &App) -> Option
 /// Onshape symbol uses the `--static` colours keep light faces in dark,
 /// which only drawn art gives.
 fn dark_icon(name: &str, light: Cow<'static, [u8]>) -> Cow<'static, [u8]> {
-    match AppIcons::get(&format!("icons/dark/{name}.svg")) {
-        Some(f) => f.data,
-        None => Cow::Owned(flip_themed_colors(&light)),
+    if let Some(f) = AppIcons::get(&format!("icons/dark/{name}.svg")) {
+        return f.data;
     }
+    // Opaque white faces (`data-face`): Onshape's `--os-icon-fill-primary--static` keeps the whole light art in dark;
+    // the themed `--os-icon-fill-primary` (`data-face="themed"`) turns #333 with the outlines flipped.
+    if contains(&light, br#"data-face="themed""#) {
+        return Cow::Owned(themed_faces_dark(&flip_themed_colors(&light)));
+    }
+    if contains(&light, b"data-face") {
+        return light;
+    }
+    Cow::Owned(flip_themed_colors(&light))
+}
+
+fn contains(hay: &[u8], needle: &[u8]) -> bool {
+    hay.windows(needle.len()).any(|w| w == needle)
+}
+
+/// `svg`'s themed white faces (`fill="#fff" … data-face="themed"`) in the dark theme's #333.
+fn themed_faces_dark(svg: &[u8]) -> Vec<u8> {
+    String::from_utf8_lossy(svg).replace(r##"fill="#fff" stroke="none" data-face="themed""##, r##"fill="#333333" stroke="none" data-face="themed""##).into_bytes()
 }
 
 /// `svg` with the hex colours Onshape themes replaced by their dark values.
@@ -167,6 +184,56 @@ pub fn icon_inked(name: &str, size: f32, ink: u32, cx: &App) -> gpui_kit::AnyEle
 
 #[cfg(test)]
 mod tests {
+    /// Every icon given Onshape's opaque white faces (`data-face`) shows nothing through inside its outline: drawn at
+    /// 80 px, no see-through pixel is enclosed by the art (the user's 11-16 P1: a pressed or highlighted button's
+    /// yellow showed through the Chamfer icon's faces). The faces are white in dark mode too unless themed.
+    #[test]
+    fn icons_with_faces_are_opaque_inside() {
+        use gpui_kit::{DevicePixels, SvgRenderer, SvgSize, size};
+        // Live leaves these insides see-through too (a sketch shape's inside, a table's cells, a mate's gaps), or
+        // their art isn't closed there.
+        const SEE_THROUGH: [&str; 18] = [
+            "aligned-rectangle", "bezier", "center-rectangle", "circle", "configuration-visibiliity", "cylindrical",
+            "drawing-cutlist-table", "drawing-polygon", "ellipse", "featurescript-table", "frame-trim", "hole-diameter",
+            "hole-table", "hole-tap-clearance", "hole-tapped-depth", "realign-mate-dialog", "revolute",
+            "sheet-metal-make-joint",
+        ];
+        let r = SvgRenderer::new(std::sync::Arc::new(super::AppAssets));
+        let mut checked = 0;
+        let mut leaks = Vec::new();
+        for file in super::AppIcons::iter() {
+            let svg = super::AppIcons::get(&file).unwrap().data;
+            if !super::contains(&svg, b"data-face") || SEE_THROUGH.iter().any(|n| file == format!("icons/{n}.svg")) {
+                continue;
+            }
+            let tree = r.parse_svg(&svg).unwrap();
+            let image = r.render_parsed(&tree, SvgSize::ExactSize(size(DevicePixels(80), DevicePixels(80)))).unwrap();
+            let px = image.as_bytes(0).unwrap();
+            let clear = |x: usize, y: usize| px[(y * 80 + x) * 4 + 3] < 40;
+            // The see-through pixels reached from the border are outside; any other is a hole in a face.
+            let mut out = vec![false; 80 * 80];
+            let mut todo: Vec<(usize, usize)> = (0..80).flat_map(|i| [(i, 0), (i, 79), (0, i), (79, i)]).filter(|&(x, y)| clear(x, y)).collect();
+            while let Some((x, y)) = todo.pop() {
+                if std::mem::replace(&mut out[y * 80 + x], true) {
+                    continue;
+                }
+                for (dx, dy) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)] {
+                    let (a, b) = (x as i32 + dx, y as i32 + dy);
+                    if (0..80).contains(&a) && (0..80).contains(&b) && clear(a as usize, b as usize) && !out[b as usize * 80 + a as usize] {
+                        todo.push((a as usize, b as usize));
+                    }
+                }
+            }
+            let holes = (0..80 * 80).filter(|&i| clear(i % 80, i / 80) && !out[i]).count();
+            if holes > 24 {
+                leaks.push(format!("{file}: {holes} px"));
+            }
+            checked += 1;
+        }
+        assert!(checked >= 75, "only {checked} icons carry faces");
+        assert!(leaks.is_empty(), "see-through inside: {leaks:?}");
+    }
+
     #[test]
     fn flip_themed_colors_maps_only_whole_themed_hex() {
         let svg = br##"<path fill="#333" stroke="#333333"/><path fill="#1651B0" stroke="#3333aa"/><g fill="#999"/>"##;

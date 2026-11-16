@@ -3563,7 +3563,7 @@ impl PartStudioView {
         // Tool search with "Highlight tool in toolbar": the selected result's
         // button (or its group) turns yellow (live: `#fcda7f`, border `#fab601`).
         let found = self.palette_found_tool(cx).is_some_and(|f| f == id || group.contains(&f));
-        let main = main.when(found, |b| b.bg(gpui_kit::rgb(0xfcda7f)).border_1().border_color(gpui_kit::rgb(0xfab601)));
+        let main = main.when(found, crate::ui::search_highlight);
         // The active tool clicked again keeps its dialog (`start_feature`).
         let main = main.on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_feature(id, window, cx)));
         let main = crate::ui::with_rich_tooltip(SharedString::from(format!("tt-{id}")), tooltip, crate::tool_text::description(id).unwrap_or(ty.description), main);
