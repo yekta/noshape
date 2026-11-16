@@ -3957,6 +3957,41 @@ export const reopen = defineFeature(function(context is Context, id is Id, defin
     assert!((total_volume(&r) - 1e-6).abs() < 1e-12, "{}", total_volume(&r));
 }
 
+/// opSplitFace keeps the split face's attributes on every piece, as Parasolid (std Bend's imprint splits the wall it
+/// bends; its WALL attribute must stay on the walls either side: c2-sm-rocker-enclosure-sm's Extrude 1 read
+/// "Removal destroys sheet metal part" without it).
+#[test]
+fn a_split_face_keeps_its_attribute_on_both_pieces() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Split tagged" }
+export const splitTagged = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCuboid(context, id + "cube", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(10, 10, 10) * millimeter });
+        const top = qCreatedBy(id + "cube", EntityType.FACE)->qContainsPoint(vector(5, 5, 10) * millimeter);
+        setAttribute(context, { "entities" : top, "attribute" : "wall" });
+        opPlane(context, id + "plane", { "plane" : plane(vector(5, 0, 0) * millimeter, vector(1, 0, 0)), "width" : 20 * millimeter, "height" : 20 * millimeter });
+        opSplitFace(context, id + "split", { "faceTargets" : top, "planeTools" : qCreatedBy(id + "plane", EntityType.FACE) });
+        opDeleteBodies(context, id + "deletePlane", { "entities" : qCreatedBy(id + "plane", EntityType.BODY) });
+        const tagged = qAttributeFilter(qEverything(EntityType.FACE), "wall");
+        if (size(evaluateQuery(context, tagged)) != 2)
+            throw "both pieces tagged, not " ~ size(evaluateQuery(context, tagged));
+        for (var x in [2.5, 7.5])
+        {
+            if (isQueryEmpty(context, qContainsPoint(tagged, vector(x, 5, 10) * millimeter)))
+                throw "the piece at x = " ~ x ~ " lost it";
+        }
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&fx.ty("splitTagged"), &fx.units).unwrap());
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+}
+
 /// A Feature Studio pinned to an older std compiles against that release (Onshape: the std of its own pin), and the
 /// context's version reads in its terms: its FeatureScriptVersionNumber's newest (cf-sheet-metal-flange-plus's
 /// studios at 975 cast getCurrentVersion to their enum).

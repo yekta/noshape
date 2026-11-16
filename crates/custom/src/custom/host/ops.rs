@@ -2309,6 +2309,21 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     for key in ["edgeTools", "faceTools", "bodyTools", "planeTools"] {
         tools.extend(evaluate_refs(i, &cx, def.get(key))?);
     }
+    // Parasolid's split keeps a face's attributes on every piece (std Bend's imprint splits the wall it bends: its
+    // WALL attribute stays on the walls each side; without it c2-sm-rocker-enclosure-sm's Extrude 1 read "Removal
+    // destroys sheet metal part").
+    let attributed: Vec<(Shape, Vec<Value>)> = {
+        let st = cx.state.lock();
+        let q = super::query::QueryCx::new(&st);
+        targets
+            .iter()
+            .filter_map(|r| {
+                let attrs: Vec<Value> = st.attributes_of(r).into_iter().cloned().collect();
+                let face = q.from_ref(r).into_iter().next().and_then(|e| q.shape(&e))?;
+                (!attrs.is_empty()).then_some((face, attrs))
+            })
+            .collect()
+    };
     let mut p = ParamValues::default();
     p.set("splitType", ParamValue::Enum("FACE".into()));
     p.set("faceTargets", ParamValue::Query(targets));
@@ -2397,6 +2412,28 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let seq = st.next_seq;
         for b in &owners {
             st.touched.insert(b.clone(), seq);
+        }
+    }
+    if !attributed.is_empty() {
+        let q = super::query::QueryCx::new(&st);
+        let mut add = Vec::new();
+        for (bi, b) in st.ctx.bodies.iter().enumerate().filter(|(_, b)| owners.contains(&b.id)) {
+            for f in 0..b.faces.len() {
+                let e = Ent::Face(bi, f);
+                let Some(m) = q.shape(&e).and_then(|s| q.face_point(&s)) else { continue };
+                let Ok(v) = k::make_vertex(m) else { continue };
+                let r = q.to_ref(&e);
+                let has = st.attributes_of(&r);
+                for (old, attrs) in &attributed {
+                    if k::distance(&v, old).is_ok_and(|d| d.distance < 1e-7) {
+                        add.extend(attrs.iter().filter(|a| !has.contains(a)).map(|a| (r.clone(), a.clone())));
+                    }
+                }
+            }
+        }
+        drop(q);
+        for (r, a) in add {
+            st.push_attribute(r, a);
         }
     }
     st.split_tools.extend(tools);
