@@ -152,9 +152,13 @@ pub struct Size {
     /// The script's counts for this size (ribs, teeth), plain numbers.
     #[serde(default)]
     pub counts: BTreeMap<String, f64>,
-    /// Live's Thread length options by length (the first is the default).
+    /// Live's Thread length options by length, in live's order.
     #[serde(default)]
     pub threads: BTreeMap<String, Vec<String>>,
+    /// Live's default Thread length by length where it isn't the first
+    /// option (ISO 4014 M12: [60, 30] defaults to 30).
+    #[serde(default)]
+    pub thread_defaults: BTreeMap<String, String>,
     /// Selects whose options depend on the size (live's lists for it,
     /// the first the default), by label.
     #[serde(default)]
@@ -445,5 +449,12 @@ impl Component {
             out.push(format!("{}", (t * 1e4).round() / 1e4));
         }
         out
+    }
+
+    /// The Thread length the dialog picks for a size and length (live's
+    /// default, else the first option).
+    pub fn thread_default(&self, size: &Size, length: &str) -> Option<String> {
+        let options = self.thread_lengths(size, length);
+        size.thread_defaults.get(length).filter(|t| options.contains(*t)).cloned().or_else(|| options.into_iter().next())
     }
 }

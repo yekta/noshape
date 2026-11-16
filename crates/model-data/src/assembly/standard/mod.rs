@@ -292,12 +292,13 @@ impl StandardSpec {
         Some(std::iter::once(first).chain(rows).find(|s| s.when.iter().all(|(k, v)| self.param(k) == v)).unwrap_or(first))
     }
 
-    /// A screw's Thread length: the chosen option, else the size and
-    /// length's first (live's default).
+    /// A screw's Thread length: the chosen option, else live's default for
+    /// the size and length.
     pub fn thread_length(&self) -> Option<String> {
         let c = component(self)?;
-        let options = c.thread_lengths(self.size_row()?, self.length.as_deref()?);
-        self.params.get(THREAD_LENGTH).filter(|v| options.contains(*v)).cloned().or_else(|| options.first().cloned())
+        let (size, length) = (self.size_row()?, self.length.as_deref()?);
+        let options = c.thread_lengths(size, length);
+        self.params.get(THREAD_LENGTH).filter(|v| options.contains(*v)).cloned().or_else(|| c.thread_default(size, length))
     }
 
     /// The part's name, which instances take ("<Name> <n>") and the

@@ -476,8 +476,7 @@ impl AssemblyView {
             };
             params = params.child(row(c.length_label(), 27., length_el));
             let threads = c.thread_lengths(size, &cur);
-            if let Some(first) = threads.first().cloned() {
-                let chosen = spec.params.get(standard::THREAD_LENGTH).filter(|t| threads.contains(*t)).cloned().unwrap_or(first);
+            if let Some(chosen) = spec.thread_length().filter(|_| !threads.is_empty()) {
                 params = params.child(row("Thread length", 27., Self::std_select("std-thread", 146., chosen, threads, locked, |t, v, cx| t.std_edit_spec(cx, |s| {
                     s.params.insert(standard::THREAD_LENGTH.into(), v.to_string());
                 }), cx)));
