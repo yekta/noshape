@@ -1,20 +1,29 @@
-# bool2: current state (11-15 22:59 UTC)
+# bool2: current state (11-16 01:58 UTC)
 
 Second agent on noshape's own Boolean (crates/brep, crates/kernel/cpp/rust_boolean.cpp, boolean.cpp's unify). A case
 is taken only where it equals OCCT (or live, with a capture); results identical end to end (docs/DECISIONS.md 11-14).
 History: docs/handoff/archive/bool2.md. Rulings: docs/DECISIONS.md.
 
 ## In flight
-- gate57 (systemd unit bool2-gate57, vibe5, /root/bool2-scratch/gate57.out) on 68c1942bd: merge_cylinder_groups
-  rejects a group whose boundary meets the seam's line between vb and vt (a vertex on it within its tolerance, or an
-  edge's sampled 3D curve passing the seam's angle) before projecting (c2-helical-sweep Sweep 1's unify 71-77 -> 23-26
-  ms, same-binary A/B on vibe5; never fired in the kernel tests). Land on a clean verdict (all.rs out first).
-- OCCT patch 0031 prototype (/root/bool2-scratch/0031-topoltool-bspline-samples-grid.patch): Adaptor3d_TopolTool::
-  BSplSamplePnts evaluates its grid once (it re-evaluated the same points in its deflection passes, rebuilding the
-  B-spline cache: 42 % of c2-impeller-loft Extrude 4's Boolean f10ce62e by samples). Values identical (a parameter's
-  span doesn't depend on the cached one). Private OCCT on vibe5 ~/tmp/bool2/occt-p (/opt/occt with the patched object
-  ar'd into libTKG3d.a), A/B binaries ../target vs ~/tmp/bool2/target-occt31. Next: A/B times, then the gate with it
-  (needs the lead: hosts' /opt/occt rebuilt, CI's cache key changes).
+- 68c1942bd (helical unify: a cylinder group whose boundary meets the seam's line between vb and vt isn't projected;
+  Sweep 1's unify 71-77 -> 23-26 ms) queued 11-16: gate57 clean (replay 3026 -> 3026 taken, 5 -> 5 differing; suite
+  98 docs 883/935 both), hats/dock SAME against main. OCCT patch 0031's commit waits on branch bool2-oc31 (ae1731fbf).
+- OCCT patch 0031 (patches/occt/0031-topoltool-bspline-samples-grid.patch; lead approved 11-15 on 0030's terms):
+  Adaptor3d_TopolTool::BSplSamplePnts evaluates its grid once (c2-impeller-loft Extrude 4's Boolean 125-160 -> 73-81
+  ms). Libraries staged: vibe5 ~/agents/bool2-keep/occt-0031 (/opt/occt with the patched object in libTKG3d.a; GCC 15
+  -march=x86-64 with OCCT's flags incl. -DNo_Exception -DOCCT_NO_PLUGINS, no ymm/vfmadd; g++-13 compiles it clean),
+  Mac ~/noshape-host/occt-0031 (arm64, Apple clang, the build tree's own command). Checks: corpora replay against
+  gate57's 68c1942bd identical (/root/bool2-scratch/occt31-gate.out); suite 98 common docs unchanged, 12 docs new
+  since; A's suite run later differed on 20 c2-surf docs only because those model files were rewritten at 01:10 UTC
+  between the runs: unit bool2-occt31-suite2 (/root/bool2-scratch/occt31-suite2.out) runs A and B side by side.
+  Unit bool2-occt31-rest (/root/bool2-scratch/occt31-rest.out): hats/dock A vs B and main vs A
+  (~/tmp/bool2/udoc/run.sh, copies deleted after). Then: tell the lead the commit; the lead installs the libs on
+  vibe3/5/6/7 (+ /root/occt); then land.sh (all.rs out).
+- Lead's gate.sh change (builds through ~/bin/slot, SLOT_MIN_GB=12) queued as 46ce12b0 from worktree
+  /root/projects/noshape-wt/bool2-tools (branch bool2-gate-slot); remove that worktree once landed.
+- core's housing unify item (11-16): CLI path Rotieren 1 unify 24-26 ms, Boolesch 1 13-24, Bohrung 1 ~10; each a USD
+  merge rejected at 4.9e-15 m³ vs 1e-9 V (borderline), three memo-hit tries + one volume (9 ms). No identical-result
+  cut without moving that threshold (needs live's counts). Reported to core.
 - Worktree /root/projects/noshape-wt/bool2 (branch bool2-chamfer), scratch /root/bool2-scratch. Uncommitted on
   purpose: crates/kernel/tests/all.rs registers the scratch probes (`mod sampler; mod xprobe;`, copy in
   /root/bool2-scratch/all-with-probe.rs), crates/kernel/tests/{xprobe,sampler}.rs, scratch-docs/ (qa's docs, the valve
