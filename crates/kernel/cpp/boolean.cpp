@@ -3540,7 +3540,8 @@ thread_local bool t_precise_cylinder_merge = false;
 // hole's wall one face). Merged here, on a copy: one face on the first one's surface, its curves on it the
 // boundary's (projected, a turn from the seam), round it one new seam where both chains have a vertex at one angle.
 // The shape unchanged where there's no such group or the merge doesn't come out valid with the same volume.
-TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any_frame)
+// merge_cylinder_groups' merges, each checked valid as a whole part with `each_valid`.
+static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hist, bool any_frame, bool each_valid)
 {
   auto cyl_of = [](const TopoDS_Face& f, gp_Cylinder& c) {
     TopLoc_Location                      l;
@@ -3760,7 +3761,7 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
         for (size_t k = 1; k < g.size(); ++k)
           rs->Remove(fm(g[k]));
         const TopoDS_Shape out = rs->Apply(s);
-        if (out.IsNull() || !valid_whole(out))
+        if (out.IsNull() || (each_valid && !valid_whole(out)))
           return false;
         // The volume kept: the new face's share of it against the group's faces' (one integral of each side; the
         // whole solid's integral is noisier than the change: 2.9e-7 of it on a part fused with its mirror, 11ed9bd7,
@@ -4203,6 +4204,25 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
     hist = new BRepTools_History();
   hist->Merge(local);
   return s;
+}
+
+TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any_frame)
+{
+  // (The whole part checked once, at the end, not after each group's merge: c2-hunting-knife's Mirror 1, its 15 hole
+  // and wall halves, 15 checks of the whole knife. Where the end isn't valid, again with each merge checked.)
+  HHist              h;
+  const TopoDS_Shape fast = merge_cylinder_groups_with(s0, h, any_frame, false);
+  if (fast.IsSame(s0))
+    return s0;
+  if (valid_whole(fast))
+  {
+    if (hist.IsNull())
+      hist = h;
+    else
+      hist->Merge(h);
+    return fast;
+  }
+  return merge_cylinder_groups_with(s0, hist, any_frame, true);
 }
 
 // Adjacent faces on two surfaces of linear extrusion that are one surface: one's (u, v) the other's (u, k v + c), k
