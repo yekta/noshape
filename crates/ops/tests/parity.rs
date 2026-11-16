@@ -3066,6 +3066,13 @@ fn an_assembly_is_rebuilt_as_lives() {
     patterned["features"]["features"][0]["mateConnectors"][1]["parameters"][0]["queries"][0]["path"] = json!(["PAT1", "IB"]);
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-patterned.noshape"), &patterned, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
     assert_eq!((r.mates_matching, r.mates), (1, 1), "{r:?}");
+    // A connector the mate holds on the assembly's Origin (live: its Z axis picked in the mate's dialog): translated.
+    let mut on_origin = asm.clone();
+    on_origin["features"]["features"][0]["mateConnectors"][0] = json!({ "btType": "BTMMateConnector-66", "featureId": "MA", "implicit": true, "parameters": [
+        { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "originQuery", "queries": [{ "btType": "BTMFeatureQueryWithOccurrence-157", "path": [], "queryData": "ORIGIN_Z", "featureId": "Origin" }] }] });
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-origin.noshape"), &on_origin, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert!(!r.untranslated.iter().any(|u| u.contains("connectors not translated")), "{r:?}");
+    assert_eq!(r.mates, 1, "{r:?}");
     // A place the Revolute doesn't allow: freed there, ours solves it back
     // onto the mate, 10 mm.
     let mut off = asm.clone();

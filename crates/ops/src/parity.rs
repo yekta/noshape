@@ -8525,10 +8525,14 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         // Its own mate connectors on the assembly origin ("Assembly XZ plane": Origin's ORIGIN_X / Y / Z, Z along that
         // axis; their X left ours, the Planar mates using them don't turn about it).
         let mut origin_connectors: HashMap<String, String> = HashMap::new();
-        for f in l.features.iter().filter(|f| f["featureType"] == "mateConnector") {
+        // (Also one a mate holds, its own "Origin" pick: asm-keyboard-pattern's Fastened 1.)
+        let held = l.features.iter().flat_map(|f| f["mateConnectors"].as_array().into_iter().flatten().map(move |m| (m, *f)));
+        for (f, owner) in l.features.iter().filter(|f| f["featureType"] == "mateConnector").map(|f| (*f, *f)).chain(held) {
             let origin = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "originQuery").and_then(|p| p["queries"].as_array()).and_then(|q| q.first());
             let Some(axis) = origin.filter(|q| q["featureId"] == "Origin").and_then(|q| q["queryData"].as_str()) else { continue };
-            let (Some(id), Some(name)) = (f["featureId"].as_str(), f["name"].as_str()) else { continue };
+            let Some(id) = f["featureId"].as_str() else { continue };
+            let held_name = format!("Mate connector of {}", owner["name"].as_str().unwrap_or(id));
+            let name = f["name"].as_str().unwrap_or(&held_name);
             let mut args = json!({ "tab": l.tab, "on": { "origin": true }, "name": name });
             match axis {
                 "ORIGIN_X" => args["offset"] = json!({ "rotation": "90 deg", "rotation_axis": "y" }),
