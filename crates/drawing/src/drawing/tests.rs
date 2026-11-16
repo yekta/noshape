@@ -5539,3 +5539,22 @@ fn title_lines_pick_each_on_their_own() {
     let cell = b.title_cells.iter().find(|c| c.0 == title).unwrap().1;
     assert_ne!(b.hit([cell[0] + 3.0, (lo[1] + hi[1]) / 2.0], 0.5), Some(title), "the row away from the text");
 }
+
+/// Live2's drw-title-field-* takes on ANSI_A_INCH.dwt: sheet (230, 42) is TITLE's first line, (230, 37) its second,
+/// though the first lies within a click's reach (7 px, ~1.6 mm at the take's zoom) of the block's own lines.
+#[test]
+fn title_lines_pick_over_the_template_lines() {
+    let mut d = Drawing::default();
+    let t = templates::DrawingTemplate::standard("ANSI A", SheetSize::AnsiA, TitleBlockStyle::Ansi, true, Projection::ThirdAngle);
+    d.props = templates::template_props(&t, "ANSI_A_INCH.dwt");
+    templates::apply_template(&mut d, 0, &t);
+    let b = render_sheet(&d, 0, &super::views::Sources::new(), &ViewCache::new(), false).unwrap();
+    let field = |k: &str| b.picks.iter().position(|t| *t == PickTarget::TitleField(k.into())).map(|i| i as u32);
+    // Live picks a line above its text; a click on the text itself picks that line.
+    for (y, key) in [(44.0, "Title"), (42.0, "Title"), (40.0, "Title"), (38.0, "Title 2"), (37.0, "Title 2"), (36.0, "Title 2"), (35.0, "Title"), (30.0, "Title 2"), (25.0, "Title 3")] {
+        assert_eq!(b.hit([230.0, y], 1.6), field(key), "(230, {y})");
+    }
+    for x in [205.0, 270.0] {
+        assert!(!matches!(b.hit([x, 42.0], 1.6).and_then(|k| b.picks.get(k as usize)), Some(PickTarget::TitleField(_))), "({x}, 42)");
+    }
+}

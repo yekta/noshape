@@ -302,8 +302,10 @@ impl BuiltSheet {
             }
             consider(l.pick, dmin);
         }
+        // (A field with pick areas of its own, TITLE's lines, picks only there.)
+        let own = |pick: &u32| self.title_hits.iter().any(|(p, _)| p == pick);
         for t in &self.geometry.texts {
-            if t.pick == 0 {
+            if t.pick == 0 || own(&t.pick) {
                 continue;
             }
             // Inside the box, or within `text_tol` of it: as near as a line can be (texts win over lines under them).
@@ -327,10 +329,15 @@ impl BuiltSheet {
         // A field cell's note over the block's lines; anywhere else inside
         // the title block selects it.
         let inside = |r: &[f64; 4]| p[0] >= r[0] && p[0] <= r[2] && p[1] >= r[1] && p[1] <= r[3];
-        // (A field with lines of its own picks only there: live2 rmb-probe, TITLE.)
-        let own = |pick: &u32| self.title_hits.iter().any(|(p, _)| p == pick);
+        // (Over the block's lines: live2 rmb-probe and drw-title-field-*, TITLE.)
+        let block_line = |k: u32| matches!(self.picks.get(k as usize), Some(PickTarget::TitleBlock | PickTarget::FormatLine(_)));
+        if let Some((pick, _)) = self.title_hits.iter().find(|(_, r)| inside(r))
+            && best.is_none_or(|(k, _)| block_line(k))
+        {
+            return Some(*pick);
+        }
         if best.is_none_or(|(k, _)| matches!(self.picks.get(k as usize), Some(PickTarget::TitleBlock)))
-            && let Some((pick, _)) = self.title_hits.iter().find(|(_, r)| inside(r)).or_else(|| self.title_cells.iter().find(|(p, r)| !own(p) && inside(r)))
+            && let Some((pick, _)) = self.title_cells.iter().find(|(p, r)| !own(p) && inside(r))
         {
             return Some(*pick);
         }

@@ -916,7 +916,7 @@ impl DrawingEditor {
         // centred.
         let trow = |label: &'static str, col: f32, h: f32, top: f32, body: AnyElement| {
             rec_label(label);
-            div().h(px(h)).flex_none().flex().pl(px(13.)).child(div().w(px(col - 14.)).flex_none().h_full().flex().items_center().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().pt(px(top)).child(body)).into_any_element()
+            div().h(px(h)).flex_none().flex().pl(px(13.)).child(div().w(px(col - 14.)).flex_none().h_full().flex().items_center().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(crate::ui_script::mark_first(div().pt(px(top)), move || format!("field:{label}")).child(body)).into_any_element()
         };
         // The arrowhead control: the style's glyph and a caret, 28 px.
         // Live "ui2 (10-26) arrowhead picker": a 28 x 158 list right under

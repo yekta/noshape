@@ -279,7 +279,7 @@ impl DrawingEditor {
 
         // Row 2: B I U S, Color, Line spacing, Horizontal alignment, List,
         // Vertical alignment, Note order.
-        let toggle = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, f: fn(&mut NoteStyle), cx: &mut Context<Self>| button(id, icon, tip, on, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.note_style(&f, cx)));
+        let toggle = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, f: fn(&mut NoteStyle), cx: &mut Context<Self>| crate::ui_script::mark(button(id, icon, tip, on, cx), move || format!("toggle:{tip}")).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.note_style(&f, cx)));
         let swatch = match st.color {
             Some([r, g, b]) => gpui_kit::rgb(((r as u32) << 16) | ((g as u32) << 8) | b as u32),
             None => gpui_kit::rgb(0x000000),
