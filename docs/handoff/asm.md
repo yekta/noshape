@@ -24,7 +24,13 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
 - Gate (vibe6 g49/run.sh, slot): base29 done: 78/104 documents, 981/1194 features (g49/models-base29.log). Then
   ops-s49 (= s55, all commits) models, then the full assembly suite with it (full/s49.log). Then compare, land, SCORE.
 - vibe7 must be idle 01:30-04:05 (lead): guard0125.sh stops my runs there at 01:25; builds go to vibe6 then.
-- Next for keyboard: mates on sketch instances (connectors on a sketch's wire-body edges; ours resolves live's
+- uncommitted (s56): a connector on a sketch instance keeps live's point and is found after insertion on the
+  instance's wire edges / vertices (`instance_entity_at`, assembly_entities `near`); our MATE_INSTANCE_LOST there
+  came from a66ca5's sketches having no geometry (its in-context Plane 1), now with a66ca5.context.jsonl.
+- robotic-arm s55: 32/32, 39/40 (only Fastened 2, asked live2), BOM 13 -> 15/18; 07d06e's Derived OK.
+- Asked live 00:5x: refs (refs.js + refsx.js) for tvc-mount (7bc9d8's feature Mirrors / patterns, 5/11 mates),
+  pattern-std, scissor-lift, xdev-subs, suspension, corexy, welding-config, hand-drill-pinslot.
+- Was next for keyboard: mates on sketch instances (connectors on a sketch's wire-body edges; ours resolves live's
   sketch-edge query in the Part Studio, which has no such edge: map the sketch entity to the instance's wire edge,
   e.g. assembly_entities `at` live's point after placing). a66ca5's context.jsonl landed (00:4x).
 - Tried and reverted (s48): keeping a sketch moved by a configuration variable's dimension (20e932).
