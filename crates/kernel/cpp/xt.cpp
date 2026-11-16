@@ -948,6 +948,23 @@ struct BodyWriter
       key.push_back(e.TShape().get());
     }
     std::sort(key.begin(), key.end());
+    // Every face along the arcs has them as a loop of their own; else a face beside keeps the arcs and the ring
+    // wouldn't be shared with it (cf-snap-hook's hook tips: a disc's two arcs in a longer loop of the torus beside,
+    // read back as 13 sheets).
+    for (const TopoDS_Shape& g : edge_faces.FindFromKey(cycle[0]))
+    {
+      bool whole = false;
+      for (const auto& other : exchange_loops(TopoDS::Face(g), true))
+      {
+        std::vector<const void*> k;
+        for (const TopoDS_Edge& e : other)
+          k.push_back(e.TShape().get());
+        std::sort(k.begin(), k.end());
+        whole = whole || k == key;
+      }
+      if (!whole)
+        return;
+    }
     auto it = rings.find(key);
     if (it == rings.end())
     {

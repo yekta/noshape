@@ -2013,3 +2013,24 @@ fn a_face_across_a_periodic_extrusions_start_reads_back() {
     assert!((v2 - v0).abs() < 1e-4 * v0, "IGES: {v2} vs {v0}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A cylinder whose side is two faces (split down the side at 90° and 270°): the top disc's rim is arcs the disc has as
+/// a loop of their own, its side faces in a longer one. Parasolid keeps the arcs (one ring would leave the side faces'
+/// arcs unshared: cf-snap-hook's hook tips read back as 13 sheets): one closed solid of the cylinder's volume.
+#[test]
+fn a_disc_whose_rim_arcs_bound_a_split_side_exports_as_one_solid() {
+    let mm = 1e-3;
+    let cyl = make_cylinder(&Plane::from_normal(DVec3::ZERO, DVec3::Z), 5.0 * mm, 10.0 * mm, std::f64::consts::TAU).unwrap();
+    let down = |y: f64| make_line(DVec3::new(0.0, y, 10.0) * mm, DVec3::new(0.0, y, 0.0) * mm).unwrap();
+    let s = split_on(&cyl, &[down(5.0), down(-5.0)], 1e-7).unwrap().shape;
+    assert!(s.count(ShapeType::Face) >= 4);
+    let want = volume_properties(&s).unwrap().mass;
+    let path = std::env::temp_dir().join(format!("noshape-xt-rim-{}.x_t", std::process::id()));
+    write_parasolid(&path, std::slice::from_ref(&s), LengthUnit::Meter, false).unwrap();
+    let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(back.count(ShapeType::Solid), 1);
+    assert!(back.is_valid());
+    let v = volume_properties(&back).unwrap().mass;
+    assert!((v - want).abs() < 1e-6 * want, "{v} vs {want}");
+}
