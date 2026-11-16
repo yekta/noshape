@@ -4974,7 +4974,11 @@ impl<'a> Translator<'a> {
             let ours: Vec<f64> = g["regions"].as_array().into_iter().flatten().filter_map(|r| r["area"].as_f64()).map(|a| a * k * k).collect();
             live_regions.iter().filter(|l| ours.iter().any(|a| (a - **l).abs() <= 1e-4 * l.max(1e-9))).count()
         };
-        let keep = !live_regions.is_empty() && regions_as_live(&after) > regions_as_live(&before);
+        // Or when it brings the points to live's solved ones (sketches.json at the lines' configuration; the stored
+        // geometry is the author's last solve, in a configured document another configuration's: c2-config-parts-nuts'
+        // hexagon at M2, its lines at M4).
+        let closer = matches!((self.off_live_points(&oid, &before), self.off_live_points(&oid, &after)), (Some(b), Some(a)) if a < b && a <= 1e-6);
+        let keep = (!live_regions.is_empty() && regions_as_live(&after) > regions_as_live(&before)) || closer;
         if moved > 1e-7 && !keep {
             // Undone back to the edit before them (deleting them would leave
             // the points moved; some calls make no edit, so not by count).
@@ -5038,6 +5042,23 @@ impl<'a> Translator<'a> {
     }
 
     /// The areas of live's regions of sketch `oid` (its sketch bodies file), m².
+    /// How far our sketch's points (`sketch_get` reply `g`) lie from live's solved ones of the same entities (its
+    /// sketches.json geomEntities), the largest, in metres; None when live gives none of them.
+    fn off_live_points(&self, oid: &str, g: &Value) -> Option<f64> {
+        let live = self.sketch_bodies.iter().find(|s| s["featureId"] == oid)?["geomEntities"].as_array()?;
+        let k = per_unit(&g["units"]);
+        let ours: HashMap<&str, [f64; 2]> = g["entities"].as_array()?.iter().filter(|e| e["type"] == "point").filter_map(|e| Some((e["id"].as_str()?, [e["at"][0].as_f64()? * k, e["at"][1].as_f64()? * k]))).collect();
+        let mut worst: Option<f64> = None;
+        for e in live.iter().filter(|e| e["entityType"] == "point") {
+            let (Some(eid), Some(p)) = (e["id"].as_str(), e["point"].as_array().and_then(|p| Some([p.first()?.as_f64()?, p.get(1)?.as_f64()?]))) else { continue };
+            let Some(q) = self.sketch_entities.get(&(oid.to_string(), eid.to_string())).and_then(|o| ours.get(o.as_str())) else { continue };
+            let l = self.sketch_map.local(p);
+            let d = (l[0] - q[0]).hypot(l[1] - q[1]);
+            worst = Some(worst.map_or(d, |w| w.max(d)));
+        }
+        worst
+    }
+
     fn live_region_areas(&self, oid: &str) -> Vec<f64> {
         let mut out: Vec<f64> = self.refs.values().filter(|r| r.sketch_file && r.kind == "SKETCH_REGION" && r.sketch_of.as_deref() == Some(oid)).filter_map(|r| r.measure).collect();
         out.sort_by(f64::total_cmp);
