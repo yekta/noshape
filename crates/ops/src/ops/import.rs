@@ -111,6 +111,13 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             eprintln!("import stage regenerate: features {features:.1} ms, regen total {:.1} ms", r.display.regen_ms);
         }
         let name = od.doc().tab(t).map(|x| x.name.clone()).unwrap_or_default();
+        // A feature that failed (an Import whose parts didn't read as valid bodies) says so: no silent empty import.
+        if let Ok(ps) = doc::studio(od.doc(), t) {
+            for f in r.display.features.iter().filter(|f| matches!(f.status, noshape_model::display::FeatureStatus::Error)) {
+                let feature = ps.features.iter().find(|x| x.id == f.id).map_or_else(|| f.id.to_string(), |x| x.name.clone());
+                errors.push(format!("{name}: {feature}: {}", f.message.as_deref().unwrap_or("Error regenerating.")));
+            }
+        }
         for b in &r.display.bodies {
             parts.push(json!({ "tab": name, "id": crate::refs::body_id(&b.id), "name": b.name }));
         }

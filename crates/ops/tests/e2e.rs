@@ -8968,3 +8968,18 @@ fn a_start_sketch_is_not_tied_to_the_origin() {
     assert_eq!(kinds, ["Horizontal", "Horizontal", "Vertical", "Vertical"], "{got}");
     assert_eq!((got["status"].as_str(), got["dof"].as_u64()), (Some("under defined"), Some(4)), "{got}");
 }
+
+/// An Import whose part doesn't read as a valid body (a solid inside out) fails, and import_files says which feature
+/// and why rather than returning no parts in silence (our SAT of cf-sheet-metal-model-plus read back as 0 parts).
+#[test]
+fn a_failed_import_feature_is_reported() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("failed-import.noshape"), "length_unit": "mm" }));
+    let inside_out = noshape_kernel::make_box_corners(glam::DVec3::ZERO, glam::DVec3::splat(0.01)).unwrap().reversed().unwrap();
+    let file = scratch("inside-out.brep");
+    noshape_kernel::write_brep(&inside_out, &file).unwrap();
+    let r = call(&mut ctx, "import_files", json!({ "files": [file] }));
+    assert!(r["parts"].as_array().unwrap().is_empty(), "{r}");
+    let errors = r["errors"].as_array().unwrap_or_else(|| panic!("no errors: {r}"));
+    assert!(errors.iter().any(|e| e.as_str().unwrap().contains("Import 1: Error regenerating.")), "{r}");
+}
