@@ -145,10 +145,20 @@ docs/DECISIONS.md (read first; it wins over anything here).
        declarations in crates/kernel/cpp/offset_quad.hpp; both quad blocks out of the anonymous namespace
        (noshape::quad). g++-15/13 build, 473 kernel tests. bool gating it (sent 22:3x); land from core-trace when
        bool says pass. (The make-a-Surf-for-a-face helper stays in by_quadrics: offset.cpp writes its own.)
-    2. offset.cpp offset_solid for solids whose faces all keep their topology; kernel T1 tests: a box with one face
-       moved (exact), a cylinder boss, a B-spline face (fit-spline extrude) moved 0.2 mm vs its Geom_OffsetSurface.
-    3. Boolean offset (basic.rs) and Move face Offset use it for free-form faces before OCCT; fan-blade Boolean 2
-       measured against live (87773.636 mm³, 56/143/88).
+    2. DONE as 23f44d3d7 (core-offset, stacked on 1; bool told 22:35, gates both): crates/kernel/cpp/offset.cpp
+       op_offset_solid / k::offset_solid(shape, faces, distances, face_budget) + k::last_offset_report(); T1
+       tests crates/kernel/tests/offset.rs (box exact, Ø10 boss out+up, extruded spline 0.2 mm within 1e-6 of
+       its exact offset, a turned-round edge fails) + T2 probe dumped_offset_probe (NOSHAPE_OFFSET_CASE).
+       NOSHAPE_OFFSET_DEBUG=/dir dumps each input (offset-N.brep + .txt face index/distance). 477 kernel tests,
+       clippy clean, g++-13 builds. Refuses NaN (removed faces) and topology changes.
+    2b. NEXT: topology changes. fan-blade Boolean 2's tool (threaded shank: B-spline flanks 21-23, crest
+       cylinder pieces 11-19, end plane 2, cone 24; 11 faces moved 0.2): all vertices solve (seeded at their own
+       uv: helical flanks have a sheet a turn away; some move 1-3 mm, narrow angles), then edge 34 between crest
+       pieces 13/14 turns round: face 14 (0.0088 mm2, a 0.04 mm sliver) vanishes in the offset. Needs a vanishing
+       face's neighbours joined (by_quadrics' collapse/strip ideas). Case dump: vibe5 ~/tmp/core/offset-cases.
+    3. Boolean offset (basic.rs) calls offset_solid for non-analytic faces (patch /root/core-scratch/
+       offset-step3-basic.patch, OFFSET_FACE_BUDGET 20000); fan-blade Boolean 2 vs live (87773.636 mm3,
+       56/143/88; ours now 87828.366, 56/139/84). Release pair before landing.
     4. bool's Shell may call it for its inner walls (bool decides).
 - c2-fan-blade-sweep Boolean 2 (48/53, parked; lead: core's): Subtract with Offset 0.2 mm on 6 picked tool faces
   (11 per tool after the pattern copies: the sweep's free-form thread flanks among them). basic.rs offsets only analytic
