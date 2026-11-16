@@ -4,39 +4,34 @@ Area: crates/assembly, crates/assembly-ui, the assembly ops in crates/ops and th
 scenarios, the assembly parity suite (`parity_assemblies`) and the parity translator (crates/ops/src/parity.rs) for
 the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: docs/DECISIONS.md.
 
-## State (2026-11-16 00:25 UTC)
+## State (2026-11-16 00:50 UTC)
 
 ### In flight
 - Worktree /root/projects/noshape-wt/asm (detached on 93346d03 = landed fd98e8a6), on top (none landed):
   - 60b13cba (**decision with the lead**): `regions_by_sum` takes the closest group of live's sketch regions.
-  - 70ae7e9b: in-context bodies from live's context.jsonl. 1b88ff 6 -> 12/12 features, a2e4a2 7 -> 9/64.
-  - 154e6c65: an assembly's Save view / Delete view is no undo step (psui's FYI).
-  - 08d6feee: configured refs.jsonl lines; instances by our part's body id (config-assembly 21 -> 25/25, 14 -> 18/18).
-  - 07f3351a + 0c676223 + fd230597: BOM scoring against live's bom.json.
-  - cde9262e: live's unresolved mates that ours solves count as live ("live defect", DECISIONS 11-15).
-  - 40205609: in-context POINT bodies. 668e761a: mate status from mate-messages.json first.
-  - f4159c6d: a Derived's picked source sketch brought in, its regions found; empty foreignId -> blobData's file.
-  - 913fad5f: sketch instances (type "Feature") inserted as ours of that sketch.
-  - 64f53b0b: the part properties the user set in live (metadata.json, propertySource 3: part number, description,
-    revision, vendor, Exclude from BOMs, material; custom material with live's density) set on our parts; BOM text
-    trimmed. s50: clamp-pattern BOM 2 -> 13/14, gearbox-std 2 -> 8/8, keyboard 16/16.
-  - uncommitted (in s52): refs for a sub-feature's parameters (live's `subFeature:<id>.<param>`); a Derived's
-    `location` / `placement` / `mateConnectorIndex` (only keyboard 2bb133 and robotic-arm 07d06e use one); the suite
-    loads a studio without parts when the assembly inserts its sketches (keyboard a66ca5). keyboard s50 22/25.
-- Runs: vibe7 q52.sh (after the s50 loop: hand-drill, config-assembly) runs keyboard and robotic-arm with s52
-  (cfg/s5N-*.log). vibe6 g49/run.sh waits in the slot (blend, dx, skasm suites there): model gate base29 vs s52 (the
-  file is named ops-s49), then the full suite (full/s49.log) for the SCORE row. s41 full was killed by earlyoom at
-  23:25 in infento-subs; its 9 finished corpora equal base29 but config-assembly (25/25, 18/18).
-- Tried and reverted (s48): keeping a sketch moved by a configuration variable's dimension (20e932's
-  #WidthAcrossFlats): config-assembly 25 -> 23/25, the Revolves still fail.
-- Captures all answered by live (metadata, keyboard refs incl. non-sketch and sub-features, d2ecd2's Feature Studios,
-  a66ca5). dx takes corexy's STEP part names ("=>[0:1:1:2]" link names, io.cpp): rescore corexy's BOM when it lands.
-- keyboard left: 2bb133 Sketch 2's Use entities on the derived sketch ("clicks didn't complete a line": was Derived
-  1 unplaced, s52 places it), Extrude 3, Chamfer 2, Transform 1; 46fe1d Extrude 3; df4a26 Extrude 2 / 3; 7f71cc's Mate
-  connector 1 "Cannot determine owner" (its ownerPart is a sketch's wire body, which live accepts; ours
-  resolve_bodies has no sketch bodies: refgeom.rs owner check, model-core).
-- dx landed / lands configured suppressions and e541cc55 (region_from_query: EDGE / VERTEX queries aren't regions);
-  tell dx if an asm-* studio moves in the full run.
+  - 70ae7e9b in-context bodies (context.jsonl); 154e6c65 named views no undo step; 08d6feee configured refs;
+    07f3351a + 0c676223 + fd230597 BOM scoring; cde9262e live-defect mates; 40205609 in-context POINT bodies;
+    668e761a mate status from mate-messages.json.
+  - f4159c6d Derived's picked source sketch + its regions; empty foreignId -> blobData.
+  - 913fad5f sketch instances (type "Feature") inserted.
+  - 64f53b0b user-set part properties from live's metadata.json (propertySource 3) incl. material (custom: density).
+  - e62c08ba refs for sub-feature parameters (`subFeature:<id>.<param>`); Derived `location` / `placement` (index
+    -1 -> AT_ORIGIN); the suite loads sketch-only studios; user-set Name; NOSHAPE_PARITY_TRACE "TRACE use" lines.
+- Measured (single corpora, vibe7 cfg/): keyboard-pattern s52 25/25 occurrences, 16/16 BOM, mates 1/4 (3 mates on
+  sketch instances, see below); clamp-pattern BOM 2 -> 13/14; gearbox-std 2 -> 8/8; hand-drill-pinslot 0 -> 13/20
+  (s50; + names in e62c08ba); config-assembly 25/25, 18/18, 12/12; robotic-arm s52 32/32, 39/40 (Fastened 2: live2's
+  file says ERROR with no message, asked live2 00:5x; 07d06e Derived fixed in s55, run pending).
+- Gate (vibe6 g49/run.sh, slot): base29 done: 78/104 documents, 981/1194 features (g49/models-base29.log). Then
+  ops-s49 (= s55, all commits) models, then the full assembly suite with it (full/s49.log). Then compare, land, SCORE.
+- vibe7 must be idle 01:30-04:05 (lead): guard0125.sh stops my runs there at 01:25; builds go to vibe6 then.
+- Next for keyboard: mates on sketch instances (connectors on a sketch's wire-body edges; ours resolves live's
+  sketch-edge query in the Part Studio, which has no such edge: map the sketch entity to the instance's wire edge,
+  e.g. assembly_entities `at` live's point after placing). a66ca5's context.jsonl landed (00:4x).
+- Tried and reverted (s48): keeping a sketch moved by a configuration variable's dimension (20e932).
+- dx: corexy's STEP names ("=>[...]" link names, io.cpp) in progress; rescore corexy's BOM when landed. dx's
+  e541cc55 (EDGE / VERTEX queries aren't regions): tell dx if an asm-* studio moves.
+- keyboard 7f71cc's Mate connector 1 owned by a sketch's wire body: live accepts, ours resolve_bodies has no sketch
+  bodies (refgeom.rs, model-core); one feature status.
 
 ### Queued to land
 - Nothing. Landed today: 790ecad5, 36ebccbc, 163918c9, fd98e8a6, 8ffdb51e / 72805bc5 (this file).
