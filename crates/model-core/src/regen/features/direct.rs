@@ -13,6 +13,9 @@ use noshape_kernel::{Shape, ShapeType};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+/// The most points k::offset_solid marches along one face's edges.
+const OFFSET_FACE_BUDGET: u32 = 20_000;
+
 // ------------------------------------------------------------------ delete face
 
 /// Fillet faces next to the selection, recognised from the geometry (live
@@ -371,6 +374,16 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                 })?;
                 continue;
             }
+        }
+        // The faces' exact offsets first, where the part keeps its topology (k::offset_solid: OCCT's offset took
+        // 463 ms on c2-impeller-loft's Flansch (vorne) verbreitern, live 6 ms).
+        if translate_dir.is_none()
+            && let Some(r) = k::offset_solid(&body.shape, &shapes, &[dist], OFFSET_FACE_BUDGET).inspect_err(|e| log::debug!("move face: {e}: {}", k::last_offset_report())).ok().filter(|r| r.shape.is_valid() && r.shape.count(ShapeType::Solid) > 0)
+        {
+            let offset_role = |n: &Name| Role::Offset(n.clone());
+            let names = ev.name_result(&[&body.shape_names()], &r.history, &r.shape, &BTreeMap::new(), Some(&offset_role));
+            ev.replace_body(bi, r.shape, names);
+            continue;
         }
         // Faces on or beside the moved ones that aren't planes, cylinders, cones, spheres or tori (a flange's walls
         // extruded from a loft's): OCCT's offset worked on them for ~0.6 s and left an invalid solid the booleans
