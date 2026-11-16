@@ -15,7 +15,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 HOME = os.path.expanduser("~")
 CORPORA = f"{HOME}/agents/bool-corpora"
-MODELS = f"{HOME}/parity/models"
+# (The gate passes its run's snapshot of the models (DECISIONS 11-16): the 10-min sync can rewrite them mid-run.)
+MODELS = os.environ.get("NOSHAPE_GATE_MODELS") or f"{HOME}/parity/models"
 CACHE = f"{HOME}/agents/bool-gate/cache"
 # Bumped when what a result file holds or how a log is read changes: older cached results are not reused.
 FORMAT = "1"
