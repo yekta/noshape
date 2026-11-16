@@ -1161,13 +1161,14 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
         }
         let group: Vec<FeatureId> = touching.iter().find(|g| g.contains(&f)).cloned().unwrap_or_else(|| vec![f]);
         patterned.extend(&group);
+        let (tools, from_tools) = boolean_tool_faces(ev, &group);
         let groups: Vec<(BodyId, Vec<usize>)> = ev
             .ctx
             .bodies
             .iter()
-            .filter(|b| !group.contains(&b.id.feature) && b.id.feature != ev.feature)
+            .filter(|b| !group.contains(&b.id.feature) && b.id.feature != ev.feature && !tools.contains(&b.id))
             .filter_map(|b| {
-                let fs: Vec<usize> = b.faces.iter().enumerate().filter(|(_, n)| n.creator().is_some_and(|c| group.contains(&c))).map(|(i, _)| i).collect();
+                let fs: Vec<usize> = b.faces.iter().enumerate().filter(|(_, n)| n.creator().is_some_and(|c| group.contains(&c)) || from_tools.contains(n.root())).map(|(i, _)| i).collect();
                 (!fs.is_empty()).then(|| (b.id.clone(), fs))
             })
             .collect();
@@ -1329,6 +1330,22 @@ fn merged_faces(tool: &Shape, body: &Body, fs: &[usize]) -> Vec<usize> {
 }
 
 /// The solid a feature adds or removes, evaluated as New where it stands.
+/// A Boolean subtraction's faces on its targets are its tools' faces there, named after the tools' own: made by the
+/// Boolean for a feature pattern (asm-pattern-std 36b90f's Linear pattern 1 repeats Boolean 1's pocket, live). Its kept
+/// tools' bodies, and their face names.
+fn boolean_tool_faces(ev: &EvalCtx, group: &[FeatureId]) -> (Vec<BodyId>, BTreeSet<TopoName>) {
+    let mut bodies = Vec::new();
+    let mut names = BTreeSet::new();
+    for seed in ev.features.iter().filter(|x| group.contains(&x.id) && x.type_id == "booleanBodies" && x.params.enum_("operationType") == "SUBTRACTION") {
+        for i in ev.resolve_bodies(seed.params.query("tools")) {
+            let b = &ev.ctx.bodies[i];
+            bodies.push(b.id.clone());
+            names.extend(b.faces.iter().map(|n| n.root().clone()));
+        }
+    }
+    (bodies, names)
+}
+
 fn seed_tool(ev: &EvalCtx, f: FeatureId) -> Option<Shape> {
     let seed = ev.features.iter().find(|x| x.id == f)?;
     if crate::custom::is_custom(&seed.type_id) {

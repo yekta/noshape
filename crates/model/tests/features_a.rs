@@ -1809,6 +1809,31 @@ fn feature_and_face_pattern_of_pocket() {
     assert!(near(removed, 2.0 * pocket, 1e-3), "{removed}");
 }
 
+/// A feature pattern of a Boolean subtraction repeats the pocket its tool left in the target (asm-pattern-std 36b90f's
+/// Linear pattern 1 of Boolean 1, live OK; ours "Selected features do not create any geometry that may be patterned.").
+#[test]
+fn feature_pattern_of_a_boolean_subtraction() {
+    let mut t = T::new();
+    let (_, x) = t.block(0.0, 0.0, 0.1, 0.02, "10 mm");
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let cs = t.sketch(Reference::FeaturePlane(pl), circle(DVec2::new(0.01, 0.01), 0.003));
+    let r = t.regions(cs)[0].clone();
+    let pin = t.extrude(r, "5 mm", "NEW");
+    t.set(pin, "oppositeDirection", b(true));
+    let block = Reference::Body(BodyId { feature: x, index: 0 });
+    let tool = Reference::Body(BodyId { feature: pin, index: 0 });
+    let cut = t.add("booleanBodies", &[("operationType", en("SUBTRACTION")), ("tools", q(vec![tool])), ("targets", q(vec![block])), ("keepTools", b(true))]);
+    let pocket = PI * 0.003f64.powi(2) * 0.005;
+    let solid = 0.1 * 0.02 * 0.01;
+    let res = t.ok();
+    assert!(near(total_volume(&res.context), solid, 1e-6), "the kept pin fills the pocket");
+    t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(cut)])), ("directionOne", q(vec![x_axis_dir()])), ("distance", e("20 mm")), ("instanceCount", e("3"))]);
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 2, "the block and the kept pin");
+    let removed = solid + pocket - total_volume(&res.context);
+    assert!(near(removed, 3.0 * pocket, 1e-3), "{removed}");
+}
+
 #[test]
 fn pattern_instance_references_survive_upstream_edit() {
     let mut t = T::new();
