@@ -23,6 +23,7 @@
 #include <Geom_TrimmedCurve.hxx>
 #include <Geom_OffsetCurve.hxx>
 #include <Geom_OffsetSurface.hxx>
+#include <ShapeCustom.hxx>
 #include <GeomConvert_ApproxCurve.hxx>
 #include <optional>
 #include <TopExp.hxx>
@@ -1131,6 +1132,24 @@ rust::Vec<rust::String> read_step_pmi(rust::Str path)
 
 namespace
 {
+// Offset surfaces and linear extrusions as B-surfaces, as live's STEP and IGES write them (c2-rings-loft: B-spline
+// surfaces, no OFFSET_SURFACE / SURFACE_OF_LINEAR_EXTRUSION, IGES 140 / 122): with no p-curves in the file (as live's) a reader projects the
+// faces' boundaries onto those surfaces and missed (ours read the ring's Part 1 back at 176 mm³ for 440.8). Only a
+// part that has one is converted (ConvertToBSpline copies it).
+TopoDS_Shape step_bsurfaces(const TopoDS_Shape& in)
+{
+  bool any = false;
+  for (TopExp_Explorer ef(in, TopAbs_FACE); ef.More() && !any; ef.Next())
+  {
+    TopLoc_Location           loc;
+    occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(ef.Current()), loc);
+    if (auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(g))
+      g = t->BasisSurface();
+    any = !occ::down_cast<Geom_OffsetSurface>(g).IsNull() || !occ::down_cast<Geom_SurfaceOfLinearExtrusion>(g).IsNull();
+  }
+  return any ? ShapeCustom::ConvertToBSpline(in, true, false, true, false) : in;
+}
+
 // An edge using a small part of a long B-spline writes only that part. Healing an
 // imported thread splits its helix edges, and each piece keeps the whole
 // 848-pole curve: NIST's cap screw wrote 4 MB of STEP (40 such curves), and
@@ -1235,7 +1254,7 @@ void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> 
       s = BRepBuilderAPI_Transform(s.Located(TopLoc_Location()), s.Location().Transformation(), true).Shape();
     if (yard)
       s = BRepBuilderAPI_Transform(s, third, true).Shape();
-    s = compact_bspline_edges(s);
+    s = step_bsurfaces(compact_bspline_edges(s));
     TDF_Label l = st->AddShape(s, false);
     if (i < names.size() && !names[i].empty())
     {
@@ -2012,7 +2031,7 @@ std::vector<TopoDS_Shape> add_iges_parts(IGESControl_Writer& w, const OcShapeLis
   for (const auto& s : shapes.items)
   {
     require_non_null(s, "exported shape");
-    written.push_back(compact_bspline_edges(s));
+    written.push_back(step_bsurfaces(compact_bspline_edges(s)));
     w.AddShape(written.back());
   }
   w.ComputeModel();

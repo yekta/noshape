@@ -1967,3 +1967,26 @@ fn a_products_solids_by_representation_relationships_take_its_name() {
     assert_eq!(names, ["Pulley", "Pulley", "Pulley"]);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// STEP and IGES write an offset surface (the hose's outer walls) as a B-surface, as live's files have none (c2-rings-loft:
+/// B-spline surfaces only): without p-curves a reader trimmed the offsets wrong (ours read the ring's Part 1 back
+/// at 176 mm³ for 440.8). The walls read back with the model's volume.
+#[test]
+fn step_and_iges_write_offset_surfaces_as_bsurfaces() {
+    let dir = std::env::temp_dir().join(format!("noshape-step-offset-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let hose = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts/hose-routing-hose.brep")).unwrap();
+    let v0 = hose.volume().unwrap();
+    let step = dir.join("hose.step");
+    write_step(&step, &[ExportShape { shape: hose.clone(), name: None, color: None }], LengthUnit::Meter).unwrap();
+    let text = std::fs::read_to_string(&step).unwrap();
+    assert!(!text.contains("OFFSET_SURFACE(") && text.contains("B_SPLINE_SURFACE"), "offsets written as such");
+    let back = read_step(&step, LengthUnit::Meter).unwrap();
+    let v1: f64 = back.iter().map(|s| s.shape.volume().unwrap()).sum();
+    assert!((v1 - v0).abs() < 1e-5 * v0, "STEP: {v1} vs {v0}");
+    let iges = dir.join("hose.igs");
+    write_iges(&iges, std::slice::from_ref(&hose), LengthUnit::Meter).unwrap();
+    let v2 = read_iges(&iges, LengthUnit::Meter).unwrap().volume().unwrap();
+    assert!((v2 - v0).abs() < 1e-5 * v0, "IGES: {v2} vs {v0}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
