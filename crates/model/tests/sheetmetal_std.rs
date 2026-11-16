@@ -601,6 +601,44 @@ fn a_corner_break_keeps_the_plate_past_a_flanges_bend_line() {
     assert!((volume_mm3(&r) - expected).abs() < 1e-6, "{} mm³ vs {expected}", volume_mm3(&r));
 }
 
+/// A part mirror (Add) of a flanged plate across its side merges the two plates: the mirrored flange's bend beside
+/// the merged plate keeps its joint, not a rip (c2-sm-side-cuts-tab's Mirror 1: two mirrored bends turned rips).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_mirrored_flange_beside_a_merged_plate_keeps_its_bend() {
+    use noshape_model::sheetmetal::BendKind;
+    let mut s = Studio::new();
+    let region = s.rectangle(40.0, 30.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let edges = vec![edge_at(&r, DVec3::new(40.0, 15.0, 2.0)), edge_at(&r, DVec3::new(20.0, 30.0, 2.0))];
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(edges));
+        p.set("distance", expr("20 mm"));
+    });
+    let r = s.ok();
+    let (before, body) = (volume_mm3(&r), r.context.bodies[part(&r)].id.clone());
+    s.add("mirror", |p| {
+        p.set("patternType", en("PART"));
+        p.set("entities", ParamValue::Query(vec![Reference::Body(body)]));
+        p.set("mirrorPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Right)]));
+        p.set("operationType", en("ADD"));
+        p.set("defaultScope", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).count(), 1);
+    assert!((volume_mm3(&r) - 2.0 * before).abs() < 1e-6, "{} mm³ vs {}", volume_mm3(&r), 2.0 * before);
+    let data = r.context.sheet_metal.get(&r.context.bodies[part(&r)].id).expect("data");
+    let bends = data.bends.iter().filter(|b| matches!(b.kind, BendKind::Bend)).count();
+    // The flanges' corners are rips, the y = 30 bend one across the plane.
+    assert_eq!((bends, data.rips.len()), (3, 2));
+}
+
 /// A Fillet R 5 of both corners of a sheet metal part's 10 mm wide end (std: corner breaks) meet: the end is one
 /// half-round, both corners off (live config-assembly 08590a's Fillet 2 on the arm: 32 faces before and after, 32.19 mm³
 /// less at 3 mm).

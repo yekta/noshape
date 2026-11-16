@@ -536,8 +536,11 @@ impl CtxState {
 
     /// Attributes whose entity an operation renamed follow it (a sheet
     /// metal definition's vertices are renamed when a flange adds faces
-    /// beside them; live keeps their association attributes).
-    pub fn remap_attributes(&mut self, changed: &HashSet<BodyId>) {
+    /// beside them; live keeps their association attributes). Those of a
+    /// body `merged` into another (a union's tool) follow it too, but an
+    /// entity it merged with one of the other body's keeps only that one's,
+    /// as Parasolid's (c2-sm-side-cuts-tab's Mirror 1).
+    pub fn remap_attributes(&mut self, changed: &HashSet<BodyId>, merged: &HashSet<BodyId>) {
         // Each moved entity's new place, or its pieces when split (each
         // gets the attribute, as Parasolid's split keeps it on both).
         type Placed = (Reference, (BodyId, query::Snapshot));
@@ -545,14 +548,10 @@ impl CtxState {
             let q = query::QueryCx::new(self);
             let (mut out, mut gone) = (Vec::new(), HashSet::new());
             for (r, (body, snap)) in &self.attr_snapshots {
-                if !changed.contains(body) {
+                if !changed.contains(body) && !merged.contains(body) {
                     continue;
                 }
                 let Some(pieces) = query::relocated_pieces(&q, r, snap) else { continue };
-                if pieces.is_empty() {
-                    gone.insert(r.clone());
-                    continue;
-                }
                 let to: Vec<Placed> = pieces.iter().filter_map(|e| Some((q.to_ref(e), q.attribute_snapshot(&q.to_ref(e))?))).collect();
                 // Nothing that can carry it lies where it was (a sketch's point there): gone as well.
                 if to.is_empty() {
@@ -568,27 +567,39 @@ impl CtxState {
             self.retain_attributes(|(r, _)| !gone.contains(r));
             self.attr_snapshots.retain(|r, _| !gone.contains(r));
         }
-        if moves.is_empty() {
+        let from_merged = |st: &Self, r: &Reference| st.attr_snapshots.get(r).is_some_and(|(b, _)| merged.contains(b));
+        let mut tool: Vec<bool> = self.attrs.iter().map(|(r, _)| from_merged(self, r)).collect();
+        if !moves.is_empty() {
+            // All at once: one entity's new name may be another's old one.
+            let map: HashMap<Reference, Vec<Reference>> = moves.iter().map(|(o, to)| (o.clone(), to.iter().map(|(n, _)| n.clone()).collect())).collect();
+            let mut copies = Vec::new();
+            for ((r, v), t) in self.attribute_entities_mut().zip(tool.iter()) {
+                if let Some(to) = map.get(r) {
+                    copies.extend(to[1..].iter().map(|n| ((n.clone(), v.clone()), *t)));
+                    *r = to[0].clone();
+                }
+            }
+            let (copies, flags): (Vec<_>, Vec<_>) = copies.into_iter().unzip();
+            self.extend_attributes(copies);
+            tool.extend(flags);
+            for (old, _) in &moves {
+                self.attr_snapshots.remove(old);
+            }
+            for (_, to) in moves {
+                for (new, snap) in to {
+                    self.attr_snapshots.insert(new, snap);
+                }
+            }
+        }
+        if !tool.contains(&true) {
             return;
         }
-        // All at once: one entity's new name may be another's old one.
-        let map: HashMap<Reference, Vec<Reference>> = moves.iter().map(|(o, to)| (o.clone(), to.iter().map(|(n, _)| n.clone()).collect())).collect();
-        let mut copies = Vec::new();
-        for (r, v) in self.attribute_entities_mut() {
-            if let Some(to) = map.get(r) {
-                copies.extend(to[1..].iter().map(|n| (n.clone(), v.clone())));
-                *r = to[0].clone();
-            }
-        }
-        self.extend_attributes(copies);
-        for (old, _) in &moves {
-            self.attr_snapshots.remove(old);
-        }
-        for (_, to) in moves {
-            for (new, snap) in to {
-                self.attr_snapshots.insert(new, snap);
-            }
-        }
+        let kept: HashSet<Reference> = self.attrs.iter().zip(&tool).filter(|(_, t)| !**t).map(|((r, _), _)| r.clone()).collect();
+        let mut i = 0;
+        self.retain_attributes(|(r, _)| {
+            i += 1;
+            !(tool[i - 1] && kept.contains(r))
+        });
     }
 
     pub fn transient(&mut self, r: &Reference) -> Arc<str> {
@@ -1055,7 +1066,9 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
                 }
             }
             if !changed.is_empty() {
-                st.remap_attributes(&changed);
+                // And the bodies it merged into them (a union's tools). Not a body only deleted: nothing changed then.
+                let merged: HashSet<BodyId> = snapshot.bodies.iter().filter(|o| !st.ctx.bodies.iter().any(|b| b.id == o.id)).map(|o| o.id.clone()).collect();
+                st.remap_attributes(&changed, &merged);
             }
             // An operation's info (opSplitPart's SPLIT_NO_CHANGE, live): its member.
             for m in infos {
