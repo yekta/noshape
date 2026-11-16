@@ -1003,6 +1003,32 @@ fn import_foreign_mesh_parts() {
     assert!(info.closed && info.members.len() == 2 && comp.name == "Composite part 1", "{info:?} {}", comp.name);
 }
 
+/// A Mate connector on a mesh part's node (asm-corexy's studios on their STL imports; live: "Failed to resolve mate
+/// connector origin." never, the node's point with the world axes, as a vertex's).
+#[test]
+fn a_mate_connector_on_a_mesh_node() {
+    let dir = std::env::temp_dir().join(format!("noshape-featb-meshmc-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("box.stl");
+    let bx = noshape_kernel::make_box(&noshape_kernel::Plane::xy(), 0.01, 0.02, 0.03).unwrap();
+    noshape_kernel::write_stl(&bx, &path, 1e-4, noshape_kernel::StlFormat::Binary).unwrap();
+    let mesh = noshape_kernel::read_mesh_bodies(&path, noshape_kernel::LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+    let brep = String::from_utf8(mesh.to_brep_bytes().unwrap()).unwrap();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let part = s.ok().context.bodies[0].id.clone();
+    let node = Reference::mesh_point(part.clone(), [0.01, 0.02, 0.03]);
+    s.add("mateConnector", move |p| {
+        p.set("originQuery", ParamValue::Query(vec![node]));
+        p.set("entityInferenceType", ParamValue::Enum("POINT".into()));
+        p.set("ownerPart", ParamValue::Query(vec![Reference::Body(part)]));
+    });
+    let r = s.ok();
+    let c = &r.context.connectors[0];
+    assert!(vnear(c.origin, DVec3::new(0.01, 0.02, 0.03)) && vnear(c.z, DVec3::Z) && vnear(c.x, DVec3::X), "{:?} {:?} {:?}", c.origin, c.z, c.x);
+}
+
 /// An Edge point on a sketch line (asm-infento-subs' studio 1dc32b: Transform 23 / 28's in-feature "Edge point"):
 /// the point at the parameter along the line, on its sketch plane.
 #[test]

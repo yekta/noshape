@@ -204,7 +204,8 @@ fn origin_csys(ev: &EvalCtx, r: &Reference, inference: &str, secondary: &[Refere
             let c = ev.resolve_connector(r).ok_or_else(|| not_found("mate connector"))?;
             Ok(Csys { origin: c.origin, x: c.x, z: c.z })
         }
-        Reference::Vertex(_) => vertex_csys(ev, r).ok_or_else(|| not_found("vertex")),
+        // (A mesh part's node too: live's is a POINT body's vertex, world axes; asm-corexy's studios on their STL imports.)
+        Reference::Vertex(_) | Reference::MeshPoint { .. } => vertex_csys(ev, r).ok_or_else(|| not_found("vertex")),
         Reference::SketchEntity { sketch, entity } => {
             let s = ev.ctx.sketch_holding(*sketch, *entity).ok_or_else(|| not_found("sketch entity"))?;
             let id = noshape_sketch::EntityId(*entity);
