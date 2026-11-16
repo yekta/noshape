@@ -6929,10 +6929,14 @@ fn connector_at_frame(frame: &Value) -> Option<Map<String, Value>> {
     let mut p = Map::new();
     p.insert("originQuery".into(), json!(["origin"]));
     p.insert("transform".into(), json!(true));
+    // (A flip comes before the move, which runs in the flipped frame (Y and Z the other way): asm-corexy d0d597's
+    // Transform 1 base at +4.25 mm landed at −4.25 and turned the idler wheel over.)
+    let flip = near(z, [0.0, 0.0, -1.0]);
+    let o = if flip { [o[0], -o[1], -o[2]] } else { o };
     for (k, c) in ["translationX", "translationY", "translationZ"].iter().zip(o) {
         p.insert((*k).into(), json!(format!("{c} mm")));
     }
-    if near(z, [0.0, 0.0, -1.0]) {
+    if flip {
         p.insert("flipPrimary".into(), json!(true));
     } else if near(z, [0.0, -1.0, 0.0]) || near(z, [0.0, 1.0, 0.0]) {
         p.insert("rotationType".into(), json!("ABOUT_X"));
@@ -9597,12 +9601,12 @@ mod tests {
 
     /// An in-feature mate connector on live's frame (live 2632, asm-corexy's Transforms): on the Origin, moved to the
     /// frame's origin, turned to its Z (a flip for −Z, a quarter turn about X for −Y); a frame turned about Z isn't
-    /// taken.
+    /// taken. A flip comes before the move, so a flipped frame's move runs along −Y and −Z.
     #[test]
     fn an_in_feature_connector_takes_lives_frame() {
         let at = |o: [f64; 3], x: [f64; 3], z: [f64; 3]| connector_at_frame(&json!({ "origin_mm": o, "x": x, "z": z }));
-        let down = at([0.0, 0.0, 4.6], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0]).unwrap();
-        assert_eq!((&down["originQuery"], &down["translationZ"], &down["flipPrimary"]), (&json!(["origin"]), &json!("4.6 mm"), &json!(true)));
+        let down = at([1.0, 2.0, 4.6], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0]).unwrap();
+        assert_eq!((&down["originQuery"], &down["translationX"], &down["translationY"], &down["translationZ"], &down["flipPrimary"]), (&json!(["origin"]), &json!("1 mm"), &json!("-2 mm"), &json!("-4.6 mm"), &json!(true)));
         let side = at([0.0, -4.0, 0.0], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0]).unwrap();
         assert_eq!((&side["translationY"], &side["rotationType"], &side["rotation"]), (&json!("-4 mm"), &json!("ABOUT_X"), &json!("90 deg")));
         assert!(at([0.0; 3], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]).unwrap().get("flipPrimary").is_none());
