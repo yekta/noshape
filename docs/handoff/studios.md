@@ -23,8 +23,11 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncomm
   Size ▸ / Resize... | Copy, Rows Equally over a merged cell, Esc closes the Cell panel too (`OsMenu::after_escape`);
   run.py strips live's "NoteContextMenus" separators). Table takes on vibe6: 49/50; drw-hole-table-cell-bold s12 is
   live's state read before its Cell panel showed (it shows at s12 in -cell-rmb), left.
-- Live's reader reads a selected hole table's lines inside a view's box as EDGE <view> (live2 05:1x shots); ours'
-  reader does the same, so no runner rule is needed.
+- Live's reader reads a selected hole table's lines inside a view's box as EDGE <view> (live2 11-16,
+  live/uip/drw-hole-table-split-14.png); ours' reader does the same, so no runner rule is needed.
+- Full drawing run (306 takes) queued in vibe6's slot at 06:14 (~/tmp/studios/drwall, log
+  ~/agents/studios-keep/drwall.log): don't rebuild vibe6's binary until it starts. Then the matrix:
+  drawing_matrix.py --run ~/tmp/studios/drwall --ours-menus (MENUDUMP of drawing_context_menus_are_lives).
 
 Areas (11-16 01:30-02:30, vibe5): Feature Studio 116/116 takes, versions/history/release 154/154, documents/tabs/
 start/prefs 285/285 (SCORE.md's 97.8 / 98.2 / 98.4 are from 11-11..13).
