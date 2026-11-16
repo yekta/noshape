@@ -1277,6 +1277,9 @@ impl PopupMenu {
             .text_sm()
             .py_0()
             .px(INNER_PADDING)
+            // NOSHAPE PATCH: a toolbar dropdown's row (live menus/ps-dropdown-01): 1 px in from the border, its icon
+            // cell 1 px further, the shortcut chips 7 px from the right.
+            .when(self.tool_list, |this| this.mx(px(1.)).pl(px(1.)).pr(px(7.)))
             .rounded(radius)
             .items_center()
             .selected(selected)
@@ -1545,6 +1548,8 @@ impl Render for PopupMenu {
                     .border_color(gpui::rgb(0xcccccc))
                     .rounded(px(3.))
                     .shadow(vec![gpui::BoxShadow::new(px(0.), px(5.), gpui::hsla(0., 0., 0., 0.2)).blur_radius(px(10.))])
+                    // Its min width (live's 180 px) is the box's, border included.
+                    .when_some(self.min_width, |this, min_width| this.min_w(min_width))
             })
             .text_color(cx.theme().popover_foreground)
             .relative()
@@ -1560,7 +1565,7 @@ impl Render for PopupMenu {
                     // 2 px of overflow and a two-row list scrolled, qa4 F31.)
                     .when(self.tool_list, |this| this.p_0().gap_y(px(1.)))
                     .min_w(rems(8.))
-                    .when_some(self.min_width, |this, min_width| this.min_w(min_width))
+                    .when_some(self.min_width.filter(|_| !self.tool_list), |this, min_width| this.min_w(min_width))
                     .max_w(max_width)
                     .when(self.scrollable, |this| {
                         this.max_h(max_height)

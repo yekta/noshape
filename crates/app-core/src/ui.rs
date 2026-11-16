@@ -708,7 +708,7 @@ pub fn shortcut_chips(shortcut: &str) -> Div {
     h_flex().gap(px(2.)).children(keys.into_iter().map(shortcut_chip))
 }
 
-/// A toolbar dropdown row (§3.2, measured live): 32 px tall, a 20 px
+/// A toolbar dropdown row (§3.2, measured live): 32 px tall (35 with chips), a 20 px
 /// full-color icon in a 30 px cell, the name at 14 px and the shortcut
 /// chips at the right. Add `.on_click` to the result.
 pub fn menu_tool_item(name: &'static str, icon: &str, shortcut: Option<&'static str>) -> gpui_kit::component::menu::PopupMenuItem {
@@ -717,9 +717,10 @@ pub fn menu_tool_item(name: &'static str, icon: &str, shortcut: Option<&'static 
         let pal = p();
         let row = h_flex()
             .relative()
-            .h(px(32.))
+            // Live menus/ps-dropdown-01: a row with shortcut chips is 35 px tall, one without 32; the name right
+            // after the 30 px icon cell.
+            .h(px(if shortcut.is_some() { 35. } else { 32. }))
             .w_full()
-            .gap(px(4.))
             .child(div().w(px(30.)).flex_none().flex().items_center().justify_center().child(assets::icon(&icon, TOOL_ICON, cx)))
             .child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(name))
             .children(shortcut.map(shortcut_chips));
