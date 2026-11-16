@@ -2158,9 +2158,19 @@ fn check_batch(n: usize, first: u64, rich: bool) {
 /// Differences of ours from live on one case (empty: a match). Positions
 /// match within 1e-3 mm; a constraint is in error in both or neither; each
 /// curve's state (fully / under / over) is the same where live gave one.
+/// Ours against live: every difference.
 fn differences(case: &Value, live: &Value) -> Vec<String> {
-    let mut out = Vec::new();
+    let (mut d, s) = split_differences(case, live);
+    d.extend(s);
+    d
+}
+
+/// Ours against live: the differences that count, and where under-defined geometry settled elsewhere (a point or
+/// radius of a curve live calls under-defined: known, not counted in live_matches, DECISIONS 11-16).
+fn split_differences(case: &Value, live: &Value) -> (Vec<String>, Vec<String>) {
+    let (mut out, mut settled) = (Vec::new(), Vec::new());
     let ours = &case["ours"];
+    let under = |n: &str| live["curves"][n.split('.').next().unwrap_or(n)].as_str().is_some_and(|st| st.starts_with("under"));
     // (A point ours doesn't name differs.)
     let close = |a: &Value, b: &Value| {
         let c = |v: &Value, k: usize| v[k].as_f64().unwrap_or(f64::NAN);
@@ -2172,19 +2182,19 @@ fn differences(case: &Value, live: &Value) -> Vec<String> {
             if let Some(list) = p.as_array().filter(|l| l.first().is_some_and(Value::is_array)) {
                 let mine = ours["points"][n].as_array();
                 if !mine.is_some_and(|m| m.len() == list.len() && m.iter().zip(list).all(|(a, b)| close(a, b))) {
-                    out.push(format!("{n}: ours {} live {p}", ours["points"][n]));
+                    (if under(n) { &mut settled } else { &mut out }).push(format!("{n}: ours {} live {p}", ours["points"][n]));
                 }
                 continue;
             }
             if !close(&ours["points"][n], p) {
-                out.push(format!("{n}: ours {} live {p}", ours["points"][n]));
+                (if under(n) { &mut settled } else { &mut out }).push(format!("{n}: ours {} live {p}", ours["points"][n]));
             }
         }
     }
     if let Some(radii) = live["radii"].as_object() {
         for (n, v) in radii {
             if (ours["radii"][n].as_f64().unwrap_or(f64::NAN) - v.as_f64().unwrap()).abs() >= 1e-3 {
-                out.push(format!("{n} radius: ours {} live {v}", ours["radii"][n]));
+                (if under(n) { &mut settled } else { &mut out }).push(format!("{n} radius: ours {} live {v}", ours["radii"][n]));
             }
         }
     }
@@ -2202,13 +2212,14 @@ fn differences(case: &Value, live: &Value) -> Vec<String> {
     if let Some(curves) = live["curves"].as_object() {
         for (n, st) in curves {
             // "under  (pixel mix …)": the colour read under the label.
-            let st = st.as_str().and_then(|x| x.split_whitespace().next()).unwrap_or("");
+            // ("under?": too faint to be sure, but neither black nor red: under-defined.)
+            let st = st.as_str().and_then(|x| x.split_whitespace().next()).unwrap_or("").trim_end_matches('?');
             if ours["curves"][n] != st {
                 out.push(format!("{n}: ours {} live {st}", ours["curves"][n]));
             }
         }
     }
-    out
+    (out, settled)
 }
 
 /// The sum of the named points' distances from live's (mm).
@@ -2239,24 +2250,26 @@ fn drag_differences(seed: u64, rich: bool, case: &Value, live: &Value) -> Vec<St
         .collect()
 }
 
+/// Live's defect (DECISIONS 11-16: s8, s10, s11): with redundant constraints in the sketch, it calls under-defined
+/// curves fully defined. True when that is all that differs: such a curve's status and where it settled.
+fn redundant_called_fully(case: &Value, live: &Value, counted: &[String]) -> bool {
+    let fully: Vec<&str> = live["curves"].as_object().into_iter().flatten().filter(|(n, st)| st.as_str().is_some_and(|x| x.starts_with("fully")) && case["ours"]["curves"][n.as_str()] == "under").map(|(n, _)| n.as_str()).collect();
+    let redundant = case["ours"]["redundant"].as_array().is_some_and(|r| !r.is_empty());
+    redundant && !fully.is_empty() && counted.iter().all(|d| fully.iter().any(|n| d.starts_with(&format!("{n}:")) || d.starts_with(&format!("{n}."))))
+}
+
 /// Ours against live's answers (`sketch-N.live.json`, written by live:
 /// `{"cases": {"s1": {"solved": bool, "points": {...}, "radii": {...}, "constraints": {...}, "curves": {...}, "drag": {...}}}}`).
-/// Fails on a solvability difference (live "Sketch could not be solved."
-/// against ours Solved, or the reverse); position differences are counted
-/// and printed: under-defined geometry lands where each solver's least
-/// change puts it, and live's rule is still being pinned down (handoff).
-/// Live defects, not targets (DECISIONS 11-16): live calls a line held by redundant constraints fully defined.
-const LIVE_DEFECTS: [&str; 3] = ["s8", "s10", "s11"];
-/// Where free geometry settles after a drag: known and not counted until a general rule for live's drag model is
-/// found, no per-case rules (DECISIONS 11-16). Their other differences still count.
-const DRAG_SETTLE: [&str; 4] = ["s1", "s5", "s6", "s14"];
-
+/// Fails on any counted difference. Not counted (DECISIONS 11-16): live's defects (a case it can't solve; under-defined
+/// curves it calls fully defined beside redundant constraints) and where under-defined geometry settles, in the solve
+/// or after a drag (FUZZ_SETTLES=1 lists them), until a general rule for live's least change is found.
 #[test]
 #[ignore = "T2: live fuzz batch vs live"]
 fn live_matches() {
     let (mut cases, mut status_ok, mut exact, mut defects) = (0, 0, 0, 0);
     let mut report = Vec::new();
     let mut positions = Vec::new();
+    let mut settles = Vec::new();
     for (n, first, rich) in BATCHES {
         let Ok(live) = std::fs::read_to_string(fixture(&format!("sketch-{n}.live.json"))) else { continue };
         // Ours as the solver stands now (the batch file keeps ours as sent);
@@ -2276,7 +2289,15 @@ fn live_matches() {
                 continue;
             }
             cases += 1;
-            if LIVE_DEFECTS.contains(&name) {
+            // Live defects (DECISIONS 11-16): a case live fails to solve at all.
+            if l["solved"] == false {
+                defects += 1;
+                continue;
+            }
+            // Where free geometry settles, in the solve (under-defined) or after a drag: known, not counted until a
+            // general rule for live's least change and drag model is found (DECISIONS 11-16; no per-case rules).
+            let (d, mut s) = split_differences(case, l);
+            if redundant_called_fully(case, l, &d) {
                 defects += 1;
                 continue;
             }
@@ -2285,22 +2306,31 @@ fn live_matches() {
                 Some(ls) if ls != solved => report.push(format!("{name}: ours {}, live {}", case["ours"]["status"], l["message"])),
                 _ => status_ok += 1,
             }
-            let mut d = differences(case, l);
-            if !DRAG_SETTLE.contains(&name) {
-                d.extend(drag_differences(case["seed"].as_u64().unwrap(), rich, case, l));
+            s.extend(drag_differences(case["seed"].as_u64().unwrap(), rich, case, l));
+            if !s.is_empty() {
+                settles.push(format!("{name} ({} settle elsewhere, {:.2} mm): {}", s.len(), position_error(case, l), s.join("; ")));
             }
             if d.is_empty() {
                 exact += 1;
             } else {
-                positions.push(format!("{name} ({} differ, {:.2} mm{}): {}", d.len(), position_error(case, l), if l["solved"] == false { ", live unsolved" } else { "" }, d.join("; ")));
+                positions.push(format!("{name} ({} differ, {:.2} mm): {}", d.len(), position_error(case, l), d.join("; ")));
             }
         }
     }
-    println!("live fuzz (sketch): {cases} cases answered, {defects} live defects ({}), solvability matches {status_ok}, everything matches {exact}; drags known, not counted: {}", LIVE_DEFECTS.join(", "), DRAG_SETTLE.join(", "));
+    let counted = cases - defects;
+    println!("live fuzz (sketch): {cases} cases answered, {defects} live defects (unsolvable, or under-defined curves called fully defined beside redundant constraints), {counted} counted: solvability matches {status_ok}, everything else matches {exact}; {} settle elsewhere (known, not counted)", settles.len());
+    let wide = std::env::var("FUZZ_WIDE").map_or(300, |_| 4000);
     for p in &positions {
-        println!("  {}", p.chars().take(std::env::var("FUZZ_WIDE").map_or(300, |_| 4000)).collect::<String>());
+        println!("  {}", p.chars().take(wide).collect::<String>());
+    }
+    if std::env::var_os("FUZZ_SETTLES").is_some() {
+        for p in &settles {
+            println!("  known: {}", p.chars().take(wide).collect::<String>());
+        }
     }
     assert!(report.is_empty(), "{}", report.join("\n"));
+    // Every counted case matches (DECISIONS 11-16): a difference now is a regression.
+    assert!(positions.is_empty(), "{} counted cases differ from live", positions.len());
 }
 
 /// Probes of live's least change (after batch 1, where under-defined

@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-16 01:44 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
+Updated 2026-11-16 01:47 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
 only when a line here points there).
 
 ## In flight
@@ -40,9 +40,12 @@ only when a line here points there).
 1. The tracking answer (22:02): if Onshape's tracking drops a merged edge, make ours do the same (custom host query.rs
    tracking), check the 8 sheet metal suite documents + T2s, and restore the corner-vertex asserts in
    sheetmetal_std::sheet_metal_entities_are_labelled_after_their_definition_entitys_feature.
-2. Fuzz parked (DECISIONS 11-16): live_fuzz::live_matches reports s8 / s10 / s11 as live defects (LIVE_DEFECTS) and
-   leaves the drags of s1 / s5 / s6 / s14 uncounted (DRAG_SETTLE) until a general rule for live's drag model; no
-   per-case rules. 770 of 827 counted match; the other 57 are base-solve placement (23 of them live unsolved).
+2. Dropped sketch constraints (74 over the 87 documents of 23:11), largest documents first (lead 2026-11-16).
+3. Fuzz closed (DECISIONS 11-16): live_fuzz::live_matches now fails on any counted difference; 801 of 801 counted
+   match. Not counted: 29 live defects (23 live can't solve; 6 with redundant constraints where live calls
+   under-defined curves fully defined: s5 s6 s8 s10 s11 s14) and 29 cases whose under-defined geometry settles
+   elsewhere (FUZZ_SETTLES=1 lists them). "under?" in live's capture (too faint, no black / red) reads as under.
+   write_batch fails on the Mac only (aarch64 float digits in the generator check).
 
 ## Current numbers
 - Model suite 2026-11-16 00:01 vibe6 (suite-2354.log): 80/111 documents, 1019/1292 features (24 documents new to the
@@ -51,7 +54,7 @@ only when a line here points there).
   shaped-flange 809 / 1026, overcut-dogbone 210 / 270, hem 65 / 95. All four are faster than live; the suite's slower
   figures were host load.
 - Exchange: model-plus STEP / IGES import in live as 58/151/94 (6f5b151e snap_coplanar); dx "live imports ours" 43/48.
-- Sketch fuzz vs live: 770 of 827 counted (3 live defects); probes 20 11/11, probes 11 s236 open.
+- Sketch fuzz vs live: 801 of 801 counted (29 live defects, 29 known settles, of 830); probes 20 11/11.
 
 ## Hosts and rules (mine; DECISIONS.md has the general ones)
 - Builds and crate tests on the Mac: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c '…'` (one slot; rb.sh keeps file
