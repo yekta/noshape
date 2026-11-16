@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-16 15:08 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-16 16:20 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -9,27 +9,22 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## In flight
 
-- Speed (P0, lead 11-16 14:23): branch `blend-samples` in blend5 (on 3178c98b5), 4 commits, g++-13 OK:
-  e3f5d1a32 SamplesScope per fillet / chamfer (a4e419 Fillet 1's IsTangentFaces); 7ce936eab tools named in parallel,
-  lies_on samples once, classifiers kept; aa828af21 rolling-ball tools made on another thread while OCCT tries the round
-  (stop flag set when OCCT's round isn't split; checked between balls and before lofts), lies_on per tool in parallel
-  (OSD_Parallel, own projectors / classifiers, read back in order); e34b0c1f3 conic_contacts' chain boxes before
-  distances. Mac release (hints): knife Fillet 5 41 -> 23 ms (live 9), Fillet 3 81 -> 63 (live 11); a4e419 83 -> 65 ms
-  (live 78; its Fillet 1 36 ms: OCCT's round at the working scale after the as-is one fails, a 1e-7 smaller retry, its
-  FixSmallFace pass). All identical by construction. Knife, Mac: Fillet 2 95 (live 9), Fillet 8 65 (12), Fillet 6 20 (7).
-  Fillet 5 still: OCCT 5 || balls 6.6, direct build 12.8 (tools 4.4: face 13's FClass2d slow path; sections 2.5, part
-  faces 2, solid 1.6, check 1), naming 2. Tried and reverted: foot-off-box skip in lies_on (no gain).
-- Runs: vibe7 unit blend-seq-ss7 (blend5 release suite -> suite-r-ss.log / .cmp via bin/cmp-strict.py against vibe6's
-  suite-r-base.log, then the A/B blend8 vs blend5 x3 in vibe7's slot, knife + ma4 -> ab-speed.log, flag ab-speed.done);
-  vibe5 unit blend-ud-ss (release CLIs blend8 / blend5, qa's userdocs.py on hats + dock -> ud-ss.log). Land blend5 when
-  suite strict-identical, userdocs SAME, A/B faster.
-- bin/cmp-strict.py: each document's summary line without times (first difference, counts, volumes): use it, not
-  cmp-suite.py (match counts only).
-- vibe6 (release suites, bin/suite-rel.sh): base blend8 3178c98b5 done (suite-r-base.log, 127 docs); blend3 706404cab
-  (impeller chamfer join) strict-identical on all 127 (its own impeller effect hidden there by asm's Extrude 4 bug: check
-  on current main before landing); blend6 4b2f94289 scale-first queued (unit blend-seq-sf2 -> suite-r-sf.cmp).
-- Land when the cmps are identical: blend3 (impeller chamfer join; core/dx told earlier), blend6 (scale-first; also
-  its assemblies, asm-one.sh, not yet rerun), blend5 (after the A/B).
+- Speed (P0): branch `blend-samples` (blend5, 4 commits) QUEUED as d818750d (11-16 ~16:15): SamplesScope per
+  fillet / chamfer; rolling-ball tools named in parallel, lies_on samples once; ball tools made while OCCT tries the round
+  (scoped thread, stop flag when OCCT's round isn't split), lies_on per tool in parallel; conic_contacts box prefilter.
+  Evidence: release suite strict-identical 127/127 (suite-r-ss.cmp, vibe7 vs vibe6 base), userdocs hats + dock ALL-SAME,
+  g++-13 OK. Same-session A/B vibe7 (load 5-8: a hint), medians of 3, main -> branch: knife Fillet 5 89 -> 57 ms (live 9),
+  Fillet 3 202 -> 156 (11), Fillet 8 243 -> 178 (12), knife 2496 -> 2379; a4e419 Fillet 1 179 -> 132 (live 16), its
+  regeneration 291 -> 223 (live 78). Mac release: Fillet 5 41 -> 23, a4e419 83 -> 65.
+- What's left in Fillet 5 (Mac 23 ms): OCCT's try 5 || ball tools 6.6 (3 lofts: ThruSections CreateSmoothed, MakeSolid's
+  classifier, CompatibleWires), direct build ~12 (lies_on on face 13: FClass2d's slow path; IntSS sections; check,
+  sew), naming 2. Knife Fillet 2 (Mac 95, live 9): trimmed_run_on's OCCT split of the tool by the extended walls 26 ms,
+  wall extension 9.5, met-face distances 6.5, then the fuse 26 (Booleans with extended B-spline faces). a4e419 Fillet 1:
+  OCCT's round at the working scale (the as-is one fails), a 1e-7 smaller retry and FixSmallFace: all needed as is.
+- Landed 11-16: d7f9264c9 impeller chamfer end edge joined (impeller 26 -> 27/48 on main; strict suite 127/127, userdocs
+  SAME). Core told.
+- vibe6: scale-first blend6 4b2f94289 (rebased on 3178c98b5) release suite queued (unit blend-seq-sf2 -> suite-r-sf.log;
+  compare with bin/cmp-strict.py against suite-r-base.log), then its assemblies (asm-one.sh) and userdocs before landing.
 - Live's knife times (11-16): Fillet 1-8 8/9/10/6/9/27/7/12 ms, studio 622. Lead: Fillet 5 at or below live is P0.
 - impeller Fillet 3: PARKED by the lead (behind speed and the gearbox fillet). WIP only in parked/imp-f3-conic-balls-wip.patch
   (blend10 is now the speed branch), which also holds the ZZ
