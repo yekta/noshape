@@ -84,8 +84,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
   its pair.
 - c2-surf-workshop-cpcurves Main pipe (thin sweep, 7/24): (1) Sketch 4's circle kept 18.8 mm off the path (translator
   take-back: in skasm's handoff). (2) Mine: live merges the faces swept along the path's three collinear lines into
-  one per wall (6 faces; ours 10: a face per path edge). Try unify_same_domain on sweep results (same surface only:
-  the spline's face stays apart), names via unify_merged as solid_a.rs ~1808; needs a suite pair.
+  one per wall (6 faces; ours 10: a face per path edge). **Committed b173dc5bb (core-oc, NOT in the vibe7 pair):
+  join_collinear_lines joins a sweep path's lines along one line into one edge (first piece's source)**: Main pipe's
+  faces = live (only its box differs, the take-back). T1 features_a::a_sweep_along_collinear_lines_has_one_side_face.
+- **Landing plan:** the vibe7 pair covers 1357fddb1..bcaf5ffdb. 97b778e7d and b173dc5bb need a second full pair
+  (base bcaf5ffdb, branch HEAD) before landing; land the six from a worktree at bcaf5ffdb (core-trace) if the second
+  pair isn't done when the first comes back clean.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
