@@ -3421,3 +3421,43 @@ fn a_surface_extrudes_cylinder_keeps_the_sweeps_frame() {
     let (o, z, x, _) = frame(false).unwrap();
     assert!(close(o, DVec3::new(0.0, 0.0, 0.001524)) && close(z, -DVec3::Z) && close(x, -DVec3::X), "solid {o} {z} {x}");
 }
+
+/// Subtract with Offset on a tool's free-form face (c2-fan-blade-sweep's Boolean 2: thread flanks): the face moved as
+/// its exact offset before the cut. A 40 x 40 x 10 mm block less a 20 mm tall tool whose back is an extruded fit
+/// spline, that face offset 1 mm: the cut grows by about the spline's length x 1 mm x the block's 10 mm.
+#[test]
+fn subtract_with_offset_moves_a_tools_spline_face() {
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    let run = |offset: bool| {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.04, 0.04, "10 mm");
+        let mut sk = noshape_sketch::Sketch::new();
+        sk.add_line(mm(10.0, 10.0), mm(30.0, 10.0));
+        sk.add_line(mm(30.0, 10.0), mm(30.0, 20.0));
+        sk.add_fit_spline(&[mm(30.0, 20.0), mm(23.0, 24.0), mm(17.0, 21.0), mm(10.0, 23.0)]).unwrap();
+        sk.add_line(mm(10.0, 23.0), mm(10.0, 10.0));
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = t.regions(s)[0].clone();
+        t.add("extrude", &[("entities", q(vec![region])), ("depth", e("20 mm")), ("operationType", en("NEW"))]);
+        let r = t.ok();
+        let (block, tool) = (&r.context.bodies[0], &r.context.bodies[1]);
+        let spline = tool.shape.faces().iter().position(|f| !matches!(f.face_surface(), Ok(noshape_kernel::Surface::Plane(_)))).unwrap();
+        let area = tool.shape.faces()[spline].area().unwrap();
+        let mut p = vec![
+            ("operationType", en("SUBTRACTION")),
+            ("targets", q(vec![Reference::Body(block.id.clone())])),
+            ("tools", q(vec![Reference::Body(tool.id.clone())])),
+        ];
+        if offset {
+            p.extend([("offset", b(true)), ("offsetDistance", e("1 mm")), ("entitiesToOffset", q(vec![Reference::Face((*tool.faces[spline]).clone())]))]);
+        }
+        t.add("booleanBodies", &p);
+        let r = t.ok();
+        (total_volume(&r.context), area)
+    };
+    let (plain, area) = run(false);
+    let (moved, _) = run(true);
+    // (The spline's length from its face's area over the tool's 20 mm; the offset curve is a little longer or shorter.)
+    let want = area / 0.02 * 1e-3 * 0.01;
+    assert!(((plain - moved) - want).abs() < 0.05 * want, "{} mm3 more cut, about {}", (plain - moved) * 1e9, want * 1e9);
+}
