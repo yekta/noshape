@@ -975,11 +975,18 @@ pub fn standard_orientation(drawing: &Drawing, sheet: &Sheet, id: ViewId) -> Opt
         .find(|o| orientation_frame(*o).dir.normalize().dot(dir) > 1.0 - 1e-9)
 }
 
+/// [`reoriented_base`]'s answer: the base view, the orientation naming it and its frame (viewing direction, up), None
+/// when it is that orientation's own.
+pub struct Reoriented {
+    pub base: ViewId,
+    pub orientation: ViewOrientation,
+    pub frame: Option<[[f64; 3]; 2]>,
+}
+
 /// A projected view's View orientation ▸ `target`: its base view and the base's new orientation and frame (viewing
 /// direction, up) under which this view shows `target`; the family follows, still projected (live2 vo-probe: Right ›
 /// Top turns the Front base into Left, the old Top into Back).
-/// The frame is None when it is `o`'s own (a standard orientation, no custom frame).
-pub fn reoriented_base(drawing: &Drawing, sheet: &Sheet, id: ViewId, target: ViewOrientation) -> Option<(ViewId, ViewOrientation, Option<[[f64; 3]; 2]>)> {
+pub fn reoriented_base(drawing: &Drawing, sheet: &Sheet, id: ViewId, target: ViewOrientation) -> Option<Reoriented> {
     let mut base = id;
     for _ in 0..32 {
         match &sheet.view(base)?.kind {
@@ -997,7 +1004,7 @@ pub fn reoriented_base(drawing: &Drawing, sheet: &Sheet, id: ViewId, target: Vie
     let o = named.into_iter().find(|o| orientation_frame(*o).dir.dot(dir.normalize()) > 1.0 - 1e-9).unwrap_or(ViewOrientation::Front);
     let own = orientation_frame(o);
     let standard = own.dir.dot(dir.normalize()) > 1.0 - 1e-9 && own.up.dot(up.normalize()) > 1.0 - 1e-9;
-    Some((base, o, (!standard).then(|| [dir.to_array(), up.to_array()])))
+    Some(Reoriented { base, orientation: o, frame: (!standard).then(|| [dir.to_array(), up.to_array()]) })
 }
 
 pub fn view_frame(drawing: &Drawing, sheet: &Sheet, id: ViewId) -> Option<ViewFrame> {

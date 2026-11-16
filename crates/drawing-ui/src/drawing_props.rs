@@ -1275,7 +1275,7 @@ impl DrawingEditor {
 impl DrawingEditor {
     /// View orientation ▸ `o` on a projected view: its base turned so that it shows `o`, the family following.
     pub(crate) fn reorient_from(&mut self, id: ViewId, o: ViewOrientation, cx: &mut Context<Self>) {
-        let Some((base, named, frame)) = views::reoriented_base(&self.drawing, self.current_sheet(), id, o) else { return };
-        self.edit_view("View orientation", base, cx, move |v| noshape_scene::drawing_tools::view_edit::set_base_frame(v, named, frame));
+        let Some(r) = views::reoriented_base(&self.drawing, self.current_sheet(), id, o) else { return };
+        self.edit_view("View orientation", r.base, cx, move |v| noshape_scene::drawing_tools::view_edit::set_base_frame(v, r.orientation, r.frame));
     }
 }

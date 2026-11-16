@@ -194,8 +194,8 @@ fn view_display(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         if noshape_model::drawing::views::standard_orientation(&t.d, &t.d.sheets[t.sheet], id) == Some(o) {
             return Err(OpError::param("orientation", &format!("the view already shows {name}")));
         }
-        let (base, named, frame) = noshape_model::drawing::views::reoriented_base(&t.d, &t.d.sheets[t.sheet], id, o).ok_or_else(|| OpError::param("view", "a projected view of a base view"))?;
-        edits.push(("View orientation", base, Box::new(move |v| ve::set_base_frame(v, named, frame))));
+        let r = noshape_model::drawing::views::reoriented_base(&t.d, &t.d.sheets[t.sheet], id, o).ok_or_else(|| OpError::param("view", "a projected view of a base view"))?;
+        edits.push(("View orientation", r.base, Box::new(move |v| ve::set_base_frame(v, r.orientation, r.frame))));
     } else if let Some(name) = a.opt_str("orientation")? {
         let ViewKind::Base { source, .. } = v.kind else { return Err(OpError::param("orientation", "base and projected views only (View orientation ▸)")) };
         let doc = od.doc();
