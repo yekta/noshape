@@ -1,4 +1,4 @@
-# bool2: current state (11-16 01:58 UTC)
+# bool2: current state (11-16 06:30 UTC)
 
 Second agent on noshape's own Boolean (crates/brep, crates/kernel/cpp/rust_boolean.cpp, boolean.cpp's unify). A case
 is taken only where it equals OCCT (or live, with a capture); results identical end to end (docs/DECISIONS.md 11-14).
@@ -8,19 +8,25 @@ History: docs/handoff/archive/bool2.md. Rulings: docs/DECISIONS.md.
 - 68c1942bd (helical unify: a cylinder group whose boundary meets the seam's line between vb and vt isn't projected;
   Sweep 1's unify 71-77 -> 23-26 ms) queued 11-16: gate57 clean (replay 3026 -> 3026 taken, 5 -> 5 differing; suite
   98 docs 883/935 both), hats/dock SAME against main. OCCT patch 0031's commit waits on branch bool2-oc31 (ae1731fbf).
-- OCCT patch 0031 (patches/occt/0031-topoltool-bspline-samples-grid.patch; lead approved 11-15 on 0030's terms):
-  Adaptor3d_TopolTool::BSplSamplePnts evaluates its grid once (c2-impeller-loft Extrude 4's Boolean 125-160 -> 73-81
-  ms). Libraries staged: vibe5 ~/agents/bool2-keep/occt-0031 (/opt/occt with the patched object in libTKG3d.a; GCC 15
-  -march=x86-64 with OCCT's flags incl. -DNo_Exception -DOCCT_NO_PLUGINS, no ymm/vfmadd; g++-13 compiles it clean),
-  Mac ~/noshape-host/occt-0031 (arm64, Apple clang, the build tree's own command). Checks: corpora replay against
-  gate57's 68c1942bd identical (/root/bool2-scratch/occt31-gate.out); suite 98 common docs unchanged, 12 docs new
-  since; A's suite run later differed on 20 c2-surf docs only because those model files were rewritten at 01:10 UTC
-  between the runs: unit bool2-occt31-suite2 (/root/bool2-scratch/occt31-suite2.out) runs A and B side by side.
-  Unit bool2-occt31-rest (/root/bool2-scratch/occt31-rest.out): hats/dock A vs B and main vs A
-  (~/tmp/bool2/udoc/run.sh, copies deleted after). Then: tell the lead the commit; the lead installs the libs on
-  vibe3/5/6/7 (+ /root/occt); then land.sh (all.rs out).
-- Lead's gate.sh change (builds through ~/bin/slot, SLOT_MIN_GB=12) queued as 46ce12b0 from worktree
-  /root/projects/noshape-wt/bool2-tools (branch bool2-gate-slot); remove that worktree once landed.
+- OCCT patch 0031 (branch bool2-oc31, ae1731fbf; lead approved 11-15 on 0030's terms): Adaptor3d_TopolTool::
+  BSplSamplePnts evaluates its grid once (c2-impeller-loft Extrude 4's Boolean 125-160 -> 73-81 ms). Libraries staged:
+  vibe5 ~/agents/bool2-keep/occt-0031 (GCC 15 -march=x86-64, OCCT's flags incl. -DNo_Exception -DOCCT_NO_PLUGINS, no
+  ymm/vfmadd; g++-13 clean), Mac ~/noshape-host/occt-0031 (arm64, Apple clang). Done: corpora replay identical to
+  gate57's (occt31-gate.out); hats/dock A vs B SAME 12/12. Open: the suite pair. The side-by-side run
+  (occt31-suite2.out) lost B's shard s7 to its 5400 s timeout after bracket120-datenkrake (A's s7: 91 s), so 17 docs
+  had no result, and the models changed under it (137 docs). Unit bool2-s7 (/root/bool2-scratch/s7-docs.out,
+  vibe5 ~/agents/bool2-keep/s7-docs.sh) runs those 17 docs one at a time, B then A, 600 s each, on a snapshot: a hang
+  under B = find why; none = rerun the suite pair on a snapshot. Then the commit to the lead (installs), land.sh.
+  Binaries: A kernel ../target (vibe5 ~/agents/bool2/target), A ops ~/agents/bool2-gate/target/.../all-a79b487bf0dd0b06,
+  B ~/agents/bool2-keep/target-occt31; CLIs ~/agents/bool2-keep/cli-{main,a,b}.
+- gate.sh: builds through ~/bin/slot (SLOT_MIN_GB=12) landed 19afd619; the models snapshot (cp -al into
+  ~/tmp/bool-gate/models-<caller>-<sha>-<pid>, NOSHAPE_GATE_MODELS for gate-host.py, deleted at exit; DECISIONS 11-16)
+  queued add363bf from worktree /root/projects/noshape-wt/bool2-tools (branch bool2-gate-slot): remove it once landed.
+  My own suite pairs must read such a snapshot too.
+- qa's P0 helical Sweep 1 0.4.48 -> 0.4.53 2.2x slower: 0.4.53 lacks 895c8e3b (its cut declined to OCCT). vibe7
+  same run: 0.4.48 341-557 ms, 0.4.53 873-977, current + e47268f2 257-326. Told qa 11-16. Its unify (15-16 ms on vibe5:
+  usd.check 7, loop_pieces 4, patches 3) is ~20 ms over 0.4.48's on vibe7 under load (another Boolean result): low.
+- Impeller Extrude 4 with 0031 (samples): OCCT's PointDepart 16 %, BRepCheck 13 %, the rest spread.
 - core's housing unify item (11-16): CLI path Rotieren 1 unify 24-26 ms, Boolesch 1 13-24, Bohrung 1 ~10; each a USD
   merge rejected at 4.9e-15 m³ vs 1e-9 V (borderline), three memo-hit tries + one volume (9 ms). No identical-result
   cut without moving that threshold (needs live's counts). Reported to core.
