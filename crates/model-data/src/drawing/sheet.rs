@@ -206,6 +206,10 @@ pub struct SheetGeometry {
     /// y1], its value's `texts`): each is a note edited in place (live qa4
     /// round 5 s11 (4)).
     pub title_cells: Vec<(String, [f64; 4], std::ops::Range<usize>)>,
+    /// Where a field picks when that isn't its whole cell (key, rectangle): TITLE's lines, each its text and the line
+    /// above.
+    #[serde(default)]
+    pub title_hits: Vec<(String, [f64; 4])>,
 }
 
 /// Chamfer dimension settings (Drawing properties › Dimensions › Chamfer).
@@ -1241,8 +1245,21 @@ impl SheetGeometry {
         {
             let v = value_of("Title", sheet.title_field("Title").unwrap_or(""));
             let t0 = self.texts.len();
+            // Each line picks on its own: its text and the line above it (live2 rmb-probe hover sweep: x 230 mm picks
+            // the first "----" from y 40 to 44, the second from 36 to 38; x 205 and 270 nothing).
+            let mut lines = Vec::new();
             for (i, l) in v.split('\n').filter(|l| !l.is_empty()).enumerate() {
+                let t = self.texts.len();
                 field(self, at((0.74691, 0.75882), 0.67 - 0.126 * i as f64), 2.4 * lab, l, (0.45679, 0.43529), 0.126);
+                lines.push(t..self.texts.len());
+            }
+            let pitch = 0.126 * bh;
+            for r in &lines {
+                let pts: Vec<[f64; 2]> = self.texts[r.clone()].iter().flat_map(font::text_box).collect();
+                let (lo, hi) = pts.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
+                if lo[0] <= hi[0] {
+                    self.title_hits.push(("Title".to_string(), [lo[0] - 1.0, lo[1], hi[0] + 1.0, hi[1] + pitch]));
+                }
             }
             self.title_cells.push(("Title".to_string(), [px(mid), py(right_rows[2]), x1, py(right_rows[1])], t0..self.texts.len()));
         }

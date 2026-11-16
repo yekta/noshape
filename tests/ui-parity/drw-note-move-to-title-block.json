@@ -5,6 +5,12 @@
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-06: drawing menus, most-used first)",
   "start": "block-drawing",
+  "excluded": [
+    {
+      "from_step": 8,
+      "why": "Live's note menu has Add comment and a separator (comments: a left-out cloud feature; lead 11-16, DECISIONS 76780c8c5). Shifted up to fit the window, its Move to ▸ Title block row sits ~30 px higher than ours, so live's pointer ends on Front's bottom edge (lit) and ours 31 px under it."
+    }
+  ],
   "steps": [
     {
       "do": "click",

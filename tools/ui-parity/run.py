@@ -1469,11 +1469,14 @@ def main():
         start = scenario.get("start")
         whole = isinstance(start, str) and any(k in STARTS.get(start, {}) for k in ("tabs", "page"))
         live_rec = forget_old_query_states(json.loads(live.read_text()))
-        # A live defect (README "live_defects"): live's states from that step on aren't compared.
-        cut = min((d["from_step"] for d in scenario.get("live_defects") or []), default=None)
+        # A live defect or a left-out cloud feature's effect (README "live_defects", "excluded"): live's states from
+        # that step on aren't compared.
+        defect = min((d["from_step"] for d in scenario.get("live_defects") or []), default=None)
+        excluded = min((d["from_step"] for d in scenario.get("excluded") or []), default=None)
+        cut = min((c for c in (defect, excluded) if c is not None), default=None)
         if cut is not None:
             live_rec["steps"] = [s for s in live_rec.get("steps", []) if s.get("step", 0) < cut]
-        note = f", live defect from step {cut} not compared" if cut is not None else ""
+        note = "" if cut is None else f", live defect from step {cut} not compared" if cut == defect else f", excluded feature from step {cut} not compared"
         m, n, first = compare(live_rec, ours, whole)
         steps_ok, steps_all = steps_ok + m, steps_all + n
         if first is None:

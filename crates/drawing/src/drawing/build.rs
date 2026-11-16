@@ -236,6 +236,9 @@ pub struct BuiltSheet {
     pub title_rect: Option<[f64; 4]>,
     /// The title block's field cells (pick, rectangle).
     pub title_cells: Vec<(u32, [f64; 4])>,
+    /// Where a field picks instead of its whole cell (pick, rectangle): TITLE's lines.
+    #[serde(default)]
+    pub title_hits: Vec<(u32, [f64; 4])>,
 }
 
 impl BuiltSheet {
@@ -324,8 +327,10 @@ impl BuiltSheet {
         // A field cell's note over the block's lines; anywhere else inside
         // the title block selects it.
         let inside = |r: &[f64; 4]| p[0] >= r[0] && p[0] <= r[2] && p[1] >= r[1] && p[1] <= r[3];
+        // (A field with lines of its own picks only there: live2 rmb-probe, TITLE.)
+        let own = |pick: &u32| self.title_hits.iter().any(|(p, _)| p == pick);
         if best.is_none_or(|(k, _)| matches!(self.picks.get(k as usize), Some(PickTarget::TitleBlock)))
-            && let Some((pick, _)) = self.title_cells.iter().find(|(_, r)| inside(r))
+            && let Some((pick, _)) = self.title_hits.iter().find(|(_, r)| inside(r)).or_else(|| self.title_cells.iter().find(|(p, r)| !own(p) && inside(r)))
         {
             return Some(*pick);
         }
@@ -1797,6 +1802,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         })
         .collect();
 
+    let title_hits: Vec<(u32, [f64; 4])> = std::mem::take(&mut g.title_hits)
+        .into_iter()
+        .filter(|(key, _)| sheet.title_field_note(key).is_none())
+        .map(|(key, r)| (picks.id(PickTarget::TitleField(key)), r))
+        .collect();
+
     let mut placements: Vec<ViewPlacement> = Vec::new();
     // Parent mirrors of linked views have no place on this sheet.
     for v in sheet.views.iter().filter(|v| !v.id.is_ghost() || v.id.is_child_ghost()) {
@@ -3073,7 +3084,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     g.freeform_lines.dedup();
     g.polyline_lines.sort_unstable();
     g.polyline_lines.dedup();
-    BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, lost, tables: table_layouts, title_rect, title_cells }
+    BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, lost, tables: table_layouts, title_rect, title_cells, title_hits }
 }
 
 /// The foot of the perpendicular from `p` to the line through `a` and `b`.

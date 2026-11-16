@@ -465,10 +465,19 @@ impl DrawingEditor {
             }
             // A view hovered under the pointer where a menu row was clicked: live lights it at once, its 11-15 reader
             // reads it (live2 drw-note-move-to-title-block s8, drw-view-align-horizontally s4).
+            // (Live's reach: lit 6 px under Front's bottom edge in drw-note-move-to-title-block, not 7 px over its top
+            // in drw-surface-finish-flip s6.)
+            let near = |v: ViewId| {
+                self.placement(v).is_some_and(|pl| {
+                    let c = self.cursor;
+                    let d = (pl.min[0] - c[0]).max(c[0] - pl.max[0]).max(0.0).hypot((pl.min[1] - c[1]).max(c[1] - pl.max[1]).max(0.0));
+                    d * self.zoom <= 6.5
+                })
+            };
             let hovered = self.hover.filter(|_| self.menu_closed_at == Some(self.cursor)).and_then(|h| match b.picks.get(h as usize) {
                 Some(PickTarget::View(v) | PickTarget::Edge { view: v, .. }) => Some(*v),
                 _ => None,
-            });
+            }).filter(|v| near(*v));
             if let Some(v) = hovered {
                 selection.push(("EDGE+".into(), self.ui_view_name(v)));
             }

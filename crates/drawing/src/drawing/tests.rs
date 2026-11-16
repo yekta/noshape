@@ -1843,6 +1843,7 @@ fn formats_gaps_and_revision_tables_across_sheets() {
     assert!(!built.title_cells.is_empty());
     for &(pick, r) in &built.title_cells {
         assert!(matches!(built.picks[pick as usize], PickTarget::TitleField(_)));
+        let r = built.title_hits.iter().find(|h| h.0 == pick).map_or(r, |h| h.1);
         assert_eq!(built.hit([(r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0], 0.5), Some(pick), "{:?}", built.picks[pick as usize]);
     }
     let g = &built.geometry;
@@ -5507,4 +5508,34 @@ fn a_dimensions_value_keeps_its_distance_from_the_left_end_when_the_sheet_scale_
     assert_eq!(along(sheet, 902), None, "a vertical one over a horizontal edge measures nothing: unmoved");
     views::set_sheet_scale(sheet, 1.0);
     assert_eq!(along(sheet, 901), None, "back at 1:1: centred again");
+}
+
+#[test]
+fn title_lines_pick_each_on_their_own() {
+    let mut d = Drawing::default();
+    d.sheets[0].title_style = TitleBlockStyle::Ansi;
+    d.sheets[0].size = SheetSize::AnsiA;
+    let fields = &mut d.sheets[0].title_block.fields;
+    match fields.iter_mut().find(|(k, _)| k == "Title") {
+        Some(f) => f.1 = "ONE\nTWO".into(),
+        None => fields.push(("Title".into(), "ONE\nTWO".into())),
+    }
+    let b = render_sheet(&d, 0, &super::views::Sources::new(), &ViewCache::new(), false).unwrap();
+    // ANSI TITLE's lines pick each on its own, from their text up to the line above, not across the row (live2
+    // rmb-probe: x 230 picks, x 205 doesn't).
+    let title = b.picks.iter().position(|t| *t == PickTarget::TitleField("Title".into())).expect("TITLE") as u32;
+    let lines: Vec<_> = b.geometry.texts.iter().filter(|t| t.pick == title).collect();
+    assert!(lines.len() >= 2, "{} lines", lines.len());
+    let bounds = |t: &sheet::Text2| {
+        let b = font::text_box(t);
+        let (xs, ys) = (b.map(|p| p[0]), b.map(|p| p[1]));
+        ([xs.iter().copied().fold(f64::MAX, f64::min), ys.iter().copied().fold(f64::MAX, f64::min)], [xs.iter().copied().fold(f64::MIN, f64::max), ys.iter().copied().fold(f64::MIN, f64::max)])
+    };
+    let top = lines.iter().max_by(|a, b| a.pos[1].total_cmp(&b.pos[1])).unwrap();
+    let pitch = top.pos[1] - lines.iter().map(|t| t.pos[1]).filter(|y| *y < top.pos[1]).fold(f64::MIN, f64::max);
+    let (lo, hi) = bounds(top);
+    let above = [(lo[0] + hi[0]) / 2.0, hi[1] + 0.5 * pitch];
+    assert_eq!(b.hit(above, 0.5), Some(title), "a line above the first line's text");
+    let cell = b.title_cells.iter().find(|c| c.0 == title).unwrap().1;
+    assert_ne!(b.hit([cell[0] + 3.0, (lo[1] + hi[1]) / 2.0], 0.5), Some(title), "the row away from the text");
 }

@@ -99,6 +99,13 @@ comparison: live's states from `from_step` on aren't compared, and the result li
 
     "live_defects": [{"from_step": 20, "why": "Onshape drops the first click after a box select … (live2, 3 runs)"}]
 
+### excluded (studios, 11-16)
+
+A difference a left-out cloud feature makes (comments, sharing…; AGENTS.md) ends the comparison the same way, the
+result line saying "excluded feature": the lead decides. Name what it is in `why`:
+
+    "excluded": [{"from_step": 8, "why": "live's menu has Add comment (cloud) …"}]
+
 ### steps
 - `{"do": "click" | "dblclick" | "rclick" | "hover", "on": TARGET}`; `hover` waits `ms` (default 1500); a click may
   carry `"mods": "shift" | "mod" | "alt"`, held during the click.
