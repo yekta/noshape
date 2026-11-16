@@ -633,6 +633,18 @@ def old_dimension_pick(a, b, recorded):
         lb["selection"] = [x for x in lb["selection"] if not (isinstance(x, dict) and x.get("kind") == "EDGE")]
 
 
+def panel_list_over_view(a, b):
+    """A list a drawing panel opened over a view: live's selection reader counts its pixels inside the view's box and says
+    EDGE <view> while it is open (live2 drw-note-panel-dropdowns s34: the Note editor's 22-row Insert drawing property
+    list over Front, [] again once closed). Ours draws its list as a menu, so such an EDGE isn't compared."""
+    la, lb = ((a or {}).get("drawing") or {}), ((b or {}).get("drawing") or {})
+    panel = ((a or {}).get("dialog") or {}).get("kind") in ("cell-format", "drawing-panel")
+    if not (panel and isinstance((a or {}).get("list"), dict) and isinstance(la.get("selection"), list) and isinstance(lb.get("selection"), list)):
+        return
+    if not any(isinstance(x, dict) and x.get("kind") == "EDGE" for x in lb["selection"]):
+        la["selection"] = [x for x in la["selection"] if not (isinstance(x, dict) and x.get("kind") == "EDGE")]
+
+
 def panel_fields_unread(a, b, recorded):
     """A drawing panel's fields: live's recorder read none before 11-10 (drw-inspection-table-export-csv, 11-07:
     "fields": []), so ours' aren't compared against those takes."""
@@ -1089,6 +1101,14 @@ def compare(live, ours, whole_document=True):
         nx = steps[i + 1]
         if (nx.get("do") or {}).get("do") == "wait" and isinstance((nx.get("state") or {}).get("undo"), dict):
             late_undo[f"step {st.get('step')}"] = nx["state"]["undo"]
+    # A panel live shows only by the wait after a click whose drawing it failed to read (live2 drw-hole-table-cell-bold
+    # s12: "translation failed", the Cell popup at s13): its next state's panel, ours shown at once.
+    late_dialog = {}
+    for i, st in enumerate(steps[:-1]):
+        cur, nx = st.get("state") or {}, steps[i + 1]
+        unread = isinstance(cur.get("drawing"), dict) and cur["drawing"].get("selection") is None
+        if unread and cur.get("dialog") is None and (nx.get("do") or {}).get("do") == "wait" and isinstance((nx.get("state") or {}).get("dialog"), dict):
+            late_dialog[f"step {st.get('step')}"] = nx["state"]["dialog"]
     for i, st in enumerate(steps[:-1]):
         m = (steps[i + 1].get("state") or {}).get("message")
         if isinstance(m, str):
@@ -1115,6 +1135,8 @@ def compare(live, ours, whole_document=True):
         # Live's document runner (run.mjs) blanks the tooltip after every step but a hover; its page runner (a state
         # with `url`: docs-*, prefs-*) reads it.
         tip_blanked = isinstance(a, dict) and "url" not in a and (step or {}).get("do") != "hover"
+        if isinstance(a, dict) and isinstance(b, dict) and a.get("dialog") is None and isinstance(b.get("dialog"), dict) and name in late_dialog:
+            a = dict(a, dialog=late_dialog[name])
         a = company_row(insert_panel(runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True)))
         b = company_row(insert_panel(runner_names(old_workspace_labels(a, reference_manager_as_panel(a, material_as_panel(a, json.loads(json.dumps(b))))), start_name, False)))
         if free_plan:
@@ -1184,7 +1206,8 @@ def compare(live, ours, whole_document=True):
             a = dict(a, assembly=None)
         # (camera and measure: also once our side records them, the Part Studio's for now.)
         keys = KEYS + [k for k in LATER_KEYS if k in (a or {}) and (whole_document or k != "document") and (k not in ("camera", "measure") or k in (b or {}))]
-        if (a or {}).get("drawing"):
+        # (Also where live's drawing read failed and was dropped: ours' drawing says it is one.)
+        if (a or {}).get("drawing") or (b or {}).get("drawing"):
             keys = [k for k in keys if k not in NOT_IN_DRAWINGS]
         a = {k: (a or {}).get(k) for k in keys}
         b = json.loads(json.dumps({k: (b or {}).get(k) for k in keys}))
@@ -1401,6 +1424,7 @@ def compare(live, ours, whole_document=True):
         old_dimension_pick(a, b, str(live.get("recorded") or ""))
         recorder_form(b, live)
         panel_fields_unread(a, b, str(live.get("recorded") or ""))
+        panel_list_over_view(a, b)
         select_unread(a, b, step)
         document_loading(a, b)
         hole_callout_export_text(a, b)

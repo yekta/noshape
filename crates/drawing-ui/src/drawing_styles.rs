@@ -38,8 +38,14 @@ impl DrawingEditor {
         if !self.styles_gap[k].as_ref().is_some_and(|(id, _, _)| *id == ann) {
             let stx = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
             let meters = u.meters();
-            let sub = cx.subscribe(&stx, move |this: &mut Self, stx, ev: &InputEvent, cx| {
-                if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+            let sub = cx.subscribe_in(&stx, window, move |this: &mut Self, stx, ev: &InputEvent, window, cx| {
+                // Enter gives the keys back to the sheet (Esc then clears the selection: live2 drw-styles-dimension s29);
+                // the blur that follows sets the value.
+                if matches!(ev, InputEvent::PressEnter { .. }) {
+                    window.focus(&this.focus, cx);
+                    return;
+                }
+                if !matches!(ev, InputEvent::Blur) {
                     return;
                 }
                 if let Ok(v) = stx.read(cx).value().trim().parse::<f64>() {
@@ -64,7 +70,7 @@ impl DrawingEditor {
             .h(px(26.))
             .border_b_1()
             .border_color(gpui_kit::rgb(0xdddddd))
-            .children(input.map(|g| div().flex_1().child(Input::new(&g).appearance(false).small())))
+            .children(input.map(|g| crate::ui_script::mark(div(), move || format!("field:{}", ["Text gap", "Geometry gap", "Extension past line"][k.min(2)])).flex_1().child(Input::new(&g).appearance(false).small())))
             .child(v_flex().child(stepper(("st-up", k), "▲", step, cx)).child(stepper(("st-down", k), "▼", -step, cx)))
             .into_any_element()
     }
@@ -303,16 +309,18 @@ impl DrawingEditor {
         let ink = gpui_kit::rgb(0x333333);
         // Live 474 (dom/drawing-styles-*): label left, the control at 145 px; a
         // select is underlined with a ▾; sizes are a number ▾ then the unit.
+        // (Found by its value, as live's runner finds a <select>.)
         let select = |id: &'static str, label: String, w: f32, items: Vec<(String, bool, Edit)>| -> AnyElement {
             let ed = ed.clone();
-            Button::new(id).label(label).ghost().small().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            let name = format!("dropdown:{label}");
+            let button = Button::new(id).label(label).ghost().small().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_styles(f.clone(), cx))));
                 }
                 m
-            })
-            .into_any_element()
+            });
+            crate::ui_script::wrap(button.into_any_element(), move || name)
         };
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).px(px(12.)).child(div().w(px(122.)).flex_none().text_size(px(13.33)).text_color(ink).child(label)).child(body).into_any_element();
         let st = |f: fn(&mut AnnStyle)| -> Edit {
@@ -406,7 +414,7 @@ impl DrawingEditor {
         };
         let mut body = v_flex()
             .pt(px(14.))
-            .child(row("Font", select("st-font", font_label, 220., font_items)))
+            .child(row("Font", select("st-font", font_label.clone(), 220., font_items)))
             .child(row("Text height", unit(select("st-height", h_label, 80., presets(own.height, base_h, set_height)))))
             .child(row("Color", swatch))
             .child(row("Arrowhead", h_flex().gap(px(10.)).child(unit(select("st-arrow", a_label, 80., presets(own.arrow, base_arrow, set_arrow)))).child(arrow_picker).into_any_element()));
@@ -448,6 +456,26 @@ impl DrawingEditor {
             let broken = !first.unbroken;
             let radial = sel.iter().all(|a| matches!(a.kind, AnnotationKind::RadialDimension { diameter: true, .. }));
             let dim_line = matches!(first.kind, AnnotationKind::RadialDimension { dim_line: true, .. });
+            let radii = sel.iter().all(|a| matches!(a.kind, AnnotationKind::RadialDimension { .. }));
+            // Live's reading (live2 drw-styles-dimension): the text in order with a <select>'s options, the <select>s and
+            // the checkboxes as fields.
+            let (font, just, align, hidden, unbroken) = (font_label.clone(), jl.clone(), al.clone(), own.hide_ext, first.unbroken);
+            crate::ui_script::note_dialog(|| {
+                let sym = u.symbol().to_string();
+                let mut text: Vec<String> = ["Styles", "Font"].iter().chain(FONT_FAMILIES.iter()).map(|t| t.to_string()).collect();
+                text.extend(["Text height", &sym, "Color", "Arrowhead", &sym, "Text justification", "Text alignment", "Text gap", &sym, "Geometry gap", &sym, "Extension past line", &sym].map(String::from));
+                let select = |v: &str| serde_json::json!({ "label": "", "kind": "select", "value": v });
+                let check = |l: &str, v: bool| serde_json::json!({ "label": l, "kind": "checkbox", "value": v });
+                let mut fields = vec![select(&font), select(&just), select(&align)];
+                if linear {
+                    fields.extend([check("Show first extension line", !hidden[0]), check("Show second extension line", !hidden[1])]);
+                }
+                fields.push(check("Break dimension", !unbroken));
+                if radii {
+                    fields.push(check("Show dimension line", dim_line));
+                }
+                serde_json::json!({ "kind": "drawing-panel", "title": "Styles", "text": text, "fields": fields })
+            });
             body = body
                 .child(row("Text justification", select("st-just", jl, 220., justs)))
                 .child(row("Text alignment", select("st-align", al, 220., aligns)))
@@ -459,13 +487,13 @@ impl DrawingEditor {
                     let v = *v;
                     this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| a.unbroken = !v), cx);
                 }))))
-                .child(div().h(px(33.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("st-dimline").native().label("Show dimension line").checked(dim_line).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                .when(radii, |b| b.child(div().h(px(33.)).px(px(10.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("st-dimline").native().label("Show dimension line").checked(dim_line).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     if !radial {
                         return;
                     }
                     let v = *v;
                     this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| if let AnnotationKind::RadialDimension { dim_line, .. } = &mut a.kind { *dim_line = v }), cx);
-                }))));
+                })))));
         }
         // Callouts (help styles, drawing.md A64): Stack direction, Stack gap size.
         if sel.iter().all(|a| matches!(a.kind, AnnotationKind::Balloon { .. })) {

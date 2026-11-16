@@ -40,6 +40,9 @@
      731,
      132
     ]
+   },
+   "ours_on": {
+    "button": "cd-cs-ISO"
    }
   },
   {
@@ -54,6 +57,9 @@
      767,
      132
     ]
+   },
+   "ours_on": {
+    "button": "cd-cs-JIS"
    }
   },
   {
@@ -68,6 +74,9 @@
      689,
      132
     ]
+   },
+   "ours_on": {
+    "button": "cd-cs-ANSI"
    }
   },
   {
@@ -82,6 +91,9 @@
      730,
      204
     ]
+   },
+   "ours_on": {
+    "dropdown": "cd-size"
    }
   },
   {
@@ -114,6 +126,9 @@
      730,
      238
     ]
+   },
+   "ours_on": {
+    "dropdown": "cd-units"
    }
   },
   {
@@ -146,6 +161,9 @@
      1160,
      179
     ]
+   },
+   "ours_on": {
+    "dropdown": "cd-hzones"
    }
   },
   {
@@ -178,6 +196,9 @@
      1160,
      214
     ]
+   },
+   "ours_on": {
+    "dropdown": "cd-vzones"
    }
   },
   {
@@ -210,6 +231,9 @@
      822,
      286
     ]
+   },
+   "ours_on": {
+    "button": "cd-dec-comma"
    }
   },
   {
@@ -224,6 +248,9 @@
      885,
      363
     ]
+   },
+   "ours_on": {
+    "button": "First angle (ISO)"
    }
   },
   {
@@ -238,6 +265,9 @@
      1220,
      250
     ]
+   },
+   "ours_on": {
+    "button": "cd-start-tl"
    }
   },
   {
@@ -252,6 +282,9 @@
      1207,
      285
     ]
+   },
+   "ours_on": {
+    "button": "cd-tb-off"
    }
   },
   {
@@ -266,6 +299,9 @@
      1207,
      145
     ]
+   },
+   "ours_on": {
+    "button": "cd-border-off"
    }
   },
   {

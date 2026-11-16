@@ -29,6 +29,9 @@
      580,
      131
     ]
+   },
+   "ours_on": {
+    "button": "noshape"
    }
   },
   {
@@ -43,6 +46,9 @@
      578,
      163
     ]
+   },
+   "ours_on": {
+    "button": "Owned by me"
    }
   },
   {
@@ -57,6 +63,9 @@
      599,
      228
     ]
+   },
+   "ours_on": {
+    "button": "Created by me"
    }
   },
   {
@@ -71,6 +80,9 @@
      603,
      260
     ]
+   },
+   "ours_on": {
+    "button": "Shared with me"
    }
   },
   {
@@ -85,6 +97,9 @@
      573,
      292
     ]
+   },
+   "ours_on": {
+    "button": "Public"
    }
   },
   {
@@ -99,6 +114,9 @@
      609,
      196
     ]
+   },
+   "ours_on": {
+    "button": "Recently opened"
    }
   },
   {
@@ -113,6 +131,9 @@
      863,
      133
     ]
+   },
+   "ours_on": {
+    "tab": "ANSI"
    }
   },
   {
@@ -127,6 +148,9 @@
      953,
      133
     ]
+   },
+   "ours_on": {
+    "tab": "ISO"
    }
   },
   {
@@ -141,6 +165,9 @@
      1038,
      133
     ]
+   },
+   "ours_on": {
+    "tab": "JIS"
    }
   },
   {
@@ -155,6 +182,9 @@
      774,
      133
     ]
+   },
+   "ours_on": {
+    "tab": "All"
    }
   },
   {
@@ -169,6 +199,9 @@
      885,
      495
     ]
+   },
+   "ours_on": {
+    "button": "Suggested views"
    }
   },
   {
@@ -183,6 +216,9 @@
      1033,
      495
     ]
+   },
+   "ours_on": {
+    "button": "No views"
    }
   },
   {

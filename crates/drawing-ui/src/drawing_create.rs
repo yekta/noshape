@@ -229,7 +229,7 @@ impl CreateDrawingDialog {
         let pal = p();
         let std_tab = |label: &'static str, cur: &'static str, cx: &mut Context<Self>| {
             let on = label == cur;
-            div()
+            crate::ui_script::mark(div(), move || format!("tab:{label}"))
                 .id(SharedString::from(format!("cd-std-{label}")))
                 .w(px(88.))
                 .py(px(6.))
@@ -336,7 +336,7 @@ impl CreateDrawingDialog {
                     for (i, (label, icon)) in SOURCES.iter().enumerate() {
                         let on = i == self.source_filter;
                         col = col.child(
-                            h_flex()
+                            crate::ui_script::mark(h_flex(), move || format!("button:{label}"))
                                 .id(SharedString::from(format!("cd-src-{i}")))
                                 .h(px(32.))
                                 .gap(px(6.))
@@ -389,7 +389,8 @@ impl CreateDrawingDialog {
         let label = |w: f32, text: &'static str| div().w(px(w)).flex_none().text_right().text_size(px(14.)).line_height(px(22.)).text_color(gpui_kit::rgb(0x333333)).child(text);
         let row = |w: f32, text: &'static str, body: AnyElement| h_flex().min_h(px(35.)).gap(px(16.)).items_center().child(label(w, text)).child(body);
         let choice = |id: String, text: &'static str, on: bool, cx: &mut Context<Self>, f: Box<dyn Fn(&mut CustomTemplate)>| {
-            div()
+            let name = format!("button:{id}");
+            crate::ui_script::mark(div(), move || name)
                 .id(SharedString::from(id))
                 .mr(px(15.))
                 .pt(px(2.))
@@ -409,7 +410,7 @@ impl CreateDrawingDialog {
             let label = options.get(current).cloned().unwrap_or_default();
             let bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
             let probe = bounds.clone();
-            div()
+            crate::ui_script::mark(div(), move || format!("dropdown:{id}"))
                 .id(id)
                 .relative()
                 .w(px(120.))
@@ -449,7 +450,7 @@ impl CreateDrawingDialog {
                 })
         };
         let tile = |id: &'static str, text: &'static str, icon: &'static str, on: bool, cx: &mut Context<Self>, first: bool| {
-            v_flex()
+            crate::ui_script::mark(v_flex(), move || format!("button:{text}"))
                 .id(id)
                 .w(px(140.))
                 .h(px(90.))
