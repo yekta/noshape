@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 14:14 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 16:39 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
@@ -8,11 +8,28 @@ docs/DECISIONS.md (read first; it wins over anything here).
   than the axis's), as the host's opHole full_exit: asm-tvc-mount 7bc9d8 Hole 10/12/3 -> live 8/8/0 (model copy vibe5
   ~/agents/core-keep/m7b, 8 -> 19/120; next there Extrude 5's Inner Ring 11/27/18 vs 10/24/16, asm's withdrawn item).
   T1 features_a::a_hole_up_to_next_into_a_bore_leaves_no_web_beside_it. Feature 22 (same kind) needs asm's unlanded arc fix.
-- Landed 55552e704 (translator: a region query whose ids' regions hold imprinted segments, keys >= 2^31, keeps the
-  text's whole region): main's c2-impeller-loft 24 -> 26/48 (Extrude 4), caused by asm's 57de87f07 (bisected); note in
-  docs/handoff/asm.md "From core 11-16". Model side left: the 12 mm² sliver alone (its side is the target's imprint,
-  60 nm off the offset wall) fails "up-to target does not fully bound" in prism_until; a 1 µm fuzzy retry of the split
-  and extending the target didn't help; live extrudes it.
+- Translator rule narrowed (landed with this handoff): 55552e704's whole-region rule (impeller 24 -> 26) turned
+  c2-sm-rocker-enclosure-body 15 -> 9/28 (landed without a suite pair: my error); now only when another of the
+  feature's queries names the same whole region (`shares_whole_region`). Release pair vibe7 (screws out): only rocker
+  changed, 1190 -> 1196/1585. asm handoff note updated.
+- Impeller Extrude 4 model side: closed, nothing to fix. The 12 mm² sliver alone never meets the offset wall: even its
+  surface over all of its own bounds only grazes the prism at the sketch plane (replayed dump vibe5
+  ~/agents/core-keep/e4dump/prism_until-10, experiment patch /root/core-scratch/uptowiden-exp.patch). Live's Extrude 4
+  is the whole region, which we match (impeller 27/48 on main after blend's d7f9264c9; first difference Fillet 3).
+- Landed 198c2b6d: rolled walls (a cylinder WALL without a BEND between two walls) develop in the flat at
+  kFactorRolled: c2-sm-tablet-stand 3 -> 6/16; T2 sheetmetal_std::an_extruded_arc_is_a_rolled_wall_in_the_flat.
+- **Queued b83e3f0b:** Move face on an active sheet metal part runs std's moveFace (sheetMetalAwareMoveFace;
+  std_route.rs `moves_active_sheet_metal`): c2-sm-tablet-stand 6 -> 12/16 (only corpus document with it). T2
+  sheetmetal_std::moving_a_sheet_metal_end_face_keeps_its_walls_and_bend_apart (fails without: 10 vs 14 faces).
+- **tablet-stand Extrude 1 (next difference), handed to bool 11-16 16:20:** the definition-sheet cut (recorded case
+  vibe5 ~/agents/core-keep/tsrec/a/7b08434da3624636, Rust declines, OCCT runs) keeps the bend cylinder whole although
+  its y∈[-5,0] strip lies inside the slot tool (tangent to the tool's start face): live's extra 140 mm³ is exactly that
+  strip, and the uncut bend is our false "Collision in sheet metal flat pattern". Recheck when bool says it's on main.
+- **rocker-enclosure-sm Extrude 1 ("Removal destroys sheet metal part", live removes 227.7 mm³; 6/14):** the definition
+  cut itself is right (case vibe5 ~/agents/core-keep/rsrec/a/c399410014e4d7ca: two Ø6.76 circle sheets coplanar with
+  the wall cut two holes, 10382.15 -> 10310.44 mm²), so std's eachSheetStillExists (boolean.fs 1154) fails after it:
+  the tracked sheet or its WALL faces come back empty. Not found yet: FS println in std showed nothing in the probe
+  (debug patch /root/core-scratch/rocker-sm-debug.patch); next: print from the host's query evaluation instead.
 - **Impeller speed P0 (qa 11-16 04:40): waiting on blend.** Delete face 2 3.9 -> 26.4 s from v0.4.48 to v0.4.53
   (release A/B beside asm's full7: a hint; qa reruns it quiet). Chamfer 26 now builds (Error -> Ok, as live), so OCCT's
   Defeaturing gets a bigger part (trimming faces 13.2 s, FF 6.4 s, EF 6.1 s). Root: Part 1 differs from Fillet 28 on

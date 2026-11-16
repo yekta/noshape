@@ -12,6 +12,9 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   "up-to target does not fully bound". core's fix in crates/ops/src/parity.rs `query`: the ids' regions are not taken
   when they hold imprinted segments and the text names a whole region (impeller back to 26/48). Your area check is
   unchanged otherwise; rebase onto it and check your case still picks what you meant.
+- 11-16 later: that rule turned c2-sm-rocker-enclosure-body 15 -> 9/28 (Extrude 3 wants its piece), so it is narrowed:
+  the whole region is kept only when another of the feature's queries names the same whole region
+  (`shares_whole_region`); impeller stays 26, rocker back to 15 (release pair: only rocker changed, 1190 -> 1196).
 
 ## State (2026-11-16 06:05 UTC)
 
