@@ -3555,7 +3555,12 @@ impl<'a> Translator<'a> {
             {
                 let mut faces = Vec::new();
                 for side in sides {
-                    match self.extrude_name_from_tree(side)? {
+                    if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                        let mut s = Vec::new();
+                        packed_strings(side, &mut s);
+                        eprintln!("TRACE INTERSECT side {s:?}");
+                    }
+                    match self.named_faces(side)? {
                         Ok(f) => faces.push(f),
                         Err(e) => return Some(Err(format!("INTERSECT: {e}"))),
                     }
@@ -3671,7 +3676,37 @@ impl<'a> Translator<'a> {
             let r = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 100000 }));
             return Some(r.map(|f| f["faces"].as_array().into_iter().flatten().filter(|f| f["surface"] != "plane").filter_map(|f| f["id"].as_str().map(str::to_string)).collect::<Vec<_>>()).and_then(|f| if f.is_empty() { Err(format!("SWEPT_FACE: loft {loft} has no side face of ours")) } else { Ok(f) }));
         }
+        if let Some(r) = self.hole_body_faces(&strings) {
+            return Some(r);
+        }
         self.extrude_name_from_tree(tree).map(|r| r.map(|f| vec![f]))
+    }
+
+    /// The faces a line of a Hole's profile sketch swept (`SWEPT_FACE` of `<hole>.holeBodies.*.opRevolve`, std hole.fs'
+    /// `core_line_2` the bore, `start_line_2` a counterbore's wall):
+    /// ours of the Hole at every location (asm-infento-subs 74d3d6's Plane 1 on three vertices of a bore's wall).
+    fn hole_body_faces(&mut self, strings: &[String]) -> Option<Result<Vec<String>, String>> {
+        if !strings.iter().any(|s| s == "SWEPT_FACE") {
+            return None;
+        }
+        let hole = strings.iter().find_map(|s| s.strip_suffix(".opRevolve")?.split_once(".holeBodies").map(|(h, _)| h.to_string()))?;
+        let line = strings.iter().find(|s| s.contains("_line_") && !s.contains('.'))?.clone();
+        let Some(ours) = self.feature_ids.get(&hole).cloned() else { return Some(Err(format!("SWEPT_FACE: hole {hole} was not built"))) };
+        let faces = match self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 100000 })) {
+            Ok(f) => f["faces"].as_array().cloned().unwrap_or_default(),
+            Err(e) => return Some(Err(e)),
+        };
+        let radius = |f: &Value| f["radius"].as_f64().unwrap_or(f64::NAN);
+        let cylinders: Vec<&Value> = faces.iter().filter(|f| f["surface"] == "cylinder").collect();
+        let (lo, hi) = cylinders.iter().map(|f| radius(f)).fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), r| (a.min(r), b.max(r)));
+        let of_radius = |r: f64| cylinders.iter().filter(|f| (radius(f) - r).abs() <= 1e-9 * r.abs().max(1.0)).copied().collect::<Vec<_>>();
+        let picked: Vec<&Value> = match line.as_str() {
+            "core_line_2" => of_radius(lo),
+            "start_line_2" | "cbore_start_line_2" | "csink_start_line_2" if hi > lo => of_radius(hi),
+            _ => return Some(Err(format!("SWEPT_FACE: hole {hole}'s {line} not translated"))),
+        };
+        let ids: Vec<String> = picked.iter().filter_map(|f| f["id"].as_str().map(str::to_string)).collect();
+        Some(if ids.is_empty() { Err(format!("SWEPT_FACE: hole {hole} has no face of ours for its {line}")) } else { Ok(ids) })
     }
 
     /// An end of a curve a custom feature fit or a Helix made (`VERTEX` created by `<feature>.….opFitSpline` or
@@ -3920,11 +3955,20 @@ impl<'a> Translator<'a> {
         }
     }
 
-    fn common_vertex(&mut self, faces: &[String]) -> Result<String, String> {
+    /// The vertex where three faces meet, each one of a set of candidates (a Hole's wall at any of its locations).
+    fn common_vertex(&mut self, faces: &[Vec<String>]) -> Result<String, String> {
         let mut common: Option<Vec<String>> = None;
-        for f in faces {
-            let r = self.call("query_entities", json!({ "kind": "vertices", "of": [f], "limit": 10000 }))?;
-            let ids: Vec<String> = r["vertices"].as_array().into_iter().flatten().filter_map(|v| v["id"].as_str().map(str::to_string)).collect();
+        for set in faces {
+            let mut ids: Vec<String> = Vec::new();
+            for f in set {
+                let r = self.call("query_entities", json!({ "kind": "vertices", "of": [f], "limit": 10000 }))?;
+                ids.extend(r["vertices"].as_array().into_iter().flatten().filter_map(|v| v["id"].as_str().map(str::to_string)));
+            }
+            ids.sort();
+            ids.dedup();
+            if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                eprintln!("TRACE INTERSECT faces {set:?}: {} vertices", ids.len());
+            }
             common = Some(match common {
                 None => ids,
                 Some(c) => c.into_iter().filter(|v| ids.contains(v)).collect(),
