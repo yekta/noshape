@@ -4935,9 +4935,10 @@ static bool sphere_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::v
 }
 
 // An extrusion against a cylinder across its direction, a sphere (c2-rings-loft's Extrude 5: a sketch's quadratic
-// splines extruded across the ring) or a surface of revolution about an axis across its direction (c2-valve-config's
-// Extrude 3: the body's revolved profile, 23 of OCCT's walks, 5-21 ms each): each ruling p(u) + w d meets it where
-// A w^2 + B w + C = 0 (|(p + w d - O) across the axis|^2 = r^2, r the profile's radius at the ruling's height, a
+// splines extruded across the ring) or a cone or surface of revolution about an axis across its direction
+// (c2-valve-config's Extrude 3: the body's revolved profile, 23 of OCCT's walks, 5-21 ms each, and 68 empty cone pairs):
+// each ruling p(u) + w d meets it where A w^2 + B w + C = 0 (|(p + w d - O) across the axis|^2 = r^2, r the cone's or
+// the profile's radius at the ruling's height, a
 // sphere's |p + w d - O|^2 = r^2), two branches, exact point by point; each run of a branch
 // within the extrusion's heights and the other face's box (ends bisected between samples, 32 a span of the profile),
 // cut where its angle passes the other surface's own seam (as OCCT's), interpolated. False where a run ends where the
@@ -4950,11 +4951,13 @@ static bool quadric_across(const Extruded& e, bool e_first, const TopoDS_Face& o
   const occ::handle<Geom_CylindricalSurface> cy = occ::down_cast<Geom_CylindricalSurface>(s);
   const occ::handle<Geom_SphericalSurface>   sp = occ::down_cast<Geom_SphericalSurface>(s);
   const occ::handle<Geom_SurfaceOfRevolution> rv = occ::down_cast<Geom_SurfaceOfRevolution>(s);
-  if (cy.IsNull() && sp.IsNull() && rv.IsNull())
+  const occ::handle<Geom_ConicalSurface>      kc = occ::down_cast<Geom_ConicalSurface>(s);
+  if (cy.IsNull() && sp.IsNull() && rv.IsNull() && kc.IsNull())
     return false;
   const gp_Cylinder Cy = cy.IsNull() ? gp_Cylinder() : cy->Cylinder();
   const gp_Sphere   Sp = sp.IsNull() ? gp_Sphere() : sp->Sphere();
-  const gp_Ax1      Ax = !rv.IsNull() ? rv->Axis() : !cy.IsNull() ? Cy.Axis() : gp_Ax1();
+  const gp_Cone     Kc = kc.IsNull() ? gp_Cone() : kc->Cone();
+  const gp_Ax1      Ax = !rv.IsNull() ? rv->Axis() : !cy.IsNull() ? Cy.Axis() : !kc.IsNull() ? Kc.Axis() : gp_Ax1();
   const gp_XYZ      O  = !sp.IsNull() ? Sp.Location().XYZ() : Ax.Location().XYZ();
   const gp_XYZ      ax = !sp.IsNull() ? gp_XYZ() : Ax.Direction().XYZ();
   auto              across = [&](const gp_XYZ& v) { return !sp.IsNull() ? v : v - ax * v.Dot(ax); };
@@ -4973,9 +4976,12 @@ static bool quadric_across(const Extruded& e, bool e_first, const TopoDS_Face& o
   const gp_Dir                  ref2(gp_Vec(Ax.Direction()).Crossed(gp_Vec(ref)));
   auto height = [&](double v) { return (prof->Value(v).XYZ() - O).Dot(ax); };
   double h0 = 0, h1 = 0;
+  // (A cone's or revolution's rulings across its axis: each at one height.)
+  if ((!rv.IsNull() || !kc.IsNull()) && std::abs(e.d.XYZ().Dot(ax)) > 1e-12)
+    return false;
   if (!rv.IsNull())
   {
-    if (std::abs(e.d.XYZ().Dot(ax)) > 1e-12 || prof.IsNull())
+    if (prof.IsNull())
       return false;
     h0 = height(ov0), h1 = height(ov1);
     const int    m    = 256;
@@ -5019,8 +5025,14 @@ static bool quadric_across(const Extruded& e, bool e_first, const TopoDS_Face& o
     return true;
   };
   auto angle_of = [&](const gp_XYZ& x) { const gp_XYZ m = across(x - O); return std::atan2(m.Dot(ref2.XYZ()), m.Dot(ref.XYZ())); };
-  // (A ruling's radius to meet: the cylinder's or sphere's, the profile's at the ruling's height; false past its ends.)
+  // (A ruling's radius to meet: the cylinder's or sphere's, the cone's or the profile's at the ruling's height; false
+  // past the profile's ends or the cone's apex.)
   auto radius_at = [&](double u, double& r) {
+    if (!kc.IsNull())
+    {
+      r = Kc.RefRadius() + (e.c->Value(u).XYZ() - O).Dot(ax) * std::tan(Kc.SemiAngle());
+      return r > 0;
+    }
     if (rv.IsNull())
     {
       r = !cy.IsNull() ? Cy.Radius() : Sp.Radius();
@@ -5042,6 +5054,8 @@ static bool quadric_across(const Extruded& e, bool e_first, const TopoDS_Face& o
       pu = angle_of(x.XYZ()) - angle_of(prof->Value(pv).XYZ());
       pu -= 2 * M_PI * std::floor(pu / (2 * M_PI));
     }
+    else if (!kc.IsNull())
+      ElSLib::Parameters(Kc, x, pu, pv);
     else if (cy.IsNull())
       ElSLib::Parameters(Sp, x, pu, pv);
     else
@@ -5214,6 +5228,9 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
     IntTools_Curve     ic;
     if (const std::optional<Extruded>& x = g_first ? xa : xb)
     {
+      // (Across its axis: each ruling at one height, meeting the cone's circle there.)
+      if (std::abs(x->d.Dot(K.Axis().Direction())) <= 1e-12)
+        return quadric_across(*x, g_first, g_first ? fb : fa, out);
       if (!lifted(K, [&](double u) { return x->c->Value(u); }, x->d, [&](double u, double s) { return x->uv(u, s); }, x->u0, x->u1, std::max(32, 8 * (x->c->NbKnots() - 1)), g_first, ic))
         return false;
       out.push_back(ic);
