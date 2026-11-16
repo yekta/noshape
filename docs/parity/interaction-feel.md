@@ -394,7 +394,7 @@ Alt+right drags, view keys, animations, double middle click, acted out with real
 | Easing | smootherstep t³(6t² − 15t + 10) | the same | = |
 | A new animation while one runs | ignored until it ends | replaced the running one; now ignored | = (fixed) |
 | Double middle click | two middle releases within 500 ms fit (150 ms did, 600 ms didn't) | the OS's double click count; now live's own 500 ms timer | = (fixed) |
-| Not yet in the matrix | inertia (a flick keeps turning, ×0.77 per 16.67 ms; none held still 50 ms; none below 20 fps: it reads real time and the frame rate, so not a T1 row; navigation `inertia_decays_like_onshape` checks the decay); Alt+right on a tilted view animates upright first; the view cube (150 px, 15 px margins, face / edge / corner 500 ms, arrows 15° in 250 ms, curved arrows roll, hover fill) and its menu | – | – |
+| Not yet in the matrix | inertia (a flick keeps turning, ×0.77 per 16.67 ms; none held still 50 ms; none below 20 fps: it reads real time and the frame rate, so not a T1 row; navigation `inertia_decays_like_onshape` checks the decay); Alt+right on a tilted view animates upright first; the view cube (150 px, 15 px margins, face / edge / corner 500 ms, arrows 15° in 250 ms, curved arrows roll, hover fill) and its menu; live navigation-gaps2 (client source): Alt+right levels the view on the first drag move over 125 ms (tilt ≤ 45°) or 250 ms (> 45°), smootherstep, drag moves ignored until it ends (ours the same: `level_view`, `CAMERA_SNAP_ANIMATION` / `CAMERA_SHORT_ANIMATION`, `AxisTag::Levelling`) | – | – |
 
 ## Chrome (matrix)
 
@@ -473,7 +473,7 @@ live2's sheetmetal.json (11-13 08:10–08:37, a 60 × 40 sheet metal model with 
 `sm::the_sheet_metal_matrix_matches_live` (T1, no GPU) on the sm-box start, the Sheet metal table and flat view
 panel open, a fresh document per row; cells carry `sm-cell-<table>-<row>-<column>` debug selectors.
 
-**Matched: 11 / 11** (11-13 14:14 UTC; 5 / 7 at the first run). ui-parity: the 11 sm-* scenarios 10 / 11
+**Matched: 12 / 12** (11-16 02:59 UTC: the flat bend hover row from sheetmetal-gaps2; 5 / 7 at the first run). ui-parity: the 11 sm-* scenarios 10 / 11
 (sm-form-tool: live's Form dialog opens on "Circle emboss", ours "Select Part Studio…"; the same on green).
 
 | Row | Live | Ours | Status |
@@ -489,7 +489,8 @@ panel open, a fresh document per row; cells carry `sm-cell-<table>-<row>-<column
 | The flat view | its own camera: the wheel zooms it alone | the same | = |
 | The flat view's start | looking straight down (Top) | the same | = |
 | A click inside a bend's zone in the flat view | selects that bend in both views and its Bends row | only the centre line (5 px) took a click, else the whole flat face; now the bend's face, line and row (`FlatViewEvent::BendZone`, as Select other's "Face of …") | = (fixed) |
-| Not yet in the matrix | the panel's open time (0.9–1.4 s live on a software GPU), the flat view re-fitting, its bend lines (rgb(47,47,47), dashed centre), a flat bend hovered lighting both views and selecting its row, the Make joint / Corner / Bend relief picks, Tab filling its fields from the sketch | – | – |
+| A bend zone hovered in the flat view | lights that bend in both views rgb(255, 198, 133), not its table row; on the dashed centre line nothing (sheetmetal-gaps2) | lit nothing (only the flat face's outline); now as live (`FlatViewEvent::BendHover`) | = (fixed) |
+| Not yet in the matrix | the panel's open time (0.9–1.4 s live on a software GPU), the flat view re-fitting, its bend lines (rgb(47,47,47), dashed centre), the Make joint / Corner / Bend relief picks, Tab filling its fields from the sketch; live sheetmetal-gaps2: flat bends' tangent lines solid 1 px, the centre line dashed 10 / 10 / 5 / 10 px at every zoom (ours now `LineSegment::CENTER_LINE`, was the 16 px dash-dot); a click selects the row (frame rgb(22, 81, 176)), the zone filled rgb(214, 151, 30) with an rgb(255, 169, 10) outline (ours the selection colour) | – | – |
 
 ## Sketch tools (matrix)
 
@@ -519,7 +520,7 @@ live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-st
 | Search tools in a sketch | the sketch tools (Offset o, Linear / Circular pattern, Mirror, Text, Insert image, Trim, Extend) | the same | = |
 | Sketch fillet, a click on a corner | a preview, nothing made; Esc cancels | the same | = |
 | Sketch fillet, a drag from the corner | made on release (arc, tangents, radius; its radius box opens) | only previewed (a second click made it); now made on release (`SketchEditor::corner_pressed`) | = (fixed) |
-| Not yet in the matrix | Search tools' panel (Recently used, the info box, Highlight tool in toolbar), the pattern labels (3x / 1x, spacing, inline boxes), Text's dash-dot rectangle and dialog layout (font list, "Default text" selected, n/250 characters: ours has them), Insert image's tabs and aspect-kept rectangle | – | – |
+| Not yet in the matrix | Search tools' panel (Recently used, the info box, Highlight tool in toolbar), the pattern labels (3x / 1x, spacing, inline boxes), Text's dash-dot rectangle and dialog layout (font list, "Default text" selected, n/250 characters: ours has them), Insert image's tabs and aspect-kept rectangle; live sketch-gaps2 / 3: pattern labels near-black 16 px regular on opaque canvas-colour boxes (30 × 28 "3x", 30 × 26 the spacing), placed ~100 px off at the zoom the tool started at and then fixed in the model (the spacing dimension 99.8 px to the side, "3x" (+97, +99.8) px from the 2nd instance, a 1 px leader to it, no arrowhead), a circular "3x" 0.4 × the seed's radius beyond the seed; no angle label (ours the same since 11-16: `pattern_count_labels_sit_where_live_puts_them`; ours still shows an open circular pattern's angle) | – | – |
 
 ## Editing (matrix)
 
@@ -539,7 +540,7 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 | Y / Shift+Y with nothing selected or under the pointer | nothing (Shift+Y isn't "show all") | the same | = |
 | Sketch Ctrl+C, Ctrl+V | the copy's centre under the pointer at once, selected; one undo removes it | the same | = |
 | Eye icons | a row's eye toggles it (Part 1 hidden, shown; a hidden sketch shown); the selection stays | the same | = |
-| Not yet in the matrix | the toolbar's Undo tooltip (always "Undo (cmd+z/ctrl+z)": ours the same), undo in a feature dialog (an existing test), the paste's 2D triad and kept constraints, the assembly rows (asm's) | – | – |
+| Not yet in the matrix | the toolbar's Undo tooltip (always "Undo (cmd+z/ctrl+z)": ours the same), undo in a feature dialog (an existing test), the paste's 2D triad and kept constraints, the assembly rows (asm's); live editing-gaps2: a sketch paste lands at once centred on the pointer, keeps every constraint wholly inside the copy (dimensions too), drops those to entities left out; its triad's handles grey double outlines at the copy's lower-left corner | – | – |
 
 ## Dialogs (matrix)
 
@@ -573,7 +574,7 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | Material on opening | 280 × 368 at the graphics area's bottom; nothing picked ('- None -') | the same | = |
 | Material: a picked row | the list closes, the search keeps the keyboard with its text cleared; typing opens the list again; "No material assigned" stays under the open list (material-search-acetal-ok, material-library-pick-abs-cancel) | the keyboard went nowhere and the line hid while the list was open; now as live (the search stays in the tree, unseen) | = (fixed) |
 | Material's search and Esc | filters as you type ("steel": 38 rows; live's read counted its highlighted first row twice), the first highlighted; Esc closes the list only, a second Esc the dialog | the second Esc did nothing (the keyboard was left on the closed list's search); now it cancels | = (fixed) |
-| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, preview timing while dragging (every ~0.4 s);  the Appearance palette's swatch grid and the Material picker's rows (look); Appearance's keys are in `sketch_ui_tests` (escape / Tab / Enter) | – | – |
+| Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, preview timing while dragging (every ~0.4 s);  the Appearance palette's swatch grid and the Material picker's rows (look); Appearance's keys are in `sketch_ui_tests` (escape / Tab / Enter); live dialogs-gaps2 (11-16): the Depth arrow moves from 4 px with the full displacement (its readout updates every ~3 px, so the first tick may be the throttle; ours from 3 px), sideways drags nothing, no value box, no snap to geometry, preview cadence host-bound (450–850 ms there) | – | – |
 
 ## Fields (matrix)
 

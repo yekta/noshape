@@ -682,6 +682,8 @@ pub struct SketchEditor {
     slot_session: Option<EntityId>,
     /// Pattern being edited (Edit pattern): replaced on commit.
     pub editing_pattern: Option<u32>,
+    /// World units per pixel when the pattern tool started: its labels' offsets (live sketch-gaps3).
+    pattern_label_wpp: f64,
     /// Insert image: the chosen file (name, bytes, width / height) waiting for its rectangle.
     pub pending_image: Option<(String, Vec<u8>, f64)>,
     /// Insert DXF: meters per drawing unit (`None`: the file's units, else millimeters).
@@ -866,13 +868,19 @@ const FILLET_ARROW_STEM_PX: f64 = 28.0;
 /// One previewed pattern instance: where a seed point goes.
 type PointMap = Box<dyn Fn(DVec2) -> DVec2>;
 /// Linear pattern manipulators (live sketch/136): a 16 px hollow square at
-/// the first instance, the count arrow's 30 px stem from its edge; labels
-/// ~95 px off diagonally; the spacing dimension 101 px to the side.
+/// the first instance, the count arrow's 30 px stem from its edge. Live
+/// sketch-gaps3: the "3x" label's centre (+97, +99.8) px from the 2nd instance
+/// (along, across the direction) and the spacing dimension 99.8 px to the side,
+/// both in px at the zoom the tool started at, then fixed in the model.
 const PATTERN_SQUARE_PX: f64 = 16.0;
 const PATTERN_ARROW_STEM_PX: f64 = 30.0;
 const PATTERN_ARROW_HANDLE_PX: f64 = PATTERN_SQUARE_PX * 0.5 + PATTERN_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX * 0.5;
-const PATTERN_LABEL_PX: f64 = 95.0;
-const PATTERN_DIM_PX: f64 = 101.0;
+const PATTERN_LABEL_ALONG_PX: f64 = 97.0;
+const PATTERN_DIM_PX: f64 = 99.8;
+/// Half a pattern label's box (live sketch-gaps3: ~30 px wide): where the leader meets it.
+const PATTERN_LABEL_HALF_PX: f64 = 15.0;
+/// A circular pattern's "3x" (live sketch-gaps3): 0.4 × the seed's radius beyond the seed, in the model.
+const CIRCULAR_LABEL_BEYOND: f64 = 0.4;
 /// The line shader's dash-dot period (`fs_line`, style 4) in pixels.
 const DASH_DOT_PERIOD_PX: f64 = 16.0;
 
@@ -1339,6 +1347,7 @@ impl SketchEditor {
             dxf_unit_scale: None,
             dxf_use_origin: false,
             editing_pattern: None,
+            pattern_label_wpp: 0.0,
             otf: None,
             otf_typing: false,
             woken: Vec::new(),
@@ -1379,6 +1388,9 @@ impl SketchEditor {
         // polygon keeps the last count.
         if self.tool != previous && matches!(self.tool, Tool::Polygon | Tool::CircumPolygon) {
             self.polygon_sides = 6;
+        }
+        if self.tool != previous {
+            self.pattern_label_wpp = self.world_per_px;
         }
         // Choosing a drawing tool clears the selection (live: L with a line
         // selected deselects it).
@@ -4647,6 +4659,7 @@ impl SketchEditor {
         }
         self.selection = seeds;
         self.editing_pattern = Some(id);
+        self.pattern_label_wpp = self.world_per_px;
         if p.circular {
             self.circular_count = p.count;
             self.circular_angle = p.angle;
@@ -4709,6 +4722,19 @@ impl SketchEditor {
     /// step, count and the diagonal its label and spacing dimension go to
     /// (first direction down-right of +X, second up-left of +Y, turned with
     /// the direction).
+    /// World units per pixel for the pattern labels' offsets: the zoom when the tool started.
+    fn label_wpp(&self) -> f64 {
+        if self.pattern_label_wpp > 0.0 { self.pattern_label_wpp } else { self.world_per_px }
+    }
+
+    /// A linear pattern direction's "3x" label centre (live sketch-gaps3).
+    fn linear_count_label(&self, second: bool, sk: &Sketch) -> Option<DVec2> {
+        let c = self.selection_center(sk)?;
+        let (dir, step, _, diag) = self.linear_direction(second);
+        let across = if diag.dot(dir.perp()) >= 0.0 { dir.perp() } else { -dir.perp() };
+        Some(c + step + (dir * PATTERN_LABEL_ALONG_PX + across * PATTERN_DIM_PX) * self.label_wpp())
+    }
+
     fn linear_direction(&self, second: bool) -> (DVec2, DVec2, usize, DVec2) {
         let (angle, distance, count) = if second {
             (self.pattern_second_angle, self.pattern_second_distance, self.pattern_second_count)
@@ -4725,7 +4751,7 @@ impl SketchEditor {
     fn linear_spacing_feet(&self, c: DVec2, second: bool) -> (DVec2, DVec2) {
         let (dir, step, _, diag) = self.linear_direction(second);
         let n = dir.perp();
-        let side = if diag.dot(n) >= 0.0 { n } else { -n } * self.world_per_px * PATTERN_DIM_PX;
+        let side = if diag.dot(n) >= 0.0 { n } else { -n } * self.label_wpp() * PATTERN_DIM_PX;
         (c + side, c + step + side)
     }
 
@@ -4733,22 +4759,19 @@ impl SketchEditor {
     /// `3x` / `1x` next to each direction's count manipulator, click to
     /// type a count; sketch/136–138).
     pub fn pattern_count_labels(&self, sk: &Sketch) -> Vec<(PatternHandle, DVec2, usize)> {
-        let px = self.world_per_px;
         self.pattern_handles(sk)
             .into_iter()
-            .filter_map(|(h, at)| {
-                let n = match h {
-                    PatternHandle::LinearCount | PatternHandle::LinearSecondCount => {
-                        // Centred ~95 px diagonally off the square (leader drawn in the overlay).
-                        let second = h == PatternHandle::LinearSecondCount;
-                        let (dir, _, n, diag) = self.linear_direction(second);
-                        let q = at - dir * px * PATTERN_ARROW_HANDLE_PX;
-                        return Some((h, q + diag * px * PATTERN_LABEL_PX, n));
-                    }
-                    PatternHandle::CircularCount => self.circular_count,
-                    _ => return None,
-                };
-                Some((h, at + DVec2::new(px * 26.0, px * 22.0), n))
+            .filter_map(|(h, _)| match h {
+                // The leader to it is drawn in the overlay.
+                PatternHandle::LinearCount | PatternHandle::LinearSecondCount => {
+                    let second = h == PatternHandle::LinearSecondCount;
+                    Some((h, self.linear_count_label(second, sk)?, self.linear_direction(second).2))
+                }
+                PatternHandle::CircularCount => {
+                    let (r, a0) = self.circular_arm(sk)?;
+                    Some((h, self.pattern_center + DVec2::from_angle(a0) * r * (1.0 + CIRCULAR_LABEL_BEYOND), self.circular_count))
+                }
+                _ => None,
             })
             .collect()
     }
@@ -6033,7 +6056,7 @@ impl SketchEditor {
                         // the spacing dimension with extension lines.
                         if let Some(c) = sel_c {
                             let second = h == PatternHandle::LinearSecondStep;
-                            let (dir, _, count, diag) = self.linear_direction(second);
+                            let (dir, _, count, _) = self.linear_direction(second);
                             if !second {
                                 push_hollow_square(&mut wide, self.snap_to_pixel(c), px, PATTERN_SQUARE_PX);
                             }
@@ -6042,15 +6065,10 @@ impl SketchEditor {
                             push_hollow_arrow(&mut wide, qs + dir * px * PATTERN_SQUARE_PX * 0.5, dir, px, PATTERN_ARROW_STEM_PX);
                             let ink = [0x33, 0x33, 0x33, 255];
                             let mut segs = Vec::new();
-                            // The leader runs into the square, its filled ~8 x 5 px arrowhead
-                            // tip just off the centre (live sketch/136), 1.5 px.
-                            let along = diag.normalize_or_zero();
-                            let tip = q + along * px * 3.0;
-                            let lead_end = q + diag * px * (PATTERN_LABEL_PX - 13.0);
-                            wide.push((vec![lead_end, tip], ink, 1.5));
-                            for i in 0..=16 {
-                                let t = i as f64 / 16.0 * 2.0 - 1.0;
-                                wide.push((vec![tip, tip + along * px * 8.0 + along.perp() * px * 2.5 * t], ink, 1.0));
+                            // Live sketch-gaps2 / 3: a 1 px leader from the instance's centre to the label's
+                            // near side, no arrowhead.
+                            if let Some(label) = self.linear_count_label(second, &data.sketch) {
+                                wide.push((vec![q, label - dir * px * PATTERN_LABEL_HALF_PX], ink, 1.0));
                             }
                             if count >= 2 {
                                 wide.push((vec![c, q], preview_color, -1.0));
@@ -8454,6 +8472,27 @@ mod tests {
         ed.set_pattern_value(PatternHandle::Rotate, 0.5);
         ed.set_pattern_value(PatternHandle::Scale, 2.0);
         assert_eq!(ed.pattern_value_labels(&d.sketch).iter().map(|l| l.0).collect::<Vec<_>>(), vec![PatternHandle::Rotate, PatternHandle::Scale]);
+        let _ = &mut d;
+    }
+
+    #[test]
+    fn pattern_count_labels_sit_where_live_puts_them() {
+        // Live sketch-gaps3: a linear "3x" (+97, +99.8) px from the 2nd instance at the zoom the tool started at, then
+        // fixed in the model; a circular one 0.4 × the seed's radius beyond the seed.
+        let (mut ed, mut d) = editor(Tool::Select);
+        ed.world_per_px = 1.778e-4;
+        let circle = d.sketch.add_circle(v(0.01, 0.05), 0.003);
+        ed.set_tool(Tool::LinearPattern);
+        ed.selection.push(circle);
+        let label = |ed: &SketchEditor, d: &SketchData| ed.pattern_count_labels(&d.sketch)[0].1;
+        let want = v(0.01 + ed.pattern_distance + 97.0 * 1.778e-4, 0.05 - 99.8 * 1.778e-4);
+        assert!((label(&ed, &d) - want).length() < 1e-9, "{:?} vs {want:?}", label(&ed, &d));
+        ed.world_per_px = 1.495e-4;
+        assert!((label(&ed, &d) - want).length() < 1e-9, "a zoom after the start keeps it in the model");
+        ed.set_tool(Tool::CircularPattern);
+        ed.selection = vec![circle];
+        ed.pattern_center = v(0.0, 0.0);
+        assert!((label(&ed, &d) - v(0.014, 0.07)).length() < 1e-9, "{:?}", label(&ed, &d));
         let _ = &mut d;
     }
 

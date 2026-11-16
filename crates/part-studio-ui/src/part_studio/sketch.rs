@@ -3354,19 +3354,12 @@ impl PartStudioView {
                 out.push(div().absolute().left(px(x - 4.)).top(px(y - 12.)).w(px(56.)).occlude().child(Input::new(st).xsmall()).into_any_element());
                 continue;
             }
-            // Centred on the editor's anchor (live sketch/136: at the end of the leader).
-            let linear = matches!(h, crate::sketch_mode::PatternHandle::LinearCount | crate::sketch_mode::PatternHandle::LinearSecondCount);
-            let label_w = if linear { crate::sketch_mode::label_width_px(&format!("{n}x")) as f32 } else { 0.0 };
+            // Centred on the editor's anchor (live sketch-gaps3).
+            let label_w = crate::sketch_mode::label_width_px(&format!("{n}x")) as f32;
             out.push(
-                div()
+                pattern_label_box(y, 28.)
                     .id(SharedString::from(format!("sk-count-{h:?}")))
-                    .absolute()
-                    .left(px(x - label_w * 0.5))
-                    .top(px(y - 10.))
-                    .text_size(px(16.))
-                    // Live (sketch/136): "3x" / "1x" at medium weight.
-                    .font_weight(FontWeight::MEDIUM)
-                    .text_color(rgb(0x333333))
+                    .left(px(x - label_w * 0.5 - PATTERN_LABEL_PAD))
                     .cursor_pointer()
                     .whitespace_nowrap()
                     .occlude()
@@ -3396,13 +3389,9 @@ impl PartStudioView {
             // Centred on the spacing dimension's line (live sketch/136).
             let label_w = crate::sketch_mode::label_width_px(&text) as f32;
             out.push(
-                div()
+                pattern_label_box(y, 26.)
                     .id(SharedString::from(format!("sk-spacing-{h:?}")))
-                    .absolute()
-                    .left(px(x - label_w * 0.5))
-                    .top(px(y - 10.))
-                    .text_size(px(16.))
-                    .text_color(rgb(0x333333))
+                    .left(px(x - label_w * 0.5 - PATTERN_LABEL_PAD))
                     .cursor_pointer()
                     .whitespace_nowrap()
                     .occlude()
@@ -5241,6 +5230,26 @@ struct PlacedDimension {
 /// Onshape: 16 px black value with no box at rest (the dimension line is
 /// broken around it); hover / selected get a rounded `#d9bfa0` / `#d9a566`
 /// box; driven values are `#666`; conflicts red.
+/// Left / right padding of a pattern label's box.
+const PATTERN_LABEL_PAD: f32 = 6.;
+
+/// A sketch pattern's count or spacing label centred on `y` (live sketch-gaps2 / 3): black 16 px regular text on an
+/// opaque box `h` px high (the count 28, the spacing 26) in the sketch plane's colour, which masks the dimension
+/// line and the grid under it.
+fn pattern_label_box(y: f32, h: f32) -> Div {
+    use crate::theme::{pick, viewport as l, viewport_dark as d};
+    div()
+        .absolute()
+        .top(px(y - h * 0.5))
+        .h(px(h))
+        .px(px(PATTERN_LABEL_PAD))
+        .flex()
+        .items_center()
+        .bg(gpui_kit::rgb_static(pick(0xf5f8fa, 0x3d3d3d)))
+        .text_size(px(16.))
+        .text_color(gpui_kit::rgb_static(pick(l::SKETCH_FULL, d::SKETCH_FULL)))
+}
+
 fn dimension_label_colors(ed: &SketchEditor, cid: noshape_sketch::ConstraintId, driving: bool) -> (Option<Rgba>, Rgba) {
     if ed.selected_constraints.contains(&cid) {
         (Some(rgb(0xd9a566)), rgb(0x000000))
