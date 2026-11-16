@@ -3521,6 +3521,29 @@ static bool connect_sections(std::vector<TopoDS_Wire>& wires, const std::vector<
   return true;
 }
 
+// A straight path square to both of two profiles adds nothing to the loft: its sections are the plain loft's (live
+// c2-loft-paths-guides' Loft 2, a line along the axis beyond both profiles: 7/13/9, the plain loft's volume).
+static bool straight_path_square_to(const TopoDS_Shape& path, const std::vector<TopoDS_Wire>& wires)
+{
+  if (wires.size() != 2)
+    return false;
+  ShapeIMap edges;
+  TopExp::MapShapes(path, TopAbs_EDGE, edges);
+  if (edges.Extent() != 1)
+    return false;
+  const BRepAdaptor_Curve c(TopoDS::Edge(edges(1)));
+  if (c.GetType() != GeomAbs_Line)
+    return false;
+  for (const TopoDS_Wire& w : wires)
+  {
+    BRepLib_FindSurface fs(w, Precision::Confusion(), true);
+    const auto          pl = fs.Found() ? occ::down_cast<Geom_Plane>(fs.Surface()) : occ::handle<Geom_Plane>();
+    if (pl.IsNull() || !pl->Axis().Direction().IsParallel(c.Line().Direction(), 1e-9))
+      return false;
+  }
+  return true;
+}
+
 // Loft along a path (Onshape's Path): the matched section wires carried
 // along `spine` (MakePipeShell), and `count` sections cut from that at even
 // steps of the path between the first and last profile, so the loft runs
@@ -4300,7 +4323,7 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
     split = split.IsNull() ? more : compose(compound_of(args), split, more);
   // Along a path: the sections cut from the profiles carried along it.
   bool along = false;
-  if (!path.IsNull() && !points)
+  if (!path.IsNull() && !points && !straight_path_square_to(path, wires))
   {
     if (!path_sections(wires, as_wire(path, "loft path"), path_count))
       fail_op("the loft can't follow the path");

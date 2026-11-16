@@ -627,6 +627,43 @@ fn a_path_loft_runs_through_a_middle_profile() {
     assert!(total_volume(&res.context) > 0.02 * 0.02 * 0.04, "{}", total_volume(&res.context));
 }
 
+/// A loft of two profiles along a straight path square to both is the plain loft, wherever the path lies along its
+/// line (live c2-loft-paths-guides' Loft 2: a line along the axis beyond both profiles; ours "Could not create loft").
+#[test]
+fn a_straight_path_square_to_two_profiles_past_them_lofts_them_plainly() {
+    let mut t = T::new();
+    let mut c1 = noshape_sketch::Sketch::new();
+    c1.add_circle(DVec2::ZERO, 0.01);
+    let s1 = t.sketch(Reference::Plane(DatumPlane::Top), c1);
+    let p2 = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("50 mm"))]);
+    let mut c2 = noshape_sketch::Sketch::new();
+    c2.add_circle(DVec2::ZERO, 0.005);
+    let s2 = t.sketch(Reference::FeaturePlane(p2), c2);
+    let mut sk = noshape_sketch::Sketch::new();
+    // Front: sketch x = X, y = Z; the line from z 80 to 120 mm, 10 mm off the axis.
+    let line = sk.add_line(DVec2::new(0.01, 0.08), DVec2::new(0.01, 0.12)).0;
+    let path = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let item = |r: Reference| {
+        let mut v = ParamValues::default();
+        v.set("sheetProfileEntities", q(vec![r]));
+        v
+    };
+    let (r1, r2) = (t.regions(s1)[0].clone(), t.regions(s2)[0].clone());
+    t.add(
+        "loft",
+        &[
+            ("sheetProfilesArray", ParamValue::Array(vec![item(r1), item(r2)])),
+            ("addSections", b(true)),
+            ("spine", q(vec![Reference::SketchEntity { sketch: path, entity: line }])),
+            ("sectionCount", e("5")),
+        ],
+    );
+    let res = t.ok();
+    let frustum = std::f64::consts::PI * 0.05 / 3.0 * (0.01f64.powi(2) + 0.01 * 0.005 + 0.005f64.powi(2));
+    assert!(near(total_volume(&res.context), frustum, 1e-3), "{} vs {frustum}", total_volume(&res.context));
+    assert_eq!(res.context.bodies[0].faces.len(), 3);
+}
+
 #[test]
 fn thicken_region_and_face() {
     let mut t = T::new();
