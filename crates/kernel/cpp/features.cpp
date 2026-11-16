@@ -504,8 +504,9 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
   // toward the sketch, which std's patterns about an edge and tangent planes
   // follow (oracle CP2, P6). So the profile goes to the far end and is swept
   // back (a draft keeps the sketch end: its neutral plane).
-  const bool   back = std::abs(draft_angle) <= 1e-12;
-  const gp_Vec from = back ? ve : vs;
+  const bool   back  = std::abs(draft_angle) <= 1e-12;
+  const bool   sheet = !TopExp_Explorer(profile.shape, TopAbs_FACE).More();
+  const gp_Vec from  = back ? ve : vs;
   // Swept back, the cylinders are re-framed in place (frame_cylinders_
   // toward_sketch adds pcurves to their edges): the prism must not share
   // edges with the caller's profile (a sketch region other threads read:
@@ -524,7 +525,7 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
   if (back)
   {
     seat = new BRepTools_ReShape;
-    base = seat_circles(base, gp_Dir(-d), seat);
+    base = seat_circles(base, sheet ? gp_Dir(d) : gp_Dir(-d), seat);
     merge_into(hist, seat->History());
   }
   BRepPrimAPI_MakePrism prism(base, back ? -d : d, false, true);
@@ -532,7 +533,18 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
     fail_op("extrude failed");
   TopoDS_Shape result = prism.Shape();
   merge_into(hist, history_of({base}, prism));
-  if (back)
+  // A sheet's cylinders keep the sweep's frame: origin at the sketch, z along the extrude (live core/q-cylframe: a
+  // surface extrude's face z +1, a solid's -1 from the far cap; dx's c2-loft-guide-curves-driven-pattern's Linear
+  // pattern about one steps +z).
+  if (back && sheet)
+    for (TopExp_Explorer x(result, TopAbs_FACE); x.More(); x.Next())
+    {
+      TopLoc_Location                       loc;
+      occ::handle<Geom_CylindricalSurface> cyl = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(TopoDS::Face(x.Current()), loc));
+      if (!cyl.IsNull())
+        reframe_cylinder(TopoDS::Face(x.Current()), gp_Dir(d), cyl->Position().Location().Transformed(loc.Transformation()).Translated(-d));
+    }
+  else if (back)
     frame_cylinders_toward_sketch(result, gp_Dir(d));
 
   HHist post; // history after the prism (draft)

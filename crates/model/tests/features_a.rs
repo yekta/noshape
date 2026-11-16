@@ -3370,3 +3370,36 @@ fn a_part_mirror_onto_its_own_block_adds_with_a_boss_too() {
         assert_eq!(changed.get("operationType"), Some(&ParamValue::Enum("ADD".into())), "boss {boss}: {changed:?}");
     }
 }
+
+/// A surface extrude's cylinder keeps the sweep's frame, a solid extrude's points back from its far cap (live
+/// core/q-cylframe: Ø2.54 circle on Top, 1.524 mm; the sheet origin 0, z +1, x +x; the solid origin at 1.524 mm, z -1,
+/// x -x), so a Linear pattern about the sheet's face steps along the extrude (dx's c2-loft-guide-curves-driven-pattern).
+#[test]
+fn a_surface_extrudes_cylinder_keeps_the_sweeps_frame() {
+    let frame = |surface: bool| {
+        let mut t = T::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let c = sk.add_circle(DVec2::ZERO, 0.00127);
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        if surface {
+            t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![Reference::SketchEntity { sketch: s, entity: c.0 }])), ("depth", e("1.524 mm"))]);
+        } else {
+            let r = t.regions(s)[0].clone();
+            t.extrude(r, "1.524 mm", "NEW");
+        }
+        let res = t.ok();
+        let shape = &res.context.bodies[0].shape;
+        let seam = shape.edges().iter().filter_map(|e| e.edge_info().ok()).find(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. })).map(|i| i.start);
+        shape.faces().iter().find_map(|f| match f.face_surface() {
+            Ok(noshape_kernel::Surface::Cylinder { origin, axis, x_dir, .. }) => Some((origin, axis, x_dir, seam)),
+            _ => None,
+        })
+    };
+    let close = |a: DVec3, b: DVec3| a.distance(b) < 1e-12;
+    let (o, z, x, seam) = frame(true).unwrap();
+    assert!(close(o, DVec3::ZERO) && close(z, DVec3::Z) && close(x, DVec3::X), "sheet {o} {z} {x}");
+    // (Its seam on the frame's x.)
+    assert!(seam.is_some_and(|p| (p.x - 0.00127).abs() < 1e-12 && p.y.abs() < 1e-12), "seam {seam:?}");
+    let (o, z, x, _) = frame(false).unwrap();
+    assert!(close(o, DVec3::new(0.0, 0.0, 0.001524)) && close(z, -DVec3::Z) && close(x, -DVec3::X), "solid {o} {z} {x}");
+}
