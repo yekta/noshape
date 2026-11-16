@@ -1837,7 +1837,13 @@ fn plane_cylinder_contacts(sup: &[Support; 2], r: f64) -> Vec<k::Conic> {
 /// cylinders: live's contact edges of c2-hunting-knife's Fillet 3), within 0.004 r.
 fn conic_contacts(ev: &EvalCtx, before: &Shape, chain: &[Shape], conics: &[k::Conic], shape: Shape, names: Vec<Name>, r: f64) -> FResult<(Shape, Vec<Name>)> {
     let old = before.edges();
-    let near_chain = |p: DVec3| k::make_vertex(p).is_ok_and(|v| chain.iter().any(|c| k::distance(&v, c).is_ok_and(|d| d.distance < 4.0 * r)));
+    // (A chain edge's box farther off than that first: a distance each took most of c2-hunting-knife's Fillet 3's 9 ms
+    // here.)
+    let boxes: Vec<Option<k::BoundingBox>> = chain.iter().map(|c| c.bounding_box(false).ok()).collect();
+    let near_chain = |p: DVec3| {
+        let near_box = |b: &Option<k::BoundingBox>| b.as_ref().is_none_or(|b| (p - p.clamp(b.min, b.max)).length() < 4.0 * r);
+        k::make_vertex(p).is_ok_and(|v| chain.iter().zip(&boxes).any(|(c, b)| near_box(b) && k::distance(&v, c).is_ok_and(|d| d.distance < 4.0 * r)))
+    };
     let mids: Vec<DVec3> = shape
         .edges()
         .iter()
