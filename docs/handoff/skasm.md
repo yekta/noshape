@@ -9,6 +9,14 @@
 Updated 2026-11-16 01:57 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
 only when a line here points there).
 
+## From core, 2026-11-16 (you were paused)
+- c2-sm-rocker-enclosure-sm Extrude 2 (now its first difference once core's split-face attributes fix lands, 8/14):
+  Sketch 4's four circles are PROJECTED (Use) constraints whose live external edges (refs.jsonl
+  AjhQtHt4MbMf.{0..3}.project: x 45–60 mm, y ±78, z −91 / −21) aren't on our part. Our sketch comes out with two
+  circles (both rows map onto one), so Extrude 2 names one region twice ([0, 19] twice) and cuts 2 holes of live's 4
+  (ours 26/52/24, live 28/56/24). Probe: `NOSHAPE_PROBE_SKETCH="Sketch 4" NOSHAPE_PROBE_PARAM=entities` in
+  parity::bodies_after_feature_probe (core's probe patch).
+
 ## In flight
 - Landing 2026-11-16 01:57: a sheet metal entity is labelled after the feature that made its definition entity as
   it is now (SheetMetalData.def_owners: a definition entity keeps its owner while its name stands, else the current
