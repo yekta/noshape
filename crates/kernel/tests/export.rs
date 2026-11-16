@@ -2050,3 +2050,20 @@ fn a_sat_edge_keeps_its_range_where_projection_misses() {
     let a = surface_properties(&back[0].shape).unwrap().mass;
     assert!((a - want).abs() < 1e-5 * want, "{a} vs {want}");
 }
+
+/// Two Shell walls (offsets of a loft's periodic B-surface) and the cylinder between them, as Parasolid: the offsets
+/// written as OFFSET_SURF over the basis (approximated, the edges along them were refitted badly) and each fin's curve
+/// in the period of the basis's range as written (one a period off put an edge 9 mm away): c2-rings-loft's Part 1
+/// read back at 303 mm³ for 441.
+#[test]
+fn offsets_of_a_periodic_bsurface_round_trip_through_parasolid() {
+    let walls = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts/rings-loft-shell-walls.brep")).unwrap();
+    let want = surface_properties(&walls).unwrap().mass;
+    let path = std::env::temp_dir().join(format!("noshape-xt-walls-{}.x_t", std::process::id()));
+    write_parasolid(&path, std::slice::from_ref(&walls), LengthUnit::Meter, false).unwrap();
+    let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(back.count(ShapeType::Face), 3);
+    let a = surface_properties(&back).unwrap().mass;
+    assert!((a - want).abs() < 1e-4 * want, "{a} vs {want}");
+}

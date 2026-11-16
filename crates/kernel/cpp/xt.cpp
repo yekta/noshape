@@ -553,6 +553,10 @@ struct XSurface
   int                                       index = 0;
   double                                    su = 1, ou = 0, sv = 1;
   bool                                      swap = false;
+  // A B-surface's range as written (an offset's basis's), when the face's OCCT surface is periodic: a fin's
+  // curve on it is moved into it by whole periods.
+  bool                                      bounded = false;
+  double                                    bu0 = 0, bu1 = 0, bv0 = 0, bv1 = 0;
   std::function<gp_Vec(const gp_Pnt&, double, double)> natural; // point, OCCT u, v
 };
 
@@ -1157,6 +1161,8 @@ struct BodyWriter
     {
       const int                        basis = w.alloc();
       const occ::handle<Geom_BSplineSurface> b = b_surface(basis_surface(off->BasisSurface()), f, basis, w.next_id++, body);
+      xs.bounded = true;
+      b->Bounds(xs.bu0, xs.bu1, xs.bv0, xs.bv1);
       chain_surface.push_back(basis);
       Node& nd = head(60);
       nd.fields.insert(nd.fields.end(), {fc('U'), fl(false), fp(basis), ff(off->Offset()), ff_null()});
@@ -1171,6 +1177,8 @@ struct BodyWriter
     }
     // Anything else: a B-spline surface (b_surface).
     const occ::handle<Geom_BSplineSurface> b = b_surface(s, f, idx, id, face_index);
+    xs.bounded = true;
+    b->Bounds(xs.bu0, xs.bu1, xs.bv0, xs.bv1);
     xs.natural = [b](const gp_Pnt&, double u, double v) {
       gp_Pnt q;
       gp_Vec du, dv;
@@ -1370,6 +1378,23 @@ struct BodyWriter
       b->Segment(f, l);
     }
     const XSurface&     xs  = surfaces[face];
+    // On a periodic surface written over one range (an offset's B-surface basis over the face's), the curve in the
+    // period that range holds (c2-rings-loft's Shell walls: a fin a period off, the edge rebuilt from it 9 mm away).
+    TopLoc_Location                 sl;
+    const occ::handle<Geom_Surface> occ_s = BRep_Tool::Surface(F, sl);
+    if (xs.bounded && !xs.swap && !occ_s.IsNull())
+    {
+      const gp_Pnt2d mid = b->Value((b->FirstParameter() + b->LastParameter()) / 2);
+      const auto     into = [](double x, double lo, double hi, double per) {
+        if (per <= 0 || (x >= lo && x <= hi))
+          return 0.0;
+        return -std::floor((x - lo) / per) * per;
+      };
+      const double du = occ_s->IsUPeriodic() ? into(mid.X(), xs.bu0, xs.bu1, occ_s->UPeriod()) : 0.0;
+      const double dv = occ_s->IsVPeriodic() ? into(mid.Y(), xs.bv0, xs.bv1, occ_s->VPeriod()) : 0.0;
+      if (du != 0 || dv != 0)
+        b->Translate(gp_Vec2d(du, dv));
+    }
     const bool          rat = b->IsRational();
     std::vector<double> p;
     for (int i = 1; i <= b->NbPoles(); ++i)
@@ -2165,8 +2190,10 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splin
     for (TopExp_Explorer ee(ef.Current(), TopAbs_EDGE); ee.More() && keep_spun && !occ::down_cast<Geom_SurfaceOfRevolution>(fs).IsNull(); ee.Next())
       keep_spun = !BRep_Tool::Degenerated(TopoDS::Edge(ee.Current()));
   }
-  // (Extrusions of ellipses and splines stay: XT swept surfaces, exact. The others are written as B-surfaces.)
-  r = ShapeCustom::ConvertToBSpline(r, false, !keep_spun, true, false);
+  // (Extrusions of ellipses and splines stay: XT swept surfaces, exact. The others are written as B-surfaces. Offset
+  // surfaces stay too, written as Parasolid's OFFSET_SURF over their basis's B-surface: approximated, the edges along
+  // them came out tolerant with curves on them that no longer fit; c2-rings-loft's Shell walls read back 303 mm³ for 441.)
+  r = ShapeCustom::ConvertToBSpline(r, false, !keep_spun, false, false);
   if (periodic_splines)
     r = offsets_restored(r);
   bool split = false;
