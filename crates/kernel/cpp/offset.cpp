@@ -39,6 +39,7 @@
 #include <TopoDS_Iterator.hxx>
 #include <gp_Vec2d.hxx>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -349,6 +350,12 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
   TopExp::MapShapesAndUniqueAncestors(so, TopAbs_EDGE, TopAbs_FACE, ef);
   TopExp::MapShapesAndUniqueAncestors(so, TopAbs_VERTEX, TopAbs_FACE, vf);
   TopExp::MapShapesAndUniqueAncestors(so, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  auto t_lap = std::chrono::steady_clock::now();
+  auto lap   = [&](const char* what) {
+    const auto now = std::chrono::steady_clock::now();
+    report << what << " " << std::chrono::duration<double, std::milli>(now - t_lap).count() << " ms\n";
+    t_lap = now;
+  };
   std::vector<quad::Surf>                sf((size_t)nf + 1);
   std::vector<occ::handle<Geom_Surface>> world((size_t)nf + 1); // each face's own surface, its location applied
   for (int i = 1; i <= nf; ++i)
@@ -380,6 +387,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
     if (degen[(size_t)i] && D[(size_t)efi[(size_t)i][0]] != 0)
       failed("edge " + std::to_string(i) + ": a pole on a moved face");
   }
+  lap("surfaces");
   // The vertices' new places: on all their faces' offsets.
   std::vector<gp_XYZ> pts((size_t)nv + 1);
   for (int i = 1; i <= nv; ++i)
@@ -502,6 +510,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
       failed("vertex " + std::to_string(i) + ": its offset ran " + std::to_string((x - V).Modulus() * 1e3) + " mm off");
     pts[(size_t)i] = x;
   }
+  lap("vertices");
   // Three-sided faces whose offset vanishes (an edge of them turned round: a sliver past a seam, its corners passing
   // each other): gone, their three neighbours meeting at one new vertex where their offsets do.
   std::vector<char> gone_face((size_t)nf + 1), gone_edge((size_t)ne + 1);
@@ -581,6 +590,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
       bld.MakeVertex(vx[(size_t)i], gp_Pnt(pts[(size_t)i]), 1e3 * tol);
   for (int i = 1; i <= nv; ++i)
     vx[(size_t)i] = vx[(size_t)vmap[(size_t)i]];
+  lap("collapses");
   // The edges' offsets.
   std::vector<NewEdge> ex((size_t)ne + 1);
   std::vector<int>     work((size_t)nf + 1, 0);
@@ -893,6 +903,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
     bld.Add(n.e, B.Oriented(TopAbs_REVERSED));
     n.s0 = s0, n.s1 = s1;
   }
+  lap("edges");
   // The faces: each one's loops of new edges on its new surface.
   TopoDS_Shell shell;
   bld.MakeShell(shell);
@@ -907,7 +918,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
       continue;
     }
     const TopoDS_Face               ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
-    const occ::handle<Geom_Surface> g  = new_surface(i);
+    const occ::handle<Geom_Surface> g = new_surface(i);
     TopoDS_Face                     of;
     bld.MakeFace(of, g, 1e3 * tol);
     for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
@@ -975,6 +986,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
   TopoDS_Solid out;
   bld.MakeSolid(out);
   bld.Add(out, shell);
+  lap("faces");
   BRepLib::SameParameter(out, 1e3 * tol, true);
   for (int k = 1; k <= ne; ++k)
     if (!gone_edge[(size_t)k] && BRep_Tool::Tolerance(ex[(size_t)k].e) > 1e4 * tol)
@@ -993,6 +1005,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
       t = std::max(t, BRep_Tool::Tolerance(TopoDS::Edge(x.Current())));
     report << face_name(i) << " moved " << D[(size_t)i] * 1e3 << " mm, tolerance " << t * 1e3 << " mm\n";
   }
+  lap("same parameter");
   if (!BRepCheck_Analyzer(out).IsValid())
   {
     std::string bad;
@@ -1031,6 +1044,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
             }
     failed("the result not valid" + (bad.empty() ? std::string() : " (" + bad + ")"));
   }
+  lap("check");
   // A volume that moved the other way from the faces' areas times their distances: turned inside out somewhere.
   GProp_GProps p0, p1;
   BRepGProp::VolumeProperties(so, p0);
@@ -1038,6 +1052,8 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
   double change = 0, scale = 0;
   for (int i = 1; i <= nf; ++i)
   {
+    if (D[(size_t)i] == 0)
+      continue;
     GProp_GProps a;
     BRepGProp::SurfaceProperties(faces(i), a);
     change += a.Mass() * D[(size_t)i];
@@ -1046,6 +1062,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
   report << "volume " << p0.Mass() * 1e9 << " -> " << p1.Mass() * 1e9 << " mm3 (first order " << (p0.Mass() + change) * 1e9 << ")\n";
   if (p1.Mass() <= 0 || std::abs(p1.Mass() - p0.Mass() - change) > 0.5 * scale + 1e-9 * p0.Mass())
     failed("its volume off the faces' moves");
+  lap("volumes");
   return out;
 }
 
@@ -1078,11 +1095,15 @@ OpOut op_offset_solid(const OcShape& s, const OcShapeList& faces, rust::Slice<co
   std::ostringstream        report;
   try
   {
+    const auto         t0 = std::chrono::steady_clock::now();
     const TopoDS_Shape r = offset_solid_impl(s.shape, faces.items, d, (int)face_budget, h, report);
+    const auto         t1 = std::chrono::steady_clock::now();
+    OpOut              o  = make_result(args, r, h.get());
+    report << "offset " << std::chrono::duration<double, std::milli>(t1 - t0).count() << " ms, result and history " << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count() << " ms\n";
     t_offset_report      = report.str();
     if (std::getenv("NOSHAPE_OFFSET_DEBUG"))
       std::fprintf(stderr, "offset_solid: done\n%s", t_offset_report.c_str());
-    return make_result(args, r, h.get());
+    return o;
   }
   catch (const Failed& f)
   {
