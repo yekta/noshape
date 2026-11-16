@@ -599,9 +599,9 @@ pub mod view_cube {
     /// Onshape's back-face-culled mesh: the far faces' frames seen through
     /// the gaps, a white disk under each near corner, the near faces' white
     /// squares.
-    /// How far from its centre a corner takes the pointer, in half edges
-    /// (its disc is 0.24).
-    const CORNER_HIT: f64 = 0.31;
+    /// How far from its centre a corner takes the pointer, in half edges (its disc is 0.24; live chrome-gaps 11-16:
+    /// the knobs' hover regions 35–60 cells of 3 px, ours 41–42 at 0.37).
+    const CORNER_HIT: f64 = 0.37;
 
     pub fn cube_shapes(rotation: DQuat) -> Vec<CubeShape> {
         let inv = rotation.inverse();
@@ -651,7 +651,30 @@ pub mod view_cube {
         let shapes = cube_shapes(rotation);
         let inv = rotation.inverse();
         let corner = shapes.iter().filter(|s| s.cell.0.iter().all(|c| *c != 0)).find(|s| (inv * (s.cell.dir() * (0.8 * HALF_EDGE))).truncate().distance(p) <= CORNER_HIT * HALF_EDGE);
-        corner.map(|s| s.cell).or_else(|| shapes.into_iter().rev().find(|s| point_in_poly(p, &s.poly)).map(|s| s.cell))
+        if let Some(c) = corner {
+            return Some(c.cell);
+        }
+        if let Some(s) = shapes.iter().rev().find(|s| point_in_poly(p, &s.poly)) {
+            return Some(s.cell);
+        }
+        // Live picks with a reach (chrome-gaps' hover map): just outside the silhouette, the nearest piece.
+        shapes.iter().map(|s| (s.cell, poly_distance(p, &s.poly))).filter(|x| x.1 <= SILHOUETTE_REACH_PX).min_by(|a, b| a.1.total_cmp(&b.1)).map(|x| x.0)
+    }
+
+    /// How far outside the cube's outline a point still picks its nearest piece (live chrome-gaps 11-16: the bands
+    /// along the silhouette reach ~6 px past the drawn cube).
+    const SILHOUETTE_REACH_PX: f64 = 6.0;
+
+    /// A point's distance to a closed polygon's outline.
+    fn poly_distance(p: DVec2, poly: &[DVec2]) -> f64 {
+        let n = poly.len();
+        (0..n)
+            .map(|i| {
+                let (a, b) = (poly[i], poly[(i + 1) % n]);
+                let t = ((p - a).dot(b - a) / (b - a).length_squared().max(1e-12)).clamp(0.0, 1.0);
+                (a + (b - a) * t).distance(p)
+            })
+            .fold(f64::INFINITY, f64::min)
     }
 
     /// What's under a widget point: an arrow's pseudo cell or a cube cell.
@@ -827,6 +850,106 @@ pub mod view_cube {
                 out.grow((top_left[0] + mask.width as i32) as f32, (top_left[1] + mask.height as i32) as f32);
                 out.masks.push((mask.clone(), top_left, color));
             }
+        }
+    }
+}
+
+
+/// The view cube's hover targets as live's (chrome-gaps 11-16: each 3 px cell of the 150 px widget, read from the
+/// cube's own highlightedId, at the ui-parity starts' camera): faces and corners only, the hidden faces' bands along
+/// the silhouette, round corner knobs. Ours agrees on 84 % of the cells either cube covers.
+#[cfg(test)]
+mod cube_hover_map {
+    use super::view_cube::*;
+    use glam::{DMat3, DQuat, DVec2, DVec3};
+
+    const LIVE: [&str; 50] = [
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "...................LLLKKKKKKKK....................",
+    ".................LLLLLKKKKKKKKKKK.................",
+    "................LLLLLTTTTTKKKKKKKKKKK.............",
+    "...............LLLLLTTTTTTTTTTKKKKKKKK............",
+    ".............LLLLLLTTTTTTTTTTTTTT11111K...........",
+    "............LLLLLLTTTTTTTTTTTTTTT111111K..........",
+    "...........LL22222TTTTTTTTTTTTTTT111111K..........",
+    "...........L222222TTTTTTTTTTTTTTT111111K..........",
+    "...........L222222TTTTTTTTTTTTTTKK11111K..........",
+    "..........L2222222LLTTTTTTTTTTTKKKK1111K..........",
+    "..........L2222222LLLLTTT******KKKKR111K..........",
+    "..........L2222222LLLLKK********KKKKRRKK..........",
+    "..........L222222FLLLLKK********KRRRRRKK..........",
+    "..........LLLL22FFFFFFFK********RRRRRRKK..........",
+    "..........LLLLLFFFFFFFFF********RRRRRRKK..........",
+    "..........LLLLFFFFFFFFFF********RRRRRRKK..........",
+    "..........LLLLLFFFFFFFFF********RRRRRRKKKKKK......",
+    "..........LLLLFFFFFFFFFFF******RRRRRRRKK..........",
+    "..........LLLLFFFFFFFFFFFFFKKKRRRRRRRRKK..........",
+    "..........LLLLFFFFFFFFFFFFFBBBRRRRRRRRKK..........",
+    "..........LLLLFFFFFFFFFFFFFBBBRRRRRRRRKK..........",
+    "..........LLLLFFFFFFFFFFFFFBBBRRRRRRRRKK..........",
+    "..........LLLLFFFFFFFFFFFFFBBBRRRRRRBBB...........",
+    "..........LLLLBFFFFFFFFFFFFBBBRRRRRBBBB...........",
+    "..........LLLBBBFFFFFFFFFFFBBBRRRRBBBBB...........",
+    "...........LBBBBBBBFFFFFF3333333BBBBBB............",
+    "............BBBBBBBBBBFF33333333BBBBB.............",
+    ".............BBBBBBBBBBB33333333BBBB..............",
+    "...............BBBBBBBBB33333333BBB...............",
+    "..................BBBBBB33333333B.................",
+    "......................BBBBBBBBBB..................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    "..................................................",
+    ];
+
+    #[test]
+    fn the_cube_hover_map_matches_live() {
+        let z = DVec3::new(0.433013, -0.75, 0.5).normalize();
+        let y = DVec3::new(-0.25, 0.433013, 0.866025).normalize();
+        let rot = DQuat::from_mat3(&DMat3::from_cols(y.cross(z), y, z));
+        let ours: Vec<Vec<char>> = (0..50)
+            .map(|j| {
+                (0..50)
+                    .map(|i| match cube_hit(rot, DVec2::new(3.0 * i as f64 - CENTER[0], CENTER[1] - 3.0 * j as f64)).map(|c| c.0) {
+                        Some([0, 0, 1]) => 'T',
+                        Some([0, -1, 0]) => 'F',
+                        Some([1, 0, 0]) => 'R',
+                        Some([-1, 0, 0]) => 'L',
+                        Some([0, 1, 0]) => 'K',
+                        Some([0, 0, -1]) => 'B',
+                        Some([1, -1, 1]) => '*',
+                        Some([1, 1, 1]) => '1',
+                        Some([-1, -1, 1]) => '2',
+                        Some([1, -1, -1]) => '3',
+                        Some(_) => '?',
+                        None => '.',
+                    })
+                    .collect()
+            })
+            .collect();
+        let live: Vec<Vec<char>> = LIVE.iter().map(|r| r.chars().collect()).collect();
+        let pairs = || live.iter().flatten().zip(ours.iter().flatten());
+        let covered = pairs().filter(|(a, b)| **a != '.' || **b != '.').count();
+        let same = pairs().filter(|(a, b)| (**a != '.' || **b != '.') && a == b).count();
+        let map: String = ours.iter().map(|r| r.iter().collect::<String>() + "\n").collect();
+        assert!(same as f64 >= 0.8 * covered as f64, "{same} of {covered} cells agree with live:\n{map}");
+        for t in "TFRLKB*123".chars() {
+            let n = |m: &Vec<Vec<char>>| m.iter().flatten().filter(|c| **c == t).count() as f64;
+            assert!((n(&ours) - n(&live)).abs() <= 0.3 * n(&live), "{t}: ours {} cells, live {}\n{map}", n(&ours), n(&live));
         }
     }
 }
