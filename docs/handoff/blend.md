@@ -34,9 +34,11 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   circle 81 - spline 19 on the x = 5 face): now the document's first difference on main: ours 33/88/56, live 33/86/54
   (two more edges and vertices, one per chain end), then Fillet 3 / Fillet Stevenrohr zum Halter fail. Our side pick
   is live's (OCCT distance-angle, reference faces 2, 3, 28). Live's chamfer runs out past the chain's end vertices
-  (5, +-2.61, -43.106), cutting the top lines back to x = 1.5; ours stops there with a stub. Debug patch
-  parked/imp-d1-debug.patch. Next: the run-out at a chain end that meets a corner (G7's section run-out, for a
-  distance-angle chain).
+  (5, +-2.61, -43.106): its end edge on each side is the top line itself, one 59.47 mm line from x = 1.5. Ours ends
+  in OCCT's 3.5012 mm B-spline from (5, 2.61, -43.106) to (1.5, 2.616, -43.105), 6 um off the line's y = 2.6104, so
+  the 55.97 mm line and it stay two edges (the +2). Debug patch parked/imp-d1-debug.patch; doc copy vibe6
+  ~/tmp/blend/imp/imp.noshape. Next: the chamfer's end edges exact (a line where the end section is straight in a
+  plane), then merged with the collinear line when they bound the same two faces.
 - isaac-ball 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63): 14 line edges, R 4.5; face 21 has a 9 mm strip:
   full rounds across it (live one half cylinder each, face 21 split 618.32 + 216.00). checked_blend's hair-smaller
   retry leaves a 9e-9 m neck in face 21. Branch `blend-necks` d6de0d70f (blend4): necks cut (all, at the part's scale
