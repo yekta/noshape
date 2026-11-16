@@ -140,7 +140,7 @@ pub fn ops() -> Vec<Op> {
             "transform",
             "Move, rotate or scale sketch entities (the Transform tool)",
             "Rotates by `rotate` and scales by `scale` about `center` (default: the selection's center), then translates by `translate`, as the tool's triad does.",
-            vec![req("entities", ids(), "Entities to transform."), opt("translate", point(), "Translation [dx, dy]."), opt("rotate", value(), "Rotation angle (counter-clockwise)."), opt("scale", json!({ "type": "number", "exclusiveMinimum": 0 }), "Scale factor."), opt("center", point(), "Pivot [x, y].")],
+            vec![req("entities", ids(), "Entities to transform."), opt("translate", point(), "Translation [dx, dy]."), opt("rotate", value(), "Rotation angle (counter-clockwise)."), opt("scale", json!({ "type": "number", "exclusiveMinimum": 0 }), "Scale factor."), opt("center", point(), "Pivot [x, y] (default: where the Transform tool's manipulator sits, the entities' lowest end or centre, the leftmost of equals).")],
             transform,
         ),
         op(
@@ -610,11 +610,9 @@ fn copy_entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     pattern(ctx, a, Tool::Transform, |ed, t, vars| {
-        let bb = t.data.sketch.entities_bbox(&ed.selection);
         ed.pattern_center = match a.get("center") {
             Some(c) => point_value(c, &t.units).map_err(|e| e.with_param("center"))?,
-            None if !bb.is_empty() => bb.center(),
-            None => DVec2::ZERO,
+            None => ed.transform_anchor(&t.data.sketch).unwrap_or(DVec2::ZERO),
         };
         if let Some(v) = a.get("translate") {
             ed.xf_offset = point_value(v, &t.units).map_err(|e| e.with_param("translate"))?;

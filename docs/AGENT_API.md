@@ -1981,7 +1981,7 @@ Examples:
 | `translate` | array of number or string |  | Translation [dx, dy]. |
 | `rotate` | string or number |  | Rotation angle (counter-clockwise). |
 | `scale` | number |  | Scale factor. |
-| `center` | array of number or string |  | Pivot [x, y]. |
+| `center` | array of number or string |  | Pivot [x, y] (default: where the Transform tool's manipulator sits, the entities' lowest end or centre, the leftmost of equals). |
 
 #### sketch_use
 

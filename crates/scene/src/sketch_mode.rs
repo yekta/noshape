@@ -312,8 +312,11 @@ pub enum PatternHandle {
     CircularAngle,
     /// Circular pattern: first instance (instance count).
     CircularCount,
-    /// Transform: translation.
+    /// Transform: translation in the plane (the square).
     Move,
+    /// Transform: translation along the triad's X / Y arrow.
+    MoveX,
+    MoveY,
     /// Transform: rotation.
     Rotate,
     /// Transform: scale.
@@ -881,6 +884,18 @@ const PATTERN_DIM_PX: f64 = 99.8;
 const PATTERN_LABEL_HALF_PX: f64 = 15.0;
 /// A circular pattern's "3x" (live sketch-gaps3): 0.4 × the seed's radius beyond the seed, in the model.
 const CIRCULAR_LABEL_BEYOND: f64 = 0.4;
+/// The sketch 2D manipulator (Transform, a paste), px from its anchor along its X / Y (live editing-gaps3, the client's
+/// triad: arrows' gap 8 + shaft 60 then the head; the square 20–45; the rotation ring 108 out on X; the scale head
+/// from (60, 60) on the diagonal, 30 long). Handles are screen-sized; no shafts are drawn.
+const XF_ARROW_BASE_PX: f64 = 68.0;
+const XF_ARROW_HEAD_PX: f64 = 28.0;
+const XF_ARROW_HALF_W_PX: f64 = 11.0;
+const XF_SQUARE_PX: (f64, f64) = (20.0, 45.0);
+const XF_RING_AT_PX: f64 = 108.0;
+const XF_RING_R_PX: f64 = 9.0;
+const XF_SCALE_BASE_PX: f64 = 84.85;
+const XF_SCALE_HEAD_PX: f64 = 30.0;
+const XF_SCALE_HALF_W_PX: f64 = 16.0;
 /// The line shader's dash-dot period (`fs_line`, style 4) in pixels.
 const DASH_DOT_PERIOD_PX: f64 = 16.0;
 
@@ -940,6 +955,13 @@ fn push_hollow_arrow(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, start: DVec2, d
     for (color, width) in [(MANIPULATOR_OUTLINE, 3.0), ([0xff, 0xff, 0xff, 0xff], 1.2)] {
         wide.push((vec![start, base], color, width));
         wide.push((vec![base + half, apex, base - half, base + half], color, width));
+    }
+}
+
+/// A closed outline in the manipulators' grey double line (3 px outline under a white core).
+fn push_hollow(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, pts: Vec<DVec2>) {
+    for (color, width) in [(MANIPULATOR_OUTLINE, 3.0), ([0xff, 0xff, 0xff, 0xff], 1.2)] {
+        wide.push((pts.clone(), color, width));
     }
 }
 
@@ -4320,9 +4342,32 @@ impl SketchEditor {
         if self.tool != Tool::Transform || self.xf_center_pinned || self.xf_offset != DVec2::ZERO || self.xf_angle != 0.0 || self.xf_scale != 1.0 {
             return;
         }
-        if let Some(c) = self.selection_center(sk) {
+        if let Some(c) = self.transform_anchor(sk) {
             self.pattern_center = c;
         }
+    }
+
+    /// Where the 2D manipulator sits on the selection (live editing-gaps3, paste and Transform alike): its lowest key
+    /// point (curve ends, centres, points), the leftmost of equals; the bounding box's centre if it has none.
+    pub fn transform_anchor(&self, sk: &Sketch) -> Option<DVec2> {
+        let mut keys = Vec::new();
+        for e in self.selection.iter().filter_map(|e| sk.entity(*e)) {
+            match (e.endpoints(), e.center()) {
+                (None, None) => keys.push(e.id),
+                (ends, centre) => keys.extend(ends.into_iter().flat_map(|(a, b)| [a, b]).chain(centre)),
+            }
+        }
+        let tol = 1e-9;
+        keys.into_iter()
+            .filter_map(|k| sk.point(k))
+            .reduce(|a, b| if b.y < a.y - tol || (b.y < a.y + tol && b.x < a.x) { b } else { a })
+            .or_else(|| self.selection_center(sk))
+    }
+
+    /// The 2D manipulator's axes (turned with its rotation).
+    fn xf_axes(&self) -> (DVec2, DVec2) {
+        let u = DVec2::from_angle(self.xf_angle);
+        (u, u.perp())
     }
 
     fn tool_up_inner(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
@@ -4706,12 +4751,16 @@ impl SketchEditor {
                 }
             }
             Tool::Transform => {
-                let c = self.pattern_center;
-                let m = c + self.xf_offset;
-                out.push((PatternHandle::Center, c));
-                out.push((PatternHandle::Move, m + DVec2::new(px * 14.0, px * 14.0)));
-                out.push((PatternHandle::Rotate, m + DVec2::from_angle(self.xf_angle) * px * 70.0));
-                out.push((PatternHandle::Scale, m + DVec2::from_angle(self.xf_angle + PI * 0.25) * px * 45.0 * self.xf_scale));
+                let m = self.pattern_center + self.xf_offset;
+                let (u, v) = self.xf_axes();
+                let arrow = px * (XF_ARROW_BASE_PX + XF_ARROW_HEAD_PX * 0.5);
+                let sq = px * (XF_SQUARE_PX.0 + XF_SQUARE_PX.1) * 0.5;
+                out.push((PatternHandle::Center, m));
+                out.push((PatternHandle::Move, m + (u + v) * sq));
+                out.push((PatternHandle::MoveX, m + u * arrow));
+                out.push((PatternHandle::MoveY, m + v * arrow));
+                out.push((PatternHandle::Rotate, m + u * px * XF_RING_AT_PX));
+                out.push((PatternHandle::Scale, m + (u + v).normalize() * px * (XF_SCALE_BASE_PX + XF_SCALE_HEAD_PX * 0.5) * self.xf_scale));
             }
             _ => {}
         }
@@ -4813,10 +4862,10 @@ impl SketchEditor {
             Tool::Transform if !self.selection.is_empty() => {
                 let m = self.pattern_center + self.xf_offset;
                 if self.xf_angle.abs() > 1e-12 {
-                    out.push((PatternHandle::Rotate, m + DVec2::from_angle(self.xf_angle) * px * 92.0, self.xf_angle));
+                    out.push((PatternHandle::Rotate, m + DVec2::from_angle(self.xf_angle) * px * (XF_RING_AT_PX + 34.0), self.xf_angle));
                 }
                 if (self.xf_scale - 1.0).abs() > 1e-12 {
-                    out.push((PatternHandle::Scale, m + DVec2::from_angle(self.xf_angle + PI * 0.25) * px * (45.0 * self.xf_scale + 22.0), self.xf_scale));
+                    out.push((PatternHandle::Scale, m + DVec2::from_angle(self.xf_angle + PI * 0.25) * px * ((XF_SCALE_BASE_PX + XF_SCALE_HEAD_PX) * self.xf_scale + 22.0), self.xf_scale));
                 }
             }
             _ => {}
@@ -4865,8 +4914,19 @@ impl SketchEditor {
     }
 
     fn handle_at(&self, sk: &Sketch, p: DVec2) -> Option<PatternHandle> {
-        let r = self.world_per_px * 9.0;
-        self.pattern_handles(sk).into_iter().map(|(h, q)| (h, (q - p).length())).filter(|x| x.1 <= r).min_by(|a, b| a.1.total_cmp(&b.1)).map(|x| x.0)
+        // The 2D manipulator's handles are bigger than the pattern handles' 9 px.
+        let reach = |h: PatternHandle| match h {
+            PatternHandle::MoveX | PatternHandle::MoveY | PatternHandle::Scale => 15.0,
+            PatternHandle::Move => 13.0,
+            PatternHandle::Rotate | PatternHandle::Center if self.tool == Tool::Transform => 11.0,
+            _ => 9.0,
+        };
+        self.pattern_handles(sk)
+            .into_iter()
+            .map(|(h, q)| (h, (q - p).length() / reach(h)))
+            .filter(|x| x.1 <= self.world_per_px)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|x| x.0)
     }
 
     /// Updates the pattern / transform parameters from a dragged manipulator.
@@ -4907,7 +4967,9 @@ impl SketchEditor {
                 }
             }
             PatternHandle::Center => {
-                self.pattern_center = self.inference_free_snap(sk, p);
+                // The 2D manipulator's ring moves the triad only, the geometry stays (live editing-gaps3).
+                let shift = if self.tool == Tool::Transform { self.xf_offset } else { DVec2::ZERO };
+                self.pattern_center = self.inference_free_snap(sk, p) - shift;
                 self.xf_center_pinned = true;
             }
             PatternHandle::CircularAngle => {
@@ -4927,7 +4989,16 @@ impl SketchEditor {
                     self.circular_count = if full { n } else { n + 1 }.clamp(2, 100);
                 }
             }
-            PatternHandle::Move => self.xf_offset = p - DVec2::new(px * 14.0, px * 14.0) - self.pattern_center,
+            PatternHandle::Move => {
+                let (u, v) = self.xf_axes();
+                self.xf_offset = p - (u + v) * px * (XF_SQUARE_PX.0 + XF_SQUARE_PX.1) * 0.5 - self.pattern_center;
+            }
+            PatternHandle::MoveX | PatternHandle::MoveY => {
+                let (u, v) = self.xf_axes();
+                let a = if h == PatternHandle::MoveX { u } else { v };
+                let along = (p - a * px * (XF_ARROW_BASE_PX + XF_ARROW_HEAD_PX * 0.5) - self.pattern_center).dot(a);
+                self.xf_offset += a * (along - self.xf_offset.dot(a));
+            }
             PatternHandle::Rotate => {
                 let d = p - (self.pattern_center + self.xf_offset);
                 if d.length() > px * 3.0 {
@@ -4942,7 +5013,7 @@ impl SketchEditor {
             }
             PatternHandle::Scale => {
                 let d = (p - (self.pattern_center + self.xf_offset)).length();
-                self.xf_scale = (d / (px * 45.0)).clamp(0.01, 100.0);
+                self.xf_scale = (d / (px * (XF_SCALE_BASE_PX + XF_SCALE_HEAD_PX * 0.5))).clamp(1e-5, 1000.0);
             }
         }
     }
@@ -6086,6 +6157,7 @@ impl SketchEditor {
                         }
                     }
                     PatternHandle::LinearCount | PatternHandle::LinearSecondCount => {}
+                    PatternHandle::Center if self.tool == Tool::Transform => push_hollow(&mut wide, circle_pts(q, px * XF_RING_R_PX, 32)),
                     PatternHandle::Center => {
                         let r = px * 7.0;
                         poly(&[q - DVec2::X * r, q + DVec2::X * r], guide_color, false);
@@ -6100,28 +6172,34 @@ impl SketchEditor {
                             poly(&[self.pattern_center, self.pattern_center + DVec2::from_angle(a0) * rr], guide_color, true);
                         }
                     }
+                    // The 2D manipulator (live editing-gaps2 / 3): grey double outlines, no lines to the anchor.
                     PatternHandle::Rotate => {
                         let m = self.pattern_center + self.xf_offset;
-                        poly(&[m, q], guide_color, true);
-                        poly(&circle_pts(m, px * 70.0, 96), [0xff, 0xc2, 0x0e, 110], true);
+                        push_hollow(&mut wide, circle_pts(q, px * XF_RING_R_PX, 32));
+                        // Two short ticks of the turning circle above and below the ring.
+                        let r = px * XF_RING_AT_PX;
+                        let (a0, a1) = (((XF_RING_R_PX + 1.0) / XF_RING_AT_PX).asin(), (23.0 / XF_RING_AT_PX).asin());
+                        for side in [1.0, -1.0] {
+                            let arc: Vec<DVec2> = (0..=6).map(|i| m + DVec2::from_angle(self.xf_angle + side * (a0 + (a1 - a0) * i as f64 / 6.0)) * r).collect();
+                            push_hollow(&mut wide, arc);
+                        }
                     }
-                    PatternHandle::Scale => {
+                    PatternHandle::Scale | PatternHandle::MoveX | PatternHandle::MoveY => {
                         let m = self.pattern_center + self.xf_offset;
-                        poly(&[m, q], guide_color, true);
                         let d = (q - m).try_normalize().unwrap_or(DVec2::X);
-                        let n = d.perp();
-                        let s = px * 6.0;
-                        poly(&[q + d * s, q - d * s * 0.6 + n * s, q - d * s * 0.6 - n * s, q + d * s], handle_color, false);
+                        let (head, half) = if h == PatternHandle::Scale { (XF_SCALE_HEAD_PX, XF_SCALE_HALF_W_PX) } else { (XF_ARROW_HEAD_PX, XF_ARROW_HALF_W_PX) };
+                        let (base, n) = (q - d * px * head * 0.5, d.perp() * px * half);
+                        push_hollow(&mut wide, vec![base + n, q + d * px * head * 0.5, base - n, base + n]);
                     }
                     PatternHandle::Move => {
                         let m = self.pattern_center + self.xf_offset;
-                        let s = px * 5.0;
-                        poly(&[m, q], guide_color, true);
-                        poly(&[q + DVec2::new(-s, -s), q + DVec2::new(s, -s), q + DVec2::new(s, s), q + DVec2::new(-s, s), q + DVec2::new(-s, -s)], handle_color, false);
+                        let (u, v) = self.xf_axes();
+                        let (a, b) = (px * XF_SQUARE_PX.0, px * XF_SQUARE_PX.1);
+                        push_hollow(&mut wide, vec![m + u * a + v * a, m + u * b + v * a, m + u * b + v * b, m + u * a + v * b, m + u * a + v * a]);
                     }
                     _ => {}
                 }
-                if matches!(h, PatternHandle::LinearStep | PatternHandle::LinearSecondStep | PatternHandle::LinearCount | PatternHandle::LinearSecondCount) {
+                if matches!(h, PatternHandle::LinearStep | PatternHandle::LinearSecondStep | PatternHandle::LinearCount | PatternHandle::LinearSecondCount) || self.tool == Tool::Transform {
                     continue;
                 }
                 let size = if active == Some(h) { 13.0 } else { 10.0 };
@@ -8507,6 +8585,50 @@ mod tests {
         ed.drag_handle(&d.sketch.clone(), PatternHandle::Center, v(0.0, 0.0));
         ed.follow_transform_selection(&d.sketch);
         assert!(ed.pattern_center.length() < 1e-6, "a dragged center stays put");
+    }
+
+    /// Live editing-gaps3 (the client's triad): the 2D manipulator sits on the selection's lowest key point, the
+    /// leftmost of equals; its handles are screen-sized; an arrow moves the selection along its axis only.
+    #[test]
+    fn transform_triad_sits_and_moves_as_live() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let anchor = |make: &dyn Fn(&mut SketchData) -> Vec<EntityId>| {
+            let (mut ed, mut d) = editor(Tool::Select);
+            ed.selection = make(&mut d);
+            ed.set_tool(Tool::Transform);
+            ed.apply_preselection(&mut d);
+            ed.pattern_center / 1e-3
+        };
+        let near = |a: DVec2, b: DVec2| (a - b).length() < 1e-6;
+        assert!(near(anchor(&|d| vec![d.sketch.add_line(mm(40., 80.), mm(20., 65.))]), v(20., 65.)), "a right-to-left line: its end");
+        let tri = anchor(&|d| {
+            let t0 = d.sketch.add_line(mm(60., 10.), mm(80., 10.));
+            let t1 = d.sketch.add_line(mm(80., 10.), mm(70., 25.));
+            let t2 = d.sketch.add_line(mm(70., 25.), mm(60., 10.));
+            vec![t2, t0, t1]
+        });
+        assert!(near(tri, v(60., 10.)), "a triangle picked T2, T0, T1: {tri}");
+        assert!(near(anchor(&|d| vec![d.sketch.add_circle(mm(-30., 40.), 5e-3)]), v(-30., 40.)), "a circle: its centre");
+        // An arc 0..120° about (-30, 0) r 6: its start (-24, 0) ties the centre's Y; the centre is further left.
+        let arc = anchor(&|d| vec![d.sketch.add_arc_angles(mm(-30., 0.), 6e-3, 0.0, TAU / 3.0)]);
+        assert!(near(arc, v(-30., 0.)), "an arc: its centre: {arc}");
+
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(mm(0., 0.), mm(10., 0.));
+        ed.selection = vec![l];
+        ed.set_tool(Tool::Transform);
+        ed.apply_preselection(&mut d);
+        let px = ed.world_per_px;
+        let at = |ed: &SketchEditor, d: &SketchData, h: PatternHandle| ed.pattern_handles(&d.sketch).into_iter().find(|x| x.0 == h).unwrap().1 / px;
+        assert!(near(at(&ed, &d, PatternHandle::MoveX), v(82., 0.)) && near(at(&ed, &d, PatternHandle::MoveY), v(0., 82.)), "the arrows' heads 68..96 px out");
+        assert!(near(at(&ed, &d, PatternHandle::Move), v(32.5, 32.5)), "the square 20..45 px");
+        assert!(near(at(&ed, &d, PatternHandle::Rotate), v(108., 0.)), "the rotation ring 108 px along X");
+        assert!(near(at(&ed, &d, PatternHandle::Scale), v(1., 1.).normalize() * 99.85), "the scale head from (60, 60) px");
+        assert_eq!(ed.handle_at(&d.sketch, v(90., 4.) * px), Some(PatternHandle::MoveX), "a press on the X head takes it");
+        ed.drag_handle(&d.sketch.clone(), PatternHandle::MoveX, v(82. + 50., 30.) * px);
+        assert!(near(ed.xf_offset / px, v(50., 0.)), "the X arrow moves along X only: {}", ed.xf_offset / px);
+        ed.drag_handle(&d.sketch.clone(), PatternHandle::Center, mm(5., 5.));
+        assert!(near(ed.xf_offset / px, v(50., 0.)) && near((ed.pattern_center + ed.xf_offset) / 1e-3, v(5., 5.)), "the ring moves the triad only");
     }
 
     /// live2's combined snaps (feel/combo.json, 0.2507 mm a pixel, mm here): a chain's next end where two zones cross
@@ -10947,7 +11069,7 @@ mod tests {
         assert!(((c.start_point() + c.end_point()) * 0.5 - v(0.05, 0.03)).length() < 1e-9);
         assert_eq!(ed.tool, Tool::Transform);
         assert_eq!(ed.message, None);
-        assert!((ed.pattern_center - v(0.05, 0.03)).length() < 1e-9, "the triad sits on the copy: {}", ed.pattern_center);
+        assert!((ed.pattern_center - v(0.045, 0.03)).length() < 1e-9, "the triad sits on the copy's lowest, leftmost end: {}", ed.pattern_center);
         assert!(!ed.paste_clipboard(&mut d, "hello"));
     }
 
