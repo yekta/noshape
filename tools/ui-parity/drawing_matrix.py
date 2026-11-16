@@ -112,9 +112,58 @@ def key(s):
     return re.sub(r"\s*\((?:[a-z]|shift\+[a-z]|ctrl\+[a-z])\)$", "", norm(s).rstrip("…").strip()).lower()
 
 
-def texts_of(path):
+VOID = {"area", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+
+
+def strip_hidden(raw):
+    """An HTML dump without its display: none elements."""
+    from html.parser import HTMLParser
+    starts = [0]
+    for line in raw.splitlines(keepends=True):
+        starts.append(starts[-1] + len(line))
+    cuts = []
+
+    class P(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=False)
+            self.depth, self.hidden_at, self.hidden_from = 0, None, 0
+
+        def at(self):
+            line, col = self.getpos()
+            return starts[line - 1] + col
+
+        def handle_starttag(self, tag, attrs):
+            if tag in VOID:
+                return
+            self.depth += 1
+            style = (dict(attrs).get("style") or "").replace(" ", "")
+            if self.hidden_at is None and "display:none" in style:
+                self.hidden_at, self.hidden_from = self.depth, self.at()
+
+        def handle_endtag(self, tag):
+            if tag in VOID:
+                return
+            if self.hidden_at == self.depth:
+                cuts.append((self.hidden_from, self.at()))
+                self.hidden_at = None
+            self.depth -= 1
+
+    P().feed(raw)
+    for a, b in reversed(cuts):
+        raw = raw[:a] + raw[b:]
+    return raw
+
+
+# Surfaces whose dumps' hidden elements live never shows (live2 11-16, holes-plate: a hole table has no Title row,
+# Reorder items or Collapse tags row in its dialog, no insert / remove / merge rows in its Cell popup).
+HIDDEN_IS_ABSENT = {"Hole table"}
+
+
+def texts_of(path, visible_only=False):
     """Every visible text, option, tooltip and placeholder of a dump (dx's audit reader)."""
     raw = open(path, errors="ignore").read()
+    if visible_only and path.endswith(".html"):
+        raw = strip_hidden(raw)
     out = []
     if path.endswith(".json"):
         def walk(v):
@@ -339,7 +388,7 @@ def main():
         texts = []
         for g in globs_:
             for p in sorted(glob.glob(f"{args.dom}/{g}")):
-                texts += [t for t in texts_of(p) if t not in texts]
+                texts += [t for t in texts_of(p, surface in HIDDEN_IS_ABSENT) if t not in texts]
         recorded = {t for (title, t) in text_seen if title in titles}
         for t in sorted(recorded):
             if NOISE.match(t) or USER.search(t) or len(t) < 2:
