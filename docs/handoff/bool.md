@@ -4,13 +4,11 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-16 12:35 UTC.
+Updated 11-16 14:45 UTC.
 
 ## In flight
-- dx's P0 fix 979de111a (split_by_edges_on_faces' crossing check bounded; c2-config-parts-screws hung): gate on vibe7
-  (unit bool-gate-979de111a-v7b, restarted 12:14 after my chain's cap killed the first at 12:13; cap now 12 h). Verdict
-  file /root/bool-scratch/dx-gate-verdict.txt (unit bool-dx-verdict): send it to dx at once; dx lands it.
-- Gating next on vibe5: e5c584e35 (branch bool-cp2-ahead in bool-split: CP2 moved pairs on free-form faces in the ahead
+- dx's P0 fix 979de111a: gate (vibe7) reviewed 14:40, none of the 10 changed documents worse; dx landing it.
+- Gating on vibe5 (gate began 14:09 after the dx gate): e5c584e35 (branch bool-cp2-ahead in bool-split: CP2 moved pairs on free-form faces in the ahead
   batch; off_shared_edges in the ahead jobs; ~10 % on rings CP2 and housing Rotieren 1), then 31dbff530 (branch
   bool-cyl-merge: merge_cylinder_groups for a sector whose frame is far along the axis: host on the nearer frame,
   curves mapped exactly where projection misses, volume in one call (+ adaptive) only where a frame is far;
