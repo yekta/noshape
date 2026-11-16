@@ -2034,3 +2034,19 @@ fn a_disc_whose_rim_arcs_bound_a_split_side_exports_as_one_solid() {
     let v = volume_properties(&back).unwrap().mass;
     assert!((v - want).abs() < 1e-6 * want, "{v} vs {want}");
 }
+
+/// An edge on a B-spline its end vertex can't be projected onto (degree 14, 108 poles: a cf-sheet-metal-model-plus hem
+/// face's) reads back over the range the SAT file gives it: the projection ended it 0.07 mm in for 19.7, and the part
+/// read back inside out, so its import failed.
+#[test]
+fn a_sat_edge_keeps_its_range_where_projection_misses() {
+    let face = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts/sheet-metal-plus-hem-face.brep")).unwrap();
+    let want = surface_properties(&face).unwrap().mass;
+    let path = std::env::temp_dir().join(format!("noshape-sat-range-{}.sat", std::process::id()));
+    write_acis(&path, &[sew(&[face], 1e-7, false).unwrap().shape], LengthUnit::Meter).unwrap();
+    let back = read_acis_parts(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(back.len(), 1);
+    let a = surface_properties(&back[0].shape).unwrap().mass;
+    assert!((a - want).abs() < 1e-5 * want, "{a} vs {want}");
+}

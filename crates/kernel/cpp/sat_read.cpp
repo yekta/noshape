@@ -1080,21 +1080,28 @@ private:
       g = g->Reversed();
     TopoDS_Vertex v1 = vertex(vs), v2 = vertex(ve);
     double        t1 = param_on(g, BRep_Tool::Pnt(v1)), t2 = param_on(g, BRep_Tool::Pnt(v2));
-    // A forward edge on a line, circle or ellipse: its own range, exact
-    // where a tolerant vertex's stored point is off the curve (g25-b.sat:
-    // the blend apexes 0.03 mm away, so projecting them shortened the
-    // plane's edges; live's import keeps the plane at exactly 384 mm²).
-    // Reversed edges and other curves keep the projection.
+    // A forward edge: its own range where it ends on its vertices, exact where a tolerant vertex's stored point is
+    // off the curve (g25-b.sat: the blend apexes 0.03 mm away, so projecting them shortened the plane's edges; live's
+    // import keeps the plane at exactly 384 mm²), and on a B-spline the projection can't follow (a degree 14 curve
+    // of 108 poles: cf-sheet-metal-model-plus's edge ended 0.07 mm in for 19.7). Reversed edges keep the projection.
     const bool line = g->DynamicType() == STANDARD_TYPE(Geom_Line);
-    const bool conic = g->DynamicType() == STANDARD_TYPE(Geom_Circle) || g->DynamicType() == STANDARD_TYPE(Geom_Ellipse);
-    if (ps && pe && !rev && (line || conic) && *ps < *pe)
+    if (ps && pe && !rev && *ps < *pe)
     {
       const double k = line ? mm : 1.0, s0 = *ps * k, s1 = *pe * k;
-      const double d0 = g->Value(s0).Distance(BRep_Tool::Pnt(v1)), d1 = g->Value(s1).Distance(BRep_Tool::Pnt(v2));
-      if (d0 <= BRep_Tool::Tolerance(v1) + tol && d1 <= BRep_Tool::Tolerance(v2) + tol)
+      const bool   inside = g->IsPeriodic() || (s0 >= g->FirstParameter() - 1e-9 && s1 <= g->LastParameter() + 1e-9);
+      const gp_Pnt p1 = BRep_Tool::Pnt(v1), p2 = BRep_Tool::Pnt(v2);
+      const double d0 = inside ? g->Value(s0).Distance(p1) : INFINITY, d1 = inside ? g->Value(s1).Distance(p2) : INFINITY;
+      // (Or nearer them than the projection's ends: a projection that missed; the vertices then take the distance.)
+      const bool on = d0 <= BRep_Tool::Tolerance(v1) + tol && d1 <= BRep_Tool::Tolerance(v2) + tol;
+      if (on || d0 + d1 + tol < g->Value(t1).Distance(p1) + g->Value(t2).Distance(p2))
       {
         t1 = s0;
         t2 = s1;
+        if (!on)
+        {
+          B.UpdateVertex(v1, std::max(BRep_Tool::Tolerance(v1), d0));
+          B.UpdateVertex(v2, std::max(BRep_Tool::Tolerance(v2), d1));
+        }
       }
     }
     if (g->IsPeriodic())
