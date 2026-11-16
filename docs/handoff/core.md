@@ -94,10 +94,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   guide's end), start Normal to profile, guides Normal to guide + Match tangent to Extrude 1's cap edge; live makes
   one singular patch (Problem loft 1/3/3). Guided loft to a point: a loft_guided item, not started.
   T1 features_a::a_mirrored_surface_added_joins_the_surface_it_meets.
-- **Check before landing:** core-oc HEAD's debug run of c2-hunting-knife stops at Fillet 5 (32/52; GUARD 23/54/33, live
-  22/52/32) where the 16:38 suite had 46/52. Suspects: blend's threaded Fillet 5 work on main (31105b015, 684e77e2e,
-  before my 18:10 base) or my 8deb8156c (face_contains_point). The vibe7 pair's base (main 18:10) vs branch line for
-  hunting-knife decides; if mine, fix before landing; if main's, tell blend.
+- **bd8b5f74f (core-oc, on top): face_project_point classified as before** (8deb8156c's period shift there made
+  c2-hunting-knife's Fillet 5 a face more, 46 -> 32/52; face_contains_point keeps the shift, tablet-stand 16/16;
+  verified by debug runs). Both pairs carry the old change: vibe7's branch will show hunting-knife worse (and any other
+  doc the projection touched): recheck each doc vibe7 marks worse with HEAD (.ts3.sh <doc>) before landing.
 - **Landing plan:** the vibe7 pair covers 1357fddb1..bcaf5ffdb. The second pair (97b778e7d + b173dc5bb + d2605e45d vs
   bcaf5ffdb) runs on vibe5, restarted 19:36 UTC: ~/agents/core-keep/p2pair.sh -> p2res (own src copy p2src, target
   p2target, base files p2base; src and target removed at the end). Land all nine when both are clean; or the six from
