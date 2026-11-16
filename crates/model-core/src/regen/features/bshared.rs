@@ -225,6 +225,11 @@ pub fn surface_result(ev: &mut EvalCtx, tool: NamedShape) -> FResult<()> {
     } else {
         ev.resolve_bodies(ev.query("booleanSurfaceScope")).into_iter().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Surface).collect()
     };
+    join_surface(ev, tool, scope)
+}
+
+/// `tool` sewn to the surfaces of `scope` it touches (a closed result a solid part), else a new surface.
+pub fn join_surface(ev: &mut EvalCtx, tool: NamedShape, scope: Vec<usize>) -> FResult<()> {
     let targets: Vec<usize> = scope.into_iter().filter(|&i| k::distance(&ev.ctx.bodies[i].shape, &tool.shape).map(|d| d.distance < 1e-6).unwrap_or(false)).collect();
     if targets.is_empty() {
         return ev.apply_operation(vec![tool], "NEW", None, BodyKind::Surface);
