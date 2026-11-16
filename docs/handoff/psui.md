@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-16 01:40 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-16 02:33 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -38,11 +38,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
 
-- Landing (01:40): fields-gaps (bare "#" highlights nothing, Tab moves on; Create variable 4 px right of the field,
-  top-aligned; wheel row), midpoint dwell 60 ms (was 250), Thickness panel state, Routing curve point-on-vertex state,
-  late Undo rule (runner + README), "Edit thickness analysis…", the version-update toast, the drag ring's fill. Checked:
-  fields matrix 14 / 14, coverage, clippy (Mac); 8 / 8 affected scenarios on vibe6 (thickness ×3,
-  context-create-version-update, the "#" variable takes). boundary-surface-new-edit-reedit matches on main (18 / 18).
+- Landed 11-16 02:17 (19afd619): fields-gaps (fields matrix 14 / 14), midpoint dwell 60 ms, Thickness panel state,
+  Routing curve point-on-vertex state, late Undo rule, "Edit thickness analysis…", the version-update toast, the drag
+  ring's fill. Snaps matrix 59 / 59 (live sketch-gaps' crossing row) queued with this handoff.
+- Failed preview (live feedback-gaps 5): ours matches the title / chip / row; the graphics differ: live draws the whole
+  part red (std marks the shelled body as an error entity). Asked core 02:20 to push the input body onto
+  `error_shapes` on a failed Shell; then compare edge widths (ours 3.5 px, live ~5) with
+  /root/psui-scratch/fb5/run.sh (a one-off scenario with --scenarios, screenshots per step).
+- live (b89af730) asked 02:00 for gaps2: manipulator drag (dead zone, value box, preview cadence, snapping), pattern
+  labels, paste triad and kept constraints, flat-view bend lines, Alt+right's upright animation.
 - routing-curve-new-edit-reedit: core's 85db0f89 (centripetal spline: 91.693 / 134.227 mm) + my Points reading
   (57ea09fd): rerun once both are on main.
 - live's feel gaps (live/feel/*-gaps.json, 11-16): folded into interaction-feel.md (fields rows in the matrix; measure,
@@ -59,8 +63,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Queued to land
 
-- The 6 commits above (01:40).
-- Landed 11-16: f14f85a8 (dock hover-card fix 74bcd957, prune objects, handoff).
+- 6440348c snaps matrix crossing row, this handoff.
 
 ## Waiting on others
 
