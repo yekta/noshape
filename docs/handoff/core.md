@@ -104,6 +104,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   x 198 mm; live 23827.4. A Coons patch (GeomFill_BSplineCurves, CoonsStyle) gives 23669.5 (-0.66 %: outside the
   band), box inside the boundary's. Next: why fair_g1_fill declines all-G0 loops, or a plate sanity check (surface
   box far outside the boundary's) falling back to Coons.
+- c2-surf-workshop-split Boundary surface 1 (6/12, parked): 2x2 profiles, defaults; ours 3803.55 mm², live 3762.61
+  (+1.1 %). It goes through k::fill_surface (op_fill) but not its plate: a Coons branch for 4 G0 edges placed first
+  changed nothing (edge count != 4 or Coons declined; not chased). Experimental coons_fill saved in
+  /root/core-scratch/features-coons.cpp (full file, not a patch).
+- c2-surf-workshop-loft Loft 2: 3-profile surface loft 7e-5 off live's area (interpolation detail); skipped.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
