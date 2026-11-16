@@ -1868,6 +1868,26 @@ fn a_cut_by_a_revolved_arcs_spindle_torus_as_recorded() {
     assert!((got.volume - want.volume).abs() <= 1e-6 * want.volume, "volume {} against {}", got.volume, want.volume);
 }
 
+/// asm-pattern-std's Extrude 11 (recorded): two parts each fused with an up-to-surface extrusion whose cylinder sectors
+/// continue the parts' own round ends, one sector's frame 178 m along the axis and edges a Boolean's B-spline curves.
+/// Unified, each part's sectors of one cylinder are one face, as live's 14 faces, 36 edges and 24 vertices a part.
+#[test]
+fn an_extrusions_cylinder_sectors_merge_with_the_parts_own_as_live() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "e8447726ce927741").expect("the recorded case");
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("the fuse");
+    let u = k::unify_same_domain(&r.shape).expect("the unify").shape;
+    assert!(u.is_valid(), "valid");
+    let solids = u.sub_shapes(k::ShapeType::Solid);
+    assert_eq!(solids.len(), 2, "two parts");
+    for s in &solids {
+        assert_eq!((s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge), s.count(k::ShapeType::Vertex)), (14, 36, 24), "live's faces, edges, vertices");
+    }
+    let (v, w) = (u.volume().unwrap(), r.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-9 * w, "volume {v} against the fuse's {w}");
+}
+
 /// cf-snap-hook's rounds at its four pegs' bases (recorded): each round's ring fused to the plate (glued, op_boolean's
 /// scaled inputs), its inner face on the peg's revolved face and its edge there a full circle from the peg's seam. As
 /// OCCT's (it declined "an edge on another argument's free-form face"), its history too: on scaled copies OCCT has the
