@@ -111,6 +111,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   changed nothing (edge count != 4 or Coons declined; not chased). Experimental coons_fill saved in
   /root/core-scratch/features-coons.cpp (full file, not a patch).
 - c2-surf-workshop-loft Loft 2: 3-profile surface loft 7e-5 off live's area (interpolation detail); skipped.
+- c2-sm-rocker-enclosure-body Extrude 6: Sketch 6 taken back by the translator (skasm's handoff 11-16). Not core's.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the

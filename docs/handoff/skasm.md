@@ -45,6 +45,10 @@ only when a line here points there).
 - c2-surf-workshop-manualblend Sweep 2 (11/19): Sketch 5's circle (the profile, on Plane 3) has its CONCENTRIC
   rejected ("constraints left to the solved geometry: 1 CONCENTRIC rejected"), so it stays where stored, ~100 mm
   from the path (our Curve 2 matches live's); our swept surface lands at x 67–95 mm, live's at −61…−26.
+- c2-sm-rocker-enclosure-body Extrude 6 (15/28): Sketch 6's solve is taken back ("COINCIDENT on
+  R4oICkWq6xtC.cCircle.center, oKC7s6ob7uli.0.center by 1.974 mm"; also "CIRCULAR_PATTERN: the instances aren't
+  copies of the seeds"), so our hexagon-and-lines stays as stored: one region of 107.106 mm² where live has two
+  (84.163 + 22.943, refs.jsonl) at the solved place; the cut removes 115 mm³ more than live's and has one face more.
 
 ## In flight
 - Landing 2026-11-16 01:57: a sheet metal entity is labelled after the feature that made its definition entity as
