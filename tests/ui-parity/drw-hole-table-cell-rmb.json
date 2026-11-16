@@ -1,0 +1,152 @@
+{
+ "name": "drw-hole-table-cell-rmb",
+ "about": "holes-plate-drawing: Hole table placed; a selected cell right-clicked: Size \u25b8 / Resize... / Copy, Size hovered",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Hole table): live2 exploration live/feel/panel-explore/live2-ht-explore2-*",
+ "start": "holes-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole table"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Show location data"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "view": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     150,
+     120
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     109,
+     99
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     109,
+     99
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     109,
+     99
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Size"
+   },
+   "ms": 900
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  }
+ ]
+}

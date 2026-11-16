@@ -1,0 +1,128 @@
+{
+ "name": "drw-hole-table-cell-bold",
+ "about": "holes-plate-drawing: Hole table placed; a cell clicked twice, Bold toggled in the Cell popup: the merged \u00d8.197 THRU cell turns bold",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Hole table): live2 exploration live/feel/panel-explore/live2-ht-explore2-*",
+ "start": "holes-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole table"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Show location data"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "view": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     150,
+     120
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     109,
+     99
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     109,
+     99
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "toggle": "Bold"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  }
+ ]
+}
