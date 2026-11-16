@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-16 02:33 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-16 03:25 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -38,32 +38,33 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
 
-- Landed 11-16 02:17 (19afd619): fields-gaps (fields matrix 14 / 14), midpoint dwell 60 ms, Thickness panel state,
-  Routing curve point-on-vertex state, late Undo rule, "Edit thickness analysis…", the version-update toast, the drag
-  ring's fill. Snaps matrix 59 / 59 (live sketch-gaps' crossing row) queued with this handoff.
-- Failed preview (live feedback-gaps 5): ours matches the title / chip / row; the graphics differ: live draws the whole
-  part red (std marks the shelled body as an error entity). Asked core 02:20 to push the input body onto
-  `error_shapes` on a failed Shell; then compare edge widths (ours 3.5 px, live ~5) with
-  /root/psui-scratch/fb5/run.sh (a one-off scenario with --scenarios, screenshots per step).
-- live (b89af730) asked 02:00 for gaps2: manipulator drag (dead zone, value box, preview cadence, snapping), pattern
-  labels, paste triad and kept constraints, flat-view bend lines, Alt+right's upright animation.
-- routing-curve-new-edit-reedit: core's 85db0f89 (centripetal spline: 91.693 / 134.227 mm) + my Points reading
-  (57ea09fd): rerun once both are on main.
-- live's feel gaps (live/feel/*-gaps.json, 11-16): folded into interaction-feel.md (fields rows in the matrix; measure,
-  list, chrome, feedback in the "not yet" rows). Open: the tooltip fade-out (ours vanishes at once: vendored gpui drops
-  it on leave), the failed preview's edge width (ours 3.5 px, live ~5: side by side first), the view cube knob size
-  vs live's 3 px hover map, sketch snap rows (sketch-gaps: no intersection snap on crossing lines, midpoint 6-9 px,
-  spline through-points 7-9 px, a model edge wakes after 60 ms then perpendicular 7-9 px) into the snaps matrix.
-- end-cap-profile-circle step 3: matches on a quiet host; under load our Faces field keeps focus a moment after the
-  click (live drops it at once). Load-sensitive, low priority.
-- tab-new-edit-reedit: decision asked of the lead (11-15 23:50): the click lands ~1.1 px from Flange 1's wall
-  (0.3 mm at 0.275 mm/px); known (sub-pixel camera) or retarget onto the wall live hit.
-- Mac: prune-target.py runs on macOS; a stale incremental build once broke app-core's link (undefined `.llvm.*`
-  symbol): `cargo clean -p noshape-app-core -p noshape-part-studio-ui` fixed it.
+- Queued 11-16 03:25 (this handoff): flat view bend centre lines dashed 10 / 10 / 5 / 10 px (`LineSegment::CENTER_LINE`
+  = 512, shaders.wgsl; checked in a vibe6 shot: 5 on / 10 off / 10 on / 10 off, 35 px); a hovered flat bend zone
+  lights its bend in both views, not its table row (`FlatViewEvent::BendHover`, `ui.sm_flat_hover`; sheet metal matrix
+  12 / 12); sketch pattern labels as live sketch-gaps2 / 3 (black on opaque canvas-colour boxes, ~100 px off at the
+  zoom the tool started at then model-fixed, circular 3x at 1.4 × the seed radius).
+- Sketch 2D manipulator (Transform tool and a paste's triad): live editing-gaps3 (live/feel/editing-gaps3.json) is in:
+  anchor = the selection's lowest key point (endpoints and centres; min Y then min X), same for paste and Transform;
+  handles screen-constant (arrows gap 8 + shaft 60 px; square 20–45 px; rotation ring 108 px along +X with an angle
+  box; scale triangle on the diagonal from (60, 60) px, head 30, factor box; the origin ring moves the triad only).
+  Ours: bbox centre, no X / Y arrows, move square at (14, 14) px, rotate 70 px, scale 45 px at 45°. Next: redraw it.
+- Failed preview (live feedback-gaps 5): core queued "a failed Shell puts its whole input part on ev.error_shapes"
+  (T1 features_a::a_failed_shell_shows_its_part_as_the_error). Once on main: edge widths side by side (ours 3.5 px,
+  live ~5) with /root/psui-scratch/fb5/run.sh (one-off scenario via --scenarios, shots per step; swap sm-flat for
+  shell-fail).
+- routing-curve-new-edit-reedit: core's 41c146a8 (centripetal) and my Points reading are on main: rerun.
+- Open feel gaps: the tooltip fade-out (vendored gpui drops it on leave), the view cube knob size vs live's 3 px hover
+  map, sketch-gaps snap rows into the snaps matrix (spline through-points 7-9 px; a model edge wakes after 60 ms then
+  perpendicular 7-9 px), the flat bend click colours (zone fill rgb(214,151,30), outline rgb(255,169,10): ours the
+  selection colour), an open circular pattern's angle label (live has none).
+- end-cap-profile-circle step 3: matches on a quiet host; under load our Faces field keeps focus a moment. Low.
+- tab-new-edit-reedit: decision asked of the lead (11-15 23:50): the click lands ~1.1 px from Flange 1's wall;
+  known (sub-pixel camera) or retarget onto the wall live hit.
+- Mac target: 20 GB after prune-target.py + dropping incremental dirs idle > 90 min (debug/incremental was 11 GB).
 
 ## Queued to land
 
-- 6440348c snaps matrix crossing row, this handoff.
+- 65c83b06 flat view dash + bend hover, 161a18dc pattern labels, this handoff.
 
 ## Waiting on others
 
@@ -85,31 +86,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Next, in order
 
-1. Rerun routing-curve when core's 85db0f89 lands; sketch-gaps rows into the snaps matrix; the failed preview side
-   by side; the tab pick per the lead's answer.
+1. Rerun routing-curve (on main); the 2D manipulator as live editing-gaps3; the failed preview side by side once
+   core's Shell error part lands; sketch-gaps rows into the snaps matrix; the tab pick per the lead's answer.
 2. Rerun after the others' fixes land: boundary-surface-new-edit-reedit (core 658bef9d), the gussets and end-caps
    (skasm), sketch pattern takes (skasm 58a0bd16 + linear), context-create-version-update (live2's retake).
-3. Older open items (11-06 to 11-08 "Next, in order" in the archive) were not re-verified this session; check them
-   against the rerun before picking any up (e.g. S-TOOLBAR-OVER-TABS: the S toolbar over the tab bar; qa's 11-12
-   sketch-constraint-refusals step 59, not in the psui take list).
+3. Older open items (11-06 to 11-08 "Next, in order" in the archive): doc-tab-rename-escape (5 / 5) and
+   sketch-constraint-refusals (91 / 91) match on 11-16 03:10; check the rest against a rerun before picking any up.
 
 ## Open decisions
 
 - None pending. (11-15: ±1 px on free-click readouts, granted; Mirror lost click as live defect, granted.)
-
-## What changed today (11-15), for orientation
-
-- Mirror: 24 / 25 Mirror scenarios; side by sides for the user in /root/psui-scratch/mirror-sxs.
-- Tab with a number field's unit list open applies the field (qa's hat15 fillet edit); a sketch edit's regeneration
-  clears the stuck working overlay.
-- Analysis tools as live: Zebra / Reflection keep their face selected on close; Curve/surface from the toolbar or Shift+C
-  drops a preselection (`ui.analysis_menu_target` for the menu path).
-- A blamed empty field stops reading red at its first pick (fixed plane-line-angle, ruled-surface-extended-cubic,
-  offset-surface-new-edit-reedit, revolve-add-tab).
-- Sketch Text dialog as live's 3 takes; a text placed on a point is Coincident with it; scenarios read a text as one
-  "other" entity.
-- Part Properties: Reset all goes by saved values; P0 fixed: saved metadata survives Undo / Redo of earlier steps
-  (`keep_part_metadata`, ops/session.rs), Save is no undo step unless it renames or changes the mass override.
-- Coincident edges pick the first drawn (line-pick depth Greater): the earlier part, as live at a mitred frame corner.
-- Sketch patterns: two constraints each in scenarios; a white-space accept ends the tool.
-- Runner: `live_defects`, `click_placed_readouts` (±1 px), per-take window heights (studios).

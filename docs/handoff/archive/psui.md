@@ -2560,3 +2560,23 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
   takes `{"tool": X, "menu": Y}` as the tool X itself: sketch tools in dropdowns (3 point circle, Center point arc …)
   can't be targeted yet; my scenarios use the keys meanwhile. Fixed on the way: in a sketch `a` / `q` were the
   feature dialog's Flip primary axis / Reorient secondary axis (skasm, app-core actions `dlg` now `!Sketch`).
+
+
+## From the handoff of 11-16 03:25 UTC
+
+### What changed 11-15
+
+- Mirror: 24 / 25 Mirror scenarios; side by sides for the user in /root/psui-scratch/mirror-sxs.
+- Tab with a number field's unit list open applies the field (qa's hat15 fillet edit); a sketch edit's regeneration
+  clears the stuck working overlay.
+- Analysis tools as live: Zebra / Reflection keep their face selected on close; Curve/surface from the toolbar or Shift+C
+  drops a preselection (`ui.analysis_menu_target` for the menu path).
+- A blamed empty field stops reading red at its first pick (fixed plane-line-angle, ruled-surface-extended-cubic,
+  offset-surface-new-edit-reedit, revolve-add-tab).
+- Sketch Text dialog as live's 3 takes; a text placed on a point is Coincident with it; scenarios read a text as one
+  "other" entity.
+- Part Properties: Reset all goes by saved values; P0 fixed: saved metadata survives Undo / Redo of earlier steps
+  (`keep_part_metadata`, ops/session.rs), Save is no undo step unless it renames or changes the mass override.
+- Coincident edges pick the first drawn (line-pick depth Greater): the earlier part, as live at a mitred frame corner.
+- Sketch patterns: two constraints each in scenarios; a white-space accept ends the tool.
+- Runner: `live_defects`, `click_placed_readouts` (±1 px), per-take window heights (studios).
