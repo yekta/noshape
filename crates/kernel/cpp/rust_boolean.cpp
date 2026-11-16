@@ -4934,9 +4934,11 @@ static bool sphere_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::v
   return true;
 }
 
-// An extrusion against a cylinder across its direction or a sphere (c2-rings-loft's Extrude 5: a sketch's quadratic
-// splines extruded across the ring): each ruling p(u) + w d meets the quadric where A w^2 + B w + C = 0 (|(p + w d - O)
-// across the axis|^2 = r^2, a sphere's |p + w d - O|^2 = r^2), two branches, exact point by point; each run of a branch
+// An extrusion against a cylinder across its direction, a sphere (c2-rings-loft's Extrude 5: a sketch's quadratic
+// splines extruded across the ring) or a surface of revolution about an axis across its direction (c2-valve-config's
+// Extrude 3: the body's revolved profile, 23 of OCCT's walks, 5-21 ms each): each ruling p(u) + w d meets it where
+// A w^2 + B w + C = 0 (|(p + w d - O) across the axis|^2 = r^2, r the profile's radius at the ruling's height, a
+// sphere's |p + w d - O|^2 = r^2), two branches, exact point by point; each run of a branch
 // within the extrusion's heights and the other face's box (ends bisected between samples, 32 a span of the profile),
 // cut where its angle passes the other surface's own seam (as OCCT's), interpolated. False where a run ends where the
 // branches meet (a ruling tangent to the quadric) or crosses a knot of the profile.
@@ -4947,32 +4949,113 @@ static bool quadric_across(const Extruded& e, bool e_first, const TopoDS_Face& o
     s = t->BasisSurface();
   const occ::handle<Geom_CylindricalSurface> cy = occ::down_cast<Geom_CylindricalSurface>(s);
   const occ::handle<Geom_SphericalSurface>   sp = occ::down_cast<Geom_SphericalSurface>(s);
-  if (cy.IsNull() && sp.IsNull())
+  const occ::handle<Geom_SurfaceOfRevolution> rv = occ::down_cast<Geom_SurfaceOfRevolution>(s);
+  if (cy.IsNull() && sp.IsNull() && rv.IsNull())
     return false;
   const gp_Cylinder Cy = cy.IsNull() ? gp_Cylinder() : cy->Cylinder();
   const gp_Sphere   Sp = sp.IsNull() ? gp_Sphere() : sp->Sphere();
-  const gp_XYZ      O  = cy.IsNull() ? Sp.Location().XYZ() : Cy.Location().XYZ();
-  const gp_XYZ      ax = cy.IsNull() ? gp_XYZ() : Cy.Axis().Direction().XYZ();
-  const double      r  = cy.IsNull() ? Sp.Radius() : Cy.Radius();
-  auto              across = [&](const gp_XYZ& v) { return cy.IsNull() ? v : v - ax * v.Dot(ax); };
+  const gp_Ax1      Ax = !rv.IsNull() ? rv->Axis() : !cy.IsNull() ? Cy.Axis() : gp_Ax1();
+  const gp_XYZ      O  = !sp.IsNull() ? Sp.Location().XYZ() : Ax.Location().XYZ();
+  const gp_XYZ      ax = !sp.IsNull() ? gp_XYZ() : Ax.Direction().XYZ();
+  auto              across = [&](const gp_XYZ& v) { return !sp.IsNull() ? v : v - ax * v.Dot(ax); };
   const gp_XYZ      dd = across(e.d.XYZ());
   const double      A  = dd.SquareModulus();
-  if (!(A > 1e-12) || !(r > 0))
+  if (!(A > 1e-12))
     return false;
   double ou0 = 0, ou1 = 0, ov0 = 0, ov1 = 0;
   BRepTools::UVBounds(other, ou0, ou1, ov0, ov1);
   if (!(ou1 > ou0) || !(ov1 > ov0) || ou1 - ou0 > 2 * M_PI + 1e-9)
     return false;
+  // A surface of revolution: the rulings across its axis (each at one height), its profile's height strictly one way
+  // over the face's parameters (one point of it at a height), its radius and angle there.
+  const occ::handle<Geom_Curve> prof = rv.IsNull() ? occ::handle<Geom_Curve>() : rv->BasisCurve();
+  const gp_Dir                  ref  = Ax.Direction().IsParallel(gp::DX(), 1e-6) ? gp_Dir(gp::DY()) : gp_Dir(gp_Vec(Ax.Direction()).Crossed(gp_Vec(gp::DX())));
+  const gp_Dir                  ref2(gp_Vec(Ax.Direction()).Crossed(gp_Vec(ref)));
+  auto height = [&](double v) { return (prof->Value(v).XYZ() - O).Dot(ax); };
+  double h0 = 0, h1 = 0;
+  if (!rv.IsNull())
+  {
+    if (std::abs(e.d.XYZ().Dot(ax)) > 1e-12 || prof.IsNull())
+      return false;
+    h0 = height(ov0), h1 = height(ov1);
+    const int    m    = 256;
+    const double sign = h1 > h0 ? 1 : -1;
+    double       prev = h0;
+    for (int j = 1; j <= m; ++j)
+    {
+      const double h = height(ov0 + (ov1 - ov0) * j / m);
+      if (!((h - prev) * sign > 0))
+        return false;
+      prev = h;
+    }
+  }
+  // (The profile's parameter at height h: Newton within a bracket that bisects where a step leaves it, from the last
+  // one found; false outside the face's.)
+  double last_v = 0.5 * (ov0 + ov1);
+  auto   at_height = [&](double h, double& v) {
+    if ((h - h0) * (h - h1) > 0)
+      return false;
+    const bool   up = h1 > h0;
+    const double eps = 1e-15 * (1 + std::abs(ov0) + std::abs(ov1));
+    double       a = ov0, b = ov1, x = last_v;
+    for (int it = 0; it < 100; ++it)
+    {
+      gp_Pnt p;
+      gp_Vec d1;
+      prof->D1(x, p, d1);
+      const double f = (p.XYZ() - O).Dot(ax) - h, df = d1.XYZ().Dot(ax);
+      if (f == 0)
+        break;
+      ((f < 0) == up ? a : b) = x;
+      double next = df != 0 ? x - f / df : 0.5 * (a + b);
+      if (!(next > a && next < b))
+        next = 0.5 * (a + b);
+      const bool done = std::abs(next - x) <= eps || b - a <= eps;
+      x               = next;
+      if (done)
+        break;
+    }
+    v = last_v = x;
+    return true;
+  };
+  auto angle_of = [&](const gp_XYZ& x) { const gp_XYZ m = across(x - O); return std::atan2(m.Dot(ref2.XYZ()), m.Dot(ref.XYZ())); };
+  // (A ruling's radius to meet: the cylinder's or sphere's, the profile's at the ruling's height; false past its ends.)
+  auto radius_at = [&](double u, double& r) {
+    if (rv.IsNull())
+    {
+      r = !cy.IsNull() ? Cy.Radius() : Sp.Radius();
+      return r > 0;
+    }
+    double v = 0;
+    if (!at_height((e.c->Value(u).XYZ() - O).Dot(ax), v))
+      return false;
+    r = across(prof->Value(v).XYZ() - O).Modulus();
+    return r > 0;
+  };
   const double ve = 1e-9 * std::max({1.0, std::abs(e.v0), std::abs(e.v1)}), oe = 1e-9 * std::max({1.0, std::abs(ov0), std::abs(ov1)});
-  // (The other face's parameters of a point, its angle by whole turns into the face's box.)
-  auto params_on = [&](const gp_Pnt& x, double& pu, double& pv) {
-    if (cy.IsNull())
+  // (The other face's parameters of a point, as the surface gives them (a revolution's angle from its profile's).)
+  auto raw_params = [&](const gp_Pnt& x, double& pu, double& pv) {
+    if (!rv.IsNull())
+    {
+      if (!at_height((x.XYZ() - O).Dot(ax), pv))
+        pv = (((x.XYZ() - O).Dot(ax) < std::min(h0, h1)) == (h1 > h0)) ? ov0 : ov1;
+      pu = angle_of(x.XYZ()) - angle_of(prof->Value(pv).XYZ());
+      pu -= 2 * M_PI * std::floor(pu / (2 * M_PI));
+    }
+    else if (cy.IsNull())
       ElSLib::Parameters(Sp, x, pu, pv);
     else
       ElSLib::Parameters(Cy, x, pu, pv);
+  };
+  // (Its angle by whole turns into the face's box.)
+  auto params_on = [&](const gp_Pnt& x, double& pu, double& pv) {
+    raw_params(x, pu, pv);
     pu += 2 * M_PI * std::ceil((ou0 - 1e-9 - pu) / (2 * M_PI));
   };
   auto disc_at = [&](double u, double& B, double& C) {
+    double r = 0;
+    if (!radius_at(u, r))
+      return -1.0;
     const gp_XYZ m = across(e.c->Value(u).XYZ() - O);
     B = 2 * m.Dot(dd), C = m.SquareModulus() - r * r;
     return B * B - 4 * A * C;
@@ -5036,11 +5119,7 @@ static bool quadric_across(const Extruded& e, bool e_first, const TopoDS_Face& o
     auto raw = [&](double u) {
       double w = 0, pu = 0, pv = 0;
       branch(k, u, w);
-      const gp_Pnt x = e.c->Value(u).Translated(gp_Vec(e.d) * w);
-      if (cy.IsNull())
-        ElSLib::Parameters(Sp, x, pu, pv);
-      else
-        ElSLib::Parameters(Cy, x, pu, pv);
+      raw_params(e.c->Value(u).Translated(gp_Vec(e.d) * w), pu, pv);
       return pu;
     };
     std::vector<std::pair<double, double>> pieces;
@@ -5226,7 +5305,7 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
     }
     return true;
   }
-  if (!occ::down_cast<Geom_SphericalSurface>(so).IsNull())
+  if (!occ::down_cast<Geom_SphericalSurface>(so).IsNull() || !occ::down_cast<Geom_SurfaceOfRevolution>(so).IsNull())
     return quadric_across(e, e_first, other, out);
   // Another extrusion along it: rulings where the profiles cross.
   if (xa && xb)
