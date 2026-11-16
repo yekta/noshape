@@ -185,7 +185,7 @@ fn rows() -> Vec<Row> {
             }
             expect(got, vec!["11 mm".to_string(), "12 mm".into(), "11 mm".into(), "21 mm".into(), "21.1 mm".into()], "Depth after wheel up, up, down, Shift+up, Ctrl+up from 10")
         } },
-        Row { id: "autocomplete: Tab with a lone New variable… takes nothing", live: "live fields-gaps (11-16): no variables, '#' lists only New variable…, nothing highlighted; Tab closes the list, the field keeps '#', the keyboard moves on", gap: false, check: |cx| {
+        Row { id: "autocomplete: Tab after a bare # takes nothing", live: "live fields-gaps (11-16): no variables, '#' lists only New variable…, nothing highlighted; Tab closes the list, the field keeps '#', the keyboard moves on", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "fl-hash-tab");
             type_in(cx, window, &dialog, "depth", "#", &[]);
             let highlighted = cx.update(|cx| dialog.read(cx).ui_list()).map(|l| l["highlighted"].clone());

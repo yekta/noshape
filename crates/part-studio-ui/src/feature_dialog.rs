@@ -1919,7 +1919,7 @@ impl FeatureDialog {
         // Tab accepts too (live 152: "Tab/Enter"), applies the field and keeps the keyboard there, the list closed:
         // ✓ after it commits (live behaviours "5 mm": "Tab, then ✓ commits").
         .capture_action(cx.listener(move |this, _: &crate::actions::DialogTab, window, cx| {
-            // Nothing highlighted (a lone "New variable…"): the list closes and Tab moves on, the text kept (live
+            // Nothing highlighted (a bare "#": only "New variable…"): the list closes and Tab moves on, the text kept (live
             // fields-gaps: "#" stays).
             if open(this, &p5) && this.completion.as_ref().is_some_and(|c| c.highlighted().is_none()) {
                 this.completion = None;

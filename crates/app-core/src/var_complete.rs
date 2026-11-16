@@ -238,10 +238,11 @@ impl VarCompletion {
         rows
     }
 
-    /// The highlighted row: none while "New variable…" is the only one and the arrows haven't moved (live fields-gaps:
-    /// `#` in a studio without variables highlights nothing, so Tab takes nothing), else the selected one.
+    /// The highlighted row: none for a bare `#` listing only "New variable…" before the arrows move (live fields-gaps:
+    /// so Tab takes nothing), else the selected one (`#nope`: New variable… highlighted, live extrude-depth-new-variable).
     pub fn highlighted(&self) -> Option<usize> {
-        (self.moved || !self.entries.is_empty()).then_some(self.selected)
+        let bare = self.entries.is_empty() && self.new_variable.as_deref() == Some("");
+        (self.moved || !bare).then_some(self.selected)
     }
 
     /// Rows: the entries, then "New variable…".

@@ -579,7 +579,7 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft angle). part-studio-ui
 `fields::the_fields_matrix_matches_live` (T1, no GPU) on the block start.
 
-**Matched: 14 / 14** (11-16 00:47 UTC: live's fields-gaps rows added (wheel, Tab with a lone New variable…, Create variable's place), 2 fixed; 11 / 11 at 11-15 20:35 UTC with the open list row; 10 / 10 at 20:06 UTC with the right press row; 9 / 9 at 11-14 00:33 UTC; 6 / 9 at the first run).
+**Matched: 14 / 14** (11-16 00:47 UTC: live's fields-gaps rows added (wheel, Tab after a bare "#", Create variable's place), 2 fixed; 11 / 11 at 11-15 20:35 UTC with the open list row; 10 / 10 at 20:06 UTC with the right press row; 9 / 9 at 11-14 00:33 UTC; 6 / 9 at the first run).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -595,7 +595,7 @@ live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft an
 | Right press (live2 11-15, dialog-number-rclick-menu) | no menu, Chrome's or Onshape's; the field takes the keyboard, all selected; one Esc cancels the dialog | the input's Cut / Copy / Paste opened and took that Esc; now no menu | = (fixed) |
 | Autocomplete open (lead P1 11-15; live2 ac-menu) | the "#" and "asin" lists overlay the rows below, which keep their rects; the list's top is the input's bottom, its right edge the input's; 5.25 px corners, no shadow, the rows fill the 1 px border | the rows below moved 2 px down (the list hung from a box in the field's column, which took its gap); the list was left-aligned, inset 1 px with square highlighted corners and a shadow; now as live | = (fixed) |
 | Wheel over the focused field (live fields-gaps 11-16) | +1 mm per notch, −1 down, Shift ×10, Ctrl ×0.1 | the same | = |
-| Tab with a lone New variable… (live fields-gaps) | nothing highlighted; Tab closes the list, the field keeps "#", the keyboard moves on | New variable… highlighted, Tab opened Create variable; now as live (`VarCompletion::highlighted`) | = (fixed) |
+| Tab after a bare "#" (live fields-gaps) | only New variable…, nothing highlighted (with a name typed, "#nope", it is highlighted: live extrude-depth-new-variable); Tab closes the list, the field keeps "#", the keyboard moves on | New variable… highlighted, Tab opened Create variable; now as live (`VarCompletion::highlighted`) | = (fixed) |
 | Create variable's place (live fields-gaps) | top-left ~4 px right of the field's right end, top level with the field's | 107 px right of the field's left, 12 px above its top; now as live | = (fixed) |
 | Not yet in the matrix | Ctrl+Up ×0.1 (an existing test), the wheel over a focused field, the "#" list's New variable… and its popover, Tab taking the highlighted entry | – | – |
 
@@ -617,7 +617,7 @@ live2's feedback.json (11-13 09:39, for psui and studios). part-studio-ui `feedb
 | Fillet R100 on the block's vertical edge | builds (5 faces), no error (behaviours "blend (2986)": every radius up to R100) | the same | = |
 | A failed preview | Fillet 100 mm on the block's top edge: the title red, the entry red (the field not marked), "… Failed to fillet selections." | regenerated "Ok" into a body with no faces: blend fixed it 11-13; the entry wasn't red, now it is for an error naming no field (`FeatureDialog::entry_failing`) | = (fixed) |
 | Its dialog | Sketch 1 deleted under Extrude 1: the title red, the lost region a red "Missing Face" entry, ✓ not disabled (an edge whose feature is only below reads "Edge of Extrude 1": live fillet-chip-edit-healthy-moment) | "Face of deleted feature"; now "Missing Face" | = (fixed) |
-| Not yet in the matrix | a failed preview drawing the edge in the error colour; the commit's working overlay (live first seen 1119 ms after ✓, polled every 40–150 ms; ours 1200 ms: within a frame or two, not changed without a finer measure); toasts (studios: success rgb(221,246,204), top centre, 5.1 s, no stacking, hover doesn't pause); empty states | – | – |
+| Not yet in the matrix | a failed preview (live feedback-gaps 11-16, Shell 20 mm on the 10 mm block: every edge of the part red rgb(189, 48, 57) ~5 px, faces tinted (rgb(125, 106, 119) on the dark sides), the title red, the face chip and the feature row red, ✓ still enabled; ours `error_geometry`: the same red at 3.5 px, a side by side due before changing it); the commit's working overlay (live first seen 1119 ms after ✓, polled every 40–150 ms; ours 1200 ms: within a frame or two, not changed without a finer measure); toasts (studios: success rgb(221,246,204), top centre, 5.1 s, no stacking, hover doesn't pause); empty states | – | – |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
