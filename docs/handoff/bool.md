@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-16 17:23 UTC.
+Updated 11-16 19:30 UTC.
 
 ## In flight
 - P0 c2-config-parts-screws memory: what grows is OCCT's UnifySameDomain wire loop (IntUnifyFaces /
@@ -15,17 +15,16 @@ Updated 11-16 17:23 UTC.
   cherry-picked on main in bool-hat, branch bool-screws-mem (4694fe512, f752ba60f) + T1
   bool_patterns::a_wire_that_never_closes_leaves_the_unify_its_input (tests/data/unify/thread-wire-never-closes.brep,
   Revolve 9's dumped input, 40 KB). Dump replay: 0032 10 faces kept in 106 ms; stock OCCT past 2 GB in seconds.
-  Staged libs: vibe5 ~/agents/bool2-keep/occt-0032, Mac ~/noshape-host/occt-0032. Identity check: unit bool2-oc32b
-  (/root/bool2-scratch/oc32-cmp.out, ends OC32-DONE); its B binary lacks dx's Split hang fix, killed its screws run
-  17:19 after 85 min. Then: lead installs the libs on every host, then land.sh from bool-hat.
+  Checks clean 11-16: corpora + parity56 0 new differences, suite (screws out) 138 docs identical, hats/dock 12/12
+  SAME. Lead installed the libs on every host 11-16 ~19:2x; landing with bool2's 0031 + 0032 patch files.
 - Sweep 1 accuracy (the invalid thread): not a Boolean fix; with the lead (sweep owner).
 - Gates on vibe5: 31dbff530 (cylinder merge, asm-pattern-std Extrude 11 -> live 14/36/24) waiting for the slot; then
   e5c584e35 again (unit bool-after-cyl-gate: its 12:13 run timed out behind bool2's stuck slot). Each: hats/dock
   (udoc-ab.sh <commit>) then land; tell asm (handoff note) when 31dbff530 lands.
-- core's tablet-stand Extrude 1 (vibe5 ~/agents/core-keep/tsrec/a): 7b08434da3624636 is a sheet cut by two plane-face
-  tools (coplanar slot faces on the sheet's two walls); the bend cylinder's strip has no tool face, so the strip is
-  lost earlier: the commons before it (3d8db0a4..., d294ca6b... target 8 faces -> 0) of the slot solid with the sheet
-  solids. Next: which common should give the cylinder strip (tangent to the tool's start face).
+- core's tablet-stand Extrude 1: not a Boolean; handed back to core 11-16 18:0x (std never builds the bend's tool:
+  no thickened-bend common in performSheetMetalBoolean; the cut 7b08434d is right for its plane-face tools).
+- core's parting-line Rib (7 s): not a Boolean regression (ribs now build); core dropped Rib's redundant merge fuse
+  (bb61a968).
 - Landed 11-16: a8b8f1851 (Shell filter), a2952b329 (extrusion x quadric sections); dx's 979de111a (gate reviewed).
 
 ## Parked (branches / diffs, not landing as they are)
