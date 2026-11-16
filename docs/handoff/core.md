@@ -66,7 +66,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - **Committed bcaf5ffdb (in the pair): a path loft merges smoothly meeting sides** (merge_tangent_sides now also when
   `along`; live 1784's 3+-section rule): Loft 3 (two slots along an arc) 20 -> 17 faces, live 15/33/23. Left: two
   Boolean slivers (15.6 and 0.16 mm², 0.012 mm thick) along profile 1's flat side at x=-50.8, y 68-92: the path loft's
-  surface there is a hair off Extrude 2's face (path_sections' cut sections are approximations). Next item there.
+  surface there is a hair off Extrude 2's face. Likely cause: path_sections cuts each section with a plane square to
+  the path; Loft 3's arc leaves profile 1 ~23 deg off its normal, so the first cut planes slant across the 197 mm slot
+  and clip against the carried sweep's start: the surface near profile 1 bends into the part. Parasolid presumably
+  places sections by the spine's parameter instead. Next item there.
   Mirror 1 times swing 0.3-1.7 s on loaded vibe5 runs; check on the Mac / in the pair before calling it.
   T1 features_a::a_path_loft_of_two_slots_has_one_side_face.
 - **Lofts (mine, from dx's list):**
