@@ -263,7 +263,7 @@ a line crossing a curve near the pointer gives the crossing with both constraint
 point → H + V through it; a sketch line → parallel + perpendicular through the start; a model edge → perpendicular;
 a circle → the two tangent lines from the start; a spline → nothing. Shift: no snapping. In-plane model entities only.
 
-**Matched: 59 / 59** (11-16 01:57 UTC: live sketch-gaps' crossing row added, matched; 55 / 55 at 11-13 06:02 UTC). Probes: a point 6.5 px straight out snaps, 8.5 doesn't; 9.5 / 11.5 diagonally;
+**Matched: 60 / 62** (11-16 03:36 UTC: three spline rows from live2's sketch-snaps reachZoomA / B, the through-point along matched, across and the curve gaps; 59 / 59 at 01:57 with sketch-gaps' crossing row; 55 / 55 at 11-13 06:02 UTC). Probes: a point 6.5 px straight out snaps, 8.5 doesn't; 9.5 / 11.5 diagonally;
 a band 6.5 / 8.5 across (live's own takes vary by a pixel with where its target sits in its pixel).
 
 | Row (tool / target / inference) | Live | Ours (where) | Status |
@@ -290,7 +290,8 @@ a band 6.5 / 8.5 across (live's own takes vary by a pixel with where its target 
 | Rectangle, second corner | the full set but no H / V through its first corner; midpoints kept | the same | = |
 | 3 point arc, third point | coincident points (and its chord's midpoint) only | the same | = |
 | Drags: a free end onto a point (straight, diagonally), a midpoint, a circle's rim; no H / V | 7–9 / 6, not 8 / ≤ 6; COINCIDENT / MIDPOINT on release | the squares and bands (`point_drop_target`; points were an 8.5 px circle) | = (fixed) |
-| Not yet in the matrix | spline through-points (live: COINCIDENT to SPLINE.n.internal up to 7–9 px: the harness has no spline yet); a woken model edge's perpendicular (live sketch-gaps 1c: the edge wakes after a 60 ms rest, then PERPENDICULAR through the start 7–9 px either side: needs a slanted model edge, the block's are level with the start's H / V) | – | – |
+| Line end / a spline's through-point (along); across it; its curve between points | 7 px along, then on the curve; 8–9 px across; the curve 12, not 14 | the square (7.5) and band (7.5): along =, across and the curve stop at 7.5 | = / ≠ / ≠ (live's spline shape isn't recorded: a wider spline zone or its tessellation's chords?) |
+| Not yet in the matrix | a woken model edge's perpendicular (live sketch-gaps 1c: the edge wakes after a 60 ms rest, then PERPENDICULAR through the start 7–9 px either side: needs a slanted model edge, the block's are level with the start's H / V) | – | – |
 
 ## Feature list and Parts list (matrix)
 
@@ -540,7 +541,7 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 | Y / Shift+Y with nothing selected or under the pointer | nothing (Shift+Y isn't "show all") | the same | = |
 | Sketch Ctrl+C, Ctrl+V | the copy's centre under the pointer at once, selected; one undo removes it | the same | = |
 | Eye icons | a row's eye toggles it (Part 1 hidden, shown; a hidden sketch shown); the selection stays | the same | = |
-| Not yet in the matrix | the toolbar's Undo tooltip (always "Undo (cmd+z/ctrl+z)": ours the same), undo in a feature dialog (an existing test), the paste's 2D triad and kept constraints, the assembly rows (asm's); live editing-gaps2: a sketch paste lands at once centred on the pointer, keeps every constraint wholly inside the copy (dimensions too), drops those to entities left out; its triad's handles grey double outlines at the copy's lower-left corner | – | – |
+| Not yet in the matrix | the toolbar's Undo tooltip (always "Undo (cmd+z/ctrl+z)": ours the same), undo in a feature dialog (an existing test), the paste's 2D triad and kept constraints, the assembly rows (asm's); live editing-gaps2: a sketch paste lands at once centred on the pointer, keeps every constraint wholly inside the copy (dimensions too), drops those to entities left out; live editing-gaps3 (the client's triad): the 2D manipulator (paste and Transform alike) sits on the selection's lowest key point (curve ends, centres; the leftmost of equals), grey double outlines, screen-sized: X / Y arrow heads 68–96 px out (move along that axis), the square 20–45 px (move freely), the rotation ring 108 px out on X with two ticks (rotate about the anchor, an angle box), the scale head from (60, 60) px, 30 long (scale, a factor box); the ring at the anchor moves the triad only (ours the same since 11-16: `transform_triad_sits_and_moves_as_live`; was the bbox centre, a 14 px square, rotate 70 px, scale 45 px, no arrows; the agent API's `sketch_transform` pivot defaults to the same anchor). Not checked: where live's angle / factor boxes sit; an arc copy's paste offset (live: centre at pointer + (−2.3, −4.2) mm, unresolved) | – | – |
 
 ## Dialogs (matrix)
 

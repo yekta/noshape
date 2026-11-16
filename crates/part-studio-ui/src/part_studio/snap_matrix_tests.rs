@@ -29,6 +29,8 @@ enum Draw {
     Circle(Pt, f64),
     /// Start, end, a point on the arc (the 3 point arc's clicks).
     Arc(Pt, Pt, Pt),
+    /// A spline through three points (the last one double-clicked).
+    Spline(Pt, Pt, Pt),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -111,6 +113,8 @@ const CIRCLE: &[Draw] = &[Draw::Circle(C(80., 0.), 50.)];
 const ARC: &[Draw] = &[Draw::Arc(C(-120., 0.), C(0., 0.), C(-60., 45.))];
 
 const POINT_P: &[Draw] = &[Draw::Point(C(-60., 70.))];
+/// A spline through three points on a level (a straight spline: its curve points are known).
+const SPLINE: &[Draw] = &[Draw::Spline(C(-120., 20.), C(-60., 20.), C(0., 20.))];
 /// A vertical line crossed 10.1 px above its midpoint by a horizontal one (live sketch-gaps 1a: X1 and X2).
 const CROSSING: &[Draw] = &[Draw::Line(C(0., -80.), C(0., 80.)), Draw::Line(C(-30., 10.1), C(130., 10.1))];
 /// live2 combo perpLine's line Lc and perpAlign's line Lw3 (its end woken), in px.
@@ -144,6 +148,12 @@ fn rows() -> Vec<Row> {
         Row { not: &["CONCENTRIC"], ..point_row("reach/circle-centre/straight", CIRCLE, S, C(80., 0.), (1., 0.), false, &["COINCIDENT"]) },
         point_row("reach/circle-centre/diagonal", CIRCLE, S, C(80., 0.), d, true, &["COINCIDENT"]),
         point_row("reach/point/straight", POINT_P, S, C(-60., 70.), (1., 0.), false, &["COINCIDENT"]),
+        // A spline's through-point (live2 sketch-snaps reachZoomA / B): 7 px along, then on the curve; 8–9 px across.
+        point_row("reach/spline-through-point/along", SPLINE, S, C(-60., 20.), (1., 0.), false, &["COINCIDENT"]),
+        // Live reaches further across a spline (through-point 8–9 px, the curve 12): its spline's shape isn't recorded,
+        // so whether that is a wider spline zone or its curve's tessellation is open (gaps).
+        Row { snaps: 7.5, not_from: Some(10.5), gap: true, ..point_row("reach/spline-through-point/across", SPLINE, S, C(-60., 20.), (0., 1.), false, &["COINCIDENT"]) },
+        Row { gap: true, ..row("reach/spline-curve/across", Tool::Line, SPLINE, Some(S), (C(-90., 20.), (0., 1.)), (11.5, Some(14.5)), &["COINCIDENT"]) },
         point_row("reach/point/diagonal", POINT_P, S, C(-60., 70.), d, true, &["COINCIDENT"]),
         Row { lit: Lit::Vertex, ..point_row("reach/model-vertex/straight", &[], C(-60., -40.), Pt::Corner, (-1., 0.), false, &["COINCIDENT"]) },
         Row { lit: Lit::Vertex, ..point_row("reach/model-vertex/diagonal", &[], C(-60., -40.), Pt::Corner, (-H, -H), true, &["COINCIDENT"]) },
@@ -407,6 +417,15 @@ impl Bench {
                 for p in [a, b, m] {
                     self.click(cx, self.at(p), None);
                 }
+            }
+            Draw::Spline(a, b, c) => {
+                self.tool(cx, Tool::Spline);
+                for p in [a, b, c] {
+                    self.click(cx, self.at(p), None);
+                }
+                let at = self.at(c);
+                let m = Modifiers::default();
+                self.events(cx, &[ViewportEvent::ToolDown { position: at, modifiers: m, click_count: 2 }, ViewportEvent::ToolUp { position: at, modifiers: m }]);
             }
         }
     }
