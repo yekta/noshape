@@ -135,6 +135,17 @@ fn rows() -> Vec<Row> {
             }
             Ok(())
         } },
+        Row { id: "tooltip / fades out", live: "Bootstrap's 0.15 s fade after the pointer leaves (the node gone 165-200 ms after; chrome-gaps 11-16)", gap: false, check: |c, cx| {
+            c.hover_first(cx);
+            let _ = c.wait(cx, 450);
+            c.move_to(cx, 300., 200.);
+            crate::ui_script::clear_tooltip();
+            let fading = c.wait(cx, 100);
+            let _ = c.wait(cx, 60);
+            crate::ui_script::clear_tooltip();
+            let gone = c.wait(cx, 30);
+            expect((fading.as_deref(), gone.as_deref()), (Some("First"), None), "(drawn 100 ms after leaving, drawn 160-190 ms after)")
+        } },
         Row { id: "tooltip / a click or the wheel closes it", live: "closes on click (buttons, links, inputs, dropdowns), double-click, wheel, drag start", gap: false, check: |c, cx| {
             let mut gone = Vec::new();
             for wheel in [false, true] {

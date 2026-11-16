@@ -3894,8 +3894,9 @@ impl Window {
             prompt_element.paint(self, cx);
         } else if let Some(mut drag_element) = active_drag_element {
             drag_element.paint(self, cx);
-        } else if let Some(mut tooltip_element) = tooltip_element {
-            tooltip_element.paint(self, cx);
+        } else if let Some((mut tooltip_element, opacity)) = tooltip_element {
+            // NOSHAPE PATCH: a tooltip fading out (`div::tooltip_fade_opacity`).
+            self.with_element_opacity(opacity, |window| tooltip_element.paint(window, cx));
         }
 
         #[cfg(any(feature = "inspector", debug_assertions))]
@@ -3938,7 +3939,7 @@ impl Window {
         }
     }
 
-    fn prepaint_tooltip(&mut self, cx: &mut App) -> Option<AnyElement> {
+    fn prepaint_tooltip(&mut self, cx: &mut App) -> Option<(AnyElement, Option<f32>)> {
         // Use indexing instead of iteration to avoid borrowing self for the duration of the loop.
         for tooltip_request_index in (0..self.next_frame.tooltip_requests.len()).rev() {
             let Some(Some(tooltip_request)) = self
@@ -3950,6 +3951,11 @@ impl Window {
                 log::error!("Unexpectedly absent TooltipRequest");
                 continue;
             };
+            let opacity = crate::elements::tooltip_fade_opacity(tooltip_request.tooltip.view.entity_id(), cx.background_executor().now());
+            if opacity.is_some() {
+                // (No view is rendering here: the next frame redraws the window.)
+                self.on_next_frame(|window, _| window.refresh());
+            }
             let mut element = tooltip_request.tooltip.view.clone().into_any_element();
             let mouse_position = tooltip_request.tooltip.mouse_position;
             let tooltip_size = element.layout_as_root(AvailableSpace::min_size(), self, cx);
@@ -4002,7 +4008,7 @@ impl Window {
                 id: tooltip_request.id,
                 bounds: tooltip_bounds,
             });
-            return Some(element);
+            return Some((element, opacity));
         }
         None
     }

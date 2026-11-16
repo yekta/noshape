@@ -56,8 +56,19 @@ const DEFAULT_TOOLTIP_SHOW_DELAY: Duration = Duration::from_millis(400);
 // element's default tooltip shows at once (live "warm_switch").
 const TOOLTIP_WARM_WINDOW: Duration = Duration::from_millis(200);
 
+// NOSHAPE PATCH: Onshape's Bootstrap tooltips fade out over 0.15 s when the pointer leaves (live chrome-gaps 11-16:
+// the node gone 165-200 ms after); a non-hoverable tooltip is painted fading meanwhile.
+const TOOLTIP_FADE_OUT: Duration = Duration::from_millis(150);
+
 thread_local! {
     static TOOLTIP_GONE_AT: Cell<Option<scheduler::Instant>> = const { Cell::new(None) };
+    static TOOLTIP_FADING: Cell<Option<(EntityId, scheduler::Instant)>> = const { Cell::new(None) };
+}
+
+/// NOSHAPE PATCH: the opacity of a tooltip view fading out (`None`: not fading).
+pub(crate) fn tooltip_fade_opacity(view: EntityId, now: scheduler::Instant) -> Option<f32> {
+    let (id, since) = TOOLTIP_FADING.with(|f| f.get())?;
+    (id == view).then(|| 1.0 - (now.saturating_duration_since(since).as_secs_f32() / TOOLTIP_FADE_OUT.as_secs_f32()).min(1.0))
 }
 
 /// (The executor's clock: tests drive it.)
@@ -3745,6 +3756,8 @@ pub(crate) enum ActiveTooltip {
     /// before hiding it.
     WaitingForHide {
         tooltip: AnyTooltip,
+        // NOSHAPE PATCH: false while a non-hoverable tooltip fades out.
+        is_hoverable: bool,
         _task: Task<()>,
     },
 }
@@ -3769,7 +3782,7 @@ pub(crate) fn clear_active_tooltip_if_not_hoverable(
         None => false,
         Some(ActiveTooltip::WaitingForShow { .. }) => false,
         Some(ActiveTooltip::Visible { is_hoverable, .. }) => !is_hoverable,
-        Some(ActiveTooltip::WaitingForHide { .. }) => false,
+        Some(ActiveTooltip::WaitingForHide { is_hoverable, .. }) => !is_hoverable,
     };
     if should_clear {
         active_tooltip.borrow_mut().take();
@@ -4095,9 +4108,9 @@ fn handle_tooltip_check_visible_and_update(
     // borrows.
     enum Action {
         None,
-        Hide,
+        Hide(AnyTooltip),
         ScheduleHide(AnyTooltip),
-        CancelHide(AnyTooltip),
+        CancelHide(AnyTooltip, bool),
     }
 
     let is_hovered = check_is_hovered(window)
@@ -4110,13 +4123,13 @@ fn handle_tooltip_check_visible_and_update(
                 if tooltip_is_hoverable {
                     Action::ScheduleHide(tooltip.clone())
                 } else {
-                    Action::Hide
+                    Action::Hide(tooltip.clone())
                 }
             }
         }
-        Some(ActiveTooltip::WaitingForHide { tooltip, .. }) => {
+        Some(ActiveTooltip::WaitingForHide { tooltip, is_hoverable, .. }) => {
             if is_hovered {
-                Action::CancelHide(tooltip.clone())
+                Action::CancelHide(tooltip.clone(), *is_hoverable)
             } else {
                 Action::None
             }
@@ -4126,10 +4139,25 @@ fn handle_tooltip_check_visible_and_update(
 
     match action {
         Action::None => {}
-        Action::Hide => {
+        Action::Hide(tooltip) => {
             let now = cx.background_executor().now();
             TOOLTIP_GONE_AT.with(|t| t.set(Some(now)));
-            clear_active_tooltip(active_tooltip, window)
+            // NOSHAPE PATCH: it fades out, then goes.
+            TOOLTIP_FADING.with(|f| f.set(Some((tooltip.view.entity_id(), now))));
+            let fade = window.spawn(cx, {
+                let weak_active_tooltip = Rc::downgrade(active_tooltip);
+                async move |cx| {
+                    cx.background_executor().timer(TOOLTIP_FADE_OUT).await;
+                    let Some(active_tooltip) = weak_active_tooltip.upgrade() else {
+                        return;
+                    };
+                    if active_tooltip.borrow_mut().take().is_some() {
+                        cx.update(|window, _cx| window.refresh()).ok();
+                    }
+                }
+            });
+            active_tooltip.borrow_mut().replace(ActiveTooltip::WaitingForHide { tooltip, is_hoverable: false, _task: fade });
+            window.refresh();
         }
         Action::ScheduleHide(tooltip) => {
             let delayed_hide_task = window.spawn(cx, {
@@ -4150,14 +4178,16 @@ fn handle_tooltip_check_visible_and_update(
                 .borrow_mut()
                 .replace(ActiveTooltip::WaitingForHide {
                     tooltip,
+                    is_hoverable: true,
                     _task: delayed_hide_task,
                 });
         }
-        Action::CancelHide(tooltip) => {
+        Action::CancelHide(tooltip, is_hoverable) => {
             // Cancel waiting to hide tooltip when it becomes hovered.
+            TOOLTIP_FADING.with(|f| f.set(None));
             active_tooltip.borrow_mut().replace(ActiveTooltip::Visible {
                 tooltip,
-                is_hoverable: true,
+                is_hoverable,
             });
         }
     }
@@ -5295,6 +5325,10 @@ mod tests {
             })
             .unwrap();
 
+        // NOSHAPE PATCH: it fades out first (live: 150 ms), then goes.
+        assert!(matches!(active_tooltip.borrow().as_ref(), Some(ActiveTooltip::WaitingForHide { is_hoverable: false, .. })));
+        test_app.dispatcher.advance_clock(TOOLTIP_FADE_OUT);
+        test_app.run_until_parked();
         assert!(active_tooltip.borrow().is_none());
     }
 
