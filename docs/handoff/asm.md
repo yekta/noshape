@@ -34,15 +34,28 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
 ### Queued to land
 - Nothing.
 
+### Mates lost, ranked (full run s70, done 06:4x; lost = not as live + "its connectors not translated")
+- scissor-lift 49 (47 untranslated: all mate-held implicit connectors, BTMFeatureQueryWithOccurrence -> the mate's
+  own mateConnectors; per-end cause from q81's trace), infento 43 (40 untranslated, q81 too), isaac 41 (16
+  overdefined, 8 unresolved, 7 inconsistent, 10 untranslated; fffe186b A/B q79), hand-drill 17 (16 overdefined: dx's
+  b4ef875a6 planeOp-before-refs fixes the 4ece4b Plane 3 -> Plane 2 chain, in dx's gate), pattern-std 11, corexy 11
+  (Belt parts: q77), tvc 5, welding 5, xdev 5, config-assembly 4, keyboard 4, pinslot 3, suspension 2.
+- "Failed to resolve the instance for mate." (robotic-arm Fastened 2 etc.): red in live, counted as a live defect
+  (ruling 11-15): costs nothing.
+- Full run totals (s70 = stack + fffe186b, before thread/cylinder/region commits): occurrences 1604/1709, mates
+  669/737, BOM 521/612. Drops vs base29 to explain: pattern-std 161->160, robot-relations 139->138, scissor-lift
+  215->212, tvc 43->41, welding 81->76 occurrences: q80 (vibe7, base30 vs s76 on snapshot drop-0642,
+  full/q80-*.log) tells mine from main / data.
+
 ### Next, in order
-1. q79 per-mate diff -> fffe186b decision (above). q78 gate: no model document worse.
-2. Full run vs base29 per corpus; SCORE.md "Assemblies" row (last 11-08); corexy BOM rescore.
-3. hand-drill 51/67 (q75 / q76) and tvc-mount (q74): owner or fix.
+1. q79 (vibe6) per-mate diff -> fffe186b decision; q80 (vibe7) drops; q81 (vibe5 q5.status) traced scissor-lift +
+   infento -> fix the untranslated connectors (biggest). Land each fix as ready.
+2. SCORE.md "Assemblies" row (last 11-08) once q80 says which drops are mine.
+3. q78 region gate (vibe6): no model document worse. hand-drill: confirm after dx's b4ef875a6.
 4. Thread lengths: rerun thr_import.py when live has all 83 components.
-5. robot-relations a4e419 (Fixed Side 2873 vs 61001 mm³) with live2's refs; Extrude 2's booleanScope names a body of
-   its Derived by the source's feature.
-6. bjr-config (dx's 5d8bc1); pattern-std's 9 Fastened on AR-S1 / AR-S2 (36b90f parts off live's volume, also base29).
-- Done by others: welding 9bdeb5 Extrude 4 (core: an Add's apart tool has same-surface faces merged, 11-16).
+5. bjr-config (dx's 5d8bc1); pattern-std's 9 Fastened on AR-S1 / AR-S2 (36b90f parts off live's volume).
+- Done: robot-relations a4e419 matches as a model (4/4, mr/ma4 on vibe5/6/7 and Mac ~/noshape-host/asm-models/mr;
+  blend has its Fillet 1 time); welding 9bdeb5 Extrude 4 (core).
 
 ### Others' items touching mine
 - dx keeps infento (1dc32b, 74d3d6) and bjr-config (5d8bc1). dx: derivedFrom + ORIGINAL_DEPENDENCY (top-level EDGE)
