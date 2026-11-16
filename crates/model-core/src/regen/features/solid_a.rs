@@ -1765,6 +1765,7 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
     for bi in parts.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let mut shape = body.shape.clone();
+        let mut trail = RibTrail::new(&body.shape);
         for w in &wires {
             // Normal to the sketch plane, an open chain is one rib per edge as
             // in rib.fs (each edge of the profiles query is a profile): a leg
@@ -1785,6 +1786,7 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
                 };
                 match res {
                     Ok(r) => {
+                        trail.step(&r.history);
                         shape = r.shape;
                         made += 1;
                     }
@@ -1796,7 +1798,9 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
             continue;
         }
         if merge {
-            let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&body.shape), std::slice::from_ref(&shape), &k::BooleanOptions::default()).map_err(|_| fe("Failed to merge ribs into parts."))?;
+            // The part with its ribs fused in is the merge: its history is the part's faces through the rib steps
+            // (as the fuse of the part with it gave, 3 s of OCCT a rib in c2-parting-line-draft-parting-line).
+            let res = k::OpResult { history: trail.history(&shape), shape: shape.clone() };
             let empty = crate::naming::ShapeNames::default();
             let names = ev.name_result(&[&body.shape_names(), &empty], &res.history, &res.shape, &BTreeMap::new(), None);
             // Like Parasolid, the rib's faces on the part's surfaces are the
@@ -1840,6 +1844,41 @@ const RIB_MISS: &str = "None of the ribs intersected a part.";
 /// direction past the part and thickened about the sketch plane; the part
 /// splits it, and the pieces that touch the profile but not the far end of
 /// the sweep or of an extension are the rib.
+/// Where a part's sub-shapes went through Rib's fuses (each step's argument 0 is the shape before it): for each
+/// sub-shape now, the part's it comes from and whether it is still the part's own.
+struct RibTrail {
+    from: std::collections::HashMap<(ShapeType, u32), Vec<(u32, bool)>>,
+}
+
+impl RibTrail {
+    const KINDS: [ShapeType; 3] = [ShapeType::Face, ShapeType::Edge, ShapeType::Vertex];
+
+    fn new(part: &Shape) -> Self {
+        let from = Self::KINDS.iter().flat_map(|&k| (0..part.count(k) as u32).map(move |i| ((k, i), vec![(i, true)]))).collect();
+        Self { from }
+    }
+
+    fn step(&mut self, h: &k::History) {
+        let mut next: std::collections::HashMap<(ShapeType, u32), Vec<(u32, bool)>> = std::collections::HashMap::new();
+        for r in h.records.iter().filter(|r| r.arg == 0 && r.input_kind == r.output_kind && matches!(r.relation, k::Relation::Modified | k::Relation::Kept)) {
+            let kept = r.relation == k::Relation::Kept;
+            for &(p, was) in self.from.get(&(r.input_kind, r.input_index)).into_iter().flatten() {
+                next.entry((r.output_kind, r.output_index)).or_default().push((p, was && kept));
+            }
+        }
+        self.from = next;
+    }
+
+    /// The fuse of the part (argument 0) with `shape` (argument 1), which holds it.
+    fn history(&self, shape: &Shape) -> k::History {
+        let rec = |arg: u32, kind: ShapeType, input: u32, kept: bool, output: u32| k::HistoryRecord { arg, input_kind: kind, input_index: input, relation: if kept { k::Relation::Kept } else { k::Relation::Modified }, output_kind: kind, output_index: output };
+        let mut records: Vec<k::HistoryRecord> = self.from.iter().flat_map(|(&(kind, out), ps)| ps.iter().map(move |&(p, kept)| rec(0, kind, p, kept, out))).collect();
+        records.extend(Self::KINDS.iter().flat_map(|&kind| (0..shape.count(kind) as u32).map(move |j| rec(1, kind, j, true, j))));
+        records.sort_by_key(|r| (r.arg, r.input_kind as u8, r.input_index, r.output_index));
+        k::History { records }
+    }
+}
+
 fn rib_parallel(base: &Shape, wire: &Shape, normal: DVec3, opposite: bool, t: f64, extend: bool, draft: Option<(f64, bool)>) -> FResult<k::OpResult> {
     let edges = wire.edges();
     let [e] = edges.as_slice() else { return err(RIB_FAILED) };
