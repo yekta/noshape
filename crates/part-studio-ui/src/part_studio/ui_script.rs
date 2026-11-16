@@ -698,6 +698,13 @@ impl PartStudioView {
         if let Some(name) = t.get("view_cube").and_then(Value::as_str) {
             return super::view_cube::ui_cell_point(name, self.ui.cube_origin, vp.camera.rotation);
         }
+        // A point in the flat view, `frac` of the way from bend line `flat_bend`'s middle to its zone's edge.
+        if let Some(n) = t.get("flat_bend").and_then(Value::as_u64) {
+            let f = self.flat_view.as_ref().ok_or("no flat view")?.read(cx);
+            let frac = t.get("frac").and_then(Value::as_f64).unwrap_or(0.4);
+            let at = f.bend_zone_point(n as usize, frac, cx).ok_or_else(|| format!("no bend line {n} in the flat view"))?;
+            return Ok(f.viewport.read(cx).origin() + point(px(at.x as f32), px(at.y as f32)));
+        }
         if let Some(letter) = t.get("annotation").and_then(Value::as_str) {
             let at = self.annotation_point(letter, cx).ok_or_else(|| format!("no annotation {letter} shown"))?;
             return Ok(vp.origin() + point(px(at.x as f32), px(at.y as f32)));

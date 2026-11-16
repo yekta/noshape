@@ -277,7 +277,6 @@ impl FlatView {
     }
 
     /// The viewport point `frac` of the way from bend line `line`'s middle to its zone's edge.
-    #[cfg(test)]
     pub(crate) fn bend_zone_point(&self, line: usize, frac: f64, cx: &App) -> Option<glam::DVec2> {
         let z = self.bend_zone(line)?;
         let mid = (z[0] + z[1] + z[2] + z[3]) * 0.25;
@@ -341,12 +340,9 @@ impl FlatView {
         let face = |side: bool| self.picked.filter(|i| self.sides.get(*i).copied().flatten() == Some(side)).or_else(|| self.sides.iter().position(|s| *s == Some(side)));
         let selected: Vec<Reference> = self.selected.and_then(face).map(|i| Reference::Face(noshape_model::reference::TopoName::face(noshape_model::reference::FeatureId(0), noshape_model::reference::Role::New(i as u32)))).into_iter().collect();
         let mut extra_now = self.parts.as_ref().map(|p| p.2.clone()).unwrap_or_default();
-        // The selected bend line in the selection colour (live: orange).
-        if let Some((a, b)) = self.selected_bend.and_then(|i| self.flat.as_ref().and_then(|(f, _)| f.flat_view_bend_lines().get(i).copied())) {
-            let mut lines = LineData::default();
-            let [_, r, g, b8] = noshape_scene::palette::viewport::SELECTION.to_be_bytes();
-            lines.push_polyline(&[a.as_vec3().to_array(), b.as_vec3().to_array()], [r, g, b8, 0xff], 0, 3.0, LineSegment::ON_TOP);
-            extra_now.push(Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(14));
+        // The selected bend as live draws a clicked flat bend (its zone filled and edged).
+        if let Some((f, l)) = self.selected_bend.and_then(|i| self.flat.as_ref().and_then(|(f, _)| Some((f, f.bend_lines.get(i)?)))) {
+            extra_now.extend(selected_zone(f, l, &self.gpu));
         }
         // The open sketch's frame and name, in the 3D view's sketch box colour.
         let [_, r, g, b8] = noshape_scene::sketch_mode::SKETCH_BOX_COLOR.to_be_bytes();
@@ -423,7 +419,9 @@ fn flat_parts(flat: &FlatPattern, color: [f32; 4], highlight: Option<usize>, hov
     // dashed 10 / 10 / 5 / 10 px at every zoom (live sheetmetal-gaps2).
     let mut lines = LineData::default();
     for (a, b) in flat.flat_view_bend_lines() {
-        lines.push_polyline(&[a.as_vec3().to_array(), b.as_vec3().to_array()], [0x33, 0x33, 0x33, 0xff], 0, 1.0, LineSegment::CENTER_LINE);
+        // (Lifted over a selected bend's fill.)
+        let lift = |q: glam::DVec3| (q + glam::DVec3::Z * 3e-5).as_vec3().to_array();
+        lines.push_polyline(&[lift(a), lift(b)], [0x33, 0x33, 0x33, 0xff], 0, 1.0, LineSegment::CENTER_LINE);
     }
     if !lines.segments.is_empty() {
         extra.push(Instance::new(Drawable::Lines(gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(12));
@@ -440,17 +438,30 @@ fn flat_parts(flat: &FlatPattern, color: [f32; 4], highlight: Option<usize>, hov
     if !outline.segments.is_empty() {
         extra.push(Instance::new(Drawable::Lines(gpu.uploader().upload_lines(&outline))).per_primitive_color().unpickable().layer(13));
     }
-    // The selected bend's strip (its developed length wide) over the top.
+    // The selected bend's zone (its developed length wide) over the top.
     for l in flat.bend_lines.iter().filter(|l| Some(l.bend) == highlight) {
-        let d = (l.b - l.a).normalize_or_zero();
-        let n = glam::DVec2::new(-d.y, d.x) * (l.allowance / 2.0);
-        let p = |q: glam::DVec2| (flat.flat_view_point(q) + glam::DVec3::Z * 1e-5).as_vec3().to_array();
-        let positions = [p(l.a - n), p(l.b - n), p(l.b + n), p(l.a + n)];
-        let mesh = gpu.uploader().upload_mesh_parts(&positions, &[[0.0, 0.0, 1.0]; 4], &[0; 4], &[0, 1, 2, 0, 2, 3]);
-        extra.push(Instance::new(Drawable::Mesh(mesh)).with_color(noshape_scene::palette::lin(noshape_scene::palette::viewport::SELECTION)).unpickable().layer(11));
+        extra.extend(selected_zone(flat, l, gpu));
     }
     Some((display, built, extra))
 }
+
+/// A selected bend's zone on the flat (live sheetmetal-gaps2, a flat bend clicked): filled rgb(214, 151, 30) flat, its
+/// edge 1 px in the selection colour; the dashed centre line stays over it.
+fn selected_zone(flat: &FlatPattern, l: &noshape_model::sheetmetal::FlatBendLine, gpu: &Gpu) -> Vec<Instance> {
+    let d = (l.b - l.a).normalize_or_zero();
+    let n = glam::DVec2::new(-d.y, d.x) * (l.allowance / 2.0);
+    let p = |q: glam::DVec2, lift: f64| (flat.flat_view_point(q) + glam::DVec3::Z * lift).as_vec3().to_array();
+    let positions = [p(l.a - n, 1e-5), p(l.b - n, 1e-5), p(l.b + n, 1e-5), p(l.a + n, 1e-5)];
+    let mesh = gpu.uploader().upload_mesh_parts(&positions, &[[0.0, 0.0, 1.0]; 4], &[0; 4], &[0, 1, 2, 0, 2, 3]);
+    let fill = Instance::new(Drawable::Mesh(mesh)).with_color(noshape_scene::palette::lin(FLAT_BEND_SELECTED_FILL)).unlit().unpickable().layer(11);
+    let mut edge = LineData::default();
+    let [_, r, g, b] = noshape_scene::palette::viewport::SELECTION.to_be_bytes();
+    edge.push_polyline(&[p(l.a - n, 2e-5), p(l.b - n, 2e-5), p(l.b + n, 2e-5), p(l.a + n, 2e-5), p(l.a - n, 2e-5)], [r, g, b, 0xff], 0, 1.0, LineSegment::ON_TOP);
+    vec![fill, Instance::new(Drawable::Lines(gpu.uploader().upload_lines(&edge))).per_primitive_color().unpickable().layer(13)]
+}
+
+/// A selected flat bend's fill (live sheetmetal-gaps2: rgb(214, 151, 30)).
+const FLAT_BEND_SELECTED_FILL: u32 = 0xd6971e;
 
 impl Render for FlatView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
