@@ -9,17 +9,21 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-16 01:22 UTC.
+Updated 2026-11-16 01:27 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-Nothing. Landed 01:21 as 65d386f7: View orientation ▸ on a projected view, the sheet's menu 35 px above the pointer
-with row 2 hovered where it fits, TITLE's per-line pick areas, a title field joining a selection's menu, the
-`excluded` ui-parity marker. Full drawing run before the last commit: 284 of 288 (left: centermark flicker x2,
-drw-insert-view-top-1to1, drw-datum-copy-paste's highlighted row, fixed by ae7e870ff and checked on vibe6).
+- fdba14d6 (queued 01:27): the Projected tool's parent after Insert view reads VIEW for the 11-15 recorder, EDGE
+  for older ones (ours marks `new` / `old`; run.py keeps the one for the take's recorder): all 8 Insert view takes
+  match.
+
+Landed 01:21 as 65d386f7: View orientation ▸ on a projected view, the sheet's menu 35 px above the pointer with row 2
+hovered where it fits, TITLE's per-line pick areas, a title field joining a selection's menu, the `excluded`
+ui-parity marker. Full drawing run before its last commit: 284 of 288. A table's Bring to front / Send to back
+already grey only with no other note, dimension or table on the sheet (live2 REQUESTS 11-14 00:48).
 
 ## Waiting on others
 - live2: panel takes for Drawing properties, Hole table, Title block (asked 11-15 23:15).
@@ -35,8 +39,6 @@ drw-insert-view-top-1to1, drw-datum-copy-paste's highlighted row, fixed by ae7e8
   the take matches.
 - Full run of my areas (vibe5, 11-15 ~22:00, before the batch in flight): 992 of 1004 takes match. Besides the
   takes above: asm-cylindrical-limits (old).
-- drw-insert-view-top-1to1: live reads VIEW where five other Insert view takes read EDGE (the reader's pixels).
-- A table's Bring to front greyed when just placed (REQUESTS 12:38; ours greys it only for a table alone).
 - Projected view preview: ours snaps at 22.5° both ways. Live2's coarse sweep put the side/iso boundary at 25-30°
   (250 px) and 20-25° (400 px), and top at 20-25° from vertical. Left as is until a finer sweep.
 - Assembly "?" rows: a list row's tooltip (live2 ~70 ms), a selected instance's outline through other parts in
