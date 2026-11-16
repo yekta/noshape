@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 04:05 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 04:16 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
@@ -57,10 +57,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
    the point and a free start: each lateral face's surface swapped for columns [Q, (Q+B2)/2, B2, P], B2 = P - m/3 *
    (P - Q) projected into the point's plane, u and the v range kept, side edges = new UIso. Volume 370667 mm³ vs live
    370677.72 (T1 features_a::a_loft_to_a_sketch_point_tangent_to_its_plane, live's geometry) but BRepCheck says the
-   lateral face is UnorientableShape (status 27), so it falls back to the cone (274568). Next: why (the degenerate
-   apex edge's pcurve? SameParameter?), compare with ThruSections' own face; then remove the debug prints
-   (NOSHAPE_LOFT_DEBUG). (b) c2-loft-guide-curves-wave-washer f6 "Loft path with more than two profiles is not
-   supported yet" (solid_a.rs opts.path, 2 sections only): not started. Done and queued 11-16: psui's failed-Shell error shapes, the corner break
+   lateral face is UnorientableShape (status 27) because its wire is NotClosed in the face (status 28; no edge error;
+   with or without the SameParameter / tolerance reset: NOSHAPE_APEX_NO_SP), so it falls back to the cone (274568).
+   Next: BRepCheck_Wire::Closed2d at the apex (the degenerate edge's pcurve ends vs the seams' on a v-degree-3
+   surface; compare ThruSections' face), or build the faces fresh; then remove the debug prints (NOSHAPE_LOFT_DEBUG). (b) c2-loft-guide-curves-wave-washer f6 "Loft path with more than two profiles is not
+   supported yet" (solid_a.rs opts.path, 2 sections only): not started. Done and queued 11-16: psui's failed-Shell error shapes, then FeatureState::error_parts (parts of the result an
+   error is about, highlighted in place; error_mesh keeps the ghosts), the corner break
    taking a side whole (c2-sm-side-cuts-tab 7 -> 13/18, next a Hole), Offset surface sheets touching at a corner as one
    (hem-plus feature 3; its Derived 1 still 6/12/8 vs live 14/36/24). Impeller: blend's chamfer fix (12b25c47e) moves
    the first difference to Fillet 3 (blend's); Move face 1 / Delete face 2 speed after that.
