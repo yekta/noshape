@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-16 12:27 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-16 13:31 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -46,16 +46,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
   `SEE_THROUGH` allowlist of 18 where live is see-through too). Buttons as live2's toolbar-states + live's addendum:
   pressed #EAEAEA + inset, active hovered flat #DFDFDF (sketch group #CECECE), ⌄ hover tool #EAEAEA / arrow #D7D7D7,
   ⌄ open #D7D7D7 + inset, search highlight border 2 px. Vendored gpui-component Button: `pressed_inset`, `flat_hover`.
-- Landed 09:23: 85cb3816 (inset blur, five more icons).
-- Queued 12:25: 6b16ed19 (lead 09:00 decision). Vendored gpui takes `blur_radius` as CSS's (`BoxShadow::blur_sigma`
-  = half, window.rs both shadow paths; vendor/gpui-pre/NOSHAPE.md; test `ui::tests::box_shadow_blur_is_css`). Halved
-  call sites back to CSS values (eight 0 5px 5px → 10px, toolbar_customize, gpui-component styled.rs Tailwind
-  shadows, the pressed inset). Toolbar lists (PopupMenu `tool_list`): 1 px #ccc, radius 3, 0 5px 10px .2. Tooltips
-  (`ui::tooltip_shadow`, all three paths): 0 1px 2px .2. Measured against live feel/shadows within 1 grey level:
-  /root/psui-scratch/shadows (sxs-*.png, README). Icons: new hole-table (Part Studio panel) after live's, the old art
-  as drawing-hole-table (drawing toolbar, faces filled); configuration and import-foreign faces as live.
-- Our Fillet list is ~189 px wide, live's 180: not yet looked at.
-- parallel / tangent already match live's sketch-parallel / sketch-tangent buttons (the check compared mate icons).
+- Landed 12:42 (99dea19f): box shadows blur as CSS (`BoxShadow::blur_sigma`, vendor/gpui-pre/NOSHAPE.md, test
+  `ui::tests::box_shadow_blur_is_css`), halved call sites back to CSS, toolbar lists and tooltips with live's shadows;
+  hole-table / drawing-hole-table, configuration, import-foreign icons. Crops /root/psui-scratch/shadows.
+- Queued: 547b4db1 (ui-parity: free-click readouts within one screen pixel on the sketch plane, doubled for two-click
+  measures, lead 11-16; `pixel_on_plane`; README), 04e40652 (toolbar dropdowns: 180 px with border, icon cell 2 px
+  in, rows with chips 35 px; measured equal to live menus/ps-dropdown-01 within 1 px).
+- Running 13:20: full psui shards on vibe6 (/home/ngyekta/tmp/psui/full1116, psui-names.txt): take the next miss.
+- Paused until ~10:15 UTC 11-17: asm, skasm, bool2, studios, live, live2. Don't message them (it wakes them): write
+  into onshape-research/live/REQUESTS.md or their handoffs. Waiting there: live/live2's tool-list box model request
+  (now measured from menus/ps-dropdown-*; can be dropped).
 - skasm's sheet metal colour fix (`Context::reuse_colours_from`) lands after their suite: then recheck our flat view
   colours with fb5 sm-click.json.
 - tab-new-edit-reedit: decision asked of the lead (11-15 23:50; click ~1.1 px from Flange 1's wall).
@@ -91,12 +91,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 ## Next, in order
 
 1. Recheck the flat view's colours after skasm's colour fix; the tab pick per the lead's answer.
-2. The Fillet list's width (ours 189, live 180).
-3. Older open items (11-06 to 11-08 "Next, in order" in the archive): check against a rerun before picking any up.
+2. Older open items (11-06 to 11-08 "Next, in order" in the archive): check against a rerun before picking any up.
 
 ## Open decisions
 
-- Asked 12:27: sketch-linear-pattern-click-commit's Diameter (live 9.618 / ours 10.110) is a free click. Live's
-  whole-pixel second click (Δ 15, 5 px from its first, snapped to the origin) lands up to half a pixel off, and in the
-  take's iso view one px is 0.275 mm across but 0.55 mm deep on Top; a diameter doubles the radius' error. Count
-  ±1 px as the pixel's footprint on the sketch plane (mmPerPixel / |view · normal|) and twice for a Diameter?
+- None pending (11-16: free-click tolerance answered and in the runner).
