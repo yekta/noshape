@@ -53,16 +53,19 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   vs s37 shows it with the rest.
 
 ### Next, in order
-1. Read full/base29 vs full/s41 per assembly (occurrences, mates; BOM rows for s41); land the commits (60b13cba per the
-   lead); a SCORE.md "Assemblies" row (the last is 11-08).
-2. BOM: standard content's material (insert standard-content instances as our catalogue's, or set live's material);
-   then the rows that differ most in the full run.
-3. a2e4a2's Extrude 5: 2 extra edges (ours splits a 0.451 mm arc at a vertex of JUm's edges and adds a 13 mm line);
-   live's JUm / Sketch 5 / Extrude 5 edges are in studios/a2e4a2….jum-sketch5.json (live 20:0x).
-4. isaac-ball 1e81ca / 90f78b (GearLab): core's loft 55e517e0, then the opFillet (blend's). 3c5c58 Fillet 1: blend has a
-   dump (vibe7 ~/tmp/blend/m3cd), third in their queue.
-5. config-assembly 20e932: Revolve 1 / 2 still "do not intersect" (configured dimensions taken back by the translator).
-6. live's mate messages (isaac-ball's 7 ERROR, infento's 23) when they land: compare messages, not only statuses.
+1. Full run (s70) vs full/base29.sum per assembly (`cmp.py`); a corpus that drops: A/B it alone with base30 (same
+   main, same data) to tell code from data. Land (60b13cba per the lead's decision); SCORE.md "Assemblies" row (the
+   last is 11-08); rescore corexy's BOM (dx's STEP names are in the rebase).
+2. Standard content Thread length as live (live's q-stdthread, behaviours.md "Standard content: Thread length…"): ISO
+   4762 / DIN 912 b = 2d+12 (ours ISO 888's 2d+6), ISO 4762 defaults to b, DIN 912 to L; the full per size × length
+   table asked of live (P2, 03:0x) goes into Size.threads as data.
+3. keyboard: Fastened 2 / Slider 2 / Slider 4 on sketch instances: read hd.sh's s63-asm-keyboard-pattern.log traces
+   ("sketch-at … nearest", "end … path / entity").
+4. scissor-lift fed22d Mirror 1: dx's planeOp-before-refs change (dx's queue) fixes it; then fed22d's next difference.
+5. welding-config 9bdeb5 Extrude 4 (Part 5 7/15/10 faces vs live 6/12/8); its Sketch 4's Uses were trimmed in live:
+   ours already draws live's piece (a free curve: our Split drops a Use's link, sketch editor, not asked yet).
+6. bjr-config (dx's): side triangle connectors (5d8bc1) and a subassembly instance id missing from the instance lists.
+7. config-assembly 20e932: Revolve 1 / 2 still "do not intersect" (configured dimensions taken back by the translator).
 
 ### Others' items touching mine
 - dx keeps infento (1dc32b, 74d3d6) and bjr-config (5d8bc1). dx: derivedFrom + ORIGINAL_DEPENDENCY (top-level EDGE)
