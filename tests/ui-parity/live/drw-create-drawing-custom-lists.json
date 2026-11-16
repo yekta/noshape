@@ -1,0 +1,5139 @@
+{
+ "scenario": "drw-create-drawing-custom-lists",
+ "recorded": "2026-11-16T07:11:27.099Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
+ },
+ "live": {
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "2638d89b7ca5ffa826b350a5",
+  "start": "block",
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "part": "Part 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    112,
+    747
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Properties…",
+      "Assign material…",
+      "Edit appearance…",
+      "Copy here…",
+      "Copy Part 1",
+      "Create Drawing of Part 1…",
+      "Export…",
+      "Where used…",
+      "Create task…",
+      "Hide",
+      "Isolate…",
+      "Make transparent…",
+      "Add comment",
+      "Zoom to selection",
+      "Delete…"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 31815
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Create Drawing of Part 1…"
+    }
+   },
+   "ok": true,
+   "at": [
+    214,
+    527
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Onshape Loopelf Recently opened Created by me Shared with me Public AllANSIISOJIS Template Document Owner Retrieving templates… Options Suggested views No views"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 35513
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 5000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Onshape Loopelf Recently opened Created by me Shared with me Public AllANSIISOJIS Template Document Owner ANSI_A_INCH.dwt Onshape ANSI Drawing Templates Onshape ISO_A4_Portrait.dwt Onshape ISO Drawing Templates Onshape ISO_A3.dwt Onshape ISO Drawing Templates Onshape ANSI_B_MM.dwt Onshape ANSI Drawing Templates Onshape ISO_A4.dwt Onshape ISO Drawing Templates Onshape ANSI_A_MM.dwt Onshape ANSI Drawing Templates Onshape live bom asm Drawing 1.dwt noshape mm test"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 42629
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Custom template"
+    }
+   },
+   "ok": true,
+   "via": "text-only button",
+   "at": [
+    739,
+    88
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 57341
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 60980
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      731,
+      132
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    731,
+    132
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A4 A4 Portrait A3 A2 A1 A0 Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not inc"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 63475
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A4 A4 Portrait A3 A2 A1 A0 Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not inc"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 67102
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      767,
+      132
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    767,
+    132
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A4 A4 Portrait A3 A2 A1 A0 Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not inc"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 69632
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A4 A4 Portrait A3 A2 A1 A0 Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not inc"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 73247
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      689,
+      132
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    689,
+    132
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 75715
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 79343
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      730,
+      204
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    730,
+    204
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "object:1048",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 81855
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "object:1048",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 84776
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "key",
+    "key": "ArrowDown"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     730,
+     204
+    ],
+    "hover": [],
+    "element": "select.ng-pristine.ng-untouched"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "object:1048",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 86906
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 400
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "object:1048",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 89428
+  },
+  {
+   "step": 16,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     730,
+     204
+    ],
+    "hover": [],
+    "element": "select.ng-pristine.ng-untouched"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "object:1049",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 91639
+  },
+  {
+   "step": 17,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 400
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "object:1049",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 94183
+  },
+  {
+   "step": 18,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      730,
+      238
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    730,
+    238
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "string:inches",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 96770
+  },
+  {
+   "step": 19,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "string:inches",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 99692
+  },
+  {
+   "step": 20,
+   "do": {
+    "do": "key",
+    "key": "ArrowUp"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     730,
+     238
+    ],
+    "hover": [],
+    "element": "select.ng-pristine.ng-untouched"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "string:inches",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 101828
+  },
+  {
+   "step": 21,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 400
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "string:inches",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 104350
+  },
+  {
+   "step": 22,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     730,
+     238
+    ],
+    "hover": [],
+    "element": "select.ng-pristine.ng-untouched"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "string:meter",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 106542
+  },
+  {
+   "step": 23,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 400
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "string:meter",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 109088
+  },
+  {
+   "step": 24,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      1160,
+      179
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    1160,
+    179
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "2",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 111591
+  },
+  {
+   "step": 25,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "2",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 114526
+  },
+  {
+   "step": 26,
+   "do": {
+    "do": "key",
+    "key": "ArrowDown"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     1160,
+     179
+    ],
+    "hover": [],
+    "element": "select.ng-pristine.ng-untouched"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "2",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 116685
+  },
+  {
+   "step": 27,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 400
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "2",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 119232
+  },
+  {
+   "step": 28,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     1160,
+     179
+    ],
+    "hover": [],
+    "element": "select.ng-pristine.ng-untouched"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "4",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 121448
+  },
+  {
+   "step": 29,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 400
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "4",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 123964
+  },
+  {
+   "step": 30,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      1160,
+      214
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    1160,
+    214
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "2",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 126559
+  },
+  {
+   "step": 31,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "2",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 129504
+  },
+  {
+   "step": 32,
+   "do": {
+    "do": "key",
+    "key": "ArrowDown"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     1160,
+     214
+    ],
+    "hover": [],
+    "element": "select.ng-pristine.ng-untouched"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "2",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 131685
+  },
+  {
+   "step": 33,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 400
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "2",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 134230
+  },
+  {
+   "step": 34,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     1160,
+     214
+    ],
+    "hover": [],
+    "element": "select.ng-pristine.ng-untouched"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "4",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 136428
+  },
+  {
+   "step": 35,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 400
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "select",
+     "text": "4",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 138924
+  },
+  {
+   "step": 36,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      822,
+      286
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    822,
+    286
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 141425
+  },
+  {
+   "step": 37,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 145052
+  },
+  {
+   "step": 38,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      885,
+      363
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    885,
+    363
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 147575
+  },
+  {
+   "step": 39,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 151235
+  },
+  {
+   "step": 40,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      1220,
+      250
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    1220,
+    250
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 153733
+  },
+  {
+   "step": 41,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 157411
+  },
+  {
+   "step": 42,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      1207,
+      285
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    1207,
+    285
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 159940
+  },
+  {
+   "step": 43,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Horizontal zones 0 2 4 6 8 10 12 14 16 18 20 Vertical zones 0 2 4 6 8 10 12 14 16 18 20 Start zones Bottom right Top left Titleblock Include Do not include Opt"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 163530
+  },
+  {
+   "step": 44,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      1207,
+      145
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    1207,
+    145
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Titleblock Include Do not include Options Suggested views No views"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 166024
+  },
+  {
+   "step": 45,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Standard ANSIISOJIS Language 繁體中文 Français English Deutsch 简体中文 日本語 한국어 Español Italiano Size A A Portrait B C D Units Millimeters Centimeter Meter Inches Feet and inches Foot Yard Decimal separator Period (12.34) Comma (12,34) Projection Third angle (ANSI) First angle (ISO) Border Include Do not include Titleblock Include Do not include Options Suggested views No views"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 169633
+  },
+  {
+   "step": 46,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     1207,
+     145
+    ],
+    "hover": [],
+    "element": "span.radio-text-button.strong"
+   },
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 173305
+  },
+  {
+   "step": 47,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 176235
+  }
+ ]
+}

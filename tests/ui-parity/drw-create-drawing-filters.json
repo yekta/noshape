@@ -1,0 +1,203 @@
+{
+ "name": "drw-create-drawing-filters",
+ "about": "block: Part 1 \u203a Create Drawing of Part 1\u2026 \u203a Existing templates: each source (Onshape, the company, Created by me, Shared with me, Public, Recently opened) and standard (ANSI, ISO, JIS, All) clicked once; Options Suggested views / No views; Escape",
+ "area": "drawing",
+ "source": "studios 11-16 panel takes (Create Drawing); unlabelled controls clicked by screen point (px), dialog at its default place",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create Drawing of Part 1\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 5000
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     580,
+     131
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     578,
+     163
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     599,
+     228
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     603,
+     260
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     573,
+     292
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     609,
+     196
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     863,
+     133
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     953,
+     133
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1038,
+     133
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     774,
+     133
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     885,
+     495
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1033,
+     495
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}
