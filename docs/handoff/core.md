@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 03:55 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-16 04:05 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
@@ -50,13 +50,17 @@ docs/DECISIONS.md (read first; it wins over anything here).
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. Asked of me 11-16, left: dx's lofts. c2-loft-paths-guides Loft 1 (face -> sketch point, TANGENT_TO_PROFILE):
-   branch core-loftpt in core-oc (cc42f4faf, WIP, not for landing) gives point profiles their sketch's normal, but the
-   kernel loft drops end conditions at a point section (features.cpp loft_impl: `natural` is off with a vertex section),
-   so the T1 a_loft_to_a_sketch_point_tangent_to_its_plane gets the pyramid (4000 mm³): needs natural_loft to take an
-   apex with a tangent plane (live: a dome, +370678 mm³ on the r 50.8 cylinder). The document's other cause is dx's
-   (Sketch 2 on the cylinder top, not Plane 1; told). c2-loft-guide-curves-wave-washer f6 "Loft path with more than two
-   profiles is not supported yet" (solid_a.rs, opts.path with 2 sections only): mine, not started. Done and queued 11-16: psui's failed-Shell error shapes, the corner break
+0. Asked of me 11-16, left: dx's lofts. (a) c2-loft-paths-guides Loft 1 (face -> sketch point, TANGENT_TO_PROFILE);
+   dx's e7e19bfa6 puts Sketch 2 on Plane 1, then ours fails "Only planar profiles ...". Branch core-loftpt2 in core-oc
+   (2 WIP commits, not for landing): solid_a.rs Section.point_normal (the point's sketch normal for the end condition)
+   and features.cpp apex_tangent_loft, called in loft_impl after ThruSections for a wire -> point loft with Tangent at
+   the point and a free start: each lateral face's surface swapped for columns [Q, (Q+B2)/2, B2, P], B2 = P - m/3 *
+   (P - Q) projected into the point's plane, u and the v range kept, side edges = new UIso. Volume 370667 mm³ vs live
+   370677.72 (T1 features_a::a_loft_to_a_sketch_point_tangent_to_its_plane, live's geometry) but BRepCheck says the
+   lateral face is UnorientableShape (status 27), so it falls back to the cone (274568). Next: why (the degenerate
+   apex edge's pcurve? SameParameter?), compare with ThruSections' own face; then remove the debug prints
+   (NOSHAPE_LOFT_DEBUG). (b) c2-loft-guide-curves-wave-washer f6 "Loft path with more than two profiles is not
+   supported yet" (solid_a.rs opts.path, 2 sections only): not started. Done and queued 11-16: psui's failed-Shell error shapes, the corner break
    taking a side whole (c2-sm-side-cuts-tab 7 -> 13/18, next a Hole), Offset surface sheets touching at a corner as one
    (hem-plus feature 3; its Derived 1 still 6/12/8 vs live 14/36/24). Impeller: blend's chamfer fix (12b25c47e) moves
    the first difference to Fillet 3 (blend's); Move face 1 / Delete face 2 speed after that.
