@@ -106,6 +106,9 @@
 #include <BRepOffsetAPI_MakeOffset.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
+#include <gp_Mat.hxx>
+#include <GeomAPI_IntCS.hxx>
+#include <Geom_Line.hxx>
 #include <BRepTopAdaptor_FClass2d.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <TopoDS_Iterator.hxx>
@@ -919,6 +922,105 @@ std::vector<TopoDS_Shape> joined_pieces(const std::vector<TopoDS_Shape>& keep, H
   }
   return out;
 }
+// The patch of face `f`'s surface that `base` swept along `dir` meets: a face on the (u, v) box of the hits of rays from
+// `base`'s outline along `dir`, with a margin; null where a ray misses `f`, or the box isn't wholly inside `f` (a
+// boundary of `f` passes through it).
+TopoDS_Face footprint_patch(const TopoDS_Face& f, const TopoDS_Shape& base, const gp_Dir& dir, double size)
+{
+  const occ::handle<Geom_Surface> S = BRep_Tool::Surface(f);
+  if (S.IsNull())
+    return {};
+  std::vector<gp_Pnt> pts;
+  for (TopExp_Explorer x(base, TopAbs_EDGE); x.More(); x.Next())
+  {
+    if (BRep_Tool::Degenerated(TopoDS::Edge(x.Current())))
+      continue;
+    BRepAdaptor_Curve c(TopoDS::Edge(x.Current()));
+    for (int k = 0; k <= 16; ++k)
+      pts.push_back(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 16));
+  }
+  if (pts.empty() || pts.size() > 2000)
+    return {};
+  const double             tol = BRep_Tool::Tolerance(f);
+  BRepClass_FaceClassifier in;
+  double                   u0 = 1e300, u1 = -1e300, v0 = 1e300, v1 = -1e300;
+  // The first ray's nearest hit ahead (the surface can wrap round behind the profile too), the others by Newton from
+  // the last one's.
+  double u = 0, v = 0, t = 0;
+  {
+    GeomAPI_IntCS ic(new Geom_Line(pts[0], dir), S);
+    if (!ic.IsDone())
+      return {};
+    double best = 1e300;
+    for (int k = 1; k <= ic.NbPoints(); ++k)
+    {
+      double pu, pv, pt;
+      ic.Parameters(k, pu, pv, pt);
+      if (pt > -1e-9 * size && pt < best)
+        best = pt, u = pu, v = pv, t = pt;
+    }
+    if (best == 1e300)
+      return {};
+  }
+  gp_Pnt2d uv;
+  for (size_t k = 0; k < pts.size(); ++k)
+  {
+    // The ray p + t dir on the surface: S(u, v) - p - t dir = 0.
+    const gp_Pnt& p   = pts[k];
+    bool          hit = false;
+    for (int it = 0; it < 30 && !hit; ++it)
+    {
+      gp_Pnt P;
+      gp_Vec Su, Sv;
+      S->D1(u, v, P, Su, Sv);
+      const gp_XYZ G = P.XYZ() - p.XYZ() - dir.XYZ() * t;
+      if (G.Modulus() < 1e-10 * size)
+      {
+        hit = true;
+        break;
+      }
+      gp_Mat J(Su.XYZ(), Sv.XYZ(), dir.XYZ().Reversed());
+      if (std::abs(J.Determinant()) < 1e-300)
+        return {};
+      const gp_XYZ d = J.Inverted() * G;
+      u -= d.X(), v -= d.Y(), t -= d.Z();
+    }
+    if (!hit || t < -1e-9 * size)
+      return {};
+    uv = gp_Pnt2d(u, v);
+    in.Perform(f, uv, tol);
+    if (in.State() != TopAbs_IN)
+      return {};
+    u0 = std::min(u0, u), u1 = std::max(u1, u), v0 = std::min(v0, v), v1 = std::max(v1, v);
+  }
+  double fu0, fu1, fv0, fv1;
+  BRepTools::UVBounds(f, fu0, fu1, fv0, fv1);
+  const double mu = 0.25 * (u1 - u0) + 1e-3 * (fu1 - fu0), mv = 0.25 * (v1 - v0) + 1e-3 * (fv1 - fv0);
+  u0 -= mu, u1 += mu, v0 -= mv, v1 += mv;
+  if ((S->IsUPeriodic() && u1 - u0 > 0.5 * S->UPeriod()) || (S->IsVPeriodic() && v1 - v0 > 0.5 * S->VPeriod()))
+    return {};
+  // (No point of `f`'s boundary inside the box, its middle inside `f`: the box is.)
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    double                          e0, e1;
+    const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(TopoDS::Edge(x.Current()), f, e0, e1);
+    if (pc.IsNull())
+      return {};
+    for (int k = 0; k <= 64; ++k)
+    {
+      const gp_Pnt2d q = pc->Value(e0 + (e1 - e0) * k / 64);
+      if (q.X() > u0 && q.X() < u1 && q.Y() > v0 && q.Y() < v1)
+        return {};
+    }
+  }
+  in.Perform(f, gp_Pnt2d(0.5 * (u0 + u1), 0.5 * (v0 + v1)), tol);
+  if (in.State() != TopAbs_IN)
+    return {};
+  BRepBuilderAPI_MakeFace mf(S, u0, u1, v0, v1, Precision::Confusion());
+  if (!mf.IsDone())
+    return {};
+  return TopoDS::Face(mf.Face().Oriented(f.Orientation()));
+}
 } // namespace
 
 OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, double start_offset)
@@ -1028,6 +1130,25 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
         tool = compound_of(meeting);
     }
   }
+  // One target face much larger than the prism's footprint: split by the patch of its surface the prism meets (the same
+  // surface, the face's piece of it): c2-hunting-knife's Extrude 10, a Ø3 mm pin up to the handle's 7645 mm² B-spline
+  // side, 48 ms a split by the whole face.
+  const bool  sheet_profile = !TopExp_Explorer(profile.shape, TopAbs_FACE).More();
+  TopoDS_Face patched;
+  if (!sheet_profile && !std::getenv("NOSHAPE_PRISM_NO_PATCH"))
+  {
+    ShapeIMap tf;
+    TopExp::MapShapes(tool, TopAbs_FACE, tf);
+    if (tf.Extent() == 1)
+    {
+      const TopoDS_Face patch = footprint_patch(TopoDS::Face(tf(1)), base, dir, bbox_diag({base, tool}));
+      if (!patch.IsNull())
+      {
+        patched = TopoDS::Face(tf(1));
+        tool    = patch;
+      }
+    }
+  }
   BRepAlgoAPI_Splitter sp;
   sp.SetArguments(single(longPrism));
   sp.SetTools(single(tool));
@@ -1039,8 +1160,12 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   }
   if (sp.HasErrors())
     fail_op("up-to extrude: split failed: " + algo_errors(sp));
-  HHist spH = history_of({longPrism, until.shape}, sp);
+  HHist spH = history_of({longPrism, patched.IsNull() ? until.shape : tool}, sp);
   merge_into(hist, spH);
+  // (The patch's pieces as the target face's.)
+  if (!patched.IsNull())
+    for (const TopoDS_Shape& img : images_vec(spH, tool))
+      hist->AddModified(patched, img);
 
   ShapeIMap startFaces, endFaces, targetFaces;
   for (TopExp_Explorer e(prism.FirstShape(), TopAbs_FACE); e.More(); e.Next())
@@ -1049,7 +1174,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   for (TopExp_Explorer e(prism.LastShape(), TopAbs_FACE); e.More(); e.Next())
     for (const TopoDS_Shape& img : images_vec(spH, e.Current()))
       endFaces.Add(img);
-  for (TopExp_Explorer e(until.shape, TopAbs_FACE); e.More(); e.Next())
+  for (TopExp_Explorer e(patched.IsNull() ? until.shape : tool, TopAbs_FACE); e.More(); e.Next())
     for (const TopoDS_Shape& img : images_vec(spH, e.Current()))
       targetFaces.Add(img);
 
