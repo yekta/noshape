@@ -8694,10 +8694,14 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 // By its name unless its volume fits other parts of ours and not that one (default names shift when
                 // ours has a part fewer: asm-welding-config's "Part 7" is our Part 6).
                 let by_name = ours_parts.iter().any(|(n, _)| n == pname) && (fits.is_empty() || fits.iter().any(|n| n == pname));
-                // Several of ours by that name (asm-rack-pinion's two "Spur gear (8 teeth)"): one each, in order, by id.
-                let same: Vec<&String> = solids.iter().filter(|(n, ..)| n == pname).map(|(.., id)| id).collect();
+                // Several of ours by that name (asm-rack-pinion's two "Spur gear (8 teeth)"): one each, in order, by id;
+                // the first whose volume fits live's (asm-tvc-mount's SG90 import: 13 parts "….1_Peça", 2 to 2821 mm³).
+                let same: Vec<&(String, f64, String)> = solids.iter().filter(|(n, ..)| n == pname).collect();
+                let band = volume_band(p);
+                let fits_volume = |v: f64| band.is_some_and(|(lo, hi)| v >= lo * (1.0 - 1e-6) && v <= hi * (1.0 + 1e-6));
                 let ours = if by_name && same.len() > 1 {
-                    same.iter().find(|id| !taken.contains(id)).copied().unwrap_or(same[0]).clone()
+                    let free = |s: &&&(String, f64, String)| !taken.contains(&s.2);
+                    same.iter().filter(free).find(|s| fits_volume(s.1)).or_else(|| same.iter().find(free)).unwrap_or(&same[0]).2.clone()
                 } else if by_name || ours_parts.is_empty() {
                     pname.to_string()
                 } else if let [(only, _)] = ours_parts.as_slice() {
