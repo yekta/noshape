@@ -9,24 +9,23 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-16 03:13 UTC.
+Updated 2026-11-16 03:30 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-Not queued yet, each its own land:
-1. 5bf47b679 TITLE split (lead 01:20): TITLE is three fields "Title", "Title 2", "Title 3" (`TITLE_KEYS`), a line
-   each (cell band, pick from its text up to the line above); drawings (`Drawing::upgrade_title_lines` in
-   `Document::from_blobs` and merge) and saved templates (dwt apply) split an old three-line Title on load; the
-   field's Move to lists Title block greyed. e2e drawing_title_block_fields (rewritten), drawing_title_lines_from_an_old_file.
-   Waits for the full drawing run on vibe5 (~/tmp/studios/drw288, behind bool's gates and dx in ~/bin/slot).
-2. Uncommitted, Drawing properties takes (live2 drw-dprops-*, 6): run.py ignores ours' list for a drawing panel's
-   native select opened by a click; the dual precision default is 0.12 for metric dual units, 0.123 for inches
-   (`DualDims::default_precision`, panel and format); a dimension's "[dual]" text isn't in ours' ui text (live's
-   reader reads the primary only); the panel's dropdowns register `mark_first` (live2's "0.123" is Precision's).
-   5 of 6 matched before the last fix; rerun on vibe6 (~/tmp/studios/dp2) pending.
+Not queued yet, each its own land (lead 01:20), after the full drawing run on vibe5 (~/tmp/studios/drw288, 294 takes,
+binary with both; waiting in ~/bin/slot behind bool's gate builds and dx at 03:24):
+1. 5bf47b679 TITLE split: TITLE is three fields "Title", "Title 2", "Title 3" (`TITLE_KEYS`), a line each (cell
+   band, pick from its text up to the line above); drawings (`Drawing::upgrade_title_lines` in `Document::from_blobs`
+   and merge) and saved templates (dwt apply) split an old three-line Title on load; the field's Move to lists Title
+   block greyed. e2e drawing_title_block_fields (rewritten), drawing_title_lines_from_an_old_file.
+2. 20838a543 Drawing properties (live2 drw-dprops-*, 6/6, 75/75 on vibe6): run.py ignores ours' list for a drawing
+   panel's native select opened by a click; dual precision default 0.12 metric / 0.123 inches
+   (`DualDims::default_precision`); a dimension's "[dual]" text isn't in ours' ui text; the panel's dropdowns
+   register `mark_first`.
 
 Areas (11-16 01:30-02:30, vibe5): Feature Studio 116/116 takes, versions/history/release 154/154, documents/tabs/
 start/prefs 285/285 (SCORE.md's 97.8 / 98.2 / 98.4 are from 11-11..13).
@@ -52,11 +51,10 @@ start/prefs 285/285 (SCORE.md's 97.8 / 98.2 / 98.4 are from 11-11..13).
   the code before taking an item from it.
 
 ## Next, in order
-1. drw-datum-copy-paste: Add leader on the empty sheet's menu and the menu's placement, from live2's answer.
-2. View orientation on a projected view's menu, from live2's answer.
-3. Ask live2 for takes of the drawing panels with most items uncompared (docs/parity/drawing-matrix.md, refreshed
-   23:11: 964 of 1874 compared and matching, none missing): Drawing properties, Hole table, Title block, Note, Hatch
-   region, Hole/thread callout.
+1. Land the two commits above once the drawing run is clean; report.
+2. live2's Hole table and Title block takes as they land (live2's explore shots: live/feel/panel-explore/).
+3. The drawing panels with most items uncompared (docs/parity/drawing-matrix.md, 964 of 1874): Note, Hatch region,
+   Hole/thread callout; ask live2 for takes.
 4. interaction-feel.md's remaining "?" rows in Drawings / Documents / Assembly (ask live2 for the missing captures).
 
 ## How to run
