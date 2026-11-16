@@ -269,6 +269,10 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
     let mut out: HashMap<(usize, String), LiveRef> = HashMap::new();
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+        // (A query live didn't resolve at that index, `found: false`, says nothing of its entity.)
+        if v["found"] == false {
+            continue;
+        }
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
         // A face may come as its plane's `origin` and its `area` (live 2290); a sketch's region as its `centroid`
         // and area, a sketch's line as its `mid` and `length` (live 2313, `bodyType` SKETCH).
@@ -2161,7 +2165,10 @@ impl<'a> Translator<'a> {
                 let per_query = mine.iter().all(|(_, n)| n.is_some());
                 let texts: Vec<String> = queries.iter().map(|q| q["queryString"].as_str().unwrap_or("").to_string()).collect();
                 if !evaluated.is_empty() {
-                    for (n, q) in queries.iter_mut().enumerate().filter(|(_, q)| q["deterministicIds"].as_array().is_none_or(|a| a.is_empty())) {
+                    // (Not a query naming one of its in-feature construction points or mate connectors: those are ours
+                    // as translated, asm-corexy studio 4a6a96's Plane 1 through three Mesh points.)
+                    let own_sub = |q: &Value| q["featureId"].as_str().is_some_and(|f| self.sub_points.contains_key(f) || self.sub_params.contains_key(f));
+                    for (n, q) in queries.iter_mut().enumerate().filter(|(_, q)| q["deterministicIds"].as_array().is_none_or(|a| a.is_empty()) && !own_sub(q)) {
                         let mut own: Vec<String> = mine.iter().filter(|(_, m)| *m == Some(n)).map(|(id, _)| id.clone()).collect();
                         own.sort();
                         let ids = if per_query && !own.is_empty() { own } else { evaluated.clone() };
