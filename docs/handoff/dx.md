@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-16 14:49 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-16 19:20 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -27,22 +27,27 @@ where every face has the arcs as a loop (cf-snap-hook one solid); 03467fc8 ACIS 
 where projection misses (cf-sheet-metal-model-plus' SAT: Part 1 was inside out -> import failed; now 10148.89 mm³,
 live 10147.18); b777cbd1 the screws Split hang fix (bool's gate clean).
 Queued: b3f549eb import_files reports a failed Import feature in `errors` (was 0 parts, no error).
+Landed 11-16 pm: 5acd8e11 curve pattern along a 3D path in the corrected Frenet frame (driven-pattern Curve pattern 1:
+instances 50 -> 2-4 µm off live, still 7/11: ours are exact screw copies of the seed, live's not quite: helix geometry?);
+de3fb725 live's rings-loft x_t imports (periodic tube both ways, blend SP-curves not p-curves; Extruded ring 273 faces,
+440.79 mm³ / 1193.08 mm² as live; 766/510 edges/vertices for 762/508 = the two ring faces' seams; no T1 test: the only
+reproducer is live's 1 MB file, exchange suite covers it); e3109d3c drawings: B-spline edges on a circle / ellipse to
+1 µm drawn as conics (rings-loft ELLIPSE 15 -> 96, live 95). Queued 4fd6bad2: an exact view whose shape loads no
+edges (OCCT Update swallows the failure, at random in one of a sheet's parallel views) retries, then goes polygonal.
 Open, ranked:
-1. c2-rings-loft live.x_t refused by our reader (clean refusal; keep until a fix is right). Branch dx-bosdxf WIP:
-   e9facf060 (closed intersection curve: vertex at the closing end takes the curve's start: edges / vertices = live),
-   476fcd5e2 (per-face tube for a blend across its periodic spine's start: 260 faces + four 5-face pieces, wrong).
+1. Drawings: rings-loft ARC 40 for live's 91: in the isometric view live writes ARCs (r 0.02-0.13 in) where ours are
+   ELLIPSEs of ratios 0.34-0.82 (/root/dx-scratch/rl: ours-drawing.dxf, live-drawing.dxf; region (6,6)); TANGENT
+   ELLIPSE 4 for 33. Tolerance 0.1 µm was tried and is not the answer. sm-louver 117 of 243 bend lines on TANGENT_LINES.
+   The empty-view race's cause is unknown (a shared lock with meshing did not fix it); find it if 4fd6bad2's fallback
+   shows up in timings.
 2. Our SAT, other docs (rerun the suite first: 03467fc8 may cover them): motor-mount-jack 24/26/2 for 16/24/0;
    cf-hose-routing 22/44/24 for 12/12/0; cf-o-ring Part 3 read back as another ring (names?).
-3. Drawings: SPLINE where live has ARC / ELLIPSE (rings-loft ARC 30 / 89, ELLIPSE 15 / 62: model edges B-splines where
-   live's are conics; exact_edges covers plane / extrusion cuts only); sm-louver 117 of 243 bend lines on TANGENT_LINES.
+3. Our own rings-loft x_t reads back 275/776/517 with a wrong box (y -12.35 for -12, z -13.04 for -11.25): writer or
+   reader on our periodic tubes. housing-draft x_t reads back 37/82/46 for 36/79/44.
 4. SAT of live: sm-louver's file splits two cylinders (40 faces); waits on live-self "ACIS".
-   Possible exact-HLR nondeterminism: one rings-loft DXF export once had 693 lines (normally ~936).
-   housing-draft x_t reads back 37/82/46 for 36/79/44; rings-loft own x_t Part 1 303 mm³.
-- c2-config-parts-screws: hang fixed (b777cbd1), still in tests/parity-models/unscored.json: with the helix path
-  (d19054198) Sweep 1 runs and grows to 14.8 GB in bool's Rust Boolean (sections_ahead) of its REMOVE (bool has it).
-  Score it once fixed. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
-- core 14:1x: c2-loft-guide-curves-driven-pattern 7/11 after their 7bc8e345; next Curve pattern 1 "Select a path to
-  pattern along." although the helix / fit-spline path translation is on main (d19054198): find why (mine).
+- c2-config-parts-screws: hang fixed (b777cbd1), still in tests/parity-models/unscored.json: Sweep 1's 14.8 GB
+  Boolean is bool's P0 (lead 11-16). Score it once fixed. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
+- Next after these: exchange suite rerun once live2's 18:50 fetch is in (vibe6, ~/bin/slot, timeout, main binary).
 
 ## Other in flight
 - config-parts (vibe5 07:4x, ops-hx2, screws skipped; ~/tmp/dx/cfgparts-hx2.log): linear-rail 19/26, links 10/35, nuts
