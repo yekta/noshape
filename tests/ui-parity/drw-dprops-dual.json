@@ -1,0 +1,81 @@
+{
+ "name": "drw-dprops-dual",
+ "about": "Drawing properties › Dual › Show dual dimensions on; a linear dimension on Front placed first shows both units",
+ "area": "studios",
+ "source": "studios drawing-matrix 23:11 (Drawing properties: 112 items no take compares), live2 11-16",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      18
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     150,
+     110
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Drawing properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Show dual dimensions"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  }
+ ]
+}

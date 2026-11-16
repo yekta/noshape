@@ -1,0 +1,98 @@
+{
+ "name": "drw-dprops-text-alignment",
+ "about": "Drawing properties › Gaps and extensions › Text alignment ▾ Align with dimension line; a linear dimension on Front placed first",
+ "area": "studios",
+ "source": "studios drawing-matrix 23:11 (Drawing properties: 112 items no take compares), live2 11-16",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      18
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     150,
+     110
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Drawing properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Dimensions"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Horizontal"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Align with dimension line"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  }
+ ]
+}

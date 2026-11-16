@@ -1,0 +1,83 @@
+{
+ "name": "drw-dprops-chamfer",
+ "about": "Drawing properties › Chamfer dimensions: 45 degree content ▾ C Length, Non 45 degree content ▾ Length x Angle (panel state only: block has no chamfer)",
+ "area": "studios",
+ "source": "studios drawing-matrix 23:11 (Drawing properties: 112 items no take compares), live2 11-16",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     150,
+     110
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Drawing properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Dimensions"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Length x Angle"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "C Length"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Length x Length"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Length x Angle"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  }
+ ]
+}
