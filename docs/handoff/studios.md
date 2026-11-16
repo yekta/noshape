@@ -18,7 +18,7 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncomm
 ## Queued to land
 - Landed today: 547a769e (TITLE split, Drawing properties, title-field picks, 05:02), 79a35df0 (box past 7 px,
   05:17).
-- Queued 06:12: 2e6aa396d hole tables as live2's drw-hole-table-* (Split Hole table below: the part goes under the first,
+- Landed 06:18 as c2d47005: hole tables as live2's drw-hole-table-* (Split Hole table below: the part goes under the first,
   3 mm apart, left selected; Esc keeps a selected hole table; Bring to front / Send to back offered; a cell's menu
   Size ▸ / Resize... | Copy, Rows Equally over a merged cell, Esc closes the Cell panel too (`OsMenu::after_escape`);
   run.py strips live's "NoteContextMenus" separators). Table takes on vibe6: 49/50; drw-hole-table-cell-bold s12 is
