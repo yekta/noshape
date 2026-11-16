@@ -267,7 +267,12 @@ impl DrawingEditor {
         f.below = val(&d.below);
         f.prefix = val(&d.prefix);
         f.suffix = val(&d.suffix);
+        let was_fit = matches!(f.tolerance, noshape_model::drawing::Tolerance::Fit { .. });
         noshape_ops::drawing::set_tolerance(f, d.tol, m(&d.tol_a).unwrap_or(0.0), m(&d.tol_b).unwrap_or(0.0));
+        // A hole callout's new fit has no class yet (live2 drw-hcallout-fit: Fit › None, "⌀.197 THRU").
+        if let (true, false, noshape_model::drawing::Tolerance::Fit { hole, .. }) = (d.hole, was_fit, &mut f.tolerance) {
+            hole.clear();
+        }
         // A typed value overrides the dimension's text (D39).
         let typed = d.retext.clone().unwrap_or_else(|| val(&d.value));
         if typed == VARIES {
@@ -805,7 +810,7 @@ impl DrawingEditor {
         };
         // The toggles row.
         let radial = matches!(d.cur.kind, AnnotationKind::RadialDimension { .. });
-        let mut toggles = h_flex().gap(px(if hole { 4. } else { 2. })).child(symbols);
+        let mut toggles = h_flex().gap(px(if hole { 4. } else { 2. })).child(crate::ui_script::wrap(symbols.into_any_element(), || "button:Symbols".into()));
         if hole {
             toggles = toggles.child(toggle("dp-ref", "(XX)", "Parentheses", fmt.reference, |d| d.cur.format.reference = !d.cur.format.reference, cx)).child(menu("dp-dual", small("[XX] x.xx".into()), 80., dual_items)).child(
                 div().pl(px(8.)).child(crate::drawing_chrome::DrCheckbox::new("dp-override").label("Override precision/tolerance").checked(opts.override_tol).tooltip("Click to override the precision and tolerance from the hole feature").on_click(cx.listener(|this, v: &bool, _, cx| {
@@ -926,13 +931,13 @@ impl DrawingEditor {
             h_flex()
                 .gap(px(3.))
                 .pt(px(3.))
-                .child(menu("dp-fit-type", small(fo.fit_type.name().into()), 98., type_items))
-                .child(menu("dp-fit-hole", small(or_none(&hole_class)), 58., hole_items))
+                .child(crate::ui_script::wrap(menu("dp-fit-type", small(fo.fit_type.name().into()), 98., type_items), || "dropdown:Fit class".into()))
+                .child(crate::ui_script::wrap(menu("dp-fit-hole", small(or_none(&hole_class)), 58., hole_items), || "dropdown:Hole fit".into()))
                 .child(menu("dp-fit-shaft", small(or_none(&shaft_class)), 58., shaft_items))
-                .child(menu("dp-fit-std", small(match fo.iso {
+                .child(crate::ui_script::wrap(menu("dp-fit-std", small(match fo.iso {
                     None => format!("{standard} (Drawing)"),
                     Some(_) => standard.to_string(),
-                }), 110., std_items))
+                }), 110., std_items), || "dropdown:Fit standard".into()))
                 .when(fo.mode != FitMode::Fit, |e| e.child(menu("dp-fit-prec", small(PRECISIONS.iter().find(|x| x.1 == fo.precision).map(|x| x.0).unwrap_or("(Drawing)").to_string()), 80., fprec_items)))
                 .child(vis)
                 .child(menu("dp-fit-stack", small("H7/g6".into()), 58., stack_items))
@@ -941,7 +946,7 @@ impl DrawingEditor {
         let tol_row = h_flex()
             .gap(px(4.))
             .pt(px(3.))
-            .when(hole, |e| e.child(crate::ui_script::wrap(menu("dp-hprec", small(prec_label.clone()), 110., prec_items), || "dropdown:Precision".into())).child(menu("dp-htol", small(tol.to_string()), 150., tol_items)))
+            .when(hole, |e| e.child(crate::ui_script::wrap(menu("dp-hprec", small(prec_label.clone()), 110., prec_items), || "dropdown:Precision".into())).child(crate::ui_script::wrap(menu("dp-htol", small(tol.to_string()), 150., tol_items), || "dropdown:Tolerance".into())))
             .when(matches!(tol, "Symmetrical" | "Deviation" | "Limits"), |e| e.child(crate::ui_script::wrap(field(&d.tol_a, Some(70.), 26.).into_any_element(), || "field:Tolerance".into())))
             .when(matches!(tol, "Deviation" | "Limits"), |e| e.child(flip("dp-flip-a", true, cx)).child(field(&d.tol_b, Some(70.), 26.)).child(flip("dp-flip-b", false, cx)));
         let touched = d.touched;

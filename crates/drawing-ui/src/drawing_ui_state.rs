@@ -304,7 +304,13 @@ impl DrawingEditor {
         // An inspection item is an annotation of its own in live, read as its number (live2 2226), hidden or not.
         annotations.extend(sheet.annotations.iter().filter_map(|a| a.inspection).map(|n| ("inspectionsymbol", n.to_string(), None)));
         let open: &[noshape_sketch::EntityId] = if matches!(self.tool, Tool::Sketch { tool: SkTool::Point, .. }) { &self.tool_points } else { &[] };
-        annotations.extend(sheet_sketch_items(&sheet.sketch, open).into_iter().map(|k| (k, String::new(), None)));
+        // Profiles drawn in the open Hatch region dialog aren't read until ✓ (live2 drw-hatch-rect-edit s5-s10).
+        let drawn: Vec<noshape_sketch::EntityId> = match &self.hatch_dlg {
+            Some(d) if d.sections.is_none() => sheet.sketch.sketch.entities().map(|e| e.id).filter(|e| e.0 > d.sketch_start).collect(),
+            _ => Vec::new(),
+        };
+        let open: Vec<noshape_sketch::EntityId> = open.iter().copied().chain(drawn).collect();
+        annotations.extend(sheet_sketch_items(&sheet.sketch, &open).into_iter().map(|k| (k, String::new(), None)));
         annotations.sort();
         // What is drawn in selection colours (README "### Drawings"; live 2068): selected views; the Projected
         // tool's parent drawn picked after Insert view placed it. Live's reader (2402) says VIEW for a view drawn
@@ -426,9 +432,9 @@ impl DrawingEditor {
         // under a selected BOM table). Only while nothing else is going on: a tool or a panel takes the highlight
         // (drw-dimension-foreshorten, Edit hatch region in drw-hatch-edit; BOM table properties keeps it,
         // drw-bom-table-properties); a centermark's thin lines don't count (drw-centermark-align).
-        // (Placing a revision callout keeps its table lit: live2 drw-revision-callout-add; an open dimension palette
-        // reads none: live drw-hole-callout-palette, live2 drw-dimension-dblclick-precision.)
-        if let Some(b) = self.built.as_ref().filter(|_| matches!(self.tool, Tool::Select | Tool::RevisionCallout { .. }) && self.panel.is_none() && self.hatch_dlg.is_none() && self.palette.is_none()) {
+        // (Placing a revision callout keeps its table lit: live2 drw-revision-callout-add; so does an open dimension
+        // palette: live2 drw-hcallout-override, a callout in Top's box read EDGE Top while its Edit... palette is open.)
+        if let Some(b) = self.built.as_ref().filter(|_| matches!(self.tool, Tool::Select | Tool::RevisionCallout { .. }) && self.panel.is_none() && self.hatch_dlg.is_none()) {
             let thin = |id: u64| sheet.annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. } | AnnotationKind::CircleCenterline { .. }));
             // A selected hole callout is orange only behind its text (live q-escsel: its leader stays black).
             let callout_lines = self.hole_callout_selection_picks();
@@ -616,6 +622,10 @@ impl DrawingEditor {
             || self.hatch_dlg.as_ref().is_some_and(|d| d.edit.is_some() && d.sections.is_none())
         {
             return None;
+        }
+        // A profile drawn in the Hatch region dialog: still its tool (live2 drw-hatch-rect-edit s3, Corner rectangle).
+        if matches!(self.tool, Tool::Sketch { .. }) && self.hatch_dlg.as_ref().is_some_and(|d| d.sections.is_none() && d.edit.is_none()) {
+            return Some("Hatch region");
         }
         ui_tool_name(&self.tool).or_else(|| self.dialog_tool_name())
     }

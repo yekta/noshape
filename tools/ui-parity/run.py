@@ -335,6 +335,13 @@ PRO_SINCE = "2026-11-14T00:00"
 PRO_ROWS = {"Where used…"}
 
 
+def live_annotation_text(t):
+    """An annotation's text in live's drawing data in ours' terms: DXF's %%c is ⌀ (live drw-hole-callout-palette:
+    "3X %%c.197"), and a fit's MTEXT codes go (live2 drw-hcallout-fit: "\\A1;3X %%c.197\\S^;", its alignment and an
+    empty stacked fit)."""
+    return re.sub(r"\\A\d+;|\\S[^;]*;", "", t.replace("%%c", "⌀"))
+
+
 def normalize_live(state):
     """Live's state in the agreed form: cloud-only menu rows dropped, no highlighted row as null (live: -1)."""
     # A focused checkbox: the DOM gives its value "on" and no selection; it has no text.
@@ -403,6 +410,12 @@ def normalize_live(state):
     d = (state or {}).get("dialog")
     if isinstance(d, dict) and d.get("kind") == "drawing-panel":
         d["text"] = [re.sub(r"^start \S+ Copy \d+( |$)", r"Part Studio 1\1", t) if isinstance(t, str) else t for t in d.get("text") or []]
+        # A list open inside the panel (the Hatch region dialog's Pattern, Scale, Angle: live2 drw-hatch-panel) adds its
+        # rows to the panel's text, after the panel's own; ours' list is its own menu.
+        rows = ((state or {}).get("list") or {}).get("rows")
+        if isinstance(rows, list) and rows:
+            while d["text"] and d["text"][-1] in rows:
+                d["text"].pop()
     # The same name in a modal's File name ("start block Copy 1 - Sketch 1": Export as DXF/DWG; an assembly's instance
     # Export…: "start two-blocks - Part 2"), and as the focus' text.
     focus = (state or {}).get("focus")
@@ -475,10 +488,9 @@ def normalize_live(state):
         focus["text"] = re.sub(r"^live2 uip (\S+) \d{4}-\d\d-\d\dT[\d:]+", r"\1", focus["text"])
         if focus.get("selection") == [0, n]:
             focus["selection"] = [0, len(focus["text"])]
-    # A hole callout's text in live's drawing data spells ⌀ as DXF's %%c (live drw-hole-callout-palette: "3X %%c.197").
     for an in (((state or {}).get("drawing") or {}).get("annotations") or []):
-        if isinstance(an, dict) and isinstance(an.get("text"), str) and "%%c" in an["text"]:
-            an["text"] = an["text"].replace("%%c", "⌀")
+        if isinstance(an, dict) and isinstance(an.get("text"), str):
+            an["text"] = live_annotation_text(an["text"])
     # The dimension palette's value (live drw-hole-callout-palette: "∅ .197 THRU"): live's palette spells the diameter
     # ∅ (U+2205) apart from the number, ours (and its drawings) ⌀ (U+2300) before it.
     pd = (state or {}).get("dialog")
@@ -489,8 +501,9 @@ def normalize_live(state):
     lst = (state or {}).get("list")
     # Live's recorder from 2026-11-15.2 reads a drawing's context menu (its "RmbMenu", live2 drw-surface-finish-flip)
     # with the separators as "" rows and a check flag a row; ours leaves separators out and has no checks there. A table
-    # cell's menu is its "NoteContextMenus" (live2 drw-hole-table-cell-rmb).
-    if isinstance(lst, dict) and lst.get("name") in ("RmbMenu", "NoteContextMenus"):
+    # cell's menu is its "NoteContextMenus" (live2 drw-hole-table-cell-rmb), the Note editor's lists "NoteContextMenus…"
+    # (drw-note-panel-dropdowns: "NoteContextMenusLineSpacing").
+    if isinstance(lst, dict) and (lst.get("name") == "RmbMenu" or str(lst.get("name") or "").startswith("NoteContextMenus")):
         rows = lst.get("rows") or []
         keep = [i for i, r in enumerate(rows) if r != ""]
         hl = lst.get("highlighted")
@@ -1067,7 +1080,7 @@ def compare(live, ours, whole_document=True):
         for nx in steps[i + 1:i + 3]:
             anns = ((nx.get("state") or {}).get("drawing") or {}).get("annotations")
             if isinstance(anns, list):
-                later.append([x["text"].replace("%%c", "⌀") if isinstance(x.get("text"), str) else x.get("text") for x in anns if isinstance(x, dict)])
+                later.append([live_annotation_text(x["text"]) if isinstance(x.get("text"), str) else x.get("text") for x in anns if isinstance(x, dict)])
         late_texts[f"step {st.get('step')}"] = later
     # Each step's next live Undo / Redo when that next step only waits: live's history answers after its server's round
     # trip (Create version and update in assembly: Undo on only once the wait is over, context-create-version-update).
@@ -1091,6 +1104,7 @@ def compare(live, ours, whole_document=True):
         if rest:
             resting.add(f"step {s.get('step')}")
     free_clicks = any(isinstance((st.get("do") or {}).get("on"), dict) and "sketch_point" in st["do"]["on"] for st in steps)
+    native_open = False
     for name, a, b, failed, t, step in pairs:
         mm_per_px = (((a or {}).get("camera") or {}).get("mmPerPixel") if free_clicks else None)
         if failed:
@@ -1193,9 +1207,12 @@ def compare(live, ours, whole_document=True):
         if isinstance(a.get("focus"), dict) and a["focus"].get("tag") == "select" and a.get("list") is None:
             b["list"] = None
         # Likewise a drawing panel's native <select> opened by a click (Drawing properties: live's focus stays on the
-        # drawing's iframe, live2 drw-dprops-*).
+        # drawing's iframe, live2 drw-dprops-*; the Note editor's font, live2 drw-note-panel-dropdowns).
+        # (And through the waits after it.)
         on = ((step or {}).get("on") or {}) if isinstance(step, dict) else {}
-        if isinstance(step, dict) and step.get("do") == "click" and "dropdown" in on and "pick" not in on and a.get("list") is None and (a.get("dialog") or {}).get("kind") == "drawing-panel":
+        if isinstance(step, dict) and step.get("do") != "wait":
+            native_open = step.get("do") == "click" and "dropdown" in on and "pick" not in on
+        if native_open and a.get("list") is None and (a.get("dialog") or {}).get("kind") in ("drawing-panel", "cell-format"):
             b["list"] = None
         # A feature-style panel whose header live's recorder doesn't read (Insert Variable Studio: `title` null, so
         # its `titleState` and `ok` are defaults).

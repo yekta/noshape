@@ -47,6 +47,8 @@ pub struct HatchDlg {
     /// The picked closed profiles, each in a view (view coordinates) or on
     /// the sheet.
     pub profiles: Vec<(Profile, Option<ViewId>)>,
+    /// The sheet sketch's last entity id when the dialog opened (what is drawn in it comes after).
+    pub sketch_start: u32,
     /// Edit hatch section... (live asb 10-23 views (4)): the picked hatch
     /// regions of views' cuts (a point inside each, view coordinates);
     /// None: the Hatch region dialog.
@@ -111,9 +113,10 @@ impl DrawingEditor {
             })
         };
         let subs = [sub(&scale, cx), sub(&angle, cx)];
+        let sketch_start = self.sketch().sketch.entities().map(|e| e.id.0).max().unwrap_or(0);
         self.hatch_dlg = Some(match existing {
-            Some(h) => HatchDlg { edit, standard: h.standard, pattern: h.pattern, scale, angle, drawing_color: h.color.is_none(), color: h.color, profiles: vec![((h.boundary, h.holes), h.view)], sections: None, _subs: subs },
-            None => HatchDlg { edit: None, standard: 0, pattern: hatch_pat::default_pattern(0), scale, angle, drawing_color: true, color: None, profiles: Vec::new(), sections: None, _subs: subs },
+            Some(h) => HatchDlg { edit, standard: h.standard, pattern: h.pattern, scale, angle, drawing_color: h.color.is_none(), color: h.color, profiles: vec![((h.boundary, h.holes), h.view)], sketch_start, sections: None, _subs: subs },
+            None => HatchDlg { edit: None, standard: 0, pattern: hatch_pat::default_pattern(0), scale, angle, drawing_color: true, color: None, profiles: Vec::new(), sketch_start, sections: None, _subs: subs },
         });
         self.tool = Tool::Select;
         self.status = None;
@@ -233,6 +236,20 @@ impl DrawingEditor {
         true
     }
 
+    /// A closed shape just drawn with the dialog's profile tools: the profile at `inside` joins its closed profiles.
+    pub fn hatch_add_drawn(&mut self, inside: [f64; 2], cx: &mut Context<Self>) {
+        if self.hatch_dlg.as_ref().is_none_or(|d| d.sections.is_some()) {
+            return;
+        }
+        let Some(picked) = self.pk().hatch_profile_at(inside) else { return };
+        if let Some(d) = &mut self.hatch_dlg
+            && !d.profiles.contains(&picked)
+        {
+            noshape_scene::drawing_tools::hatch_toggle(&mut d.profiles, picked, d.edit.is_some());
+        }
+        self.hatch_preview(cx);
+    }
+
     /// Ids for the dialog's regions: the edited one, else new ones.
     fn hatch_first_id(&self) -> u64 {
         self.hatch_dlg.as_ref().and_then(|d| d.edit).unwrap_or_else(|| self.sketch().next_hatch_id())
@@ -297,6 +314,10 @@ impl DrawingEditor {
         let first = self.hatch_first_id();
         let Some(d) = self.hatch_dlg.take() else { return };
         self.preview = None;
+        // A profile tool picked in the dialog ends with it (live2 drw-hatch-panel, drw-hatch-rect-edit: no tool after ✓).
+        if matches!(self.tool, Tool::Sketch { .. }) {
+            self.tool = Tool::Select;
+        }
         let regions = d.regions(first, cx);
         if regions.is_empty() {
             self.refresh(cx);
@@ -353,13 +374,13 @@ impl DrawingEditor {
             let ed = ed.clone();
             crate::ui::tool_group(
                 id,
-                crate::ui::split_tool_button(SharedString::from(format!("{id}-main")), main.2, on, cx).tooltip(main.1).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_tool(Tool::Sketch { tool: main.0, pts: vec![], from: None }, cx))),
+                crate::ui_script::mark(crate::ui::split_tool_button(SharedString::from(format!("{id}-main")), main.2, on, cx), move || format!("button:{}", main.1)).tooltip(main.1).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_tool(Tool::Sketch { tool: main.0, pts: vec![], from: None }, cx))),
                 crate::ui::tool_caret(SharedString::from(format!("{id}-more")), cx).tooltip(main.1).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx)),
             )
             .into_any_element()
         };
         let tool = |id: &'static str, t: SkTool, icon: &'static str, tip: &'static str, cx: &mut Context<Self>| {
-            crate::ui::tool_button(id, icon, cur == Some(t), cx).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_tool(Tool::Sketch { tool: t, pts: vec![], from: None }, cx))).into_any_element()
+            crate::ui_script::mark(crate::ui::tool_button(id, icon, cur == Some(t), cx), move || format!("button:{tip}")).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_tool(Tool::Sketch { tool: t, pts: vec![], from: None }, cx))).into_any_element()
         };
         let tools = h_flex()
             .pl(px(4.))
@@ -375,7 +396,7 @@ impl DrawingEditor {
             .iter()
             .enumerate()
             .map(|(i, _)| {
-                h_flex()
+                crate::ui_script::mark(h_flex(), move || format!("list_row:Hatch {}", i + 1))
                     .id(("hd-profile", i))
                     .h(px(20.))
                     .text_size(px(13.))
@@ -436,7 +457,8 @@ impl DrawingEditor {
         };
         let profiles = v_flex()
             .id("hd-profiles")
-            .when(!section_mode, |d| d.tooltip(crate::ui::tooltip("Select or create closed profile for hatch region")))
+            // (Not over its rows: live2 drw-hatch-rect-edit, "Hatch 1" hovered shows none.)
+            .when(!section_mode && d.profiles.is_empty(), |d| d.tooltip(crate::ui::tooltip("Select or create closed profile for hatch region")))
             .mx(px(9.))
             .my(px(3.))
             .px(px(6.))
@@ -511,10 +533,11 @@ impl DrawingEditor {
                     }
                     m
                 });
-            field.child(btn).into_any_element()
+            // (And by name: live2's drw-hatch-panel clicks the list's arrow.)
+            crate::ui_script::wrap(field.child(btn).into_any_element(), || "dropdown:Pattern".into())
         };
         // Scale / Angle: editable boxes with a list.
-        let combo = |id: &'static str, input: &Entity<InputState>, items: Vec<String>| -> AnyElement {
+        let combo = |id: &'static str, name: &'static str, input: &Entity<InputState>, items: Vec<String>| -> AnyElement {
             let current = input.read(cx).value().to_string();
             let (ed, input2) = (ed.clone(), input.clone());
             h_flex()
@@ -522,7 +545,7 @@ impl DrawingEditor {
                 .border_b_1()
                 .border_color(gpui_kit::rgb(RULE))
                 .child(div().flex_1().child(Input::new(input).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()))
-                .child(Button::new(id).ghost().xsmall().dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+                .child(crate::ui_script::wrap(Button::new(id).ghost().xsmall().dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                     for v in &items {
                         let (e, st, v) = (ed.clone(), input2.clone(), v.clone());
                         m = m.item(crate::os_menu::OsMenuItem::new(v.clone()).checked(current == v).on_click(move |_, window, cx| {
@@ -531,7 +554,7 @@ impl DrawingEditor {
                         }));
                     }
                     m
-                }))
+                }).into_any_element(), move || format!("dropdown:{name}")))
                 .into_any_element()
         };
         let scales: Vec<String> = std::iter::once("Auto".to_string()).chain((1..=10).map(|k| format!("{k}.0"))).collect();
@@ -673,7 +696,7 @@ impl DrawingEditor {
                 .when(show_style, |e| {
                     e.child(tabs)
                         .child(div().px(px(9.)).child(row("Pattern", pattern_btn)))
-                        .when(!general && !none, |e| e.child(div().px(px(9.)).child(row("Scale", combo("hd-scale", &d.scale, scales)))).child(div().px(px(9.)).child(row("Angle", combo("hd-angle", &d.angle, angles)))))
+                        .when(!general && !none, |e| e.child(div().px(px(9.)).child(row("Scale", combo("hd-scale", "Scale", &d.scale, scales)))).child(div().px(px(9.)).child(row("Angle", combo("hd-angle", "Angle", &d.angle, angles)))))
                         .when(!none, |e| e.child(div().px(px(9.)).border_b_1().border_color(gpui_kit::rgb(0xe0e0e0)).child(color)))
                         .child(div().pt(px(4.)).child(preview))
                 })

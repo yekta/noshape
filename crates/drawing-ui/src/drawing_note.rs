@@ -27,7 +27,7 @@ type Entry = Option<(String, Option<&'static str>, bool, Set)>;
 const SPACINGS: [f64; 5] = [1.0, 1.5, 2.0, 2.5, 3.0];
 
 /// Note symbols (live: Insert symbol, one column, in this order).
-const SYMBOLS: [&str; 14] = ["°", "Ø", "℄", "⌵", "↧", "⌴", "□", "⌒", "±", "Ⓤ", "Ⓘ", "✟", "✝", "▷"];
+const SYMBOLS: [&str; 15] = ["°", "Ø", "℄", "⌵", "↧", "⌴", "□", "⌒", "⌓", "±", "Ⓤ", "Ⓘ", "✟", "✝", "▷"];
 
 /// The `{key|format}` property token ending right at byte offset `at` (live:
 /// Text format / Date time format apply just after an inserted property).
@@ -258,7 +258,8 @@ impl DrawingEditor {
         let font_names: Vec<String> = fonts.iter().flatten().map(|e| e.0.clone()).collect();
         let font_value = font_label.clone();
         let field = |w: f32| div().w(px(w)).h(px(24.)).bg(crate::theme::light().panel).border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(2.));
-        let font_box = field(238.)
+        // (Found by its value, as live's select: live2 drw-note-panel-dropdowns.)
+        let font_box = crate::ui_script::mark(field(238.), { let v = font_label.clone(); move || format!("dropdown:{v}") })
             .id("note-font")
             .pl(px(6.))
             .pr(px(6.))
@@ -368,7 +369,7 @@ impl DrawingEditor {
         drawing_props.extend(custom(CustomTarget::Drawing, noshape_model::drawing::format::DRAWING_CUSTOM));
         let mut sheet_props: Vec<(String, String)> = SHEET_REF_FIELDS.iter().map(|(k, n)| (n.to_string(), token(k))).collect();
         sheet_props.extend(custom(CustomTarget::Part, noshape_model::drawing::format::PART_CUSTOM));
-        let symbol_btn = div()
+        let symbol_btn = crate::ui_script::mark(div(), || "button:Insert symbol".into())
             .id("note-symbol")
             .w(px(45.))
             .h(px(30.))

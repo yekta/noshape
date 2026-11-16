@@ -717,6 +717,7 @@ pub trait OsDropdownExt: IntoElement + Sized {
         let f = Rc::new(f);
         let id: ElementId = id.into();
         let key = id.to_string();
+        let own = key.clone();
         let open = Rc::new(move |window: &mut Window, cx: &mut App| {
             let (f, b) = (f.clone(), bounds.get());
             let width = f32::from(b.size.width);
@@ -726,20 +727,27 @@ pub trait OsDropdownExt: IntoElement + Sized {
             });
             OPEN_DROPDOWNS.with(|o| o.borrow_mut().insert(key.clone(), menu.downgrade()));
             // Near the window's right edge the menu aligns to the button's right.
-            if b.right() + px(260.) > window.viewport_size().width {
-                crate::os_menu::open_anchored(point(b.right(), b.bottom()), Anchor::TopRight, menu, window, cx);
-            } else {
-                crate::os_menu::open_anchored(point(b.origin.x, b.bottom()), Anchor::TopLeft, menu, window, cx);
-            }
+            let (x, anchor) = if b.right() + px(260.) > window.viewport_size().width { (b.right(), Anchor::TopRight) } else { (b.origin.x, Anchor::TopLeft) };
+            menu.update(cx, |m, _| m.set_flip(point(x, b.top())));
+            crate::os_menu::open_anchored(point(x, b.bottom()), anchor, menu, window, cx);
         });
         let on_key = open.clone();
+        // A click on the button while its own menu is open only closes it (live2 drw-hcallout-fit, drw-hatch-panel: a
+        // list opened and closed again by a second click). Read at the press, before the press closes the menu.
+        let was_open: Rc<Cell<bool>> = Default::default();
+        let pressed = was_open.clone();
         div()
             .id(id)
             .relative()
             .flex_none()
             .child(self)
             .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
-            .on_click(move |_, window, cx| open(window, cx))
+            .capture_any_mouse_down(move |_, _, cx| pressed.set(dropdown_open(&own, cx)))
+            .on_click(move |_, window, cx| {
+                if !was_open.take() {
+                    open(window, cx);
+                }
+            })
             // Enter or Space on the focused button opens it too (a Bootstrap
             // dropdown toggle; live request 1669: Esc gives the focus back),
             // bound in this context so it wins over the window's Enter.

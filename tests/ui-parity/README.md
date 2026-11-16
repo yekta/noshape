@@ -106,6 +106,13 @@ result line saying "excluded feature": the lead decides. Name what it is in `why
 
     "excluded": [{"from_step": 8, "why": "live's menu has Add comment (cloud) …"}]
 
+### ours_on (studios, 11-16)
+
+A step live's runner can only aim at a screen point (`{"px": [x, y]}`: a control without a label, valid for the
+take's placement) carries the same control by name for ours, which runs `ours_on` in place of `on`:
+
+    {"do": "click", "on": {"px": [959, 433]}, "ours_on": {"dropdown": "Precision"}}
+
 ### steps
 - `{"do": "click" | "dblclick" | "rclick" | "hover", "on": TARGET}`; `hover` waits `ms` (default 1500); a click may
   carry `"mods": "shift" | "mod" | "alt"`, held during the click.

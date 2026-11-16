@@ -322,7 +322,8 @@ impl DrawingEditor {
         match self.tool {
             Tool::Sketch { tool: dt::SkTool::SplinePoint | dt::SkTool::Trim, .. } => Vec::new(),
             Tool::Sketch { .. } => sheet.sketch.sketch.entities().map(|e| e.id.0).filter(|&id| id > entities).map(Sel::Sketch).collect(),
-            Tool::Dimension { kind: DimTool::MaxMin | DimTool::Angle | DimTool::Angle3 | DimTool::Radius, .. } => sheet.annotations.iter().filter(|a| a.id > annotations).map(|a| Sel::Annotation(a.id)).collect(),
+            // (And a hole callout: live2 drw-hcallout-override s7, its text read lit in Top after Esc.)
+            Tool::Dimension { kind: DimTool::MaxMin | DimTool::Angle | DimTool::Angle3 | DimTool::Radius, .. } | Tool::HoleCallout { .. } => sheet.annotations.iter().filter(|a| a.id > annotations).map(|a| Sel::Annotation(a.id)).collect(),
             _ => Vec::new(),
         }
     }

@@ -370,6 +370,12 @@ impl OsMenu {
         self
     }
 
+    /// Where the menu sits when it doesn't fit and opens on the other side (a dropdown's list opened upward ends at its
+    /// button's top, not over the button: live2 drw-note-panel-dropdowns, the font list closed by a second click).
+    pub fn set_flip(&mut self, at: Point<Pixels>) {
+        self.flip = Some(at);
+    }
+
     /// Run `f` after an Esc dismissed the menu.
     pub fn after_escape(mut self, f: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.after_escape = Some(Rc::new(f));

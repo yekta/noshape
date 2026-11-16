@@ -195,6 +195,15 @@ fn keystroke(key: &str) -> Option<Keystroke> {
     Some(ks)
 }
 
+/// A step as ours runs it: its `ours_on` target in place of `on` (a live take that clicks a screen point, `px`, where
+/// ours has the control by name: tests/ui-parity/README.md).
+fn ours_step(mut step: Value) -> Value {
+    if let Some(on) = step.get("ours_on").cloned() {
+        step["on"] = on;
+    }
+    step
+}
+
 fn modifiers(step: &Value) -> Modifiers {
     let mut m = Modifiers::default();
     for k in step["mods"].as_str().unwrap_or("").split('+').filter(|k| !k.is_empty()) {
@@ -264,6 +273,11 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
                 _ if name.starts_with("editor:") => point(b.left() + (b.size.width / 2.).min(px(400.)), b.top() + (b.size.height / 2.).min(px(300.))),
                 _ => visible_center(b, noshape_app_core::ui_script::clip_of(&name)),
             });
+        }
+        // A dropdown live's runner names by its tooltip that ours marks as a button (a Note panel's popups: live2
+        // drw-note-panel-dropdowns "Line spacing").
+        if let Some(b) = name.strip_prefix("dropdown:").and_then(|d| noshape_app_core::ui_script::bounds_of(&format!("button:{d}"))) {
+            return Ok(b.center());
         }
         // A list row by the start of its text, as live's runner falls back to ("Assembly" for "Assembly 2 <1>"), when only
         // one row starts with it and a space.
@@ -544,6 +558,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         // sketch inference).
         let mut pointer: Option<Point<Pixels>> = None;
         for (i, step) in scenario["steps"].as_array().cloned().unwrap_or_default().into_iter().enumerate() {
+            let step = ours_step(step);
             let what = step["do"].as_str().unwrap_or("");
             let mods = modifiers(&step);
             let target = step.get("on").or_else(|| step.get("from")).cloned().unwrap_or(Value::Null);
@@ -769,6 +784,8 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     }
                     Ok(())
                 }
+                // A screenshot of live's runner (live2's takes): nothing to do here.
+                "shot" => Ok(()),
                 other => Err(format!("unknown step {other}")),
             };
             let idle = settle(cx).await;
@@ -928,6 +945,7 @@ pub fn start_page(cx: &mut App) {
         let mut steps = Vec::new();
         let mut pointer: Option<Point<Pixels>> = None;
         for (i, step) in scenario["steps"].as_array().cloned().unwrap_or_default().into_iter().enumerate() {
+            let step = ours_step(step);
             let Some(w) = follow(cx) else { break };
             // (Also a help link: live's opens a browser tab, docs-advanced-search-help.)
             let help = step["on"]["button"].as_str().is_some_and(|b| b.to_lowercase().contains("help") || b.starts_with("Learn more"));

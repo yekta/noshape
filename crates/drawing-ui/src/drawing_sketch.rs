@@ -116,6 +116,9 @@ impl DrawingEditor {
                     let name = tool.name();
                     self.edit_sketch(name, cx, |s| noshape_scene::drawing_tools::sketch_two_click(&mut s.sketch, tool, from.map(EntityId), a, p));
                     self.tool = Tool::Sketch { tool, pts: vec![], from: None };
+                    // Drawn in the Hatch region dialog: its closed profile (live2 drw-hatch-rect-edit: "Hatch 1" at once).
+                    let inside = if matches!(tool, SkTool::CornerRect) { [(a[0] + p[0]) / 2.0, (a[1] + p[1]) / 2.0] } else { a };
+                    self.hatch_add_drawn(inside, cx);
                 } else {
                     self.tool = Tool::Sketch { tool, pts: vec![p], from: existing.map(|e| e.0) };
                 }
