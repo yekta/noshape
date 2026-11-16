@@ -9,32 +9,55 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-16 09:08 UTC (restarted on a new account 07:27 from the 06:27 handoff).
+Updated 2026-11-16 11:50 UTC. PAUSED by the lead (~24 h; restart ~11-17 10:15 UTC). Nothing running on any host.
 
-## In flight
+## State at the pause
 
-Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Lead 11-16 queue: (1) versions, branches and merge
-as full flows against live; (2) speed in my areas vs PLAN 2.7 and live.
-- (1) Versions / release takes: 154 exist (46 merge / compare / restore / branch, 22 rel-*), all matched 01:30-02:30.
-  New full flows (committed with this handoff): ver-flow-branch-version-merge, ver-flow-merge-same-feature,
-  rel-flow-revision-b, rel-flow-two-parts; asked live2 (REQUESTS 09:06). Ours runs the first three end to end;
-  rel-flow-two-parts stops at "Part 2" (ours' Add Items tree opens collapsed; live2 to say how live's opens).
-  Approve / reject: not capturable with one account (live2 11-14).
-- (2) Speed: perfrun.py on vibe6 (~/agents/studios-keep/perf-1116.log; fixtures ~/tmp/studios/perf from
-  /root/studios-scratch/bin/mkperf.py, + drw30.noshape: the 30-feature part with a 4-view drawing). Live's numbers:
-  behaviours.md "speed: studios" (1)-(4), "speed: studios, part 2", "speed: drawings" (tab switch 1.6-2.7 s, version
-  Open 3.7 s, back to Main 4.1 s, other workspace 4.6 s, Compare 7.1 s, VS 200 vars 5.3 s, drawing open 3.2-3.7 s).
-- Queued 3e8dec24 (08:57; carries 03d18275 view drag + centermark): not landed yet at 09:04.
-- Asked live2: the box-select sweep (07:57), the 4 manual captures (08:47), the 4 flow takes (09:06).
-- Row 97 ≠: a centerline over a view edge, live's click takes the view, ours the centerline (GPU pick bias); P3.
-- Full drawing run (306 takes) waits in vibe6's slot.
+Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
+- Landed today: 547a769e, 79a35df0, c2d47005, db04b19b (08:12: panel fixes, Styles on a dimension, Create Drawing
+  names, runner rules), 9c9366b1 (09:23: view drag + `drawing_view_move`, centermark reading + `expect` centermarks,
+  Esc in Align centermark, the 4 flow scenarios, Add Items rows named, coverage "manual capture").
+- Committed, NOT landed: bdab0ef9 (ui_script: a documents-page step that opens a document is timed until its active
+  tab is built and drawn; clippy clean on the Mac). Land it first (tools/tiers/land.sh).
 
-## Queued to land
-- Landed 08:12 as db04b19b: the panel fixes, Styles on a dimension, Create Drawing names, runner rules.
+## Lead's queue (11-16 ~09:00), in order
+
+1. Versions, branches and merge as full flows vs live; release management (Professional account).
+   - 154 versions / release takes exist and matched (01:30-02:30); qa's 00:32 misses in my areas 16/16 on today's build.
+   - New: ver-flow-branch-version-merge, ver-flow-merge-same-feature, rel-flow-revision-b, rel-flow-two-parts (on main);
+     live2 asked (REQUESTS 09:06). Ours runs the first three end to end; rel-flow-two-parts stops at "Part 2": ours'
+     Add Items tree opens Part Studio 1 collapsed (live2 to say how live's opens; then match).
+   - Approve / reject: not capturable with one account (live2 11-14).
+2. Speed in my areas vs PLAN 2.7 and live (behaviours.md "speed: studios" (1)-(4), "speed: studios, part 2",
+   "speed: drawings"). vibe6 11-16 09:07-09:40, load 3-12 (hints, not the quiet window), medians of 5,
+   ~/agents/studios-keep/perf-1116.log:
+   | operation | ours frame / idle ms | live ms |
+   |---|---|---|
+   | drawing tab open (30-feature part, 4 views) | 11 / 37-41 | 3200-3700 (first 23000) |
+   | tab switch PS / Asm / VS / FS | 13-29 / 11-79 | 1578-2705 |
+   | Versions and history open (2000 entries) | 13-32 / 63-241 | 771 |
+   | Compare V10 / Open B1 / Main / V40 | 26-33 / 11-149 | 7135 / 4551 / 4087 / 3668 |
+   | Variable Studio 500 vars open / repeat | 37 / 85-87 | 5315 (200 vars) |
+   None slower than live. Still to do: document open (perf-open-30 / perf-open-hist scenarios, needs bdab0ef9 in the
+   app build: `python3 ~/agents/studios-keep/perfrun.py ~/tmp/studios/noshape :389 5 ~/tmp/studios/perf/perf-open-30.json`
+   with an Xvfb on :389); Feature Studio open on a large studio. Fixtures: `python3 ~/agents/studios-keep/mkperf.py
+   ~/tmp/studios/noshape ~/tmp/studios/perf` (vibe6 ~/tmp is pruned after 12 h; scripts + scenarios kept in
+   ~/agents/studios-keep/{perf,perfrun.py,mkperf.py}, local masters /root/studios-scratch/{bin,perf}).
+3. The 4 manual captures (lead 11-16: no recorder work): live2 asked (REQUESTS 08:47, live/feel/manual-4): FS Ctrl-hover
+   cursor; quick tab switcher hover + mouse-up; Print… pop-up toast; shortcuts with focus on the top bar. When it lands:
+   implement each, a GPUI test each, set `manual.test` in tools/ui-parity/universe/{documents,feature-studio}.json.
+4. Box select (interaction-feel row 106): ANSWERED by live2 (live/feel/box-select-rule/README.md): L→R takes a view
+   only with a whole model edge of it inside (part of an edge or the frame corner: nothing); R→L when the box meets its
+   frame (geometry box + ~7 px); a dimension L→R when its whole text or an arrow end is inside (not an extension line's
+   foot alone), R→L when touched; a press within ~7 px of a view's geometry drags the view, not a box. Implement in
+   crates/drawing-ui/src/drawing_cells.rs `select_in_box` + the press rule, GPUI tests, update row 106.
+5. Drawing matrix refresh: the full drawing run (306 takes) never got vibe6's slot (queue 2nd at 07:58); live2 landed
+   15533efc (6 Move to sheet / Replicate retakes); Datum target / Weld / GTOL takes + 12 retakes after 18:50 UTC.
+   Then drawing_matrix.py --run on the fresh run.
 
 ## Waiting on others
-- live2: re-recording Move to sheet / Replicate (6 takes from 11-07 read no dialog), then Datum target, Table, Custom
-  table, Export Drawing, Weld symbol, GTOL, Ordinate, MBD status, Reference manager, Sheets panel; the box-select sweep.
+- live2 (paused to ~11-17 10:15): the 4 flow takes (09:06), the 4 manual captures (08:47), Datum target / Weld / GTOL
+  panel takes and 12 retakes (after the translation quota, 18:50 UTC).
 
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;
@@ -45,19 +68,14 @@ as full flows against live; (2) speed in my areas vs PLAN 2.7 and live.
   (250 px) and 20-25° (400 px), and top at 20-25° from vertical. Left as is until a finer sweep.
 - Assembly "?" rows: a list row's tooltip (live2 ~70 ms), a selected instance's outline through other parts in
   explode mode, a Revolute-constrained drag's grab point.
-- context-create-version-update: an old difference, not new.
-- Coverage items that need live takes:
-  - documents: the Print… pop-up toast, the quick tab switcher's hover + mouse-up, shortcuts with focus on the top bar
-  - Feature Studio: the pointer cursor over an identifier with Ctrl held
+- Interaction-feel row 97 ≠: a centerline over a view edge, live's click takes the view, ours the centerline (GPU pick
+  bias); P3.
 - Release: the gap list in the archive (11-12 07:33 entry) is partly stale. Submit already makes the version, and
   approvals and the release_* ops (approve, reject, comment, drafts, obsolete, settings) exist. Re-audit it against
   the code before taking an item from it.
 
 ## Next, in order
-1. Refresh docs/parity/drawing-matrix.md (drawing_matrix.py --run on a fresh full drawing run + our menus).
-2. live2's re-recorded matrix takes as they land (Move to sheet / Replicate first).
-3. The next drw-* / studio miss in qa's latest ui-parity run (lead 08:50), then the Variable / Feature Studio items.
-4. Box select's rule once live2 sweeps it (interaction-feel row 106).
+See "Lead's queue" above: land bdab0ef9, then 1-5 there.
 
 ## How to run
 
