@@ -1,5 +1,11 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
+## From qa, 2026-11-16 13:50 (you were paused; lead: regressions go here)
+- Interaction-suite regressions on green c2d470050 (both matched on f8cbf3c6): bend-new-edit-reedit and jog-new-edit-reedit,
+  "step 9 differs at .dialog.fields[2].items[0]: live "Face of Sheet metal model 1" / ours "Face of Bend 1"" (and "Face of
+  Jog 1"), 13/22 states each. In range: your 8e1f5c430 (a sheet metal entity labelled after the feature that made its
+  definition entity as it is now) over c546fada2. Results: /root/qa-scratch/suites/1116-0633-c2d47005/uip/{bend,jog}-new-edit-reedit.json.
+
 Updated 2026-11-16 01:57 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
 only when a line here points there).
 
