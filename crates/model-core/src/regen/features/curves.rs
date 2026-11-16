@@ -1526,14 +1526,55 @@ pub fn routing_curve(ev: &mut EvalCtx) -> FResult<()> {
         let r: Vec<f64> = (0..pts.len()).map(|i| radii.get(i).copied().flatten().unwrap_or(global)).collect();
         lines_before_arcs(&filleted_polyline(&pts, &r, closed)?)?
     } else {
-        let t = if tangents.iter().any(|t| t.length_squared() > 0.0) { tangents } else { Vec::new() };
-        k::make_wire(&[k::make_interpolated_spline(&pts, &t, closed)?])?
+        // std's opFitSpline (live: 91.693 mm through (40, 30, 10), (0, 30, 10), (40, 0, 10); closed 134.227 mm); with
+        // derivatives at points, OCCT's interpolation through them.
+        if tangents.iter().any(|t| t.length_squared() > 0.0) {
+            k::make_wire(&[k::make_interpolated_spline(&pts, &tangents, closed)?])?
+        } else {
+            let ring: Vec<DVec3> = if closed { pts.iter().chain(pts.first()).copied().collect() } else { pts.clone() };
+            k::make_wire(&[fit_spline_edge(&ring, None)?])?
+        }
     };
     // The feature's name: "Routing curve (61.825 mm)" (std's name template).
     let length = wire.length().unwrap_or(0.0);
     ev.computed.retain(|(k, _)| k != "curveLength");
     ev.computed.push(("curveLength".into(), crate::display::ComputedValue::Length(length)));
     add_wire_bodies(ev, vec![wire])
+}
+
+/// std's opFitSpline: a cubic B-spline through `pts` at their centripetal parameters on [0, 1] with natural ends, or
+/// with `ends`' derivatives (live 2052); periodic where the last point is the first; through two points and no
+/// derivatives a line.
+pub fn fit_spline_edge(pts: &[DVec3], ends: Option<(DVec3, DVec3)>) -> FResult<Shape> {
+    if pts.len() < 2 {
+        return err("A spline needs at least two points");
+    }
+    // (std Jog reads its fitted bend reference with evLine.)
+    if pts.len() == 2 && ends.is_none() {
+        return Ok(k::make_line(pts[0], pts[1])?);
+    }
+    let closed = pts.len() > 2 && (pts[0] - pts[pts.len() - 1]).length() < 1e-9;
+    // Closed: periodic at the centripetal parameters, as a closed sketch spline (cf-3d-spline's box as live's).
+    let fit = if closed && ends.is_none() { noshape_sketch::nurbs::fit_3d_closed(pts) } else { None };
+    if closed && fit.is_none() {
+        // (OCCT's periodic interpolation runs over the chord length.)
+        let chord: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum::<f64>().max(1e-300);
+        let tangents: Vec<DVec3> = ends.map(|(s, e)| vec![s / chord, e / chord]).unwrap_or_default();
+        return Ok(k::make_interpolated_spline(&pts[..pts.len() - 1], &tangents, true)?);
+    }
+    let (knots, poles) = fit.or_else(|| noshape_sketch::nurbs::fit_3d(pts, ends)).ok_or_else(|| FeatureError::new("The spline could not be fitted"))?;
+    let mut unique: Vec<f64> = Vec::new();
+    let mut mults: Vec<u32> = Vec::new();
+    for k in knots {
+        match mults.last_mut() {
+            Some(m) if unique.last().is_some_and(|&u| (k - u).abs() < 1e-15) => *m += 1,
+            _ => {
+                unique.push(k);
+                mults.push(1);
+            }
+        }
+    }
+    Ok(k::make_bspline(&poles, None, &unique, &mults, 3, false)?)
 }
 
 fn point_at_fraction(samples: &[DVec3], t: f64) -> DVec3 {

@@ -1080,6 +1080,33 @@ fn boundary_routing_edit_isoparametric() {
     }
 }
 
+/// Live (routing-curve-new-edit-reedit): an interpolated Routing curve is std's opFitSpline, centripetal knots and
+/// natural ends: through (40, 30, 10), (0, 30, 10), (40, 0, 10) mm 91.693 mm, closed 134.227 mm (OCCT's chord-length
+/// interpolation: 91.903).
+#[test]
+fn an_interpolated_routing_curve_is_centripetal_with_natural_ends() {
+    for (closed, length) in [(false, 0.091693), (true, 0.134227)] {
+        let mut s = Studio::new();
+        s.add("routingCurve", move |p| {
+            let pt = |x: &str, y: &str| {
+                let mut v = ParamValues::default();
+                v.set("referenceType", ParamValue::Enum("ORIGIN".into()));
+                v.set("dx", expr(x));
+                v.set("dy", expr(y));
+                v.set("dz", expr("10 mm"));
+                v
+            };
+            p.set("curveType", ParamValue::Enum("INTERPOLATED_SPLINE".into()));
+            p.set("isPeriodic", ParamValue::Bool(closed));
+            p.set("points", ParamValue::Array(vec![pt("40 mm", "30 mm"), pt("0 mm", "30 mm"), pt("40 mm", "0 mm")]));
+        });
+        let r = s.ok();
+        let w = (0..r.context.bodies.len()).find(|&i| r.context.bodies[i].kind == BodyKind::Wire).unwrap();
+        let l = wire_length(&r, w);
+        assert!(near(l, length, 5e-7), "closed {closed}: {l}");
+    }
+}
+
 /// Offset curve on a trapezoid's top face (live 1813): its front edge 5 mm in (Flip on; Flip off goes off the face:
 /// live's warning, nothing made). Sides leaning out: Offset 0 .. 40 (1 edge), Offset and extend -2.5 .. 42.5 (3 edges),
 /// Trim 3 mm 0.5 .. 42.5 (2 edges) with std's arrows, Offset, extend and split the top face in two; sides leaning in: 2.5 .. 37.5 (1 edge) for both scopes.
