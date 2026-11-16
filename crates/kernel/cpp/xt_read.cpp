@@ -970,21 +970,32 @@ struct Builder
       x               = x - tg[i + 1] * x.Dot(tg[i + 1]);
       xs[i + 1]       = x.Normalized();
     }
+    // Round a periodic spine (c2-rings-loft's blends round an ellipse) the tube is periodic too: a face across the
+    // spine's start is whole. The frame's twist over the loop is spread along it, so it closes.
+    const bool periodic = c->IsPeriodic() && std::abs(l - f - c->Period()) <= 1e-9 * c->Period();
+    if (periodic)
+    {
+      const double twist = std::atan2(xs[0].Crossed(xs[n]).Dot(tg[0]), xs[0].Dot(xs[n]));
+      for (int i = 1; i <= n; ++i)
+        xs[i] = xs[i].Rotated(gp_Ax1(gp::Origin(), gp_Dir(tg[i])), -twist * i / n);
+    }
     // A full circle: 9 poles, weights 1, sqrt(2)/2 alternating, knots 0..4.
     static const double cx[9] = {1, 1, 0, -1, -1, -1, 0, 1, 1}, cy[9] = {0, 1, 1, 1, 0, -1, -1, -1, 0};
     const double        w2    = std::sqrt(0.5);
     std::vector<occ::handle<Geom_BSplineCurve>> rows;
     for (int j = 0; j < 9; ++j)
     {
-      occ::handle<NCollection_HArray1<gp_Pnt>> row = new NCollection_HArray1<gp_Pnt>(1, n + 1);
+      // (Periodic: the last station is the first again, its parameter the period's end.)
+      occ::handle<NCollection_HArray1<gp_Pnt>> row = new NCollection_HArray1<gp_Pnt>(1, periodic ? n : n + 1);
       occ::handle<NCollection_HArray1<double>> par = new NCollection_HArray1<double>(1, n + 1);
       for (int i = 0; i <= n; ++i)
       {
         const gp_Vec y = tg[i].Crossed(xs[i]);
-        row->SetValue(i + 1, cs[i].Translated((xs[i] * cx[j] + y * cy[j]) * r));
+        if (!periodic || i < n)
+          row->SetValue(i + 1, cs[i].Translated((xs[i] * cx[j] + y * cy[j]) * r));
         par->SetValue(i + 1, ts[i]);
       }
-      GeomAPI_Interpolate in(row, par, false, 1e-15);
+      GeomAPI_Interpolate in(row, par, periodic, 1e-15);
       in.Perform();
       if (!in.IsDone() || (!rows.empty() && in.Curve()->NbPoles() != rows[0]->NbPoles()))
         fail_op("parasolid: could not build a blend surface");
@@ -1007,7 +1018,11 @@ struct Builder
       vk(k) = (k - 1) * std::acos(-1.0) / 2;
       vm(k) = k == 1 || k == 5 ? 3 : 2;
     }
-    return new Geom_BSplineSurface(poles, wts, r0->Knots(), vk, r0->Multiplicities(), vm, 3, 2);
+    occ::handle<Geom_BSplineSurface> t = new Geom_BSplineSurface(poles, wts, r0->Knots(), vk, r0->Multiplicities(), vm, 3, 2, periodic, false);
+    // (Round a periodic spine periodic round the circle too: a band there may cross the circle's start.)
+    if (periodic)
+      t->SetVPeriodic();
+    return t;
   }
 
   // The foot of x on a surface (false when there is none). Points come
@@ -1463,6 +1478,15 @@ struct Builder
           }
         }
       }
+      // A closed curve that isn't periodic (an intersection curve's chart returning to its start: c2-rings-loft, live
+      // exchange suite): a vertex where it closes is at whichever end gives the edge its increasing range.
+      if (!ring && t2 < t1 && !c->IsPeriodic() && c->Value(c->FirstParameter()).Distance(c->Value(c->LastParameter())) <= etol)
+      {
+        if (c->Value(c->FirstParameter()).Distance(BRep_Tool::Pnt(v1)) <= etol)
+          t1 = c->FirstParameter();
+        else if (c->Value(c->LastParameter()).Distance(BRep_Tool::Pnt(v2)) <= etol)
+          t2 = c->LastParameter();
+      }
       B.MakeEdge(E, c, etol);
       B.Range(E, t1, t2);
       if (rebuilt)
@@ -1534,7 +1558,10 @@ struct Builder
         // (live: the McMaster screw's thread helices, the flank's curve on
         // either fin, 159.393 / 159.345 mm and its cylinder 13.912 mm²).
         const auto analytic = [&](long long sidx) { const int t = r.at_index(sidx).type; return t >= 50 && t <= 54; };
-        if (fins.size() > 1 && analytic(fins[0].s) && !analytic(fins[1].s))
+        // A rolling-ball blend's SP-curve is in Parasolid's (u, v) of it, not our tube's: the other fin's first, and
+        // never put on the tube (projected there later).
+        const auto blend = [&](long long sidx) { return r.at_index(sidx).type == 56; };
+        if (fins.size() > 1 && ((analytic(fins[0].s) && !analytic(fins[1].s)) || (blend(fins[0].s) && !blend(fins[1].s))))
           std::swap(fins[0], fins[1]);
         B.UpdateEdge(E, fins[0].c, surface(fins[0].s), TopLoc_Location(), etol);
         B.Range(E, fins[0].a, fins[0].b);
@@ -1548,7 +1575,7 @@ struct Builder
         // The other fin's SP-curve follows the edge only to within its
         // tolerance, not in its parameter: put on the edge's parameter point
         // by point (else projected later), in finish_fins.
-        if (fins.size() > 1 && fins[1].s != fins[0].s)
+        if (fins.size() > 1 && fins[1].s != fins[0].s && !blend(fins[1].s))
           fin_jobs.push_back({E, fins[1].c, fins[1].a, fins[1].b, surface(fins[1].s), etol});
       }
     }
@@ -1970,6 +1997,9 @@ UnwrappedLoop unwrap_loop(const TopoDS_Wire& W, const TopoDS_Face& F, double per
   BRep_Builder  B;
   bool          have = false;
   gp_Pnt2d      prev;
+  // A surface periodic in v too (a tube round a closed spine): the loop is made continuous in v as well.
+  const occ::handle<Geom_Surface> S  = BRep_Tool::Surface(F);
+  const double                    pv = !S.IsNull() && S->IsVPeriodic() ? S->VPeriod() : 0.0;
   for (BRepTools_WireExplorer wx(W, F); wx.More(); wx.Next())
   {
     const TopoDS_Edge& E = wx.Current();
@@ -1984,14 +2014,14 @@ UnwrappedLoop unwrap_loop(const TopoDS_Wire& W, const TopoDS_Face& F, double per
     gp_Pnt2d   a = c->Value(fwd ? f : l), b = c->Value(fwd ? l : f);
     if (have)
     {
-      const double k = std::round((prev.X() - a.X()) / period);
-      if (k != 0)
+      const double k = std::round((prev.X() - a.X()) / period), kv = pv > 0 ? std::round((prev.Y() - a.Y()) / pv) : 0.0;
+      if (k != 0 || kv != 0)
       {
         occ::handle<Geom2d_Curve> t = occ::down_cast<Geom2d_Curve>(c->Copy());
-        t->Translate(gp_Vec2d(k * period, 0));
+        t->Translate(gp_Vec2d(k * period, kv * pv));
         B.UpdateEdge(E, t, F, BRep_Tool::Tolerance(E));
-        a.SetX(a.X() + k * period);
-        b.SetX(b.X() + k * period);
+        a.Translate(gp_Vec2d(k * period, kv * pv));
+        b.Translate(gp_Vec2d(k * period, kv * pv));
       }
       if (a.Distance(prev) > 1e-6 * std::max(1.0, period))
         out.ok = false; // the loop doesn't close in (u, v): leave it to ShapeFix
