@@ -2304,6 +2304,144 @@ static bool pair_as_parasolid(std::vector<LoftSide>& sides, const std::vector<To
   return !fresh_rows.empty();
 }
 
+// A loft from a profile to a point with Tangent to profile at the point (`kind` 2, the point's sketch plane normal
+// `n`): each lateral face's columns are cubics arriving at the apex within that plane, the pole before it m / 3 of
+// the chord's part in the plane back, natural at the profile (live c2-loft-paths-guides Loft 1: a dome, not the
+// cone ThruSections makes). The faces' surfaces are swapped in place (u and the v range kept, so the pcurves hold;
+// the side edges take the new columns). False (shape untouched) if anything doesn't fit.
+static bool apex_tangent_loft(const TopoDS_Shape& loft, const gp_Pnt& P, const gp_Vec& n_in, double m)
+{
+  if (n_in.Magnitude() < 1e-12)
+    return false;
+  const gp_Vec n = n_in.Normalized();
+  Bnd_Box      box;
+  BRepBndLib::Add(loft, box);
+  const double size = box.IsVoid() ? 1.0 : std::sqrt(box.SquareExtent());
+  const double tol  = 1e-7 * size;
+  struct Update
+  {
+    TopoDS_Face                      face;
+    occ::handle<Geom_BSplineSurface> surface;
+  };
+  std::vector<Update>                                          faces;
+  std::vector<std::pair<TopoDS_Edge, occ::handle<Geom_Curve>>> sides;
+  for (TopExp_Explorer ex(loft, TopAbs_FACE); ex.More(); ex.Next())
+  {
+    const TopoDS_Face&        f = TopoDS::Face(ex.Current());
+    TopLoc_Location           loc;
+    occ::handle<Geom_Surface> gs = BRep_Tool::Surface(f, loc);
+    auto                      bs = occ::down_cast<Geom_BSplineSurface>(gs);
+    if (bs.IsNull())
+      continue; // the profile's cap
+    if (!loc.IsIdentity() || bs->IsUPeriodic() || bs->IsVPeriodic())
+      return false;
+    double u0, u1, v0, v1;
+    bs->Bounds(u0, u1, v0, v1);
+    const double um = 0.5 * (u0 + u1);
+    const bool   apex_last = bs->Value(um, v1).Distance(P) < 1e-6 * size;
+    if (!apex_last && bs->Value(um, v0).Distance(P) > 1e-6 * size)
+      return false;
+    auto row = occ::down_cast<Geom_BSplineCurve>(bs->VIso(apex_last ? v0 : v1));
+    if (row.IsNull())
+      return false;
+    const int                        nu = row->NbPoles();
+    NCollection_Array2<gp_Pnt>       poles(1, nu, 1, 4);
+    NCollection_Array2<double>       weights(1, nu, 1, 4);
+    for (int j = 1; j <= nu; ++j)
+    {
+      const gp_Pnt Q   = row->Pole(j);
+      gp_Vec       c(Q, P);
+      c -= n * c.Dot(n);
+      const gp_Pnt B2 = P.Translated(-c * (m / 3.0));
+      const gp_Pnt B1((Q.XYZ() + B2.XYZ()) * 0.5);
+      const gp_Pnt col[4] = {Q, B1, B2, P};
+      for (int k = 0; k < 4; ++k)
+      {
+        poles(j, apex_last ? k + 1 : 4 - k) = col[k];
+        weights(j, apex_last ? k + 1 : 4 - k) = row->Weight(j);
+      }
+    }
+    NCollection_Array1<double> uk(1, row->NbKnots()), vk(1, 2);
+    NCollection_Array1<int>    um_(1, row->NbKnots()), vm(1, 2);
+    row->Knots(uk);
+    row->Multiplicities(um_);
+    vk(1) = v0, vk(2) = v1, vm(1) = 4, vm(2) = 4;
+    occ::handle<Geom_BSplineSurface> ns = new Geom_BSplineSurface(poles, weights, uk, vk, um_, vm, row->Degree(), 3);
+    faces.push_back({f, ns});
+    for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(ee.Current());
+      if (BRep_Tool::Degenerated(e))
+        continue;
+      double                    pf, pl;
+      occ::handle<Geom2d_Curve> pc   = BRep_Tool::CurveOnSurface(e, f, pf, pl);
+      occ::handle<Geom2d_Line>  line = occ::down_cast<Geom2d_Line>(pc);
+      if (line.IsNull())
+        return false;
+      if (std::abs(line->Direction().X()) > 1e-12)
+        continue; // the profile edge: v = const, unchanged
+      if (!e.Location().IsIdentity())
+        return false;
+      sides.emplace_back(e, ns->UIso(line->Location().X()));
+    }
+  }
+  if (faces.empty())
+    return false;
+  struct PCurve
+  {
+    TopoDS_Edge               edge;
+    TopoDS_Face               face;
+    occ::handle<Geom2d_Curve> forward, reversed;
+    double                    first, last;
+  };
+  std::vector<PCurve> pcurves;
+  for (const auto& u : faces)
+  {
+    ShapeIMap edges;
+    TopExp::MapShapes(u.face, TopAbs_EDGE, edges);
+    for (int i = 1; i <= edges.Extent(); ++i)
+    {
+      TopoDS_Edge e = TopoDS::Edge(edges(i));
+      double      pf, pl;
+      e.Orientation(TopAbs_FORWARD);
+      PCurve p{e, u.face, BRep_Tool::CurveOnSurface(e, u.face, pf, pl), {}, pf, pl};
+      if (BRep_Tool::IsClosed(e, u.face))
+        p.reversed = BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Reversed()), u.face, pf, pl);
+      pcurves.push_back(p);
+    }
+  }
+  BRep_Builder                           B;
+  std::vector<occ::handle<Geom_Surface>> old_surfaces;
+  for (const auto& u : faces)
+    old_surfaces.push_back(BRep_Tool::Surface(u.face));
+  for (const auto& u : faces)
+    B.UpdateFace(u.face, u.surface, TopLoc_Location(), BRep_Tool::Tolerance(u.face));
+  for (const auto& p : pcurves)
+    if (p.reversed.IsNull())
+      B.UpdateEdge(p.edge, p.forward, p.face, BRep_Tool::Tolerance(p.edge));
+    else
+      B.UpdateEdge(p.edge, p.forward, p.reversed, p.face, BRep_Tool::Tolerance(p.edge));
+  for (const auto& p : pcurves)
+    if (BRep_Tool::Degenerated(p.edge))
+      B.Range(p.edge, p.face, p.first, p.last); // (UpdateEdge gives a degenerate edge's new curve [0, 1])
+  for (const auto& [e, c] : sides)
+    B.UpdateEdge(e, c, BRep_Tool::Tolerance(e));
+  for (const auto& p : pcurves)
+    for (const auto& old : old_surfaces)
+      ShapeBuild_Edge().RemovePCurve(p.edge, old, TopLoc_Location());
+  ShapeFix_ShapeTolerance().SetTolerance(loft, Precision::Confusion(), TopAbs_SHAPE);
+  for (TopExp_Explorer x(loft, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+    if (BRep_Tool::Degenerated(e))
+      continue;
+    B.SameParameter(e, false);
+    BRepLib::SameParameter(e, tol);
+  }
+  BRepLib::UpdateTolerances(loft, false);
+  return true;
+}
+
 // Lofts through three or more sections: Parasolid interpolates between the
 // sections with a natural cubic spline at chord-length parameters (Onshape G10: Ø20 → square 12 → Ø20,
 // 6125.607 mm³), OCCT with one polynomial (a parabola through three,
@@ -4157,6 +4295,20 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
     fail_op("loft failed (incompatible sections?)");
   if (natural && (!natural_loft(ts.Shape(), smooth, ends, drop) || !BRepCheck_Analyzer(ts.Shape()).IsValid()))
     return loft_impl(sections, solid, ruled, closed, start_points, ends, false, path, path_count);
+  // A profile to a point, Tangent to profile at the point and the profile's end free.
+  if (allow_natural && points && n == 2 && !ruled && !closed && path.IsNull())
+  {
+    const bool apex_last = sections.items[1].ShapeType() == TopAbs_VERTEX && sections.items[0].ShapeType() != TopAbs_VERTEX;
+    const bool apex_first = sections.items[0].ShapeType() == TopAbs_VERTEX && sections.items[1].ShapeType() != TopAbs_VERTEX;
+    const int  at = apex_last ? ends.end : apex_first ? ends.start : 0, other = apex_last ? ends.start : ends.end;
+    if (at == 2 && other == 0)
+    {
+      const gp_Pnt P = BRep_Tool::Pnt(TopoDS::Vertex(sections.items[apex_last ? 1 : 0]));
+      const bool done = apex_tangent_loft(ts.Shape(), P, apex_last ? ends.end_dir : ends.start_dir, apex_last ? ends.end_mag : ends.start_mag);
+      if (!done || !BRepCheck_Analyzer(ts.Shape()).IsValid())
+        return loft_impl(sections, solid, ruled, closed, start_points, ends, false, path, path_count);
+    }
+  }
   // A bare loft (a blend's tool): its shape only, as ThruSections makes it, its sides' planes and its ends' curves.
   if (bare)
   {

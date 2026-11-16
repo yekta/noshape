@@ -887,6 +887,9 @@ fn fixed_mode_for(wire: &Shape) -> FResult<k::SweepMode> {
 struct Section {
     shape: Shape,
     profile: Option<Profile>,
+    /// A point profile's sketch plane normal (a sketch's point or a vertex of its bodies): its plane for the Normal /
+    /// Tangent to profile end conditions (live c2-loft-paths-guides Loft 1: to Sketch 2's circle centre, tangent).
+    point_normal: Option<DVec3>,
 }
 
 fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool) -> FResult<Vec<Section>> {
@@ -901,7 +904,8 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
             || matches!(&refs[0], Reference::SketchEntity { sketch, entity } if ev.ctx.sketch_holding(*sketch, *entity).is_some_and(|s| s.sketch.point(noshape_sketch::EntityId(*entity)).is_some()))
         {
             let p = ev.resolve_vertex_point(&refs[0]).ok_or_else(|| fe("Could not create valid profiles from selections."))?;
-            out.push(Section { shape: k::make_vertex(p)?, profile: None });
+            let point_normal = ev.ctx.sketch_bodies_of(&refs[..1]).first().and_then(|(i, _)| ev.ctx.sketches.get(*i)).map(|sk| sk.frame.normal);
+            out.push(Section { shape: k::make_vertex(p)?, profile: None, point_normal });
             continue;
         }
         if wire {
@@ -918,7 +922,7 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
                 return err("Could not create valid profiles from selections.");
             }
             let w = wires.remove(0);
-            out.push(Section { shape: w.clone(), profile: Some(wire_profile(w, &edges, Source::Index(i as u32))) });
+            out.push(Section { shape: w.clone(), profile: Some(wire_profile(w, &edges, Source::Index(i as u32))), point_normal: None });
             continue;
         }
         // A curved face as a profile (std's opLoft takes any face: GearLab's bevel gear lofts its teeth through filled
@@ -984,7 +988,7 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
         if p.shape.wires().len() > 1 {
             return err("Cannot use faces or regions with inner loops as profiles.");
         }
-        out.push(Section { shape: p.shape.clone(), profile: Some(p) });
+        out.push(Section { shape: p.shape.clone(), profile: Some(p), point_normal: None });
     }
     Ok(out)
 }
@@ -1107,7 +1111,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     // loft.fs createProfileConditions ("End conditions" is only a group
     // header: the conditions apply whether it's open or not).
     let vals = ev.params;
-    let normal = |s: &Section| s.profile.as_ref().map(|p| p.frame.normal);
+    let normal = |s: &Section| s.profile.as_ref().map(|p| p.frame.normal).or(s.point_normal);
     let (first, last) = (&sections[0], &sections[sections.len() - 1]);
     opts.start = loft_end(ev, vals, ["startCondition", "startMagnitude", "startDirection"], &first.shape, normal(first), "start")?;
     opts.end = loft_end(ev, vals, ["endCondition", "endMagnitude", "endDirection"], &last.shape, normal(last), "end")?;

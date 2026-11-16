@@ -175,6 +175,34 @@ fn sweep_circle_along_line() {
     assert_eq!(res.context.bodies[0].faces.len(), 3);
 }
 
+/// A loft to a sketch point, Tangent to profile at that end, takes the point's sketch plane and arrives in it: a dome
+/// (live c2-loft-paths-guides Loft 1: a Ø101.6 circle to a point 101.6 mm above it, 12.7 mm off its axis, magnitude 1:
+/// 370677.72 mm³ within live's own mass-property band of ±3875.5 mm³ on the part; ThruSections' cone 274566, a
+/// quadratic column 411851).
+#[test]
+fn a_loft_to_a_sketch_point_tangent_to_its_plane() {
+    let mut t = T::new();
+    let mut base = noshape_sketch::Sketch::new();
+    base.add_circle(DVec2::ZERO, 0.0508);
+    let s1 = t.sketch(Reference::Plane(DatumPlane::Top), base);
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("101.6 mm"))]);
+    let mut sk = noshape_sketch::Sketch::new();
+    let id = sk.add_point(DVec2::new(0.0, 0.0127));
+    let tip = Reference::SketchEntity { sketch: t.sketch(Reference::FeaturePlane(pl), sk), entity: id.0 };
+    let r1 = t.regions(s1)[0].clone();
+    let item = |r: Reference| {
+        let mut v = ParamValues::default();
+        v.set("sheetProfileEntities", q(vec![r]));
+        v
+    };
+    t.add("loft", &[("sheetProfilesArray", ParamValue::Array(vec![item(r1), item(tip)])), ("endCondition", en("TANGENT_TO_PROFILE")), ("endMagnitude", e("1"))]);
+    let res = t.ok();
+    let v = total_volume(&res.context) * 1e9;
+    assert!((v - 370677.72).abs() < 3875.5, "loft volume {v} mm³");
+    let bb = res.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.max.z, 0.1016, 1e-7), "{bb:?}");
+}
+
 #[test]
 fn loft_between_squares() {
     let mut t = T::new();
