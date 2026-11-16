@@ -106,6 +106,7 @@
 #include <BRepOffsetAPI_MakeOffset.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
+#include <BRepTopAdaptor_FClass2d.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <BRepTools_WireExplorer.hxx>
@@ -4164,6 +4165,46 @@ static void keep_vertices_added(const TopoDS_Shape& out, const std::vector<TopoD
     }
 }
 
+// Whether a closed solid's faces face into it: at the middle of a face, a point just off it along its normal is in the
+// solid. By rays (noshape's classifier: parity, no orientation), two faces agreeing; none when no two clean ones do.
+// (Its signed volume told it before: ~40% of a lofted chamfer's tool, c2-hunting-knife's Chamfer 1.)
+static std::optional<bool> faces_face_in(const TopoDS_Shape& solid)
+{
+  Bnd_Box box;
+  BRepBndLib::Add(solid, box);
+  if (box.IsVoid())
+    return std::nullopt;
+  const double  size = std::sqrt(box.SquareExtent());
+  RayClassifier rays(solid, 1e-7 * size, 1e-6 * size);
+  int           in = 0, out = 0;
+  for (TopExp_Explorer x(solid, TopAbs_FACE); x.More() && in + out < 2; x.Next())
+  {
+    const TopoDS_Face f = TopoDS::Face(x.Current());
+    double            u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    const gp_Pnt2d uv(0.5 * (u0 + u1), 0.5 * (v0 + v1));
+    if (BRepTopAdaptor_FClass2d(f, 1e-9).Perform(uv, false) != TopAbs_IN)
+      continue;
+    gp_Pnt q;
+    gp_Vec du, dv;
+    BRepAdaptor_Surface(f, false).D1(uv.X(), uv.Y(), q, du, dv);
+    gp_Vec n = du.Crossed(dv);
+    if (n.Magnitude() < 1e-300)
+      continue;
+    n.Normalize();
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    const TopAbs_State st = rays.Perform(q.Translated(n * (1e-4 * size)));
+    if (st == TopAbs_IN)
+      ++in;
+    else if (st == TopAbs_OUT)
+      ++out;
+  }
+  if (in + out < 2 || (in > 0 && out > 0))
+    return std::nullopt;
+  return in > 0;
+}
+
 static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool closed,
                        rust::Slice<const double> start_points, const LoftEnds& ends, bool allow_natural,
                        const TopoDS_Shape& path = TopoDS_Shape(), int path_count = 0, bool bare = false)
@@ -4347,9 +4388,14 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   // on Top to one on x = 15) came out with every face facing in: the solid turned the right way out.
   if (natural && solid)
   {
-    GProp_GProps g;
-    BRepGProp::VolumeProperties(out, g);
-    if (g.Mass() < 0)
+    std::optional<bool> in = faces_face_in(out);
+    if (!in)
+    {
+      GProp_GProps g;
+      BRepGProp::VolumeProperties(out, g);
+      in = g.Mass() < 0;
+    }
+    if (*in)
       out.Reverse();
   }
   {
