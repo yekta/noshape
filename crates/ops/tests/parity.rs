@@ -1943,6 +1943,11 @@ fn differences_use_lives_bands() {
     live.centroid = Some([0.0100005, 0.0, 0.0]);
     live.centroid_band = Some([[0.0099, -1e-4, -1e-4], [0.0101, 1e-4, 1e-4]]);
     assert!(differences(&[live.clone()], &[part(1.0005e-6, 6)]).is_empty(), "inside live's bands");
+    // A composite has no box of live's: its centroid's band is ours (1dc32b's Large wheel asm, ±1.5e-4 by 68 mm).
+    let wheel = |c: f64, bbox: Option<[[f64; 3]; 2]>| PartState { name: "Large wheel asm".into(), body_type: "composite".into(), faces: 0, edges: 0, vertices: 0, volume: Some(3.3971339e-3), volume_band: Some([3.3966191e-3, 3.3976487e-3]), centroid: Some([c, 0.0, 0.8]), bbox, ..Default::default() };
+    let ours = Some([[-0.034, -0.172, 0.628], [0.034, 0.172, 0.972]]);
+    assert!(differences(&[wheel(-4.0776e-6, None)], &[wheel(-9.034e-6, ours)]).is_empty(), "5 µm in a 68 mm composite");
+    assert!(differences(&[wheel(-4.0776e-6, None)], &[wheel(-30e-6, ours)]).iter().any(|d| d.contains("centroid")), "26 µm");
     let d = differences(&[live.clone()], &[part(1.002e-6, 7)]);
     assert!(d.iter().any(|x| x.contains("7/12/8 faces/edges/vertices, live 6/12/8")) && d.iter().any(|x| x.contains("volume")), "{d:?}");
     assert_eq!(differences(&[live.clone()], &[]), ["0 parts, live 1"]);

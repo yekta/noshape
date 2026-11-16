@@ -6999,10 +6999,12 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
         }
         // Where live's mass properties are approximate (it gives a volume band), its centroid is as uncertain: the
         // band's relative half-width times the part's extent each way (c2-rings-loft's ring: our area is the exact
-        // 136.82166 mm² of its profile, live's volume 7e-5 short, its centroid 2 µm off; band ±0.16 %).
+        // 136.82166 mm² of its profile, live's volume 7e-5 short, its centroid 2 µm off; band ±0.16 %). A composite
+        // has no box of live's: ours (asm-infento-subs 1dc32b's Large wheel asm: live's -4.1 µm against the -9.07 µm
+        // its own tyre and hub give, ours -9.03 µm).
         let centroid_tol = |j: usize| {
             let rel = l.volume_band.zip(l.volume).map_or(0.0, |([lo, hi], v)| (hi - lo) / 2.0 / v.abs().max(1e-30));
-            l.bbox.map_or(1e-6, |b| (rel * (b[1][j] - b[0][j])).max(1e-6))
+            l.bbox.or(o.bbox).map_or(1e-6, |b| (rel * (b[1][j] - b[0][j])).max(1e-6))
         };
         if let (Some(a), Some(b)) = (o.centroid, l.centroid)
             && (0..3).any(|j| (a[j] - b[j]).abs() > centroid_tol(j) && !l.centroid_band.is_some_and(|[lo, hi]| a[j] >= lo[j] - 1e-9 && a[j] <= hi[j] + 1e-9))
