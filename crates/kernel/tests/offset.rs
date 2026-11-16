@@ -120,6 +120,26 @@ fn a_corner_triangle_whose_offset_vanishes_goes() {
     assert!(last_offset_report().contains("vanishes"));
 }
 
+/// Shell's inner wall: a 40 x 20 x 10 mm box, its top removed (NaN) and its other faces moved 1 mm in: an open shell of
+/// five faces, its rim on the top's plane (a 38 x 18 floor at z = 1, walls up to z = 10).
+#[test]
+fn a_removed_face_leaves_the_others_offsets_open_at_its_rim() {
+    let b = make_box_corners(mm(0.0, 0.0, 0.0), mm(40.0, 20.0, 10.0)).unwrap();
+    let faces = b.faces();
+    let dist: Vec<f64> = faces.iter().map(|f| if f.centroid().unwrap().z / MM > 9.9 { f64::NAN } else { -MM }).collect();
+    let r = offset_solid(&b, &faces, &dist, 0).unwrap_or_else(|e| panic!("{e}: {}", last_offset_report()));
+    assert_eq!(r.shape.shape_type(), ShapeType::Shell);
+    assert!(r.shape.is_valid());
+    assert_eq!(r.shape.faces().len(), 5);
+    let area: f64 = r.shape.faces().iter().map(|f| f.area().unwrap()).sum::<f64>() / (MM * MM);
+    let want = 38.0 * 18.0 + 2.0 * (38.0 + 18.0) * 9.0;
+    assert!((area - want).abs() < 1e-6, "{area} mm2, want {want}");
+    let top = faces.iter().position(|f| f.centroid().unwrap().z / MM > 9.9).unwrap();
+    assert!(r.history.is_deleted(0, ShapeType::Face, top as u32));
+    let bb = r.shape.bounding_box(true).unwrap();
+    assert!((bb.max.z / MM - 10.0).abs() < 1e-9 && (bb.min.z / MM - 1.0).abs() < 1e-9, "{bb:?}");
+}
+
 /// A face whose move would turn an edge round (a 1 mm wide step's side moved 2 mm past its other side) fails, naming
 /// the edge or vertex, and the input is left as it was.
 #[test]

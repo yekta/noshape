@@ -823,7 +823,8 @@ pub fn offset_faces_each(shape: &Shape, faces: &[Shape], distances: &[f64]) -> R
 
 /// `shape` (one solid) with each of `faces` moved along its outward normal by its distance in `distances` (one for
 /// all, or one per face), the other faces trimmed or run on to meet them; free-form faces as their exact offsets.
-/// `face_budget` bounds the points marched along a face's edges (0: no bound). Fails, naming the face or edge, where
+/// A NaN distance removes the face (Shell's open side): the others' offsets end on its surface and the result is
+/// their open shell. `face_budget` bounds the points marched along a face's edges (0: no bound). Fails, naming the face or edge, where
 /// the offset would change the solid's topology; [`last_offset_report`] then says where.
 pub fn offset_solid(shape: &Shape, faces: &[Shape], distances: &[f64], face_budget: u32) -> Result<OpResult> {
     let l = vec_to_list(faces);

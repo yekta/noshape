@@ -38,6 +38,7 @@
 #include <TopoDS.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <gp_Vec2d.hxx>
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -330,15 +331,22 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
   TopExp::MapShapes(so, TopAbs_VERTEX, verts);
   const int           nf = faces.Extent(), ne = edges.Extent(), nv = verts.Extent();
   std::vector<double> D((size_t)nf + 1, 0.0);
-  double              dmax = 0;
+  std::vector<char>   removed((size_t)nf + 1);
+  bool                any_removed = false;
+  double              dmax        = 0;
   for (size_t k = 0; k < moved.size(); ++k)
   {
     const int i = faces.FindIndex(moved[k]);
     if (i == 0)
       failed("a face not on the solid");
     const double d = dist.size() == 1 ? dist[0] : dist[k];
+    // (Removed (NaN): it stays where it is for its neighbours' offsets to end on, and isn't in the result.)
     if (std::isnan(d))
-      failed(face_name(i) + ": removed faces not supported yet");
+    {
+      removed[(size_t)i] = 1;
+      any_removed        = true;
+      continue;
+    }
     D[(size_t)i] = d;
     dmax         = std::max(dmax, std::abs(d));
   }
@@ -583,6 +591,11 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
     if ((pts[(size_t)vmap[(size_t)i]] - BRep_Tool::Pnt(TopoDS::Vertex(verts(i))).XYZ()).Modulus() > tol)
       for (ShapeList::Iterator it(vf.FindFromKey(verts(i))); it.More(); it.Next())
         corners_moved[(size_t)faces.FindIndex(it.Value())] = 1;
+  // Removed faces go, and the edges between them.
+  for (int i = 1; i <= nf; ++i)
+    gone_face[(size_t)i] = gone_face[(size_t)i] || removed[(size_t)i];
+  for (int k = 1; k <= ne; ++k)
+    gone_edge[(size_t)k] = gone_edge[(size_t)k] || std::all_of(efi[(size_t)k].begin(), efi[(size_t)k].end(), [&](int f) { return gone_face[(size_t)f] != 0; });
   BRep_Builder               bld;
   std::vector<TopoDS_Vertex> vx((size_t)nv + 1);
   for (int i = 1; i <= nv; ++i)
@@ -983,9 +996,15 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
       hist->AddModified(edges(i), ex[(size_t)i].e);
   for (int i = 1; i <= nv; ++i)
     hist->AddModified(verts(i), vx[(size_t)i]);
-  TopoDS_Solid out;
-  bld.MakeSolid(out);
-  bld.Add(out, shell);
+  // (With faces removed: the open shell of the others.)
+  TopoDS_Shape out = shell;
+  if (!any_removed)
+  {
+    TopoDS_Solid solid_out;
+    bld.MakeSolid(solid_out);
+    bld.Add(solid_out, shell);
+    out = solid_out;
+  }
   lap("faces");
   BRepLib::SameParameter(out, 1e3 * tol, true);
   for (int k = 1; k <= ne; ++k)
@@ -1045,6 +1064,8 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
     failed("the result not valid" + (bad.empty() ? std::string() : " (" + bad + ")"));
   }
   lap("check");
+  if (any_removed)
+    return out;
   // A volume that moved the other way from the faces' areas times their distances: turned inside out somewhere.
   GProp_GProps p0, p1;
   BRepGProp::VolumeProperties(so, p0);
