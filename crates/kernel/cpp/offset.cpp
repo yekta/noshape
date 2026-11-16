@@ -68,6 +68,17 @@ struct Failed
 
 std::string face_name(int i) { return "face " + std::to_string(i); }
 
+// Edge `e`'s curve on face `f` (forward), for the way `e` runs in `f`: two faces on one surface (a cylinder's strips)
+// share it, and OCCT keeps such an edge's two curves there as a seam's.
+occ::handle<Geom2d_Curve> curve_on(const TopoDS_Edge& e, const TopoDS_Face& f, double& p0, double& p1)
+{
+  const TopoDS_Face ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+  for (TopExp_Explorer x(ff, TopAbs_EDGE); x.More(); x.Next())
+    if (x.Current().IsSame(e))
+      return BRep_Tool::CurveOnSurface(TopoDS::Edge(x.Current()), ff, p0, p1);
+  return BRep_Tool::CurveOnSurface(e, ff, p0, p1);
+}
+
 // The outward normal of face `f` at its point nearest `p` (its orientation applied).
 gp_XYZ outward_normal(const TopoDS_Face& f, const occ::handle<Geom_Surface>& s, const gp_XYZ& p)
 {
@@ -271,7 +282,7 @@ bool param_on(const occ::handle<Geom_Curve>& c, const gp_Pnt& p, double& s)
 bool tangent_along(const TopoDS_Edge& e, const TopoDS_Face& a, const TopoDS_Face& b)
 {
   double                          a0, a1, b0, b1;
-  const occ::handle<Geom2d_Curve> pa = BRep_Tool::CurveOnSurface(e, a, a0, a1), pb = BRep_Tool::CurveOnSurface(e, b, b0, b1);
+  const occ::handle<Geom2d_Curve> pa = curve_on(e, a, a0, a1), pb = curve_on(e, b, b0, b1);
   if (pa.IsNull() || pb.IsNull())
     return false;
   const occ::handle<Geom_Surface> sa = BRep_Tool::Surface(a), sb = BRep_Tool::Surface(b);
@@ -346,7 +357,9 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
     sf[(size_t)i]        = offset_surf(f, D[(size_t)i], dmax, size, tol, i);
     world[(size_t)i]     = BRep_Tool::Surface(f);
   }
-  auto new_surface = [&](int i) { return D[(size_t)i] != 0 ? sf[(size_t)i].off : world[(size_t)i]; };
+  // (A free-form face that stays but whose corners move: its run-on surface, its new edges can lie past the old.)
+  std::vector<char> corners_moved((size_t)nf + 1);
+  auto new_surface = [&](int i) { return D[(size_t)i] != 0 || (sf[(size_t)i].general && corners_moved[(size_t)i]) ? sf[(size_t)i].off : world[(size_t)i]; };
   std::vector<std::vector<int>> efi((size_t)ne + 1);
   for (int i = 1; i <= ne; ++i)
   {
@@ -489,10 +502,85 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
       failed("vertex " + std::to_string(i) + ": its offset ran " + std::to_string((x - V).Modulus() * 1e3) + " mm off");
     pts[(size_t)i] = x;
   }
+  // Three-sided faces whose offset vanishes (an edge of them turned round: a sliver past a seam, its corners passing
+  // each other): gone, their three neighbours meeting at one new vertex where their offsets do.
+  std::vector<char> gone_face((size_t)nf + 1), gone_edge((size_t)ne + 1);
+  std::vector<int>  vmap((size_t)nv + 1);
+  for (int i = 1; i <= nv; ++i)
+    vmap[(size_t)i] = i;
+  auto ends = [&](int k) {
+    TopoDS_Vertex a, b;
+    TopExp::Vertices(TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), a, b);
+    return std::make_pair(verts.FindIndex(a), verts.FindIndex(b));
+  };
+  for (int i = 1; i <= nf; ++i)
+  {
+    std::vector<int> fe;
+    int              wires = 0;
+    for (TopoDS_Iterator w(faces(i), false); w.More(); w.Next(), ++wires)
+      for (TopoDS_Iterator x(w.Value(), false); x.More(); x.Next())
+        fe.push_back(edges.FindIndex(x.Value()));
+    if (wires != 1 || fe.size() != 3)
+      continue;
+    bool turned = false, plain = true;
+    for (const int k : fe)
+    {
+      plain = plain && efi[(size_t)k].size() == 2 && !degen[(size_t)k] && !gone_edge[(size_t)k];
+      if (!plain)
+        break;
+      const auto [a, b] = ends(k);
+      const gp_XYZ was  = BRep_Tool::Pnt(TopoDS::Vertex(verts(b))).XYZ() - BRep_Tool::Pnt(TopoDS::Vertex(verts(a))).XYZ();
+      turned            = turned || (pts[(size_t)b] - pts[(size_t)a]).Dot(was) < 0;
+    }
+    if (!plain || !turned)
+      continue;
+    std::vector<int> across;
+    std::set<int>    vs;
+    for (const int k : fe)
+    {
+      across.push_back(efi[(size_t)k][0] == i ? efi[(size_t)k][1] : efi[(size_t)k][0]);
+      vs.insert(ends(k).first), vs.insert(ends(k).second);
+    }
+    if (std::set<int>(across.begin(), across.end()).size() != 3 || vs.size() != 3)
+      failed(face_name(i) + ": its offset vanishes");
+    gp_XYZ x(0, 0, 0);
+    for (const int v : vs)
+      x += pts[(size_t)v] / 3.0;
+    const gp_XYZ start = x;
+    for (const int f : across)
+      if (sf[(size_t)f].general)
+        for (const int v : vs)
+          if (const TopoDS_Vertex& vv = TopoDS::Vertex(verts(v)); vf.FindFromKey(vv).Contains(faces(f)))
+          {
+            sf[(size_t)f].hint     = BRep_Tool::Parameters(vv, TopoDS::Face(faces(f)));
+            sf[(size_t)f].has_hint = true;
+            break;
+          }
+    const quad::Surf* s3[3] = {&sf[(size_t)across[0]], &sf[(size_t)across[1]], &sf[(size_t)across[2]]};
+    if (!quad::solve3(s3, x, size) && !quad::solve3_damped(s3, (x = start), size))
+      failed(face_name(i) + ": its offset vanishes, its neighbours' offsets don't meet");
+    if ((x - start).Modulus() > 100 * dmax)
+      failed(face_name(i) + ": its offset vanishes, its neighbours' offsets meet far off");
+    gone_face[(size_t)i] = 1;
+    for (const int k : fe)
+      gone_edge[(size_t)k] = 1;
+    const int to = *vs.begin();
+    for (const int v : vs)
+      vmap[(size_t)v] = to;
+    pts[(size_t)to] = x;
+    report << face_name(i) << " vanishes\n";
+  }
+  for (int i = 1; i <= nv; ++i)
+    if ((pts[(size_t)vmap[(size_t)i]] - BRep_Tool::Pnt(TopoDS::Vertex(verts(i))).XYZ()).Modulus() > tol)
+      for (ShapeList::Iterator it(vf.FindFromKey(verts(i))); it.More(); it.Next())
+        corners_moved[(size_t)faces.FindIndex(it.Value())] = 1;
   BRep_Builder               bld;
   std::vector<TopoDS_Vertex> vx((size_t)nv + 1);
   for (int i = 1; i <= nv; ++i)
-    bld.MakeVertex(vx[(size_t)i], gp_Pnt(pts[(size_t)i]), 1e3 * tol);
+    if (vmap[(size_t)i] == i)
+      bld.MakeVertex(vx[(size_t)i], gp_Pnt(pts[(size_t)i]), 1e3 * tol);
+  for (int i = 1; i <= nv; ++i)
+    vx[(size_t)i] = vx[(size_t)vmap[(size_t)i]];
   // The edges' offsets.
   std::vector<NewEdge> ex((size_t)ne + 1);
   std::vector<int>     work((size_t)nf + 1, 0);
@@ -501,10 +589,12 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
   {
     if (noshape_should_break() != 0)
       failed("stopped");
+    if (gone_edge[(size_t)i])
+      continue;
     const TopoDS_Edge e = TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD));
     TopoDS_Vertex     va, vb;
     TopExp::Vertices(e, va, vb);
-    const int            ia = verts.FindIndex(va), ib = verts.FindIndex(vb);
+    const int            ia = vmap[(size_t)verts.FindIndex(va)], ib = vmap[(size_t)verts.FindIndex(vb)];
     const TopoDS_Vertex &A = vx[(size_t)ia], &B = vx[(size_t)ib];
     const gp_Pnt         pA(pts[(size_t)ia]), pB(pts[(size_t)ib]);
     NewEdge&             n  = ex[(size_t)i];
@@ -531,7 +621,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
     gp_Pnt o0;
     gp_Vec t0;
     oc->D1(c0, o0, t0);
-    const bool closed = ia == ib;
+    const bool closed = va.IsSame(vb);
     if (fi.size() == 1)
     {
       // A seam: its two curves on the closed face kept (the offset keeps the face's parameters), its 3D curve made from
@@ -610,7 +700,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
       if (!sf[(size_t)f].general || g->IsUPeriodic() || g->IsVPeriodic())
         return g;
       double                          e0, e1;
-      const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, TopoDS::Face(faces(f)), e0, e1);
+      const occ::handle<Geom2d_Curve> pc = curve_on(e, TopoDS::Face(faces(f)), e0, e1);
       if (pc.IsNull())
         return g;
       double u0 = 1e300, u1 = -1e300, v0 = 1e300, v1 = -1e300;
@@ -685,7 +775,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
         for (const int f : fi)
         {
           double                          q0, q1;
-          const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, TopoDS::Face(faces(f)), q0, q1);
+          const occ::handle<Geom2d_Curve> pc = curve_on(e, TopoDS::Face(faces(f)), q0, q1);
           if (!pc.IsNull())
             n.pc[f] = occ::down_cast<Geom2d_Curve>(pc->Copy());
         }
@@ -738,7 +828,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
           if (sf[(size_t)f].kind != GeomAbs_Cone)
           {
             double                          q0, q1;
-            const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, TopoDS::Face(faces(f)), q0, q1);
+            const occ::handle<Geom2d_Curve> pc = curve_on(e, TopoDS::Face(faces(f)), q0, q1);
             if (!pc.IsNull())
               n.pc[f] = occ::down_cast<Geom2d_Curve>(pc->Copy());
           }
@@ -810,7 +900,12 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
   std::vector<TopoDS_Face> nfs((size_t)nf + 1);
   for (int i = 1; i <= nf; ++i)
   {
-    const TopoDS_Face&              f  = TopoDS::Face(faces(i));
+    const TopoDS_Face& f = TopoDS::Face(faces(i));
+    if (gone_face[(size_t)i])
+    {
+      hist->Remove(f);
+      continue;
+    }
     const TopoDS_Face               ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
     const occ::handle<Geom_Surface> g  = new_surface(i);
     TopoDS_Face                     of;
@@ -820,14 +915,15 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
       TopoDS_Wire nw;
       bld.MakeWire(nw);
       for (TopoDS_Iterator x(w.Value(), false); x.More(); x.Next())
-        bld.Add(nw, ex[(size_t)edges.FindIndex(x.Value())].e.Oriented(x.Value().Orientation()));
+        if (const int k = edges.FindIndex(x.Value()); !gone_edge[(size_t)k])
+          bld.Add(nw, ex[(size_t)k].e.Oriented(x.Value().Orientation()));
       bld.Add(of, nw.Oriented(w.Value().Orientation()));
     }
     std::set<int> done;
     for (TopExp_Explorer x(ff, TopAbs_EDGE); x.More(); x.Next())
     {
       const int k = edges.FindIndex(x.Current());
-      if (!done.insert(k).second)
+      if (gone_edge[(size_t)k] || !done.insert(k).second)
         continue;
       NewEdge& n = ex[(size_t)k];
       if (const auto sp = n.seam_pc.find(i); sp != n.seam_pc.end())
@@ -850,7 +946,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
         // to where the old one starts (the offset keeps the face's parameters but for a cone's v).)
         double                          o0, o1;
         const TopoDS_Edge               oe = TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD));
-        const occ::handle<Geom2d_Curve> op = BRep_Tool::CurveOnSurface(oe, ff, o0, o1);
+        const occ::handle<Geom2d_Curve> op = curve_on(oe, ff, o0, o1);
         if (!op.IsNull() && (g->IsUPeriodic() || g->IsVPeriodic()))
         {
           const gp_Pnt2d a = pc->Value(q0), b = op->Value(o0);
@@ -870,15 +966,28 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
     hist->AddModified(f, nfs[(size_t)i]);
   }
   for (int i = 1; i <= ne; ++i)
-    hist->AddModified(edges(i), ex[(size_t)i].e);
+    if (gone_edge[(size_t)i])
+      hist->Remove(edges(i));
+    else
+      hist->AddModified(edges(i), ex[(size_t)i].e);
   for (int i = 1; i <= nv; ++i)
     hist->AddModified(verts(i), vx[(size_t)i]);
   TopoDS_Solid out;
   bld.MakeSolid(out);
   bld.Add(out, shell);
   BRepLib::SameParameter(out, 1e3 * tol, true);
+  for (int k = 1; k <= ne; ++k)
+    if (!gone_edge[(size_t)k] && BRep_Tool::Tolerance(ex[(size_t)k].e) > 1e4 * tol)
+    {
+      report << "edge " << k << " (faces";
+      for (const int f : efi[(size_t)k])
+        report << " " << f;
+      report << ") tolerance " << BRep_Tool::Tolerance(ex[(size_t)k].e) * 1e3 << " mm\n";
+    }
   for (int i = 1; i <= nf; ++i)
   {
+    if (gone_face[(size_t)i])
+      continue;
     double t = BRep_Tool::Tolerance(nfs[(size_t)i]);
     for (TopExp_Explorer x(nfs[(size_t)i], TopAbs_EDGE); x.More(); x.Next())
       t = std::max(t, BRep_Tool::Tolerance(TopoDS::Edge(x.Current())));
@@ -888,7 +997,7 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
   {
     std::string bad;
     for (int i = 1; i <= nf && bad.empty(); ++i)
-      if (!BRepCheck_Analyzer(nfs[(size_t)i]).IsValid())
+      if (!gone_face[(size_t)i] && !BRepCheck_Analyzer(nfs[(size_t)i]).IsValid())
       {
         bad = face_name(i);
         BRepCheck_Analyzer an(nfs[(size_t)i]);
@@ -906,7 +1015,20 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
             bad += ", edge " + std::to_string(edges.FindIndex(x.Current()));
       }
     if (std::getenv("NOSHAPE_OFFSET_DEBUG"))
-      BRepTools::Write(out, "offset-invalid.brep");
+      for (int i = 1; i <= nf; ++i)
+        if (!gone_face[(size_t)i] && !BRepCheck_Analyzer(nfs[(size_t)i]).IsValid())
+          for (TopExp_Explorer w(nfs[(size_t)i], TopAbs_WIRE); w.More(); w.Next())
+            for (TopoDS_Iterator x(w.Current()); x.More(); x.Next())
+            {
+              const TopoDS_Edge&              e = TopoDS::Edge(x.Value());
+              double                          q0, q1;
+              const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, nfs[(size_t)i], q0, q1);
+              const bool                      rv = e.Orientation() == TopAbs_REVERSED;
+              TopoDS_Vertex                   a, b;
+              TopExp::Vertices(e, a, b, true);
+              const gp_Pnt2d u0 = pc.IsNull() ? gp_Pnt2d() : pc->Value(rv ? q1 : q0), u1 = pc.IsNull() ? gp_Pnt2d() : pc->Value(rv ? q0 : q1);
+              std::fprintf(stderr, "offset_solid: face %d edge %d%s 2d (%.6g %.6g) -> (%.6g %.6g), 3d (%.4f %.4f %.4f) -> (%.4f %.4f %.4f) tol %g\n", i, edges.FindIndex(e), rv ? " rev" : "", u0.X(), u0.Y(), u1.X(), u1.Y(), BRep_Tool::Pnt(a).X() * 1e3, BRep_Tool::Pnt(a).Y() * 1e3, BRep_Tool::Pnt(a).Z() * 1e3, BRep_Tool::Pnt(b).X() * 1e3, BRep_Tool::Pnt(b).Y() * 1e3, BRep_Tool::Pnt(b).Z() * 1e3, BRep_Tool::Tolerance(e) * 1e3);
+            }
     failed("the result not valid" + (bad.empty() ? std::string() : " (" + bad + ")"));
   }
   // A volume that moved the other way from the faces' areas times their distances: turned inside out somewhere.
