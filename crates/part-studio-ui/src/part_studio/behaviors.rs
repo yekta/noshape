@@ -612,6 +612,8 @@ pub struct UiState {
     /// The table cell under the pointer: (table: 0 Bends / 1 Other joints,
     /// row, column).
     pub sm_hover: Option<(u8, usize, usize)>,
+    /// The bend (index into the model's bends) whose zone is under the pointer in the flat view.
+    pub sm_flat_hover: Option<usize>,
     /// The bend (index into the model's bends) whose line is selected in the
     /// flat view: Shift+C analyses it (live request 1622).
     pub sm_flat_bend: Option<usize>,
@@ -959,6 +961,7 @@ impl UiState {
             sm_joints_closed: false,
             sm_bends_scroll: ScrollHandle::new(),
             sm_hover: None,
+            sm_flat_hover: None,
             sm_flat_bend: None,
             flat_backdrop: None,
             sm_select_other: None,

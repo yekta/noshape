@@ -167,6 +167,18 @@ fn rows() -> Vec<Row> {
             });
             expect((faces, row), (1, Some((0, 0))), "faces selected in 3D, the Bends row selected")
         } },
+        Row { id: "flat view / a bend zone hovered", live: "lights that bend in both views, not its table row; on the dashed centre line nothing (sheetmetal-gaps2)", gap: false, check: |s, cx| {
+            let fv = cx.update(|cx| s.view.read(cx).flat_view.clone()).ok_or("no flat view")?;
+            let vp = cx.update(|cx| fv.read(cx).viewport.clone());
+            let mut lit = Vec::new();
+            for frac in [0.4, 0.0] {
+                let at = cx.update(|cx| fv.read(cx).bend_zone_point(0, frac, cx)).ok_or("no bend zone")?;
+                cx.update(|cx| vp.update(cx, |_, cx| cx.emit(ViewportEvent::PointerMove { position: at, modifiers: NONE })));
+                s.frames(cx);
+                lit.push(cx.update(|cx| (s.view.read(cx).sm_hover_refs().is_empty(), s.view.read(cx).ui.sm_hover)));
+            }
+            expect(lit, vec![(false, None), (true, None)], "(nothing lit, table row hovered) in the zone, on the centre line")
+        } },
         Row { id: "flat view / starts from Top", live: "it starts looking straight down (Top), the view cube 'Top'", gap: false, check: |s, cx| {
             let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).viewport.clone())).ok_or("no flat view")?;
             let rot = cx.update(|cx| flat.read(cx).camera.rotation);

@@ -1063,6 +1063,11 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
         let t = fract(i.along / (16.0 * g.viewport.z));
         if (t > 0.55 && (t < 0.68 || t > 0.8)) { discard; }
     }
+    // A bend's centre line: 10 px on, 10 off, 5 on, 10 off.
+    if ((i.style & 512u) != 0u) {
+        let t = fract(i.along / (35.0 * g.viewport.z)) * 35.0;
+        if ((t > 10.0 && t < 20.0) || t > 25.0) { discard; }
+    }
     // Inferred direction over a rubber band: 4 px on / 4 off from 1.25 px.
     if ((i.style & 16u) != 0u && fract((i.along / g.viewport.z - 1.25) / 8.0) >= 0.5) { discard; }
     // Construction lines: dash, gap, dash, gap (Graphics preferences).

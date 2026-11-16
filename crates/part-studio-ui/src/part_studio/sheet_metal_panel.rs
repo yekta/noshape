@@ -571,11 +571,14 @@ impl PartStudioView {
         data.bends.get(row).map(|b| b.inner_faces.iter().chain(&b.outer_faces).map(|n| noshape_model::reference::Reference::Face((**n).clone())).collect()).unwrap_or_default()
     }
 
-    /// The bend under the pointer in the Bends table (pre-highlighted).
+    /// The bend under the pointer in the Bends table or the flat view (pre-highlighted).
     pub(super) fn sm_hover_refs(&self) -> Vec<noshape_model::reference::Reference> {
+        if self.right_panel != Some(super::config_panel::RightPanel::SheetMetal) {
+            return Vec::new();
+        }
         match self.ui.sm_hover {
-            Some((0, row, _)) if self.right_panel == Some(super::config_panel::RightPanel::SheetMetal) => self.sm_bend_refs(row),
-            _ => Vec::new(),
+            Some((0, row, _)) => self.sm_bend_refs(row),
+            _ => self.ui.sm_flat_hover.map(|row| self.sm_bend_refs(row)).unwrap_or_default(),
         }
     }
 
@@ -1060,6 +1063,11 @@ impl PartStudioView {
                         FlatViewEvent::Selected(side) => this.select_flat_face(*side, cx),
                         FlatViewEvent::BendSelected(b) => this.ui.sm_flat_bend = *b,
                         FlatViewEvent::BendZone(line) => this.select_flat_bend_zone(*line, cx),
+                        FlatViewEvent::BendHover(b) => {
+                            this.ui.sm_flat_hover = *b;
+                            this.refresh_scene(false, cx);
+                            cx.notify();
+                        }
                         // A sketch on the flat is drawn in the flat view (live 2468): its events go to sketch mode there.
                         FlatViewEvent::Sketching(ev) => {
                             let Some(fvp) = this.flat_view.as_ref().map(|f| f.read(cx).viewport.clone()) else { return };
@@ -1080,7 +1088,7 @@ impl PartStudioView {
         // Live "ui (10-24 b)": the hovered row's bend zone outlined too.
         let hovered = match self.ui.sm_hover {
             Some((0, row, _)) => Some(row),
-            _ => None,
+            _ => self.ui.sm_flat_hover,
         };
         // An open sketch on a face of the flat's part: the face's box on the
         // flat, with a margin, and the sketch's name at its top-left (live

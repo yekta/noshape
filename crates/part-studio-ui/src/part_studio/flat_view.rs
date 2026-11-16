@@ -30,6 +30,8 @@ pub struct FlatView {
     /// highlights), and the face under the pointer.
     parts: Option<(StudioDisplay, crate::scene_builder::BuiltScene, Vec<Instance>)>,
     hover: Option<Reference>,
+    /// The bend line whose zone is under the pointer (live sheetmetal-gaps2: it lights the bend in both views).
+    bend_hover: Option<usize>,
     /// Each flat face's side: the reference side (the top, z 0), the back,
     /// or `None` (an edge face); and the side selected.
     sides: Vec<Option<bool>>,
@@ -66,6 +68,8 @@ pub enum FlatViewEvent {
     /// A click inside bend line `n`'s zone, off its centre line (live feel/sheetmetal.json "flatView.select": the bend
     /// selected in both views, its Bends row too).
     BendZone(usize),
+    /// The bend (the model's index) whose zone is under the pointer, or none.
+    BendHover(Option<usize>),
     /// While a sketch on the flat is open here (live 2468: you sketch inside the flat view): the view's events, for
     /// sketch mode.
     Sketching(ViewportEvent),
@@ -101,10 +105,19 @@ impl FlatView {
             // pre-select colour.
             ViewportEvent::Hover(id) => {
                 let r = id.and_then(|id| this.parts.as_ref()?.1.picks.get(id).map(|t| t.reference.clone())).filter(|r| matches!(r, Reference::Face(_)));
+                if id.is_none() {
+                    this.set_bend_hover(None, cx);
+                }
                 if r != this.hover {
                     this.hover = r;
                     this.compose(false, cx);
                 }
+            }
+            // Live sheetmetal-gaps2: a bend zone (or its tangent line) under the pointer lights that bend in both
+            // views, not its table row; the dashed centre line itself lights nothing.
+            ViewportEvent::PointerMove { position, .. } => {
+                let line = this.bend_zone_at(*position, cx).filter(|_| this.bend_within(*position, 2.0, cx).is_none());
+                this.set_bend_hover(line, cx);
             }
             ViewportEvent::ContextMenu { position, pick } => {
                 if let Some(i) = pick.and_then(|id| this.face_index(id)) {
@@ -149,7 +162,7 @@ impl FlatView {
             ViewportEvent::CameraChanged if this.fitted.is_some_and(|c| c != this.viewport.read(cx).camera) && this.viewport.read(cx).size() == this.fit_size => this.pending_fit = false,
             _ => {}
         });
-        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, sides: Vec::new(), selected: None, picked: None, sketch_scene: None, selected_bend: None, sketch_frame: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
+        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, bend_hover: None, sides: Vec::new(), selected: None, picked: None, sketch_scene: None, selected_bend: None, sketch_frame: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
     }
 
     /// Show `flat` in `color` (linear RGBA, the part's). The first pattern
@@ -213,6 +226,11 @@ impl FlatView {
 
     /// The bend line within 5 px of a viewport-local point.
     fn bend_at(&self, p: glam::DVec2, cx: &App) -> Option<usize> {
+        self.bend_within(p, 5.0, cx)
+    }
+
+    /// The bend line within `tol` px of viewport point `p`, the nearest.
+    fn bend_within(&self, p: glam::DVec2, tol: f64, cx: &App) -> Option<usize> {
         let (f, _) = self.flat.as_ref()?;
         let vp = self.viewport.read(cx);
         f.flat_view_bend_lines()
@@ -223,9 +241,18 @@ impl FlatView {
                 let t = ((p - a).dot(b - a) / (b - a).length_squared().max(1e-12)).clamp(0.0, 1.0);
                 Some((i, (a + (b - a) * t).distance(p)))
             })
-            .filter(|x| x.1 <= 5.0)
+            .filter(|x| x.1 <= tol)
             .min_by(|x, y| x.1.total_cmp(&y.1))
             .map(|x| x.0)
+    }
+
+    fn set_bend_hover(&mut self, line: Option<usize>, cx: &mut Context<Self>) {
+        if line == self.bend_hover {
+            return;
+        }
+        self.bend_hover = line;
+        self.compose(false, cx);
+        cx.emit(FlatViewEvent::BendHover(line.and_then(|l| self.bend_of_line(l))));
     }
 
     /// The model's bend (index into its bends) of bend line `line`.
@@ -339,7 +366,7 @@ impl FlatView {
         }
         self.viewport.update(cx, |vp, cx| vp.set_plane_labels(fills, cx));
         let scene = match &self.parts {
-            Some((display, built, _)) => crate::scene_builder::with_highlights(built, display, &selected, self.hover.as_ref(), &[], extra_now, Default::default(), self.gpu.uploader()),
+            Some((display, built, _)) => crate::scene_builder::with_highlights(built, display, &selected, self.hover.as_ref().filter(|_| self.bend_hover.is_none()), &[], extra_now, Default::default(), self.gpu.uploader()),
             None => Scene::default(),
         };
         self.viewport.update(cx, |vp, cx| vp.set_scene(Arc::new(scene), geometry_changed, cx));
@@ -392,11 +419,11 @@ fn flat_parts(flat: &FlatPattern, color: [f32; 4], highlight: Option<usize>, hov
     let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: !display.sketches.is_empty(), show_origin: false, ..Default::default() };
     let built = crate::scene_builder::build(&display, &opts, &mut Default::default(), gpu.uploader());
     let mut extra: Vec<Instance> = Vec::new();
-    // Live (sm-105, 4x): dark centre lines through the bend zones, over the
-    // flat's top (the reference side, z 0).
+    // Live (sm-105, 4x): dark centre lines through the bend zones, over the flat's top (the reference side, z 0),
+    // dashed 10 / 10 / 5 / 10 px at every zoom (live sheetmetal-gaps2).
     let mut lines = LineData::default();
     for (a, b) in flat.flat_view_bend_lines() {
-        lines.push_polyline(&[a.as_vec3().to_array(), b.as_vec3().to_array()], [0x33, 0x33, 0x33, 0xff], 0, 1.0, LineSegment::DASH_DOT);
+        lines.push_polyline(&[a.as_vec3().to_array(), b.as_vec3().to_array()], [0x33, 0x33, 0x33, 0xff], 0, 1.0, LineSegment::CENTER_LINE);
     }
     if !lines.segments.is_empty() {
         extra.push(Instance::new(Drawable::Lines(gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(12));

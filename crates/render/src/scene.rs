@@ -74,6 +74,9 @@ impl LineSegment {
     pub const NO_HOLD: u32 = 128;
     /// Picked 5 px wide whatever its drawn width (a plane's border: live lights it from 7–8 px).
     pub const WIDE_PICK: u32 = 256;
+    /// A sheet metal bend's centre line in the flat view: 10 px on, 10 off, 5 on, 10 off, the same at every zoom (live
+    /// sheetmetal-gaps2).
+    pub const CENTER_LINE: u32 = 512;
 }
 
 impl LineData {
