@@ -12,7 +12,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   A feature that gets worse writes compat/ALERT-<sha> and one line per feature to /tmp/lead/qa-alerts. Move the baseline by
   restarting the unit with the new version (rel-published.sh does it).
 - **qa-w7-nightly**: bin/w7-nightly.sh. Sleeps to 02:00 UTC, then on vibe7 with the newest release (downloaded to vibe7
-  ~/qa-rel/<v>/) runs: (1) opentime.py (hat8, hat15, hat15b, dock) and modeltime.py (84 suite docs), 3 runs; nightly-sum.py
+  ~/qa-rel/<v>/) runs: (1) opentime.py (hat8, hat15, hat15b, dock) and modeltime.py (84 suite docs), 3 runs, the previous release's CLI
+  alternating with the current one (DECISIONS db4db21a0; the row shows the same-session sums and docs > 1.25x slower, details
+  nightly/<mmdd>.json vs_prev); nightly-sum.py
   -> a row in SCORE.md "Nightly, vibe7 02:00" (pushed from the qa worktree); (2) the latency set (bin/../lat/hat/lat-priv.sh:
   hat15 / dock UI-script rounds + cold / reopen + rotate / pan / zoom, block baseline) -> nightly/lat-<mmdd>.txt; (3) the
   QUIT-ABORT-DOCK guard (qa-asm-a x5) -> nightly/quit-<mmdd>.txt. Failures and a crash append to /tmp/lead/qa-alerts. Log:
@@ -24,7 +26,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - vibe7 user units **qa-fzloop** + **qa-fz-xvfb** (`systemctl --user` there): the GUI fuzz, ~/qa/bin/fzloop.sh :61 on
   ~/qa/rel/noshape-green (0.4.52-era green; refresh by copying a newer app to that path), seeds from ~/qa/fzseed.next,
   results ~/qa/fz*-result.txt. fzrun.sh kills the app's own `--reopen` restarts after each run. Pause: touch
-  ~/tmp/qa-fz-pause-61.
+  ~/tmp/qa-fz-pause-61; it also idles 01:50-04:05 every night (the window runs alone).
 
 ## Release checks (per release; lead cuts 05:00 / 17:00)
 1. Candidate: bin/rel-cand.sh <prev> <tag> (checks out nothing: check out the candidate in worktree qa-bisect first; builds
@@ -52,6 +54,13 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   ms on a block), dock's first switch to B 14.7 s settle. psui owns the hat15 fillet edit (Tab not applying a variable-bound
   Radius; ✓ leaving the dialog open); my 7.9 / 4.4 s were the caret blink (lat-steps now 450 ms quiet). Send owners only
   what the nightly confirms slow, or > 3x a PLAN 2.7 target.
+- Clean A/B v0.4.48 vs v0.4.53 (impeller, helical, knife incl. Fillet 5): bin/ab-clean.sh as unit qa-ab-clean, after asm's
+  full7 on vibe7, `SLOT_QUIET_OK=1 ~/bin/slot`, load every 30 s, removes ~/.slot-quiet -> nightly/ab-clean-<mmdd>.*; valid if
+  load < ~1.5. Owners so far: impeller Delete face 2 is upstream (core: Move face 1 fails where live builds; blend Fillet 28/29),
+  impeller fillet failure cost (blend 29c1841df), helical Sweep 1 fixed on main (bool2 895c8e3b / e47268f2).
+- v0.4.54: unit qa-pub-0454 builds the candidate CLI (release/v0.4.54 8a8537439, qa-bisect, vibe5), then rel-published.sh
+  0.4.54 and rel-compat.sh 0.4.53 0.4.54.
+- The suites runs of 11-16 00:32 (f14f85a8) and 04:43 (601df0ac) were stopped to keep vibe7 quiet; the loop reruns.
 - QUIT-ABORT-DOCK: verified fixed (80e16e42d); guarded by the nightly and rel-published.
 - f197 Fillet 1 vs 0.4.51 was core's 1ac08e247 (reverted on v0.4.52's branch); 0.4.52 baseline is clean.
 
