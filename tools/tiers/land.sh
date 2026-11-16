@@ -82,6 +82,9 @@ deps = {p['name']: {d['name'] for d in p['dependencies'] if d['name'] in pk} for
 touched = {n for n, d in pk.items() if any(c == d or c.startswith(d + '/') for c in changed)}
 if any(c in ('Cargo.toml', 'Cargo.lock') or c.startswith('.cargo/') for c in changed): touched = set(pk)
 out = set(touched) | {n for n, ds in deps.items() if ds & touched}
+# noshape-model only re-exports the engine crates: its real users (the agent API, e2e) are one level further, so a
+# change under it also runs noshape-ops (11-16: a drawing-only change broke an ops e2e test the land never ran).
+if 'noshape-model' in out: out.add('noshape-ops')
 out.discard('noshape-workspace-hack')
 print(' '.join(sorted(out)))
 P
