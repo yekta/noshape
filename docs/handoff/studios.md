@@ -9,14 +9,14 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-16 04:37 UTC.
+Updated 2026-11-16 05:02 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncommitted.
 
 ## Queued to land
-- de12cde2 (queued 04:28, 7 commits): the TITLE split (TITLE = "Title", "Title 2", "Title 3", `TITLE_KEYS`; old
+- LANDED 05:02 as 547a769e: the TITLE split (TITLE = "Title", "Title 2", "Title 3", `TITLE_KEYS`; old
   drawings and saved templates split a three-line Title on load: `Drawing::upgrade_title_lines`; e2e
   drawing_title_block_fields, drawing_title_lines_from_an_old_file); Drawing properties (live2 drw-dprops-*: dual
   precision 0.12 metric / 0.123 inch, `mark_first` dropdowns); TITLE's pick areas as live2's drw-title-field-* (a
@@ -25,7 +25,7 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Nothing uncomm
   for UI scripts; drawing_matrix.py ignores a hole table dump's hidden texts. Full drawing run on that binary (vibe7
   04:00): 290/294, the rest known (centermark x2, two takes without a recording); the later fixes: 39 title / note /
   dprops takes match on vibe6.
-- 79624acbd (to queue once de12cde2 lands): a box on the empty sheet starts past 7 px (`BOX_START_PX`, live2
+- Queued 05:02: a box on the empty sheet starts past 7 px (`BOX_START_PX`, live2
   drw-feel-q (a)); GPUI a_box_on_the_empty_sheet_starts_past_7_px; 5 drag takes match.
 
 Areas (11-16 01:30-02:30, vibe5): Feature Studio 116/116 takes, versions/history/release 154/154, documents/tabs/
