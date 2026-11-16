@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-16 21:35 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-16 23:25 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -38,16 +38,28 @@ reproducer is live's 1 MB file, exchange suite covers it); e3109d3c drawings: B-
 654ffaf5: x_t export writes offset surfaces as OFFSET_SURF over their basis's B-surface and puts each fin's SP-curve in
 the period of the B-surface's range as written (rings-loft Part 1 read back 302.72 -> 440.65 mm³, 440.77; T1
 export::offsets_of_a_periodic_bsurface_round_trip_through_parasolid).
+Landed 11-16 late: 212337b1 x_t import: a blend's tube stations from its spine's curvature, halved until round to
+1 nm (were r/16: 618-1235 stations; live's rings-loft x_t imported 7.1 -> 3.1 s on the Mac, same parts; query_parts' 4.7 s
+is OCCT volume integration, generic). Queued: x_t export joins a periodic face's pieces OCCT cut only at its seam
+(face_joins) into one face, and fuses a rim's arcs meeting at a vertex only they use (housing-draft x_t matches;
+T1 export::a_cone_face_cut_at_its_seam_writes_as_one_face).
+Suite x1116j (main + both, vibe6 23:12): ours imports live's 59/75, live imports ours 46/48, ours reads ours 112/118,
+times 48/49, drawings' DXF 0/4.
 Open, ranked:
-1. Drawings: rings-loft ARC 40 for live's 91: in the isometric view live writes ARCs (r 0.02-0.13 in) where ours are
-   ELLIPSEs of ratios 0.34-0.82 (/root/dx-scratch/rl: ours-drawing.dxf, live-drawing.dxf; region (6,6)); TANGENT
-   ELLIPSE 4 for 33. Tolerance 0.1 µm was tried and is not the answer. sm-louver 117 of 243 bend lines on TANGENT_LINES.
-   The empty-view race's cause is unknown (a shared lock with meshing did not fix it); find it if 4fd6bad2's fallback
-   shows up in timings.
-2. Our SAT, other docs (rerun the suite first: 03467fc8 may cover them): motor-mount-jack 24/26/2 for 16/24/0;
-   cf-hose-routing 22/44/24 for 12/12/0; cf-o-ring Part 3 read back as another ring (names?).
-3. Our own rings-loft x_t: volume fixed (654ffaf5); still 275 faces for 273 (check box in x1116n). housing-draft x_t reads back 37/82/46 for 36/79/44.
-4. SAT of live: sm-louver's file splits two cylinders (40 faces); waits on live-self "ACIS".
+1. rings-loft ours.sat not exported ("Geom_RectangularTrimmedSurface::V parameters out of range"): SAT writer.
+2. rings-loft own x_t Part 1 275/776/517 for 273/762/508, Part 2 133/338/208 for 132/335/206.
+3. Our SAT read-backs: motor-mount-jack 24/26/2 for 16/24/0; hose 22/44/24 for 12/12/0; o-ring Part 3 4/7/2 for 1/0/0.
+   live's: sm-louver Part 2 40/82/44 for 38/76/40; rings-loft live.sat/.igs 275/771/514 for 273/762/508.
+4. Drawings DXF 0/4. rings-loft ARC 40 for 91 is model geometry: live's Shell walls are exact rational tubes (deg 3x2;
+   their cuts with the cylinders 56 ELLIPSEs), ours are offsets written as approximations (deg 15x13, 7189 poles), the
+   cuts B-splines (/root/dx-scratch/bin/step_edgefaces.py, step_bsurf.py). Reported to the lead for bool/core.
+   housing-draft ARC 0/3, ELLIPSE 10/15, SPLINE 15/7; sm-louver ARC 101/68, ELLIPSE 50/86, SPLINE 31/0.
+- Not bugs: sheet-metal-plus ours.3mf read back 554665 for 626770 mm³ (the suite's fallback expectation: Part 2 inside
+  Part 1 is its hollow, as live's import of ours.obj does; wait for live's 3MF import of ours). ours.obj "3 parts, live
+  2": ours reads the zip by groups (live refuses zips), live was given the bare .obj.
+- Intermittent segfault (vibe6, binary ops-ex2 22:47 and 22:52, both right after rings-loft's imports, before its STEP
+  export); not again in 8 runs (vibe5 gdb, vibe5/vibe6 plain, x1116j). gdb on vibe5: `handle SIG37 nostop noprint
+  pass` (the checkpoint thread's signal). Watch for it.
 - c2-config-parts-screws: hang fixed (b777cbd1), still in tests/parity-models/unscored.json: Sweep 1's 14.8 GB
   Boolean is bool's P0 (lead 11-16). Score it once fixed. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
 - Exchange suite x1116n running (above); set 2 again when live2 refetches.
