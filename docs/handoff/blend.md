@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-16 00:58 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-16 01:41 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -16,9 +16,10 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   2 fillets, both "as-is not kept"; never on a kept one. Dock tab B with scale-first: every fillet's part identical
   (faces/edges/vertices, volume, area) to log mode; Rib Round Dizi ~270 -> ~160 ms, Rib Round 1 ~150 -> ~130 (vibe6
   at load 15: candidates). Rib Dip R 1 / Dizi don't fire (their as-is round thrown away too: a wider trigger later).
-  Full check queued on vibe6 (unit blend-seq-sf, bin/seq-sf.sh): CLI, model pair blend2 (main) vs blend6 (logs
-  suite-sf-*), assemblies (asm-sf-{base,new}.log). Then qa's userdocs.py on vibe5 (hats, dock, 47 tickets) with green
-  (= base) vs my CLI. Land if all identical.
+  qa's userdocs.py on vibe5 (green 84f94ad8a = base vs my CLI): hat15, hat15b, hat8, dock and the 47 ticket docs all
+  SAME (log userdocs-sf.log). Still queued on vibe6 (unit blend-seq-sf, bin/seq-sf.sh; behind asm's s49 in the slot):
+  model pair blend2 (main) vs blend6 (suite-sf-*: every suite doc, corner-break's 42 faces), then the assemblies
+  (asm-sf-{base,new}.log). Land if all identical.
 
 ## Open questions / waiting
 
@@ -32,15 +33,17 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - c2-impeller-loft feature 26 (dx, OFFSET_ANGLE 3.5 mm / 20 deg): our chain is linked (edge 81 the circle, 16 / 19 the
   splines) and puts the width on feature 24's faces 2 / 3 as live; the difference is elsewhere (how width / angle reach
   the kernel, or the build). Next after the above.
-- isaac-ball 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63): 14 line edges between planes, R 4.5; face 21 is
-  9 mm tall between 73 + 80 and 76 + 77: full rounds across a strip of a bigger face (live: one half cylinder each,
-  face 21 split 618.32 + 216.00). Cause: checked_blend's hair-smaller retry is valid with a 9e-9 m neck left in face
-  21, and without_necks ran only when invalid at part scale. Branch `blend-necks` 97f669374 (blend4): always cut a
-  neck where that is valid at part scale. Probe (kernel test zz_probe_m3c, dump vibe6 ~/tmp/blend/m3c-fillet.brep):
-  73 + 80 now one half cylinder (127.2345 mm2, face 21 split); 76 + 77's 1e-5 retry cut is valid at working scale but
-  not at part scale (a plane piece UnorientableShape / NoCurveOnSurface after the scale back; ShapeFix or cutting at
-  the part's scale fixes it), so it falls to by_groups: one exact R 4.5 face (129.7389, live 129.69) but 250 ms. All
-  14 together: 43 faces, the merge not reached. Next: cut at the part's own scale; then all 14; pairs.
+- isaac-ball 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63): 14 line edges, R 4.5; face 21 has a 9 mm strip:
+  full rounds across it (live one half cylinder each, face 21 split 618.32 + 216.00). checked_blend's hair-smaller
+  retry leaves a 9e-9 m neck in face 21. Branch `blend-necks` d6de0d70f (blend4): necks cut (all, at the part's scale
+  when the working-scale cut isn't valid there), pcurves stored on new plane pieces, full rounds 5e-5 R apart.
+  73 + 80: one half cylinder 127.2345 mm2, face split, as live. 76 + 77 (needs the 1e-5 retry): the cut comes out
+  invalid again once scaled (a sewn plane piece), so the neck stays. All 14: 42 faces. Probe zz_probe_m3c, dump vibe6
+  ~/tmp/blend/m3c-fillet.brep. Next: find why a sewn piece breaks under BRepBuilderAPI_Transform.
+- GearLab 90f78b (asm-isaac-ball; core's opLoft fix): two causes. Ours: a variable fillet run found its edges by name
+  and the tooth root's two share one (same edge twice); fixed on branch `blend-gearvar` 8055969d5 (+ a fillet-variable
+  op dump). Then OCCT can't round either edge even at a constant 0.2 mm (90.24 deg cone / loft B-spline): asked core
+  to check the new loft face (dump vibe6 ~/tmp/blend/gd/fillet-variable-15). Land the name fix with a T1 later.
 - Boolean sections (bool's): the knife's Chamfer 1 58 ms / Fillet 2 17 ms are OCCT on pairs that touch within the
   knife's ~21 um tolerances (a disjointness test proves 4 of 96; parked hulls-wip.patch).
 - cf-snap-hook (dx): Mac release Fillet 6 26 ms (live 8), Fillet 3 14 (7); the document 243 vs live 274. Low.
