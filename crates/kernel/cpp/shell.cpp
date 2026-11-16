@@ -11386,13 +11386,35 @@ OpOut op_draft_parting_curve(const OcShape& solid_in, const OcShapeList& faces_i
       const int N = 128;
       occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, N + 1), near_pts = new NCollection_HArray1<gp_Pnt>(1, N + 1);
       occ::handle<NCollection_HArray1<double>> prm = new NCollection_HArray1<double>(1, N + 1);
-      for (int k = 0; k <= N; ++k)
+      // An open curve's sheet runs on a tenth past its ends, so that it crosses the slab: ending on the faces its ends
+      // lie on (the slab's sides too) or short of them where the rulings lean, it split nothing and the whole slab went
+      // (c2-parting-line-draft-parting-line's Draft 1: 154234 mm³ off, live 45232). Where the face's surface can't take
+      // the curve on, its ends as they are.
+      auto sample = [&](double lo, double hi) {
+        for (int k = 0; k <= N; ++k)
+        {
+          const double t = k == N ? hi : lo + (hi - lo) * k / N;
+          const double tt = closed && k == N ? lo : t; // the same point
+          near_pts->SetValue(k + 1, c->Value(tt));
+          pts->SetValue(k + 1, far_at(tt));
+          prm->SetValue(k + 1, t);
+        }
+      };
+      const double ext = closed || c->IsPeriodic() ? 0.0 : 0.1 * (b - a);
+      double       lo = a - ext, hi = b + ext;
+      try
       {
-        const double t = k == N ? b : a + (b - a) * k / N;
-        const double tt = closed && k == N ? a : t; // the same point
-        near_pts->SetValue(k + 1, c->Value(tt));
-        pts->SetValue(k + 1, far_at(tt));
-        prm->SetValue(k + 1, t);
+        sample(lo, hi);
+      }
+      catch (const std::exception&)
+      {
+        lo = a, hi = b;
+        sample(lo, hi);
+      }
+      catch (const Standard_Failure&)
+      {
+        lo = a, hi = b;
+        sample(lo, hi);
       }
       // Both ends interpolated on the same parameters (the same knots), so
       // the rulings join C(t) to its far end: a degree 3 × 1 B-spline (live:
@@ -11411,8 +11433,8 @@ OpOut op_draft_parting_curve(const OcShape& solid_in, const OcShapeList& faces_i
       if (!ip.IsDone() || !in.IsDone())
         fail_op("draft: ruling end curve failed");
       occ::handle<Geom_Curve> far_curve(ip.Curve()), start(in.Curve());  // direct-init: older GCC (CI) rejects the converting copy-init
-      TopoDS_Edge e0 = BRepBuilderAPI_MakeEdge(start, a, b).Edge();
-      TopoDS_Edge e1 = BRepBuilderAPI_MakeEdge(far_curve, a, b).Edge();
+      TopoDS_Edge e0 = BRepBuilderAPI_MakeEdge(start, lo, hi).Edge();
+      TopoDS_Edge e1 = BRepBuilderAPI_MakeEdge(far_curve, lo, hi).Edge();
       TopoDS_Face rf = BRepFill::Face(e0, e1);
       if (rf.IsNull())
         fail_op("draft: ruled face failed");
@@ -11438,9 +11460,10 @@ OpOut op_draft_parting_curve(const OcShape& solid_in, const OcShapeList& faces_i
     sp.Build(new_cancel_indicator()->Start());
     if (sp.HasErrors())
       fail_op("draft: split failed");
+    const TopoDS_Shape pieces = sp.Shape();
     tool_chain.push_back(sp.History());
     // Pieces touching the face (a face of theirs on its surface).
-    for (TopExp_Explorer z(sp.Shape(), TopAbs_SOLID); z.More(); z.Next())
+    for (TopExp_Explorer z(pieces, TopAbs_SOLID); z.More(); z.Next())
     {
       const TopoDS_Shape w = z.Current();
       bool touches = false;
@@ -11500,6 +11523,16 @@ OpOut op_draft_parting_curve(const OcShape& solid_in, const OcShapeList& faces_i
   }
   ShapeUpgrade_UnifySameDomain usd(r, true, true, false);
   usd.SetLinearTolerance(1e-7);
+  // Only what the draft made merges: edges away from the drafted faces stay (a Split's line on a face the draft didn't
+  // touch, c2-parting-line-draft-parting-line's y = 25 side: live 8 faces).
+  {
+    ShapeIMap drafted;
+    for (const TopoDS_Shape& fx : faces.items)
+      TopExp::MapShapes(fx, TopAbs_EDGE, drafted);
+    for (TopExp_Explorer x(solid.shape, TopAbs_EDGE); x.More(); x.Next())
+      if (!drafted.Contains(x.Current()))
+        usd.KeepShape(x.Current());
+  }
   usd.Build();
   chain.push_back(usd.History());
   r = single_solid(usd.Shape());

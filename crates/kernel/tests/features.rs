@@ -1680,3 +1680,18 @@ fn a_pocketed_block_shells_with_sharp_concave_corners_as_live() {
         assert!((v - w).abs() < 1e-9 * w, "t {t}: {v} vs {w} mm³");
     }
 }
+
+/// A wavy parting line across a block's side, from one end face to the other, drafted 20° both ways (live:
+/// c2-parting-line-draft-parting-line's Draft 1, TOP 8 / 18, 367268.53 mm³ in [366635.71, 367901.36]): each side's
+/// ruled sheet runs on past the curve's ends and cuts its wedge; the Split's line on the other side stays.
+#[test]
+fn a_wavy_parting_line_across_a_block_drafts_both_sides_as_live() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/draft/wave-parting-line.brep");
+    let s = read_brep(&path).unwrap();
+    let faces = s.faces();
+    let r = draft_parting_curve(&s, &[faces[0].clone(), faces[1].clone()], &[s.edges()[2].clone()], DVec3::Z, &[20f64.to_radians(); 2]).unwrap().shape;
+    assert!(r.is_valid());
+    assert_eq!((r.faces().len(), r.edges().len()), (8, 18));
+    let v = r.volume().unwrap() * 1e9;
+    assert!((366635.71..=367901.36).contains(&v), "volume {v} mm³");
+}
