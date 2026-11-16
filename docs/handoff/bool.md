@@ -4,18 +4,14 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-16 02:50 UTC.
+Updated 11-16 04:43 UTC.
 
 ## In flight
-- Queued to land: 56a9528b (566b10155 re-queued 01:5x: it had dropped out of the queue, neither landed nor failed; Shell
-  self-interference filter, closed-form distance from a cylinder / cone / sphere / ring torus patch before meshing;
-  c2-bottle-split Shell 1 33 -> 18 ms). Gate 578353275 clean; hats/dock 12/12 SAME.
-- Gating (retry, built 01:57, running): fa8a800ef (worktree bool-hat, branch bool-impeller-sliver): quadric_across, an
-  extrusion against a cylinder across its direction or a sphere, per ruling A w^2 + B w + C = 0; runs within the heights
-  and the other face's box, cut where the angle passes the other surface's OWN seam (as OCCT); declines at tangent
-  rulings and across profile knots. c2-rings-loft 8f262543 (Extrude 5): 13 pairs ours, same counts / volume. Then
-  hats/dock (/root/bool-hat-scratch/udoc-ab.sh, in bool-split: point its final `git switch` at the branch) and land.
-- Next to gate (after fa8a800ef; branch bool-cp2-ahead in bool-split, 2 commits on d0948a91b):
+- Landed tonight: a8b8f1851 (Shell self-interference filter), a2952b32 (quadric_across: an extrusion against a cylinder
+  across its direction or a sphere, our own sections; its gate's suite FAIL was ~/parity/models rewritten mid-run, the
+  12 changed documents identical main vs branch on one model set; hats/dock 12/12 SAME).
+- Gating (unit bool-gate-e5c584e35b; the first run died on the 04:37 ~/bin/slot rewrite): branch bool-cp2-ahead in
+  bool-split, 2 commits on d0948a91b:
   3a3249cbc moved_pair returns None where the uncopied face is free-form (clear_inside always refuses those, so the
   pairs were sectioned one at a time on the main thread after the moved curves; now they go in the parallel ahead
   batch): c2-rings-loft CP2 fuse 86892e9b ~10 % faster in 6 of 6 interleaved rounds, 103/261 and volume the same.
@@ -94,7 +90,7 @@ cf-snap-hook 866 / 274 (suite run 18:5x); c2-bottle-split Split 1 ~12 ms in rele
 - g++-13: /root/bool-scratch/gcc13-split.sh / gcc13-hat.sh <file.cpp> (name only, e.g. rust_boolean.cpp).
 - A/B binaries: /root/bool-scratch/kb5.sh <worktree> <name> (kernel release test binary to vibe5 ~/tmp/bool/<name>).
 - Private documents (hats, dock): vibe5 ~/agents/bool-keep/private (mode 700); compare main vs branch with
-  /root/bool-hat-scratch/udoc-ab.sh (copies in ~/tmp/bool/udoc, deleted after).
+  /root/bool-hat-scratch/udoc-ab.sh <commit> (builds in bool-split, returns to its branch; copies in ~/tmp/bool/udoc, deleted after).
 - Probes (xprobe.rs): probe_case_timed (PROBE_CORPUS, PROBE_CASE, PROBE_RUNS; NOSHAPE_SAMPLE_OUT samples all runs),
   probe_case_sample (PROBE_ONLY rust/occt, PROBE_SAMPLE), probe_case_unify, probe_shell_dump (PROBE_DUMP=vibe7
   ~/agents/bool-keep/rl/shell-9; NOSHAPE_SHELL_DEBUG for stage times), probe_split_dump, probe_project_dump.
