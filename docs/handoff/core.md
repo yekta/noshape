@@ -82,6 +82,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   out): every score as before (pulleys' Sketch 1 now kept; the rest stop at take-backs, in skasm's handoff). T1
   parity::a_configuration_variable_takes_the_captured_configurations_value. Land after the six, with those 6 docs as
   its pair.
+- c2-surf-workshop-cpcurves Main pipe (thin sweep, 7/24): (1) Sketch 4's circle kept 18.8 mm off the path (translator
+  take-back: in skasm's handoff). (2) Mine: live merges the faces swept along the path's three collinear lines into
+  one per wall (6 faces; ours 10: a face per path edge). Try unify_same_domain on sweep results (same surface only:
+  the spline's face stays apart), names via unify_merged as solid_a.rs ~1808; needs a suite pair.
 - **Lofts (mine, from dx's list):**
   c2-loft-guide-curves-wave-washer Loft 1: Sketch 4's rectangles are 63.5 mm off live's (an external COINCIDENT to
   live vertex JHk/JH4 unresolved: in skasm's handoff 11-16), which explains the "83 mm off the ring" below; redo the
