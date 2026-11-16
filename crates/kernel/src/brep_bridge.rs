@@ -379,6 +379,29 @@ fn pool_leave(previous: usize) {
     unsafe { noshape_pool_leave(previous as *mut std::ffi::c_void) }
 }
 
+/// The calling thread's stop state (its cancel flag and its budgets' deadlines), for work it hands to other threads
+/// while it waits for them: [`with_stop_state`] there.
+#[derive(Clone, Copy)]
+pub struct StopState(usize);
+
+/// This thread's [`StopState`].
+pub fn stop_state() -> StopState {
+    StopState(pool_capture())
+}
+
+/// Runs `f` on this (worker) thread under `s`, the stop state of a thread that waits for it: its cancel and budgets
+/// stop the kernel's work here too.
+pub fn with_stop_state<R>(s: StopState, f: impl FnOnce() -> R) -> R {
+    struct Leave(usize);
+    impl Drop for Leave {
+        fn drop(&mut self) {
+            pool_leave(self.0);
+        }
+    }
+    let _leave = Leave(pool_enter(s.0));
+    f()
+}
+
 fn kernel_should_break() -> bool {
     // SAFETY: a plain C function of the kernel's, reading this thread's state.
     unsafe { noshape_should_break() != 0 }
