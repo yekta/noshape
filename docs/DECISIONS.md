@@ -55,8 +55,10 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   them on every host, with backups, before the land.
 - 11-15 Draft 1 (1dc32b): OCCT patch + wedge fallback, not wedges-first.
 - 11-15 Parsed-std disk cache parked: at most 2 ms gain for 15 MB and more code. Keep it simple.
-- 11-15 Speed claims: relative A/B in one run on any host; absolute numbers only from the 02:00 vibe7 window or a quiet
-  host; vibe timings under load are candidates, not results.
+- 11-16 Speed comparisons count only when both builds run in the same session, alternating, on an otherwise idle host
+  (load recorded, near idle throughout; nothing else on it). Never compare runs from different sessions or nights.
+  A/Bs on a loaded host are hints for where to look, never results. The nightly window runs the previous and the
+  current release back to back.
 
 ## Process
 - 11-14 Never ask the user anything; decisions go to the lead as "decision needed: …" and work continues.
