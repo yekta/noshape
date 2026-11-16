@@ -709,17 +709,28 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
     sections(ev, bi, edges, spec, false, None)
 }
 
-/// A round's rolling-ball tools and contact conics ([`rolling_ball_blend`]'s), made ahead (while OCCT tries the round).
-pub struct BallTools(FResult<(Vec<Shape>, Vec<k::Conic>)>);
+/// A round's rolling-ball tools and contact conics ([`rolling_ball_blend`]'s), made ahead (while OCCT tries the round),
+/// and the direct build by them when made before OCCT's try ended.
+pub struct BallTools(FResult<(Vec<Shape>, Vec<k::Conic>)>, Option<k::Result<k::OpResult>>);
 
-/// [`rolling_ball_blend`]'s tools for `edges` of `shape` at radius `r`; given up once `stop` is set.
+/// [`rolling_ball_tools`]'s tools for `edges` of `shape` at radius `r`, then the direct build by them (c2-hunting-
+/// knife's Fillet 3: 25 ms after OCCT's 26 ms try, run beside it); given up once `stop` is set.
 pub fn rolling_ball_tools(shape: &Shape, edges: &[usize], r: f64, stop: &std::sync::atomic::AtomicBool) -> BallTools {
-    BallTools((|| {
+    let made = (|| {
         let ef = shape.edge_faces()?;
         let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
         let chain = chain_ordered(shape, edges, true)?;
-        ball_tools(shape, &chain, &ef, &shape.faces(), r, scale, Some(stop))
-    })())
+        let tools = ball_tools(shape, &chain, &ef, &shape.faces(), r, scale, Some(stop))?;
+        Ok((tools, chain.iter().map(|c| shape.sub_shape(ShapeType::Edge, c.index)).collect::<Result<Vec<_>, _>>()))
+    })();
+    match made {
+        Ok((tools, Ok(rims))) if !stop.load(std::sync::atomic::Ordering::Relaxed) => {
+            let direct = k::with_cancel(stop, || k::blend_direct(shape, &tools.0, &rims));
+            BallTools(Ok(tools), Some(direct))
+        }
+        Ok((tools, _)) => BallTools(Ok(tools), None),
+        Err(e) => BallTools(Err(e), None),
+    }
 }
 
 /// A round of radius `r` whose sections on curved faces are exact rolling balls, one face per edge, running on past
@@ -902,9 +913,14 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     let mut cut_edges: Vec<usize> = Vec::new();
     let mut refaced: Vec<(usize, Shape)> = Vec::new();
     let mut conics = Vec::new();
+    // (The direct build by the ball tools, made with them.)
+    let mut direct = None;
     if ball {
         let (tools, contacts) = match made {
-            Some(BallTools(made)) => made?,
+            Some(BallTools(made, made_direct)) => {
+                direct = made_direct;
+                made?
+            }
             None => ball_tools(shape, &chain, &ef, &faces, spec.r1, scale, None)?,
         };
         conics = contacts;
@@ -1217,7 +1233,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     if (ball || ranges.iter().any(|r| r.2)) && adds.is_empty() && !cuts.is_empty() {
         let tools: Vec<Shape> = cuts.iter().map(|t| t.shape.clone()).collect();
         let rims = cut_edges.iter().map(|&e| shape.sub_shape(ShapeType::Edge, e)).collect::<Result<Vec<_>, _>>()?;
-        match k::blend_direct(shape, &tools, &rims) {
+        match direct.take().unwrap_or_else(|| k::blend_direct(shape, &tools, &rims)) {
             // (Checked valid by the build.)
             Ok(res) if res.shape.count(ShapeType::Solid) == 1 => {
                 let names = body.shape_names();
