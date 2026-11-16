@@ -865,8 +865,9 @@ ProjPoint face_project_point(const OcShape& fs, P3 p)
       {
         double u, v;
         pr.LowerDistanceParameters(u, v);
-        const TopAbs_State st = classify_periodic(f, surf, u, v, BRep_Tool::Tolerance(f));
-        if (st == TopAbs_IN || st == TopAbs_ON)
+        // (Not moved by periods as face_contains_point's: c2-hunting-knife's Fillet 5 came out with a face more.)
+        BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), BRep_Tool::Tolerance(f));
+        if (fc.State() == TopAbs_IN || fc.State() == TopAbs_ON)
         {
           ProjPoint r{};
           r.point    = from_pnt(pr.NearestPoint());
