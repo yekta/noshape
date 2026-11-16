@@ -40,7 +40,15 @@
      35,
      2
     ]
-   }
+   },
+   "ours_on": {
+    "face": [
+     30,
+     0,
+     15
+    ]
+   },
+   "note": "live's ray through (30, 35, 2) passes ~0.3 mm above Flange 1's top edge and takes its outer wall (Face of Flange 1); ours clicks the middle of that wall, far from any edge, so sub-pixel camera drift can't flip the pick (lead 11-16)"
   },
   {
    "do": "wait",

@@ -6,7 +6,7 @@ use super::*;
 
 /// The GPU lock, once a GPU's pick is known to come back: a point drawn at the frame's centre picks there. None (and
 /// why) where it doesn't: CI's Linux runner has no adapter, macOS CI's readback came out white (run 42333748082).
-fn gpu_pointer() -> Option<parking_lot::MutexGuard<'static, ()>> {
+pub(super) fn gpu_pointer() -> Option<parking_lot::MutexGuard<'static, ()>> {
     let lock = noshape_ops::doc::gpu_lock();
     if let Err(e) = Gpu::headless_rendering() {
         eprintln!("feel: GPU pointer tests skipped: {e}");
@@ -32,24 +32,24 @@ fn gpu_pointer() -> Option<parking_lot::MutexGuard<'static, ()>> {
 }
 
 /// The pointer in a test window's viewport, by viewport-local CSS px.
-struct Pointer {
+pub(super) struct Pointer {
     window: AnyWindowHandle,
-    vp: Entity<crate::viewport::Viewport>,
+    pub(super) vp: Entity<crate::viewport::Viewport>,
 }
 
 impl Pointer {
-    fn new(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>) -> Self {
+    pub(super) fn new(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>) -> Self {
         let vp = cx.update(|cx| view.read(cx).viewport.clone());
         Self { window, vp }
     }
 
-    fn window_point(&self, cx: &mut TestAppContext, at: DVec2) -> Point<gpui_kit::Pixels> {
+    pub(super) fn window_point(&self, cx: &mut TestAppContext, at: DVec2) -> Point<gpui_kit::Pixels> {
         let origin = cx.update(|cx| self.vp.read(cx).origin());
         gpui_kit::point(origin.x + px(at.x as f32), origin.y + px(at.y as f32))
     }
 
     /// Moves there and waits for the GPU's hover pick of it to show (frames delivered meanwhile).
-    fn move_to(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>, at: DVec2) {
+    pub(super) fn move_to(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>, at: DVec2) {
         let win = self.window_point(cx, at);
         gpui_kit::VisualTestContext::from_window(self.window, cx).simulate_mouse_move(win, None, Modifiers::default());
         let t = std::time::Instant::now();
@@ -74,7 +74,7 @@ impl Pointer {
         }
     }
 
-    fn frames(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>) {
+    pub(super) fn frames(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>) {
         for _ in 0..5 {
             cx.update(|cx| self.vp.update(cx, |v, cx| v.request_frame(cx)));
             cx.update(|cx| view.read(cx).gpu.deliver_frames());

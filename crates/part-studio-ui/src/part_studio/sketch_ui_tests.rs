@@ -36,6 +36,17 @@ impl gpui_kit::Global for KeysBound {}
 
 /// A Part Studio built from a ui-parity start (tests/ui-parity/starts.json's form), or a fresh one.
 fn part_studio_from(cx: &mut TestAppContext, name: &str, start: Option<serde_json::Value>) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    part_studio_with(cx, name, |path| match start {
+        Some(start) => {
+            noshape_ops::ui_parity::build_start(&mut noshape_ops::Ctx::new(), path, &start).unwrap();
+            crate::session::Session::open(path).unwrap()
+        }
+        None => crate::session::Session::create(path, crate::user_units::new_document()).unwrap(),
+    })
+}
+
+/// A Part Studio of the document `make` writes and opens at the path it is given (a scratch file of the test's own).
+fn part_studio_with(cx: &mut TestAppContext, name: &str, make: impl FnOnce(&std::path::Path) -> crate::session::Session) -> (AnyWindowHandle, Entity<PartStudioView>) {
     // Once per App, as the app does: bound again, a key's action ran once per window opened (a matrix's Enter in a
     // field applied, then accepted).
     cx.update(|cx| {
@@ -58,13 +69,7 @@ fn part_studio_from(cx: &mut TestAppContext, name: &str, start: Option<serde_jso
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("ui.noshape");
     let _ = std::fs::remove_file(&path);
-    let session = match start {
-        Some(start) => {
-            noshape_ops::ui_parity::build_start(&mut noshape_ops::Ctx::new(), &path, &start).unwrap();
-            crate::session::Session::open(&path).unwrap()
-        }
-        None => crate::session::Session::create(&path, crate::user_units::new_document()).unwrap(),
-    };
+    let session = make(&path);
     let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).unwrap().id;
     let gpu = if RENDERING.get() { Gpu::headless_rendering().unwrap() } else { Gpu::headless().unwrap() };
     let (window, view) = cx.update(|cx| {
@@ -4452,6 +4457,8 @@ mod sketchtools;
 mod editing;
 #[path = "dialogs_feel_tests.rs"]
 mod dialogs;
+#[path = "latency_tests.rs"]
+mod latency;
 #[path = "fields_feel_tests.rs"]
 mod fields;
 #[path = "feedback_feel_tests.rs"]

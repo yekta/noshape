@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-16 16:23 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-16 17:49 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -56,12 +56,19 @@ docs/DECISIONS.md (read first; it wins over anything here).
   a point and a line ("Min dist") and two circles (Center / Max / Min dist), sketch-key-symmetric / -midpoint /
   -concentric-two-circles match. Left, others': bend / jog / tab "Face of …" labels and bend-relief related rows
   (skasm), gusset title error (skasm), face-rclick-export-dxf (dx).
+- Speed (lead 11-16, PLAN 2.7), live's 30-feature part on the Mac, release, real frames, 120 Hz tick: T2
+  `latency::everyday_interactions_beat_live_on_the_30_feature_part` (`cargo test --release -p noshape-part-studio-ui
+  --lib latency:: -- --ignored --nocapture`). Medians: hover after live's 8-move approach 16.9 ms (target 30; live
+  10–50 + pick), click → selection drawn 8.5 (16.7), Extrude 1 dialog on its preview 17 (100; live 200–300), a depth
+  step's preview 17 (100; live ~400), ✓ → redrawn 43 (155; live 310–350). None slower than live. A whole-frame pick
+  prefetch takes hover to 8.5 (/root/psui-scratch/ab/hover-prefetch.patch) but reads back 15–60 MB per scene change:
+  not landed. Live never timed click → selection or a dialog's open: asked in REQUESTS.
+- tab-new-edit-reedit: ours clicks the middle of Flange 1's wall (`ours_on`, lead 11-16); matches 22/22.
 - Paused until ~10:15 UTC 11-17: asm, skasm, bool2, studios, live, live2. Don't message them (it wakes them): write
   into onshape-research/live/REQUESTS.md or their handoffs. Waiting there: live/live2's tool-list box model request
   (now measured from menus/ps-dropdown-*; can be dropped).
 - skasm's sheet metal colour fix (`Context::reuse_colours_from`) lands after their suite: then recheck our flat view
   colours with fb5 sm-click.json.
-- tab-new-edit-reedit: decision asked of the lead (11-15 23:50; click ~1.1 px from Flange 1's wall).
 - Rerun 11-16: boundary-surface, end-caps, circular click-commit, context-create-version-update, routing match.
   Still apart: gusset-rectangle-aligned step 3 (title error, skasm's), sketch-linear-pattern-click-commit readout
   9.618 vs 10.110.

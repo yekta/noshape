@@ -832,6 +832,11 @@ impl Viewport {
         !self.pick_requests.is_empty()
     }
 
+    /// Onshape's `averagePickDuration` here (ms): a fast move's hover waits five of these (at most 250 ms).
+    pub fn average_pick_ms(&self) -> f64 {
+        self.avg_pick_ms
+    }
+
     /// What is lit is the pick under the pointer: no hover pick in flight, none waiting for a fast move to pause.
     pub fn hover_settled(&self) -> bool {
         !self.hover_query && self.paused_hover.is_none()
