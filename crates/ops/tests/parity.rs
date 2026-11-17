@@ -3873,6 +3873,36 @@ fn an_assembly_is_rebuilt_as_lives() {
     assert!(r.differences.iter().any(|d| d.starts_with("Part 1 <2>: freed at live's place, our mates move it 10.000000 mm")), "{r:?}");
 }
 
+/// Standard content one fetched studio holds at two sizes (its instances' configuration variables): each size its
+/// own BOM row, named and with the material as live's (asm-bjr-config's cap screws M2.5 x 8 / M2 x 5 of one studio).
+#[test]
+fn standard_content_sizes_name_their_rows() {
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.002, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": "FS1", "entityType": "FACE" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "#Length" }] }
+    ] });
+    let parts = json!([{ "partId": "JHD", "name": "Screw x 10" }]);
+    let at = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    let instance = |id: &str, name: &str, length: &str| json!({ "id": id, "name": name, "type": "Part", "partId": "JHD", "elementId": "E1", "isStandardContent": true, "configuration": format!("Length={length}+meter"), "fullConfiguration": format!("Length={length}+meter") });
+    let row = |name: &str, length: &str| json!({ "itemSource": { "indentLevel": 0, "elementId": "E1", "partId": "JHD", "fullConfiguration": format!("Length={length}+meter") }, "name": name, "quantity": 1, "partNumber": "", "description": "", "material": { "displayName": "Steel" } });
+    let asm = json!({
+        "rootAssembly": {
+            "instances": [instance("IA", "Screw x 10 <1>", "0.01"), instance("IB", "Screw x 20 <1>", "0.02")],
+            "occurrences": [{ "path": ["IA"], "fixed": true, "transform": at }, { "path": ["IB"], "fixed": true, "transform": at }] },
+        "features": { "features": [], "featureStates": {} },
+        "liveBom": { "root": { "bom": { "bomTable": { "items": [row("Screw x 10", "0.01"), row("Screw x 20", "0.02")] } } } } });
+    let mut ctx = Ctx::new();
+    let r = rebuild_assembly(&mut ctx, &scratch("standard-sizes.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    assert_eq!((r.bom_matching, r.bom_rows), (2, 2), "{r:?}");
+}
+
 /// Live's two parts of one name ("Part 1" twice, alike in volume: asm-robotic-arm 07d06e's) go to two parts of ours, not
 /// both to our "Part 1": each instance its own BOM row, as live's.
 #[test]
