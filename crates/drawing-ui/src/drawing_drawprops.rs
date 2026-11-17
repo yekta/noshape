@@ -1687,7 +1687,7 @@ impl DrawingEditor {
             // Under the panel's title and the tab's own, but Annotations, Views and Tables under their own alone
             // (live2 drw-drawprops-*, drw-properties-*).
             let tab = TABS.get(self.drawing_props.tab).map(|t| t.0).unwrap_or_default();
-            let own = matches!(tab, "Annotations" | "Views" | "Tables");
+            let own = matches!(tab, "Dimensions" | "Annotations" | "Views" | "Tables");
             let mut lines: Vec<(String, bool)> = if own { vec![(tab.into(), false)] } else { vec![("Drawing properties".into(), false), (tab.into(), false)] };
             lines.append(&mut rec.borrow_mut());
             lines.append(&mut pending.borrow_mut());

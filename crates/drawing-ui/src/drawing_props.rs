@@ -1126,31 +1126,6 @@ impl DrawingEditor {
         // The panel's texts as live's recorder reads them (dom asbv-view-properties-right-projected: labels and each
         // list's options).
         let several_sheets = self.drawing.sheets.len() > 1;
-        if multi.is_none() {
-            crate::ui_script::note_dialog(|| {
-                let mut t = crate::drawing_panels::PanelText::default();
-                t.texts(["View properties", "Document", doc_name.as_str(), "Workspace", workspace, "Type", if is_asm { "Assembly" } else { "Part" }, "Reference", source_name.as_str(), badge_text.as_str()]);
-                if let Some(n) = &v.named_view {
-                    t.texts(["Named view".to_string(), n.clone()]);
-                }
-                t.text("View orientation");
-                match props.orientation {
-                    Some(_) => t.options(ORIENTATIONS.iter().map(|(_, n)| n.to_string())),
-                    None => t.text(default_view_name(&self.drawing, sheet, &v)),
-                };
-                t.text("Scale");
-                if has_parent {
-                    t.texts(["Suppress alignment with parent", "Synchronize breaks from parent"]);
-                }
-                t.texts(["Rotation angle", "Tangent edges"]).options(["Hidden", "Solid", "Phantom"]).text("View render mode").options(["Best performance", "Best quality"]).text("View simplification");
-                t.options(crate::drawing_insert::simplification_choices(eff).into_iter().map(|c| c.name().to_string()));
-                t.text("Sheet");
-                let sheets = self.drawing.sheets.iter().map(|s| s.name.clone());
-                if several_sheets { t.options(sheets) } else { t.texts(sheets) };
-                t.text("Name");
-                crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "View properties" }), t.0)
-            });
-        }
         // Sheet: the sheet's name; with several sheets a list that moves the view.
         let sheet_name = self.drawing.sheets.get(props.sheet).map(|s| s.name.clone()).unwrap_or_default();
         if self.drawing.sheets.len() > 1 {
@@ -1210,6 +1185,36 @@ impl DrawingEditor {
         };
         let (bom, bom_items, bom_on) = assigned(bom);
         let (cut, cut_items, cut_on) = assigned(cut);
+        if multi.is_none() {
+            crate::ui_script::note_dialog(|| {
+                let mut t = crate::drawing_panels::PanelText::default();
+                t.texts(["View properties", "Document", doc_name.as_str(), "Workspace", workspace, "Type", if is_asm { "Assembly" } else { "Part" }, "Reference", source_name.as_str(), badge_text.as_str()]);
+                if let Some(n) = &v.named_view {
+                    t.texts(["Named view".to_string(), n.clone()]);
+                }
+                t.text("View orientation");
+                match props.orientation {
+                    Some(_) => t.options(ORIENTATIONS.iter().map(|(_, n)| n.to_string())),
+                    None => t.text(default_view_name(&self.drawing, sheet, &v)),
+                };
+                t.text("Scale");
+                if has_parent {
+                    t.texts(["Suppress alignment with parent", "Synchronize breaks from parent"]);
+                }
+                t.texts(["Rotation angle", "Tangent edges"]).options(["Hidden", "Solid", "Phantom"]).text("View render mode").options(["Best performance", "Best quality"]).text("View simplification");
+                t.options(crate::drawing_insert::simplification_choices(eff).into_iter().map(|c| c.name().to_string()));
+                t.text("Sheet");
+                let sheets = self.drawing.sheets.iter().map(|s| s.name.clone());
+                if several_sheets { t.options(sheets) } else { t.texts(sheets) };
+                t.text("Name");
+                // Past the old recorders' 30 lines (live drw-view-properties, recorder .5).
+                t.texts(["View label", "Scale label", "Show sketch appearances", "Show annotations from model", "BOM table reference"]).options([bom.clone()]);
+                if !is_asm {
+                    t.text("Cut list table reference").options([cut.clone()]);
+                }
+                crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "View properties" }), t.0)
+            });
+        }
         // Several views (live drw-views-shift-select-properties): the rows they share, each list's options.
         if multi.is_some() {
             let (bom_text, cut_text) = (bom.clone(), cut.clone());
