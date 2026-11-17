@@ -85,3 +85,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-11 Private user documents (hats, dock, anything in ~/lead-private): never in the repo, artifacts or logs; work only
   on mode-700 copies in ~/tmp/<agent> on the vibe host and delete them afterwards (CLI batches with mutating ops save).
 - 11-15 Release cut: a user-document regression on the candidate is reverted on the release branch, never shipped.
+- 11-17 A feature that used to fail must never start returning wrong geometry as Ok: an error is better than a silent
+  wrong result (f197 Mirror 3 slivers, singularities' point loft). Before landing, compare every changed feature's
+  volume / area against live, not only its status.
+- 11-17 Suite pairs report every differing feature (NOSHAPE_PARITY_DIFFERING), not just each document's first
+  difference: a later feature's broken reference (impeller Move face 2 after 64744410b) hides behind an earlier change.
+- 11-17 Don't message paused (stopped) agents: a message wakes them and spends limits. Their P0s go to the lead.
