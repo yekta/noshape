@@ -32,16 +32,25 @@ fn a_left_lines_glyphs_go_when_the_linger_ends(cx: &mut TestAppContext) {
     let pointer = Pointer::new(cx, window, &view);
     pointer.move_to(cx, &view, on);
     assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover), Some(line), "the line lit");
-    pointer.move_to(cx, &view, on + DVec2::new(0.0, 160.0));
-    let lingering = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().glyph_entity.map(|(e, _)| e));
-    assert_eq!(lingering, Some(line), "the left line's glyphs linger");
+    // Off the line with one pointer event and no time passing; then the linger on the test clock alone.
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_move(pointer.window_point(cx, on + DVec2::new(0.0, 160.0)), None, Modifiers::default());
+    draw(cx, window);
+    let lingering = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        v.ui.glyph_linger_task.as_ref().and(v.sketch.as_ref().unwrap().glyph_entity.map(|(e, _)| e))
+    });
+    assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover), None, "the line let go");
+    assert_eq!(lingering(cx), Some(line), "the left line's glyphs linger");
     let redraws = std::rc::Rc::new(std::cell::Cell::new(0));
     let counted = redraws.clone();
     let _watch = cx.update(|cx| cx.observe(&view, move |_, _| counted.set(counted.get() + 1)));
-    // (The linger is measured on the wall clock; the redraw's timer on the test executor's.)
-    std::thread::sleep(GLYPH_LINGER);
-    cx.executor().advance_clock(GLYPH_LINGER + std::time::Duration::from_millis(10));
+    cx.executor().advance_clock(GLYPH_LINGER - std::time::Duration::from_millis(100));
     cx.run_until_parked();
+    assert_eq!(lingering(cx), Some(line), "still there 100 ms before the linger ends");
+    cx.executor().advance_clock(std::time::Duration::from_millis(110));
+    cx.run_until_parked();
+    assert_eq!(lingering(cx), None, "gone when it ends");
     assert!(redraws.get() > 0, "a redraw when the lingering glyphs are due to go");
 }
 
@@ -105,7 +114,8 @@ fn a_hovered_lines_glyphs_wait_by_the_pointer(cx: &mut TestAppContext) {
         let at = gpui_kit::point(spot.x + (glyph.x - spot.x) * t, spot.y + (glyph.y - spot.y) * t);
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
         vcx.simulate_mouse_move(at, None, Modifiers::default());
-        pointer.frames(cx, &view);
+        // (Drawn, no time passing: the glyphs' linger runs on the test clock.)
+        draw(cx, window);
     }
     let (hovered, lit) = cx.update(|cx| {
         let v = view.read(cx);

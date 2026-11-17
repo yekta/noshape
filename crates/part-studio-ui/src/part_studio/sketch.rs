@@ -148,7 +148,8 @@ const CM_TYPES: [(&str, &str); 22] = [
     ("Projected", "use"),
     ("Dimension", "dimension"),
 ];
-/// Redraws once a left entity's lingering glyphs are due to go (nothing else may draw then).
+/// A left entity's glyphs linger while this timer is pending (on the app's clock, so a test drives it); it ends the
+/// linger with a redraw (nothing else may draw then).
 fn glyph_linger_redraw(cx: &mut Context<PartStudioView>) -> Task<()> {
     cx.spawn(async move |this, cx| {
         cx.background_executor().timer(GLYPH_LINGER + std::time::Duration::from_millis(5)).await;
@@ -3964,7 +3965,7 @@ impl PartStudioView {
         let all = ed.constraint_glyphs(&data);
         // (A glyph of the row hovered keeps the whole row, live2 feel-1417.)
         let row_hovered = |e: noshape_sketch::EntityId| all.iter().any(|g| g.entity == e && ed.hover_constraint == Some(g.constraint));
-        let recent = ed.glyph_entity.filter(|(e, t)| t.elapsed() < GLYPH_LINGER || row_hovered(*e)).map(|(e, _)| e);
+        let recent = ed.glyph_entity.filter(|(e, _)| self.ui.glyph_linger_task.is_some() || row_hovered(*e)).map(|(e, _)| e);
         let glyphs: Vec<_> = all
             .into_iter()
             .filter(|g| {

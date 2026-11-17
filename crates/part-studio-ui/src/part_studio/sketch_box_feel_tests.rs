@@ -192,13 +192,14 @@ fn midpoint_glyph_and_plane_clicks_in_a_sketch_as_live(cx: &mut TestAppContext) 
             let p = gpui_kit::point(at.x + (to.x - at.x) * t, at.y + (to.y - at.y) * t);
             let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
             vcx.simulate_mouse_move(p, None, Modifiers::default());
-            pointer.frames(cx, &view);
+            // (Drawn, no time passing: the glyphs' linger runs on the test clock.)
+            draw(cx, window);
         }
         // (Where it is drawn now, under the pointer: the row may settle as the hover moves onto it.)
         let to = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(selector).map_or(to, |b| b.center());
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
         vcx.simulate_mouse_move(to, None, Modifiers::default());
-        pointer.frames(cx, &view);
+        draw(cx, window);
         at = to;
         let under = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover_constraint);
         if under != Some(*cid) {
