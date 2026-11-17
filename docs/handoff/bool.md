@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 00:25 UTC.
+Updated 11-17 01:13 UTC.
 
 ## In flight
 - Landed 11-16: 190a71558 (cp2), 7d1b8799 (kernel profile per feature), 765b2281 (screws P0: OCCT 0031 + 0032),
@@ -26,19 +26,23 @@ Updated 11-17 00:25 UTC.
     case 682aa19d75e30e09): Mirror 1's fuse 115 -> 43 ms vibe5, same result.
   - Mac A/B main vs bool-stack (same session): knife 1042/1427/1443 -> 934/1307/1318 ms; bottle 48-51 -> 40-43 (live 40).
 - OCCT 0033: commit f4ceaa2ff on branch bool-oc33 (patch only touches the non-MSVC branch; CI key hashes
-  patches/occt/**). Libs: vibe5 ~/agents/bool-keep/occt-0033, Mac ~/noshape-host/occt-0033 (no OCC_CONVERT_SIGNALS).
-  Done: crash_inputs:: 4/4 Linux + Mac; qa's 3 segv docs SAME (Mac); knife Mac A/B: Split 4 129-158 -> 60-80 ms
-  (half its projection was setjmp's sigprocmask / sigaltstack in GeomLib_CheckCurveOnSurface's PSO), Revolve 1
-  87-111 -> 60-84, knife -10-15 %. Running: vibe5 unit bool-v5-oc33ident2 (corpora + parity56 + suite base vs new,
-  /root/bool-hat-scratch/v5-oc33ident.log), then unit bool-udoc-oc33 (hats/dock with ~/agents/bool-keep/oc33/cli-*,
-  /root/bool-hat-scratch/udoc-oc33.out). When both clean: tell the lead the libs are staged (paths above); after the
-  lead installs them everywhere, land bool-oc33.
-- Fillet 2 findings (11-17): its fuse c1d9's sample: a third is BRepBndLib::AddOptimal (PSO) of the grind B-spline
-  (5 x 97 poles) for resting_on_plane / apart_across_slab, once per Boolean (cached per OcShape only); its four plane
-  x grind pairs are real (1-3 lines). Tried (dropped, no gain): an inner-extent shortcut in the slab test and pole-box /
-  edge-point bounds in the resting test (they settle 4 of 6 checks; the grind box is still needed). Next idea: the
-  exact boxes cached across Booleans (key: the surface handle held in the cache, the face's location and UV bounds;
-  LRU bounded): Fillet 2's cut 17b8 and fuse c1d9 both box the grind face; later knife Booleans the blade's faces.
+  patches/occt/**). Libs STAGED (told the lead 11-17 01:1x): vibe5 ~/agents/bool-keep/occt-0033, Mac
+  ~/noshape-host/occt-0033 (no OCC_CONVERT_SIGNALS). All checks clean: crash_inputs:: 4/4 Linux + Mac; qa's 3 segv
+  docs SAME (Mac); identity vibe5 (replay 3025/6 -> 3025/6, parity56 512/0 -> 512/0, suite 1194/1573 both, only the
+  sprockets / rocker region-order flake); hats/dock 12/12 SAME. Knife Mac: Split 4 129-158 -> 60-80 ms. Land
+  bool-oc33 once the lead has installed the libs on every host.
+- bool-knife2 (bool-hat, on bool-knife): a5c287f9a free-form samples + k-d index kept across Booleans (GRID_CACHE,
+  same LRU as the patches; knife Extrude 8 22-34 -> 12-17, Extrude 9 24-34 -> 14-20, Revolve 1 58-76 -> 49-59 Mac);
+  dc060ff1c Shell's wall checked once (it was checked twice), parallel past 16 faces (snap-hook Shell 1 dump
+  -15 %, same faces / edges). Needs the gate + Shell corpus A/B + hats/dock after bool-knife lands.
+- Fillet 2 (11-17, Mac 100 ms vs live 9): op_boolean 30 (cut + fuse), op_split 28 (dump split-11: the 5-face
+  run-on tool split by 2 planes + the grind B-spline, OCCT's splitter 25 ms), min_distance x31 11, op_fillet 10,
+  props_surface x11 6. A cross-Boolean exact-box cache can't hit: the cut trims the grind face (a new face, a
+  new box). No single lever left in mine.
+- Revolve 1 (54f29c1fecb98afe) after the grid cache: 60 % OCCT's sections ahead (ComputeTolReached3d PSO 24,
+  CheckSingularPoints' Extrema grid on the whole blade 14, WLApprox 10, ImpPrm 8), free::apart 8.5. Extrude 8 =
+  5d62643e95aabaa7, Extrude 9 = b58272a7dbba8cc5 (all cut the blade's one B-spline face, x 6-122 mm).
+- blend FYI 11-17: cf-spur-gear's Boolean 1 54 ms vs live 34 (others under live); raw /root/blend-scratch/sg.log.
 - Knife, mine (Mac): Fillet 2 85 ms vs live 10 (fuse: four plane x grind B-spline pairs 15-18 ms each, 1 line each,
   case c1d9f750d291ba85 / 17b8bafce508d06d; run-on tool op_split 25), next. Then core's handover: Revolve 1 (op_boolean
   63 ms Mac, sections ahead 44 vibe5), Extrude 8/9 (55/51), Extrude 2 (sections ahead 34), Extrude 3. Recorded cases:
