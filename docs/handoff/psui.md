@@ -75,7 +75,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Agents back 11-17 09:25 as fresh threads (full ids): asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm
   18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
   58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2
-  3b9b1e66-33a0-4dfe-9e0a-eee216e354b2, bool 0f798808-e854-4e83-bbd0-22ae5a1a0578, qa
+  79ae5cdb-42a4-4025-b43a-da61a4f92ad7 (from 11-17; 3b9b1e66 stopped), bool 0f798808-e854-4e83-bbd0-22ae5a1a0578, qa
   132756b3-e48d-4b9f-8a0e-3d4f23629c8b. Old ids stopped.
 - skasm's sheet metal colour fix (`Context::reuse_colours_from`) lands after their suite: then recheck our flat view
   colours with fb5 sm-click.json.
