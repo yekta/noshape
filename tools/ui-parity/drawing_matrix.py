@@ -157,8 +157,9 @@ def strip_hidden(raw):
 # Surfaces whose dumps' hidden elements live never shows (live2 11-16, holes-plate: a hole table has no Title row,
 # Reorder items or Collapse tags row in its dialog, no insert / remove / merge rows in its Cell popup).
 HIDDEN_IS_ABSENT = {"Hole table"}
-# Texts display:none in every live drawing panel dump, whatever is listed (live2 11-17): never shown, so not items.
-NEVER_SHOWN = {"Reorder items", "Cut from section"}
+# Texts live never lets a user reach (live2 11-17): display:none in every drawing panel dump (Reorder items, Cut from
+# section), or options of the note editor's Flag notes lists, which are disabled in every note and table cell.
+NEVER_SHOWN = {"Reorder items", "Cut from section", "Double circle", "Square circle", "Tight fit"}
 
 
 def texts_of(path, visible_only=False):

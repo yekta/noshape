@@ -412,3 +412,81 @@ fn a_note_leader_lights_its_note_within_10_px(cx: &mut TestAppContext) {
         }
     }
 }
+
+/// Live2 feel/drawing.json "colours", D1, live 2068: a view under the pointer gets a tan rgb(204,178,146) frame ~8 px
+/// outside its geometry, its edges as they are; a click turns its edges orange rgb(204,146,92) (and frames it in that
+/// orange once the pointer leaves); the pointer gone, nothing is tan.
+#[gpui::test]
+fn a_hovered_view_is_framed_in_tan_and_a_click_turns_its_edges_orange(cx: &mut TestAppContext) {
+    use noshape_render::state;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-colours");
+    real_sheet(cx, window, &editor);
+    assert_eq!((crate::drawing_view::DRAWING_HOVER, crate::drawing_view::DRAWING_SELECTED), (0xccb292, 0xcc925c), "live's tan and orange");
+    let pl = cx.update(|cx| editor.read(cx).built.as_ref().and_then(|b| b.placements.first().copied())).expect("a view");
+    let inside = [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0];
+    let flags = |cx: &mut TestAppContext, flag: u32| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let scene = e.build_scene();
+            let picks = e.picks_of(Sel::View(pl.id));
+            (picks.iter().filter(|p| scene.states.get(**p as usize).is_some_and(|s| s & flag != 0)).count(), picks.len())
+        })
+    };
+    let lit = lit_at(cx, window, &editor, inside);
+    assert_eq!(view_of(&lit), Some(pl.id), "the view lights: {lit:?}");
+    let (hovered, all) = flags(cx, state::HOVER);
+    assert!(all > 0 && hovered == 0, "the hovered view's edges stay as they are (its frame shows): {hovered} of {all}");
+    let frames = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).view_frames());
+    assert_eq!(frames(cx), vec![(pl.id, crate::drawing_view::DRAWING_HOVER)], "the hovered view framed in tan");
+    let sel = click_at(cx, window, &editor, inside, Modifiers::default());
+    assert!(sel.iter().any(|s| view_of(&Some(*s)) == Some(pl.id)), "the click selects the view: {sel:?}");
+    let (selected, all) = flags(cx, state::SELECTED);
+    assert_eq!(selected, all, "every edge of the view in the selection colour");
+    lit_at(cx, window, &editor, [5.0, 5.0]);
+    assert_eq!(flags(cx, state::HOVER).0, 0, "off the view: nothing lit");
+    assert_eq!(frames(cx), vec![(pl.id, crate::drawing_view::DRAWING_SELECTED)], "off it, the selected view framed in orange");
+    cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
+    assert!(frames(cx).is_empty(), "nothing selected or hovered: no frame");
+}
+
+/// Live2 feel/drawing.json D5: a dimension's text moves from 5 px of drag (4 px is a click, which selects it); no hold
+/// needed.
+#[gpui::test]
+fn a_dimension_moves_from_5_px_and_4_px_is_a_click(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "feel-dim-drag");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| a.kind.is_dimension()).map(|a| a.id)).expect("a dimension");
+    let at = cx.update(|cx| {
+        let e = editor.read(cx);
+        let (b, picks) = (e.built.clone().expect("built"), e.picks_of(Sel::Annotation(id)));
+        let t = b.geometry.texts.iter().find(|t| picks.contains(&t.pick)).expect("its text");
+        let q = noshape_model::drawing::font::text_box(t);
+        [q.iter().map(|p| p[0]).sum::<f64>() / 4.0, q.iter().map(|p| p[1]).sum::<f64>() / 4.0]
+    });
+    let state = |cx: &mut TestAppContext| cx.update(|cx| format!("{:?}", editor.read(cx).current_sheet().annotations.iter().find(|a| a.id == id).expect("the dimension")));
+    for (dx, moves) in [(4.0, false), (5.0, true)] {
+        cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
+        cx.executor().advance_clock(std::time::Duration::from_millis(600));
+        let before = state(cx);
+        let p = at_window(cx, &editor, at);
+        let q = p + Point::new(px(0.), px(-dx));
+        let mut v = VisualTestContext::from_window(window, cx);
+        v.simulate_mouse_move(p, None, Modifiers::default());
+        v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
+        v.simulate_mouse_move(q, Some(MouseButton::Left), Modifiers::default());
+        v.simulate_mouse_up(q, MouseButton::Left, Modifiers::default());
+        draw(cx, window);
+        let (after, sel) = (state(cx), cx.update(|cx| editor.read(cx).selection.clone()));
+        assert_eq!(after != before, moves, "{dx} px: moved");
+        if moves {
+            cx.update(|cx| editor.update(cx, |e, cx| e.doc.update(cx, |d, cx| d.undo(cx))));
+            draw(cx, window);
+        } else {
+            assert_eq!(sel, vec![Sel::Annotation(id)], "{dx} px: a click, the dimension selected");
+        }
+    }
+}

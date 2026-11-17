@@ -113,6 +113,11 @@ pub enum Panel {
 
 /// The Note panel of a general table cell edited in place: its style (font,
 /// bold, italic, underline, strikethrough, alignments) and text height.
+/// A drawing's hover and selection colours (live feel/drawing.json "colours": tan rgb(204,178,146), orange
+/// rgb(204,146,92)).
+pub(crate) const DRAWING_HOVER: u32 = 0xccb292;
+pub(crate) const DRAWING_SELECTED: u32 = 0xcc925c;
+
 pub struct CellNote {
     pub style: noshape_model::drawing::note::NoteStyle,
     pub height: Entity<InputState>,
@@ -1570,7 +1575,7 @@ impl DrawingEditor {
         self.pk().sel_of_pick(pick)
     }
 
-    fn build_scene(&self) -> Scene {
+    pub(crate) fn build_scene(&self) -> Scene {
         let mut scene = Scene::default();
         // Onshape: the white sheet sits flat on the gray surround (no shadow).
         if let Some((_shadow, paper, _)) = self.paper.as_ref().filter(|_| self.model_bg.is_none()) {
@@ -1632,6 +1637,8 @@ impl DrawingEditor {
                     // Onshape (drawing/14): a hovered annotation turns tan with
                     // a tan label box and its grips, drawn on top below.
                     Some(s @ Sel::Annotation(_)) if !single => self.push_annotation_hover(&mut scene, b, &self.picks_of(s)),
+                    // A hovered view keeps its edges and gets the tan frame (push_view_frames).
+                    Some(Sel::View(_) | Sel::Edge(..)) if matches!(self.tool, Tool::Select) => {}
                     // Hovered labels and indicators show their dots only.
                     Some(Sel::ViewLabel(_) | Sel::AuxIndicator(_)) if !single => {}
                     _ => {
@@ -1642,6 +1649,7 @@ impl DrawingEditor {
                     }
                 }
             }
+            self.push_view_frames(&mut scene);
             // The hovered / selected annotations' referenced edges (blue) and
             // group members (yellow).
             self.push_related_highlights(&mut scene);
@@ -1652,6 +1660,47 @@ impl DrawingEditor {
             self.push_aux_states(&mut scene);
         }
         scene
+    }
+
+    /// The hovered view's frame (live D1, 2068: tan rgb(204,178,146) ~8 px outside its geometry, its edges as they
+    /// are) and a selected view's (its edges orange; with the pointer off it, a frame in that orange).
+    fn push_view_frames(&self, scene: &mut Scene) {
+        use noshape_render::{LineData, LineSegment};
+        let frames = self.view_frames();
+        if frames.is_empty() {
+            return;
+        }
+        let (off, width) = (self.tol_mm(8.0), 3.0);
+        let mut lines = LineData::default();
+        for (v, rgb) in frames {
+            let Some(pl) = self.placement(v) else { continue };
+            let color = [(rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8, 255];
+            let (a, c) = ([pl.min[0] - off, pl.min[1] - off], [pl.max[0] + off, pl.max[1] + off]);
+            let q = [[a[0], a[1]], [c[0], a[1]], [c[0], c[1]], [a[0], c[1]], [a[0], a[1]]];
+            for w in q.windows(2) {
+                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color, pick_id: 0, width, style: LineSegment::ON_TOP });
+            }
+        }
+        let up = self.gpu.uploader();
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
+    }
+
+    /// The views framed now and the frame's colour: the hovered one tan, the other selected ones orange.
+    pub(crate) fn view_frames(&self) -> Vec<(ViewId, u32)> {
+        let select = matches!(self.tool, Tool::Select);
+        let hovered = self.hover.and_then(|h| self.sel_of_pick(h)).and_then(|s| match s {
+            Sel::View(v) | Sel::Edge(v, _) if select => Some(v),
+            _ => None,
+        });
+        let mut frames: Vec<(ViewId, u32)> = hovered.map(|v| (v, DRAWING_HOVER)).into_iter().collect();
+        for s in &self.selection {
+            if let Sel::View(v) = s
+                && Some(*v) != hovered
+            {
+                frames.push((*v, DRAWING_SELECTED));
+            }
+        }
+        frames
     }
 
     /// Onshape's hovered-annotation look (live, drawing/14): its lines in
@@ -1752,8 +1801,8 @@ impl DrawingEditor {
         style.background_bottom = bg;
         // Drawings use their own (behaviours 1480, asb/u-906/907): hover
         // #CCB292, selected #CC925C.
-        style.hover_color = crate::theme::lin(0xccb292);
-        style.select_color = crate::theme::lin(0xcc925c);
+        style.hover_color = crate::theme::lin(DRAWING_HOVER);
+        style.select_color = crate::theme::lin(DRAWING_SELECTED);
         // Other members of a hovered / selected annotation group (live
         // drawing/423: #EBEB92).
         style.accent_color = crate::theme::lin(0xebeb92);
