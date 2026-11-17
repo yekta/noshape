@@ -4517,3 +4517,69 @@ fn a_connector_on_a_cap_edge_points_along_its_sketch_line() {
         assert!((z - want).length() < 1e-9, "edge {i}: z {z} vs the line's {want}");
     }
 }
+
+/// Face pattern of a pocket whose opening lies on a cylinder split into two faces (c2-config-parts-pulleys' tooth
+/// groove: its rim's cylinder and the chamfers at its ends, "Failed to create pattern"): the opening is capped on the
+/// cylinder; 4 pockets round the axis take 4 × the seed's volume.
+#[test]
+fn face_pattern_caps_a_pocket_on_a_split_cylinder() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, mm(20.0));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("20 mm"));
+    });
+    let z10 = top_plane_at(&mut s, 10.0);
+    let r = s.ok();
+    let side = cylinder_face(&r, 0);
+    s.add("splitPart", move |p| {
+        p.set("splitType", en("FACE"));
+        p.set("faceTargets", q(side));
+        p.set("faceTools", q(Reference::FeaturePlane(z10)));
+    });
+    // A 6 × 10 mm pocket into the side at y = ±20, 2 mm deep at its middle (to |y| = 18).
+    let back = s.add("cPlane", move |p| {
+        p.set("entities", q(Reference::Plane(DatumPlane::Front)));
+        p.set("offset", expr("25 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(-3.0, 5.0), (3.0, 5.0), (3.0, 15.0), (-3.0, 15.0)], true);
+    let pocket = s.sketch(Reference::FeaturePlane(back), sk);
+    let region = s.region(pocket);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
+        p.set("symmetric", ParamValue::Bool(true));
+        p.set("depth", expr("14 mm"));
+    });
+    let r = s.ok();
+    let v_seed = volume(&r, 0);
+    let rr: f64 = mm(20.0);
+    let prim = |x: f64| (x * (rr * rr - x * x).sqrt() + rr * rr * (x / rr).asin()) / 2.0;
+    let seed_pocket = mm(10.0) * ((prim(mm(3.0)) - prim(mm(-3.0))) - mm(18.0) * mm(6.0));
+    assert!(near(v_seed, PI * rr * rr * mm(20.0) - seed_pocket, 1e-12), "seed {} vs {}", v_seed * 1e9, (PI * rr * rr * mm(20.0) - seed_pocket) * 1e9);
+    let faces: Vec<Reference> = r.context.bodies[0]
+        .shape
+        .faces()
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| f.centroid().is_ok_and(|c| c.y.abs() > mm(17.0) && c.y.abs() < mm(19.5) && c.x.abs() <= mm(3.0) + 1e-9))
+        .map(|(i, _)| Reference::Face((*r.context.bodies[0].faces[i]).clone()))
+        .collect();
+    assert_eq!(faces.len(), 5, "the pocket's faces");
+    let mut ax = noshape_sketch::Sketch::new();
+    let axis = polyline(&mut ax, &[(0.0, 0.0), (0.0, 10.0)], false);
+    let axis_sketch = s.sketch(Reference::Plane(DatumPlane::Front), ax);
+    s.add("circularPattern", move |p| {
+        p.set("patternType", en("FACE"));
+        p.set("faces", ParamValue::Query(faces));
+        p.set("axis", entities(axis_sketch, &axis));
+        p.set("instanceCount", expr("4"));
+    });
+    let v = volume(&s.ok(), 0);
+    assert!(near(v, PI * rr * rr * mm(20.0) - 4.0 * seed_pocket, 1e-12), "{} mm³", v * 1e9);
+}
