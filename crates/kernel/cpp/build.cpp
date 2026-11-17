@@ -1484,10 +1484,26 @@ std::unique_ptr<OcShape> reface_on(const OcShape& in, uint32_t index, const OcSh
     B.Add(g, it.Value());
   // (The surface's own orientation: the face keeps the side it had when the new surface's normal agrees.)
   g.Orientation(f.Orientation());
+  // (The face's own surface, only its bounds extended: its edges' curves on it hold as they are. Projected again they
+  // took 0.5 s of c2-impeller-loft's Fillet 3, ComputeBoundIsos approximating an offset surface's isos.)
+  ShapeIMap ofaces;
+  TopExp::MapShapes(in.shape, TopAbs_FACE, ofaces);
+  TopLoc_Location           floc;
+  occ::handle<Geom_Surface> own = BRep_Tool::Surface(TopoDS::Face(ofaces((int)index + 1)), floc);
+  if (const auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(own); !t.IsNull())
+    own = t->BasisSurface();
+  const bool same = own == surf && floc.IsEqual(loc);
   for (TopExp_Explorer ex(g, TopAbs_EDGE); ex.More(); ex.Next())
   {
     const TopoDS_Edge& e = TopoDS::Edge(ex.Current());
-    ShapeFix_Edge      sfe;
+    double             a, b;
+    if (same && !BRep_Tool::IsClosed(e, f) && !BRep_Tool::CurveOnSurface(e, f, a, b).IsNull())
+    {
+      B.UpdateEdge(e, BRep_Tool::CurveOnSurface(e, f, a, b), g, BRep_Tool::Tolerance(e));
+      B.Range(e, g, a, b);
+      continue;
+    }
+    ShapeFix_Edge sfe;
     sfe.FixAddPCurve(e, g, BRep_Tool::IsClosed(e, f), tol);
   }
   BRepLib::SameParameter(g, tol, true);

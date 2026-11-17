@@ -10893,13 +10893,14 @@ OpOut op_merge_on_surfaces(const OcShape& s, const OcShapeList& ons, double tol)
       if (a->DynamicType() != b->DynamicType())
         continue;
       // (Five points inside the face on the other surface; its normal's way there at the middle one.)
-      bool lies = true, same_way = true;
+      bool lies = true, same_way = true, same_uv = true;
       for (const auto& [su, sv] : {std::pair{0.5, 0.5}, {0.25, 0.25}, {0.75, 0.25}, {0.25, 0.75}, {0.75, 0.75}})
       {
         gp_Pnt p;
         gp_Vec du, dv;
         fs->D1(u0 + (u1 - u0) * su, v0 + (v1 - v0) * sv, p, du, dv);
         p.Transform(floc.Transformation());
+        same_uv = same_uv && os->Value(u0 + (u1 - u0) * su, v0 + (v1 - v0) * sv).Transformed(oloc.Transformation()).Distance(p) <= tol;
         GeomAPI_ProjectPointOnSurf pr(p.Transformed(oloc.Transformation().Inverted()), os);
         if (!pr.IsDone() || pr.NbPoints() == 0 || pr.LowerDistance() > tol)
         {
@@ -10928,8 +10929,20 @@ OpOut op_merge_on_surfaces(const OcShape& s, const OcShapeList& ons, double tol)
       for (TopoDS_Iterator it(f.Oriented(TopAbs_FORWARD)); it.More(); it.Next())
         B.Add(g, same_way ? it.Value() : it.Value().Reversed());
       g.Orientation(same_way ? f.Orientation() : TopAbs::Reverse(f.Orientation()));
+      // (A copy of the surface, the same points at the same parameters: the edges' curves on it hold. Projected
+      // again they took 0.23 s of c2-impeller-loft's Fillet 3.)
       for (TopExp_Explorer ex(g, TopAbs_EDGE); ex.More(); ex.Next())
-        ShapeFix_Edge().FixAddPCurve(TopoDS::Edge(ex.Current()), g, BRep_Tool::IsClosed(TopoDS::Edge(ex.Current()), f), ftol);
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(ex.Current());
+        double             a, b;
+        if (same_uv && same_way && !BRep_Tool::IsClosed(e, f) && !BRep_Tool::CurveOnSurface(e, f, a, b).IsNull())
+        {
+          B.UpdateEdge(e, BRep_Tool::CurveOnSurface(e, f, a, b), g, BRep_Tool::Tolerance(e));
+          B.Range(e, g, a, b);
+          continue;
+        }
+        ShapeFix_Edge().FixAddPCurve(e, g, BRep_Tool::IsClosed(e, f), ftol);
+      }
       BRepLib::SameParameter(g, ftol, true);
       rs->Replace(f, g);
       break;

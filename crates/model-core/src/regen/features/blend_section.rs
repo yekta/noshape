@@ -690,6 +690,33 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
     let first = |s: &Shape, q: DVec3, out: DVec3| s.bounding_box(true).map_or(f64::MAX, |b| corner_reach(b, q, out, false));
     let body_faces = shape.faces();
     let touches = |f: &Shape, p: &Shape| p.vertices().iter().any(|v| k::distance(v, f).is_ok_and(|d| d.distance <= tol)) || k::distance(f, p).is_ok_and(|d| d.distance <= tol);
+    // (A point inside a solid without its area integral where its box's middle is one: B-spline and offset faces made
+    // c2-impeller-loft's Fillet 3's tools' and cells' centroids 0.6 of its 4 s.)
+    let inner = |s: &Shape| -> FResult<DVec3> {
+        let Ok(b) = s.bounding_box(true) else { return Ok(s.centroid()?) };
+        let c = b.center();
+        if s.classify_point(c, tol)? == k::PointClass::Inside {
+            return Ok(c);
+        }
+        // (Else the middle of the widest span inside along a line through the box's middle.)
+        let d = b.diagonal().max(tol);
+        let mut best: Option<(f64, DVec3)> = None;
+        for dir in [DVec3::X, DVec3::Y, DVec3::Z] {
+            let start = c - dir * d;
+            let mut ts: Vec<f64> = s.line_crossings(start, dir, 2.0 * d)?.into_iter().map(|x| x.0).collect();
+            ts.sort_by(f64::total_cmp);
+            for w in ts.windows(2) {
+                let q = start + dir * (0.5 * (w[0] + w[1]));
+                if w[1] - w[0] > best.map_or(0.0, |x| x.0) && s.classify_point(q, tol)? == k::PointClass::Inside {
+                    best = Some((w[1] - w[0], q));
+                }
+            }
+        }
+        match best {
+            Some((_, q)) => Ok(q),
+            None => Ok(s.centroid()?),
+        }
+    };
     let neighbours = |f: usize| -> Vec<usize> {
         let mut n: Vec<usize> = ef.iter().filter(|fs| fs.contains(&(f as u32))).flat_map(|fs| fs.iter().map(|&g| g as usize)).filter(|&g| g != f).collect();
         n.sort_unstable();
@@ -708,7 +735,7 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
     // Each corner end: its tool, the end, its faces.
     let mut corners: Vec<(usize, Shape, DVec3, DVec3, Vec<usize>)> = Vec::new();
     for (ti, t) in tools.iter().enumerate() {
-        let seed = t.tool.centroid()?;
+        let seed = inner(&t.tool)?;
         if t.tool.classify_point(seed, tol)? != k::PointClass::Inside {
             return Err(fail("a run-on round's tool with its centroid outside it"));
         }
@@ -718,10 +745,13 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
         for (run, q, out) in &t.run_on {
             let tip = reach(&piece, *q, *out).min(reach(run, *q, *out)) - margin;
             let rb = run.bounding_box(false)?;
+            let rt = run.bounding_box(true).ok();
             let mut met: Vec<(f64, usize)> = body_faces
                 .iter()
                 .enumerate()
-                .filter(|(i, f)| !t.supports.contains(i) && f.bounding_box(false).is_ok_and(|b| (b.min - DVec3::splat(tol)).cmple(rb.max).all() && rb.min.cmple(b.max + DVec3::splat(tol)).all()) && touches(f, run))
+                .filter(|(i, f)| !t.supports.contains(i) && f.bounding_box(false).is_ok_and(|b| (b.min - DVec3::splat(tol)).cmple(rb.max).all() && rb.min.cmple(b.max + DVec3::splat(tol)).all()))
+                // (Tight boxes before the distances: 268 of them were a tenth of c2-impeller-loft's Fillet 3.)
+                .filter(|(_, f)| rt.is_none_or(|r| f.bounding_box(true).is_ok_and(|b| (b.min - DVec3::splat(tol)).cmple(r.max).all() && r.min.cmple(b.max + DVec3::splat(tol)).all())) && touches(f, run))
                 .map(|(i, f)| (first(f, *q, *out), i))
                 .collect();
             met.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -785,7 +815,7 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
             // (The round less the cells behind every wall, not the cells left: those split its faces at each wall.)
             let mut whole = Vec::new();
             for piece in cells.iter() {
-                let (dropped, kept): (Vec<Shape>, Vec<Shape>) = k::split(std::slice::from_ref(piece), &walls, &k::BooleanOptions::default())?.shape.solids().into_iter().partition(|c| c.centroid().is_ok_and(|q| walls.iter().all(|w| behind(w, q))));
+                let (dropped, kept): (Vec<Shape>, Vec<Shape>) = k::split(std::slice::from_ref(piece), &walls, &k::BooleanOptions::default())?.shape.solids().into_iter().partition(|c| inner(c).is_ok_and(|q| walls.iter().all(|w| behind(w, q))));
                 if dropped.is_empty() {
                     whole.push(piece.clone());
                     continue;
