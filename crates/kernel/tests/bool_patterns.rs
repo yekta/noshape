@@ -2968,3 +2968,37 @@ fn a_lofts_side_cut_by_planes_as_occt() {
         assert!((v - w).abs() <= 1e-6 * w, "{lo:?}: volume {v} vs OCCT's {w}");
     }
 }
+
+/// A recorded cut taken by noshape's Boolean with OCCT's faces, edges, vertices and volume (within 1e-8 of it: its
+/// curves on free-form faces projected, OCCT's its own).
+fn recorded_cut_as_occt(hash: &str) {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, hash).expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let counts = |k: k::ShapeType| r.shape.count(k);
+    assert_eq!((counts(k::ShapeType::Face), counts(k::ShapeType::Edge), counts(k::ShapeType::Vertex)), (c.summary.faces, c.summary.edges, c.summary.vertices));
+    assert!(r.shape.is_valid());
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-8 * c.summary.volume, "volume {v} vs OCCT's {}", c.summary.volume);
+}
+
+/// A thread's root strip (a B-spline 12 turns round a 4 mm bore, 5 samples a turn, 0.5 mm apart) cut where the bore's
+/// end circle crosses its run-out, 44 um off the strip there (c2-config-parts-standoffs, recorded, OCCT's 889 ms):
+/// points on the strip's edge found on their own turn, the circle in stretches between its crossings with the strip's
+/// edges.
+#[test]
+fn a_thread_root_strip_cut_where_a_circle_crosses_its_run_out() {
+    recorded_cut_as_occt("dd85b48f7488742a");
+}
+
+/// The same thread's top end: the end face's circle grazes the run-out edge (within 0.8 um of it for 44 degrees) and
+/// crosses it once, where OCCT's vertex is; no second vertex where it leaves the strip's surface beside it.
+#[test]
+fn a_circle_grazing_a_thread_run_out_edge_is_cut_where_it_crosses_it() {
+    recorded_cut_as_occt("5608f6620712c5c8");
+}
