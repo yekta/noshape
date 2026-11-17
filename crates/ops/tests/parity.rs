@@ -823,6 +823,15 @@ fn exchange_round_trip() {
         // Live's own import of a format, unless it is off from its Parasolid import's volume by over 0.1 % (live read
         // its own STEP of cf-wave-spring as 7559 mm³ for 916.5: Onshape's failure is no target): then the Parasolid's.
         let volume = |v: &[PartState]| v.iter().filter_map(|p| p.volume).sum::<f64>();
+        // Live's own import holding only some of its Parasolid's parts, each at its volume: the format can't hold the
+        // rest (IGES and ACIS drop c2-hex-bookcase-derived's mesh part "imported"), not an import off its file.
+        let dropped = |own: &[PartState], x: &[PartState]| {
+            own.len() < x.len() && own.iter().all(|o| x.iter().any(|p| p.name == o.name && p.volume.zip(o.volume).is_some_and(|(a, b)| (a - b).abs() <= 1e-3 * a.abs())))
+        };
+        // The Parasolid's parts such a format holds (all of them otherwise).
+        let kept = |own: &[PartState], x: &[PartState]| -> Vec<PartState> {
+            if dropped(own, x) { x.iter().filter(|p| own.iter().any(|o| o.name == p.name)).cloned().collect() } else { x.to_vec() }
+        };
         let xt = (!selfs["PARASOLID"].is_null()).then(|| parts_from_live_import(&selfs["PARASOLID"], false));
         // `ours`: what live's import of our file is held to (an STL of live's off its model by over 1 %: the model's).
         // (No own import of ACIS, OBJ or 3MF: its Parasolid's or its STL's, the same model and mesher.)
@@ -838,6 +847,10 @@ fn exchange_round_trip() {
                 // quarter more (live reads its own 32-tooth gear's STEP 9.7 mm³ over its model, ours 10.7; its IGES of
                 // either the same); where live fails its own file (the wave spring's STEP), the model's.)
                 Some(x) if !mesh(format) && ours => Some(held_to_model(own, x, 1.25, true, false)),
+                Some(x) if !mesh(format) && dropped(&own, x) => {
+                    let x = kept(&own, x);
+                    Some(held_to_model(own, &x, 1.0, false, false))
+                }
                 Some(x) if !mesh(format) && (volume(&own) - volume(x)).abs() > 1e-3 * volume(x).abs() => {
                     println!("{name}: live's own {format} import is off ({:.3} mm³, its Parasolid's {:.3}): compared with the Parasolid's", volume(&own) * 1e9, volume(x) * 1e9);
                     Some(x.clone())
@@ -870,8 +883,9 @@ fn exchange_round_trip() {
                     let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], false));
                     // (Live's own import off its model's volume, as its IGES of c2-rings-loft's ring, 565.6 mm³ for
                     // 440.8: counts from the model's Parasolid on.)
-                    let held = xt.as_ref().zip(own.as_ref()).and_then(|(x, o)| model_topology(o, x));
-                    match (&xt, own) {
+                    let xk = xt.as_ref().zip(own.as_ref()).map(|(x, o)| kept(o, x));
+                    let held = xk.as_ref().zip(own.as_ref()).and_then(|(x, o)| model_topology(o, x));
+                    match (&xk, own) {
                         (Some(x), Some(own))
                             if !diff.is_empty()
                                 && (held.as_ref().is_some_and(|h| differences(h, &ours).is_empty())
