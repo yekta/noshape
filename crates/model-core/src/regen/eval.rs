@@ -702,13 +702,19 @@ impl<'a> EvalCtx<'a> {
                 // Sketch origin on a face: world origin projected onto the face plane; on a part a Transform moved,
                 // the frame of the face where it was, moved with it (live c2-sm-hem-plus's Sketch 3).
                 let n = pl.unit_normal();
-                let moved = (!self.ctx.legacy_moved_face_frames).then(|| self.ctx.placements.get(&self.ctx.bodies[bi].id)).flatten();
-                let Some(m) = moved else {
+                // Not where the move left the face's plane as it was (turned about its normal: live asm-rack-pinion's
+                // Sketch 4 on the SpurGear's face after Transform 1, in the frame of the face where it is).
+                let here = || {
                     let x = self.ctx.planar_face_x(&pl);
-                    return Some(PlaneFrame { origin: n * pl.origin.dot(n), x, y: n.cross(x), normal: n });
+                    Some(PlaneFrame { origin: n * pl.origin.dot(n), x, y: n.cross(x), normal: n })
                 };
+                let moved = (!self.ctx.legacy_moved_face_frames).then(|| self.ctx.placements.get(&self.ctx.bodies[bi].id)).flatten();
+                let Some(m) = moved else { return here() };
                 let back = m.inverse();
                 let (o, n0) = (back.transform_point3(pl.origin), back.transform_vector3(n).normalize_or_zero());
+                if n0.dot(n) > 1.0 - 1e-12 && (o - pl.origin).dot(n).abs() < 1e-12 {
+                    return here();
+                }
                 let x0 = self.ctx.planar_face_x(&k::Plane::new(o, n0, back.transform_vector3(pl.unit_x())));
                 let x = m.transform_vector3(x0).normalize_or_zero();
                 Some(PlaneFrame { origin: m.transform_point3(n0 * o.dot(n0)), x, y: n.cross(x), normal: n })
