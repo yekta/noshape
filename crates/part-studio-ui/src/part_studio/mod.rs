@@ -1851,8 +1851,11 @@ impl PartStudioView {
                     .collect()
             })
             .unwrap_or_default();
-        // A sheet metal part's faces, edges and vertices read the feature that first made their definition entity.
-        let sm_owners: std::collections::HashMap<Reference, FeatureId> = self.context.as_ref().map(|c| c.sheet_metal.values().flat_map(|d| d.label_owners.iter().cloned()).collect()).unwrap_or_default();
+        // A sheet metal part's faces, edges and vertices read the feature that made their definition entity as it is
+        // now; while a feature is edited, as it is before that feature (live: Bend 1's face reads "Face of Sheet metal
+        // model 1" on re-edit).
+        let edited_from = self.ui.before_context.as_ref().filter(|_| self.edit.is_some());
+        let sm_owners: std::collections::HashMap<Reference, FeatureId> = self.context.iter().chain(edited_from).flat_map(|c| c.sheet_metal.values().flat_map(|d| d.label_owners.iter().cloned())).collect();
         Arc::new(move |r: &Reference| {
             let owner = |id: Option<FeatureId>| match id {
                 Some(i) if names.iter().any(|(x, _)| *x == i) || noshape_model::in_context::context_of(i).is_some() => Some(i),
