@@ -24,7 +24,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **qa-suites**: bin/qa-suites-loop.sh, every 4 h: interaction suite, model suite (speed, debug) and assembly / exchange
   suites of the newest green, each through `~/bin/slot`: ui + models on **vibe7**, assemblies / exchange (suites-rest) on
   **vibe6** beside them since 11-17 04:51 (vibe7's slot was held 4 h by dx). 1117-0227-ecf8c33a's stage re-run as unit
-  qa-suites-redo-0227 (QA_REDO).
+  qa-suites-redo-0227 (QA_REDO), done 07:07: models 85/126 1233/1585 (5 better, none worse), assemblies 5/24 1614/1709
+  664/755 (scissor-lift BOM 59 -> 57: P0 to asm), exchange 58/74. The models report.json is written beside the corpus
+  snapshot (~/tmp/qa/report.json): qa-suites.sh copies it from there since 07:15 (lost since 11-16's snapshot change).
   Results suites/<mmdd-hhmm-sha>/; host overrides QA_UI_HOST / QA_SPEED_HOST / QA_SUITES_HOST.
 - **qa-cut-0415 / qa-cut-1615** timers: bin/cut-verdict.sh (cut-check.sh: newest green's compat vs the baseline) -> one GO /
   NO-GO line in /tmp/lead/qa-alerts and compat/cut-<mmdd-hhmm>.txt. Add the verdict as a "Release blockers" section in TICKETS.md.
@@ -65,6 +67,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **11-17 05:00 cut**: v0.4.56 from 35baa32fa (published 06:35). Main HOLD (f197 Mirror 3, blend ba7a8d755) cleared 05:57 by
   the revert b596da51b (qa-hold-watch, exited). blend owes a fixed full-round strip with f197 in its T1 case.
 - **v0.4.56 published check** done 06:58 (compat/published-0.4.56.txt, rel-0.4.56.txt): clean; compat baseline 0.4.56.
+- **Open P0s from qa 11-17**: IMPELLER-MOVE-FACE-2-REF (core, suspect 64744410b), SCISSOR-LIFT-BOM-ROWS (asm),
+  IMPELLER-DELETE-FACE-2-SLOW (core). Re-check each on the green that claims the fix. dx: rings-loft x_t import works since
+  0.4.56 but 9-10 s vs live 8.6 (queue item, not P0).
 - **Clean A/B 11-17** (lead ran it by hand on vibe7 02:55-03:31; ab1117/ here and in lead-scratch): 0.4.48 -> 0.4.53 -> 0.4.55 ms:
   helical 159 / 398 | 380 / 96 (Sweep 1 fixed in 0.4.55, no ticket); knife 1700 / 3154 | 2947 / 2207 (0.4.48 had 9 features
   in error); impeller 15643 / 28592 | 27584 / 25314; live 40 / 408 / 2773. Green 35baa32f: knife 1803 (Mirror 1 128 / 220 /
