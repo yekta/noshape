@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## qa, 2026-11-17
-- [ ] P0 SCISSOR-LIFT-BOM-ROWS (asm; qa 2026-11-17 07:20, assembly suite 1117-0227 on green ecf8c33a vs 1116-1642 on 684e77e2)
+- [ ] P0 SCISSOR-LIFT-BOM-ROWS (bool bisects, lead 07:30; asm owns the BOM; qa 2026-11-17 07:20, assembly suite 1117-0227 on green ecf8c33a vs 1116-1642 on 684e77e2)
   asm-scissor-lift: BOM rows as live 59 -> 57 of 87 (rows 63 -> 62; occurrences 214/242 and mates 13/19 unchanged). New
   difference: ours has (1, "Motor Mount", 3.0, "Motor Mount", "", "- None -") under "Drive", live doesn't; the "Gear Frame"
   row under "Gearbox" no longer differs. 106 commits in range (bool, core, dx, blend; no asm). Logs:
