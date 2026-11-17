@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 15:36 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45.
+Updated 2026-11-17 15:52 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45.
 
 ## In flight
 
@@ -17,27 +17,22 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
 - Landed 11-17: 7abd9bdf (doc-open timing), b5d11ad7 (box select), 01fb280e (panel text form, versions flows,
   manual-4). 57dc3ed4 failed 13:06 (ops e2e: first angle's side view); fixed forward (drawing_get "isometric",
   e2e takes either side view; ops e2e 222/222 on vibe5).
-- Failed twice (14:54, 15:44) on coverage reading the drawing_ui_tests/ folder as a file; fixed. 1db5e57e, 11 commits: section / detail / menu readings, first angle, the e2e fix, the
-  drawing feel tests (drawing_ui_tests/feel.rs, 7), centerline_on_edge, Move to sheet / cell Note / Cell panel
-  readings, the mate-row flyout (assembly_flyout.rs).
-- Committed 15:36 (landing after 1db5e57e), from live2 asm-feel 13:05 and asm-feel2 15:0x (behaviours "studios
-  (11-17 12:52, P0)" and "(11-17 15:0x, P0 asm feel follow-ups)"):
-  - mate glyphs at screen size (asm_scene::MateGlyphs camera geometry, 26 px, a pick disc 2 px past it); a hovered
-    glyph sits on a light backing square and outlines its part. Still ours: a square glyph for every mate type
-    (live: per type, Slider = a ring and an arrow) - next look item;
-  - a hovered face shows its part's silhouette in #FFC20E (Highlights::hover_part, render Scene::hover_outline_rgb),
-    only that part inside a subassembly;
-  - every instance row has its name as its tooltip (live2: the 11-14 "only when cut off" was wrong);
-  - the unticked Angular section takes 3 clicks (section_free_angle); section takes 10/10 match;
-  - tests: assembly-ui src/assembly_feel_tests.rs (glyph reach + click, box rule), drawing
-    an_angular_section_without_a_cut_angle_takes_its_line_from_two_clicks, feel
-    a_dragged_view_lands_where_released_with_no_alignment_snap (F4).
-- vibe6 slot (queued behind psui's run): asm + section takes, 224 (~/tmp/studios/asmsec, log
+- Queued 15:48: ff75508e, 17 commits = 1db5e57e's 11 (failed twice, 14:54 and 15:44, on coverage reading the
+  drawing_ui_tests/ folder as a file: coverage.rs now scans files only; ops --test all green on vibe6) plus:
+  - mate glyphs at screen size (asm_scene::MateGlyphs, 26 px, a pick disc 2 px past it), backing square on hover,
+    the part outlined; a hovered face shows its part's silhouette #FFC20E (Scene::hover_outline_rgb); a part picked
+    inside a sub leaves the sub's row related (picked_inside); every instance row tooltips its name;
+  - the unticked Angular section takes 3 clicks; a note's leader lights the note from 10 px in Select;
+  - feel tests: assembly_feel_tests.rs (glyph reach + click, box rule, sub part), drawing feel.rs (F4 no snap, D3
+    snap marker, leader reach), the Angular test. Section takes 10/10, 15 asm takes (show mates, mate menus,
+    select, drag, menus) match.
+  - Still ours: a square glyph for every mate type; asked live2 for per-type glyph looks (15:4x).
+- vibe6 slot (behind psui's run): all 224 asm + section takes with the 15:50 binary (~/tmp/studios/asmsec, log
   ~/agents/studios-keep/asmsec.log).
 - live2 2fdb573f (queued): drw-datum-target-panel-tips, drw-hatch-panel-tips: implement once landed. Next from them:
   Custom table, Hole table.
-- Not rerun yet: the drawing matrix refresh (`drawing_matrix.py --run` on ~/tmp/studios/drw1117), the speed run
-  (speed1117.sh). The weld take waits on live2's metric-position fix. Live re-records the 52 panel takes (.5): then
+- After live's 43 re-recorded takes land: one full drawing run, then the matrix refresh (`drawing_matrix.py --run`).
+  Speed: absolute numbers come from the Mac (DECISIONS 11-17), when its slot is free; speed1117.sh is vibe6-only. The weld take waits on live2's metric-position fix. Live re-records the 52 panel takes (.5): then
   fill panel texts past line 30.
 
 ## Lead's queue (11-17, restated after compaction)
@@ -45,8 +40,7 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
 viewport, parts vs connectors) and Drawings (views, edges, dimensions, annotations: hover, click, box, drag), each
 against live with a feel scenario; share psui's pick code (`Viewport::pick_priority`, `AsmPickMap::priority_fn`,
 `PickKind::priority`; psui owns viewport.rs' hover path). 3. Versions / branches / release queue.
-- Drawings without a test yet: note leader reach (needs a leader op), snap markers, placement inference, view drag
-  alignment.
+- Drawing feel rows all have a GPUI test now (feel.rs, 11) except the double-click palette (its own test).
 - Assembly already as live (checked 11-17): box select rule, glyph click selects the mate (related rows, mated faces
   amber, dashed connector line), graphics hover lights no list row, list hover outlines the parts.
 
