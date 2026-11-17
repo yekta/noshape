@@ -83,6 +83,13 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 0d. **Selection feel (lead 22:25)**: live2's sel-feel rows on green 592b0fc9, TICKETS "Part Studio selection feel": 4 P0 + 1 P1 to
    psui. Tools in qa-scratch/sf (vibex6 ~/tmp/qa/sf): drive.py (actions, real pointer), sfs.sh (held session), mini.sh <tag>
    <idx,..> (one state per row; feel.sh's timed waits drift ~3 actions), sheet.py (pointer-marked sheets). Re-run on psui's fixes.
+0e. **Sketch snap (lead 22:50)**: live's sketch-snap rows on 592b0fc9 -> TICKETS "Sketch line snap and inference", 2 P0 / 1 P1 / 2 P2 to
+   skasm. qa-scratch/sk: sks.sh (session :666, SNAP=snapg for the glyph run that ends before the runner's 180 s watchdog), batch.sh,
+   sweep.py / hv.py / glyphs.py, ana.py. The runner's watchdog (180 s) ends every session: keep each batch under ~150 s.
+0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
+   + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
+   nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
+   SELFEEL-PART-ROW: psui reads it as screen lag (a real-event GPUI test passes): re-check in the quiet window.
 0b. **LOADED runs (lead 21:50)**: speed / timing at load > 16 (2 x 8 cores) don't count. suites-diff.py prints "LOADED: …" first,
    skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
    the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.
