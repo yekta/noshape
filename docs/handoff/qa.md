@@ -58,6 +58,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.56** published check done 11-17 06:58: clean, baseline 0.4.56. Next: the 17:00 cut (qa-cut-1615).
 
 ## Next (in this order)
+0a. **Validity column (lead 11-17 ruling)**: compat (userdocs.py / sig.py) and suite comparisons (suites-diff.py) also compare
+   each changed feature's solid validity (BRepCheck): valid on the base, invalid on the candidate = a difference. bool told
+   (gate.sh). Do it when next touching those tools (find whether the CLI exposes validity first).
 0. **05:00 checklist (psui via lead)**: REMEMBERED-VALUES-OLD-FORMAT fix 582351aab (uh/uf2.sh on its green: 3 mm, 0.3 cm,
    0.2 in, 5 mm; v0.4.57 / a1383a65 gives 5 mm, 0.5 cm, 0.2 in, 5 mm), f6ef6a252 glyph (uh2.sh: no parallel glyph in the
    "off" shots), f74af0d9a. psui sends main shas if the land rebases them.
