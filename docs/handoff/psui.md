@@ -88,10 +88,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Queued to land
 
-- 15a48786 (11-17 10:08): Search tools' toolbar highlight as live (psui/toolbar-highlight: `.is-highlighted` on the
+- Landed 11-17 10:28 as a14ef99e (queued as 15a48786): Search tools' toolbar highlight as live (psui/toolbar-highlight: `.is-highlighted` on the
   button, #fcda7f + `inset 0 0 0 2px #fab601`, no border, nothing moves; a dropdown member lights the ⌄ alone).
   ui.rs `search_highlight`, part_studio/mod.rs `found` / `in_menu`, T1 `toolbar_highlight::` (fails with the old
-  border: Sketch 99 → 103 px). Check `land.sh --status`; fix forward if it fails.
+  border: Sketch 99 → 103 px).
+- live's timings (11-17, live/psui/timings-1117, SwiftShader lanes): click → selected face drawn 57–67 ms (ours 8.5),
+  "Area" readout 167–185 ms; Extrude 1 double-click → dialog 322–448 ms (ours 17), preview 0.73–2.2 s. Put into the
+  latency test's TARGETS comments when next touched.
 - Landed 11-17 09:54: 498b96a8 (leak fixes + NOSHAPE_SOAK + spawn_guard allow).
 - The Mac's one build slot can hold a test 10+ min: for a quick single test use NOSHAPE_RB_HOST=vibe6.
 
