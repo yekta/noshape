@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 00:15 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 01:40 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -43,15 +43,26 @@ Landed 11-16 late: 212337b1 x_t import: a blend's tube stations from its spine's
 is OCCT volume integration, generic). 4a77e41a x_t export joins a periodic face's pieces OCCT cut only at its seam
 (face_joins) into one face and fuses a rim's arcs meeting at a vertex only they use (housing-draft x_t matches).
 5d0813e0 ACIS / JT export: offsets as B-surfaces again (my 4dd88057 had broken rings-loft's SAT; T1
-offset_walls_export_to_acis, area 0.17 % off: the B-surface approximation, open). Queued: x_t export: a B-surface
-closed but for its end rows' weights' last digits (6e-12) is one periodic face (rings-loft Part 1 x_t matches; T1
-a_loft_wall_closed_but_for_its_weights_last_digits_stays_one_face, fixture rings-loft-wall.brep).
+offset_walls_export_to_acis, area 0.17 % off: the B-surface approximation, open). f6b9adf5 x_t export: a B-surface
+closed but for its end rows' weights' last digits (6e-12) is one periodic face (rings-loft Part 1 x_t matches).
+4620ccea a sketch ellipse of equal radii is a circle (o-ring generator's round rings are tori, 19 as live; psui's
+rust_mesh o-ring test now asserts the torus). 25ca889a suggested views' scale fits Front, Top and Right in 30 % of the
+frame (housing-draft 1:1 as live, was 2:1; T1 suggested_scale_fits_all_three_views). Queued fbb87314: DXF writes a
+model edge straight in its view as a LINE (sm-louver SPLINE 31 -> 0, live 0; LINE +31).
 Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live imports ours 46/48, ours reads ours
 112/119, times 49/50, drawings' DXF 0/4.
 Open, ranked:
-1. rings-loft own x_t Part 2 133/338/208 for 132/335/206 (a 0.007 mm² cylinder piece joined to its neighbour stays
-   apart: seam_pieces_joined's unify refused?). rings-loft own SAT 275/776/517 + 133/339/209 (SAT writer splits the
-   loft walls itself).
+1. Drawings DXF 0/4. housing-draft (now 1:1): ARC 0/3, CIRCLE 5/6, ELLIPSE 9/15, SPLINE 16/7, LINE 161/154: its 12
+   plane x torus B-spline edges (both models have them) are ELLIPSE / ARC in live's views. sm-louver: scale 1:40 for
+   live's 1:50 (whole-studio bounds 2678 x 841 x 978 mm fit 1:40 by every rule matching 1898's data: parked), ARC
+   101/68, ELLIPSE 50/86, LINE 2552/2472 (Mac; vibe6 draws 20 fewer). extension-spring SPLINE 37/47 (live splits
+   more), LINE 120/117. rings-loft ARC: model (below).
+   rings-loft own x_t Part 2 133/338/208 for 132/335/206: a 0.007 mm² cylinder piece shares part of the big face's seam
+   edge (three uses), so UnifySameDomain leaves it: parked.
+   SAT: live's own SAT splits periodic faces (rings-loft live.sat 445 faces for the model's 439), so the SAT rows wait
+   on live's import of its SAT (REQUESTS 13:31 "ACIS"). Ours writes closed B-surfaces split at mid (hose, o-ring's 4
+   elliptic rings, motor-mount, rings-loft); ACIS has periodic B-surfaces (clamped knots + "periodic" form, faces with
+   no seam): writer + reader would be needed.
 2. Probes: a saved rings-loft doc on the Mac (~/noshape-host/dx-keep/rl-save; copy it before each use, export_parts
    saves into the open doc).
 3. Our SAT read-backs: motor-mount-jack 24/26/2 for 16/24/0; hose 22/44/24 for 12/12/0; o-ring Part 3 4/7/2 for 1/0/0.
