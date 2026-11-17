@@ -3254,7 +3254,7 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
 // interpolation carries one a point (the Boolean's work on a curve grows with its spans). False where it can't.
 static bool fitted(const std::function<bool(double, gp_Pnt&, gp_Pnt2d&, gp_Pnt2d&)>& at, double t0, double t1, IntTools_Curve& out, double ka, double kb, const std::vector<std::pair<int, double>>& lines = {}, int side = 1)
 {
-  constexpr int p   = 5;
+  static constexpr int p = 5;
   // (Well inside the section's 1e-7 tolerance: at 1e-7 a later forced SameParameter (a blend's face refaced,
   // c2-hunting-knife's Fillet 2) fitted the edges' curves on the faces again, and their faces' integrals then changed
   // under a mirror: its Mirror 1 kept its halves apart, 31 faces for live's 22.)
