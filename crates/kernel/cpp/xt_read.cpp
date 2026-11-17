@@ -2611,6 +2611,10 @@ std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree)
     for (const auto& [i, n] : p.nodes)
       if ((n.type == 12 || n.type == 10) && !referenced.count(i))
         visit(i, gp_Trsf(), 0, -1, true, gp_Trsf());
+  // No assembly: the tree is empty and its reader drops the bodies (they are read again as parts), so they aren't healed
+  // here (live's c2-rings-loft x_t: 4.6 s of heal a read).
+  if (tree && tree->root.empty())
+    return {};
   // Heal the bodies in parallel (an instanced body once: its instances share
   // its edges), each under its own crash guard (unhealed if it crashes).
   {
