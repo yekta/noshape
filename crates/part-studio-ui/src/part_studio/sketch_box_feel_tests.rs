@@ -142,3 +142,97 @@ fn sketch_clicks_toggle_and_ctrl_opens_the_menu_as_live(cx: &mut TestAppContext)
     assert!(cx.update(|cx| view.read(cx).context_menu.is_some()), "Ctrl+click opened the sketch's context menu");
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// Live2 Part 2 (iso, planes behind): with no tool a line's midpoint hovers the line (midpoints snap only while a tool
+/// draws); a glyph click selects its constraint and a second glyph click replaces it; a click on a plane selects the
+/// plane (it isn't empty space).
+#[gpui::test]
+fn midpoint_glyph_and_plane_clicks_in_a_sketch_as_live(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-glyph-plane-clicks", Tool::CornerRect);
+    click(cx, window, &view, (450., 300.));
+    click(cx, window, &view, (750., 420.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let feature = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+    let all = lines(cx, &view);
+    let (line, a, b) = *all.iter().max_by(|x, y| (x.2 - x.1).length().total_cmp(&(y.2 - y.1).length())).unwrap();
+    let pointer = Pointer::new(cx, window, &view);
+    let mut wrong = Vec::new();
+    pointer.move_to(cx, &view, (a + b) * 0.5);
+    let got = cx.update(|cx| view.read(cx).hover.clone());
+    if got != Some(Reference::SketchEntity { sketch: feature, entity: line }) {
+        wrong.push(format!("a line's midpoint, no tool: lit {got:?}, not the line"));
+    }
+    // The glyph row (Show constraints off: shown while its line is hovered) of the line with the most glyphs, two
+    // glyphs clicked in turn.
+    let rows: Vec<(u32, DVec2, DVec2, Vec<noshape_sketch::ConstraintId>)> = cx.update(|cx| {
+        let v = view.read(cx);
+        let data = v.sketch_data(cx).unwrap();
+        let glyphs = v.sketch.as_ref().unwrap().constraint_glyphs(&data);
+        all.iter().map(|(id, a, b)| (*id, *a, *b, glyphs.iter().filter(|g| g.entity.0 == *id && !g.on_point && g.offset.is_none()).map(|g| g.constraint).collect())).collect()
+    });
+    let (line, a, b, row) = rows.into_iter().max_by_key(|r| r.3.len()).unwrap();
+    assert!(row.len() >= 2, "a line with two glyphs or more: {row:?}");
+    pointer.move_to(cx, &view, a + (b - a) * 0.3);
+    let spot = pointer.window_point(cx, a + (b - a) * 0.3);
+    let mut at = spot;
+    for (k, cid) in row.iter().take(2).enumerate() {
+        let selector: &'static str = Box::leak(format!("glyph-{}-{}", cid.0, line).into_boxed_str());
+        let Some(to) = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(selector).map(|b| b.center()) else {
+            let state = cx.update(|cx| {
+                let ed = view.read(cx).sketch.as_ref().unwrap();
+                format!("hover {:?}, hover_constraint {:?}, glyph_entity {:?}, selected {:?}", ed.hover, ed.hover_constraint, ed.glyph_entity.map(|g| g.0), ed.selected_constraints)
+            });
+            panic!("glyph {} of line {line} not shown: {state}", k + 1);
+        };
+        for i in 1..=6 {
+            let t = i as f32 / 6.0;
+            let p = gpui_kit::point(at.x + (to.x - at.x) * t, at.y + (to.y - at.y) * t);
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_mouse_move(p, None, Modifiers::default());
+            pointer.frames(cx, &view);
+        }
+        // (Where it is drawn now, under the pointer: the row may settle as the hover moves onto it.)
+        let to = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(selector).map_or(to, |b| b.center());
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_mouse_move(to, None, Modifiers::default());
+        pointer.frames(cx, &view);
+        at = to;
+        let under = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover_constraint);
+        if under != Some(*cid) {
+            let state = cx.update(|cx| {
+                let ed = view.read(cx).sketch.as_ref().unwrap();
+                format!("hover {:?}, glyph_entity {:?}, row_at {:?}, selected {:?}", ed.hover, ed.glyph_entity.map(|g| (g.0, g.1.elapsed())), ed.glyph_row_at, ed.selected_constraints)
+            });
+            let rows: Vec<String> = row.iter().map(|c| {
+                let sel: &'static str = Box::leak(format!("glyph-{}-{}", c.0, line).into_boxed_str());
+                format!("{c:?} {:?}", gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel))
+            }).collect();
+            wrong.push(format!("glyph {} under the pointer at {to:?}: {under:?}, want {cid:?}; {state}; row {rows:?}", k + 1));
+        }
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_click(to, Modifiers::default());
+        draw(cx, window);
+        let selected = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().selected_constraints.to_vec());
+        if selected != vec![*cid] {
+            wrong.push(format!("glyph click {}: selected {selected:?}, want [{cid:?}]", k + 1));
+        }
+    }
+    // A plane in view beside the sketch: the first spot below and right of it where a plane lights.
+    let lo = all.iter().flat_map(|l| [l.1, l.2]).fold(DVec2::splat(f64::MAX), |m, p| m.min(p));
+    let hi = all.iter().flat_map(|l| [l.1, l.2]).fold(DVec2::splat(f64::MIN), |m, p| m.max(p));
+    let spots = [DVec2::new(hi.x + 60.0, hi.y + 40.0), DVec2::new(lo.x - 60.0, hi.y + 40.0), DVec2::new((lo.x + hi.x) * 0.5, hi.y + 80.0), DVec2::new(hi.x + 120.0, lo.y)];
+    let plane = spots.iter().find_map(|s| {
+        pointer.move_to(cx, &view, *s);
+        cx.update(|cx| view.read(cx).hover.clone()).filter(|r| matches!(r, Reference::Plane(_))).map(|r| (*s, r))
+    });
+    let (spot, plane) = plane.expect("a plane lit beside the sketch");
+    pointer.click(cx, &view, spot);
+    let selected = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().model_selection.clone());
+    if !selected.contains(&plane) {
+        wrong.push(format!("a plane clicked in sketch mode: selection {selected:?}, want {plane:?}"));
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}

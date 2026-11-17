@@ -45,9 +45,9 @@ fn a_left_lines_glyphs_go_when_the_linger_ends(cx: &mut TestAppContext) {
     assert!(redraws.get() > 0, "a redraw when the lingering glyphs are due to go");
 }
 
-/// Live2 feel-1417 (Show constraints off): a hovered line's glyph row sits ~40 px off the line around the pointer's
-/// spot on it (not the line's middle), so moving straight up from a quarter along the line reaches its first glyph:
-/// the glyph lights and the line stays lit as its partner.
+/// Live2 feel-1417 (Show constraints off): a hovered line's glyph row is placed once, ~40 px off the line by the spot
+/// where the hover started (not the line's middle), and stays there while the pointer slides along the line; moving
+/// straight off the line from that spot reaches its first glyph: the glyph lights and the line stays lit as its partner.
 #[gpui::test]
 fn a_hovered_lines_glyphs_wait_by_the_pointer(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -84,6 +84,22 @@ fn a_hovered_lines_glyphs_wait_by_the_pointer(cx: &mut TestAppContext) {
     let glyph = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(selector).expect("the line's first glyph shown").center();
     let (dx, dy) = (f32::from(glyph.x - spot.x), f32::from(glyph.y - spot.y));
     assert!(dx.abs() <= 11.0 * count as f32 + 1.0 && (30.0..50.0).contains(&dy.abs()), "the row by the pointer: first glyph {dx:.0}, {dy:.0} px from the pointer's spot");
+    // Placed once where the hover starts: sliding 60 px along the line leaves it there (live2 feel-1417 follow-up).
+    let (a, b) = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        let data = v.sketch_data(cx).unwrap();
+        let vp = v.viewport.read(cx);
+        let Some(noshape_sketch::Curve2::Line { a, b }) = data.sketch.curve(line) else { unreachable!() };
+        (vp.project(ed.frame.to_world(a)).unwrap(), vp.project(ed.frame.to_world(b)).unwrap())
+    });
+    let along = (b - a).normalize();
+    for i in 1..=6 {
+        pointer.move_to(cx, &view, on + along * (10.0 * i as f64));
+    }
+    let moved = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(selector).expect("the row still shown").center();
+    assert!(f32::from(moved.x - glyph.x).abs() < 0.5 && f32::from(moved.y - glyph.y).abs() < 0.5, "the row stays put while the pointer slides along the line: {glyph:?} -> {moved:?}");
+    pointer.move_to(cx, &view, on);
     for i in 1..=8 {
         let t = i as f32 / 8.0;
         let at = gpui_kit::point(spot.x + (glyph.x - spot.x) * t, spot.y + (glyph.y - spot.y) * t);

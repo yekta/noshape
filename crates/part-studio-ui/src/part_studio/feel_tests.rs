@@ -86,7 +86,7 @@ impl Pointer {
 
     /// Clicks there and lets the click's pick come back (a hover just changed is picked again first; a loaded
     /// software GPU can take a while).
-    fn click(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>, at: DVec2) {
+    pub(super) fn click(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>, at: DVec2) {
         let win = self.window_point(cx, at);
         gpui_kit::VisualTestContext::from_window(self.window, cx).simulate_click(win, Modifiers::default());
         self.settle(cx, view);

@@ -589,14 +589,18 @@ pub struct SketchEditor {
     /// Model edges / vertices selected in the sketch (live sketch.md 8.11):
     /// they join the selection for a constraint, as linked external entities.
     pub model_selection: Vec<noshape_model::reference::Reference>,
+    /// A plane pressed with no tool (the view sets it): released without a drag it joins `model_selection`, as live
+    /// (a click on a plane isn't on empty space, live2 Part 2).
+    pub model_press: Option<noshape_model::reference::Reference>,
     /// Hovered dimension label or constraint glyph.
     pub hover_constraint: Option<ConstraintId>,
     /// Hovered sketch pattern glyph (pattern id).
     pub hover_pattern: Option<u32>,
     /// Entity whose glyphs stay visible briefly after hover ends.
     pub glyph_entity: Option<(EntityId, std::time::Instant)>,
-    /// The hovered line and the pointer's spot on the plane: with Show constraints off its glyph row sits there, not
-    /// at the line's middle (live2 feel-1417), and stays after the hover ends.
+    /// The hovered line and the pointer's spot on the plane where its hover started: with Show constraints off its
+    /// glyph row sits there, not at the line's middle, and stays put while the pointer slides along the line and after
+    /// the hover ends (live2 feel-1417).
     pub glyph_row_at: Option<(EntityId, DVec2)>,
     drag: Option<DragState>,
     /// The sketch as a geometry drag found it: each step solves from it.
@@ -1356,6 +1360,7 @@ impl SketchEditor {
             hover_region: None,
             selected_regions: Vec::new(),
             model_selection: Vec::new(),
+            model_press: None,
             hover_constraint: None,
             hover_pattern: None,
             glyph_entity: None,
@@ -4658,6 +4663,12 @@ impl SketchEditor {
                             self.selection.push(e.id);
                         }
                     }
+                } else if let Some(r) = self.model_press.take() {
+                    if let Some(i) = self.model_selection.iter().position(|x| *x == r) {
+                        self.model_selection.remove(i);
+                    } else {
+                        self.model_selection.push(r);
+                    }
                 } else if let Some(r) = self.hover_region.clone() {
                     // A click inside a closed profile selects the region.
                     if let Some(i) = self.selected_regions.iter().position(|x| *x == r) {
@@ -4671,6 +4682,7 @@ impl SketchEditor {
                     self.selected_regions.clear();
                 }
                 self.box_end = None;
+                self.model_press = None;
                 EditOutcome::redraw()
             }
             Some(DragState::Label { constraint, moved, additive, .. }) => {
@@ -4685,6 +4697,10 @@ impl SketchEditor {
                 if moved {
                     EditOutcome::changed()
                 } else {
+                    // A glyph click replaces the selected constraints (live2 Part 2); Shift adds.
+                    if !additive && !self.selected_constraints.contains(&constraint) {
+                        self.selected_constraints.clear();
+                    }
                     self.toggle_constraint_selection(constraint, additive);
                     EditOutcome::redraw()
                 }
