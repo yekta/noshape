@@ -128,11 +128,19 @@ impl DrawingEditor {
         match d.mode {
             0 => Some([0.0, 1.0]),
             1 => Some([1.0, 0.0]),
+            // Angular with Cut angle unticked: the second click sets the line (live2 asm-feel (6)).
+            _ if !d.angle_on => None,
             _ => {
                 let a = d.angle.to_radians() * if d.opposite { -1.0 } else { 1.0 };
                 Some([a.cos(), a.sin()])
             }
         }
+    }
+
+    /// Angular with Cut angle unticked: the cutting line pivots about the first click toward the pointer, not
+    /// square to the view (live2 asm-feel (6)).
+    pub fn section_free_angle(&self) -> bool {
+        self.section_dlg.as_ref().is_some_and(|d| d.mode == 2 && !d.angle_on)
     }
 
     /// The label typed in the dialog (else the sheet's next free letter).

@@ -112,7 +112,7 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | Click vs drag | a view or a dimension moves from 5 px (4 is a click), a note from 8 (6 is a click); no hold needed (D5) | 4 px past the press for views and dimensions, 7 for notes (`drag_threshold_px`) | GPUI feel `a_view_moves_from_5_px_and_4_px_is_a_click` (views) | = |
 | Box on empty sheet | shows past 7 px from the press: none at 3–7 px along an axis or (4, 4) px, a box at 8 px and at (5, 5) px; D5's "none at ≤ 8" was a late repaint (live2 drw-feel-q (a)) | past 7 px (`BOX_START_PX`) | GPUI `a_box_on_the_empty_sheet_starts_past_7_px` | = |
 | Dragging a view | a view aligned with its parent follows the parent's move only across its axis (Front dragged (+40, −20): Top +40 in x, Right −20 in y); a projected view dragged across its axis takes its parent along (Right 40 px down: Front down too, Top stays) (followUp (3)) | the same (`dragged_view_positions`; was: the whole family moved, a projected view locked to its axis) | drawing `a_dragged_view_takes_its_aligned_family_as_live`; e2e `drawing_view_move_takes_the_aligned_views_along` | = (fixed 11-16) |
-| Dragging a view near another's alignment | no snap at 16 down to 1 px, Shift or not (F4) | none (built 11-13, removed on live2's answer) | – | = |
+| Dragging a view near another's alignment | no snap at 16 down to 1 px, Shift or not (F4) | none (built 11-13, removed on live2's answer) | GPUI feel `a_dragged_view_lands_where_released_with_no_alignment_snap` | = |
 | Double-click | the OS's (live2's Linux: 400 ms, 2 px); a dimension's palette only within ~200 ms and 3 px (live2 11-13) | the OS's (GPUI's Linux constant: 400 ms, 5 px); a dimension's palette within 200 ms and 3 px (`quick_double_click`) | `a_dimensions_palette_needs_a_quick_close_double_click` | = (Linux distance 5 vs 2 px: GPUI's constant) |
 
 ## Documents page and tabs (studios, from 2026-11-13)
@@ -242,6 +242,12 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 |---|---|---|---|---|
 | Explicit connector's reach | 23 px across, 14 px up and down | the disc picks, in its plane (18 px + the pick square's 5) | `a_picked_glyphs_disc_takes_the_pointer_across_it` | = |
 | Explicit connector's priority | over vertex, edge, face | the same (overlay first) | psui's 3D matrix | = |
+| Mate glyph's reach (live2 asm-feel2 (b)) | the drawn glyph (~26 px across face-on) plus 6–7 px wins over the face behind it (Slider 1 on a slanted face: left 12, up / down 20, right ≥ 24 along its arrow); hovered: a light backing square, its part outlined | a 26 px square on screen in its plane (`MateGlyphs`, `MATE_GLYPH_HALF_PX` 13), picked by a disc 2 px past it + the 5 px pick square; backing square, the part outlined. The glyph's own shape per mate type (Slider's ring and arrow) not yet | GPUI `a_mate_glyph_wins_the_hover_within_its_reach_and_its_click_selects_the_mate` (19 px the glyph, 24 the face) | ≈ |
+| Mate glyph click (4) | selects the mate: row blue, its instances' rows grey, mated faces amber, a dashed line between the connectors | the same | the same test | = |
+| Part hover (3b, asm-feel2 (c)) | the face's boundary edges (every loop) #FFC685, the part's silhouette #FFC20E, the fill unchanged; inside a subassembly only that part | the same (`Highlights::hover_part`, `Scene::hover_outline_rgb`) | – | = |
+| Instance row tooltip (asm-feel2 (a)) | every row's label shows the instance name, cut off or not, fading in ~0.1–0.27 s; the icon columns their own tips | the same | – | = |
+| Graphics → list (2) | nothing lights in the list, no flyout | the same | – | = |
+| Box select (5) | left → right over half a part: nothing; round it: the instance; right → left over half: the whole instance; never faces | the same | GPUI `a_box_takes_whole_instances_as_live` | = |
 | Explicit connector's look | a 36 px disc, 4 px ring, Z line 20 px, X/Y 12 px | the Part Studio's disc (`ConnectorGlyphs::picked`, screen size) | `connector_glyph_extent_counts_for_the_zoom_limits` | = |
 | Implicit, over a face | the centroid wherever the pointer is; corner dots larger than midpoint dots | the same (17:18; Shift still picks among the points) | `a_faces_connector_is_its_centroid_wherever_the_pointer_is` | = |
 | Implicit, over an edge | the midpoint, Z along the edge | the same (17:18) | – | = |

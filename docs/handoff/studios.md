@@ -9,38 +9,46 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 13:10 UTC. Restarted 11-17 09:20 after the lead's pause.
+Updated 2026-11-17 15:36 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
-- Landed 11-17: 7abd9bdf (doc-open timing), b5d11ad7 (box select), 01fb280e (panel text form gated on live2
-  2026-11-17.3, versions flows, manual-4).
-- Queued 12:45: 57dc3ed4 (Section panels: Cut angle checkbox, Edit section's depth block + Opposite direction;
-  first angle suggested views (Left, iso projected from Front, sheet-centred); Detail panel reading; drawing context
-  menu reads its submenu only after a pointer move).
-- Committed, not landed: Cut angle ticked row; section/aux/detail VIEW for the 11-15 reader; runner
-  `section_cut_point_read`; drawing feel tests (drawing-ui src/drawing_ui_tests/feel.rs: view reach, dimension line /
-  text reach, click toggles, view and note drag thresholds, centerline on an edge); `centerline_on_edge` (row 97 =).
-  Mac test run studios-mac-feel-*; land after it and 57dc3ed4.
-- vibe6: full drawing run restarted 13:03 (319 takes, ~/tmp/studios/drw1117, log ~/agents/studios-keep/drw1117b.log);
-  no rb.sh to vibe6 while it runs (the 11:58 run died at 12:07, likely during a sync). Then `drawing_matrix.py --run`
-  and the speed run (speed1117.sh, died in the slot queue: rerun).
-- Waiting on live2: the weld take re-recorded after their metric-position fix (ours matches its views at 60.9 mm);
-  REQUESTS 12:52 P0 assembly hover captures (mate-row flyout, graphics -> list, priorities, click, box, the unticked
-  Angular second click). Live re-records the 52 panel takes (.5, ~17:30): then fill panel texts past line 30.
+- Landed 11-17: 7abd9bdf (doc-open timing), b5d11ad7 (box select), 01fb280e (panel text form, versions flows,
+  manual-4). 57dc3ed4 failed 13:06 (ops e2e: first angle's side view); fixed forward (drawing_get "isometric",
+  e2e takes either side view; ops e2e 222/222 on vibe5).
+- Checking since 14:47: 1db5e57e, 11 commits: section / detail / menu readings, first angle, the e2e fix, the
+  drawing feel tests (drawing_ui_tests/feel.rs, 7), centerline_on_edge, Move to sheet / cell Note / Cell panel
+  readings, the mate-row flyout (assembly_flyout.rs).
+- Committed 15:36 (landing after 1db5e57e), from live2 asm-feel 13:05 and asm-feel2 15:0x (behaviours "studios
+  (11-17 12:52, P0)" and "(11-17 15:0x, P0 asm feel follow-ups)"):
+  - mate glyphs at screen size (asm_scene::MateGlyphs camera geometry, 26 px, a pick disc 2 px past it); a hovered
+    glyph sits on a light backing square and outlines its part. Still ours: a square glyph for every mate type
+    (live: per type, Slider = a ring and an arrow) - next look item;
+  - a hovered face shows its part's silhouette in #FFC20E (Highlights::hover_part, render Scene::hover_outline_rgb),
+    only that part inside a subassembly;
+  - every instance row has its name as its tooltip (live2: the 11-14 "only when cut off" was wrong);
+  - the unticked Angular section takes 3 clicks (section_free_angle); section takes 10/10 match;
+  - tests: assembly-ui src/assembly_feel_tests.rs (glyph reach + click, box rule), drawing
+    an_angular_section_without_a_cut_angle_takes_its_line_from_two_clicks, feel
+    a_dragged_view_lands_where_released_with_no_alignment_snap (F4).
+- vibe6 slot (queued behind psui's run): asm + section takes, 224 (~/tmp/studios/asmsec, log
+  ~/agents/studios-keep/asmsec.log).
+- live2 2fdb573f (queued): drw-datum-target-panel-tips, drw-hatch-panel-tips: implement once landed. Next from them:
+  Custom table, Hole table.
+- Not rerun yet: the drawing matrix refresh (`drawing_matrix.py --run` on ~/tmp/studios/drw1117), the speed run
+  (speed1117.sh). The weld take waits on live2's metric-position fix. Live re-records the 52 panel takes (.5): then
+  fill panel texts past line 30.
 
-## Lead's queue (11-17)
-
-P0 (lead 11-17 ~12:45): hover / select parity outside Part Studios, a feel scenario per item.
-- Drawings: 6 GPUI feel tests (above). Still without a test: note leader reach (needs a leader op), snap markers,
-  placement inference, view drag alignment, double-click (has one). Row 97 fixed.
-- Assembly: ours has list -> viewport hover (instance outline, mate row: both parts + glyph); missing: the mate-row
-  flyout (live opens one), graphics -> list (unknown in live). GPU pick through psui's code: `Viewport::pick_priority`
-  from `AsmPickMap::priority_fn`, `PickKind::priority`, PickBuffer::pick; psui is in viewport.rs hover path,
-  behaviors.rs sync_pick_filter, mod.rs set_built/rebuild_scene until they land (today) - stay out. Assembly feel rows
-  in a sibling file in assembly-ui in feel_tests.rs' style (its `Pointer` is pub(super) in part-studio-ui).
-Then the earlier queue: speed (Mac judged numbers: decision asked of the lead), drawing matrix refresh.
+## Lead's queue (11-17, restated after compaction)
+1. Land what is green. 2. User P0: hover / select parity in Assemblies (instances, mate connectors, mates list <->
+viewport, parts vs connectors) and Drawings (views, edges, dimensions, annotations: hover, click, box, drag), each
+against live with a feel scenario; share psui's pick code (`Viewport::pick_priority`, `AsmPickMap::priority_fn`,
+`PickKind::priority`; psui owns viewport.rs' hover path). 3. Versions / branches / release queue.
+- Drawings without a test yet: note leader reach (needs a leader op), snap markers, placement inference, view drag
+  alignment.
+- Assembly already as live (checked 11-17): box select rule, glyph click selects the mate (related rows, mated faces
+  amber, dashed connector line), graphics hover lights no list row, list hover outlines the parts.
 
 ## Agents (lead's roster 11-17 10:30; only these ids)
 psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, core 6692ae35-758a-4442-81c8-29f67be2e21a,
@@ -48,12 +56,14 @@ blend 0e6e9942-0713-46c1-ae55-132fbbb4a14b, bool 7fa8ceab-4549-499f-9b01-3a289c2
 dx f93a1292-5bb7-406f-9a25-59767e01878e, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b,
 asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6,
 bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios 58e9bca8-346c-4847-8012-e15006ae61ef,
-live e8549719-ef9a-42de-960c-e24b29f142a6, live2 3b9b1e66-33a0-4dfe-9e0a-eee216e354b2.
+live e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7 (fresh id 11-17).
 Paused agents are not messaged (DECISIONS 11-17).
 
 ## Waiting on others
-- live2 (3b9b1e66): REQUESTS 12:52 (P0 assembly hover), the weld retake (metric positions). live (e8549719): the 52
-  panel takes in the .5 form, Hole/thread callout palette takes (drw-hcallout-palette-tips / -dual / -fit-tips).
+- live2 (79ae5cdb): the weld retake (metric positions), 2fdb573f (datum-target / hatch tips). live (e8549719): 43
+  re-recorded drawing takes + 3 Hole/thread callout palette takes landing in one commit; the 8 drw-revision-* and
+  drw-styles-dimension in ~40 min (from ~15:10): run them all when they land (then fill panel texts past
+  line 30).
 
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;

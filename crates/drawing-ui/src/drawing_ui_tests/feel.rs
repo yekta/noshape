@@ -284,3 +284,53 @@ fn placing_a_note_lines_up_with_another_within_8_px(cx: &mut TestAppContext) {
         assert_eq!((x - note[0]).abs() < 1e-9, lines_up, "{off} px off: the point on the note's x ({x} for {})", note[0]);
     }
 }
+
+/// Live2 feel/drawing.json F4: a dragged view lands exactly where it is released, with no snap to another view's
+/// centre line at 12, 9, 5 or 3 px from it (and no guide line). The isometric view is dragged level with Top's centre.
+#[gpui::test]
+fn a_dragged_view_lands_where_released_with_no_alignment_snap(cx: &mut TestAppContext) {
+    use noshape_model::drawing::ViewKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-view-align");
+    real_sheet(cx, window, &editor);
+    let (iso, top_y) = cx.update(|cx| {
+        let s = editor.read(cx).current_sheet();
+        let iso = s.views.iter().find(|v| matches!(v.kind, ViewKind::Projected { direction: Some(d), .. } if d[0] != 0.0 && d[1] != 0.0)).expect("the isometric view");
+        let top = s.views.iter().filter(|v| matches!(v.kind, ViewKind::Projected { direction: Some(d), .. } if d[0] == 0.0)).max_by(|a, b| a.position[1].total_cmp(&b.position[1])).expect("Top");
+        (iso.id, top.position[1])
+    });
+    let mm_per_px = cx.update(|cx| {
+        let e = editor.read(cx);
+        let (a, b) = (e.sheet_to_local([0.0, 0.0]), e.sheet_to_local([100.0, 0.0]));
+        100.0 / (b[0] - a[0]).abs()
+    });
+    // Drags the view's centre to sheet height `y` (from inside its geometry, in steps).
+    let drag_to = |cx: &mut TestAppContext, y: f64| {
+        cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
+        cx.executor().advance_clock(std::time::Duration::from_millis(600));
+        let from = cx.update(|cx| editor.read(cx).current_sheet().view(iso).map(|v| v.position)).expect("the view");
+        let grab = cx.update(|cx| editor.read(cx).built.as_ref().and_then(|b| b.placements.iter().find(|p| p.id == iso).copied())).expect("placed");
+        let g = [(grab.min[0] + grab.max[0]) / 2.0, (grab.min[1] + grab.max[1]) / 2.0];
+        let to = [g[0], g[1] + (y - from[1])];
+        let p = at_window(cx, &editor, g);
+        let mut v = VisualTestContext::from_window(window, cx);
+        v.simulate_mouse_move(p, None, Modifiers::default());
+        v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
+        for k in 1..=6 {
+            let t = f64::from(k) / 6.0;
+            let m = at_window(cx, &editor, [g[0] + (to[0] - g[0]) * t, g[1] + (to[1] - g[1]) * t]);
+            VisualTestContext::from_window(window, cx).simulate_mouse_move(m, Some(MouseButton::Left), Modifiers::default());
+        }
+        let q = at_window(cx, &editor, to);
+        VisualTestContext::from_window(window, cx).simulate_mouse_up(q, MouseButton::Left, Modifiers::default());
+        draw(cx, window);
+        cx.update(|cx| editor.read(cx).current_sheet().view(iso).map(|v| v.position)).expect("the view")
+    };
+    // Down well clear of Top's line first (the view starts level with it: a 3 px drag would be a click).
+    drag_to(cx, top_y - 40.0 * mm_per_px);
+    for off_px in [12.0, 9.0, 5.0, 3.0, 1.0] {
+        let after = drag_to(cx, top_y + off_px * mm_per_px);
+        assert!(((after[1] - top_y) / mm_per_px - off_px).abs() < 0.6, "{off_px} px from Top's centre line: landed {:.2} px from it", (after[1] - top_y) / mm_per_px);
+        drag_to(cx, top_y - 40.0 * mm_per_px);
+    }
+}

@@ -760,7 +760,7 @@ impl DrawingEditor {
             Tool::Section { parent: Some(pid), p0: Some(p0), line: None, .. } => {
                 if let Some(pl) = self.placement(*pid) {
                     let a = pl.to_sheet(*p0);
-                    let b = self.ortho_point(a, c);
+                    let b = if self.section_free_angle() { self.hover_snap.unwrap_or(c) } else { self.ortho_point(a, c) };
                     overlay.lines.push((vec![a, b], true));
                 }
             }
@@ -1011,7 +1011,9 @@ impl DrawingEditor {
             Tool::Section { parent: Some(pid), p0: Some(p0), line: None, partial, .. } => {
                 let Some(pl) = self.placement(pid) else { return };
                 let a = pl.to_sheet(p0);
-                let b = self.ortho_point(a, c);
+                // Angular, Cut angle unticked: through the second click (its snap point), at any angle.
+                let free = self.section_free_angle() && !partial;
+                let b = if free { self.snap_at(c).filter(|q| q.view == pid).map(|q| pl.to_sheet(q.p)).unwrap_or(c) } else { self.ortho_point(a, c) };
                 if len(sub(b, a)) < 2.0 {
                     return;
                 }
