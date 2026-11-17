@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-17 11:30 on the Ubeyd account)
+# QA handoff (agent qa; current state only, updated 2026-11-17 11:30 (11:50) on the Ubeyd account)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -110,6 +110,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   Since 11-17 10:50 both write "parts_same" (each CLI's final parts on a fresh copy, outside the timed runs; scp sig.py + nscli.py
   beside them, else None). parts_same False = the builds model different geometry: no regression claim from such an A/B.
 - Speed: mac/opentime.py, mac/modeltime.py (vibe7 copies in ~/agents/qa-keep), bin/nightly-sum.py, mac/live-regen.json.
+- Live's times (live 11-17): bin/livetime.py reads <models>/<doc>/live.jsonl: the last "fresh-copy" line (median of 3
+  fresh copies) else "open-sum" (no timing_kind); per_feature_ms by name or featureId, mapped to names. The nightly rebuilds
+  mac/live-regen.json from it (its 84-doc set kept; .kinds beside it) and the SCORE row says "live: N of 84 fresh-copy";
+  speed-gaps.py uses it too. live is re-timing the ~30 slowest documents, then the asm-* ("assembly-open-solved" lines,
+  not read yet), so live's totals move: the knife 408 -> 622 ms. qa-w7-nightly restarted 11:29 to take it.
 - Private documents (hat8, hat15, hat15b, dock in vibe5 / vibe7 ~/lead-private) only as mode-700 copies in ~/tmp/qa on a
   host, deleted after; never in the repo or tickets.
 

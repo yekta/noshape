@@ -557,7 +557,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - Suites on green 827a23a6 (11:19) vs ecf8c33a: models 85/126 (0 worse, 0 better), scenarios 0 worse; exchange imports
   57 -> 60/74, reads ours back 143 -> 145; assemblies 5/24, mates 664 -> 668. One change: c2-fan-blade-sweep Boolean 2
   56/139/84 -> 57/142/86 (live 56/143/88), volume now within live's band, 127 -> 813 ms (document 704 -> 1373 ms, live
-  1418). 11:40 on fa6f90cc: 56/139/84 again, volume 87828.37 -> 87773.87 (live 87773.64), Boolean 2 75-88 -> 650 ms (vibe5 A/B):
+  1418). 11:25 on fa6f90cc: 56/139/84 again, volume 87828.37 -> 87773.87 (live 87773.64), Boolean 2 75-88 -> 650 ms (vibe5 A/B):
   core's Subtract with Offset (3e998be12 / 5deebf6d1; bool's marcher ruled out). Now correct, the time is a speed item sent to core.
   Not a blocker.
 - c2-impeller-loft (IMPELLER-MOVE-FACE-2-REF): fixed by core c85e75070, every feature's status as v0.4.56 (vibe6, 3 runs).
