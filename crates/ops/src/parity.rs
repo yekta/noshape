@@ -8363,7 +8363,6 @@ pub fn standard_spec_by_part_name(name: &str) -> Option<noshape_model::assembly:
     Some(spec)
 }
 
-/// A part's volume band (m³, lo and hi) in an assembly corpus' parts list: `volume` [lo, hi] from `.mass.json`, else
 /// NOSHAPE_PATTERN_TRACE: for a pattern or mirror feature `k`, live's change of each part's volume from line `k - 1` to
 /// line `k` (`PATTERN <feature>: live …` on stderr), beside the regeneration's own `PATTERN` lines (model-core's pattern
 /// tracing: each instance's tool and what it alone adds).
@@ -8385,6 +8384,7 @@ pub fn trace_live_pattern(feature: &str, feature_type: &str, live: &[Value], k: 
     }
 }
 
+/// A part's volume band (m³, lo and hi) in an assembly corpus' parts list: `volume` [lo, hi] from `.mass.json`, else
 /// `volume_band` of live's per-feature lines (where `volume` is the number).
 fn volume_band(p: &Value) -> Option<(f64, f64)> {
     let b = p["volume"].as_array().filter(|v| v.len() == 2).or_else(|| p["volume_band"].as_array())?;
@@ -8837,8 +8837,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                         if let Some(n) = by_creator().filter(|n| made.iter().any(|s| &s.2 == n)) {
                             return Some(n);
                         }
-                        let (lo, hi) = volume_band(p)?;
-                        let mid = (lo + hi) * 0.5;
+                        // (Live's band, else the volume of its per-feature lines: asm-pattern-std 36b90f's live.jsonl.)
+                        let mid = volume_band(p).map(|(lo, hi)| (lo + hi) * 0.5).or_else(|| p["volume"].as_f64())?;
                         made.into_iter().filter(|s| !taken.contains(&s.2)).min_by(|a, b| (a.1 - mid).abs().total_cmp(&(b.1 - mid).abs())).map(|s| s.2.clone())
                     });
                     match by_maker.or_else(|| by_centroid(p, &taken)) {
