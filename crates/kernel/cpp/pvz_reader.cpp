@@ -311,10 +311,20 @@ std::map<std::string, std::string> unzip(const std::string& z)
     }
   if (eocd == std::string::npos)
     bad("no zip directory");
-  const unsigned count = u16(z, eocd + 10);
-  size_t         at    = u32(z, eocd + 16);
+  uint64_t count = u16(z, eocd + 10);
+  size_t   at    = u32(z, eocd + 16);
+  // Zip64 (live's 3MF: every size and the directory's offset 0xFFFFFFFF): its own end record, found by the locator just
+  // before this one.
+  if ((count == 0xffff || at == 0xffffffffu) && eocd >= 20 && u32(z, eocd - 20) == 0x07064b50)
+  {
+    const uint64_t z64 = u64(z, eocd - 20 + 8);
+    if (z64 + 56 > z.size() || u32(z, z64) != 0x06064b50)
+      bad("bad zip64 directory");
+    count = u64(z, z64 + 32);
+    at    = u64(z, z64 + 48);
+  }
   std::map<std::string, std::string> out;
-  for (unsigned k = 0; k < count; ++k)
+  for (uint64_t k = 0; k < count; ++k)
   {
     if (u32(z, at) != 0x02014b50)
       bad("bad zip directory entry");

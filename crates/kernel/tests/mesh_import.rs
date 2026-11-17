@@ -138,7 +138,10 @@ fn mesh_formats_3mf_gltf() {
     }
     xml += "</triangles></mesh></object></resources><build><item objectid=\"1\" transform=\"1 0 0 0 1 0 0 0 1 5 0 0\"/></build></model>";
     let path3 = dir.join("cube.3mf");
-    std::fs::write(&path3, stored_zip("3D/3dmodel.model", xml.as_bytes())).unwrap();
+    std::fs::write(&path3, stored_zip("3D/3dmodel.model", xml.as_bytes(), false)).unwrap();
+    // Zip64, as live writes its 3MF (the exchange suite: every live.3mf read as no parts).
+    let path64 = dir.join("cube64.3mf");
+    std::fs::write(&path64, stored_zip("3D/3dmodel.model", xml.as_bytes(), true)).unwrap();
     // glTF: metres, a base64 buffer, a node translation.
     let mut buf = Vec::new();
     for p in v {
@@ -158,7 +161,7 @@ fn mesh_formats_3mf_gltf() {
     );
     let pathg = dir.join("cube.gltf");
     std::fs::write(&pathg, gltf).unwrap();
-    for path in [&path3, &pathg] {
+    for path in [&path3, &path64, &pathg] {
         let s = read_mesh_bodies(path, LengthUnit::Millimeter).unwrap_or_else(|e| panic!("{path:?}: {e}"));
         assert!(s.is_mesh() && s.is_valid(), "{path:?}");
         assert_eq!(s.count(ShapeType::Solid), 1, "{path:?}");
@@ -181,34 +184,62 @@ fn crc32(data: &[u8]) -> u32 {
     !c
 }
 
-/// A zip with one stored member.
-fn stored_zip(name: &str, data: &[u8]) -> Vec<u8> {
+/// A zip with one stored member; `zip64`: as live writes its 3MF, every size and offset 0xFFFFFFFF with the values in
+/// Zip64 extra fields and end records.
+fn stored_zip(name: &str, data: &[u8], zip64: bool) -> Vec<u8> {
     let (crc, n, len) = (crc32(data), name.len() as u16, data.len() as u32);
+    let big = |v: u32| if zip64 { u32::MAX } else { v };
     let mut z = Vec::new();
     z.extend_from_slice(&0x0403_4b50u32.to_le_bytes());
-    z.extend_from_slice(&[20, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    z.extend_from_slice(&[45, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     z.extend_from_slice(&crc.to_le_bytes());
-    z.extend_from_slice(&len.to_le_bytes());
-    z.extend_from_slice(&len.to_le_bytes());
+    z.extend_from_slice(&big(len).to_le_bytes());
+    z.extend_from_slice(&big(len).to_le_bytes());
     z.extend_from_slice(&n.to_le_bytes());
-    z.extend_from_slice(&0u16.to_le_bytes());
+    z.extend_from_slice(&(if zip64 { 20u16 } else { 0 }).to_le_bytes());
     z.extend_from_slice(name.as_bytes());
+    if zip64 {
+        z.extend_from_slice(&[1, 0, 16, 0]);
+        z.extend_from_slice(&(len as u64).to_le_bytes());
+        z.extend_from_slice(&(len as u64).to_le_bytes());
+    }
     z.extend_from_slice(data);
     let central = z.len() as u32;
     z.extend_from_slice(&0x0201_4b50u32.to_le_bytes());
-    z.extend_from_slice(&[20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    z.extend_from_slice(&[45, 0, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     z.extend_from_slice(&crc.to_le_bytes());
-    z.extend_from_slice(&len.to_le_bytes());
-    z.extend_from_slice(&len.to_le_bytes());
+    z.extend_from_slice(&big(len).to_le_bytes());
+    z.extend_from_slice(&big(len).to_le_bytes());
     z.extend_from_slice(&n.to_le_bytes());
-    z.extend_from_slice(&[0; 12]);
-    z.extend_from_slice(&0u32.to_le_bytes());
+    z.extend_from_slice(&(if zip64 { 28u16 } else { 0 }).to_le_bytes());
+    z.extend_from_slice(&[0; 10]);
+    z.extend_from_slice(&big(0).to_le_bytes());
     z.extend_from_slice(name.as_bytes());
+    if zip64 {
+        z.extend_from_slice(&[1, 0, 24, 0]);
+        z.extend_from_slice(&(len as u64).to_le_bytes());
+        z.extend_from_slice(&(len as u64).to_le_bytes());
+        z.extend_from_slice(&0u64.to_le_bytes());
+    }
     let size = z.len() as u32 - central;
+    if zip64 {
+        let end64 = z.len() as u64;
+        z.extend_from_slice(&0x0606_4b50u32.to_le_bytes());
+        z.extend_from_slice(&44u64.to_le_bytes());
+        z.extend_from_slice(&[45, 0, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        z.extend_from_slice(&1u64.to_le_bytes());
+        z.extend_from_slice(&1u64.to_le_bytes());
+        z.extend_from_slice(&(size as u64).to_le_bytes());
+        z.extend_from_slice(&(central as u64).to_le_bytes());
+        z.extend_from_slice(&0x0706_4b50u32.to_le_bytes());
+        z.extend_from_slice(&0u32.to_le_bytes());
+        z.extend_from_slice(&end64.to_le_bytes());
+        z.extend_from_slice(&1u32.to_le_bytes());
+    }
     z.extend_from_slice(&0x0605_4b50u32.to_le_bytes());
     z.extend_from_slice(&[0, 0, 0, 0, 1, 0, 1, 0]);
     z.extend_from_slice(&size.to_le_bytes());
-    z.extend_from_slice(&central.to_le_bytes());
+    z.extend_from_slice(&big(central).to_le_bytes());
     z.extend_from_slice(&0u16.to_le_bytes());
     z
 }
