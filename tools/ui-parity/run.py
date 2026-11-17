@@ -788,6 +788,12 @@ def hole_callout_export_text(a, b):
             tx, ty = x.get("text"), y.get("text")
             if isinstance(tx, str) and isinstance(ty, str) and "⌀" in tx and ty.startswith(tx + " "):
                 y["text"] = tx
+            # With its dual shown, live's text is the bracketed dual alone, without the count ("[⌀5.00 THRU]", live2
+            # drw-hcallout-palette-dual), where ours is the whole callout ("[3X ⌀5.00 THRU] 3X ⌀.197 THRU").
+            elif isinstance(tx, str) and isinstance(ty, str) and tx.startswith("[") and tx.endswith("]"):
+                dual = re.sub(r"^\[\d+[Xx-] ", "[", ty.split("] ")[0] + "]") if ty.startswith("[") else None
+                if dual == tx:
+                    y["text"] = tx
 
 
 def section_cut_point_read(a, b):

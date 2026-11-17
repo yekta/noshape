@@ -543,24 +543,6 @@ impl DrawingEditor {
         };
         let menu = |id: &'static str, label: AnyElement, w: f32, items: Vec<(String, bool, Act)>| combo(id, label, w, 28., items);
         let menu_tall = |id: &'static str, label: AnyElement, w: f32, items: Vec<(String, bool, Act)>| combo(id, label, w, 54., items);
-        let toggle = |id: &'static str, label: &'static str, tip: &'static str, on: bool, f: fn(&mut PaletteDlg), cx: &mut Context<Self>| {
-            div()
-                .id(id)
-                .h(px(26.))
-                .px(px(4.))
-                .flex()
-                .items_center()
-                .rounded(px(2.))
-                .border_1()
-                .border_color(gpui_kit::rgb(0xcccccc))
-                .when(on, |e| e.bg(gpui_kit::rgb(0xdfe7ee)))
-                .cursor_pointer()
-                .text_size(px(12.))
-                .child(label)
-                .tooltip(crate::ui::tooltip(tip))
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.edit_palette(f, cx)))
-                .into_any_element()
-        };
         let small = |s: String| div().text_size(px(12.)).text_color(ink).child(s).into_any_element();
         // Units (D34): the drawing's entry "… (Drawing)" in the list.
         let mut unit_items: Vec<(String, bool, Act)> = DimUnits::ALL.iter().map(|&u| (u.name().to_string(), units == Some(u), std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.units = Some(u)) as Act)).collect();
@@ -653,7 +635,7 @@ impl DrawingEditor {
                 .into_any_element()
         };
         let icon_toggle = |id: &'static str, content: AnyElement, tip: &'static str, on: bool, f: fn(&mut PaletteDlg), cx: &mut Context<Self>| -> AnyElement {
-            div()
+            crate::ui_script::mark(div(), move || format!("button:{tip}"))
                 .id(id)
                 .size(px(30.))
                 .flex()
@@ -668,6 +650,12 @@ impl DrawingEditor {
                 .tooltip(crate::ui::tooltip(tip))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.edit_palette(f, cx)))
                 .into_any_element()
+        };
+        // A dual shown: the bracketed row's units (live2 behaviours "studios (11-17, low)").
+        let dual_shown = fmt.dual.unwrap_or(self.drawing.props.dual.show) && !matches!(d.cur.kind, AnnotationKind::AngularDimension { .. });
+        let dual_unit_label = {
+            let du = noshape_model::drawing::format::dual_units(&self.drawing, &fmt);
+            if du.symbol().is_empty() { "(ft-in)".to_string() } else { format!("({})", du.symbol()) }
         };
         // The middle row.
         let middle = if hole {
@@ -695,7 +683,9 @@ impl DrawingEditor {
                     serde_json::json!({ "label": "Prefix", "kind": "input", "value": text(&d.prefix) }),
                     serde_json::json!({ "label": "Quantity", "kind": "combo", "value": format!("{n}{}", self.drawing.props.hole_indicator) }),
                     serde_json::json!({ "label": "Value", "kind": "text", "value": value }),
-                    serde_json::json!({ "label": "Units", "kind": "select", "value": unit_label }),
+                    // With its dual shown, the bracketed row above holds the first Units list (live2 behaviours
+                    // "studios (11-17, low)": "(mm)" after Dual unit).
+                    serde_json::json!({ "label": "Units", "kind": "select", "value": if dual_shown { dual_unit_label.clone() } else { unit_label.clone() } }),
                     serde_json::json!({ "label": "Suffix", "kind": "input", "value": text(&d.suffix) }),
                     serde_json::json!({ "label": "Text below", "kind": "input", "value": text(&d.below) }),
                     serde_json::json!({ "label": "Override precision/tolerance", "kind": "checkbox", "value": opts.override_tol }),
@@ -759,10 +749,22 @@ impl DrawingEditor {
         // (in) ▾ 👁 ]" on grey, the value read only; precision, units and
         // Show/hide units are this dimension's ("(Drawing)": Drawing
         // properties › Dual).
-        let dual_row = if !hole && fmt.dual.unwrap_or(self.drawing.props.dual.show) && !matches!(d.cur.kind, AnnotationKind::AngularDimension { .. }) {
+        // A hole callout's (live2 behaviours "studios (11-17, low)"): "[ Ø5.00 THRU (mm)▾ 👁 ]", its dual callout
+        // without the count, no precision list.
+        let dual_row = if dual_shown {
             use noshape_model::drawing::format as nf;
             let rotation = d.cur.kind.view().and_then(|v| self.placement(v)).map(|p| p.rotation).unwrap_or(0.0);
-            let value = d.cur.kind.measured(rotation).map(|m| nf::dual_value(&self.drawing, &fmt, m)).unwrap_or_default();
+            let value = if hole {
+                let lines = noshape_model::drawing::build::hole_callout_preview(&self.drawing, sheet, &self.sources, &d.annotation()).unwrap_or_default();
+                let n = noshape_model::drawing::build::hole_callout_count(sheet, &self.sources, &d.cur).unwrap_or(1);
+                let count = format!("{n}{} ", self.drawing.props.hole_indicator);
+                let dual: Vec<String> = lines.iter().map(|l| l.iter().map(|r| r.0.as_str()).collect::<String>()).filter(|t| t.starts_with('[') || t.ends_with(']')).collect();
+                let joined = dual.join(" ");
+                let body = joined.trim_start_matches('[').trim_end_matches(']').trim();
+                body.strip_prefix(&count).unwrap_or(body).to_string()
+            } else {
+                d.cur.kind.measured(rotation).map(|m| nf::dual_value(&self.drawing, &fmt, m)).unwrap_or_default()
+            };
             let du = nf::dual_units(&self.drawing, &fmt);
             let drawing_du = self.drawing.props.dual.units_for(!nf::length_units(&self.drawing, &fmt).imperial());
             let dprec = fmt.dual_fmt.precision;
@@ -774,7 +776,7 @@ impl DrawingEditor {
             let unit_label = if du.symbol().is_empty() { "(ft-in)".to_string() } else { format!("({})", du.symbol()) };
             let shown = nf::dual_shows_unit(&self.drawing, &fmt);
             let bracket = |s: &'static str| div().w(px(14.)).flex().justify_center().text_size(px(28.)).font_weight(FontWeight::LIGHT).text_color(gpui_kit::rgb(0x777777)).child(s);
-            let eye = div()
+            let eye = crate::ui_script::mark(div(), || "button:Show/hide units".into())
                 .id("dp-dual-units")
                 .size(px(30.))
                 .flex()
@@ -799,8 +801,8 @@ impl DrawingEditor {
                         h_flex()
                             .h(px(30.))
                             .ml(px(4.))
-                            .child(div().w(px(85.)).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xdddddd)).rounded_l(px(4.)).bg(gpui_kit::rgb(0xeeeeee)).flex().items_center().justify_center().text_size(px(14.)).text_color(gpui_kit::rgb(0x999999)).child(value))
-                            .child(pbutton("dp-dual-prec", div().into_any_element(), 20., prec_items, true)),
+                            .child(div().w(px(if hole { 180. } else { 85. })).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xdddddd)).rounded_l(px(4.)).when(hole, |e| e.rounded_r(px(4.))).bg(gpui_kit::rgb(0xeeeeee)).flex().items_center().justify_center().text_size(px(14.)).text_color(gpui_kit::rgb(0x999999)).child(value))
+                            .when(!hole, |e| e.child(pbutton("dp-dual-prec", div().into_any_element(), 20., prec_items, true))),
                     )
                     .child(div().w(px(50.)))
                     .child(pbutton("dp-dual-unit", div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(ink).child(unit_label).into_any_element(), 60., unit_items, false))
@@ -815,7 +817,11 @@ impl DrawingEditor {
         let radial = matches!(d.cur.kind, AnnotationKind::RadialDimension { .. });
         let mut toggles = h_flex().gap(px(if hole { 4. } else { 2. })).child(crate::ui_script::wrap(div().id("dp-sym-tip").tooltip(crate::ui::tooltip("Insert symbol")).child(symbols).into_any_element(), || "button:Symbols".into()));
         if hole {
-            toggles = toggles.child(toggle("dp-ref", "(XX)", "Parentheses", fmt.reference, |d| d.cur.format.reference = !d.cur.format.reference, cx)).child(crate::ui_script::wrap(menu("dp-dual", small("[XX] x.xx".into()), 80., dual_items), || "dropdown:Dual dimension".into())).child(
+            // Live (behaviours "Hole callout palette (single)"): symbol · inspection · dual dimension · Override (no
+            // Parentheses).
+            let blue = gpui_kit::rgb(0x1b72c4);
+            let oval = div().px(px(3.)).rounded_full().border_1().border_color(blue).text_size(px(11.)).text_color(ink).child("XX").into_any_element();
+            toggles = toggles.child(icon_toggle("dp-insp", oval, "Inspection dimension", fmt.inspection_frame, |d| d.cur.format.inspection_frame = !d.cur.format.inspection_frame, cx)).child(crate::ui_script::mark(div().id("dp-dual-tip"), || "dropdown:Dual dimension".into()).tooltip(crate::ui::tooltip("Dual dimension")).child(menu("dp-dual", small("[XX] x.xx".into()), 80., dual_items))).child(
                 div().pl(px(8.)).child(crate::drawing_chrome::DrCheckbox::new("dp-override").label("Override precision/tolerance").checked(opts.override_tol).tooltip("Click to override the precision and tolerance from the hole feature").on_click(cx.listener(|this, v: &bool, _, cx| {
                     let v = *v;
                     this.edit_palette(|d| d.cur.hole.get_or_insert_with(Default::default).override_tol = v, cx)
