@@ -201,6 +201,12 @@ the staged green), on vibex7 (copies in /root/psui-scratch); scenarios ~/tmp/psu
   (/root/psui-scratch/after-land.sh, log after-land.log) waits for 582351aa to land and reach green, stages that green
   on vibex7 (half b uses it too if not started) and queues unit psui-list26 (-> ~/agents/psui-keep/list26). Read its
   score.log, fix what is left.
+- The 63 psui failures of both halves, scored on qa's 21:03 run (current tools, green 592b0fc9; 49 of 63 there so
+  far): 41 / 49 pass. The ~50 "step 3" failures were my stale 11-15 scenario snapshot (old run.py), not the app.
+  Left: bend-relief x3, end-cap-profile-rectangle, gusset, hem x2 (sheet metal / frames: skasm, core) and
+  intersection-curve-new-edit-reedit (Group 2's red comes one state later than live's: our field blame waits for the
+  regeneration; live shows it as the dialog opens with a preselected face). The psui-list63 rerun on vibex7 is still
+  queued behind qa's run; it can be dropped once qa's run is complete.
 - Before: 11-16 psui list 1009 / 1021.
 
 ## Waiting on others
