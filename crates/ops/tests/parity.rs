@@ -4156,6 +4156,38 @@ fn a_subassembly_is_rebuilt_as_lives() {
     assert_eq!((r.occurrences_matching, r.occurrences, r.mates_matching, r.mates), (3, 3, 1, 1));
 }
 
+/// A subassembly's own properties come from live's BOM row of it: its part number, and "Show Assembly only", so its
+/// part has no row under it (asm-xdev-subs' FXAA3-10-F43-SET).
+#[test]
+fn a_subassemblys_properties_are_lives_bom_rows() {
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": "FS1", "entityType": "FACE" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "20 mm" }] }
+    ] });
+    let parts = json!([{ "partId": "JHD", "name": "Part 1" }]);
+    let at = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    let asm = json!({
+        "rootAssembly": {
+            "instances": [{ "id": "IS", "name": "Clamp set <1>", "type": "Assembly", "elementId": "SUB1" }],
+            "occurrences": [{ "path": ["IS"], "fixed": true, "transform": at }, { "path": ["IS", "IC"], "fixed": true, "transform": at }] },
+        "subAssemblies": [{ "elementId": "SUB1", "instances": [{ "id": "IC", "name": "Part 1 <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }], "features": [] }],
+        "subAssemblyFeatures": { "SUB1": { "features": [] } },
+        "features": { "features": [], "featureStates": {} },
+        "liveBom": { "root": { "bom": { "bomTable": { "items": [
+            { "itemSource": { "indentLevel": 0, "elementId": "SUB1", "partId": "" }, "name": "Clamp set", "quantity": 1, "partNumber": "CS-10", "description": "A clamp set", "vendor": "MISUMI", "bomBehavior": "Show Assembly only", "material": "N/A" }] } } } } });
+    let mut ctx = Ctx::new();
+    let r = rebuild_assembly(&mut ctx, &scratch("subassembly-properties.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    assert_eq!((r.bom_matching, r.bom_rows), (1, 1), "{r:?}");
+    assert!(r.differences.is_empty(), "{r:?}");
+}
+
 /// A sketch on Top of `entities` (Onshape JSON) and one Extrude of `region`
 /// 10 mm, with live's part after it.
 fn one_extrude(sketch: &str, entities: Value, region: Value, live_part: Value) -> (Value, Vec<Value>) {

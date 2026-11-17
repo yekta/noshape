@@ -9133,6 +9133,24 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             res.untranslated.push(format!("subassembly {}: {e}", l.element));
             continue;
         }
+        // Its own properties, as live's BOM row of it shows them (the assembly's Properties dialog): part number,
+        // description, vendor, BOM behavior (asm-xdev-subs' FXAA3-10-F43-SET, "Show Assembly only": its parts no rows).
+        if k != 0
+            && let Some(row) = asm["liveBom"]["root"]["bom"]["bomTable"]["items"].as_array().into_iter().flatten().find(|r| r["itemSource"]["elementId"] == l.element.as_str() && r["itemSource"]["partId"] == "")
+        {
+            let text = |key: &str| row[key].as_str().filter(|v| !v.is_empty() && *v != "N/A");
+            let mut args = json!({ "tab": l.tab });
+            for (ours, theirs) in [("part_number", "partNumber"), ("description", "description"), ("vendor", "vendor"), ("bom_behavior", "bomBehavior")] {
+                if let Some(v) = text(theirs) {
+                    args[ours] = json!(v);
+                }
+            }
+            if args.as_object().is_some_and(|o| o.len() > 1)
+                && let Err(e) = placer.call("assembly_properties", args)
+            {
+                res.untranslated.push(format!("subassembly {}: its properties: {e}", l.element));
+            }
+        }
         // The instances, in live's order; ours named as inserted.
         for i in &l.instances {
             let (Some(id), Some(element)) = (i["id"].as_str(), i["elementId"].as_str()) else { continue };
