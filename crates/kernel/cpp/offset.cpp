@@ -1067,9 +1067,11 @@ TopoDS_Shape offset_solid_impl(const TopoDS_Shape& solid, const std::vector<Topo
   if (any_removed)
     return out;
   // A volume that moved the other way from the faces' areas times their distances: turned inside out somewhere.
+  // (Adaptive to 1e-3: the test is loose, and the fixed-order integration took 30 ms a solid of B-spline faces,
+  // c2-fan-blade-sweep's offset thread copies.)
   GProp_GProps p0, p1;
-  BRepGProp::VolumeProperties(so, p0);
-  BRepGProp::VolumeProperties(out, p1);
+  BRepGProp::VolumeProperties(so, p0, 1e-3);
+  BRepGProp::VolumeProperties(out, p1, 1e-3);
   double change = 0, scale = 0;
   for (int i = 1; i <= nf; ++i)
   {
