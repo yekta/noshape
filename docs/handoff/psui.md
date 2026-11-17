@@ -133,6 +133,16 @@ e1ce5e41 readouts. qa verified both user P0s on green c330a760 (14:0x).
 - interaction-feel.md: woken model edge parallel = none (live2 wake-parallel), ours none.
 - Show constraints remembered per user (live2 14:3x): skasm's (sketch dialog), sent to them.
 
+## Queued 11-17 ~16:30
+
+- 0a87d6b1: glyph row placed once at the hover start (live2 follow-up), re-lingers off any of its glyphs, a selected
+  glyph keeps its row place, glyph click replaces (Shift adds), plane click in sketch mode selects it (editor
+  `model_press`); test sketch_box::midpoint_glyph_and_plane_clicks_in_a_sketch_as_live. 170/170 sketch UI tests.
+- Remembered values: stores keep lengths per unit ("length:Millimeter": older builds and the ui-parity runner's
+  seeds); 1313b3c9 read only "length:metric" / "length:imperial", so every seeded scenario opened our defaults (half a:
+  ~18 of 24 psui failures) and users' older memories were lost. apply_remembered reads the system's per-unit groups
+  too (own unit last, then the system group). Test updated (older store in "length:Millimeter").
+
 ## Full ui-parity rerun (11-17)
 
 Script ~/agents/psui-keep/full-half.sh (/root/psui-scratch/full-half.sh), scenarios ~/tmp/psui/src-1117.

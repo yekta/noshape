@@ -4336,7 +4336,12 @@ impl PartStudioView {
     /// the document's kind of length unit and its angle unit (never one with a #variable, kept by an older build).
     pub(super) fn apply_remembered(&self, f: &mut noshape_model::partstudio::Feature, units: &noshape_units::UnitPrefs) {
         let saved = self.ui.remembered.get(&f.type_id).cloned().unwrap_or_else(|| crate::feature_settings::get(&f.type_id));
-        let groups = [String::new(), length_group(units), format!("angle:{:?}", units.angle)];
+        // Stores written before the metric / inch memories (and the ui-parity runner's seeds) keep lengths per unit,
+        // "length:Millimeter": read as their system's memory, the document's own unit last, the system's group after.
+        let own_unit = format!("length:{:?}", units.length);
+        let mut legacy: Vec<&String> = saved.keys().filter(|g| g.strip_prefix("length:").is_some_and(|u| !matches!(u, "metric" | "imperial") && legacy_imperial(u) == (length_group(units) == "length:imperial")) && **g != own_unit).collect();
+        legacy.sort();
+        let groups: Vec<String> = std::iter::once(String::new()).chain(legacy.into_iter().cloned()).chain([own_unit, length_group(units), format!("angle:{:?}", units.angle)]).collect();
         for values in groups.iter().filter_map(|g| saved.get(g)) {
             for (id, v) in values.iter().filter(|(_, v)| !uses_variables(v)) {
                 f.params.set(id, v.clone());
@@ -5166,6 +5171,11 @@ fn uses_variables(v: &ParamValue) -> bool {
 }
 
 /// Live: one length memory for metric documents, one for inch (foot, yard) ones.
+/// Whether an older store's per-unit length group ("length:Inch") is an inch-system one.
+fn legacy_imperial(unit: &str) -> bool {
+    matches!(unit, "Inch" | "Foot" | "Yard")
+}
+
 fn length_group(units: &noshape_units::UnitPrefs) -> String {
     use noshape_units::LengthUnit as L;
     let imperial = matches!(units.length, L::Inch | L::Foot | L::Yard);

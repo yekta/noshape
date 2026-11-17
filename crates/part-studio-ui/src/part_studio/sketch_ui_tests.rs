@@ -3333,12 +3333,19 @@ fn a_remembered_value_never_carries_a_variable(cx: &mut TestAppContext) {
         g.params.expr("radius").map(|e| e.text.clone()).unwrap()
     };
     let default = opens(&mm, cx);
-    // A store an older build wrote with a #variable in it: read as nothing, the default opens.
-    view.update(cx, |v, _| {
-        let old: noshape_model::params::ParamValues = noshape_model::params::ParamValues([("radius".to_string(), noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("9 mm + #wall_thickness")))].into_iter().collect());
-        v.ui.remembered.insert("fillet".into(), [("length:metric".to_string(), old.0.into_iter().collect())].into_iter().collect());
-    });
+    // A store an older build wrote (lengths per unit, "length:Millimeter"): a #variable in it reads as nothing, the
+    // default opens; a plain value is the metric memory (in a cm document too), not the inch one.
+    let older = |radius: &str, cx: &mut TestAppContext| {
+        view.update(cx, |v, _| {
+            let old: noshape_model::params::ParamValues = noshape_model::params::ParamValues([("radius".to_string(), noshape_model::ParamValue::Expr(noshape_units::ExprValue::new(radius)))].into_iter().collect());
+            v.ui.remembered.insert("fillet".into(), [("length:Millimeter".to_string(), old.0.into_iter().collect())].into_iter().collect());
+        })
+    };
+    older("9 mm + #wall_thickness", cx);
     assert_eq!(opens(&mm, cx), default, "a stored value with a variable is ignored");
+    older("3 mm", cx);
+    assert_eq!((opens(&mm, cx), opens(&cm, cx)), ("3 mm".to_string(), "3 mm".to_string()), "an older store's mm memory is the metric one");
+    assert_ne!(opens(&inch, cx), "3 mm", "not the inch one");
     view.update(cx, |v, _| v.ui.remembered.clear());
     commit("9 mm + #wall_thickness", cx);
     assert_eq!(opens(&mm, cx), default, "nothing with a variable is remembered");
