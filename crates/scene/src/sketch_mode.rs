@@ -8139,6 +8139,8 @@ fn refusal_words(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> &'static s
         ConstraintTool::Horizontal | ConstraintTool::Vertical => "The entities must be all points or all lines and ellipses.",
         ConstraintTool::Midpoint => "Midpoint constraint requires a point and a line or arc.",
         ConstraintTool::Curvature => "An equal curvature constraint requires two curves one of which must be a conic or spline.",
+        // Live (skasm 10:12): a circle, a spline and a point picked at once.
+        ConstraintTool::Pierce if ids.len() > 2 => "A pierce constraint requires a curve or point from the sketch and an external edge.",
         _ => ADD_CONSTRAINT_FAILED,
     }
 }
@@ -10803,6 +10805,7 @@ mod tests {
             (ConstraintTool::Coincident, vec![b0, b1], "A coincident constraint cannot be added to two points from the same curve."),
             (ConstraintTool::Coincident, vec![a, c], "A coincident constraint cannot be applied to two curves of different types."),
             (ConstraintTool::Pierce, vec![a, p], "Could not add constraint."),
+            (ConstraintTool::Pierce, vec![a, c, p], "A pierce constraint requires a curve or point from the sketch and an external edge."),
             (ConstraintTool::Curvature, vec![a, c], "An equal curvature constraint requires two curves one of which must be a conic or spline."),
         ];
         for (tool, sel, words) in refused {
