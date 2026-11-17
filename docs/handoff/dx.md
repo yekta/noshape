@@ -209,11 +209,19 @@ Open, ranked:
    with_a_slightly_kinked_seam_goes_round_as_one_acis_face): prove hose x_t / sat read back 12/12/0 (were 12/14/4,
    22/44/24; seam 0.41 mrad, poles moved 0.21-0.52 um), no other exchange row changes. Core's SWEEP-SEAM-KINK filed.
    Then rings-loft "ours reads ours" x_t / sat Part 2 133/338/208 for 132/335/206.
-5. asm (P2, 11-17): asm-robot-relations studio 0c3466 Import 1: the STEP (studios/foreign/0fc7dd7c….step, SolidWorks,
-   one MANIFOLD_SOLID_BREP 'Combine1', one CLOSED_SHELL of 174 faces) is 6 disconnected pieces: live makes 6 parts
-   all "REV-21-1650", ours one (171986.6 mm³), so Thicken 1 fails and the BOM's 6 rows become one. Split an imported
-   solid's shell into its connected pieces (Shape::faces_oriented_consistently gives one shell per piece), each a
-   solid named as the file's. asm's trace: vibe7 ~/agents/asm-keep/one/rr2.log.
+5. P1 (lead 11-17) asm-robot-relations studio 0c3466 Import 1 (STEP studios/foreign/0fc7dd7c….step, SolidWorks): the
+   file's one MANIFOLD_SOLID_BREP is ONE closed connected shell (174 faces, every edge on 2 faces; python check on the
+   text). Live imports it as 6 SHEET bodies "REV-21-1650": 28/44/22 (box -31..30, -30..31, -58..35 mm), three 4/4/0
+   (~-37..-17, 21..43, -148..-3: tubes), 106/278/184, 1/10/7: 147 faces, no volume; Thicken 1 thickens a face of the
+   28-face one (Part 1 solid 60 faces 223.99 mm³). Ours: one solid, 147 faces (merge_same_surface_faces 174 -> 147),
+   28 edges on one face only (open: not a valid solid), 171986.6 mm³; Thicken 1 fails. Decision asked (lead 11:4x):
+   an imported solid whose healed shell is open -> sheet bodies, one per connected piece (ours would be 1 piece of 147
+   faces; live's 6 split where Parasolid didn't sew: find those edges, e.g. gaps over tolerance). Uncommitted in
+   dx-land: kernel connected_pieces / split_connected_pieces (a part of several solids or of a solid of disconnected
+   pieces -> a part per piece; T1 export::a_solid_of_disconnected_pieces_imports_as_a_part_each), ops import.rs
+   calls it; no live evidence that live splits real multi-piece solids: hold. Also uncommitted: the ACIS seam guard
+   (xt.cpp smooth_seam, ACIS only, <1 mrad, pole move <= 1 um; T1 export::a_tube_wall_with_a_slightly_kinked_seam_
+   goes_round_as_one_acis_face): hose SAT read-back not yet proven (vibe6 run cancelled 11:51, slot queue 5 behind qa).
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## How to run
