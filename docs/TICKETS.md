@@ -37,7 +37,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   other names. Not bisected (no intermediate green binaries; qa builds nothing). Other features' times: Delete face 2 12.1 ->
   9.6 s (now failing), Move face 1 (Error in both) 4.0 -> 5.3 s, Fillet Ansaugflansch zum Gehaeuse 0.6 -> 2.0 s. Data
   /root/qa-scratch/ab1117/g6.jsonl.
-- [ ] P0 IMPELLER-DELETE-FACE-2-SLOW (core; qa 2026-11-17 03:40, lead's clean A/B; core bisects) c2-impeller-loft's "Delete face 2"
+- [ ] P0 IMPELLER-DELETE-FACE-2-SLOW (core; qa 2026-11-17 03:40, lead's clean A/B) **qa 10:55: not a regression, nothing to
+  bisect: slower than live.** v0.4.48's final parts differ from v0.4.53's / v0.4.56's (abn-feat.py parts_same False, vibe5): its
+  Chamfer Stevenrohr Halterung failed, so Delete face 2 got another part (1.7 s in v0.4.48, 11.1 s v0.4.53, 10.3 s v0.4.56, one
+  run, load ~10). What stays: the document is ~19 s vs live's 2.8 s, Delete face 2 most of it. c2-impeller-loft's "Delete face 2"
   (deleteFace, Ok in every build) went from 2.1 s to 14.4 s: vibe7, quiet window (load ≤ 1.3), `feature list` medians of 3
   alternating runs. v0.4.48 2136 ms -> v0.4.53 14369 ms (same session); v0.4.53 13790 -> v0.4.55 13718 ms; v0.4.55 13687 ->
   green 35baa32f 12068 ms. Document total: 15.6 s (0.4.48) -> 28.6 s (0.4.53) -> 23.2 s (green); live 2.8 s for the whole
