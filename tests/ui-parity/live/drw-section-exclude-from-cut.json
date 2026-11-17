@@ -1,6 +1,6 @@
 {
  "scenario": "drw-section-exclude-from-cut",
- "recorded": "2026-11-17T17:04:10.309Z",
+ "recorded": "2026-11-17T17:25:08.953Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -9,12 +9,12 @@
    1919,
    1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.7"
  },
  "live": {
   "document": "a1e7207bcd206771836609af",
   "workspace": "6d6324b30f07aa9904363635",
-  "element": "f19eb8b40c854ac595da4173",
+  "element": "6ba51ef88fbb371745527255",
   "start": "pin-block-asm-drawing",
   "startElement": "7425731ef03d2b9db73c3efb",
   "runner": "live2 .nstate-uip-1.json"
@@ -188,6 +188,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -330,7 +336,7 @@
      "selection": []
     }
    },
-   "t": 233151
+   "t": 233541
   },
   {
    "step": 2,
@@ -363,6 +369,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -505,7 +517,7 @@
      "selection": []
     }
    },
-   "t": 261189
+   "t": 261597
   },
   {
    "step": 3,
@@ -541,6 +553,12 @@
       "Exclude from cut"
      ],
      "fields": [
+      {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
       {
        "label": "Show cut geometry only",
        "kind": "checkbox",
@@ -694,7 +712,7 @@
      ]
     }
    },
-   "t": 289065
+   "t": 289851
   },
   {
    "step": 4,
@@ -874,7 +892,7 @@
      ]
     }
    },
-   "t": 315762
+   "t": 316429
   },
   {
    "step": 5,
@@ -1053,7 +1071,7 @@
      ]
     }
    },
-   "t": 341771
+   "t": 342450
   },
   {
    "step": 6,
@@ -1316,7 +1334,7 @@
      ]
     }
    },
-   "t": 367821
+   "t": 368607
   },
   {
    "step": 7,
@@ -1347,6 +1365,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -1523,7 +1547,7 @@
      ]
     }
    },
-   "t": 394544
+   "t": 395072
   },
   {
    "step": 8,
@@ -1549,6 +1573,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -1725,7 +1755,7 @@
      ]
     }
    },
-   "t": 421432
+   "t": 421833
   },
   {
    "step": 9,
@@ -1760,6 +1790,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -1936,7 +1972,7 @@
      ]
     }
    },
-   "t": 447268
+   "t": 447101
   },
   {
    "step": 10,
@@ -1971,6 +2007,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -2147,7 +2189,7 @@
      ]
     }
    },
-   "t": 471718
+   "t": 472552
   },
   {
    "step": 11,
@@ -2174,6 +2216,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -2350,7 +2398,7 @@
      ]
     }
    },
-   "t": 498258
+   "t": 498958
   },
   {
    "step": 12,
@@ -2385,6 +2433,12 @@
       "Excluded parts"
      ],
      "fields": [
+      {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
       {
        "label": "Show cut geometry only",
        "kind": "checkbox",
@@ -2562,7 +2616,7 @@
      ]
     }
    },
-   "t": 523611
+   "t": 524376
   },
   {
    "step": 13,
@@ -2598,6 +2652,12 @@
       "×"
      ],
      "fields": [
+      {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
       {
        "label": "Show cut geometry only",
        "kind": "checkbox",
@@ -2775,7 +2835,7 @@
      ]
     }
    },
-   "t": 549288
+   "t": 549892
   },
   {
    "step": 14,
@@ -2814,6 +2874,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -2990,7 +3056,7 @@
      ]
     }
    },
-   "t": 574993
+   "t": 575682
   },
   {
    "step": 15,
@@ -3021,6 +3087,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -3197,7 +3269,7 @@
      ]
     }
    },
-   "t": 602848
+   "t": 600975
   },
   {
    "step": 16,
@@ -3236,6 +3308,12 @@
       "×"
      ],
      "fields": [
+      {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
       {
        "label": "Show cut geometry only",
        "kind": "checkbox",
@@ -3413,7 +3491,7 @@
      ]
     }
    },
-   "t": 629034
+   "t": 626227
   },
   {
    "step": 17,
@@ -3452,6 +3530,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -3628,7 +3712,7 @@
      ]
     }
    },
-   "t": 654790
+   "t": 652476
   },
   {
    "step": 18,
@@ -3666,6 +3750,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -3842,7 +3932,7 @@
      ]
     }
    },
-   "t": 680657
+   "t": 677833
   },
   {
    "step": 19,
@@ -3880,6 +3970,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -4056,7 +4152,7 @@
      ]
     }
    },
-   "t": 707360
+   "t": 702399
   },
   {
    "step": 20,
@@ -4087,6 +4183,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -4263,7 +4365,7 @@
      ]
     }
    },
-   "t": 732703
+   "t": 728210
   },
   {
    "step": 21,
@@ -4303,6 +4405,12 @@
      ],
      "fields": [
       {
+       "label": "",
+       "kind": "text",
+       "value": "",
+       "placeholder": "Section id"
+      },
+      {
        "label": "Show cut geometry only",
        "kind": "checkbox",
        "value": false
@@ -4479,7 +4587,7 @@
      ]
     }
    },
-   "t": 758512
+   "t": 755110
   },
   {
    "step": 22,
@@ -4658,7 +4766,7 @@
      ]
     }
    },
-   "t": 785509
+   "t": 781102
   }
  ]
 }

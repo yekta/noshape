@@ -1,6 +1,6 @@
 {
  "scenario": "drw-detail-id-profile-tips",
- "recorded": "2026-11-17T17:11:55.320Z",
+ "recorded": "2026-11-17T17:25:10.397Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -9,12 +9,12 @@
    1919,
    1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.7"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "aa72bb71c0d948611b25990b",
+  "element": "6659151619291d85b684dacc",
   "start": "hole-plate-drawing",
   "startElement": "1532a5517d526c1726ec8cde",
   "runner": "live2 .nstate-uip-2.json"
@@ -134,6 +134,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -226,7 +232,7 @@
      "selection": []
     }
    },
-   "t": 225465
+   "t": 227733
   },
   {
    "step": 2,
@@ -267,6 +273,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -359,7 +371,7 @@
      "selection": []
     }
    },
-   "t": 250984
+   "t": 253975
   },
   {
    "step": 3,
@@ -400,6 +412,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -492,7 +510,7 @@
      "selection": []
     }
    },
-   "t": 277239
+   "t": 279452
   },
   {
    "step": 4,
@@ -612,7 +630,7 @@
      "selection": []
     }
    },
-   "t": 304004
+   "t": 306387
   },
   {
    "step": 5,
@@ -731,7 +749,7 @@
      "selection": []
     }
    },
-   "t": 331350
+   "t": 331960
   },
   {
    "step": 6,
@@ -927,12 +945,16 @@
      "selection": [
       {
        "kind": "EDGE",
+       "owner": "Top"
+      },
+      {
+       "kind": "VIEW",
        "owner": "Detail"
       }
      ]
     }
    },
-   "t": 357053
+   "t": 358102
   },
   {
    "step": 7,
@@ -968,6 +990,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -1085,7 +1113,7 @@
      ]
     }
    },
-   "t": 382656
+   "t": 384049
   },
   {
    "step": 8,
@@ -1116,6 +1144,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -1233,7 +1267,7 @@
      ]
     }
    },
-   "t": 407524
+   "t": 409503
   },
   {
    "step": 9,
@@ -1273,6 +1307,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -1390,7 +1430,7 @@
      ]
     }
    },
-   "t": 433355
+   "t": 435223
   },
   {
    "step": 10,
@@ -1429,6 +1469,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -1546,7 +1592,7 @@
      ]
     }
    },
-   "t": 458756
+   "t": 460366
   },
   {
    "step": 11,
@@ -1584,6 +1630,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "A",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -1701,7 +1753,7 @@
      ]
     }
    },
-   "t": 483238
+   "t": 485205
   },
   {
    "step": 12,
@@ -1739,6 +1791,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -1856,7 +1914,7 @@
      ]
     }
    },
-   "t": 508021
+   "t": 509147
   },
   {
    "step": 13,
@@ -1887,6 +1945,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -2004,7 +2068,7 @@
      ]
     }
    },
-   "t": 532776
+   "t": 533980
   },
   {
    "step": 14,
@@ -2044,6 +2108,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -2161,7 +2231,7 @@
      ]
     }
    },
-   "t": 558305
+   "t": 559550
   },
   {
    "step": 15,
@@ -2200,6 +2270,12 @@
       "Clip border to geometry"
      ],
      "fields": [
+      {
+       "label": "View label",
+       "kind": "text",
+       "value": "",
+       "placeholder": "Detail id"
+      },
       {
        "label": "Profile style",
        "kind": "select",
@@ -2318,7 +2394,7 @@
      ]
     }
    },
-   "t": 584040
+   "t": 584625
   },
   {
    "step": 16,
@@ -2355,6 +2431,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -2467,7 +2549,7 @@
      "selection": []
     }
    },
-   "t": 610005
+   "t": 608976
   },
   {
    "step": 17,
@@ -2496,6 +2578,12 @@
      ],
      "fields": [
       {
+       "label": "View label",
+       "kind": "text",
+       "value": "",
+       "placeholder": "Detail id"
+      },
+      {
        "label": "Profile style",
        "kind": "select",
        "value": "In line"
@@ -2608,7 +2696,7 @@
      "selection": []
     }
    },
-   "t": 634639
+   "t": 633620
   },
   {
    "step": 18,
@@ -2645,6 +2733,12 @@
       "Clip border to geometry"
      ],
      "fields": [
+      {
+       "label": "View label",
+       "kind": "text",
+       "value": "",
+       "placeholder": "Detail id"
+      },
       {
        "label": "Profile style",
        "kind": "select",
@@ -2758,7 +2852,7 @@
      "selection": []
     }
    },
-   "t": 660496
+   "t": 658467
   },
   {
    "step": 19,
@@ -2877,7 +2971,7 @@
      "selection": []
     }
    },
-   "t": 685762
+   "t": 683790
   }
  ]
 }
