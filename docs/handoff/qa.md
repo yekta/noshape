@@ -61,10 +61,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 00. **v0.4.57**: GO 18:11, tagged 519afe8e2. Unit qa-pub-0457 (rel-pub-all.sh 0.4.56 0.4.57 <candidate CLI on vibex7>, started
    18:13) waits for the release, checks SHA256SUMS / userdocs candidate vs released / quit x5 (vibex6) / released vs 0.4.56,
    moves the compat baseline to 0.4.57 -> one line in qa-alerts. Then the spot-check rows 9-16 on the released app.
-0a. **Validity (lead 11-17 ruling)**: suites done 18:30 ahead of bool's d368ac82 (queued): bin/suites-models.sh exports
-   NOSHAPE_PARITY_VALIDITY=1; suites-diff.py prints "invalid <doc> › <entry>" for models[].invalid_solids entries the new run
-   has and the previous lacks (only when both reports carry the field); qa-suites.sh copies those lines to qa-alerts. Compat
-   (userdocs.py through the CLI) has no validity: the CLI reports none; ask for a CLI field if the lead wants it there too.
+0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
+   with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
+   <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
+   (18:40) prints "invalid <doc> › feature <k>: <part> valid false" for a part false in the new run and not in the previous
+   (only when both logs have CHECK lines); qa-suites.sh copies those to qa-alerts. bool's gate 2d5bf386 does the same.
+   Compat: v0.4.56's CLI query parts has no "check"; once cfd943d5 is in a release CLI, add it to sig.py's part tuple.
    (suites-models.sh was moved to bin/retired by mistake at 16:35 and restored 18:28; the hosts kept their copy meanwhile.)
 0. **05:00 checklist (psui via lead)**: REMEMBERED-VALUES-OLD-FORMAT fix 582351aab (uh/wait-uf2.sh waits for its green, runs uf2.sh: 3 mm, 0.3 cm,
    0.2 in, 5 mm; v0.4.57 / a1383a65 gives 5 mm, 0.5 cm, 0.2 in, 5 mm), f6ef6a252 glyph (uh2.sh: no parallel glyph in the
