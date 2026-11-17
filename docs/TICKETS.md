@@ -561,6 +561,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (green c330a760), skasm b87dd3dcf (c7a03f21), bool2's sections / unify ef79fdeca, 7538babf6, 08c32ea79 (on main 12:00;
   01fb280e and every green since). Waiting: skasm's second hover half 244412385 (14:34; the user flow re-run with a sketch
   tool active), blend 9e40ad95a (not on main), core's SCISSOR-LIFT fix. psui's lingering-glyph fix may miss 17:00 (P3).
+- 15:25: blend's impeller Fillet 3 landed as f6274d94e: its green f6274d94 and 2aa3f00c ALL-SAME (hats, dock, tickets,
+  authored). skasm 244412385 in green bc58c02b: the user's hover flow passes (lines each time, region over Front, Top never,
+  nothing lit over the region or Front while the line tool draws); one first hover missed on vibe6 at load 48, not on vibe5
+  (2 runs). Green 1775b123's authored-documents step failed (vibe5's ~/tmp pruned the staged copies; moved to ~/agents/qa-keep
+  at 15:20, the hats / dock / tickets there ALL-SAME); bc58c02b is next in the compat loop.
+- SCISSOR-LIFT: core's revert ddfea0eb1 queued 15:05; qa runs scissor-lift alone on it now (qa-sl-at, vibe6) and again on
+  the first green with it (qa-sl-verify).
 - **Must carry core's fix: SCISSOR-LIFT-BOM-ROWS** (lead 14:15). The culprit core 41f62884a (01:23) is in v0.4.56 (not
   0.4.55): asm-scissor-lift's BOM rows as live 59 -> 57/87 shipped. The 17:00 candidate must contain core's fix or revert
   (not on main at 14:15). qa-sl-verify runs asm-scissor-lift alone on the first green with it (vibe6, bool's method):
