@@ -4629,10 +4629,10 @@ static std::optional<Hull> face_hull(const TopoDS_Face& f)
 // tried, the closest pair first, up to 400 halvings. Only "apart" is proved: anything else is OCCT's.
 static bool hulls_apart(const TopoDS_Face& fa, const TopoDS_Face& fb)
 {
-  const auto tol = [](const TopoDS_Face& f) {
-    return std::max({BRep_Tool::Tolerance(f), BRep_Tool::MaxTolerance(f, TopAbs_EDGE), BRep_Tool::MaxTolerance(f, TopAbs_VERTEX)});
-  };
-  const double margin = 2 * (tol(fa) + tol(fb)) + Precision::Confusion();
+  // (The faces' own tolerances: this stands for their face / face section only, whose curves lie on both surfaces; their
+  // edges and vertices are met as their own tolerances say elsewhere. c2-hunting-knife's Mirror 1: a blade face and its
+  // image 21.6 um apart, their 5 um vertices 11 um apart, 79 ms of OCCT's marching for no curve.)
+  const double margin = 2 * (BRep_Tool::Tolerance(fa) + BRep_Tool::Tolerance(fb)) + Precision::Confusion();
   // (A vertex of one within the margin of one of the other's: touching there, as far as this can tell.)
   std::vector<gp_Pnt> vb;
   for (TopExp_Explorer x(fb, TopAbs_VERTEX); x.More(); x.Next())

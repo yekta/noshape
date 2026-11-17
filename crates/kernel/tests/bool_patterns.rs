@@ -2911,3 +2911,11 @@ fn a_rings_top_cut_by_a_side_drafted_off_its_axis_as_occt() {
 fn faces_apart_across_a_slanted_gap_cut_as_occt() {
     valid_as_occt("a3f92ad8f13ac4b1", 1e-8);
 }
+
+/// c2-hunting-knife's Mirror 1: the blade fused with its mirror image, a B-spline face and its image 21.6 um apart
+/// across the mirror plane, their 5 um vertices 11 um apart: shown apart by the faces' own tolerances, not marched by
+/// OCCT; the result is OCCT's.
+#[test]
+fn a_blade_and_its_mirror_image_fuse_as_occt() {
+    valid_as_occt("682aa19d75e30e09", 1e-8);
+}
