@@ -1451,9 +1451,11 @@ impl Render for HistoryPanel {
                     ),
                     _ => div().font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(r.name.clone())),
                 };
+                let selector = format!("hist-row {}", r.name);
                 h_flex()
                     .id(SharedString::from(format!("hist-{}", r.key)))
                     .map(|d| crate::ui_script::mark(d, || format!("history_row:{}", r.name)))
+                    .debug_selector(move || selector)
                     .h(px(ROW_H))
                     .flex_none()
                     .items_start()
@@ -1485,6 +1487,10 @@ impl Render for HistoryPanel {
                                     h_flex()
                                         .id(SharedString::from(format!("chg-{key}")))
                                         .map(|d| crate::ui_script::mark(d, || format!("button:Show changes:{}", r.name)))
+                                        .debug_selector({
+                                            let selector = format!("hist-changes {}", r.name);
+                                            move || selector
+                                        })
                                         .gap(px(3.))
                                         .child(crate::ui::glyph(if open_changes { "ui-chevron-down" } else { "ui-chevron-right" }, 10., pal.text_muted))
                                         .child(div().truncate().child(if open_changes { "Hide changes…" } else { "Show changes…" }))
@@ -1864,3 +1870,7 @@ impl Render for HistoryPanel {
 #[cfg(test)]
 #[path = "history_bench.rs"]
 mod bench;
+
+#[cfg(test)]
+#[path = "history_feel_tests.rs"]
+mod feel_tests;
