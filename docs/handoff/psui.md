@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-17 17:55 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-17 22:25 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -97,6 +97,27 @@ docs/DECISIONS.md (read first; it wins over anything here).
   latency test's TARGETS comments when next touched.
 - Landed 11-17 09:54: 498b96a8 (leak fixes + NOSHAPE_SOAK + spawn_guard allow).
 - The Mac's one build slot can hold a test 10+ min: for a quick single test use NOSHAPE_RB_HOST=vibex6.
+
+## P0 now: USER-HOVER-STAYS-LIT (TICKETS 3022a352f; lead 11-17 22:2x)
+
+The user's bug, still in green 592b0fc9. qa's flow (vibex6, load ~25, software GL, real xdotool moves, a shot 700 ms
+after each rest; script /root/qa-scratch/uh/uh2.sh, my copy ~/agents/psui-keep/hover/uh2.sh on :664 with extra
+shots 3 s after each rest; sheet /root/qa-scratch/tickets/hover-x-sheet.png): the hover shows what was under the
+pointer somewhere along its path, not where it rests. The off point (window 873, 740) is empty background, yet the
+loop or the Right plane lights; resting on the bottom line lights the Front plane; going back to a line lights
+nothing.
+- Lead's fix (mine, the viewport): latest wins. Tag each pick with the pointer position / a generation, drop a
+  result for a position that isn't the current one, and when a pick finishes after the pointer moved, pick again at
+  once at the current position; empty background clears the hover. Code: app-core viewport.rs `request_hover`,
+  `on_pick` (PickPurpose::Hover), the fast-move pause (`paused_hover`, `prehighlight_delay`), `pick_at` against
+  `pick_cache` (a rect around an older position), `set_hover` (emits only on an id change).
+- Feel scenario: fast moves region → empty, line → plane area → line, with the pick slowed (a sleep in the pick /
+  frames delivered late), asserting only the hover at rest. A harness test without the delay passes (mine and
+  skasm's a_quick_sweep_off_a_line_leaves_nothing_lit), so the delay is what has to be simulated.
+- skasm (18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6): sketch_hover_id re-resolves from vp.pointer_position() on every
+  PointerMove and re-tests a region id under the pointer (their next batch). Plane / non-sketch ids pass through as
+  the GPU gave them, so a stale plane pick is the viewport's. The glyph rows' linger is mine.
+- In flight: the 3 s shots run (does the right hover arrive late, or never?).
 
 ## Current order (lead 11-17 ~14:05)
 
