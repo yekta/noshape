@@ -6,6 +6,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## qa, 2026-11-17
+- [ ] P0 IMPELLER-MOVE-FACE-2-REF (core; qa 2026-11-17 07:10, vibe6, v0.4.56 CLI vs green c9b3ad6f, same session, 3 runs, load ~2)
+  c2-impeller-loft (qa-parity/saved) regenerates worse on main than in v0.4.56: "Move face 2" "Could not transform selected faces
+  as requested." -> "Select faces to move." (its saved face no longer resolves), "Delete face 2" Ok -> Error "Could not delete
+  selected faces.", "Fillet Flansch zum Stroemungskanal" Ok -> Warning "2 missing selections". The first feature that changes
+  is "Flansch (vorne) verbreitern" (Move face Offset, Ok in both): 441 -> 25 ms, so it now builds another way. Suspect core
+  64744410b (Move face Offset as exact offsets via k::offset_solid; its subject names this feature): the faces it makes carry
+  other names. Not bisected (no intermediate green binaries; qa builds nothing). Other features' times: Delete face 2 12.1 ->
+  9.6 s (now failing), Move face 1 (Error in both) 4.0 -> 5.3 s, Fillet Ansaugflansch zum Gehaeuse 0.6 -> 2.0 s. Data
+  /root/qa-scratch/ab1117/g6.jsonl.
 - [ ] P0 IMPELLER-DELETE-FACE-2-SLOW (core; qa 2026-11-17 03:40, lead's clean A/B; core bisects) c2-impeller-loft's "Delete face 2"
   (deleteFace, Ok in every build) went from 2.1 s to 14.4 s: vibe7, quiet window (load ≤ 1.3), `feature list` medians of 3
   alternating runs. v0.4.48 2136 ms -> v0.4.53 14369 ms (same session); v0.4.53 13790 -> v0.4.55 13718 ms; v0.4.55 13687 ->
