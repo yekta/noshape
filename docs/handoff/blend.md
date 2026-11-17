@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-16 20:13 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-17 00:20 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -9,27 +9,27 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## In flight
 
-- Speed (P0): `blend-samples` LANDED as 684e77e2 (11-16 16:14; SamplesScope, ball tools ahead of OCCT's try, lies_on
-  per tool in parallel, conic_contacts prefilter). A/B vibe7 (load 5-8, a hint), main -> branch: knife Fillet 5 89 -> 57
-  ms (live 9), Fillet 3 202 -> 156, Fillet 8 243 -> 178; a4e419 Fillet 1 179 -> 132 (live 16), regeneration 291 -> 223
-  (live 78). Mac release: Fillet 5 41 -> 23, a4e419 83 -> 65.
 - Speed is judged on the Mac (release, quiet, median of 3) against live (DECISIONS 11-16); vibe numbers are hints.
-  robot-relations a4e419 is done (Mac 65 vs live 78). cf-part-draft Spur Gear done (Mac 76-81 vs live 227).
-- QUEUED a9cd8f47 (11-16 20:12; blend5, 3 commits): lies_on skips points found on an earlier face; a natural solid
-  loft oriented by two rays off its faces (signed volume only when they disagree; core reviews: lead told core);
-  trimmed_run_on's extension projects in parallel and finds met faces by a run-on vertex first. Strict suite 127/127
-  (suite-r-tk.cmp, vibe7), userdocs ALL-SAME, g++-13 OK. Mac A/B x3 (bin/ab-mac.sh): knife Fillet 2 95 -> 85, Chamfer 1
-  117 -> 112, Fillet 5 23 -> 21, knife 1049 -> 1038 (live 622). Loft check (every natural solid loft: rays vs volume,
-  ZZLOFT lines) queued on vibe6 (unit blend-loftcheck, blend7 -> suite-loftcheck.log): report agree / unsure counts.
-- Next: branch `blend-ahead` (blend9, 92f53ad4f on a9cd8f47): the rolling balls' direct build made in the
-  speculative thread beside OCCT's try (with_cancel(stop)); Mac A/B: knife Fillet 3 63 -> 47 ms, others unchanged.
-  Risk: a non-split multi-edge fillet waits for the cancelled build's current phase. Suite pair queued on vibe6 (unit
-  blend-seq-ah: blend5 vs blend9 -> suite-r-ah.cmp; compare per-feature Fillet / Chamfer times too), then userdocs, land.
-- Knife blends left (Mac): Fillet 2 85 (live 9): bool's Boolean sections (split 25 + fuse 26: plane x grind
-  B-spline pairs 15-18 ms each); handed to bool by the lead (after its screws P0). Chamfer 1 ~112 (live: asked in
-  REQUESTS 17:01): Boolean sections 52 of its 63 ms (lofted tool x B-spline pairs, 20-50 ms with no section; bool's);
-  its tool sides cross the knife's faces (0.3-2.8 rad), so no direct build. Fillet 8 64 (live 12): OCCT's round at the
-  working scale 45 after the as-is one fails 7. Probes: parked/zz-fillet2-chamfer1-probes.patch.
+  Done: robot-relations a4e419 (Mac 65 vs live 78), cf-part-draft Spur Gear (76-81 vs 227).
+- Landed 11-16: 684e77e2 (samples / ball tools ahead), 534c6e30 (lies_on skip, loft orientation by rays, run-on trims),
+  ce61a597 (scale-first), 35c63214 (Fillet 3's direct build beside OCCT's try, loft probe two-sided per core's review,
+  sliver check by 1% areas). Mac x3: knife Fillet 2 95 -> 85, Chamfer 1 117 -> 112, Fillet 3 63 -> 47, Fillet 5 23 ->
+  21, Fillet 6 20 -> 7 (live 7); knife ~1020 ms (live 622). Lead split the knife's non-blend time: bool (Split 4,
+  Mirror 1, Chamfer 1 / Fillet 2 Booleans, Revolve 1, Extrudes 2/3/8/9), core (Extrude 10, Lofts 1/3); both told.
+- QUEUED 0aad993d (11-17 ~00:05): conic contact edges checked by the faces around them (Fillet 3 47 -> 45 Mac;
+  corpus check: full vs part agreed on its 2 cases).
+- In suites on vibe6 (units blend-seq-nk then blend-seq-gv; logs suite-r-nk*.log / suite-r-gv*.log, .cmp):
+  - `blend-necks` 736f4c2df (blend4, on main 11fbe0901): isaac-ball 3c5c58 9 -> 32/33 (Mac; first diff now Extrude 8,
+    52/129/71 vs live 51/128/71). Necks cut at every face (own scale where needed), plane pieces' pcurves stored,
+    sewn strip ends dropped, full rounds 5e-5 R apart merged, fillet joins edges after merged_blends too, and core's
+    join_loop_pieces joins two arcs of one ellipse (rebuilt as one ellipse, SameParameter tolerance; !legacy).
+    CORE REVIEWS the boolean.cpp part first (sent 11-17 00:20: /root/blend-scratch/necks-boolean.diff); land after
+    its OK + strict suite + userdocs (bin/ud-st.sh pattern) + g13-nk.log.
+  - `blend-gearvar` (blend3, on main): variable fillet edge by name + ends (GearLab 90f78b's shared tooth-root name);
+    T1 unit test detail::tests::a_variable_fillets_edge_of_a_shared_name_is_found_by_its_ends; base blend8.
+- Knife blends left (Mac): Fillet 8 65 (live 12: OCCT's working-scale round 45 after the as-is fails 7; split-line
+  join 5.8 needed), Fillet 3 45 (direct build 26: classify.tool 7 = ray intersectors on lofted tools; lofts; conic
+  rebuild), Chamfer 2 35, Fillet 5 21. Probes: parked/zz-*.patch; Mac A/B: bin/ab-mac.sh <base> <cand> <doc> <regex>.
 - Backlog (lead: parked, >1 day): Fillet 5 to live's 9 ms needs a contact-curve build: blend faces made straight from
   the ball sections and contact curves (no solid tool), supports trimmed along the contact curves in 2D (no lies_on,
   no IntSS on supports), the shell from known adjacency, only new faces checked; est. Mac ~8-10 ms, 3-4 days incl.
@@ -87,32 +87,17 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   far down and is clipped by the other. Needs a two-round overflow build (Parasolid's), not section_blend per edge.
   core waits on 27-29 (Extrude impellerraum on depends on them). The chamfer takes 0.6-1 s (live 20): 4 Booleans of
   rim_chamfer_cut's tool after OCCT's chamfer fails twice and section_blend once.
-- isaac-ball 3c5c58 Fillet 1 (asm; 42/112/68 vs live 41/106/63): 14 line edges, R 4.5; face 21 has a 9 mm strip:
-  full rounds across it (live one half cylinder each, face 21 split 618.32 + 216.00). checked_blend's hair-smaller
-  retry leaves a 9e-9 m neck in face 21. Branch `blend-necks` d6de0d70f (blend4): necks cut (all, at the part's scale
-  when the working-scale cut isn't valid there), pcurves stored on new plane pieces, full rounds 5e-5 R apart.
-  73 + 80: one half cylinder 127.2345 mm2, face split, as live. 76 + 77 (needs the 1e-5 retry): the cut comes out
-  invalid again once scaled (a sewn plane piece), so the neck stays. All 14: 42 faces. Probe zz_probe_m3c, dump vibe6
-  ~/tmp/blend/m3c-fillet.brep. Next: find why a sewn piece breaks under BRepBuilderAPI_Transform.
-- GearLab 90f78b (asm-isaac-ball; core's opLoft fix): two causes. Ours: a variable fillet run found its edges by name
-  and the tooth root's two share one (same edge twice); fixed on branch `blend-gearvar` 8055969d5 (+ a fillet-variable
-  op dump). Then OCCT can't round either edge even at a constant 0.2 mm (90.24 deg cone / loft B-spline): asked core
-  to check the new loft face (dump vibe6 ~/tmp/blend/gd/fillet-variable-15). Land the name fix with a T1 later.
 - Boolean sections (bool's): the knife's Chamfer 1 58 ms / Fillet 2 17 ms are OCCT on pairs that touch within the
   knife's ~21 um tolerances (a disjointness test proves 4 of 96; parked hulls-wip.patch).
 - cf-snap-hook (dx): Mac release Fillet 6 26 ms (live 8), Fillet 3 14 (7); the document 243 vs live 274. Low.
 
 ## Next, in order
 
-1. Dock scale-first (in flight).
-2. Impeller Fillet 3 (above); then Chamfer 3 when the lead decides.
-3. isaac-ball 3c5c58 Fillet 1: the full round across a strip (above).
-4. cf-spur-gear's opFillet blend 65-120 ms (dx); GearLab 90f78b opFillet "Failed to fillet selections." after core's
-   opLoft fix (asm; no dump yet).
-5. Knife Fillet 2 (100 ms, live 10): OCCT's split of the run-on tool by the extended walls 25 ms (the grind wall 17 of
-   it; a planes-first two-step split saves ~5 ms only), met-face distances 6, extend_face_over 10, the fuse 25. Fillet
-   3 (87, live 11): OCCT's try 28 ms thrown away (only 5 fillets in the suite take that path: no predicate).
-6. Knife parity after core's Revolve 1: Fillet 8's spring-line split at the support's G2 knot lines (live 3093).
+1. cf-spur-gear's opFillet blend (65-120 ms, dx's note): Mac profile, take the lever (lead 11-17).
+2. Knife Fillet 8's spring-line split at the support's G2 knot lines (live 3093).
+3. Land blend-necks (after core's OK) and blend-gearvar when their suites hold; GearLab then needs OCCT to round the
+   tooth root (core checks the loft face: dump vibe6 ~/tmp/blend/gd/fillet-variable-15).
+4. Impeller Fillet 3 (parked WIP), Chamfer 3 when the lead decides.
 
 ## Parked (with where)
 
