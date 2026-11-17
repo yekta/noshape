@@ -91,3 +91,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-17 Suite pairs report every differing feature (NOSHAPE_PARITY_DIFFERING), not just each document's first
   difference: a later feature's broken reference (impeller Move face 2 after 64744410b) hides behind an earlier change.
 - 11-17 Don't message paused (stopped) agents: a message wakes them and spends limits. Their P0s go to the lead.
+- 11-17 An imported solid whose healed shell isn't closed comes in as sheet bodies, one per piece live makes (robot-relations'
+  STEP: live 6 sheets, 147 faces), never as an invalid solid with open edges. Splitting a valid solid into its disjoint
+  pieces waits for live evidence.
+- 11-17 Never wait for an idle host: an A/B on a busy host alternates A and B in one run (ABAB…, ≥5 rounds, medians).
+  Absolute speed comes from the Mac or vibe7's 02:00–04:00 window. A run fifth in one host's slot queue moves to the
+  least-loaded host.
