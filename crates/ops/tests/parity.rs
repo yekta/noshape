@@ -4188,6 +4188,40 @@ fn a_subassemblys_properties_are_lives_bom_rows() {
     assert!(r.differences.is_empty(), "{r:?}");
 }
 
+/// A part id only a configuration gives (asm-xdev-subs' "Hinge Plate", JaD at v1_1_3, JcD at the default) is ours by
+/// the body the default part of its name has: both instances inserted, the BOM's two rows as live's.
+#[test]
+fn a_configurations_own_part_id_takes_its_named_body() {
+    let circle = |id: &str, x: f64| json!({ "btType": "BTMSketchCurve-4", "entityId": id, "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": x, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } });
+    let values: Vec<Value> = [("Default", "10 mm"), ("Long", "20 mm")].iter().map(|(o, v)| json!({ "btType": "BTMConfiguredValueByEnum-1923", "enumName": "List_abc_conf", "enumValue": o,
+        "value": { "btType": "BTMParameterQuantity-147", "parameterId": "", "expression": v } })).collect();
+    let depth = json!({ "btType": "BTMParameterConfigured-2222", "parameterId": "depth", "configurationParameterId": "List_abc", "values": values });
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [circle("c1", 0.0), circle("c2", 0.03)], "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": "FS1", "entityType": "FACE" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" }, depth] }
+    ], "configuration": { "configurationParameters": [{ "btType": "BTMConfigurationParameterEnum-105", "parameterId": "List_abc", "parameterName": "Size", "defaultValue": "Default",
+        "options": [{ "option": "Default", "optionName": "Default" }, { "option": "Long", "optionName": "Long" }] }] } });
+    let v = std::f64::consts::PI * 0.004 * 0.004 * 0.01;
+    let parts = json!([{ "partId": "JHD", "name": "Mount", "volume": [v * 0.999, v * 1.001] }, { "partId": "JcD", "name": "Hinge Plate", "volume": [v * 0.999, v * 1.001] }]);
+    let at = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    let instance = |id: &str, name: &str, pid: &str| json!({ "id": id, "name": name, "type": "Part", "partId": pid, "elementId": "E1", "configuration": "List_abc=Long", "fullConfiguration": "List_abc=Long" });
+    let row = |n: &str| json!({ "itemSource": { "indentLevel": 0 }, "name": n, "quantity": 1, "partNumber": "", "description": "", "material": { "displayName": "" } });
+    let asm = json!({
+        "rootAssembly": {
+            "instances": [instance("IA", "Mount <1>", "JHD"), instance("IB", "Hinge Plate <1>", "JaD")],
+            "occurrences": [{ "path": ["IA"], "fixed": true, "transform": at }, { "path": ["IB"], "fixed": true, "transform": at }] },
+        "features": { "features": [], "featureStates": {} },
+        "liveBom": { "root": { "bom": { "bomTable": { "items": [row("Mount"), row("Hinge Plate")] } } } } });
+    let mut ctx = Ctx::new();
+    let r = rebuild_assembly(&mut ctx, &scratch("configuration-part-by-name.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    assert_eq!((r.occurrences_matching, r.occurrences, r.bom_matching, r.bom_rows), (2, 2, 2, 2), "{r:?}");
+}
+
 /// A sketch on Top of `entities` (Onshape JSON) and one Extrude of `region`
 /// 10 mm, with live's part after it.
 fn one_extrude(sketch: &str, entities: Value, region: Value, live_part: Value) -> (Value, Vec<Value>) {

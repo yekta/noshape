@@ -8935,7 +8935,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
             let Ok(q) = t.call("query_parts", json!({ "tab": t.tab, "configuration": choices })) else { continue };
             let there: Vec<String> = q["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid" || p["kind"] == "Composite").filter_map(|p| p["id"].as_str().map(str::to_string)).collect();
-            let Some(id) = t.part_by_creator(t.len(), pid, &there) else { continue };
+            // The body of ours a default part of that name has (asm-xdev-subs' "Hinge Plate", JaD at v1_1_3, is JcD's
+            // body there; its creator's gave Mount's), else the one its creator made.
+            let base = i["name"].as_str().map(|n| n.rsplit_once(" <").map_or(n, |(b, _)| b)).unwrap_or_default();
+            let named = listed.iter().filter(|p| p["name"] == base).filter_map(|p| part_bodies.get(&(element.clone(), p["partId"].as_str()?.to_string()))).find(|b| there.contains(b)).cloned();
+            let Some(id) = named.or_else(|| t.part_by_creator(t.len(), pid, &there)) else { continue };
             trace(&format!("{element}: live part {pid} (configuration {choices:?}) -> ours {id}"));
             if let Some((item, _)) = metadata_item(&studio["partMetadata"], i["fullConfiguration"].as_str(), pid) {
                 for e in set_metadata(&mut t, &id, item, true) {
