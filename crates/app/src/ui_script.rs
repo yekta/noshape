@@ -308,6 +308,11 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
         }
         return Err(format!("{name} is not shown"));
     }
+    // A pixel of the page, where live2's runner clicks a drawing panel's list (drw-weld-panel-lists).
+    if let Some(p) = t.get("px") {
+        let (Some(x), Some(y)) = (p.get(0).and_then(Value::as_f64), p.get(1).and_then(Value::as_f64)) else { return Err("px: [x, y] window pixels".into()) };
+        return Ok(point(px(x as f32), px(y as f32)));
+    }
     // The rollback bar dropped just below a row.
     if let Some(f) = t.get("rollback_to").and_then(Value::as_str) {
         let b = noshape_app_core::ui_script::bounds_of(&format!("feature:{f}")).ok_or_else(|| format!("feature:{f} is not shown"))?;

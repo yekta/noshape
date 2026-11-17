@@ -425,7 +425,7 @@ impl DrawingEditor {
 
     pub fn render_datum_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.datum_dlg.as_ref()?;
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Datum", "text": datum_dlg_texts(d) }));
+        crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Datum" }), datum_dlg_texts(d)));
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();
@@ -922,55 +922,56 @@ fn style_glyph(s: TargetStyle) -> &'static str {
 }
 
 /// The Datum panel's texts in reading order, as live's recorder reads them (live 2146: a label's value not; live2
-/// drw-datum-target: a target row's name, its ×, an open row's captions, a select's options and a field's value).
-fn datum_dlg_texts(d: &DatumDlg) -> Vec<String> {
-    let mut out: Vec<String> = ["Datum", "Datum", "Datum target"].map(String::from).to_vec();
+/// drw-datum-target: a target row's name, its ×, an open row's captions, a select's options (flagged) and a field's
+/// value).
+fn datum_dlg_texts(d: &DatumDlg) -> Vec<(String, bool)> {
+    let mut out: Vec<(String, bool)> = ["Datum", "Datum", "Datum target"].map(|t| (t.to_string(), false)).to_vec();
     if d.tab == 0 {
-        out.push("Label".into());
+        out.push(("Label".into(), false));
         return out;
     }
-    out.extend(["Target area:", "Style:", "Area size:", "Targets"].map(String::from));
+    out.extend(["Target area:", "Style:", "Area size:", "Targets"].map(|t| (t.to_string(), false)));
     for (k, r) in d.rows.iter().enumerate() {
         let AnnotationKind::DatumTarget { label, area, .. } = &r.ann.kind else { continue };
         let opts = r.ann.target.as_deref().cloned().unwrap_or_default();
         let n = if opts.angular { opts.instances.max(1) as usize } else { 1 };
-        out.push(if n > 1 { format!("{label}-{}", DatumTargetOpts::instance_label(label, n - 1)) } else { label.clone() });
-        out.push("×".into());
+        out.push((if n > 1 { format!("{label}-{}", DatumTargetOpts::instance_label(label, n - 1)) } else { label.clone() }, false));
+        out.push(("×".into(), false));
         if d.open != Some(k) {
             continue;
         }
-        out.push("Label".into());
+        out.push(("Label".into(), false));
         if matches!(area, DatumTargetArea::Custom) {
             continue;
         }
-        out.extend(["Length", "Angle", "Origin"].map(String::from));
+        out.extend([("Length", true), ("Angle", true), ("Origin", false)].map(|(t, o)| (t.to_string(), o)));
         if opts.origin.is_some() {
-            out.extend(["Point", "×"].map(String::from));
+            out.extend(["Point", "×"].map(|t| (t.to_string(), false)));
         }
-        out.extend(["Target location", "Point"].map(String::from));
+        out.extend(["Target location", "Point"].map(|t| (t.to_string(), false)));
         if opts.angular {
-            out.extend(["Diameter distance:", "Radial lines", "Reference line"].map(String::from));
+            out.extend(["Diameter distance:", "Radial lines", "Reference line"].map(|t| (t.to_string(), false)));
             if opts.ref_dir.is_some() {
-                out.push("Edge".into());
+                out.push(("Edge".into(), false));
             }
-            out.extend(["Angle:", "Instance count:", "Flip", "Rotate"].map(String::from));
+            out.extend(["Angle:", "Instance count:", "Flip", "Rotate"].map(|t| (t.to_string(), false)));
             continue;
         }
-        out.push("X position".into());
+        out.push(("X position".into(), false));
         if opts.x_dir.is_none() || !r.dir_y {
-            out.push("X direction".into());
+            out.push(("X direction".into(), false));
             if opts.x_dir.is_some() {
-                out.push("Edge".into());
+                out.push(("Edge".into(), false));
             }
         }
-        out.extend(["Distance:", "Y position"].map(String::from));
+        out.extend(["Distance:", "Y position"].map(|t| (t.to_string(), false)));
         if opts.x_dir.is_none() || r.dir_y {
-            out.push("Y direction".into());
+            out.push(("Y direction".into(), false));
             if opts.x_dir.is_some() {
-                out.push("Edge".into());
+                out.push(("Edge".into(), false));
             }
         }
-        out.extend(["Distance:", "X", "Y"].map(String::from));
+        out.extend(["Distance:", "X", "Y"].map(|t| (t.to_string(), false)));
     }
     out
 }

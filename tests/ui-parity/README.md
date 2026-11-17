@@ -151,6 +151,8 @@ take's placement) carries the same control by name for ours, which runs `ours_on
   `{"button": "eye", "feature": "Sketch 1"}`.
 - `{"feature": "Extrude 1"}`, `{"part": "Part 1"}`, `{"rollback_bar": true}`, `{"rollback_to": "Extrude 1"}`; a row's top
   or bottom edge `{"feature": "Extrude 1", "edge": "top"}` (a drag's drop above or below it).
+- `{"px": [x, y]}`: a window pixel, only where live's recorder can't name a control (a drawing panel's Wt list in its
+  iframe, live2 11-17 drw-*-panel-lists): ours must have the control at live's pixel.
 - `{"list_row": "#wall_thickness"}`: a row of the open autocomplete / dropdown, by its first text.
 - `{"menu": "Suppress"}`: an item of the open context menu.
 - `{"face": [x, y, z]}`, `{"edge": [x, y, z]}`, `{"vertex": [x, y, z]}`: the entity through that model point (mm),
