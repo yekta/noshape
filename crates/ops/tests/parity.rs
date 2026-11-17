@@ -408,6 +408,28 @@ fn live_import_refits_hold_the_studs_counts() {
     assert!(!differences(&held, &[short(60.6, 108.872761)]).is_empty(), "past the refit's own difference");
 }
 
+/// Live's parts of a row. A capture that read massproperties at each rollbackBarIndex holds the final volume on every
+/// row (massproperties ignores the rollback, live 11-17): its volume counts only on the last row (asm-robotic-arm 21ab69).
+fn live_parts_of_row(line: &Value, last: Option<u64>) -> Vec<PartState> {
+    let mut parts = live_parts(line);
+    let method = line["method"].as_str().unwrap_or("");
+    if method.contains("massproperties") && method.contains("rollbackBarIndex") && line["index"].as_u64() != last {
+        for p in &mut parts {
+            (p.volume, p.volume_band, p.volume_high) = (None, None, None);
+        }
+    }
+    parts
+}
+
+#[test]
+fn a_rollback_capture_compares_its_final_volume_on_the_last_row_only() {
+    let row = |k: u64| json!({ "index": k, "method": "REST GET bodydetails + massproperties + parts at rollbackBarIndex", "parts": [{ "name": "Pulley", "bodyType": "SOLID", "faces": 483 + k, "edges": 1442, "vertices": 960, "volume": 2.116e-5 }] });
+    assert_eq!(live_parts_of_row(&row(4), Some(9))[0].volume, None);
+    assert_eq!(live_parts_of_row(&row(9), Some(9))[0].volume, Some(2.116e-5));
+    let other = json!({ "index": 4, "parts": [{ "name": "Pulley", "bodyType": "SOLID", "faces": 483, "volume": 2.116e-5 }] });
+    assert_eq!(live_parts_of_row(&other, Some(9))[0].volume, Some(2.116e-5));
+}
+
 /// Rebuilds `features` and compares with `live` (live.jsonl lines) after each feature.
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
@@ -430,6 +452,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     res.std_pins.extend(t.std_pins.iter().filter(|(_, pin, served)| pin != served).map(|(n, pin, served)| format!("{n} pins std {pin}, served {served}")));
     let mut reached: Vec<String> = Vec::new();
     let mut banded: HashMap<String, (f64, [f64; 2])> = HashMap::new();
+    let live_last = live.iter().filter_map(|l| l["index"].as_u64()).max();
     for k in 0..t.len() {
         let step = t.step(k);
         noshape_ops::parity::trace_live_pattern(&step.name, &step.feature_type, live, k);
@@ -480,7 +503,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
                     println!("CHECK {name} feature {k}: {}", checks.join("; "));
                 }
                 let reached: Vec<&str> = reached.iter().map(String::as_str).collect();
-                let (live, parts) = drop_live_import_failures(name, &reached, carry_volume_bands(&mut banded, live_parts(line)), parts);
+                let (live, parts) = drop_live_import_failures(name, &reached, carry_volume_bands(&mut banded, live_parts_of_row(line, live_last)), parts);
                 diff.extend(differences(&allow_live_readings(name, &reached, live), &parts))
             }
             Err(e) => diff.push(format!("parts: {e}")),
