@@ -78,9 +78,31 @@ static const std::map<int, BaseType>& base_schema()
 // and ATTRIB_DEF from live's assembly in each version (samples/dx-asm-xt-<v>.x_t,
 // qa XT-ASM-VERSIONS: 12.0's ATTRIB_DEF has no field_names (the 12000 entry); the ASSEMBLY's
 // mesh_offset_data from 30.1 on (live's 30.0 and 28.1 have none)): /root/kern-scratch/xt/infer4.py, gen_versions.py.
+static std::map<int, std::map<int, std::vector<FieldSpec>>> inferred_version_schemas();
+
+// The inferred layouts, plus what their models never had: from 30.0 on an INTERSECTION points to its
+// INTERSECTION_DATA (live's 30.0 file of c2-hex-bookcase-derived has it, its 28.1 one (29.x share 28.1's schema) not;
+// 38.1's embedded schema names both).
 static const std::map<int, std::map<int, std::vector<FieldSpec>>>& version_schemas()
 {
-  static const std::map<int, std::map<int, std::vector<FieldSpec>>> s = {
+  static const std::map<int, std::map<int, std::vector<FieldSpec>>> s = [] {
+    auto                   v            = inferred_version_schemas();
+    std::vector<FieldSpec> intersection = base_schema().at(38).fields;
+    intersection.push_back({"intersection_data", 'p', 0});
+    for (auto& [code, types] : v)
+      if (code >= 30000)
+      {
+        types[38]  = intersection;
+        types[204] = {{"uv_type", 'u', 0}, {"values", 'f', 1}};
+      }
+    return v;
+  }();
+  return s;
+}
+
+static std::map<int, std::map<int, std::vector<FieldSpec>>> inferred_version_schemas()
+{
+  return {
     // Version 9.0 (SCH_900000_9008: Cadenas PARTsolutions' vendor parts, XT-B3-BINARY-TRANSMIT; worked out from
     // their text and bare binary files): BODY without nom_geom_state, FIN without attributes_groups, CURVE_DATA
     // without analytic_form, ATTRIB_DEF without field_names and with 13 legal owners, CHART's Chart_count a short.
@@ -115,13 +137,25 @@ static const std::map<int, std::map<int, std::vector<FieldSpec>>>& version_schem
     // 38.1 also: MESH and the .xmm mesh file's nodes, as live's c2-hex-bookcase-derived files describe them.
     {38100, {{10, {{"highest_node_id", 'd', 0}, {"attributes_groups", 'p', 0}, {"attribute_chains", 'p', 0}, {"list", 'p', 0}, {"lattice", 'p', 0}, {"surface", 'p', 0}, {"curve", 'p', 0}, {"point", 'p', 0}, {"mesh", 'p', 0}, {"polyline", 'p', 0}, {"key", 'p', 0}, {"res_size", 'f', 0}, {"res_linear", 'f', 0}, {"ref_instance", 'p', 0}, {"next", 'p', 0}, {"previous", 'p', 0}, {"state", 'u', 0}, {"owner", 'p', 0}, {"type", 'u', 0}, {"sub_instance", 'p', 0}, {"mesh_offset_data", 'p', 0}}}, {100, {{"node_id", 'd', 0}, {"owner", 'p', 0}, {"next", 'p', 0}, {"previous", 'p', 0}, {"rotation_matrix", 'f', 9}, {"translation_vector", 'v', 0}, {"scale", 'f', 0}, {"flag", 'd', 0}, {"perspective_vector", 'v', 0}, {"precision", 'p', 0}}}, {12, {{"highest_node_id", 'd', 0}, {"attributes_groups", 'p', 0}, {"attribute_chains", 'p', 0}, {"lattice", 'p', 0}, {"surface", 'p', 0}, {"curve", 'p', 0}, {"point", 'p', 0}, {"mesh", 'p', 0}, {"polyline", 'p', 0}, {"key", 'p', 0}, {"res_size", 'f', 0}, {"res_linear", 'f', 0}, {"ref_instance", 'p', 0}, {"next", 'p', 0}, {"previous", 'p', 0}, {"state", 'u', 0}, {"owner", 'p', 0}, {"body_type", 'u', 0}, {"nom_geom_state", 'u', 0}, {"shell", 'p', 0}, {"boundary_lattice", 'p', 0}, {"boundary_surface", 'p', 0}, {"boundary_curve", 'p', 0}, {"boundary_point", 'p', 0}, {"boundary_mesh", 'p', 0}, {"boundary_polyline", 'p', 0}, {"region", 'p', 0}, {"edge", 'p', 0}, {"vertex", 'p', 0}, {"index_map_offset", 'd', 0}, {"index_map", 'p', 0}, {"node_id_index_map", 'p', 0}, {"schema_embedding_map", 'p', 0}, {"child", 'p', 0}, {"lowest_node_id", 'd', 0}, {"mesh_offset_data", 'p', 0}}}, {19, {{"node_id", 'd', 0}, {"attributes_groups", 'p', 0}, {"body", 'p', 0}, {"next", 'p', 0}, {"previous", 'p', 0}, {"shell", 'p', 0}, {"frame", 'p', 0}, {"type", 'c', 0}, {"owner", 'p', 0}}}, {41, {{"type", 'c', 0}, {"term_use", 'c', 0}, {"hvec", 'h', 1}}}, {70, {{"node_id", 'd', 0}, {"list_type", 'u', 0}, {"notransmit", 'l', 0}, {"owner", 'p', 0}, {"next", 'p', 0}, {"previous", 'p', 0}, {"list_length", 'd', 0}, {"block_length", 'd', 0}, {"finger_index", 'd', 0}, {"finger_block", 'p', 0}, {"list_block", 'p', 0}}}, {74, {{"n_entries", 'd', 0}, {"index_map_offset", 'd', 0}, {"next_block", 'p', 0}, {"entries", 'p', 1}}}, {80, {{"next", 'p', 0}, {"identifier", 'p', 0}, {"type_id", 'd', 0}, {"actions", 'u', 8}, {"field_names", 'p', 0}, {"legal_owners", 'l', 17}, {"fields", 'u', 1}}}, {201, {{"node_id", 'd', 0}, {"attributes_features", 'p', 0}, {"owner", 'p', 0}, {"next", 'p', 0}, {"previous", 'p', 0}, {"geometric_owner", 'p', 0}, {"sense", 'c', 0}, {"mesh_box", 'b', 0}, {"transform", 'p', 0}, {"rcv_key", 'p', 0}, {"rcv_index", 'd', 0}, {"psm_imesh", 'p', 0}, {"pff_imesh", 'p', 0}}}, {189, {{"precision", 'u', 0}, {"owner", 'p', 0}, {"position_pool", 'p', 0}, {"normal_pool", 'p', 0}, {"position_indices", 'p', 0}, {"normal_type", 'u', 0}, {"normal_indices", 'p', 0}, {"combs", 'p', 1}}}, {190, {{"values", 'd', 1}}}, {191, {{"encoding", 'u', 0}, {"n_integers", 'd', 0}, {"n_max_integers", 'd', 0}, {"n_bits_per_integer", 'd', 0}, {"shift", 'd', 0}, {"teeth", 'p', 1}}}, {192, {{"values", 'f', 1}}}, {193, {{"encoding", 'u', 0}, {"n_vectors", 'd', 0}, {"n_max_vectors", 'd', 0}, {"shift", 'd', 0}, {"teeth", 'p', 1}}}}},
   };
-  return s;
+}
+
+// A version's own layouts (code major*1000 + minor*100): the latest set at or before it; null before 12.0's.
+static const std::map<int, std::vector<FieldSpec>>* version_types(int code)
+{
+  const std::map<int, std::vector<FieldSpec>>* t = nullptr;
+  for (const auto& [c, types] : version_schemas())
+    if (c <= code)
+      t = &types;
+  return t;
 }
 
 // A file's list of parts (Onshape's multi-part files; type 176): not in the base schema (Onshape's files describe it
-// in their embedded schema as a new type), the layout ours writes it in natively.
-static const std::vector<FieldSpec>& part_xmt_block()
+// in their embedded schema as a new type). Its index_map_offset comes and goes with the BODY's (live's 28.1 and 30.0
+// files have neither, its 38.1 ones both).
+static std::vector<FieldSpec> part_xmt_block(const std::map<int, std::vector<FieldSpec>>* types)
 {
-  static const std::vector<FieldSpec> f = {{"n_entries", 'd', 0}, {"index_map_offset", 'd', 0}, {"index_map", 'p', 0}, {"schema_embedding_map", 'p', 0}, {"mesh_offset_data", 'p', 0}, {"entries", 'p', 1}};
+  std::vector<FieldSpec> f = {{"n_entries", 'd', 0}, {"index_map_offset", 'd', 0}, {"index_map", 'p', 0}, {"schema_embedding_map", 'p', 0}, {"mesh_offset_data", 'p', 0}, {"entries", 'p', 1}};
+  if (types && types->count(12) && std::none_of(types->at(12).begin(), types->at(12).end(), [](const FieldSpec& b) { return b.name == "index_map_offset"; }))
+    f.erase(f.begin() + 1);
   return f;
 }

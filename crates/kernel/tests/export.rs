@@ -270,15 +270,16 @@ fn an_iges_bspline_face_in_pieces_reads_as_one() {
 }
 
 /// Several parts in one Parasolid file (the exchange suite: Onshape rejected our pointer-list root, "Invalid or corrupt
-/// input file"): node 1, first, is a PART_XMT_BLOCK listing the bodies, as Onshape's own; 12.0 keeps the pointer list;
-/// both read back as the parts.
+/// input file"): node 1, first, is a PART_XMT_BLOCK listing the bodies, as Onshape's own (with no index_map_offset in
+/// 28.1 to 30.0, as live's 28.1 / 30.0 files: "176 2 1 2 0 0 0 <entries>"); 12.0 keeps the pointer list; all read back
+/// as the parts.
 #[test]
 fn several_parasolid_parts_are_listed_by_a_part_block() {
     let dir = std::env::temp_dir().join(format!("noshape-xt-block-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let a = make_box_corners(DVec3::ZERO, DVec3::splat(0.01)).unwrap();
     let b = make_box_corners(DVec3::new(0.02, 0.0, 0.0), DVec3::new(0.03, 0.01, 0.01)).unwrap();
-    for (version, root) in [("38.1", "176"), ("30.0", "176"), ("12.0", "74")] {
+    for (version, root, zeros) in [("38.1", "176", 4), ("30.0", "176", 3), ("28.1", "176", 3), ("28.0", "176", 4), ("12.0", "74", 1)] {
         let path = dir.join(format!("two-{version}.x_t"));
         write_parasolid_version(&path, &[a.clone(), b.clone()], LengthUnit::Meter, false, version).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
@@ -287,6 +288,9 @@ fn several_parasolid_parts_are_listed_by_a_part_block() {
         let tokens: Vec<&str> = joined.split_whitespace().skip_while(|t| !t.contains("SCH_")).skip(1).collect();
         // (The user field size follows the schema's name unspaced.) The first node: its type, entry count and index 1.
         assert_eq!(&tokens[..3], [root, "2", "1"], "{version}");
+        // Then its entry count, its fixed fields (all null here) and the first entry.
+        assert_eq!(tokens[3], "2", "{version}");
+        assert!(tokens[4..4 + zeros].iter().all(|t| *t == "0") && tokens[4 + zeros] != "0", "{version}: {:?}", &tokens[..10]);
         assert_eq!(read_parasolid(&path, LengthUnit::Meter).unwrap().count(ShapeType::Solid), 2, "{version}");
     }
     let _ = std::fs::remove_dir_all(&dir);

@@ -3060,7 +3060,13 @@ static void write_parasolid_as(const OcShapeList& shapes, rust::Slice<const rust
     Node&      n   = w.add(old ? 74 : 176, root);
     n.variable     = true;
     n.var_count    = (int)bodies.size();
-    n.fields       = old ? std::vector<Field>{fd((long long)bodies.size()), fp(0)} : std::vector<Field>{fd((long long)bodies.size()), fd(0), fp(0), fp(0), fp(0)};
+    n.fields       = {fd((long long)bodies.size())};
+    if (old)
+      n.fields.push_back(fp(0));
+    else
+      for (const FieldSpec& f : part_xmt_block(version_types(schema_code(ver))))
+        if (f.name != "n_entries" && f.name != "entries")
+          n.fields.push_back(f.type == 'd' ? fd(0) : fp(0));
     for (int b : bodies)
       n.fields.push_back(fp(b));
     std::rotate(w.nodes.begin(), w.nodes.end() - 1, w.nodes.end());

@@ -263,9 +263,7 @@ public:
     {
       const long long sch = std::atoll(archive.substr(archive.rfind('_') + 1).c_str());
       const int       code = (int)(sch / 1000 * 1000 + sch % 1000 / 100 * 100);
-      for (const auto& [c, types] : version_schemas())
-        if (c <= code)
-          native = &types;
+      native = version_types(code);
     }
     if (embedded)
       binary ? b16() : tint(); // highest node type
@@ -527,7 +525,7 @@ private:
     if (!embedded && native && native->count(type))
       *L = native->at(type);
     else if (!embedded && type == 176 && bi == base.end())
-      *L = part_xmt_block();
+      *L = part_xmt_block(native);
     else if (!embedded && bi == base.end() && version_schemas().rbegin()->second.count(type))
       // A node type newer than the base schema and laid out alike since (MESH and the mesh file's nodes: live's 28.1
       // and 30.0 files as its 38.1 ones).
