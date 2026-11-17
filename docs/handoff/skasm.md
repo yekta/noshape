@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-17 14:49 UTC (restarted 09:20). Read docs/DECISIONS.md
+Updated 2026-11-17 23:26 UTC (restarted 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed today
@@ -29,22 +29,19 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   ~/agents/skasm/trace-<doc>.log.
 
 ## Next, in order
-0. USER P0 (lead 11-17 12:30): sketch interaction parity, ahead of config-parts. psui owns the viewport pick / hover
-   emit, the dimension label drag and the feel rows; mine: what the sketch tools do (constraints from a selection,
-   tool first, inference / snapping, drags). Landed b87dd3dc and 24441238 (hover re-resolved on each move; reach 7.5 /
-   Dimension 8.5 px straight out from the pointer; a point beats the GPU's line; the region past every reach; no plane /
-   face / region hover while drawing; the second-picked line moves as live2's 2b; range errors from a variable).
-   Checked as live by hand on vibex6 (Xvfb :391, ~/tmp/skasm/hov): constraints from a selection, dimension place / edit,
-   drags. Landed today after that: 4a8381fc (curve drags, woken edge ends, H / V on two lines), 3621f719 (drag
-   glyphs, arc-end level drop, spline rows: matrix 67 / 67), 5245720f (every constraint button on two lines).
-   Pair 1117b (my stack vs main): +5 features (parting-line 5 -> 10/17), no other document changed.
-   Queued 40ac5da1 (vibe2, 22:3x): the chain / ellipse drags (live2 run4), Fix on a line holds only the line, the
-   unsolved sketch's message / badge / bubble, one glyph at a time (live2 glyph-select), the snap let-go hold
-   (HOLD_PX 9.5 / 11.5), the open sketch's region resolved from the pointer (qa USER-HOVER-STAYS-LIT; the stale pick
-   itself is psui's). FIX documents traced: bezier 4/6 and cf-parameter-pattern 9/9, as on main. Next: qa's hover
-   flow (qa-scratch/uh/uh2.sh, my copy ~/tmp/skasm/uh/uh2s.sh on vibex6 :391) against my app build
-   (~/agents/skasm-keep/noshape, scratch bin/appbuild.sh); hat15b by hand (vibex7 ~/lead-private, copy to
-   ~/tmp/skasm). Hosts: builds vibex6 / vibex7, land NOSHAPE_LAND_QUEUE_HOST=vibe2. Show constraints memory is already live's.
+0. USER P0 (lead 11-17): interaction feel. Landed today: b87dd3dc, 24441238, 4a8381fc, 3621f719, 5245720f. Stack
+   re-landing via vibe2 (40ac5da1 failed only on psui's fragile a_block_behind… test, fixed by their 5e498ffb):
+   1a1c5936b chain / ellipse drags, Fix on a line, unsolved sketch state, one glyph at a time; 40ac5da16 snap let-go
+   hold, region from the pointer (qa's uh2 hover flow 4/4 on my build: /root/skasm-scratch/uh1/sheet.png);
+   5b89e3f79 line-drawing bands / Shift scenario; 3ed5d2401 qa SELFEEL-* (double-click face sketch LIFTED over the
+   base edges, cleared by the next click; hidden sketch row hover draws it; Default geometry related); bbb220eed
+   value boxes mid-chain (a click drops the value, invalid box, vertical box 39 px left); fc5615ebd model edges on
+   the plane snap unhovered (qa SKSNAP-MODEL-EDGE), Dimension tool flow, "1abc" no longer completes to abs().
+   Next: qa SKSNAP-ALIGN-WOKEN-POINT (P0: another sketch's rested point offers no vertical alignment), SKSNAP-GLYPHS-
+   AFTER (P1), SKSNAP-REACH / SHIFT-ICON (P2); live's sketch right-click menus (behaviours "Part Studio right-click
+   menus and the Shift+/ shortcut sheet", menus-sk.json); hat15b sketch state by hand (vibex7 ~/lead-private ->
+   ~/tmp/skasm, mode 700, delete after). Rigs on vibex6 :391: ~/tmp/skasm/{uh,sf,sk} (qa's uh2 / sel-feel / snap
+   scripts pointed at ~/agents/skasm-keep/noshape; bin/appbuild.sh rebuilds it). Land NOSHAPE_LAND_QUEUE_HOST=vibe2.
 1. config-parts: linear-rail 26/26, links 35/35 (live fetched Derived 1's source), standoffs 32/32, sprockets 24/24
    (live's volume band carried while its volume stays: carry_volume_bands); pulleys 12/22 (Circular pattern 1, a face
    pattern ADD, fails in our op on main too: core's since 11:45); nuts 14/17 (Sweep 1, bool's). Standoffs regenerates
