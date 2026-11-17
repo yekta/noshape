@@ -4304,24 +4304,27 @@ impl PartStudioView {
         let Some(ty) = f.feature_type() else { return };
         let mut groups = crate::feature_settings::Groups::new();
         for spec in ty.params.iter().filter(|s| s.hints.has(noshape_model::params::Hints::REMEMBER_PREVIOUS_VALUE)) {
-            if let Some(v) = f.params.get(spec.id) {
+            if let Some(v) = f.params.get(spec.id).filter(|v| !uses_variables(v)) {
                 groups.entry(remembered_group(&spec.kind, units)).or_default().insert(spec.id.to_string(), v.clone());
             }
         }
-        let mine = self.ui.remembered.entry(f.type_id.clone()).or_default();
+        let mine = self.ui.remembered.entry(f.type_id.clone()).or_insert_with(|| crate::feature_settings::get(&f.type_id));
         for (g, values) in &groups {
-            mine.insert(g.clone(), values.clone());
+            mine.entry(g.clone()).or_default().extend(values.clone());
+    /// Store the REMEMBER_PREVIOUS_VALUE parameters of a committed feature (live 1987: per feature type, for the
+    /// user, in every document; lengths one memory for metric documents and one for inch ones). A value with a
+    /// #variable is never remembered: that parameter keeps its earlier memory (live, user P0 11-17).
         }
         crate::feature_settings::put(&f.type_id, &groups);
     }
 
     /// A new feature opens with what the user last committed in its type: the values without units and those of
-    /// the document's length and angle units.
+    /// the document's kind of length unit and its angle unit (never one with a #variable, kept by an older build).
     pub(super) fn apply_remembered(&self, f: &mut noshape_model::partstudio::Feature, units: &noshape_units::UnitPrefs) {
         let saved = self.ui.remembered.get(&f.type_id).cloned().unwrap_or_else(|| crate::feature_settings::get(&f.type_id));
-        let groups = [String::new(), format!("length:{:?}", units.length), format!("angle:{:?}", units.angle)];
+        let groups = [String::new(), length_group(units), format!("angle:{:?}", units.angle)];
         for values in groups.iter().filter_map(|g| saved.get(g)) {
-            for (id, v) in values {
+            for (id, v) in values.iter().filter(|(_, v)| !uses_variables(v)) {
                 f.params.set(id, v.clone());
             }
         }
@@ -5053,7 +5056,7 @@ mod edge_end_tests {
 fn remembered_group(kind: &noshape_model::params::ParamKind, units: &noshape_units::UnitPrefs) -> String {
     use noshape_model::params::{NumKind, ParamKind};
     match kind {
-        ParamKind::Num(n) if n.kind == NumKind::Length => format!("length:{:?}", units.length),
+        ParamKind::Num(n) if n.kind == NumKind::Length => length_group(units),
         ParamKind::Num(n) if n.kind == NumKind::Angle => format!("angle:{:?}", units.angle),
         _ => String::new(),
     }
@@ -5137,4 +5140,20 @@ pub(super) fn drop_folder(ps: &noshape_model::partstudio::PartStudio, moving: &[
     let level = (near.len() as i32 + steps).clamp(shared as i32, near.len().max(far.len()) as i32) as usize;
     let side = if level <= near.len() { near } else { far };
     level.checked_sub(1).and_then(|l| side.get(l)).copied()
+}
+
+/// Whether a value refers to a #variable (anywhere in an array's items).
+fn uses_variables(v: &ParamValue) -> bool {
+    match v {
+        ParamValue::Expr(e) => noshape_units::parse(&e.text).map_or(e.text.contains('#'), |x| !x.variables().is_empty()),
+        ParamValue::Array(items) => items.iter().any(|it| it.0.values().any(uses_variables)),
+        _ => false,
+    }
+}
+
+/// Live: one length memory for metric documents, one for inch (foot, yard) ones.
+fn length_group(units: &noshape_units::UnitPrefs) -> String {
+    use noshape_units::LengthUnit as L;
+    let imperial = matches!(units.length, L::Inch | L::Foot | L::Yard);
+    format!("length:{}", if imperial { "imperial" } else { "metric" })
 }

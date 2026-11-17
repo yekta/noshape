@@ -38,7 +38,8 @@ pub fn get(key: &str) -> Groups {
     with_store(|s| s.get(key).cloned().unwrap_or_default())
 }
 
-/// A commit's groups replace the same groups of `key` (other units' lists stay) and are written to disk.
+/// A commit's values replace the same values of `key` (the rest stay: other units' lists, a parameter not remembered
+/// this time) and are written to disk.
 pub fn put(key: &str, groups: &Groups) {
     if !PERSIST.load(Ordering::Relaxed) {
         return;
@@ -46,7 +47,7 @@ pub fn put(key: &str, groups: &Groups) {
     let bytes = with_store(|s| {
         let entry = s.entry(key.to_string()).or_default();
         for (g, values) in groups {
-            entry.insert(g.clone(), values.clone());
+            entry.entry(g.clone()).or_default().extend(values.clone());
         }
         serde_json::to_vec_pretty(s).unwrap_or_default()
     });

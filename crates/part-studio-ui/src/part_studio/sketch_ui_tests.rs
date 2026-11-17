@@ -3286,6 +3286,37 @@ fn remembered_hole_values_follow_the_document_units(cx: &mut TestAppContext) {
     assert_ne!(dia, "7 mm", "the mm diameter isn't an inch document's");
 }
 
+/// User P0 11-17 (live's answer, behaviours "feature dialogs remembering the previous value"): a value with a #variable
+/// is never remembered, the earlier memory stays ("9 mm + #wall_thickness" opened red in a new document); plain values
+/// and variable-free expressions are kept as typed; metric documents share one memory, inch ones another.
+#[gpui::test]
+fn a_remembered_value_never_carries_a_variable(cx: &mut TestAppContext) {
+    let (_window, view) = part_studio(cx, "remembered-expression");
+    let mm = noshape_units::UnitPrefs::default();
+    let cm = noshape_units::UnitPrefs { length: noshape_units::LengthUnit::Centimeter, ..mm };
+    let inch = noshape_units::UnitPrefs { length: noshape_units::LengthUnit::Inch, ..mm };
+    let new_fillet = |units: &noshape_units::UnitPrefs, cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).unwrap().new_feature("fillet", units).unwrap());
+    let commit = |radius: &str, cx: &mut TestAppContext| {
+        let mut f = new_fillet(&mm, cx);
+        f.params.set("radius", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new(radius)));
+        view.update(cx, |v, _| v.remember_values(&f, &mm));
+    };
+    let opens = |units: &noshape_units::UnitPrefs, cx: &mut TestAppContext| {
+        let mut g = new_fillet(units, cx);
+        cx.update(|cx| view.read(cx).apply_remembered(&mut g, units));
+        g.params.expr("radius").map(|e| e.text.clone()).unwrap()
+    };
+    let default = opens(&mm, cx);
+    commit("9 mm + #wall_thickness", cx);
+    assert_eq!(opens(&mm, cx), default, "nothing with a variable is remembered");
+    commit("1 mm + 1 mm", cx);
+    assert_eq!(opens(&mm, cx), "1 mm + 1 mm", "a variable-free expression as typed");
+    commit("2 mm + #v", cx);
+    assert_eq!(opens(&mm, cx), "1 mm + 1 mm", "the earlier memory stays");
+    assert_eq!(opens(&cm, cx), "1 mm + 1 mm", "one memory for metric documents");
+    assert_ne!(opens(&inch, cx), "1 mm + 1 mm", "inch documents keep their own");
+}
+
 /// A view with a cached slice holding a nested cached row, and a focusable element outside both: counts their renders.
 struct CacheHost {
     renders: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<&'static str, usize>>>,
