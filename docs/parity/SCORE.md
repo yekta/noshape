@@ -161,6 +161,7 @@ of our medians (live 41.1 s), and the user documents' cold open (median of 3; th
 | 2026-11-14 | v0.4.48 | 2.3–3.4 | **52** | 54.7 s | 5.12 s | 5.17 s | 5.25 s | 17.73 s | 4.02 s |
 | 2026-11-15 | – | – | not run (the one-night unit had ended) | | | | | | |
 | 2026-11-16 | v0.4.53 | 4.5–8.3 (qa's GUI fuzz used ~2 of 8 cores alongside; paused in the window from 11-17) | **58** | 68.3 s | 6.26 s | 6.05 s | 5.97 s | 16.00 s | 4.61 s |
+| 2026-11-17 | v0.4.55 | 0.5–0.5 | **1** | 0.0 s | 5.09 s | – | – | – | – |
 
 2026-11-13, vibe7 load 0.1–1.9, nothing else running; v0.4.46 (e06b09c83) and main's head (91a90caf) built there, run back to back.
 
