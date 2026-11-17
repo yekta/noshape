@@ -2450,10 +2450,11 @@ fn sheets_of_shells_fused_into_shells_as_occt() {
 /// c2-rings-loft's slots cut across its ring's 1 mm wall and its rounds (3 of them, recorded): their planes
 /// lie nearly along the rounds' arcs, so a section crosses a round within one of the exact plane / round sections'
 /// samples, or caps a fold between two (it found none, and ours declined "a non-manifold result": the 51-slot cut 5 s
-/// on OCCT). Such a pair is OCCT's section now; the cut ours, as OCCT's.
+/// on OCCT). Such a pair is OCCT's section now; the cut ours, as OCCT's. (Its volume 474.543498 mm³ with the planes'
+/// sections ours, the same fitted within 1e-7 to 1e-10; OCCT's sections' approximation gives 474.5435035, 1.2e-8 off.)
 #[test]
 fn slots_across_a_rings_rounds_cut_as_occt() {
-    valid_as_occt("d3b24561b7688e74", 1e-8);
+    valid_as_occt("d3b24561b7688e74", 2e-8);
 }
 
 /// cf-fill-pattern's probes (recorded, 140 of them): an instance's circle in common with a boundary's line, edges

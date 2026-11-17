@@ -3248,14 +3248,17 @@ bool plane_tube_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vect
 // A section given point by point, as interpolated()'s, fitted by least squares instead: B-splines of degree 5 over
 // spans of equal length along the section (its chords through the points), one solve for the curve and both its
 // curves on the faces, its ends on the section's, the spans doubled from 1 until the points halfway between those
-// fitted to are within 1e-7 too (the curves on the faces' misses times `ka` and `kb`; up to 64 spans). Where the
+// fitted to are within 1e-8 too (the curves on the faces' misses times `ka` and `kb`; up to 64 spans). Where the
 // curve on face `side` (0 or 1) crosses one of `lines` (u, then v: the B-spline face's knots of little continuity, the
 // section's kinks) a piece ends and the next one starts there. A few spans, as OCCT's approximation gives, where
 // interpolation carries one a point (the Boolean's work on a curve grows with its spans). False where it can't.
 static bool fitted(const std::function<bool(double, gp_Pnt&, gp_Pnt2d&, gp_Pnt2d&)>& at, double t0, double t1, IntTools_Curve& out, double ka, double kb, const std::vector<std::pair<int, double>>& lines = {}, int side = 1)
 {
   constexpr int p   = 5;
-  const double  tol = 1e-7;
+  // (Well inside the section's 1e-7 tolerance: at 1e-7 a later forced SameParameter (a blend's face refaced,
+  // c2-hunting-knife's Fillet 2) fitted the edges' curves on the faces again, and their faces' integrals then changed
+  // under a mirror: its Mirror 1 kept its halves apart, 31 faces for live's 22.)
+  const double  tol = 1e-8;
   using Row         = std::array<double, 7>;
   auto near_turn    = [](double x, double to) { return x + 2 * M_PI * std::round((to - x) / (2 * M_PI)); };
   auto eval         = [&](double t, const Row* before, Row& r) {
@@ -3509,7 +3512,7 @@ static bool fitted_section(const std::function<bool(double, gp_Pnt&, gp_Pnt2d&, 
 // side of the plane, or all inside the cylinder: none. Else the distance on a grid of four cells a knot span each way
 // (8 to 256 a way), its sign changes along the cells' sides found exactly and joined cell by cell (a saddle by the
 // cell's middle), each chain of them a section: a curve fitted through them the guide, each point of it brought onto
-// the analytic surface by Newton's steps along the distance's gradient, fitted (fitted_section, within 1e-7) over the
+// the analytic surface by Newton's steps along the distance's gradient, fitted (fitted_section, within 1e-8) over the
 // stretches inside the analytic face's box a tenth wider each way. c2-rings-loft's pattern cut and
 // c2-tpd-fillet-variable's fillet tools: 0.3-2.5 ms a pair where OCCT's marching took 4-10. False where a side's or a
 // cell's distances leave room for zeros they don't show (a tangency, a loop inside a cell): OCCT's then.
