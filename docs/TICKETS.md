@@ -6,6 +6,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## qa, 2026-11-17
+- [ ] P0 SCISSOR-LIFT-BOM-ROWS (asm; qa 2026-11-17 07:20, assembly suite 1117-0227 on green ecf8c33a vs 1116-1642 on 684e77e2)
+  asm-scissor-lift: BOM rows as live 59 -> 57 of 87 (rows 63 -> 62; occurrences 214/242 and mates 13/19 unchanged). New
+  difference: ours has (1, "Motor Mount", 3.0, "Motor Mount", "", "- None -") under "Drive", live doesn't; the "Gear Frame"
+  row under "Gearbox" no longer differs. 106 commits in range (bool, core, dx, blend; no asm). Logs:
+  /root/qa-scratch/suites/{1116-1642-684e77e2,1117-0227-ecf8c33a}/assemblies.log.
 - [ ] P0 IMPELLER-MOVE-FACE-2-REF (core; qa 2026-11-17 07:10, vibe6, v0.4.56 CLI vs green c9b3ad6f, same session, 3 runs, load ~2)
   c2-impeller-loft (qa-parity/saved) regenerates worse on main than in v0.4.56: "Move face 2" "Could not transform selected faces
   as requested." -> "Select faces to move." (its saved face no longer resolves), "Delete face 2" Ok -> Error "Could not delete
