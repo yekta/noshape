@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 17:46 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45.
+Updated 2026-11-17 18:14 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45.
 
 ## In flight
 
@@ -17,12 +17,15 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
 - Landed 11-17: 7abd9bdf (doc-open timing), b5d11ad7 (box select), 01fb280e (panel text form, versions flows,
   manual-4). 57dc3ed4 failed 13:06 (ops e2e: first angle's side view); fixed forward (drawing_get "isometric",
   e2e takes either side view; ops e2e 222/222 on vibe5).
-- Queued on vibex7 17:4x as 358ab7a3 (21 commits, carries 66eee5f9; vibe5 down, ff75508e lost;
+- Queued on vibex7 18:14 as 09af37a6 (carries 358ab7a3 / 66eee5f9 / a457a82b; vibe5 down, ff75508e lost;
   `NOSHAPE_LAND_QUEUE_HOST=vibex7 tools/tiers/land.sh [--no-precheck]` until main's land.sh): 1db5e57e's 11 (failed twice, 14:54 and 15:44, on coverage reading the
   drawing_ui_tests/ folder as a file: coverage.rs now scans files only; ops --test all green on vibex6) plus:
   - mate glyphs at screen size (asm_scene::MateGlyphs, 26 px, a pick disc 2 px past it), backing square on hover,
     the part outlined; a hovered face shows its part's silhouette #FFC20E (Scene::hover_outline_rgb); a part picked
     inside a sub leaves the sub's row related (picked_inside); every instance row tooltips its name;
+  - drawing look as live (D1, 2068): a hovered view framed tan ~8 px out, edges as they are; a selected one
+    orange edges + an orange frame once the pointer leaves (`view_frames`); feel tests for it and a dimension's
+    5 px drag; asked live2 (18:2x) about the selected view's centre handle (circle, cross, 4 grips; ours has none);
   - the unticked Angular section takes 3 clicks; a note's leader lights the note from 10 px in Select;
   - feel tests: assembly_feel_tests.rs (glyph reach + click, box rule, sub part), drawing feel.rs (F4 no snap, D3
     snap marker, leader reach), the Angular test. Section takes 10/10, 15 asm takes (show mates, mate menus,
