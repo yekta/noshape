@@ -7586,7 +7586,7 @@ impl std::ops::Index<usize> for Dense {
 }
 
 /// An angle in the gap of the arcs `covered` (start, sweep > 0): the middle of the widest gap, and its width.
-fn gap(covered: &[(f64, f64)]) -> Option<(f64, f64)> {
+pub(crate) fn gap(covered: &[(f64, f64)]) -> Option<(f64, f64)> {
     if covered.is_empty() {
         return None;
     }
