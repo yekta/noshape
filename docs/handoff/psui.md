@@ -64,9 +64,18 @@ docs/DECISIONS.md (read first; it wins over anything here).
   prefetch takes hover to 8.5 (/root/psui-scratch/ab/hover-prefetch.patch) but reads back 15–60 MB per scene change:
   not landed. Live never timed click → selection or a dialog's open: asked in REQUESTS.
 - tab-new-edit-reedit: ours clicks the middle of Flange 1's wall (`ours_on`, lead 11-16); matches 22/22.
-- Paused until ~10:15 UTC 11-17: asm, skasm, bool2, studios, live, live2. Don't message them (it wakes them): write
-  into onshape-research/live/REQUESTS.md or their handoffs. Waiting there: live/live2's tool-list box model request
-  (now measured from menus/ps-dropdown-*; can be dropped).
+- Idle cost (lead 11-16), the Mac, release, the 30-feature part: 5 min idle 0 frames presented (NOSHAPE_FRAME_LOG),
+  CPU 0.1 %, RSS flat 313.7 MB (/root/psui-scratch/idle/idle.sh). Open/close: `NOSHAPE_SOAK=<n>` (crates/app soak.rs:
+  opens the command line's document, waits until drawn, closes; logs RSS and whether the workspace, document, Part
+  Studio view and viewport were freed; soak*.sh in idle/ add vmmap / heap / leaks --traceTree snapshots). Two leaks
+  fixed: a closed document's live server thread + port (ops live.rs, test `a_dropped_server_ends_its_thread`); the
+  kernel's display mesh cache kept every face it meshed (mesh.cpp `drop_unreferenced`: keys holding a face's only
+  references go once a set doubles, across sets: each face is a key at the view's and a thumbnail's deflections; test
+  `rust_mesh::the_mesh_cache_drops_faces_no_shape_keeps`). 30 cycles: +2.3 MB / cycle before, ~0.2 after.
+- Agents back 11-17 09:25 as fresh threads (full ids): asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm
+  18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
+  58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2
+  3b9b1e66-33a0-4dfe-9e0a-eee216e354b2, bool 0f798808-e854-4e83-bbd0-22ae5a1a0578. Old ids stopped.
 - skasm's sheet metal colour fix (`Context::reuse_colours_from`) lands after their suite: then recheck our flat view
   colours with fb5 sm-click.json.
 - Rerun 11-16: boundary-surface, end-caps, circular click-commit, context-create-version-update, routing match.
@@ -78,7 +87,26 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Queued to land
 
-- 6b16ed19 (shadows, icons); this handoff.
+- ab8a2a43 (leak fixes + NOSHAPE_SOAK) FAILED 11-16 20:59 on ops `spawn_guard` (soak.rs runs `ps` without
+  CREATE_NO_WINDOW). Fix: soak.rs added to spawn_guard.rs ALLOWED (a measuring aid, off unless set), committed with
+  this handoff and queued again 11-17 ~09:30 (the Mac run of `spawn_guard::` hadn't finished): check
+  `tools/tiers/land.sh --status`; if it fails again, fix forward.
+
+## Current task (lead 11-17 09:25)
+
+1. Rerun the full ui-parity suite (`tools/ui-parity/shards.sh`: every scenario with a live take, 2146; the psui list
+   alone is psui-names.txt, 1021) and the interaction-feel suites (the `*_feel_tests` in part-studio-ui) on vibe6
+   (≤4 apps, through ~/bin/slot, under `timeout`) against current green; list the failing scenarios by owner; fix the
+   psui-owned ones, P0/P1 first (look, hover/pick, timing). Report before/after pass counts in ≤5 lines. Not started
+   (the move to Ubeyd came first). Owner mapping: no owner field in scenarios; by area (sketch / part studio / chrome /
+   viewport → psui; sheet metal → skasm; assemblies → asm; drawings → dx/studios; …) as the 11-16 run's notes.
+2. Toolbar dropdown box model (live2 11-17 09:26, live/feel/shadows/README.md "Toolbar dropdown list box model",
+   tooldd-*.json/png): rows 1 px margin + 6 px padding, icon at list.x + 8, name text at + 32 (margin 0 4px), row 32
+   (34.5 with chips), chips min-width 17, padding 0 2px, 1 px #AAA, radius 2, 11 px on 16.5, no gap, no background;
+   chips end at list right − 8. Our edit, unverified, saved as /root/psui-scratch/toolbar-boxmodel.patch (`git apply`
+   it: ui.rs `shortcut_chips` / `menu_tool_item`, `shortcut_chip` removed as unused; popup_menu.rs tool_list item
+   pr 7 → 6). Next: build, screenshot a Fillet ⌄ / Sheet metal ⌄ list (fb5/tb.json), compare with live's
+   tooldd-fillet-page.png / tooldd-sheetmetal-page.png, then land.
 
 ## Waiting on others
 
