@@ -7108,7 +7108,7 @@ impl std::ops::Index<usize> for Dense {
 }
 
 /// An angle in the gap of the arcs `covered` (start, sweep > 0): the middle of the widest gap, and its width.
-fn gap(covered: &[(f64, f64)]) -> Option<(f64, f64)> {
+pub(crate) fn gap(covered: &[(f64, f64)]) -> Option<(f64, f64)> {
     if covered.is_empty() {
         return None;
     }
@@ -7122,7 +7122,9 @@ fn gap(covered: &[(f64, f64)]) -> Option<(f64, f64)> {
     let mut best: Option<(f64, f64)> = None;
     for i in 0..ends.len() {
         let end = ends[i].0 + ends[i].1;
-        let next = ends.iter().map(|e| (e.0 - end).rem_euclid(TAU)).fold(TAU, f64::min);
+        // (An arc starting where this one ends, rounded a little before it, is next to it (c2-config-parts-pulleys'
+        // rim, two arcs meeting at -90 degrees: not a gap of a whole turn).)
+        let next = ends.iter().map(|e| (e.0 - end).rem_euclid(TAU)).map(|d| if d > TAU - 1e-9 { 0.0 } else { d }).fold(TAU, f64::min);
         let covered_inside = ends.iter().any(|e| {
             let d = (end - e.0).rem_euclid(TAU);
             d > 1e-12 && d < e.1 - 1e-12

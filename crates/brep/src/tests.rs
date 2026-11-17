@@ -580,3 +580,13 @@ fn a_cancelled_boolean_declines() {
     assert!(matches!(r, Err(crate::Decline("cancelled"))), "{:?}", r.map(|_| ()));
     assert!(crate::boolean(crate::Op::Fuse, &[&a, &b], 1e-7).is_ok());
 }
+
+/// The gap between arcs that meet, one's end rounded a little past the next one's start: the gap elsewhere, not a whole
+/// turn there (c2-config-parts-pulleys' rim with a groove at the top: "an arc across a cylinder's seam").
+#[test]
+fn arcs_meeting_end_to_start_leave_no_gap_between_them() {
+    let (mid, width) = crate::boolean::gap(&[(-1.5707963267948983, 3.033520317723272), (-4.6043166445181685, 3.033520317723274)]).unwrap();
+    assert!((mid - std::f64::consts::FRAC_PI_2).abs() < 1e-9 && (width - 0.21614467173304).abs() < 1e-9, "{mid} {width}");
+    let (mid, width) = crate::boolean::gap(&[(0.0, 1.0), (1.0, 1.0)]).unwrap();
+    assert!((mid - (2.0 + 0.5 * (std::f64::consts::TAU - 2.0))).abs() < 1e-12 && (width - (std::f64::consts::TAU - 2.0)).abs() < 1e-12, "{mid} {width}");
+}
