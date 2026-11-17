@@ -9098,7 +9098,15 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
   }
   TopoDS_Shape wall = outer_wall;
   HHist        h2;
-  if (BRepCheck_Analyzer wan0(wall); !wan0.IsValid() && !outward && !hollow)
+  // (Checked once, again only when repaired: the wall checked twice was a tenth of cf-snap-hook's Shell 1.)
+  const auto checked = [](const TopoDS_Shape& s) {
+    int n = 0;
+    for (TopExp_Explorer x(s, TopAbs_FACE); x.More() && n <= 16; x.Next())
+      ++n;
+    return std::make_unique<BRepCheck_Analyzer>(s, true, n > 16);
+  };
+  std::unique_ptr<BRepCheck_Analyzer> wan = checked(wall);
+  if (!wan->IsValid() && !outward && !hollow)
   {
     TopoDS_Shell fixed;
     bool         ok = false;
@@ -9117,10 +9125,11 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       bld.MakeSolid(sol);
       bld.Add(sol, fixed.Oriented(old_shell.Orientation()));
       wall = sol;
+      wan  = checked(wall);
       lap("repair");
     }
   }
-  if (BRepCheck_Analyzer wan(wall); !wan.IsValid())
+  if (!wan->IsValid())
   {
     if (const char* dir = std::getenv("NOSHAPE_SHELL_DUMP"))
       BRepTools::Write(wall, (std::string(dir) + "/quadrics-invalid.brep").c_str());
@@ -9128,7 +9137,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       for (const TopAbs_ShapeEnum k : {TopAbs_VERTEX, TopAbs_EDGE, TopAbs_WIRE, TopAbs_FACE, TopAbs_SHELL})
         for (TopExp_Explorer x(wall, k); x.More(); x.Next())
         {
-          const occ::handle<BRepCheck_Result> r = wan.Result(x.Current());
+          const occ::handle<BRepCheck_Result> r = wan->Result(x.Current());
           if (r.IsNull())
             continue;
           Bnd_Box bb;
