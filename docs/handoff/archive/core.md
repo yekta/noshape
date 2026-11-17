@@ -4248,3 +4248,70 @@ skasm meanwhile; I'll list what I change here before landing.
   (sheet cylinder frame; dx told).
 - Landed 11-15: 654611f6f / 8e3d52063, 52433a3d2, 348b6e241 (Kerf: offset retried in mm when empty), 9012904e (Shell by
   regions: rough check, convex pockets).
+
+## Moved from the handoff 11-17 01:15 (core-oc ten commits, landing 8ae595cc)
+- **Committed in core-oc 8deb8156c (rebased on main 18:10; with 1357fddb1 split-face attributes and 11f1335b9
+  untrimmed cylinder split), all three in one release pair: a point on an elementary face is classified with its
+  parameters moved by whole periods into the face's** (geom.cpp classify_periodic; g++-13 OK). tablet-stand's rolled
+  wall faces cross the cylinder's seam, matched no definition piece (part_sources fell back to Face(0)), so std's SM
+  Boolean never built the bend's tool: Extrude 1 = live (bool handed it back: the Boolean was right); with main's
+  narrowed translator rule c2-sm-tablet-stand is 16/16 to the end.
+  T1 kernel core::a_cylinder_face_across_its_seam_contains_its_points. A notch test across a rolled wall (/root/core-scratch/rolled-notch-test-wip.patch) still fails
+  "Subtractive tool must cut all the way through ... rolled wall": std wants 2 cap faces per trimmed piece, ours has
+  more (the caps split at the seam?).
+- **Pair (six core-oc commits: 1357fddb1, 11f1335b9, 8deb8156c, 3ce19f704, 3ace68b3f, bcaf5ffdb): vibe7
+  ~/agents/core-keep/sppair.sh -> spres (merge-base d29b5ee81 files in core-keep/base, branch copies core-keep/branch;
+  started 18:33 UTC, the last two synced in before its build). Land all six when it shows nothing worse (save the
+  probe patch first; 97b778e7d sits on top, see below: land.sh would take it too, so land the six from a branch at
+  bcaf5ffdb or after a config-docs check).** (1357fddb1): opSplitFace keeps a split face's attributes on
+  every piece** (host ops.rs op_split_face; Parasolid's). std Bend's imprint split the wall and dropped its WALL
+  attribute, so c2-sm-rocker-enclosure-sm's Extrude 1 read "Removal destroys sheet metal part" (eachSheetStillExists
+  found no WALL face): 6 -> 8/14; 14 sheet metal docs otherwise unchanged. T1
+  custom_features::a_split_face_keeps_its_attribute_on_both_pieces (0 pieces tagged without). Face attributes have no
+  snapshots (query.rs attribute_snapshot: edges / vertices only), so they follow a face only by its name.
+- **Also in that pair: Split part by a cylinder face with Use trimmed off splits by the whole cylinder** (split.rs
+  whole_cylinder; the pieces unified): c2-rib-wrap 4 -> 10/18 (Split 1: 2 parts, the disc 3 faces as live). T1
+  features_b::an_untrimmed_cylinder_face_splits_off_its_whole_disc. Next there: Wrap 1 (3.8 mm³; its sketch text's
+  ascent dimension untranslated). Land both (one commit each) when the pair shows nothing worse.
+- **Committed in core-oc 3ce19f704 (in the pair): paths-guides Loft 1 dome from a part's face** (features.cpp
+  apex_tangent_loft read the seam's pcurves through the REVERSED side face, UpdateEdge wrote them back swapped:
+  "unorientable", cone fallback) + a B-spline face's apex is a shown vertex (common.cpp shown_topology, as cone apexes):
+  c2-loft-paths-guides 4 -> 8/29 (Loft 1 3/2/1 as live). T1 features_a::a_loft_from_a_parts_face_to_a_point_tangent_to_its_plane.
+- **Committed 3ace68b3f (in the pair): two profiles along a straight path square to both = the plain loft**
+  (features.cpp straight_path_square_to; Loft 2's path line lies past both profiles, path_sections gave up): Loft 2 =
+  live (7/13/9, 5230851 vs 5230790 mm³); 8 -> 16/29. T1 features_a::a_straight_path_square_to_two_profiles_past_them_lofts_them_plainly.
+  Three or more profiles on a straight path keep path_sections (unmeasured in live).
+- **Committed bcaf5ffdb (in the pair): a path loft merges smoothly meeting sides** (merge_tangent_sides now also when
+  `along`; live 1784's 3+-section rule): Loft 3 (two slots along an arc) 20 -> 17 faces, live 15/33/23. Left: two
+  Boolean slivers (15.6 and 0.16 mm², 0.012 mm thick) along profile 1's flat side at x=-50.8, y 68-92: the path loft's
+  surface there is a hair off Extrude 2's face. Likely cause: path_sections cuts each section with a plane square to
+  the path; Loft 3's arc leaves profile 1 ~23 deg off its normal, so the first cut planes slant across the 197 mm slot
+  and clip against the carried sweep's start: the surface near profile 1 bends into the part. Parasolid presumably
+  places sections by the spine's parameter instead. Next item there.
+  Mirror 1 times swing 0.3-1.7 s on loaded vibe5 runs; check on the Mac / in the pair before calling it.
+  T1 features_a::a_path_loft_of_two_slots_has_one_side_face.
+- **Committed 97b778e7d (core-oc, NOT in the vibe7 pair): the translator builds configured documents at
+  sketches.json's capturedConfiguration (the defaults live's lines are at) instead of currentConfiguration** (only the 7
+  c2-config-parts docs record it; cf-sheet-metal-model-plus, without it, keeps current). Debug run of the 6 (screws
+  out): every score as before (pulleys' Sketch 1 now kept; the rest stop at take-backs, in skasm's handoff). T1
+  parity::a_configuration_variable_takes_the_captured_configurations_value. Land after the six, with those 6 docs as
+  its pair.
+- **Committed d2605e45d (core-oc): a pattern / Mirror with Add joins surface copies to the seeds' and merge scope's
+  surfaces they touch** (bshared.rs join_surface split out of surface_result; pattern.rs, only when every copy is a
+  surface; copies touching nothing keep the old push): c2-surf-workshop-singularities 2 -> 5/15 (Mirror 3 one sheet
+  as live). Next there: "Loft with bad singularity" ERROR: a guided SURFACE loft from a sketch curve to a point (a
+  guide's end), start Normal to profile, guides Normal to guide + Match tangent to Extrude 1's cap edge; live makes
+  one singular patch (Problem loft 1/3/3). Guided loft to a point: a loft_guided item, not started.
+  T1 features_a::a_mirrored_surface_added_joins_the_surface_it_meets.
+- **bd8b5f74f (core-oc, on top): face_project_point classified as before** (8deb8156c's period shift there made
+  c2-hunting-knife's Fillet 5 a face more, 46 -> 32/52; face_contains_point keeps the shift, tablet-stand 16/16;
+  verified by debug runs). Both pairs carry the old change: vibe7's branch will show hunting-knife worse (and any other
+  doc the projection touched): recheck each doc vibe7 marks worse with HEAD (.ts3.sh <doc>) before landing.
+- **vibe5 pair (97b778e7d, b173dc5bb, d2605e45d) CLEAN 22:45: 1247 -> 1250 (singularities 2 -> 5, cpcurves
+  Main pipe topology = live's), nothing worse. vibe7 pair (six) still running.**
+- **Landing plan:** both pairs' binaries are built; the suites run as suites-only scripts with `~/bin/slot timeout 7000`
+  (the timeout no longer counts the slot wait, which killed nothing yet but would have): vibe7
+  ~/agents/core-keep/spsuites.sh -> spres (sp/base = main 18:10, sp/branch = 1357fddb1..bcaf5ffdb; queued behind
+  qa's suites-rest since 21:45), vibe5 ~/agents/core-keep/p2suites.sh -> p2res (p2bin/base = bcaf5ffdb,
+  p2bin/branch = + 97b778e7d b173dc5bb d2605e45d; queued behind bool's gate jobs). Land all ten (with bd8b5f74f) when
+  both are clean and every doc vibe7 marks worse is rechecked with HEAD.
