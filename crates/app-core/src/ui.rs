@@ -1509,6 +1509,22 @@ mod tests {
     // shadow the built-in one and expand forever.
     use super::*;
 
+    /// Live's toolbar tooltips write the key in lower case (live2 p2b2 toolbar0: "Coincident (i)", "Concentric
+    /// (shift+o)"; behaviours: "Extrude (shift+e)") with live's names; the labels keep their own case elsewhere.
+    #[::core::prelude::v1::test]
+    fn toolbar_tooltips_write_keys_as_live() {
+        for (label, tooltip) in [
+            ("Coincident (I)", "Coincident (i)"),
+            ("Concentric (Shift+O)", "Concentric (shift+o)"),
+            ("Perpendicular (Shift+L)", "Perpendicular (shift+l)"),
+            ("Extrude (Shift+E)", "Extrude (shift+e)"),
+            ("Center rectangle (R)", "Center point rectangle (r)"),
+            ("Flow", "Flow"),
+        ] {
+            assert_eq!(onshape_title(label), tooltip);
+        }
+    }
+
     #[::core::prelude::v1::test]
     fn box_shadow_blur_is_css() {
         // CSS blurs a shadow with a Gaussian of half its blur radius; vendored gpui's shaders take the sigma
