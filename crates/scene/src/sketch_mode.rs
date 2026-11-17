@@ -6890,9 +6890,8 @@ fn rim_autos(sk: &mut Sketch, circle: EntityId, click: &Click) {
 }
 
 /// A lone line's length box and dimension (live, behaviours "skasm
-/// (2026-10-28) dimension labels vs glyph rows"): 26 px off the line's middle
-/// on the side away from its constraint glyphs (which go below a horizontal
-/// line, left of a vertical one): above, or right.
+/// (2026-10-28) dimension labels vs glyph rows"): off the line's middle above
+/// a slanted or horizontal line, left of a vertical one.
 fn line_length_field(sk: &Sketch, line: EntityId, wpp: f64) -> OtfField {
     let mut f = length_field(sk, line, wpp);
     if let Some(Curve2::Line { a, b }) = sk.curve(line) {
@@ -6900,8 +6899,10 @@ fn line_length_field(sk: &Sketch, line: EntityId, wpp: f64) -> OtfField {
         // Above a slanted or horizontal line, left of a vertical one (live,
         // SKETCH-VDIM-SIDE-ARROWS).
         let n = if n.y < -1e-9 || (n.y.abs() <= 1e-9 && n.x > 0.0) { -n } else { n };
-        f.label = (a + b) * 0.5 + n * wpp * 26.0;
-        f.label_at = Some((line, n, 26.0));
+        // 26 px above a horizontal line, 39 px left of a vertical one (live2 11-17 value-box: the 100 px box centred there).
+        let off = 26.0 * n.y.abs() + 39.0 * n.x.abs();
+        f.label = (a + b) * 0.5 + n * wpp * off;
+        f.label_at = Some((line, n, off));
     }
     f
 }
@@ -11809,7 +11810,7 @@ mod tests {
 
     /// SKETCH-VDIM-SIDE-ARROWS (live, behaviours "skasm (2026-10-28)
     /// rectangle glyphs and vertical dimension text"): a vertical line's value
-    /// box lands left of it, and a short dimension keeps its arrows inside
+    /// box lands left of it (a horizontal one's above), and a short dimension keeps its arrows inside
     /// (their tips at the extension lines, pointing out).
     #[test]
     fn a_vertical_lines_value_box_goes_left_and_short_arrows_stay_inside() {
@@ -11817,7 +11818,13 @@ mod tests {
         click(&mut ed, &mut d, v(0.0, 0.04));
         click(&mut ed, &mut d, v(0.0, 0.0));
         let f = &ed.otf.as_ref().unwrap().fields[0];
-        assert!((f.label - v(-26.0 * PX, 0.02)).length() < 1e-9, "left of the line: {:?}", f.label);
+        // (Its centre 39 px left, a horizontal line's 26 px above: live2 11-17 value-box.)
+        assert!((f.label - v(-39.0 * PX, 0.02)).length() < 1e-9, "left of the line: {:?}", f.label);
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        click(&mut ed, &mut d, v(0.04, 0.0));
+        let f = &ed.otf.as_ref().unwrap().fields[0];
+        assert!((f.label - v(0.02, 26.0 * PX)).length() < 1e-9, "above the line: {:?}", f.label);
         // A 6 px dimension: from each tip the arrow runs inward (overlapping
         // the other), and no shaft sticks out past the extension lines.
         let mut out = Vec::new();

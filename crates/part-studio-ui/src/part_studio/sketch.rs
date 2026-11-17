@@ -76,6 +76,8 @@ fn group_face(group: &[Tool]) -> Tool {
 pub(super) struct SketchUi {
     /// Input of the active on-the-fly dimension box (while typing).
     otf_input: Option<(Entity<InputState>, Subscription)>,
+    /// Its text didn't evaluate on Enter: drawn as live's invalid box until edited.
+    otf_invalid: bool,
     opts: HashMap<&'static str, Entity<InputState>>,
     opt_subs: Vec<Subscription>,
     text_dialog_focused: bool,
@@ -1125,6 +1127,11 @@ impl PartStudioView {
                 {
                     ed.link_woken_edge(&data.sketch, id);
                 }
+                // A click in the canvas with a value box open drops the typed value and does what it does (live2 11-17
+                // value-box: mid-chain it places the next point, the segment keeping no dimension).
+                if self.ui_ref().is_some_and(|u| u.otf_input.is_some()) {
+                    self.close_otf_input();
+                }
                 let (shift, dbl) = (modifiers.shift || modifiers.control, *click_count >= 2);
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_down(data, p, hovered, shift, dbl)) {
                     self.apply_outcome(out, window, cx);
@@ -1809,9 +1816,18 @@ impl PartStudioView {
         let init = first.clone().unwrap_or(suggested);
         let state = cx.new(|cx| InputState::new(window, cx).default_value(init.clone()));
         let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
-            if let InputEvent::PressEnter { .. } = ev {
-                let text = st.read(cx).value().to_string();
-                this.commit_otf_input(&text, window, cx);
+            match ev {
+                InputEvent::PressEnter { .. } => {
+                    let text = st.read(cx).value().to_string();
+                    this.commit_otf_input(&text, window, cx);
+                }
+                InputEvent::Change => {
+                    if let Some(ui) = this.ui_mut().filter(|u| u.otf_invalid) {
+                        ui.otf_invalid = false;
+                        cx.notify();
+                    }
+                }
+                _ => {}
             }
         });
         state.update(cx, |s, cx| {
@@ -1887,6 +1903,7 @@ impl PartStudioView {
     fn close_otf_input(&mut self) {
         if let Some(ui) = self.ui_mut() {
             ui.otf_input = None;
+            ui.otf_invalid = false;
         }
         if let Some(ed) = &mut self.sketch {
             ed.otf_typing = false;
@@ -1898,6 +1915,14 @@ impl PartStudioView {
         let vars = self.sketch_variables(cx);
         let res = self.with_sketch(cx, |ed, data| ed.commit_otf(data, text, &units, &vars));
         match res {
+            // Live2 11-17 value-box ("1abc" Enter): the box stays open with its text, drawn invalid, no message.
+            Some(Err(_)) if self.sketch.as_ref().is_some_and(|ed| ed.otf.is_some()) => {
+                if let Some(ui) = self.ui_mut() {
+                    ui.otf_invalid = true;
+                }
+                cx.notify();
+                return;
+            }
             Some(Err(e)) => {
                 self.message = Some((FeatureStatus::Error, e));
                 cx.notify();
@@ -4247,6 +4272,7 @@ impl PartStudioView {
 
         // ---- on-the-fly dimension boxes of the geometry just created
         let otf_input = self.ui_ref().and_then(|u| u.otf_input.as_ref().map(|(st, _)| st.clone()));
+        let otf_invalid = self.ui_ref().is_some_and(|u| u.otf_invalid);
         let otf_labels = ed.otf_labels(&data, &units);
         for (i, (pos, value, active)) in ed.otf_boxes(&data, &units).into_iter().enumerate() {
             let value = otf_labels.get(i).cloned().unwrap_or(value);
@@ -4265,7 +4291,14 @@ impl PartStudioView {
                         .on_action(cx.listener(|this, _: &SketchEntryCancel, window, cx| this.cancel_otf(window, cx)))
                         // Live (inputs/6_on-the-fly_dimension_box): 13.33 px right-aligned, pl/pr 3,
                         // a blue bottom border on a transparent box.
-                        .child(div().border_b_1().border_color(p().accent).child(Input::new(st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).px(px(3.)).h(px(25.))))
+                        // Invalid (live2 11-17 value-box: os-invalid-textbox): bg rgb(249,235,236), the border grey.
+                        .child(
+                            div()
+                                .border_b_1()
+                                .border_color(if otf_invalid { rgb(0xd7d7d7) } else { p().accent })
+                                .when(otf_invalid, |d| d.bg(rgb(0xf9ebec)))
+                                .child(Input::new(st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).px(px(3.)).h(px(25.))),
+                        )
                         .into_any_element(),
                 );
                 continue;

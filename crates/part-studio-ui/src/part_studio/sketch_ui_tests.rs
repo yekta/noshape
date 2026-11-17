@@ -202,6 +202,76 @@ fn line_value_box_takes_the_first_key(cx: &mut TestAppContext) {
     assert!(near(&dimensions(cx, &view), &[0.05]), "{:?}", dimensions(cx, &view));
 }
 
+/// Live2 11-17 value-box: mid-chain a digit opens the value box on the last finished segment (never the rubber band);
+/// Enter dimensions it and the chain goes on from its moved end; a digit after that, or Tab with no box, opens
+/// nothing; Esc in the box closes it with no dimension, the tool on; a canvas click drops the value and places the next
+/// point; "1abc" Enter keeps the box open; a circle's box only once the circle is finished.
+#[gpui::test]
+fn value_boxes_mid_chain_as_lives(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "value-box-chain", Tool::Line);
+    let open = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui_ref().is_some_and(|u| u.otf_input.is_some()));
+    let lines = |cx: &mut TestAppContext| cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let mut v: Vec<(noshape_sketch::EntityId, f64)> = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).filter_map(|e| Some((e.id, d.sketch.curve(e.id)?.length()))).collect();
+        v.sort_by_key(|x| x.0);
+        v
+    });
+    let lengths = |cx: &mut TestAppContext| cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        d.sketch.constraints().filter_map(|c| match c.kind { noshape_sketch::ConstraintKind::Length { curve, value } => Some((curve, value)), _ => None }).collect::<Vec<_>>()
+    });
+    let pointer = |cx: &mut TestAppContext, at: (f64, f64)| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: DVec2::new(at.0, at.1), modifiers: Modifiers::default() }, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    click(cx, window, &view, (400., 400.));
+    click(cx, window, &view, (520., 400.));
+    click(cx, window, &view, (520., 320.));
+    pointer(cx, (560., 300.));
+    keys(cx, window, &["tab"]);
+    assert!(!open(cx), "Tab with no box: nothing");
+    keys(cx, window, &["2", "5"]);
+    assert!(open(cx), "a digit opens the box");
+    keys(cx, window, &["enter"]);
+    let segs = lines(cx);
+    assert_eq!(segs.len(), 2, "two segments, the rubber band none: {segs:?}");
+    let dims = lengths(cx);
+    assert!(dims.len() == 1 && dims[0].0 == segs[1].0 && (dims[0].1 - 0.025).abs() < 1e-9, "LENGTH 25 mm on the last finished segment: {dims:?} {segs:?}");
+    assert!((segs[1].1 - 0.025).abs() < 1e-9, "the segment resized: {segs:?}");
+    assert!(cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.tool == Tool::Line)), "the tool on");
+    keys(cx, window, &["3"]);
+    assert!(!open(cx), "a digit after Enter opens nothing");
+    // Esc in an open box, then a canvas click with one open (one Esc ends Line: the tool armed again).
+    let line_tool = |cx: &mut TestAppContext| {
+        keys(cx, window, &["escape"]);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+        draw(cx, window);
+    };
+    line_tool(cx);
+    click(cx, window, &view, (400., 500.));
+    click(cx, window, &view, (520., 500.));
+    keys(cx, window, &["7"]);
+    assert!(open(cx), "a new segment's box opens");
+    keys(cx, window, &["escape"]);
+    assert!(!open(cx) && lengths(cx).len() == 1, "Esc: box gone, no dimension");
+    assert!(cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.tool == Tool::Line)), "Esc in the box keeps the tool");
+    line_tool(cx);
+    click(cx, window, &view, (400., 560.));
+    click(cx, window, &view, (520., 560.));
+    let n = lines(cx).len();
+    keys(cx, window, &["7"]);
+    click(cx, window, &view, (520., 620.));
+    assert_eq!((open(cx), lengths(cx).len(), lines(cx).len()), (false, 1, n + 1), "a canvas click drops the value and places the next point (box, lengths, lines)");
+    keys(cx, window, &["8"]);
+    keys(cx, window, &["a", "b", "c", "enter"]);
+    let invalid = cx.update(|cx| (view.read(cx).ui_ref().is_some_and(|u| u.otf_invalid), view.read(cx).message.is_none()));
+    assert!(open(cx) && lengths(cx).len() == 1 && invalid == (true, true), "\"8abc\" Enter: the box stays, drawn invalid, no dimension, no message: {invalid:?}");
+}
+
 /// SKETCH-UNDO-REDO-STATE (live 11-02, qa's t-skundo): the sketch toolbar's
 /// Undo and Redo follow the sketch's own history: both off on entering it;
 /// after a line Undo on, Redo off; after undoing it Undo off, Redo on; after

@@ -2240,10 +2240,10 @@ mod connector_zoom_tests {
     /// plus the pick square's 5: 23 across), lying in the connector's plane.
     #[test]
     fn a_shown_sketchs_curves_win_the_tie_with_the_edges_they_lie_on() {
-        let c = |construction: bool, handle: bool| noshape_model::display::SketchCurveDisplay { entity: 1, points: Vec::new(), construction, external: false, state: SketchEntityState::Under, handle };
+        let c = |construction: bool, handle: bool| noshape_model::display::SketchCurveDisplay { entity: 1, points: Vec::new(), construction, external: false, state: noshape_model::display::SketchEntityState::Under, handle };
         for (curve, what) in [(c(false, false), "a line"), (c(true, false), "a construction line")] {
-            assert!(sketch_curve_style(&curve, false) & LineSegment::LIFTED != 0, "{what} of a shown sketch: lifted");
-            assert!(sketch_curve_style(&curve, true) & LineSegment::LIFTED == 0, "{what} of the edited sketch: as before");
+            assert!(super::sketch_curve_style(&curve, false) & noshape_render::LineSegment::LIFTED != 0, "{what} of a shown sketch: lifted");
+            assert!(super::sketch_curve_style(&curve, true) & noshape_render::LineSegment::LIFTED == 0, "{what} of the edited sketch: as before");
         }
     }
 
