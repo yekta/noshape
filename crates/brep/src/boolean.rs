@@ -4515,6 +4515,12 @@ fn par_map_by<T: Send>(n: usize, per: usize, run: usize, f: &(dyn Fn(usize) -> T
     let mut parts = found.into_inner().expect("the parts");
     crate::check_cancel()?;
     let mut all: Vec<(usize, T)> = parts.drain(..).flatten().collect();
+    // (A worker stopped by its own stop state (a budget's deadline) where the calling thread wasn't: items missing,
+    // as stopped; returned short, a caller indexing them by `n` panicked (dx's exchange suite after c2-rings-loft's
+    // imports: index out of bounds, then the kernel aborted).)
+    if all.len() != n {
+        return Err(Decline("cancelled"));
+    }
     all.sort_by_key(|x| x.0);
     Ok(all.into_iter().map(|x| x.1).collect())
 }
