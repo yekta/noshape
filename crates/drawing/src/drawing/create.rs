@@ -45,12 +45,16 @@ pub fn first_view_scale(size: super::SheetSize, extent: [f64; 2]) -> f64 {
     SCALES.iter().copied().find(|s| extent[0] * s <= w + 1e-9 && extent[1] * s <= h + 1e-9).unwrap_or(*SCALES.last().expect("scales"))
 }
 
-/// The sheet scale of suggested views of a source `extent` (mm at 1:1): the Front (X by Z), Top (X by Y) and Right
-/// (Y by Z) views each fit 30 % of the frame, as a first inserted view does (live 1898: 3:1, 1:2, 1:3 on ANSI A, 1:1
-/// on A3; c2-housing-draft's watch case, 30 x 37 x 6 mm with its lugs along Y, 1:1 where its Front view alone fits
-/// at 2:1).
+/// The sheet scale of suggested views of a source `extent` (mm at 1:1): the largest list scale at which the Front (X
+/// by Z), Top (X by Y) and Right (Y by Z) views are each at most 30 % of the frame wide less 16 mm and 30 % of it high
+/// (live 1898: 3:1, 1:2, 1:3 on ANSI A, 1:1 on A3; c2-housing-draft's watch case, 30 x 37 x 6 mm, 1:1; live's
+/// q-svscale blocks L x 600 x 700 on ANSI A: 1:40 to L 2450, 61.25 mm wide, 1:50 from L 2500, 62.5 mm).
 pub fn suggested_scale(size: super::SheetSize, extent: DVec3) -> f64 {
-    first_view_scale(size, [extent.x, extent.z]).min(first_view_scale(size, [extent.x, extent.y])).min(first_view_scale(size, [extent.y, extent.z]))
+    let f = size.frame_rect();
+    let (w, h) = (0.3 * (f[2] - f[0]) - 16.0, 0.3 * (f[3] - f[1]));
+    let fits = |s: f64, [a, b]: [f64; 2]| a * s <= w + 1e-9 && b * s <= h + 1e-9;
+    let views = [[extent.x, extent.z], [extent.x, extent.y], [extent.y, extent.z]];
+    SCALES.iter().copied().find(|&s| views.iter().all(|v| fits(s, *v))).unwrap_or(*SCALES.last().expect("scales"))
 }
 
 /// The scale of the first view of one part inserted into an empty sheet (live 2133, Part 1 picked): the largest list
@@ -279,12 +283,16 @@ mod tests {
         }
     }
 
-    /// Live 1898 (blocks L x W x H on ANSI A and ISO A3), qa 1441 (82 x 82 x 20 on ANSI A mm) and c2-housing-draft
-    /// (30 x 37 x 6, ANSI A: 1:1): suggested views' sheet scale.
+    /// Live 1898 (blocks L x W x H on ANSI A and ISO A3), qa 1441 (82 x 82 x 20 on ANSI A mm), c2-housing-draft
+    /// (30 x 37 x 6, ANSI A: 1:1) and live's q-svscale blocks on ANSI A (1:40 / 1:50): suggested views' sheet scale.
     #[test]
     fn suggested_scale_fits_all_three_views() {
         use crate::drawing::SheetSize::{A3, AnsiA};
-        for (size, e, want) in [(AnsiA, [20.0, 10.0, 5.0], 3.0), (AnsiA, [100.0, 50.0, 20.0], 0.5), (AnsiA, [60.0, 60.0, 120.0], 1.0 / 3.0), (A3, [100.0, 50.0, 20.0], 1.0), (AnsiA, [82.0, 82.0, 20.0], 0.5), (AnsiA, [30.5, 37.0, 6.0], 1.0)] {
+        for (size, e, want) in [(AnsiA, [20.0, 10.0, 5.0], 3.0), (AnsiA, [100.0, 50.0, 20.0], 0.5), (AnsiA, [60.0, 60.0, 120.0], 1.0 / 3.0), (A3, [100.0, 50.0, 20.0], 1.0), (AnsiA, [82.0, 82.0, 20.0], 0.5), (AnsiA, [30.5, 37.0, 6.0], 1.0)]
+            .into_iter()
+            .chain([2230.0, 2300.0, 2350.0, 2400.0, 2450.0].map(|l| (AnsiA, [l, 600.0, 700.0], 1.0 / 40.0)))
+            .chain([[2500.0, 600.0, 700.0], [2678.0, 600.0, 700.0], [2800.0, 600.0, 700.0], [3000.0, 600.0, 700.0], [2678.0, 841.0, 978.0], [2678.0, 1500.0, 978.0], [2678.0, 841.0, 2000.0], [1000.0, 2500.0, 500.0], [1000.0, 600.0, 2500.0]].map(|e| (AnsiA, e, 1.0 / 50.0)))
+        {
             let got = suggested_scale(size, DVec3::from_array(e));
             assert!((got - want).abs() < 1e-12, "{size:?} {e:?}: {got} (live {want})");
         }
