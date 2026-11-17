@@ -158,12 +158,12 @@ fn rows() -> Vec<Row> {
         Row { not: &["CONCENTRIC"], ..point_row("reach/circle-centre/straight", CIRCLE, S, C(80., 0.), (1., 0.), false, &["COINCIDENT"]) },
         point_row("reach/circle-centre/diagonal", CIRCLE, S, C(80., 0.), d, true, &["COINCIDENT"]),
         point_row("reach/point/straight", POINT_P, S, C(-60., 70.), (1., 0.), false, &["COINCIDENT"]),
-        // A spline's through-point (live2 sketch-snaps reachZoomA / B): 7 px along, then on the curve; 8–9 px across.
+        // A spline's through-point (live2 sketch-snaps reachZoomA / B): 7 px along, then on the curve. Across, and its
+        // curve between points, a straight spline reaches as a line does (live2 spline-reach 11-17: 8 up / 6 down; the
+        // catalogue's 12 px was a bulging spline probed straight up where it ran at 45°).
         point_row("reach/spline-through-point/along", SPLINE, S, C(-60., 20.), (1., 0.), false, &["COINCIDENT"]),
-        // Live reaches further across a spline (through-point 8–9 px, the curve 12): its spline's shape isn't recorded,
-        // so whether that is a wider spline zone or its curve's tessellation is open (gaps).
-        Row { snaps: 7.5, not_from: Some(10.5), gap: true, ..point_row("reach/spline-through-point/across", SPLINE, S, C(-60., 20.), (0., 1.), false, &["COINCIDENT"]) },
-        Row { gap: true, ..row("reach/spline-curve/across", Tool::Line, SPLINE, Some(S), (C(-90., 20.), (0., 1.)), (11.5, Some(14.5)), &["COINCIDENT"]) },
+        point_row("reach/spline-through-point/across", SPLINE, S, C(-60., 20.), (0., 1.), false, &["COINCIDENT"]),
+        band_row("reach/spline-curve/across", SPLINE, S, C(-90., 20.), (0., 1.), &["COINCIDENT"]),
         point_row("reach/point/diagonal", POINT_P, S, C(-60., 70.), d, true, &["COINCIDENT"]),
         Row { lit: Lit::Vertex, ..point_row("reach/model-vertex/straight", &[], C(-60., -40.), Pt::Corner, (-1., 0.), false, &["COINCIDENT"]) },
         Row { lit: Lit::Vertex, ..point_row("reach/model-vertex/diagonal", &[], C(-60., -40.), Pt::Corner, (-H, -H), true, &["COINCIDENT"]) },

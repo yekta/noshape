@@ -513,6 +513,8 @@ enum Drop {
     OnCurve,
     /// The line's midpoint.
     Midpoint,
+    /// An arc's end level (true) or plumb with its other end (live2 sketch-drags b1x: HORIZONTAL on release).
+    Level(bool),
 }
 
 /// A direction through the tool's anchor (horizontal, vertical, square to, parallel to, a tangent line to a curve): one
@@ -1813,8 +1815,19 @@ impl SketchEditor {
         seen < self.world_per_px * DRAG_START_PX
     }
 
-    /// The glyphs by the pointer for the snap now ([`inference_icons`]).
+    /// The glyphs by the pointer for the snap now ([`inference_icons`]); for a dragged point, its drop's (live: the
+    /// coincident glyph under the pointer during the drag, "feel (sketch)" (3)).
     pub fn snap_icons(&self) -> Vec<&'static str> {
+        if self.dragged_point().is_some() {
+            let drop = self.drag_snap.map(|(_, _, d)| d).or(self.drag_external.as_ref().map(|s| if matches!(s, ExternalSnap::Edge { midpoint: true, .. }) { Drop::Midpoint } else { Drop::OnCurve }));
+            return match drop {
+                Some(Drop::Merge | Drop::OnCurve) => vec!["coincident"],
+                Some(Drop::Midpoint) => vec!["midpoint"],
+                Some(Drop::Level(true)) => vec!["horizontal"],
+                Some(Drop::Level(false)) => vec!["vertical"],
+                None => Vec::new(),
+            };
+        }
         let Some(inf) = &self.inference else { return Vec::new() };
         inference_icons(inf, matches!(self.external_snap, Some(ExternalSnap::Edge { midpoint: false, .. })))
     }
@@ -4479,6 +4492,17 @@ impl SketchEditor {
             })
             .min_by(|a, b| a.2.total_cmp(&b.2))
             .map(|(e, q, _)| (e, q, Drop::OnCurve))
+            .or_else(|| {
+                // An arc's end level or plumb with its other end, within a line's reach (live2 sketch-drags b1x).
+                let other = sk.entities().find_map(|e| match e.geometry {
+                    noshape_sketch::Geometry::Arc { start, end, .. } if start == id => Some(end),
+                    noshape_sketch::Geometry::Arc { start, end, .. } if end == id => Some(start),
+                    _ => None,
+                })?;
+                let q = sk.point(other)?;
+                let (dy, dx) = (seen(DVec2::new(0.0, pos.y - q.y)), seen(DVec2::new(pos.x - q.x, 0.0)));
+                [(dy, DVec2::new(pos.x, q.y), true), (dx, DVec2::new(q.x, pos.y), false)].into_iter().filter(|(d, ..)| *d <= r).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(_, at, h)| (other, at, Drop::Level(h)))
+            })
     }
 
     pub fn tool_up(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
@@ -4583,6 +4607,10 @@ impl SketchEditor {
                         // Keep the fixed/external point when merging.
                         let ext = data.sketch.entity(target).is_some_and(|e| e.external);
                         if ext || !data.sketch.entity(id).is_some_and(|e| e.external) { data.sketch.merge_points(id, target).is_ok() } else { data.sketch.merge_points(target, id).is_ok() }
+                    } else if let Drop::Level(h) = drop {
+                        let _ = data.sketch.set_point(id, at);
+                        let kind = if h { ConstraintKind::Horizontal { a: id, b: Some(target) } } else { ConstraintKind::Vertical { a: id, b: Some(target) } };
+                        !data.sketch.constraints().any(|c| c.kind == kind) && data.sketch.add_constraint(kind).is_ok()
                     } else if drop == Drop::Midpoint {
                         // The point lands on the midpoint; the line stays.
                         let _ = data.sketch.set_point(id, at);
@@ -10249,6 +10277,24 @@ mod tests {
         let (sk, e) = run(&ellipse, (260.0, 0.0), (d, 0.0));
         let Some(noshape_sketch::Geometry::Ellipse { center, major, minor }) = sk.entity(e).map(|x| x.geometry.clone()) else { panic!() };
         assert!(near(sk.point(center), (230.0, 0.0)) && (major.length() * 1e3 - 40.525).abs() < 0.3 && (minor * 1e3 - 20.263).abs() < 0.15, "ellipse: {major:?} {minor}");
+        // An arc's end dragged level with its other end: the horizontal glyph by the pointer, HORIZONTAL on release
+        // (live2 b1x); 25 px below, none (b1y).
+        for (by, level) in [((d, 0.0), true), ((d, -6.7469), false)] {
+            let (mut ed, mut data) = editor(Tool::Select);
+            arc(&mut data.sketch);
+            let (a, b) = (mm(-60.0, 0.0), mm(-60.0 + by.0, by.1));
+            ed.pointer_move(&mut data, a, false, false);
+            let h = data.sketch.pick(a, PX * 4.0);
+            ed.hover = h;
+            ed.tool_down(&mut data, a, h, false, false);
+            for k in 1..=4 {
+                ed.tool_drag(&mut data, a.lerp(b, k as f64 / 4.0));
+            }
+            assert_eq!(ed.snap_icons(), if level { vec!["horizontal"] } else { Vec::<&str>::new() }, "by {by:?}");
+            ed.tool_up(&mut data, b);
+            let horizontal = data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { b: Some(_), .. }));
+            assert_eq!(horizontal, level, "by {by:?}");
+        }
     }
 
     /// Live (feel/sketch.json "boxA": A selected, then a right-to-left box over B): a box adds to the selection.

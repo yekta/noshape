@@ -4154,11 +4154,13 @@ impl PartStudioView {
         // ---- inference icon next to the cursor
         // (By the pointer, not the snapped point: live2's combo crops, centred on the pointer, keep the glyphs in place
         // while the point holds still.)
-        if ed.tool.draws()
-            && let Some(inf) = &ed.inference
-            && let Some((x, y)) = project(ed.cursor.unwrap_or(inf.position))
+        let snapping = ed.tool.draws() && ed.inference.is_some() || ed.dragged_point().is_some();
+        if snapping
+            && let Some(at) = ed.cursor.or(ed.inference.as_ref().map(|i| i.position))
+            && let Some((x, y)) = project(at)
+            && let icons = ed.snap_icons()
+            && !icons.is_empty()
         {
-            let icons = ed.snap_icons();
             let (dx, dy) = crate::sketch_mode::glyph_offset(icons.len());
             // Live (sketch/51, 52; part-studio/1032; SKETCH-GLYPH-LAYOUT-LOST,
             // 7fa4f33d + 74dc1f8c): the constraint icon in `#333` on a 20 px
