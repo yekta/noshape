@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 04:37 UTC.
+Updated 11-17 05:49 UTC.
 
 ## In flight
 - Landed 11-17: bool-knife (ecf8c33a: hulls, Shell check, uv_of k-d tree, patch cache, validity-once unify, face
@@ -15,21 +15,17 @@ Updated 11-17 04:37 UTC.
   brep_replay::brep_corpus_replay (compares with the recorded OCCT result).
 - Landed 11-17 04:25: bool-knife2 as cf5a9aff (grid cache + Shell wall checked once; gate clean, Shell A/B 211/211,
   hats/dock SAME).
-- bool-march (bool-hat, bb7c5c4c9 = knife2 + the parked plane x B-spline marcher ca8c628f6 + fix): the knife Mirror 1
-  regression was the marcher's 1e-7 fit: Fillet 2's by-tools path refaces a face (build.cpp reface_on, forced
-  BRepLib::SameParameter) and re-fitted those edges' curves on the faces (13 poles vs the 3D curve's 14); the faces'
-  integrals then changed under a mirror and unify's volume check (usd_volume_change) refused Mirror 1's merge (31
-  faces). Fit at 1e-8: knife 46/52 as main, Mirror 1 22/60/39, Extrude 2 29 -> 3-4 ms, Revolve 1 59 -> 21-26, knife
-  699-752 ms Mac (main ~1000, live 622). slots_across_a_rings_rounds_cut_as_occt widened 1e-8 -> 2e-8 (ours 474.543498
-  converged at fits 1e-7..1e-10; OCCT's sections 474.5435035; lead ok if gate + hats/dock identical). Gate clean
-  (/root/bool-hat-scratch/chain-bb7c5c4c9.out: all corpora + parity56 0 differences, only the sprockets / rocker
-  flake). Hats/dock: unit bool-udoc-march -> /root/bool-hat-scratch/udoc-march.out (in the slot). When SAME: land
-  (bool-split: checkout bool-march, rebase, diff --stat, land.sh). g++-13 clean.
+- Landed 11-17 05:48: bool-march as d3f24a83 (the plane x B-spline marcher, fit 1e-8; gate clean, hats/dock SAME):
+  knife Mirror 1 22/60/39 again; rings-loft on the Mac 920 -> 870 ms (Shell 1 ~228, live 235).
+- Rings-loft Extrude 5 (Mac 68 ms, live 39): boolean.rust.brep 31 (its cut c40a49c401d38878, Mac
+  ~/noshape-host/agents/bool-hat/rlrec), prism_until.split 14, unify 11. Hot: intervals_on's chords of mapped
+  sections (325 mappings of ~30 curves, 70K samples); caching their 3D points gave nothing measurable (parked
+  /root/bool-scratch/parked-points-along.diff). Circular pattern 1 (~300 ms, 51 prism_until splits): decision asked.
 - c2-config-parts-nuts Sweep 1: FIXED on bool-nuts b6466ab04 (bool-hat, on bool-march): one of core's thread turn
   faces' helices fall 2.6e-8 rad short of a turn; that rounding gap became its th0 (a gap > 1e-9), both rulings on one
   side (right empty), its outline swallowed the bore's strip between turns (bore pieces 24 / 14 OnSame) -> non-manifold.
   Now a helix face's gap within the tolerance goes round between its rulings (falls back to the gap if the rulings
-  don't qualify). Ours valid, 42 faces, 135.267625 mm3 (OCCT invalid 156.81). Gate: unit bool-gate-nuts (waits for
+  don't qualify). Ours valid, 42 faces, 135.267625 mm3 (OCCT invalid 156.81). Rebase on main first (march landed). Gate: unit bool-gate-nuts (waits for
   core's) -> /root/bool-hat-scratch/chain-b6466ab04.out; then hats/dock, land. Debug diffs:
   /root/bool-scratch/nuts-fix-with-debug.diff (ZZ_FACE_PIECES, ZZ_BOUND=<faces> print pieces' states / outlines).
   Core told (its exact-cylinder sweep patch can unpark; it compares the volume with live).
