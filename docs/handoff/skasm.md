@@ -13,13 +13,17 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   + run.py bend-new-edit-reedit jog-new-edit-reedit, starts when the pair starts) -> /root/skasm-scratch/uip-1117a.log.
 - a26f18913 Bezier `<id>.<n>.internal` = poles, BEZIER_DEGREE checked, EQUAL_CURVATURE(_G3) -> Curvature / Flow.
 - 036070cc4 INTERSECTED via sketch_intersection; ids-only edge that is a sketch spline -> that spline by its ends.
-- Uncommitted (Mac tests skasm-mac-1117f / 1117h running): Pierce takes a curve (scene constraint_applicable; live's
+- (Committed since:) Pierce takes a curve (scene constraint_applicable; live's
   pipe Loft profiles / knifehandle P2-P6 pierce ellipses and circles; live capture asked in REQUESTS.md 10:12);
   CONCENTRIC of a model point and `X.center` takes the circle (manualblend Sketch 5); a sketch solve that lands
   live's COINCIDENT model vertices (refs points) is kept, not taken back (cpcurves Sketch 4); AGENT_API.md regenerated
   on the Mac (copy it back: mac ~/agents/skasm/src/docs/AGENT_API.md).
-- Single-doc effect of a26f/036070 (ops-b 10:09): manualblend 9 -> 11/19; BEZIER / internal-point drops gone in
-  bezier, boundary, britatap, knifehandle, loft, mutualtrim, pipe.
+- 52447d4eb Pierce takes a curve (live confirmed 10:12 capture), Concentric model point + `X.center`, anchored solves
+  kept, AGENT_API.md; e5f43fb96 Pierce 3-pick refusal text; ca5c2d9f0 configured docs drawn at sketches.json's
+  captured solve.
+- Single-doc effects (ops-b 10:41 vs ops-a main): config-parts 86 -> 131/156 features (links 10 -> 34, standoffs
+  13 -> 31, linear-rail 22 -> 24, pulleys 11 -> 12; nuts, sprockets same); manualblend 9 -> 11/19; cpcurves 7 -> 8/24;
+  tablet-stand 16/16; BEZIER / internal-point drops gone in the surface workshop documents.
 
 ## Running
 - skasm-pair-1117a: vibe6 `~/bin/slot pairrun.sh 1117a` (ops-a = main 143f22c12, ops-b = skasm; rebuild ops-b with
