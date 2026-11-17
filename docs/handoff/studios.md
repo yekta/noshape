@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 16:30 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45.
+Updated 2026-11-17 17:45 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45.
 
 ## In flight
 
@@ -17,8 +17,8 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
 - Landed 11-17: 7abd9bdf (doc-open timing), b5d11ad7 (box select), 01fb280e (panel text form, versions flows,
   manual-4). 57dc3ed4 failed 13:06 (ops e2e: first angle's side view); fixed forward (drawing_get "isometric",
   e2e takes either side view; ops e2e 222/222 on vibe5).
-- Re-queued on vibe7 ~16:30 (vibe5 down, ff75508e lost; `NOSHAPE_LAND_QUEUE_HOST=vibe7 tools/tiers/land.sh` until
-  main's land.sh): 1db5e57e's 11 (failed twice, 14:54 and 15:44, on coverage reading the
+- Queued on vibe7 17:4x as 358ab7a3 (21 commits, carries 66eee5f9; vibe5 down, ff75508e lost;
+  `NOSHAPE_LAND_QUEUE_HOST=vibe7 tools/tiers/land.sh [--no-precheck]` until main's land.sh): 1db5e57e's 11 (failed twice, 14:54 and 15:44, on coverage reading the
   drawing_ui_tests/ folder as a file: coverage.rs now scans files only; ops --test all green on vibe6) plus:
   - mate glyphs at screen size (asm_scene::MateGlyphs, 26 px, a pick disc 2 px past it), backing square on hover,
     the part outlined; a hovered face shows its part's silhouette #FFC20E (Scene::hover_outline_rgb); a part picked
@@ -27,13 +27,15 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
   - feel tests: assembly_feel_tests.rs (glyph reach + click, box rule, sub part), drawing feel.rs (F4 no snap, D3
     snap marker, leader reach), the Angular test. Section takes 10/10, 15 asm takes (show mates, mate menus,
     select, drag, menus) match.
-  - mate glyphs per type (live2 mate-glyphs 11-17), hovered: a translucent white square, the face outlined; the
+  - mate glyphs per type at live's size (18 px unit; side by side with live2's crops: close, the Revolute arc a
+    little small), no triads at rest; hovered: a translucent white square, the face outlined; the
     row tooltip right of the list and warm (GPUI patch: warm switching for delays up to the default); tests
     every_instance_row_tooltips_its_name, the face hover look in the sub test.
 - vibe6 slot (behind psui's run): all 224 asm + section takes with the 15:50 binary (~/tmp/studios/asmsec, log
   ~/agents/studios-keep/asmsec.log).
-- live2 2fdb573f (queued): drw-datum-target-panel-tips, drw-hatch-panel-tips: implement once landed. Next from them:
-  Custom table, Hole table.
+- live2 takes to run when landed: 2fdb573f (datum-target / hatch tips), 07e23f09 (section exclude-from-cut, detail
+  id profile tips); asked live2 to record unlabelled inputs' placeholders (Section id / Detail id) under a new
+  recorder version.
 - After live's 43 re-recorded takes land: one full drawing run, then the matrix refresh (`drawing_matrix.py --run`).
   Speed: absolute numbers come from the Mac (DECISIONS 11-17), when its slot is free; speed1117.sh is vibe6-only. The weld take waits on live2's metric-position fix. Live re-records the 52 panel takes (.5): then
   fill panel texts past line 30.
