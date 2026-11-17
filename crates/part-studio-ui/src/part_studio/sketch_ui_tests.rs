@@ -4209,6 +4209,52 @@ fn a_plane_behind_the_sketch_gets_its_menu(cx: &mut TestAppContext) {
     assert!(!own.iter().any(|l| l.starts_with("Hide ")), "{own:?}");
 }
 
+/// Live 11-17 ctx-menus-1117 (menus-sk.json): the sketch's right-click menus on a line, on its end, on a line and its
+/// end selected, with Line drawing (Add comment, a cloud item, left out).
+#[gpui::test]
+fn sketch_entity_menus_as_lives(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sketch-entity-menus", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["escape"]);
+    let (feature, line, end) = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        let l = d.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+        (v.sketch.as_ref().unwrap().feature, l, d.sketch.endpoints(l).unwrap().1)
+    });
+    let menu = |cx: &mut TestAppContext, over: noshape_sketch::EntityId, selected: Vec<noshape_sketch::EntityId>, tool: Tool| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.activate_tool(tool, w, cx);
+                if let Some(ed) = &mut v.sketch {
+                    ed.selection = selected.clone();
+                }
+                v.hover = Some(Reference::SketchEntity { sketch: feature, entity: over.0 });
+                v.open_sketch_context_menu(gpui_kit::point(px(600.), px(400.)), None, w, cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+        let labels: Vec<String> = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
+        cx.update(|cx| view.update(cx, |v, cx| v.close_context_menu(cx)));
+        labels.into_iter().filter(|l| l != "———").collect::<Vec<_>>()
+    };
+    let line_menu = ["Confirm Sketch 1", "Copy sketch entities", "Transform sketch entities", "Construction", "Extrude…", "Revolve…", "Curve/surface analysis…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Align view with vertical axis", "Delete sketch entity"];
+    let mut wrong = Vec::new();
+    for (what, got, want) in [
+        ("a line", menu(cx, line, vec![], Tool::Select), line_menu.to_vec()),
+        ("a selected line", menu(cx, line, vec![line], Tool::Select), line_menu.to_vec()),
+        ("a line's end", menu(cx, end, vec![], Tool::Select), vec!["Confirm Sketch 1", "Clear selection", "Select", "Select other…", "Zoom to fit", "View normal to sketch plane", "Delete sketch entity"]),
+        ("a line and its end", menu(cx, line, vec![line, end], Tool::Select), vec!["Confirm Sketch 1", "Copy sketch entities", "Transform sketch entities", "Curve/surface analysis…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Delete 2 sketch entities"]),
+    ] {
+        if got != want.iter().map(|s| s.to_string()).collect::<Vec<_>>() {
+            wrong.push(format!("{what}: ours {got:?}"));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
 /// Lead 11-06, the display cache: a regenerated display comes back from the cache as it was; shown in its place the
 /// view is view-only (a dialog asked for waits, the user told at once, "Regenerating…" in the list), and the real
 /// regeneration replaces it with the same meshes and opens the dialog.
