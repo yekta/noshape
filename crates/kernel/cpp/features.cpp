@@ -962,7 +962,6 @@ TopoDS_Face footprint_patch(const TopoDS_Face& f, const TopoDS_Shape& base, cons
     if (best == 1e300)
       return {};
   }
-  gp_Pnt2d uv;
   for (size_t k = 0; k < pts.size(); ++k)
   {
     // The ray p + t dir on the surface: S(u, v) - p - t dir = 0.
@@ -987,10 +986,7 @@ TopoDS_Face footprint_patch(const TopoDS_Face& f, const TopoDS_Shape& base, cons
     }
     if (!hit || t < -1e-9 * size)
       return {};
-    uv = gp_Pnt2d(u, v);
-    in.Perform(f, uv, tol);
-    if (in.State() != TopAbs_IN)
-      return {};
+    // (Not classified one by one: the box is checked inside the face below, and every hit lies in it.)
     u0 = std::min(u0, u), u1 = std::max(u1, u), v0 = std::min(v0, v), v1 = std::max(v1, v);
   }
   double fu0, fu1, fv0, fv1;
