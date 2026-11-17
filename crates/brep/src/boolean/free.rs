@@ -613,9 +613,11 @@ pub(super) fn face_box(g: &GFace) -> Option<(DVec3, DVec3)> {
 /// gap): its parameters, in order (its parameter plane image jumps there).
 pub(super) fn seam_cuts(cx: &Ctx, faces: [usize; 2], c: &NurbsCurve, t0: f64, t1: f64) -> Vec<f64> {
     let mut out = Vec::new();
+    let (lo, hi) = (t0.min(t1), t0.max(t1));
     for f in faces {
         let Some(&Surf::Cyl { o, x, y, th0, .. }) = cx.faces.get(f).map(|g| &g.s) else { continue };
-        if off_seam(c, t0, t1, o, y * th0.cos() - x * th0.sin(), x * th0.cos() + y * th0.sin()) {
+        let (n, dir) = (y * th0.cos() - x * th0.sin(), x * th0.cos() + y * th0.sin());
+        if off_seam(c, t0, t1, o, n, dir) {
             continue;
         }
         // The angle from th0 in (-π, π]: a crossing where it changes sign without passing π.
@@ -624,24 +626,34 @@ pub(super) fn seam_cuts(cx: &Ctx, faces: [usize; 2], c: &NurbsCurve, t0: f64, t1
             let d = w.dot(y).atan2(w.dot(x)) - th0;
             (d + PI).rem_euclid(TAU) - PI
         };
-        let n = 32 * (c.poles.len() - c.degree).max(1);
-        let mut prev = (t0, ang(t0));
-        for k in 1..=n {
-            let t = t0 + (t1 - t0) * k as f64 / n as f64;
-            let cur = (t, ang(t));
-            if (prev.1 < 0.0) != (cur.1 < 0.0) && (prev.1 - cur.1).abs() < PI {
-                let (mut lo, mut hi) = (prev.0, cur.0);
-                for _ in 0..80 {
-                    let mid = 0.5 * (lo + hi);
-                    if (ang(mid) < 0.0) == (prev.1 < 0.0) {
-                        lo = mid;
-                    } else {
-                        hi = mid;
+        // (Only its knot spans whose own pieces may reach the seam, 32 samples each: a long section, a 131-pole
+        // curve round half a pulley's rim, sampled 4096 times on each of 23 grooves' faces.)
+        let spans = c.spans();
+        let (Some(&k0), Some(&k1)) = (c.knots.first(), c.knots.last()) else { continue };
+        let parts: Vec<(f64, f64, usize)> = if spans.is_empty() || lo < k0 || hi > k1 {
+            vec![(lo, hi, 32 * (c.poles.len() - c.degree).max(1))]
+        } else {
+            spans[c.span_of(lo)..=c.span_of(hi)].iter().filter(|s| !hull_off(&s.2, o, n, dir)).map(|s| (s.0.max(lo), s.1.min(hi), 32)).filter(|p| p.1 > p.0).collect()
+        };
+        for (a, b, m) in parts {
+            let mut prev = (a, ang(a));
+            for k in 1..=m {
+                let t = a + (b - a) * k as f64 / m as f64;
+                let cur = (t, ang(t));
+                if (prev.1 < 0.0) != (cur.1 < 0.0) && (prev.1 - cur.1).abs() < PI {
+                    let (mut lo, mut hi) = (prev.0, cur.0);
+                    for _ in 0..80 {
+                        let mid = 0.5 * (lo + hi);
+                        if (ang(mid) < 0.0) == (prev.1 < 0.0) {
+                            lo = mid;
+                        } else {
+                            hi = mid;
+                        }
                     }
+                    out.push(0.5 * (lo + hi));
                 }
-                out.push(0.5 * (lo + hi));
+                prev = cur;
             }
-            prev = cur;
         }
     }
     out.sort_by(f64::total_cmp);
@@ -658,8 +670,13 @@ fn off_seam(c: &NurbsCurve, t0: f64, t1: f64, o: DVec3, n: DVec3, dir: DVec3) ->
     if spans.is_empty() || lo < k0 || hi > k1 {
         return false;
     }
+    hull_off(spans[c.span_of(lo)..=c.span_of(hi)].iter().flat_map(|s| s.2.iter()), o, n, dir)
+}
+
+/// Whether homogeneous control points `qs` (and the hull they hold) keep off that half-plane ([`off_seam`]).
+fn hull_off<'a>(qs: impl IntoIterator<Item = &'a DVec4>, o: DVec3, n: DVec3, dir: DVec3) -> bool {
     let (mut n_lo, mut n_hi, mut d_hi, mut size) = (f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY, 0.0_f64);
-    for q in spans[c.span_of(lo)..=c.span_of(hi)].iter().flat_map(|s| s.2.iter()) {
+    for q in qs {
         if q.w <= 0.0 {
             return false;
         }

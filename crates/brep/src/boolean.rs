@@ -1018,6 +1018,9 @@ struct Ctx<'a> {
     canonical: HashMap<(usize, usize, u32), usize>,
     /// OCCT's sections of pairs copies are moved from (by the pair, its roles as asked).
     canon_secs: HashMap<FacePair, Vec<SectionCurve>>,
+    /// Whether a pair's sections copies are moved from are clear of the boundary of a face of another argument (by the
+    /// face and the pair): the same for every copy ([`Ctx::clear_inside`]).
+    from_clear: HashMap<(usize, FacePair), bool>,
     /// Pairs of faces found clearly apart or not (`free::apart`), by the two faces as paired.
     apart: HashMap<(usize, usize), bool>,
     /// Pairs of free-form faces of arguments that must only touch, sharing an edge: they meet there alone (else the
@@ -2676,13 +2679,15 @@ impl Ctx<'_> {
         // (Moved onto a face of another argument: only where they stay inside it (and the curves they were moved
         // from); else from another member (up to the third), else made for these.)
         let other = [fs, ft].into_iter().find(|&f| self.copies.get(self.faces[f].arg as usize).copied().flatten().is_none());
-        if let (Some((canon, mut r)), Some(f)) = (moved, other)
+        if let (Some((mut canon, mut r)), Some(f)) = (moved, other)
             && canon != (a, b)
         {
             let tool = if f == fs { ft } else { fs };
             let key = (f, self.copies[self.faces[tool].arg as usize].map_or(0, |x| x.0), self.faces[tool].index);
             loop {
-                let (moved_clear, from_clear) = self.clear_inside(f, &secs, &r)?;
+                let known = self.from_clear.get(&(f, canon)).copied();
+                let (moved_clear, from_clear) = self.clear_inside(f, &secs, &r, known)?;
+                self.from_clear.insert((f, canon), from_clear);
                 if moved_clear && from_clear {
                     break;
                 }
@@ -2696,7 +2701,7 @@ impl Ctx<'_> {
                 self.canonical.insert(key, k);
                 match self.moved_pair(fs, ft) {
                     Some(m) if k < 3 => {
-                        r = m.1;
+                        (canon, r) = m;
                         (secs, froms) = self.moved_sections(src, a, b, &m)?;
                     }
                     _ => {
@@ -3012,7 +3017,8 @@ impl Ctx<'_> {
 
     /// Whether OCCT's moved section curves on the other argument's face `f`, and the curves they were moved from,
     /// stay clear of its boundary (the face trims and splits OCCT's curves there): (moved, from).
-    fn clear_inside(&self, f: usize, curves: &[SectionCurve], r: &Rigid) -> R<(bool, bool)> {
+    /// (`from`: theirs, when known.)
+    fn clear_inside(&self, f: usize, curves: &[SectionCurve], r: &Rigid, from: Option<bool>) -> R<(bool, bool)> {
         // (A free-form face's parameter plane isn't one the curves map onto here (a whole torus a motion keeps, the
         // rings' Circular pattern 1): not clear, the pair's own sections then.)
         if matches!(self.faces[f].s, Surf::Nurbs { .. }) {
@@ -3028,6 +3034,8 @@ impl Ctx<'_> {
         };
         let moving: Vec<C2> = self.faces[f].edges.iter().zip(bound).filter(|x| !kept(x.0.0)).map(|x| x.1.clone()).collect();
         let margin = 100.0 * GREY * self.tol;
+        // (The boundary's sample points, made once for all the curves.)
+        let theirs: Vec<crate::curve2::Samples> = moving.iter().map(|_| Default::default()).collect();
         // A curve on the face's parameter plane clear of that boundary: not meeting it, its ends not on it.
         let clear = |c: &NurbsCurve, t0: f64, t1: f64| -> R<bool> {
             // (Across a round face's seam: not clear.)
@@ -3038,12 +3046,17 @@ impl Ctx<'_> {
             if [c2.start(), c2.end()].iter().any(|&q| distance2(q, &moving) <= margin) {
                 return Ok(false);
             }
-            Ok(moving.iter().all(|b| c2.intersections(b, margin).is_empty()))
+            let mine = Default::default();
+            Ok(moving.iter().zip(&theirs).all(|(b, s)| c2.intersections_with(b, margin, &mine, s).is_empty()))
         };
         let back = r.inverse();
-        let (mut moved, mut from) = (true, true);
+        let (mut moved, known) = (true, from);
+        let mut from = from.unwrap_or(true);
         for c in curves {
             moved &= clear(&c.curve, c.t0, c.t1)?;
+            if known.is_some() {
+                continue;
+            }
             let mut source = c.curve.clone();
             for p in &mut source.poles {
                 *p = back.point(*p);
@@ -4251,6 +4264,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         families: Vec::new(),
         size: 0.0,
         canonical: HashMap::default(),
+        from_clear: HashMap::default(),
         canon_secs: HashMap::default(),
         apart: HashMap::default(),
         edge_only: HashSet::default(),
