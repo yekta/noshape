@@ -59,6 +59,10 @@ impl AsmPickMap {
     pub fn ids_for(&self, path: &InstancePath, r: &Reference) -> &[u32] {
         self.by_ref.get(&(path.clone(), r.clone())).map(|v| v.as_slice()).unwrap_or(&[])
     }
+    /// Pick ids of one occurrence's faces.
+    pub fn faces_at(&self, path: &InstancePath) -> Vec<u32> {
+        self.by_ref.iter().filter(|((p, r), _)| p == path && matches!(r, Reference::Face(_))).flat_map(|(_, v)| v.iter().copied()).collect()
+    }
     /// Pick ids of an instance's edges.
     pub fn edges_of(&self, top: noshape_model::assembly::InstanceId) -> Vec<u32> {
         self.by_ref.iter().filter(|((p, r), _)| p.first() == Some(&top) && matches!(r, Reference::Edge(_))).flat_map(|(_, v)| v.iter().copied()).collect()
@@ -487,6 +491,9 @@ pub struct Highlights {
     /// The face whose boundary is outlined (live: hovering a face while
     /// picking a mate connector outlines it, no fill).
     pub hover_outline: Option<(InstancePath, Reference)>,
+    /// The hovered part's occurrence: its silhouette in the hover colour, no tint (live2 asm-feel (3b): only that
+    /// part, inside a subassembly too).
+    pub hover_part: Option<InstancePath>,
     /// Move manipulator (triad with pickable axis arrows and rotation rings)
     /// and the hovered handle.
     pub manipulator: Option<(Frame, f64, Option<ManipHandle>)>,
@@ -506,9 +513,9 @@ pub struct Highlights {
     pub connectors: Vec<(Frame, f64, bool, f32)>,
     /// Mate glyph lines (between connector origins).
     pub mate_lines: Vec<(DVec3, DVec3, bool)>,
-    /// Pickable mate indicators: (connector frame, half size, highlighted,
-    /// state), drawn flat in the connector's XY plane like Onshape's.
-    pub mate_glyphs: Vec<(Frame, f64, bool, MateGlyphState)>,
+    /// Pickable mate indicators: (connector frame, highlighted, state), drawn flat in the connector's XY plane like
+    /// Onshape's, at screen size ([`MateGlyphs`]).
+    pub mate_glyphs: Vec<(Frame, bool, MateGlyphState)>,
     /// Placement preview cross at the cursor (insert).
     pub cursor_mark: Option<(DVec3, f64)>,
     /// Explode lines (dashed), start to exploded position.
@@ -718,6 +725,88 @@ impl noshape_render::camera_geometry::CameraGeometry for ScreenTriads {
     }
 }
 
+/// Half a mate glyph's side on screen (px): live2 asm-feel2 (b), ~26 px across face-on.
+pub const MATE_GLYPH_HALF_PX: f64 = 13.0;
+/// How far past the drawn glyph its pick reaches before the 5 px pick square (live2 asm-feel2 (b): the glyph plus
+/// ~6–7 px).
+const MATE_GLYPH_PICK_PAD_PX: f64 = 2.0;
+
+/// Onshape's mate glyphs (assembly/41-43) at screen size: each (connector frame, pick id, highlighted, state). A small
+/// square lying in the connector plane, a white piece and a light-blue L inside a dark outline (red when failing, grey
+/// when inactive, amber when hovered or selected); a hovered or selected one sits on a light backing square (live2
+/// asm-feel (3)). The whole square takes the pointer.
+pub struct MateGlyphs {
+    pub items: Vec<(Frame, u32, bool, MateGlyphState)>,
+}
+
+impl MateGlyphs {
+    fn geometry(&self, view: &noshape_render::camera_geometry::View) -> (LineData, Vec<MeshData>) {
+        let (mut ol, mut picks) = (LineData::default(), Vec::new());
+        for (f, id, hl, st) in &self.items {
+            let Some(px) = view.world_per_px(f.origin) else { continue };
+            let half = MATE_GLYPH_HALF_PX * px;
+            let (u, v, n) = (f.x(), f.y(), f.z());
+            let lift = n * (half * 0.02);
+            let at = |a: f64, b: f64| -> [f32; 3] { (f.origin + lift + u * (a * half) + v * (b * half)).as_vec3().into() };
+            let outline = match (hl, st) {
+                (true, _) => HANDLE_HL,
+                (_, MateGlyphState::Error) => theme::rgb8(theme::viewport::ERROR),
+                _ => DARK,
+            };
+            // Filled with dense on-top strokes (meshes can't draw over the parts).
+            let mut fill = |a0: f64, b0: f64, a1: f64, b1: f64, color: [u8; 4]| {
+                let rows = ((b1 - b0) / 0.18).ceil().max(1.0) as usize;
+                for r in 0..=rows {
+                    let b = b0 + (b1 - b0) * r as f64 / rows as f64;
+                    ol.segments.push(LineSegment { a: at(a0, b), b: at(a1, b), color, pick_id: 0, width: 4.0, style: LineSegment::ON_TOP });
+                }
+            };
+            const WHITE: [u8; 4] = [255, 255, 255, 255];
+            const BACKING: [u8; 4] = [0xe9, 0xef, 0xf4, 255];
+            if *hl {
+                fill(-1.5, -1.5, 1.5, 1.5, BACKING);
+            }
+            let l = if *st == MateGlyphState::Inactive { [0xc8, 0xc8, 0xc8, 255] } else { [0x90, 0xce, 0xf1, 255] };
+            fill(-0.45, -0.2, 1.0, 1.0, WHITE);
+            fill(-0.45, -0.6, 0.3, -0.2, WHITE);
+            fill(-1.0, -1.0, -0.45, 1.0, l);
+            fill(-0.45, -1.0, 1.0, -0.6, l);
+            fill(0.3, -0.6, 1.0, -0.2, l);
+            let edge = |a: (f64, f64), b: (f64, f64)| LineSegment { a: at(a.0, a.1), b: at(b.0, b.1), color: outline, pick_id: 0, width: if *hl { 2.0 } else { 1.2 }, style: LineSegment::ON_TOP };
+            for (a, b) in [((-1.0, -1.0), (1.0, -1.0)), ((1.0, -1.0), (1.0, 1.0)), ((1.0, 1.0), (-1.0, 1.0)), ((-1.0, 1.0), (-1.0, -1.0))] {
+                ol.segments.push(edge(a, b));
+            }
+            for (a, b) in [((-0.45, 1.0), (-0.45, -0.6)), ((-0.45, -0.6), (0.3, -0.6)), ((0.3, -0.6), (0.3, -0.2)), ((0.3, -0.2), (1.0, -0.2))] {
+                ol.segments.push(LineSegment { width: 1.0, ..edge(a, b) });
+            }
+            // A disc round it in its plane, both sides (the connector's Z may face away from the viewer).
+            let r = 1.0 + MATE_GLYPH_PICK_PAD_PX / MATE_GLYPH_HALF_PX;
+            let mut positions = vec![at(0.0, 0.0)];
+            let mut indices = Vec::new();
+            for k in 0..32u32 {
+                let t = f64::from(k) / 32.0 * std::f64::consts::TAU;
+                positions.push(at(r * t.cos(), r * t.sin()));
+                let (a, b) = (k + 1, (k + 1) % 32 + 1);
+                indices.extend([0, a, b, 0, b, a]);
+            }
+            picks.push(MeshData { normals: vec![n.as_vec3().into(); positions.len()], pick_ids: vec![*id; positions.len()], indices, positions });
+        }
+        (ol, picks)
+    }
+}
+
+impl noshape_render::camera_geometry::CameraGeometry for MateGlyphs {
+    fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
+        let (lines, picks) = self.geometry(view);
+        if lines.segments.is_empty() {
+            return Vec::new();
+        }
+        let mut out: Vec<Instance> = picks.iter().map(|m| Instance::new(Drawable::Mesh(up.upload_mesh(m))).pick_only().ignore_clip().on_top().layer(20)).collect();
+        out.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(20));
+        out
+    }
+}
+
 fn push_triad(lines: &mut LineData, f: &Frame, size: f64, width: f32, pick: u32, highlight: bool) {
     let o: [f32; 3] = f.origin.as_vec3().into();
     for (k, axis) in [f.x(), f.y(), f.z()].into_iter().enumerate() {
@@ -728,7 +817,7 @@ fn push_triad(lines: &mut LineData, f: &Frame, size: f64, width: f32, pick: u32,
 }
 
 pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights, up: &Uploader) -> Scene {
-    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, no_occlusion: built.scene.no_occlusion };
+    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, hover_outline_rgb: None, no_occlusion: built.scene.no_occlusion };
     for top in &h.accent_tops {
         for &id in built.picks.faces_of(*top) {
             scene.add_flag(id, state::ACCENT);
@@ -776,6 +865,14 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     if let Some((p, r)) = &h.hover_outline {
         for id in built.picks.boundary_ids(p, r) {
             scene.add_flag(id, state::HOVER);
+        }
+    }
+    // The silhouette in #FFC20E, the hovered face's edges in the hover colour (live2 asm-feel2 (c)).
+    if let Some(p) = &h.hover_part {
+        for id in built.picks.faces_at(p) {
+            scene.add_flag(id, state::HOVER | state::OUTLINE);
+            scene.hover_outline = true;
+            scene.hover_outline_rgb = Some([0xff, 0xc2, 0x0e]);
         }
     }
     for d in &h.dots {
@@ -876,44 +973,9 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     for i in 0..h.connectors.len() {
         scene.set_state(overlay_id(built, OverlayPick::Connector(i)), 0);
     }
-    // Onshape's mate glyph (assembly/41-43): a small square lying in the
-    // connector plane, a white piece and a light-blue L inside a dark
-    // outline (red when failing, gray when inactive, amber outline when
-    // hovered or selected).
-    for (i, (f, half, hl, st)) in h.mate_glyphs.iter().enumerate() {
-        let id = overlay_id(built, OverlayPick::Mate(i));
-        let (u, v, n) = (f.x(), f.y(), f.z());
-        let lift = n * (*half * 0.02);
-        let at = |a: f64, b: f64| -> [f32; 3] { (f.origin + lift + u * (a * half) + v * (b * half)).as_vec3().into() };
-        let outline = match (hl, st) {
-            (true, _) => HANDLE_HL,
-            (_, MateGlyphState::Error) => theme::rgb8(theme::viewport::ERROR),
-            _ => DARK,
-        };
-        // Filled with dense on-top strokes (meshes can't draw over the
-        // parts): white top band and notch, light-blue L around them.
-        let mut fill = |a0: f64, b0: f64, a1: f64, b1: f64, color: [u8; 4]| {
-            let rows = ((b1 - b0) / 0.18).ceil().max(1.0) as usize;
-            for r in 0..=rows {
-                let b = b0 + (b1 - b0) * r as f64 / rows as f64;
-                ol.segments.push(LineSegment { a: at(a0, b), b: at(a1, b), color, pick_id: id, width: 4.0, style: LineSegment::ON_TOP });
-            }
-        };
-        const WHITE: [u8; 4] = [255, 255, 255, 255];
-        let l = if *st == MateGlyphState::Inactive { [0xc8, 0xc8, 0xc8, 255] } else { [0x90, 0xce, 0xf1, 255] };
-        fill(-0.45, -0.2, 1.0, 1.0, WHITE);
-        fill(-0.45, -0.6, 0.3, -0.2, WHITE);
-        fill(-1.0, -1.0, -0.45, 1.0, l);
-        fill(-0.45, -1.0, 1.0, -0.6, l);
-        fill(0.3, -0.6, 1.0, -0.2, l);
-        let edge = |a: (f64, f64), b: (f64, f64)| LineSegment { a: at(a.0, a.1), b: at(b.0, b.1), color: outline, pick_id: id, width: if *hl { 2.0 } else { 1.2 }, style: LineSegment::ON_TOP };
-        for (a, b) in [((-1.0, -1.0), (1.0, -1.0)), ((1.0, -1.0), (1.0, 1.0)), ((1.0, 1.0), (-1.0, 1.0)), ((-1.0, 1.0), (-1.0, -1.0))] {
-            ol.segments.push(edge(a, b));
-        }
-        for (a, b) in [((-0.45, 1.0), (-0.45, -0.6)), ((-0.45, -0.6), (0.3, -0.6)), ((0.3, -0.6), (0.3, -0.2)), ((0.3, -0.2), (1.0, -0.2))] {
-            ol.segments.push(LineSegment { width: 1.0, ..edge(a, b) });
-        }
-        scene.set_state(id, 0);
+    // Mate glyphs: drawn and picked at screen size by the view ([`MateGlyphs`]); their pick ids here.
+    for i in 0..h.mate_glyphs.len() {
+        scene.set_state(overlay_id(built, OverlayPick::Mate(i)), 0);
     }
     if let Some((f, size, hovered)) = &h.manipulator {
         // Onshape's triad (assembly/12): every part drawn as a hollow

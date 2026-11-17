@@ -911,6 +911,83 @@ fn a_section_view_waits_where_it_was_placed_for_its_depth_entity(cx: &mut TestAp
 }
 
 
+/// live2 asm-feel (6), section-q (2): Angular with Cut angle unticked takes three clicks. The first (a view corner)
+/// starts the line, which pivots about it toward the pointer; the second (the opposite corner) fixes it through that
+/// point; the third places the view, which slides only along the cut's normal before it.
+#[gpui::test]
+fn an_angular_section_without_a_cut_angle_takes_its_line_from_two_clicks(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Tool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "section-angular-free");
+    real_sheet(cx, window, &editor);
+    let views = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing.sheets[0].views.len());
+    let before = views(cx);
+    // The first view's lower-left and upper-right corners (sheet mm).
+    let (lo, hi) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let pts: Vec<[f64; 2]> = g.snaps.iter().map(|s| pl.to_sheet(s.p)).collect();
+        let lo = pts.iter().copied().min_by(|a, b| (a[0] + a[1]).total_cmp(&(b[0] + b[1]))).expect("a vertex");
+        let hi = pts.iter().copied().max_by(|a, b| (a[0] + a[1]).total_cmp(&(b[0] + b[1]))).expect("a vertex");
+        (lo, hi)
+    });
+    let click = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, w, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = at;
+                e.update_preview(cx);
+                e.tool_click(w, cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+    };
+    cx.update_window(window, |_, w, cx| {
+        editor.update(cx, |e, cx| {
+            e.set_tool(Tool::Section { parent: None, p0: None, line: None, partial: false, jogs: vec![] }, cx);
+            e.sync_section_dlg(w, cx);
+            e.set_section_mode(2, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    click(cx, lo);
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Section { p0: Some(_), line: None, .. })), "the first click starts the line");
+    click(cx, hi);
+    let dir = cx.update(|cx| {
+        let e = editor.read(cx);
+        let Tool::Section { parent: Some(pid), line: Some((a, b)), .. } = &e.tool else { panic!("the second click fixes the line") };
+        let pl = e.placement(*pid).unwrap();
+        let (a, b) = (pl.to_sheet(*a), pl.to_sheet(*b));
+        let l = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
+        [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
+    });
+    let want = {
+        let l = ((hi[0] - lo[0]).powi(2) + (hi[1] - lo[1]).powi(2)).sqrt();
+        [(hi[0] - lo[0]) / l, (hi[1] - lo[1]) / l]
+    };
+    assert!((dir[0] * want[1] - dir[1] * want[0]).abs() < 1e-6, "the line runs corner to corner: {dir:?} vs {want:?}");
+    // The view hangs on the pointer: a move along the cut doesn't move it.
+    let pending = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, _, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = at;
+                e.update_preview(cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+        cx.update(|cx| editor.read(cx).pending_view().map(|v| v.position)).expect("the view on the pointer")
+    };
+    let off = [hi[0] + 60.0 * want[1], hi[1] - 60.0 * want[0]];
+    let p1 = pending(cx, off);
+    let p2 = pending(cx, [off[0] + 20.0 * want[0], off[1] + 20.0 * want[1]]);
+    assert!((p1[0] - p2[0]).abs() < 1e-6 && (p1[1] - p2[1]).abs() < 1e-6, "it slides only along the cut's normal: {p1:?} {p2:?}");
+    click(cx, off);
+    assert_eq!(views(cx), before + 1, "the third click places the view");
+}
+
 /// Every right-click menu of ours, one entity of each kind, as live's dumps have them (live2 11-14,
 /// dom/context-menus-drawing*.txt, nothing copied: no Paste; Add comment is cloud-only). `MENUDUMP <json>` prints them
 /// all ({entity: [rows]}, separators "——", a submenu's label with " ▸") for docs/parity/drawing-matrix.md.

@@ -215,6 +215,9 @@ mod open;
 #[cfg(test)]
 #[path = "assembly_ui_tests.rs"]
 mod ui_tests;
+#[cfg(test)]
+#[path = "assembly_feel_tests.rs"]
+mod feel_tests;
 pub use toolbar::{AsmToolbarPrefs, shortcut_catalog};
 pub use standard_content::*;
 
@@ -1136,8 +1139,10 @@ impl AssemblyView {
             h.hover_entity = Some((t.path.clone(), t.reference.clone()));
             // Live (behaviours "Assembly selection model" (1)): a hovered face
             // shows its boundary edges orange, no fill.
+            // Live2 asm-feel (3b): and the part's silhouette, only that part's inside a subassembly.
             if t.kind == PickKind::Face {
                 h.hover_outline = Some((t.path.clone(), t.reference.clone()));
+                h.hover_part = Some(t.path.clone());
             }
         }
         let mate_glyph = |h: &mut Highlights, ms: &noshape_model::assembly::eval::MateStatus, strong: bool, scale: f64| {
@@ -1307,7 +1312,13 @@ impl AssemblyView {
                     } else {
                         assembly_scene::MateGlyphState::Ok
                     };
-                    h.mate_glyphs.push((f, size * 0.17, hl, st));
+                    h.mate_glyphs.push((f, hl, st));
+                    // A hovered glyph outlines the part it sits on (live2 asm-feel (3)).
+                    if hovered_overlay == Some(OverlayPick::Mate(i))
+                        && let Some(m) = asm.mate(ms.id)
+                    {
+                        h.accent_tops.push(if ms.frame_b.is_some() { m.b.instance } else { m.a.instance });
+                    }
                     overlay_mates.push(ms.id);
                 }
             }
@@ -1438,6 +1449,9 @@ impl AssemblyView {
         for (f, s, _, o) in &h.connectors {
             sig.extend([f.origin.x, f.origin.y, f.origin.z, f.rotation.x, f.rotation.y, f.rotation.z, *s, f64::from(*o)]);
         }
+        for (f, _, _) in &h.mate_glyphs {
+            sig.extend([f.origin.x, f.origin.y, f.origin.z, f.rotation.x, f.rotation.y, f.rotation.z]);
+        }
         let geometry_changed = geometry_changed || sig != self.overlay_sig;
         self.overlay_sig = sig;
         // Live 3d.json explicit_mate_connector: the 36 px disc of the Part Studio's connectors, its pick the disc.
@@ -1447,6 +1461,10 @@ impl AssemblyView {
                 (f.origin, f.x(), f.z(), look, assembly_scene::overlay_id(built, OverlayPick::Connector(i)))
             });
             crate::scene_builder::ConnectorGlyphs::picked(items) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
+        });
+        let mate_glyphs: Option<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = (!h.mate_glyphs.is_empty()).then(|| {
+            let items = h.mate_glyphs.iter().enumerate().map(|(i, (f, hl, st))| (*f, assembly_scene::overlay_id(built, OverlayPick::Mate(i)), *hl, *st)).collect();
+            std::sync::Arc::new(assembly_scene::MateGlyphs { items }) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
         });
         // Live (mates.json after_second_pick): a mate's axes 50 px long at any zoom; the triads' relative sizes kept.
         let base = self.triad_size();
@@ -1474,7 +1492,7 @@ impl AssemblyView {
             } else {
                 snapping.then_some(crate::cursor::AppCursor::SnapMate)
             };
-            vp.set_camera_geometry(marks.into_iter().chain(connector_glyphs).chain(screen_triads).collect(), cx);
+            vp.set_camera_geometry(marks.into_iter().chain(connector_glyphs).chain(mate_glyphs).chain(screen_triads).collect(), cx);
             vp.set_scene(Arc::new(scene), geometry_changed, cx)
         });
     }
@@ -3962,9 +3980,7 @@ impl AssemblyView {
         let dyn_suppressed = suppressed && inst.is_some_and(|i| i.unsuppressed_if.is_some());
         // Live E15: "Part 2 <1> has error: Failed to resolve instance." (the badge repeats it).
         // A pattern copy in error (live 1754 (C)) is red with just its name.
-        // A plain name's tooltip shows only when the name is cut off (live2 06:1x: a row whose name fits has none).
-        let plain_tip = error.as_ref().is_none_or(|e| e.is_empty()) && !dyn_suppressed;
-        let has_state = state.is_some();
+        // Every row's label has its name as its tooltip, cut off or not (live2 asm-feel2 (a)).
         let row_tip: SharedString = if let Some(e) = error.as_ref().filter(|e| !e.is_empty()) {
             format!("{name} has error: {e}").into()
         } else if dyn_suppressed {
@@ -4131,15 +4147,7 @@ impl AssemblyView {
                 )
             })
             .when(!crate::os_menu::is_open(cx), |d| {
-                // The name's room: the list's width less the row's indent, expander, icon, state glyphs and the eye.
-                let room = crate::ui::left_panel_w(self.tab) - (7. + depth as f32 * 22.) - 12. - 20. - 3. * 4. - if fixed { 20. } else { 0. } - if has_state { 40. } else { 0. } - if is_top { 24. } else { 0. };
-                d.tooltip(move |w, cx| {
-                    if plain_tip && crate::ui::text_width(w, &row_tip, crate::ui::ROW_TEXT) <= room {
-                        return cx.new(|_| gpui_kit::Empty).into();
-                    }
-                    gpui_kit::component::tooltip::Tooltip::new(row_tip.clone()).build(w, cx)
-                })
-                .tooltip_show_delay(crate::ui::ROW_TIP_DELAY)
+                d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(row_tip.clone()).build(w, cx)).tooltip_show_delay(crate::ui::ROW_TIP_DELAY)
             })
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 // Hovering a row highlights the instance in the graphics area.
