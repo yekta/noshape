@@ -812,7 +812,7 @@ impl Session {
     pub fn merge_picked(&mut self, from: MicroversionId, from_name: &str, from_branch: Option<BranchId>, pick: impl FnMut(&str) -> noshape_store::MergePick) -> Result<noshape_store::MergeOutcome> {
         let outcome = self.store.merge_with(from, from_name, from_branch, self.branch, pick, |name, base, ours, theirs| {
             if name.starts_with("tab/") {
-                noshape_model::merge::merge_tab_blobs(base, ours, theirs)
+                noshape_model::merge::merge_from_source(base, ours, theirs)
             } else {
                 ours.map(|o| o.to_vec())
             }

@@ -1,8 +1,9 @@
 //! Three-way merge of tabs (Onshape's "Merge changes" for a tab).
 //!
 //! Part Studios merge feature-by-feature (matched by feature id): changes
-//! made on only one side are applied; features changed on both sides keep
-//! "ours" and are reported as conflicts. Assemblies merge item by item
+//! made on only one side are applied; features changed on both sides are
+//! reported as conflicts and keep "ours", or the source's in a Merge
+//! ([`merge_from_source`]: live ver-flow-merge-same-feature, B1's name wins). Assemblies merge item by item
 //! ([`merge_json`]). Other tab kinds merge whole-tab (one-sided changes
 //! win, otherwise ours).
 
@@ -20,6 +21,11 @@ pub struct MergeReport {
 }
 
 pub fn merge_part_studio(base: &PartStudio, ours: &PartStudio, theirs: &PartStudio) -> (PartStudio, MergeReport) {
+    merge_part_studio_with(base, ours, theirs, false)
+}
+
+/// [`merge_part_studio`] where a feature changed on both sides takes theirs when `theirs_wins`.
+pub fn merge_part_studio_with(base: &PartStudio, ours: &PartStudio, theirs: &PartStudio, theirs_wins: bool) -> (PartStudio, MergeReport) {
     let mut report = MergeReport::default();
     let index = |ps: &PartStudio| -> HashMap<FeatureId, Feature> { ps.features.iter().map(|f| (f.id, f.clone())).collect() };
     let b = index(base);
@@ -40,6 +46,9 @@ pub fn merge_part_studio(base: &PartStudio, ours: &PartStudio, theirs: &PartStud
                     report.changed.push(*id);
                 } else if of != tf {
                     report.conflicts.push(*id);
+                    if theirs_wins && let Some(slot) = result.features.iter_mut().find(|f| f.id == *id) {
+                        *slot = tf.clone();
+                    }
                 }
             }
             (Some(of), None) => {
@@ -91,6 +100,16 @@ pub fn merge_part_studio(base: &PartStudio, ours: &PartStudio, theirs: &PartStud
 
 /// Merge serialized tabs; returns merged bytes (None = deleted).
 pub fn merge_tab_blobs(base: Option<&[u8]>, ours: Option<&[u8]>, theirs: Option<&[u8]>) -> Option<Vec<u8>> {
+    merge_tab_blobs_with(base, ours, theirs, false)
+}
+
+/// A Merge of `theirs` (the source) into `ours`: as [`merge_tab_blobs`], a Part Studio's feature changed on both
+/// sides taking the source's (live ver-flow-merge-same-feature: the same feature renamed on both, B1's name wins).
+pub fn merge_from_source(base: Option<&[u8]>, ours: Option<&[u8]>, theirs: Option<&[u8]>) -> Option<Vec<u8>> {
+    merge_tab_blobs_with(base, ours, theirs, true)
+}
+
+fn merge_tab_blobs_with(base: Option<&[u8]>, ours: Option<&[u8]>, theirs: Option<&[u8]>, theirs_wins: bool) -> Option<Vec<u8>> {
     let parse = |b: Option<&[u8]>| {
         let mut tab = b.and_then(|b| serde_json::from_slice::<Tab>(b).ok())?;
         match &mut tab.content {
@@ -103,7 +122,7 @@ pub fn merge_tab_blobs(base: Option<&[u8]>, ours: Option<&[u8]>, theirs: Option<
     match (parse(base), parse(ours), parse(theirs)) {
         (Some(b), Some(mut o), Some(t)) => {
             if let (TabContent::PartStudio(bp), TabContent::PartStudio(op), TabContent::PartStudio(tp)) = (&b.content, &o.content, &t.content) {
-                let (merged, _) = merge_part_studio(bp, op, tp);
+                let (merged, _) = merge_part_studio_with(bp, op, tp, theirs_wins);
                 o.content = TabContent::PartStudio(merged);
                 if o.name == b.name {
                     o.name = t.name.clone();
@@ -263,6 +282,10 @@ mod tests {
         theirs.features[0].name = "B".into();
         let (m, r) = merge_part_studio(&base, &ours, &theirs);
         assert_eq!(m.features[0].name, "A");
+        assert_eq!(r.conflicts.len(), 1);
+        // A Merge: the source's (live ver-flow-merge-same-feature).
+        let (m, r) = merge_part_studio_with(&base, &ours, &theirs, true);
+        assert_eq!(m.features[0].name, "B");
         assert_eq!(r.conflicts.len(), 1);
     }
 }

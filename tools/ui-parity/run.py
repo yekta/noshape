@@ -1152,6 +1152,13 @@ def compare(live, ours, whole_document=True):
         nx = steps[i + 1]
         if (nx.get("do") or {}).get("do") == "wait" and isinstance((nx.get("state") or {}).get("undo"), dict):
             late_undo[f"step {st.get('step')}"] = nx["state"]["undo"]
+    # Likewise a modal live fills in after its server's answer ("Adding selection to Release candidate…", the added rows
+    # by the next step's wait: live2 rel-flow-two-parts), ours at once.
+    late_modal = {}
+    for i, st in enumerate(steps[:-1]):
+        nx = steps[i + 1]
+        if (nx.get("do") or {}).get("do") == "wait" and isinstance((nx.get("state") or {}).get("dialog"), dict) and (nx["state"]["dialog"].get("kind") == "modal"):
+            late_modal[f"step {st.get('step')}"] = nx["state"]["dialog"]
     # A wait never adds or removes a centermark: where live's count changes over one, its reader lists the take's
     # centermarks only some of the time (the plate's hole: 1, 1, 1, 0 after a plain wait, 0, 1, 0, 1 in live2
     # drw-centermark-align; one read before any was placed in drw-centermark), so they aren't compared there.
@@ -1483,6 +1490,9 @@ def compare(live, ours, whole_document=True):
             a["undo"] = b["undo"]
         old_dimension_pick(a, b, str(live.get("recorded") or ""))
         recorder_form(b, live)
+        nm, bd = late_modal.get(name), (b or {}).get("dialog") if isinstance(b, dict) else None
+        if isinstance(a, dict) and isinstance(nm, dict) and isinstance(bd, dict) and a.get("dialog") != bd and all(nm.get(k) == bd.get(k) for k in ("title", "fields", "buttons")):
+            a["dialog"] = nm
         panel_fields_unread(a, b, str(live.get("recorded") or ""))
         panel_list_over_view(a, b)
         if centermarks_unread:

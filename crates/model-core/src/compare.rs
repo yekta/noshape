@@ -323,7 +323,9 @@ fn param_text(v: &ParamValue, spec: Option<&crate::params::ParamSpec>, studio: &
 /// features only in `target` after the feature they follow there.
 pub fn compare_features(base: &PartStudio, target: &PartStudio) -> Vec<FeatureCompare> {
     let row = |a: Option<&Feature>, b: Option<&Feature>| -> FeatureCompare {
-        let f = b.or(a).expect("one side");
+        // (A feature renamed on one side reads by the base's name: live ver-flow-branch-version-merge, Main's "B1 base"
+        // against V1's "Extrude 1".)
+        let f = a.or(b).expect("one side");
         let ty = f.feature_type();
         let mut ids: Vec<&str> = Vec::new();
         for side in [a, b].into_iter().flatten() {
@@ -582,6 +584,22 @@ mod tests {
         // Suppression shows as its own row.
         assert!(ex.params.iter().any(|p| p.label == "Suppressed" && !p.differs()));
         assert!(rows.iter().filter(|r| r.type_id != "extrude" && r.type_id != "chamfer").all(|r| r.status.is_none()));
+    }
+
+    /// Live ver-flow-branch-version-merge: a feature renamed in the base reads by the base's name (Main's "B1 base"
+    /// compared with V1's "Extrude 1").
+    #[test]
+    fn a_renamed_feature_reads_by_the_base_name() {
+        let target = crate::demo::plate_document();
+        let mut base = target.clone();
+        let tab = base.tabs.iter().position(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap();
+        let TabContent::PartStudio(ps) = &mut base.tabs[tab].content else { unreachable!() };
+        let ex = ps.features.iter_mut().find(|f| f.type_id == "extrude").unwrap();
+        ex.name = "B1 base".into();
+        let id = ex.id;
+        let (TabContent::PartStudio(a), TabContent::PartStudio(b)) = (&base.tabs[tab].content, &target.tabs[tab].content) else { unreachable!() };
+        let row = compare_features(a, b).into_iter().find(|r| r.id == id).unwrap();
+        assert_eq!((row.name.as_str(), row.status), ("B1 base", Some(ChangeKind::Modified)));
     }
 
     #[test]

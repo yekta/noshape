@@ -123,7 +123,8 @@ pub struct AddItemsDialog {
     doc: Entity<DocModel>,
     kind: usize,
     search: Entity<InputState>,
-    expanded: Vec<TabId>,
+    /// Part Studio rows the user closed (live2 rel-flow-two-parts: they open expanded).
+    collapsed: Vec<TabId>,
     picked: Vec<ReleaseItem>,
     /// Configured Part Studios (Help: Releasing a configuration): the inputs
     /// as edited, and the configuration last generated (its parts are listed).
@@ -173,7 +174,7 @@ fn open_add_dialog(doc: Entity<DocModel>, obsolete: bool, existing: Vec<ReleaseI
         });
         let url = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search or paste URL"));
         let browse = add_source::Browse { filter: None, query: None, docs: None, url };
-        AddItemsDialog { doc, kind: 0, search, expanded: Vec::new(), picked: Vec::new(), pending: Default::default(), configs: Default::default(), text_inputs: Default::default(), config_menu: None, obsolete, on_add: std::rc::Rc::new(on_add), thumbs: Default::default(), requested: Default::default(), other: false, existing, source: None, browse, error: None, _sub: sub }
+        AddItemsDialog { doc, kind: 0, search, collapsed: Vec::new(), picked: Vec::new(), pending: Default::default(), configs: Default::default(), text_inputs: Default::default(), config_menu: None, obsolete, on_add: std::rc::Rc::new(on_add), thumbs: Default::default(), requested: Default::default(), other: false, existing, source: None, browse, error: None, _sub: sub }
     });
     window.open_dialog(cx, move |dialog, _, _| release_modal(dialog).w(px(860.)).child(view.clone()));
 }
@@ -441,16 +442,17 @@ impl Render for AddItemsDialog {
             Entry::Tab(it, _) => !taken(it),
         });
         // As live's recorder reads it (rel-rc-add-items): the document's name as its title, the type tabs, the search
-        // box and the rows (a Part Studio, its parts under it).
+        // box and the rows (a Part Studio, its parts under it), never checked (live2 rel-flow-two-parts: no checkboxes, a
+        // click selects the row).
         crate::ui_script::note_dialog(|| {
             let mut fields = vec![serde_json::json!({ "label": ADD_KINDS[self.kind].1, "kind": "string", "text": self.search.read(cx).value().to_string() })];
             for e in &entries {
                 match e {
-                    Entry::Studio(_, name, parts, _) => {
+                    Entry::Studio(tab, name, parts, _) => {
                         fields.push(serde_json::json!({ "label": name, "kind": "boolean", "checked": false, "child": false }));
-                        fields.extend(parts.iter().map(|p| serde_json::json!({ "label": p.name, "kind": "boolean", "checked": self.picked.iter().any(|x| x.same_object(p)), "child": true })));
+                        fields.extend(parts.iter().filter(|_| !self.collapsed.contains(tab)).map(|p| serde_json::json!({ "label": p.name, "kind": "boolean", "checked": false, "child": true })));
                     }
-                    Entry::Tab(it, _) => fields.push(serde_json::json!({ "label": it.name, "kind": "boolean", "checked": self.picked.iter().any(|x| x.same_object(it)), "child": false })),
+                    Entry::Tab(it, _) => fields.push(serde_json::json!({ "label": it.name, "kind": "boolean", "checked": false, "child": false })),
                 }
             }
             let tabs: Vec<serde_json::Value> = ADD_KINDS.iter().enumerate().map(|(i, (l, _))| serde_json::json!({ "label": l, "selected": i == self.kind })).collect();
@@ -470,7 +472,7 @@ impl Render for AddItemsDialog {
             match e {
                 Entry::Studio(tab, _, parts, _) => {
                     wanted.push(studio_item(*tab, self.configs.get(tab).cloned().unwrap_or_default()));
-                    if self.expanded.contains(tab) {
+                    if !self.collapsed.contains(tab) {
                         wanted.extend(parts.iter().cloned());
                     }
                 }
@@ -513,7 +515,10 @@ impl Render for AddItemsDialog {
             match e {
                 Entry::Studio(tab, name, parts, cfg) => {
                     // A Part Studio row expands to its parts; parts are picked.
-                    let open = self.expanded.contains(&tab);
+                    let open = !self.collapsed.contains(&tab);
+                    if open {
+                        self.load_source_parts(tab, cx);
+                    }
                     tree = tree.child(
                         h_flex()
                             .id(SharedString::from(format!("add-ps-{}", tab.0)))
@@ -525,11 +530,11 @@ impl Render for AddItemsDialog {
                             .child(div().w(px(70.)).flex().justify_center().child(picture(&studio_item(tab, self.configs.get(&tab).cloned().unwrap_or_default()), 40., "part-studio", cx)))
                             .child(div().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(name)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                if let Some(i) = this.expanded.iter().position(|x| *x == tab) {
-                                    this.expanded.remove(i);
-                                } else {
-                                    this.expanded.push(tab);
+                                if let Some(i) = this.collapsed.iter().position(|x| *x == tab) {
+                                    this.collapsed.remove(i);
                                     this.load_source_parts(tab, cx);
+                                } else {
+                                    this.collapsed.push(tab);
                                 }
                                 cx.notify();
                             })),
@@ -643,7 +648,7 @@ impl Render for AddItemsDialog {
                     if this.other != other {
                         this.other = other;
                         this.source = None;
-                        this.expanded.clear();
+                        this.collapsed.clear();
                         this.error = None;
                     }
                     cx.notify();

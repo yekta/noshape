@@ -252,7 +252,7 @@ impl AddItemsDialog {
         match Source::load(path.clone(), false, Some(0)) {
             Ok(s) => {
                 self.source = Some(s);
-                self.expanded.clear();
+                self.collapsed.clear();
             }
             Err(e) => self.error = Some(format!("Could not open {}: {e:#}", path.display())),
         }
@@ -334,7 +334,7 @@ impl AddItemsDialog {
                         .child(crate::ui::glyph("chevron-left", 16., pal.text))
                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.source = None;
-                            this.expanded.clear();
+                            this.collapsed.clear();
                             cx.notify();
                         })),
                 )
@@ -459,7 +459,7 @@ impl AddItemsDialog {
                     d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         // The workspace is the plain Current document list.
                         this.source = None;
-                        this.expanded.clear();
+                        this.collapsed.clear();
                         cx.notify();
                     }))
                 }),
@@ -480,7 +480,7 @@ impl AddItemsDialog {
                         if let Some(s) = &mut this.source {
                             s.choose(Some(i));
                         }
-                        this.expanded.clear();
+                        this.collapsed.clear();
                         cx.notify();
                     })),
             );
