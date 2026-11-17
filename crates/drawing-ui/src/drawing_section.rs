@@ -449,51 +449,53 @@ impl DrawingEditor {
                             cx.notify();
                         })))))
                         // Ticked, its field takes the keyboard (live2 drw-section-tabs-angular: Esc then leaves the panel open).
-                        .when(mode == 2, |e| e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-angle").label("Cut angle").checked(angle_on).on_click(cx.listener(|this, v: &bool, window, cx| {
-                            if let Some(d) = &mut this.section_dlg {
-                                d.angle_on = *v;
-                                if let Some((st, _)) = d.angle_input.as_ref().filter(|_| *v) {
-                                    st.update(cx, |s, cx| s.focus(window, cx));
-                                }
-                            }
-                            this.update_preview(cx);
-                            cx.notify();
-                        })))))
-                        .when_some(d.angle_input.as_ref().filter(|_| mode == 2 && angle_on).map(|x| x.0.clone()), |e, st| {
+                        // Live2 section-q (2): ticked, the row reads "Cut angle [45 deg] ↻" (the field and a reverse
+                        // button on it), the field taking the keyboard (Esc then leaves the panel open).
+                        .when(mode == 2, |e| {
+                            let field = d.angle_input.as_ref().map(|x| x.0.clone()).filter(|_| angle_on);
                             e.child(
                                 h_flex()
                                     .h(px(30.))
-                                    .px(px(6.))
+                                    .px(px(4.))
                                     .gap(px(6.))
-                                    .child(div().text_size(px(12.)).text_color(pal.text_muted).child("Cut angle"))
-                                    // Esc in the field leaves it, not the panel.
-                                    .child(div().flex_1().capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
-                                        if e.keystroke.key == "escape" {
-                                            cx.stop_propagation();
-                                            window.focus(&this.focus, cx);
+                                    .child(crate::drawing_chrome::DrCheckbox::new("ds-cut-angle").label("Cut angle").checked(angle_on).on_click(cx.listener(|this, v: &bool, window, cx| {
+                                        if let Some(d) = &mut this.section_dlg {
+                                            d.angle_on = *v;
+                                            if let Some((st, _)) = d.angle_input.as_ref().filter(|_| *v) {
+                                                st.update(cx, |s, cx| s.focus(window, cx));
+                                            }
                                         }
-                                    })).child(Input::new(&st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small()))
-                                    .child(
-                                        div()
-                                            .id("ds-opposite")
-                                            .size(px(24.))
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .border_1()
-                                            .border_color(gpui_kit::rgb(0xd3d7d9))
-                                            .when(opp, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
-                                            .cursor_pointer()
-                                            .tooltip(crate::ui::tooltip("Opposite direction"))
-                                            .child(crate::assets::icon(&crate::assets::icon_path("flip"), 16., cx))
-                                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                                if let Some(d) = &mut this.section_dlg {
-                                                    d.opposite = !d.opposite;
-                                                }
-                                                this.update_preview(cx);
-                                                cx.notify();
-                                            })),
-                                    ),
+                                        this.update_preview(cx);
+                                        cx.notify();
+                                    })))
+                                    .when_some(field, |r, st| {
+                                        r.child(div().flex_1().capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                                            if e.keystroke.key == "escape" {
+                                                cx.stop_propagation();
+                                                window.focus(&this.focus, cx);
+                                            }
+                                        })).child(Input::new(&st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small()))
+                                        .child(
+                                            div()
+                                                .id("ds-opposite")
+                                                .size(px(24.))
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .border_1()
+                                                .border_color(gpui_kit::rgb(0xd3d7d9))
+                                                .when(opp, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
+                                                .cursor_pointer()
+                                                .child(crate::assets::icon(&crate::assets::icon_path("flip"), 16., cx))
+                                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                                    if let Some(d) = &mut this.section_dlg {
+                                                        d.opposite = !d.opposite;
+                                                    }
+                                                    this.update_preview(cx);
+                                                    cx.notify();
+                                                })),
+                                        )
+                                    }),
                             )
                         })
                         .when(of_section, |e| {

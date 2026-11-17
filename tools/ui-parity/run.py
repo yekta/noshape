@@ -785,6 +785,20 @@ def hole_callout_export_text(a, b):
                 y["text"] = tx
 
 
+def section_cut_point_read(a, b):
+    """A section's parent read EDGE while ours has nothing of it selected: live leaves an orange dot on the cutting
+    line's picked point inside the parent's box (from the Section view tool's click on), which its reader takes for a
+    picked edge (live2 section-q (1),
+    drw-section-edit-depth-direction: Top's clicked edge is drawn black)."""
+    da, db = (a or {}).get("drawing"), (b or {}).get("drawing")
+    if not (isinstance(da, dict) and isinstance(db, dict) and isinstance(da.get("selection"), list) and isinstance(db.get("selection"), list)):
+        return
+    parents = {v.get("parent") for v in da.get("views") or [] if isinstance(v, dict) and v.get("kind") == "section"}
+    picking = da.get("tool") == "Section view"
+    ours = {x.get("owner") for x in db["selection"] if isinstance(x, dict)}
+    da["selection"] = [x for x in da["selection"] if not (isinstance(x, dict) and x.get("kind") == "EDGE" and (picking or x.get("owner") in parents) and x.get("owner") not in ours)]
+
+
 def view_frame_late(a, b, step):
     """A view clicked this step: live draws its dark frame 0.25-0.4 s after the click (live2 11-15), after its recorder
     read the state, which then says EDGE for that view where ours says VIEW (drw-views-shift-select-properties,
@@ -1505,6 +1519,7 @@ def compare(live, ours, whole_document=True):
         document_loading(a, b)
         hole_callout_export_text(a, b)
         view_frame_late(a, b, step)
+        section_cut_point_read(a, b)
         placed_alike(a, b)
         click_placed_readouts(a, b, pixel)
         cloud_menu(a, b)
