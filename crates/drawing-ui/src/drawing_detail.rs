@@ -386,8 +386,10 @@ impl DrawingEditor {
             // one `#cfdbe5` with a 1 px `#9aa5af` border.
             // Live 604: once the profile exists no shape stays pressed.
             let on = shape == i as u8 && !placed && !self.detail_dlg.as_ref().is_some_and(|d| d.pick_region);
+            // (Marked by its tooltip: live's runner aims at it by pixel, ours by name, `ours_on`.)
             let btn = div()
                 .id(SharedString::from(format!("det-shape-{i}")))
+                .map(|d| crate::ui_script::mark(d, move || format!("button:{tip}")))
                 .size(px(30.))
                 .flex()
                 .items_center()
@@ -450,14 +452,19 @@ impl DrawingEditor {
         };
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings"; live 2131).
-            let mut text = vec!["Detail view", field_text];
+            let mut text = crate::drawing_panels::PanelText::default();
+            text.texts(["Detail view", field_text]);
             if chip {
-                text.extend(["Profile", "×"]);
+                text.texts(["Profile", "×"]);
             }
-            text.extend(["View scale", "View label", "Profile style"]);
-            text.extend(STYLES);
-            text.extend(["Show detail view profile", "Clip border to geometry"]);
-            serde_json::json!({ "kind": "drawing-panel", "title": "Detail view", "text": text })
+            text.texts(["View scale", "View label", "Profile style"]).options(STYLES).texts(["Show detail view profile", "Clip border to geometry"]);
+            // Profile style and the checkboxes as fields (live2 drw-detail-profile-types).
+            let fields = serde_json::json!([
+                { "label": "Profile style", "kind": "select", "value": STYLES[style as usize] },
+                { "label": "Show detail view profile", "kind": "checkbox", "value": show },
+                { "label": "Clip border to geometry", "kind": "checkbox", "value": clip },
+            ]);
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Detail view", "fields": fields }), text.0)
         });
         Some(
             v_flex()
@@ -505,6 +512,7 @@ impl DrawingEditor {
                 .child(
                     div()
                         .id("dd-profile-field")
+                        .map(|d| crate::ui_script::mark(d, || "button:Create closed profile for detail view boundary".into()))
                         .tooltip(crate::ui::tooltip("Create closed profile for detail view boundary"))
                         .mx(px(3.))
                         .mt(px(1.))

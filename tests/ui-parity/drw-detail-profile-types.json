@@ -7,14 +7,14 @@
  "steps": [
   {"do": "click", "on": {"tool": "Detail view"}},
   {"do": "wait", "until": "ms", "ms": 1500},
-  {"do": "click", "on": {"px": [91, 121]}},
+  {"do": "click", "on": {"px": [91, 121]}, "ours_on": {"button": "Rectangle"}},
   {"do": "wait", "until": "ms", "ms": 800},
-  {"do": "hover", "on": {"px": [100, 153]}},
-  {"do": "click", "on": {"px": [158, 121]}},
+  {"do": "hover", "on": {"px": [100, 153]}, "ours_on": {"button": "Create closed profile for detail view boundary"}},
+  {"do": "click", "on": {"px": [158, 121]}, "ours_on": {"button": "Polygon"}},
   {"do": "wait", "until": "ms", "ms": 800},
-  {"do": "click", "on": {"px": [124, 121]}},
+  {"do": "click", "on": {"px": [124, 121]}, "ours_on": {"button": "Spline"}},
   {"do": "wait", "until": "ms", "ms": 800},
-  {"do": "click", "on": {"px": [57, 121]}},
+  {"do": "click", "on": {"px": [57, 121]}, "ours_on": {"button": "Circle"}},
   {"do": "wait", "until": "ms", "ms": 800},
   {"do": "key", "key": "Escape"}
  ]
