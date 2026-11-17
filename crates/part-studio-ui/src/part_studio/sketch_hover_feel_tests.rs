@@ -122,3 +122,51 @@ fn sketch_hover_reach_and_priority_as_live(cx: &mut TestAppContext) {
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// The user's setup with a circle (Sketch 1 on Top, default iso, the planes behind): on its rim, 5 px inside and 5 px
+/// outside it, the circle lights (a curve's 7 px reach, live2 hov10); 12 px outside nothing of the sketch does; on its
+/// centre the centre point lights (a point beats the region it sits in).
+#[gpui::test]
+fn a_sketch_circle_and_its_centre_light_over_the_planes(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-hover-circle", Tool::Circle);
+    click(cx, window, &view, (575., 350.));
+    click(cx, window, &view, (665., 350.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let (feature, circle, centre, c, rim) = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        let data = v.sketch_data(cx).unwrap();
+        let vp = v.viewport.read(cx);
+        let circle = data.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Circle).unwrap().id;
+        let centre = data.sketch.entity(circle).unwrap().center().unwrap();
+        let Some(noshape_sketch::Curve2::Circle { center, radius }) = data.sketch.curve(circle) else { panic!("a circle") };
+        let screen = |q: DVec2| vp.project(ed.frame.to_world(q)).unwrap();
+        let rim: Vec<DVec2> = (0..8).map(|k| screen(center + DVec2::from_angle(k as f64 * 45f64.to_radians()) * radius)).collect();
+        (ed.feature, circle.0, centre.0, screen(center), rim)
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    let is = |r: &Option<Reference>, id: u32| matches!(r, Some(Reference::SketchEntity { sketch, entity }) if *sketch == feature && *entity == id);
+    let mut wrong = Vec::new();
+    for at in &rim {
+        let out = (*at - c).normalize();
+        for (d, lit) in [(0.0, true), (-5.0, true), (5.0, true), (12.0, false)] {
+            pointer.move_to(cx, &view, *at + out * d);
+            let got = hovered(cx, &view);
+            if is(&got, circle) != lit {
+                wrong.push(format!("{d:+} px off the rim at ({:.0}, {:.0}): lit {got:?}", at.x, at.y));
+            }
+            if !lit && matches!(&got, Some(Reference::SketchEntity { sketch, .. }) if *sketch == feature) {
+                wrong.push(format!("{d:+} px off the rim: the sketch still lit {got:?}"));
+            }
+        }
+    }
+    pointer.move_to(cx, &view, c);
+    let got = hovered(cx, &view);
+    if !is(&got, centre) {
+        wrong.push(format!("on the centre: lit {got:?}, not the centre point"));
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
