@@ -49,19 +49,19 @@ rebase conflict. Deeper dependents' tests run in the watcher after the push. Doc
 Main red from a pushed change means land.sh wasn't used. A flaky test (passes alone, fails in parallel, or fails now
 and then) goes to T2 at once with a ticket for its owner.
 
-## Building and testing on vibe5 / vibex6 / vibex7: `tools/tiers/rb.sh` (lead, 11-01)
+## Building and testing on the build hosts: `tools/tiers/rb.sh` (lead, 11-01)
 
-Run builds and tests on vibe5, not on this machine (agents' builds kept it at 2–3× its cores and agents spent ~80 % of
+Run builds and tests on a build host, not on this machine (agents' builds kept it at 2–3× its cores and agents spent ~80 % of
 their day waiting on compiles). `tools/tiers/rb.sh <command>` syncs your worktree as it is (uncommitted changes too)
-to your build server (tools/tiers/rb-hosts: vibe5 for the kernel agents and the land checks, vibex6 and vibex7 for the UI
-agents), runs the command there in your worktree's own warm target dir and streams the output; its exit code is the
+to your build server (tools/tiers/rb-hosts), runs the command there in your worktree's own warm target dir and streams the output; its exit code is the
 command's. `--get <bin>` copies a built binary back into `$CARGO_TARGET_DIR/debug/` to run the app here (GUI checks).
 Measured: noshape-model's test build cold 188 s, unchanged 7 s, after a one-line model-core change 11 s.
 ```
 tools/tiers/rb.sh cargo test -p noshape-brep --lib
 tools/tiers/rb.sh --get noshape cargo build -p noshape   # then run $CARGO_TARGET_DIR/debug/noshape here
 ```
-Heavy jobs (replay corpora, long probes, sweeps) run there too: vibe5 has 16 cores and 29 GB of memory, vibex6 and vibex7 8 cores and 29 GB each.
+Heavy jobs (replay corpora, long probes, sweeps) run there too, through `~/bin/slot`: vibe2 has 16 cores and 30 GB of
+memory, vibex6, vibex7 and vibex8 8 cores and 29 GB each. vibex6 also runs main's watcher, vibex7 the land queue.
 
 ## CI on GitHub (`ci.yml`, cliapp 11-01)
 

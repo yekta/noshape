@@ -1,7 +1,7 @@
 #!/bin/bash
-# rb.sh: run a build or test command on a build server (vibe4 or vibe5 per tools/tiers/rb-hosts) instead of this machine,
+# rb.sh: run a build or test command on a build server (per tools/tiers/rb-hosts) instead of this machine,
 # which agents' builds kept at 2-3x its cores (11-01: building agents spent ~80% of their day waiting on compiles).
-# Syncs this worktree as it is (uncommitted changes included; not .git, not target dirs) to vibe4:~/agents/<worktree>/src,
+# Syncs this worktree as it is (uncommitted changes included; not .git, not target dirs) to the host's ~/agents/<worktree>/src,
 # runs the command there with that worktree's own target dir (~/agents/<worktree>/target, kept warm between runs) and
 # streams its output; the exit code is the command's.
 #   tools/tiers/rb.sh cargo test -p noshape-brep --lib
@@ -12,7 +12,7 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 name=$(basename "$PWD"); dir="agents/$name"
-# The host: NOSHAPE_RB_HOST, else this worktree's line in tools/tiers/rb-hosts, else vibe4 (also when that one is down).
+# The host: NOSHAPE_RB_HOST, else this worktree's line in tools/tiers/rb-hosts, else vibex7 (also when that one is down).
 host=${NOSHAPE_RB_HOST:-}
 if [ -z "$host" ]; then
   while read -r pat h; do
