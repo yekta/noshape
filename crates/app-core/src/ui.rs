@@ -697,34 +697,32 @@ pub fn tool_caret(id: impl Into<ElementId>, cx: &App) -> Button {
         .rounded_r(px(3.))
 }
 
-/// A keyboard shortcut chip (`shift`, `f`): 11 px text in a 1 px `#aaa`
-/// box with 2 px radius, as in Onshape's menus and the tool search box.
-pub fn shortcut_chip(text: impl Into<SharedString>) -> Div {
-    let pal = p();
-    div().px(px(4.)).h(px(18.)).flex().items_center().rounded(px(2.)).border_1().border_color(pal.field_outline).bg(pal.panel).text_size(px(11.)).text_color(pal.text).child(text.into())
-}
-
-/// Shortcut chips for an Onshape shortcut string such as "shift-f" or "ctrl+m".
+/// A toolbar dropdown row's shortcut chips for an Onshape shortcut string such as "shift-f" or "ctrl+m" (live2
+/// feel/shadows "Toolbar dropdown list box model": `.shortcut-key` min-width 17, padding 0 2px, 1 px #AAA border,
+/// radius 2, 11 px on a 16.5 px line, no background, touching). They sit on the foot of their 22.5 px line, as live's
+/// inline blocks on its baseline.
 pub fn shortcut_chips(shortcut: &str) -> Div {
     let keys: Vec<String> = shortcut.split(['-', '+']).filter(|k| !k.is_empty()).map(|k| k.to_lowercase()).collect();
-    h_flex().gap(px(2.)).children(keys.into_iter().map(shortcut_chip))
+    let pal = p();
+    h_flex().h(px(22.5)).items_end().children(keys.into_iter().map(move |k| {
+        div().min_w(px(17.)).px(px(2.)).h(px(19.5)).flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(gpui::rgb(0xaaaaaa)).text_size(px(11.)).line_height(px(16.5)).text_color(pal.text).child(k)
+    }))
 }
 
-/// A toolbar dropdown row (§3.2, measured live): 32 px tall (35 with chips), a 20 px
-/// full-color icon in a 30 px cell, the name at 14 px and the shortcut
-/// chips at the right. Add `.on_click` to the result.
+/// A toolbar dropdown row (live2 feel/shadows "Toolbar dropdown list box model"): 32 px tall (34.5 with chips), the
+/// 20 px full-color icon at the list's left + 8, the name at 14 px from + 32, the shortcut chips 8 px in from the
+/// right. Add `.on_click` to the result.
 pub fn menu_tool_item(name: &'static str, icon: &str, shortcut: Option<&'static str>) -> gpui_kit::component::menu::PopupMenuItem {
     let icon = icon.to_string();
     gpui_kit::component::menu::PopupMenuItem::element(move |_, cx| {
         let pal = p();
         let row = h_flex()
             .relative()
-            // Live menus/ps-dropdown-01: a row with shortcut chips is 35 px tall, one without 32; the name right
-            // after the 30 px icon cell.
-            .h(px(if shortcut.is_some() { 35. } else { 32. }))
+            // (The row's own 6 px padding: 5 here and the menu item's 1.)
+            .h(px(if shortcut.is_some() { 34.5 } else { 32. }))
             .w_full()
-            .child(div().w(px(30.)).flex_none().flex().items_center().justify_center().child(assets::icon(&icon, TOOL_ICON, cx)))
-            .child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(name))
+            .child(div().pl(px(5.)).flex_none().flex().items_center().child(assets::icon(&icon, TOOL_ICON, cx)))
+            .child(div().flex_1().mx(px(4.)).text_size(px(14.)).text_color(pal.text).child(name))
             .children(shortcut.map(shortcut_chips));
         crate::ui_script::mark(row, || format!("menu:{name}"))
     })

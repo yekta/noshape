@@ -113,27 +113,29 @@ docs/DECISIONS.md (read first; it wins over anything here).
    it: ui.rs `shortcut_chips` / `menu_tool_item`, `shortcut_chip` removed as unused; popup_menu.rs tool_list item
    pr 7 → 6). Next: build, screenshot a Fillet ⌄ / Sheet metal ⌄ list (fb5/tb.json), compare with live's
    tooldd-fillet-page.png / tooldd-sheetmetal-page.png, then land.
-3. Sketch selection readouts, live's answer (11-17, live/psui/sketch-readouts.json + crops, behaviours.md): circle
-   alone: circle icon + "Diameter"; arc alone: arc icon + "Radius"; pairs no icon. Point+circle, point+arc,
-   line+arc: Min | Max | Center dist (line+arc Max on the arc's real extent, 94.868 not 95.44; Center line→arc
-   centre). Circle+arc, two arcs, circle+circle: Center | Max | Min (r10/r5 concentric 0/15/5; r10/r3 2 mm apart
-   2/15/5). Point on a line: "Min dist: 0.000 mm" only. Label order by the kinds, not the selection order.
-   Ours: scene/sketch_mode.rs `selection_readout` (two points, point+line, two circles done 11-16).
+3. Sketch selection readouts: done, landed e1ce5e41.
 
 ## In progress (11-17, new thread)
 
 - Full ui-parity run (all 2146 with live takes, green 793cb58e) queued on vibe6: unit psui-full1117 (systemd --user),
   `~/bin/slot timeout 10800 ~/agents/psui-keep/full.sh ~/tmp/psui/full1117` (4 shards, displays 386-389, snapshot
-  of the scenarios in ~/tmp/psui/src-1117). Log ~/tmp/psui/full1117.log; score in full1117/score.log.
-- Feel matrices on the Mac: `cargo test -p noshape-part-studio-ui --lib -- sketch_ui_tests::{feel,snaps,list,measure,
-  nav,chrome,toolbar_highlight,sm,sketchtools,editing,dialogs,fields,feedback}::` (a plain `feel` filter only hits 4).
-- Toolbar box model patch applied in the worktree; screenshot run fb5/run1.sh tooldd (fb5/tooldd.json) on vibe6.
-- Sketch readouts (item 3) written: sketch_mode.rs `Pick` / `Round` extremes (arcs as arcs, Center to the infinite
-  line, order by kinds), `selection_readout_icon` (circle / center-point-arc), sketch.rs value as measure_value; test
-  `pair_readouts_follow_lives_kinds_and_arcs` (live2's table). Not yet built.
-- qa P2 (11-17): TICKETS DOCK-TAB-SWITCH-TRAILING-FRAMES: since 0.4.54 about half the switches between the dock's two
-  open tabs keep drawing frames 700-860 ms (0.4.53 settled in 76-154 ms); no regen in the perf log; suspect the tab's
-  hover card under the resting pointer. Data /root/qa-scratch/lat/hat/tabab-rel.out. After items 1-3.
+  of the scenarios in ~/tmp/psui/src-1117). Log ~/tmp/psui/full1117.log; score in full1117/score.log. 11:45: third
+  in the slot queue (qa's suite since 08:40, skasm's pair, studios' shards ahead).
+- Feel matrices (Mac, 11-17 10:50): 18 / 18 pass. Command: `cargo test -p noshape-part-studio-ui --lib --
+  ui_tests::feel:: ui_tests::snaps:: ui_tests::list:: ui_tests::measure:: ui_tests::nav:: ui_tests::chrome::
+  ui_tests::toolbar_highlight:: ui_tests::sm:: ui_tests::sketchtools:: ui_tests::editing:: ui_tests::dialogs::
+  ui_tests::fields:: ui_tests::feedback::` (module path part_studio::sketch::ui_tests::<m>; one test per matrix).
+- Landed e1ce5e41 (11:12): sketch pair readouts as live's (arcs as arcs, Center to the infinite line, order by kinds,
+  point on line Min only), lone circle / arc icon, values as measure_value; latency TARGETS note live's timings.
+- Toolbar box model: patch applied in the worktree (uncommitted) + chips on the foot of a 22.5 px line
+  (`shortcut_chips` h 22.5 items_end). First screenshot (fb5-tooldd, before the chip fix): Fillet list 180 x 71
+  (live 71.5), icon art x 9-26, text from 33, chips 127-171 all equal to live's; chips were 2 px high (ours y 9-27,
+  live 11-30). Rebuild + rerun: vibe6 unit psui-tooldd (`~/agents/psui-keep/run1.sh tooldd`, log
+  ~/tmp/psui/tooldd.log, shots ~/tmp/psui/fb5-tooldd/shots 02 = Fillet list, 06 = Sheet metal list). Measure
+  script: /root/psui-scratch/tooldd (chip #aaa extents). Then commit + land.
+- qa P2 DOCK-TAB-SWITCH-TRAILING-FRAMES: repro ~/tmp/psui/tabab (vibe6; live-30-features + duplicated tab;
+  ab.sh rounds apps). Same session 0.4.53 and 0.4.55 both ~850 ms at load 36-43; 0.4.55 208 ms at load 29: load /
+  software GL, not a regression. Told qa (11:50). Left: confirm on the Mac (real GPU) before closing.
 
 ## Waiting on others
 
@@ -152,7 +154,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Next, in order
 
-1. Recheck the flat view's colours after skasm's colour fix; the tab pick per the lead's answer.
+1. Recheck the flat view's colours: skasm's fix landed 0bb94eede (11:23); fb5 sm-click.json. Then the tab pick per the lead's answer.
 2. Older open items (11-06 to 11-08 "Next, in order" in the archive): check against a rerun before picking any up.
 
 ## Open decisions

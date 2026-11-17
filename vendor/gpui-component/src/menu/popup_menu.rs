@@ -1277,9 +1277,9 @@ impl PopupMenu {
             .text_sm()
             .py_0()
             .px(INNER_PADDING)
-            // NOSHAPE PATCH: a toolbar dropdown's row (live menus/ps-dropdown-01): 1 px in from the border, its icon
-            // cell 1 px further, the shortcut chips 7 px from the right.
-            .when(self.tool_list, |this| this.mx(px(1.)).pl(px(1.)).pr(px(7.)))
+            // NOSHAPE PATCH: a toolbar dropdown's row (live2 feel/shadows "Toolbar dropdown list box model"): a 1 px
+            // margin inside the border, 6 px padding (the left's 5 more in the row's icon cell).
+            .when(self.tool_list, |this| this.mx(px(1.)).pl(px(1.)).pr(px(6.)))
             .rounded(radius)
             .items_center()
             .selected(selected)
