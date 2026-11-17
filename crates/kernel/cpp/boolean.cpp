@@ -4994,24 +4994,6 @@ bool one_circle(const TopoDS_Edge& a, const TopoDS_Edge& b)
   return x.Location().Distance(y.Location()) <= tol && std::abs(x.Radius() - y.Radius()) <= tol && x.Axis().Direction().IsParallel(y.Axis().Direction(), 1e-9);
 }
 
-// Whether join_loop_pieces joins arcs of one ellipse: only for a blend's edges (op_join_edges), not in a unify.
-thread_local bool t_join_ellipses = false;
-
-// Edges `a` and `b` arcs of one ellipse (a full round's two halves across a strip, cut apart where they met: isaac-ball
-// 3c5c58's Fillet 1 on a tilted plane; live's is one edge).
-bool one_ellipse(const TopoDS_Edge& a, const TopoDS_Edge& b)
-{
-  if (!t_join_ellipses)
-    return false;
-  BRepAdaptor_Curve ca(a), cb(b);
-  if (ca.GetType() != GeomAbs_Ellipse || cb.GetType() != GeomAbs_Ellipse)
-    return false;
-  const gp_Elips x = ca.Ellipse(), y = cb.Ellipse();
-  const double   tol = std::max({BRep_Tool::Tolerance(a), BRep_Tool::Tolerance(b), Precision::Confusion()});
-  return x.Location().Distance(y.Location()) <= tol && std::abs(x.MajorRadius() - y.MajorRadius()) <= tol && std::abs(x.MinorRadius() - y.MinorRadius()) <= tol &&
-         x.Axis().Direction().IsParallel(y.Axis().Direction(), 1e-9) && x.XAxis().Direction().IsParallel(y.XAxis().Direction(), 1e-9);
-}
-
 // Two B-spline edges meeting smoothly at `v` (OCCT's pieces of one intersection curve, split where it turns: a hole's
 // rim through a tube's wall in three, HOLE-RIM-PIECES; Parasolid's is one closed edge).
 bool smooth_pieces(const TopoDS_Edge& a, const TopoDS_Edge& b, const TopoDS_Vertex& v)
@@ -5035,8 +5017,7 @@ bool loop_joint_candidates(const TopoDS_Shape& s)
     TopExp::MapShapesAndUniqueAncestors(s, TopAbs_VERTEX, TopAbs_EDGE, ve);
     for (int i = 1; i <= ve.Extent(); ++i)
       if (ve(i).Extent() == 2
-          && (one_circle(TopoDS::Edge(ve(i).First()), TopoDS::Edge(ve(i).Last())) ||
-              (!legacy_topology() && (one_ellipse(TopoDS::Edge(ve(i).First()), TopoDS::Edge(ve(i).Last())) || smooth_pieces(TopoDS::Edge(ve(i).First()), TopoDS::Edge(ve(i).Last()), TopoDS::Vertex(ve.FindKey(i)))))))
+          && (one_circle(TopoDS::Edge(ve(i).First()), TopoDS::Edge(ve(i).Last())) || (!legacy_topology() && smooth_pieces(TopoDS::Edge(ve(i).First()), TopoDS::Edge(ve(i).Last()), TopoDS::Vertex(ve.FindKey(i))))))
         return true;
   }
   for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
@@ -5105,7 +5086,7 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist, bool refit = f
     if (BRep_Tool::IsClosed(a, TopoDS::Face(fa->First())) || BRep_Tool::IsClosed(a, TopoDS::Face(fa->Last())) || BRep_Tool::IsClosed(b, TopoDS::Face(fa->First())) || BRep_Tool::IsClosed(b, TopoDS::Face(fa->Last())))
       continue;
     // Only where a seam split the loop (at u = 0, a whole period, of a periodic face's surface, OCCT's seams' place),
-    // two arcs of one circle or ellipse meet alone, or two B-spline pieces meet smoothly.
+    // two arcs of one circle meet alone, or two B-spline pieces meet smoothly.
     bool at_seam = false;
     for (const TopoDS_Shape& fx : {fa->First(), fa->Last()})
     {
@@ -5116,7 +5097,7 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist, bool refit = f
       const gp_Pnt2d uv = BRep_Tool::Parameters(TopoDS::Vertex(ve.FindKey(i)), f);
       at_seam = at_seam || std::abs(std::remainder(uv.X(), g->UPeriod())) < 1e-7;
     }
-    if (at_seam || one_circle(a, b) || (!legacy_topology() && (one_ellipse(a, b) || smooth_pieces(a, b, TopoDS::Vertex(ve.FindKey(i))))))
+    if (at_seam || one_circle(a, b) || (!legacy_topology() && smooth_pieces(a, b, TopoDS::Vertex(ve.FindKey(i)))))
       joints.push_back(i);
   }
   if (joints.empty())
@@ -5313,70 +5294,6 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist, bool refit = f
         }
       }
     }
-    // Arcs of one ellipse: one ellipse, its curves on the faces projected, its tolerance what they need (a full round's
-    // halves a hair apart, merged on one's cylinder: isaac-ball 3c5c58's Fillet 1, the other half's arc ~1e-6 m off it).
-    bool   fit       = refit;
-    double fit_limit = RealLast(); // (the tolerance a rebuilt ellipse may need: past it, the pieces stay)
-    if (!legacy_topology() && curve == c3)
-    {
-      bool one = true;
-      for (size_t k = 1; k < chain.size() && one; ++k)
-        one = one_ellipse(chain[0], chain[k]);
-      if (one)
-      {
-        gp_Elips el = BRepAdaptor_Curve(chain[0]).Ellipse();
-        // Along the chain: the first piece's way from vs.
-        BRepAdaptor_Curve c0(TopoDS::Edge(chain.front().Oriented(TopAbs_FORWARD)));
-        gp_Pnt            q;
-        gp_Vec            d;
-        const bool        fwd = chain.front().Orientation() != TopAbs_REVERSED;
-        c0.D1(fwd ? c0.FirstParameter() : c0.LastParameter(), q, d);
-        if (!fwd)
-          d.Reverse();
-        const gp_Pnt Pv = BRep_Tool::Pnt(vs), Pl = BRep_Tool::Pnt(vl);
-        gp_Pnt       eq;
-        gp_Vec       ed;
-        ElCLib::D1(ElCLib::Parameter(el, Pv), el, eq, ed);
-        if (ed.Dot(d) < 0)
-          el = gp_Elips(gp_Ax2(el.Location(), el.Axis().Direction().Reversed(), el.XAxis().Direction()), el.MajorRadius(), el.MinorRadius());
-        const double a = ElCLib::Parameter(el, Pv);
-        double       b = ElCLib::Parameter(el, Pl);
-        while (b <= a + 1e-12)
-          b += 2 * M_PI;
-        const occ::handle<Geom_Curve> ce = new Geom_Ellipse(el);
-        // (Within 1e-4 of its length: a hair, not another curve.)
-        const double              hair = 1e-4 * el.MajorRadius() * 2 * M_PI + tol;
-        occ::handle<Geom2d_Curve> pc[2];
-        for (int k = 0; k < 2 && one; ++k)
-        {
-          const occ::handle<Geom_Surface> g = BRep_Tool::Surface(F[k]);
-          pc[k]                            = GeomProjLib::Curve2d(new Geom_TrimmedCurve(ce, a, b), a, b, g);
-          one                              = !pc[k].IsNull();
-          if (!one)
-            break;
-          const gp_Pnt2d want = c2[k]->Value(c2[k]->FirstParameter()), got = pc[k]->Value(a);
-          const double   du   = g->IsUPeriodic() ? std::round((want.X() - got.X()) / g->UPeriod()) * g->UPeriod() : 0;
-          const double   dv   = g->IsVPeriodic() ? std::round((want.Y() - got.Y()) / g->VPeriod()) * g->VPeriod() : 0;
-          if (du != 0 || dv != 0)
-            pc[k]->Translate(gp_Vec2d(du, dv));
-          for (int m = 0; m <= 8 && one; ++m)
-          {
-            const double t = a + (b - a) * m / 8;
-            one            = g->Value(pc[k]->Value(t).X(), pc[k]->Value(t).Y()).Distance(ce->Value(t)) <= hair;
-          }
-        }
-        if (one)
-        {
-          curve = ce;
-          on[0] = pc[0];
-          on[1] = pc[1];
-          p0    = a;
-          p1        = b;
-          fit       = true;
-          fit_limit = hair;
-        }
-      }
-    }
     TopoDS_Edge E;
     B.MakeEdge(E, curve, tol);
     B.Add(E, vs.Oriented(TopAbs_FORWARD));
@@ -5391,12 +5308,10 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist, bool refit = f
       continue;
     B.SameRange(E, true);
     B.SameParameter(E, true);
-    if (fit)
+    if (refit)
     {
       B.SameParameter(E, false);
       BRepLib::SameParameter(E, tol);
-      if (BRep_Tool::Tolerance(E) > fit_limit)
-        continue;
     }
     rs->Replace(chain.front().Oriented(TopAbs_FORWARD), chain.front().Orientation() == TopAbs_REVERSED ? TopoDS::Edge(E.Reversed()) : E);
     for (size_t k = 1; k < chain.size(); ++k)
@@ -10479,13 +10394,6 @@ TopoDS_Shape unify_shape(const TopoDS_Shape& s, HHist& hist)
 OpOut op_join_edges(const OcShape& s)
 {
   require_non_null(s.shape, "shape");
-  struct Flag
-  {
-    Flag() { t_join_ellipses = true; }
-    ~Flag() { t_join_ellipses = false; }
-    Flag(const Flag&)            = delete;
-    Flag& operator=(const Flag&) = delete;
-  } flag;
   HHist              hist;
   const TopoDS_Shape res = legacy_topology() ? s.shape : join_loop_pieces(s.shape, hist);
   return make_result({s.shape}, res, hist.get());
