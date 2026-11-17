@@ -1848,6 +1848,25 @@ fn cylinders_meeting_on_a_whole_face_fuse_glued() {
     k::set_rust_boolean(None);
 }
 
+/// The same with the lower half the upper's mirror image: a mirrored plane's axes are left-handed, its face's normal
+/// the other way (asm-isaac-ball's GearLab herringbone gear: its half fused with its mirror image went to OCCT, 9 s).
+#[test]
+fn a_cylinder_and_its_mirror_image_fuse_glued() {
+    k::set_rust_boolean(Some(false));
+    let (r, h) = (0.01, 0.02);
+    let up = k::make_cylinder(&z_frame(DVec3::ZERO), r, h, TAU).unwrap();
+    let down = up.transformed(&k::Transform::Mirror(z_frame(DVec3::ZERO))).unwrap();
+    let f = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&up), &[down], &k::BooleanOptions::default());
+    let path = k::last_boolean_path();
+    k::set_rust_boolean(None);
+    let f = f.unwrap();
+    assert_eq!(path, "glued");
+    assert!(f.shape.is_valid());
+    assert_eq!((f.shape.count(k::ShapeType::Solid), f.shape.count(k::ShapeType::Face)), (1, 4));
+    let v = f.shape.volume().unwrap();
+    assert!((v / (2.0 * std::f64::consts::PI * r * r * h) - 1.0).abs() < 1e-9, "{v}");
+}
+
 /// c2-valve-config's Extrude 2 (recorded): a valve body cut by a handle whose end plane crosses the seat cone's axis
 /// past its apex, and whose face's section with the body's chamfer cone (OCCT's, of 0.206 mm) ends 0.2065 mm off where
 /// it leaves the cone's rim: no section on the other nappe, the section's end the rim's vertex (OCCT's bound pave);
