@@ -729,6 +729,7 @@ pub(crate) mod ffi {
             angle: f64,
         ) -> Result<OpOut>;
         fn op_defeature(s: &OcShape, faces: &OcShapeList) -> Result<OpOut>;
+        fn op_tweak_faces(s: &OcShape, faces: &OcShapeList, m: &[f64]) -> Result<OpOut>;
         fn op_offset_faces(s: &OcShape, faces: &OcShapeList, offsets: &[f64]) -> Result<OpOut>;
         fn op_offset_solid(s: &OcShape, faces: &OcShapeList, distances: &[f64], face_budget: u32) -> Result<OpOut>;
         /// Each face's distance and reached tolerance from this thread's last op_offset_solid, or where it failed.

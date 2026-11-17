@@ -125,6 +125,10 @@
 #include <ShapeFix_FixSmallFace.hxx>
 #include <ShapeFix_Solid.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepTools_Modification.hxx>
+#include <BRepTools_Modifier.hxx>
+#include <GeomAPI_IntSS.hxx>
+#include <GeomAPI_ExtremaCurveCurve.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
 #include <Geom2d_BSplineCurve.hxx>
@@ -12224,6 +12228,322 @@ OpOut op_join_target_seam_splits(const OcShape& sheet, const OcShape& target)
   HHist              hist;
   const TopoDS_Shape res = join_target_seam_splits(sheet.shape, target.shape, hist, true);
   return make_result({sheet.shape}, res, hist.get());
+}
+
+// Faces turned or moved rigidly in place (Move face's tweak): each moved face gets its surface's image, an edge between
+// a moved and a staying face their surfaces' intersection, a vertex on a staying edge that edge's crossing with the
+// moved surface (else where the new edges meet); a bounded B-spline beside a moved face runs on by `ext` so the moved
+// face still meets it. No new topology: fails where the faces would need it.
+class FaceTweak : public BRepTools_Modification
+{
+public:
+  ShapeIMap  moved;
+  gp_Trsf    t;
+  bool       ok  = true;
+  std::string why;
+  ShapeAncMap ef, vf;
+  NCollection_DataMap<TopoDS_Shape, occ::handle<Geom_Curve>, TopTools_ShapeMapHasher>   curves;
+  NCollection_DataMap<TopoDS_Shape, gp_Pnt, TopTools_ShapeMapHasher>                    points;
+  NCollection_DataMap<TopoDS_Shape, occ::handle<Geom_Surface>, TopTools_ShapeMapHasher> made;
+
+  bool is_moved(const TopoDS_Shape& f) const { return moved.Contains(f.Oriented(TopAbs_FORWARD)); }
+  occ::handle<Geom_Surface> new_surface(const TopoDS_Face& f)
+  {
+    const TopoDS_Shape key = f.Oriented(TopAbs_FORWARD);
+    if (made.IsBound(key))
+      return made(key);
+    TopLoc_Location           l;
+    occ::handle<Geom_Surface> s = occ::down_cast<Geom_Surface>(BRep_Tool::Surface(f, l)->Copy());
+    if (!l.IsIdentity())
+      s->Transform(l.Transformation());
+    if (is_moved(f))
+      s->Transform(t);
+    made.Bind(key, s);
+    return s;
+  }
+  void prepare(const TopoDS_Shape& shape)
+  {
+    TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, ef);
+    TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_FACE, vf);
+    for (int i = 1; i <= ef.Extent(); ++i)
+    {
+      const TopoDS_Edge& e  = TopoDS::Edge(ef.FindKey(i));
+      const auto&        fs = ef(i);
+      int                nm = 0;
+      for (const TopoDS_Shape& f : fs)
+        nm += is_moved(f) ? 1 : 0;
+      if (nm == 0 || nm == fs.Extent())
+        continue;
+      if (fs.Extent() != 2 || BRep_Tool::Degenerated(e))
+        return fail("an edge of a moved face isn't between two faces");
+      const TopoDS_Face a = TopoDS::Face(fs.First()), b = TopoDS::Face(fs.Last());
+      const TopoDS_Face m = is_moved(a) ? a : b, s = is_moved(a) ? b : a;
+      GeomAPI_IntSS ss(new_surface(m), new_surface(s), 1e-7);
+      if (!ss.IsDone() || ss.NbLines() == 0)
+        return fail("a moved face no longer meets its neighbour");
+      BRepAdaptor_Curve c(e);
+      gp_Pnt            mid;
+      gp_Vec            along;
+      c.D1((c.FirstParameter() + c.LastParameter()) / 2, mid, along);
+      mid.Transform(t);
+      along.Transform(t);
+      double            best = 1e300;
+      occ::handle<Geom_Curve> pick;
+      for (int k = 1; k <= ss.NbLines(); ++k)
+      {
+        GeomAPI_ProjectPointOnCurve pp(mid, ss.Line(k));
+        if (pp.NbPoints() > 0 && pp.LowerDistance() < best)
+        {
+          best = pp.LowerDistance();
+          pick = ss.Line(k);
+        }
+      }
+      if (pick.IsNull())
+        return fail("no intersection near an edge");
+      // Running as the edge's curve did (its vertices' parameters keep their order).
+      {
+        GeomAPI_ProjectPointOnCurve pp(mid, pick);
+        gp_Pnt                      q;
+        gp_Vec                      d;
+        pick->D1(pp.LowerDistanceParameter(), q, d);
+        if (d.Dot(along) < 0)
+          pick = pick->Reversed();
+      }
+      curves.Bind(e, pick);
+    }
+    for (int i = 1; i <= vf.Extent(); ++i)
+    {
+      const TopoDS_Vertex& v   = TopoDS::Vertex(vf.FindKey(i));
+      int                  nm = 0;
+      for (const TopoDS_Shape& f : vf(i))
+        nm += is_moved(f) ? 1 : 0;
+      if (nm == 0 || nm == vf(i).Extent())
+        continue;
+      const gp_Pnt p0 = BRep_Tool::Pnt(v);
+      bool         done = false;
+      for (int j = 1; j <= ef.Extent() && !done; ++j)
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(j));
+        if (BRep_Tool::Degenerated(e) || (!TopExp::FirstVertex(e).IsSame(v) && !TopExp::LastVertex(e).IsSame(v)))
+          continue;
+        bool stays = true;
+        for (const TopoDS_Shape& f : ef(j))
+          stays = stays && !is_moved(f);
+        if (!stays)
+          continue;
+        TopLoc_Location         l;
+        double                  f0, l0;
+        occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, l, f0, l0);
+        if (c.IsNull())
+          continue;
+        if (!l.IsIdentity())
+          c = occ::down_cast<Geom_Curve>(c->Transformed(l.Transformation()));
+        double best = 1e300;
+        for (const TopoDS_Shape& mf : vf(i))
+        {
+          if (!is_moved(mf))
+            continue;
+          GeomAPI_IntCS cs(c, new_surface(TopoDS::Face(mf)));
+          for (int k = 1; cs.IsDone() && k <= cs.NbPoints(); ++k)
+            if (cs.Point(k).Distance(p0) < best)
+            {
+              best = cs.Point(k).Distance(p0);
+              points.Bind(v, cs.Point(k));
+              done = true;
+            }
+        }
+      }
+      if (done)
+        continue;
+      std::vector<occ::handle<Geom_Curve>> cs;
+      for (int j = 1; j <= ef.Extent(); ++j)
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(j));
+        if ((TopExp::FirstVertex(e).IsSame(v) || TopExp::LastVertex(e).IsSame(v)) && curves.IsBound(e))
+          cs.push_back(curves(e));
+      }
+      if (cs.size() < 2)
+        return fail("a moved vertex has no place");
+      GeomAPI_ExtremaCurveCurve x(cs[0], cs[1]);
+      if (x.NbExtrema() == 0)
+        return fail("the new edges at a vertex don't meet");
+      gp_Pnt a, b;
+      x.NearestPoints(a, b);
+      points.Bind(v, gp_Pnt((a.XYZ() + b.XYZ()) / 2));
+    }
+    // An unbounded new curve (a plane's line across a cylinder) or an open stretch of a periodic one (a circle) trimmed
+    // to its edge's new ends: its curves on the faces are projected over its range.
+    for (int i = 1; i <= ef.Extent(); ++i)
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(i));
+      if (!curves.IsBound(e))
+        continue;
+      const occ::handle<Geom_Curve> c = curves(e);
+      TopoDS_Vertex                 v1, v2;
+      TopExp::Vertices(e, v1, v2);
+      const bool unbounded = Precision::IsInfinite(c->FirstParameter()) || Precision::IsInfinite(c->LastParameter());
+      if (v1.IsNull() || v2.IsNull() || (!unbounded && !c->IsPeriodic()) || v1.IsSame(v2))
+        continue;
+      auto at = [&](const TopoDS_Vertex& v) { return points.IsBound(v) ? points(v) : BRep_Tool::Pnt(v); };
+      GeomAPI_ProjectPointOnCurve p1(at(v1), c), p2(at(v2), c);
+      if (p1.NbPoints() == 0 || p2.NbPoints() == 0)
+        return fail("a new edge's ends are off its curve");
+      double u1 = p1.LowerDistanceParameter(), u2 = p2.LowerDistanceParameter();
+      if (c->IsPeriodic())
+      {
+        while (u2 <= u1)
+          u2 += c->Period();
+        curves.Bind(e, new Geom_TrimmedCurve(c, u1, u2));
+        continue;
+      }
+      const double lo = std::min(u1, u2), hi = std::max(u1, u2), m = 0.1 * (hi - lo) + 1e-6;
+      curves.Bind(e, new Geom_TrimmedCurve(c, lo - m, hi + m));
+    }
+  }
+  void fail(const char* w)
+  {
+    ok  = false;
+    why = w;
+  }
+  bool NewSurface(const TopoDS_Face& F, occ::handle<Geom_Surface>& S, TopLoc_Location& L, double& Tol, bool& RevWires, bool& RevFace) override
+  {
+    if (!is_moved(F))
+      return false;
+    S        = new_surface(F);
+    L        = TopLoc_Location();
+    Tol      = BRep_Tool::Tolerance(F);
+    RevWires = RevFace = false;
+    return true;
+  }
+  bool NewCurve(const TopoDS_Edge& E, occ::handle<Geom_Curve>& C, TopLoc_Location& L, double& Tol) override
+  {
+    L   = TopLoc_Location();
+    Tol = BRep_Tool::Tolerance(E);
+    if (curves.IsBound(E))
+    {
+      C = curves(E);
+      return true;
+    }
+    if (!ef.Contains(E) || BRep_Tool::Degenerated(E))
+      return false;
+    for (const TopoDS_Shape& f : ef.FindFromKey(E))
+      if (!is_moved(f))
+        return false;
+    TopLoc_Location l;
+    double          f0, l0;
+    const occ::handle<Geom_Curve> c = BRep_Tool::Curve(E, l, f0, l0);
+    if (c.IsNull())
+      return false;
+    C = occ::down_cast<Geom_Curve>(c->Copy());
+    C->Transform(t * l.Transformation());
+    return true;
+  }
+  bool NewPoint(const TopoDS_Vertex& V, gp_Pnt& P, double& Tol) override
+  {
+    Tol = BRep_Tool::Tolerance(V);
+    if (points.IsBound(V))
+    {
+      P = points(V);
+      return true;
+    }
+    if (!vf.Contains(V))
+      return false;
+    for (const TopoDS_Shape& f : vf.FindFromKey(V))
+      if (!is_moved(f))
+        return false;
+    P = BRep_Tool::Pnt(V).Transformed(t);
+    return true;
+  }
+  bool NewCurve2d(const TopoDS_Edge& E, const TopoDS_Face& F, const TopoDS_Edge& NewE, const TopoDS_Face& NewF, occ::handle<Geom2d_Curve>& C, double& Tol) override
+  {
+    Tol = BRep_Tool::Tolerance(E);
+    // On a moved face (its surface's image keeps the parameters) an edge that only moved with it keeps its pcurve.
+    if (!curves.IsBound(E))
+    {
+      if (!is_moved(F))
+        return false;
+      double f0, l0;
+      C = BRep_Tool::CurveOnSurface(E, F, f0, l0);
+      if (C.IsNull())
+        return false;
+      C = occ::down_cast<Geom2d_Curve>(C->Copy());
+      return true;
+    }
+    double f, l;
+    const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(NewE, f, l);
+    if (c3.IsNull())
+      return false;
+    const occ::handle<Geom_Surface> s = NewF.IsNull() ? new_surface(F) : BRep_Tool::Surface(NewF);
+    double tol = Tol;
+    C          = GeomProjLib::Curve2d(c3, c3->FirstParameter(), c3->LastParameter(), s, tol);
+    Tol        = std::max(Tol, tol);
+    return !C.IsNull();
+  }
+  bool NewParameter(const TopoDS_Vertex& V, const TopoDS_Edge& E, double& P, double& Tol) override
+  {
+    Tol = BRep_Tool::Tolerance(V);
+    bool edge_moves = curves.IsBound(E);
+    if (!edge_moves && ef.Contains(E) && !BRep_Tool::Degenerated(E))
+    {
+      edge_moves = true;
+      for (const TopoDS_Shape& f : ef.FindFromKey(E))
+        edge_moves = edge_moves && is_moved(f);
+      if (edge_moves)
+        return false; // moved rigidly: same parameters
+    }
+    if (!edge_moves && !points.IsBound(V))
+      return false;
+    const gp_Pnt            q = points.IsBound(V) ? points(V) : BRep_Tool::Pnt(V);
+    occ::handle<Geom_Curve> c;
+    if (curves.IsBound(E))
+      c = curves(E);
+    else
+    {
+      TopLoc_Location l;
+      double          f0, l0;
+      c = BRep_Tool::Curve(E, l, f0, l0);
+      if (c.IsNull())
+        return false;
+      if (!l.IsIdentity())
+        c = occ::down_cast<Geom_Curve>(c->Transformed(l.Transformation()));
+    }
+    GeomAPI_ProjectPointOnCurve pp(q, c);
+    if (pp.NbPoints() == 0)
+      return false;
+    P = pp.LowerDistanceParameter();
+    return true;
+  }
+  GeomAbs_Shape Continuity(const TopoDS_Edge& E, const TopoDS_Face& F1, const TopoDS_Face& F2, const TopoDS_Edge&, const TopoDS_Face&, const TopoDS_Face&) override
+  {
+    return curves.IsBound(E) ? GeomAbs_C0 : BRep_Tool::Continuity(E, F1, F2);
+  }
+};
+
+OpOut op_tweak_faces(const OcShape& s, const OcShapeList& faces, rust::Slice<const double> m)
+{
+  require_non_null(s.shape, "shape");
+  if (faces.items.empty())
+    fail_invalid("tweak needs at least one face");
+  if (m.size() != 12)
+    fail_invalid("transform matrix must have 12 values (3x4 row-major)");
+  check_faces_in(s.shape, faces.items);
+  dump_op("tweak", s.shape, faces.items, "tweak");
+  occ::handle<FaceTweak> tw = new FaceTweak;
+  tw->t.SetValues(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10], m[11]);
+  for (const TopoDS_Shape& f : faces.items)
+    tw->moved.Add(f.Oriented(TopAbs_FORWARD));
+  tw->prepare(s.shape);
+  if (!tw->ok)
+    fail_op("tweak: " + tw->why);
+  BRepTools_Modifier md(s.shape, tw);
+  if (!md.IsDone())
+    fail_op("tweak: the modifier failed");
+  const TopoDS_Shape r = md.ModifiedShape(s.shape);
+  // The new edges' curves on their faces (projected) brought within the edges' tolerances.
+  BRepLib::SameParameter(r, 1e-7, true);
+  BRepLib::UpdateTolerances(r, false);
+  HHist h = modifier_history(s.shape, md);
+  return make_result({s.shape}, r, h.get());
 }
 
 } // namespace noshape

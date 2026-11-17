@@ -807,6 +807,13 @@ pub fn delete_faces(shape: &Shape, faces: &[Shape]) -> Result<OpResult> {
     op(ffi::op_defeature(shape.raw(), &l))
 }
 
+/// `faces` of `shape` moved by the rigid motion `t` in place: their edges with the faces that stay re-intersected, the
+/// vertices placed where those meet. Fails where the move would change the topology.
+pub fn tweak_faces(shape: &Shape, faces: &[Shape], t: &Transform) -> Result<OpResult> {
+    let l = vec_to_list(faces);
+    op(ffi::op_tweak_faces(shape.raw(), &l, &t.rows()))
+}
+
 /// Offset ("move face" offset mode) the selected faces along their normals by
 /// `distance`; neighbors are extended/trimmed (BRepOffset_MakeOffset with
 /// per-face offsets). Best effort: fails when topology would change.

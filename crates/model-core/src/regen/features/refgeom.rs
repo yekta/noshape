@@ -49,6 +49,38 @@ fn vertex_csys(ev: &EvalCtx, r: &Reference) -> Option<Csys> {
     Some(Csys::new(p, DVec3::Z, Some(DVec3::X)))
 }
 
+/// The direction (start to end) of the sketch line a body's edge was made from: an edge of a profile's start cap or of
+/// a sketch's wire body.
+fn sketch_line_direction(ev: &EvalCtx, bi: usize, ei: usize) -> Option<DVec3> {
+    use crate::reference::{Role, TopoName};
+    let name = ev.ctx.bodies.get(bi)?.edges.get(ei)?;
+    let source = match &**name {
+        TopoName::Wire { source, .. } => source,
+        TopoName::Edge { faces, .. } => {
+            let role = |mut f: &TopoName| {
+                while let TopoName::Split { parent, .. } = f {
+                    f = parent;
+                }
+                if let TopoName::Face { role, .. } = f { Some(role.clone()) } else { None }
+            };
+            let (a, b) = (role(&faces[0])?, role(&faces[1])?);
+            match (a, b) {
+                (Role::Side(s), Role::CapStart(_)) | (Role::CapStart(_), Role::Side(s)) => return line_of(ev, &s),
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
+    line_of(ev, source)
+}
+
+fn line_of(ev: &EvalCtx, source: &crate::reference::Source) -> Option<DVec3> {
+    let crate::reference::Source::Sketch { sketch, entity, .. } = source else { return None };
+    let s = ev.ctx.sketch_holding(*sketch, *entity)?;
+    let noshape_sketch::Curve2::Line { a, b } = s.sketch.curve(noshape_sketch::EntityId(*entity))? else { return None };
+    (s.frame.to_world(b) - s.frame.to_world(a)).try_normalize()
+}
+
 fn edge_csys(e: &Shape, inference: &str) -> FResult<Csys> {
     let info = e.edge_info()?;
     let mid_t = (info.first_param + info.last_param) * 0.5;
@@ -207,7 +239,14 @@ fn origin_csys(ev: &EvalCtx, r: &Reference, inference: &str, secondary: &[Refere
                 let t = e.tangent_at(if at_start { info.first_param } else { info.last_param })?;
                 return Ok(Csys::new(p, t.normalize_or(DVec3::Z), None));
             }
-            let c = edge_csys(&e, inference)?;
+            let mut c = edge_csys(&e, inference)?;
+            // A straight edge drawn as a sketch line (a profile's start cap, a sketch wire): Z along the line from its
+            // start to its end, whichever way our edge runs (live knifehandle's Move face 1 turns about one).
+            if let Some(d) = sketch_line_direction(ev, bi, ei)
+                && d.dot(c.z) < -(1.0 - 1e-9)
+            {
+                c = Csys::new(c.origin, d, None);
+            }
             // Live 1708: a circular edge's CENTER connector points out of the
             // material through the planar face the edge bounds (top rims +z,
             // bottom rims −z, pins and holes alike), its X the sketch's x

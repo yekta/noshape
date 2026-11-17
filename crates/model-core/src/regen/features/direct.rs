@@ -247,6 +247,23 @@ pub fn move_rigid(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> FR
     Ok(())
 }
 
+/// Move faces by a rigid transform in place, their neighbours re-trimmed to them (no new topology): false where that
+/// can't be done (the caller then cuts and adds the region, [`move_rigid`]).
+fn tweak(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> bool {
+    let body = ev.ctx.bodies[bi].clone();
+    let shapes: Vec<Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
+    let res = match k::tweak_faces(&body.shape, &shapes, &k::Transform::Matrix(*m)) {
+        Ok(r) if r.shape.count(ShapeType::Solid) == 1 && r.shape.is_valid() => r,
+        other => {
+            log::debug!("move face: tweak declined ({}), cutting and adding the region", other.map_or_else(|e| e.to_string(), |_| "invalid".into()));
+            return false;
+        }
+    };
+    let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, res.shape, names);
+    true
+}
+
 /// Whether a face in `faces` of `shape` or one sharing an edge with them is a freeform surface (not a plane, cylinder,
 /// cone, sphere or torus).
 fn touches_freeform(shape: &Shape, faces: &[usize]) -> bool {
@@ -312,7 +329,7 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                     let name = body.faces[fi].clone();
                     replace_with(ev, bi, &name, &template, 1.0).map_err(|_| fe(failed_msg))?;
                 }
-            } else {
+            } else if !tweak(ev, bi, &faces, &m) {
                 move_rigid(ev, bi, &faces, &m).map_err(|_| fe(failed_msg))?;
             }
             continue;

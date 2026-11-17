@@ -1001,6 +1001,8 @@ OpOut op_draft_parting_curve(const OcShape& solid, const OcShapeList& faces, con
 OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir,
                const PlaneF& neutral, double angle);
 OpOut op_defeature(const OcShape& s, const OcShapeList& faces);
+// `faces` of `s` moved by the 3x4 row-major rigid motion `m`, their neighbours re-trimmed to them (no new topology).
+OpOut op_tweak_faces(const OcShape& s, const OcShapeList& faces, rust::Slice<const double> m);
 // `s` (one solid) with each of `faces` moved along its outward normal by its distance (one, or one per face), the
 // other faces staying on their surfaces (offset.cpp); a NaN distance removes the face (an open shell of the others). `face_budget`: the most points marched along a face's edges
 // (0: no limit). Fails, naming the face or edge, where the offset would change the solid's topology.

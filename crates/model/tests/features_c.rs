@@ -4440,3 +4440,80 @@ fn an_inside_out_part_is_never_kept() {
     let volumes: Vec<f64> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.shape.volume().unwrap()).collect();
     assert!(volumes.iter().all(|v| *v > 0.0), "{volumes:?} ({:?} {:?})", r.display.features[0].status, r.display.features[0].message);
 }
+
+/// Move face Rotate of a curved face moves it in place, its neighbours re-trimmed to it (c2-surf-workshop-knifehandle's
+/// Move face 1 / 2: a blade's B-spline side turned 0.3°, 2 s and an error through delete-and-rebuild, live 16 ms): a
+/// 10 mm prism whose right side is an arc (a cylinder through (10, 0), (12, 5), (10, 10)) turned 2° about the vertical
+/// line through (10, 0) has the volume of the turned circle's profile.
+#[test]
+fn move_face_rotate_turns_a_curved_face_in_place() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = |x: f64, y: f64| DVec2::new(mm(x), mm(y));
+    sk.add_line(p(10.0, 10.0), p(0.0, 10.0));
+    sk.add_line(p(0.0, 10.0), p(0.0, 0.0));
+    sk.add_line(p(0.0, 0.0), p(10.0, 0.0));
+    sk.add_arc(p(4.75, 5.0), p(10.0, 0.0), p(10.0, 10.0));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let mut ax = noshape_sketch::Sketch::new();
+    let axis = polyline(&mut ax, &[(10.0, 0.0), (10.0, 10.0)], false);
+    let axis_sketch = s.sketch(Reference::Plane(DatumPlane::Front), ax);
+    let r = s.ok();
+    let side = cylinder_face(&r, 0);
+    s.add("moveFace", move |p| {
+        p.set("moveFaces", q(side));
+        p.set("moveFaceType", en("ROTATE"));
+        p.set("axis", entities(axis_sketch, &axis));
+        p.set("angle", expr("2 deg"));
+    });
+    let r = s.ok();
+    // The profile's area: x from 0 to the turned circle's right side, y from 0 to 10 (Simpson).
+    let area = |turn: f64| {
+        let (r0, c, pv) = (7.25, DVec2::new(4.75, 5.0), DVec2::new(10.0, 0.0));
+        let c = pv + DVec2::from_angle(turn).rotate(c - pv);
+        let x = |y: f64| c.x + (r0 * r0 - (y - c.y) * (y - c.y)).sqrt();
+        let n = 2000;
+        let h = 10.0 / n as f64;
+        (0..=n).map(|i| x(i as f64 * h) * h / 3.0 * if i == 0 || i == n { 1.0 } else if i % 2 == 1 { 4.0 } else { 2.0 }).sum::<f64>()
+    };
+    let got = volume(&r, 0) * 1e9;
+    let want: Vec<f64> = [2f64, -2.0].iter().map(|a| area(a.to_radians()) * 10.0).collect();
+    assert!(want.iter().any(|w| (got - w).abs() < 1e-6 * w), "rotated volume {got} mm³ vs {want:?}");
+    assert_eq!(r.context.bodies[0].shape.faces().len(), 6);
+}
+
+/// A mate connector at the middle of a straight edge of an extrude's start cap points along the sketch line it was
+/// drawn as, from its start to its end, whichever way the part's edge runs (c2-surf-workshop-knifehandle's Move face 1
+/// turns about one: the other way, its face left the part).
+#[test]
+fn a_connector_on_a_cap_edge_points_along_its_sketch_line() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)];
+    polyline(&mut sk, &pts, true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    for i in 0..4 {
+        let (a, b) = (pts[i], pts[(i + 1) % 4]);
+        let mid = DVec3::new(mm(a.0 + b.0) * 0.5, mm(a.1 + b.1) * 0.5, 0.0);
+        let edge = edge_near(&r, 0, mid);
+        let mut t = Studio { ps: s.ps.clone(), ..Studio::new() };
+        t.add("mateConnector", move |p| {
+            p.set("originQuery", q(edge));
+            p.set("entityInferenceType", en("MID_POINT"));
+        });
+        let z = t.ok().context.connectors[0].z;
+        let want = DVec3::new(b.0 - a.0, b.1 - a.1, 0.0).normalize();
+        assert!((z - want).length() < 1e-9, "edge {i}: z {z} vs the line's {want}");
+    }
+}
