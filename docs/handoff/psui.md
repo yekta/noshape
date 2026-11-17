@@ -126,6 +126,10 @@ e1ce5e41 readouts. qa verified both user P0s on green c330a760 (14:0x).
 - Feel tests (real pointer + GPU pick; Mac green): sketch_label (drag; hover tan / click selects / double-click box),
   sketch_glyph (linger end redraw), sketch_box (iso box over the planes: window 4 lines, crossing 3; clicks toggle,
   Shift the same, Ctrl the menu). Live's Esc doesn't clear a sketch selection (behaviours 189): tests clear directly.
+- Then: a hovered line's glyph row (Show constraints off) at the pointer's spot on the line, not its middle (live2
+  feel-1417); `SketchEditor::glyph_row_at`, kept after the hover ends; glyph boxes carry debug selectors
+  `glyph-<constraint>-<entity>`; test sketch_glyph::a_hovered_lines_glyphs_wait_by_the_pointer. Asked live2 whether the
+  row follows the pointer along the line (ours follows) or stays where it appeared.
 - interaction-feel.md: woken model edge parallel = none (live2 wake-parallel), ours none.
 - Show constraints remembered per user (live2 14:3x): skasm's (sketch dialog), sent to them.
 

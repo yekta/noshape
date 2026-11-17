@@ -44,3 +44,59 @@ fn a_left_lines_glyphs_go_when_the_linger_ends(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert!(redraws.get() > 0, "a redraw when the lingering glyphs are due to go");
 }
+
+/// Live2 feel-1417 (Show constraints off): a hovered line's glyph row sits ~40 px off the line around the pointer's
+/// spot on it (not the line's middle), so moving straight up from a quarter along the line reaches its first glyph:
+/// the glyph lights and the line stays lit as its partner.
+#[gpui::test]
+fn a_hovered_lines_glyphs_wait_by_the_pointer(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "glyph-row-at-pointer", Tool::CornerRect);
+    click(cx, window, &view, (450., 300.));
+    click(cx, window, &view, (750., 420.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // The longest line on screen, a quarter along it, its first glyph's constraint and the row's count.
+    let (line, on, first, count) = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().expect("sketch mode");
+        let data = v.sketch_data(cx).expect("sketch data");
+        let vp = v.viewport.read(cx);
+        let (id, a, b) = data
+            .sketch
+            .entities()
+            .filter_map(|e| match data.sketch.curve(e.id) {
+                Some(noshape_sketch::Curve2::Line { a, b }) => Some((e.id, vp.project(ed.frame.to_world(a))?, vp.project(ed.frame.to_world(b))?)),
+                _ => None,
+            })
+            .max_by(|x, y| (x.2 - x.1).length().total_cmp(&(y.2 - y.1).length()))
+            .expect("a line");
+        let row: Vec<_> = ed.constraint_glyphs(&data).into_iter().filter(|g| g.entity == id && !g.on_point && g.offset.is_none()).collect();
+        (id, a + (b - a) * 0.25, row.first().expect("the line's glyphs").constraint, row.len())
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    pointer.move_to(cx, &view, on);
+    assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover), Some(line), "the line lit");
+    // The row's first glyph as drawn (window px): by the pointer's spot on the line, not the line's middle.
+    let spot = pointer.window_point(cx, on);
+    let selector: &'static str = Box::leak(format!("glyph-{}-{}", first.0, line.0).into_boxed_str());
+    let glyph = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(selector).expect("the line's first glyph shown").center();
+    let (dx, dy) = (f32::from(glyph.x - spot.x), f32::from(glyph.y - spot.y));
+    assert!(dx.abs() <= 11.0 * count as f32 + 1.0 && (30.0..50.0).contains(&dy.abs()), "the row by the pointer: first glyph {dx:.0}, {dy:.0} px from the pointer's spot");
+    for i in 1..=8 {
+        let t = i as f32 / 8.0;
+        let at = gpui_kit::point(spot.x + (glyph.x - spot.x) * t, spot.y + (glyph.y - spot.y) * t);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_mouse_move(at, None, Modifiers::default());
+        pointer.frames(cx, &view);
+    }
+    let (hovered, lit) = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        let data = v.sketch_data(cx).unwrap();
+        (ed.hover_constraint, ed.picked(Some(&data)).contains(&line))
+    });
+    assert_eq!(hovered, Some(first), "the pointer reached the row's first glyph, by its spot on the line");
+    assert!(lit, "the line stays lit as the hovered glyph's partner");
+}

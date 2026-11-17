@@ -824,6 +824,9 @@ impl PartStudioView {
                     }));
                 }
                 ed.hover = ent;
+                if let (Some(e), Some(c)) = (ent, ed.cursor) {
+                    ed.glyph_row_at = Some((e, c));
+                }
                 cx.notify();
             }
         }
@@ -939,6 +942,9 @@ impl PartStudioView {
                     let hov = self.hovered_sketch_entity(cx);
                     if let Some(ed) = &mut self.sketch {
                         ed.hover = hov;
+                        if let Some(e) = hov {
+                            ed.glyph_row_at = Some((e, p));
+                        }
                     }
                     self.update_use_preview();
                     self.apply_outcome(out, window, cx);
@@ -3985,7 +3991,13 @@ impl PartStudioView {
                     (x, y, -9.0, -9.0)
                 }
                 None => {
-                    let Some((x, y)) = project(g.anchor) else { continue };
+                    // A hovered line's row (Show constraints off) at the pointer's spot on it.
+                    let hover_row = !show_all && !g.on_point && !ed.selection.contains(&g.entity) && !ed.selected_constraints.contains(&g.constraint);
+                    let at = match (ed.glyph_row_at, data.sketch.curve(g.entity)) {
+                        (Some((e, p)), Some(noshape_sketch::Curve2::Line { a, b })) if hover_row && e == g.entity && (b - a).length_squared() > 0.0 => a + (b - a) * ((p - a).dot(b - a) / (b - a).length_squared()).clamp(0.0, 1.0),
+                        _ => g.anchor,
+                    };
+                    let Some((x, y)) = project(at) else { continue };
                     let k = per_entity.entry(g.entity.0).or_default();
                     let n = counts.get(&g.entity.0).copied().unwrap_or(1) as f32;
                     let kf = *k as f32;
@@ -4056,6 +4068,7 @@ impl PartStudioView {
             out.push(
                 div()
                     .id(SharedString::from(format!("glyph-{}-{}", cid.0, g.entity.0)))
+                    .debug_selector(move || format!("glyph-{}-{}", cid.0, gent.0))
                     .absolute()
                     .left(px(x + dx))
                     .top(px(y + dy))
