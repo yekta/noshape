@@ -112,6 +112,10 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   documents: vibex7 ~/lead-private only.
 - 11-17 21:00 (user) vibe2 (16 cores, 30 GB) is a build host like the others, though it is the user's own server (also
   running the user's Motile): everything of ours under user ngyekta's home and /opt/occt, never /root. core, blend, bool2.
+- 11-17 21:05 (lead) Never kill a process tree from a computed pid: a `kill_tree` on a parent that was pid 1 SIGTERMed
+  every process on the agents' machine at 21:00:08 (4 agents, every unit, Chrome, Xvfb). Stop your own units with
+  `systemctl stop <unit>`; kill only pids you started ($! or a pid file), after checking the pid is > 1, not an ancestor
+  of your shell, and its command line is yours.
 - 11-17 A gate or suite pair compares each changed feature's solid validity (BRepCheck) too, not only counts, status,
   volume and area: a feature valid on main and invalid on the branch is a difference, and an invalid solid never lands
   (blend's tighten_tolerances: Halter's input became a 36-face invalid solid while the shown counts looked SAME).
