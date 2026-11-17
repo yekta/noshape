@@ -1,0 +1,21 @@
+{
+ "name": "drw-weld-flip-identification-line",
+ "about": "Weld symbol on an ISO drawing (ISO_A4_Portrait.dwt): the panel's Flip identification line (enabled on ISO, before any symbol is picked) ticked, unticked and ticked again (the dashed identification line moves from below the reference line to above it and back), then the symbol placed on the Front view's top edge; Escape",
+ "area": "drawing",
+ "source": "studios 11-16 matrix (Weld symbol: Flip identification line unseen); live2 11-17 exploration on an ISO A4 drawing",
+ "start": "block-drawing-iso",
+ "steps": [
+  {"do": "click", "on": {"tool": "Weld symbol"}},
+  {"do": "wait", "until": "ms", "ms": 1500},
+  {"do": "click", "on": {"checkbox": "Flip identification line"}},
+  {"do": "wait", "until": "ms", "ms": 1000},
+  {"do": "click", "on": {"checkbox": "Flip identification line"}},
+  {"do": "wait", "until": "ms", "ms": 1000},
+  {"do": "click", "on": {"checkbox": "Flip identification line"}},
+  {"do": "wait", "until": "ms", "ms": 1000},
+  {"do": "click", "on": {"view_edge": {"view": "Front", "at": [20, 0, 10]}}},
+  {"do": "click", "on": {"view_point": {"view": "Front", "at": [30, 0, 22]}}},
+  {"do": "wait", "until": "ms", "ms": 1500},
+  {"do": "key", "key": "Escape"}
+ ]
+}

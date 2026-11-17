@@ -582,6 +582,48 @@
   },
   "about": "the 40 x 30 x 10 block and its drawing (Create Drawing of Part 1, ANSI_A_INCH.dwt, Suggested views: Top, Front, Right and Isometric at 1:1); opens on the drawing tab"
  },
+ "block-drawing-iso": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        40,
+        30
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "10 mm",
+     "operationType": "NEW"
+    }
+   }
+  ],
+  "drawing": {
+   "part": "Part 1",
+   "template": "ISO_A4_Portrait.dwt",
+   "views": "suggested"
+  },
+  "about": "the 40 x 30 x 10 block (as block-drawing) and its drawing on Onshape's ISO_A4_Portrait.dwt (A4 portrait, mm, First angle projection), Suggested views; opens on the drawing tab"
+ },
  "block-drawing-empty": {
   "units": "mm",
   "features": [
