@@ -41,10 +41,8 @@ fn gpu_pointer() -> Option<parking_lot::MutexGuard<'static, ()>> {
     Some(lock)
 }
 
-/// A 40 × 20 × 10 block (Part 1 <1>) and a 60 × 20 × 10 one (Part 2 <1>) side by side, Part 2 fastened by its top
-/// face's centre to Part 1's (so its top face carries Fastened 1's glyph), in a test window with a real renderer, seen
-/// from the top.
-fn mated_blocks(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<AssemblyView>) {
+/// A fresh document at a unique scratch path, built by `make` through the agent API.
+fn document(cx: &mut TestAppContext, name: &str, make: impl FnOnce(&mut Ctx)) -> std::path::PathBuf {
     cx.update(gpui_kit::init);
     crate::assembly_hooks::register_for_tests();
     let dir = std::env::temp_dir().join(format!("noshape-asm-feel-{name}-{}", std::process::id()));
@@ -53,21 +51,21 @@ fn mated_blocks(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity
     for ext in ["", "-wal", "-shm"] {
         let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
     }
-    {
-        let mut ctx = Ctx::new();
-        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
-        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
-        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }, { "tool": "corner_rectangle", "points": [[100, 0], [160, 20]] }] }));
-        let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
-        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
-        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
-        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
-        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
-        let (a, b) = (top(&mut ctx, "Part 1 <1>"), top(&mut ctx, "Part 2 <1>"));
-        call(&mut ctx, "assembly_mate", json!({ "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b }, "offset": { "x": "70 mm" } }));
-    }
-    let session = crate::session::Session::open(&path).unwrap();
-    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::Assembly(_))).unwrap().id;
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }, { "tool": "corner_rectangle", "points": [[100, 0], [160, 20]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    make(&mut ctx);
+    path
+}
+
+/// Assembly 1 of the document at `path` in a test window with a real renderer, evaluated with `occurrences`
+/// occurrences, seen from the top with its parts filling the middle of the graphics.
+fn open_from_top(cx: &mut TestAppContext, path: &std::path::Path, occurrences: usize) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    let session = crate::session::Session::open(path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| t.name == "Assembly 1").unwrap().id;
     let gpu = Gpu::headless_rendering().unwrap();
     let (window, view) = cx.update(|cx| {
         let doc = cx.new(|_| DocModel::new(session));
@@ -82,13 +80,9 @@ fn mated_blocks(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity
         (w, view.unwrap())
     });
     draw(cx, window);
-    wait_until(cx, window, &view, |v, _| v.built.is_some() && v.result.occurrences.len() == 2 && v.result.mates.first().is_some_and(|m| m.frame_b.is_some()));
-    // Seen from the top, the two blocks filling the middle of the graphics.
+    wait_until(cx, window, &view, |v, _| v.built.is_some() && v.result.occurrences.len() == occurrences && v.result.mates.iter().all(|m| m.frame_b.is_some()));
     cx.update_window(window, |_, _, cx| {
         view.update(cx, |v, cx| {
-            // A new mate is hidden (live): Show mates on it.
-            let id = v.result.mates[0].id;
-            v.set_mates_hidden(vec![id], false, cx);
             let (lo, hi) = v.result.bounds().unwrap();
             v.viewport.update(cx, |vp, cx| {
                 let s = vp.size();
@@ -97,6 +91,29 @@ fn mated_blocks(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity
                 vp.request_frame(cx);
             });
             v.refresh_scene(false, cx);
+        })
+    })
+    .unwrap();
+    frames(cx, window, &view);
+    (window, view)
+}
+
+/// A 40 × 20 × 10 block (Part 1 <1>) and a 60 × 20 × 10 one (Part 2 <1>) side by side, Part 2 fastened by its top
+/// face's centre to Part 1's (so its top face carries Fastened 1's glyph, shown), seen from the top.
+fn mated_blocks(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    let path = document(cx, name, |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
+        call(ctx, "assembly_mate", json!({ "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b }, "offset": { "x": "70 mm" } }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    // A new mate is hidden (live): Show mates on it.
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let id = v.result.mates[0].id;
+            v.set_mates_hidden(vec![id], false, cx);
         })
     })
     .unwrap();
@@ -244,4 +261,49 @@ fn a_box_takes_whole_instances_as_live(cx: &mut TestAppContext) {
     assert_eq!(selected(cx), vec!["Part 1 <1>".to_string()], "a crossing box over half a part takes the whole instance");
     let faces = cx.update(|cx| view.read(cx).hover.is_some() || view.read(cx).selected_mate.is_some());
     assert!(!faces, "no face or mate taken by a box");
+}
+
+/// live2 asm-feel (3b): in a subassembly, hovering one part outlines only that part (the pre-selection is its face with
+/// a two-level path) and a click selects that part's face inside the sub, the collapsed sub's row grey (related).
+#[gpui::test]
+fn a_part_inside_a_subassembly_hovers_and_is_taken_alone(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "sub-part", |ctx| {
+        call(ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+        call(ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 2" }));
+        call(ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Sub" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    // Part 1's top face, in the middle of its image.
+    let (centre, sub, part1) = cx.update(|cx| {
+        let v = view.read(cx);
+        let o = v.result.occurrences.iter().min_by(|a, b| {
+            let x = |o: &noshape_model::assembly::eval::PartOccurrence| o.mesh.positions.iter().map(|p| o.transform.transform_point3(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).x).fold(f64::MAX, f64::min);
+            x(a).total_cmp(&x(b))
+        }).unwrap();
+        let (mut lo, mut hi) = (glam::DVec3::splat(f64::MAX), glam::DVec3::splat(f64::MIN));
+        for p in &o.mesh.positions {
+            let w = o.transform.transform_point3(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
+            (lo, hi) = (lo.min(w), hi.max(w));
+        }
+        let c = v.viewport.read(cx).project(glam::DVec3::new((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, hi.z)).unwrap();
+        (c, o.top(), o.path.clone())
+    });
+    assert_eq!(part1.len(), 2, "a part inside the sub: a two-level path");
+    move_to(cx, window, &view, centre);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let h = v.hover.as_ref().expect("the face under the pointer");
+        assert_eq!((h.kind, &h.path), (crate::scene_builder::PickKind::Face, &part1), "the pre-selection: that part's face, its two-level path");
+    });
+    let w = at_window(cx, &view, centre);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());
+    settle(cx, window, &view);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert_eq!(v.ui.entity_sel.iter().map(|(p, _)| p.clone()).collect::<Vec<_>>(), vec![part1.clone()], "the click takes that part's face alone");
+        assert_eq!(v.selected, vec![sub], "its sub in the selection");
+        assert!(v.picked_inside(sub) && v.related_instances(cx).contains(&sub), "the sub's row related (grey), not selected");
+    });
 }

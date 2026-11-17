@@ -1060,7 +1060,16 @@ impl AssemblyView {
         if self.chip_mc_owner().is_some() {
             return Vec::new();
         }
-        self.selected_mate.map(|id| self.mate_instances(id, cx)).unwrap_or_default()
+        let mut tops = self.selected_mate.map(|id| self.mate_instances(id, cx)).unwrap_or_default();
+        tops.extend(self.selected.iter().copied().filter(|t| self.picked_inside(*t)));
+        tops
+    }
+
+    /// A subassembly selected only through entities of its parts: its row is related, not selected (live2 asm-feel
+    /// (3b): the collapsed sub's row grey).
+    fn picked_inside(&self, top: InstanceId) -> bool {
+        let mut of_top = self.ui.entity_sel.iter().filter(|(p, _)| p[0] == top).peekable();
+        of_top.peek().is_some() && of_top.all(|(p, _)| p.len() > 1)
     }
 
     /// The top instance owning the connector open from a mate's chip.
@@ -4007,7 +4016,7 @@ impl AssemblyView {
         let pattern_pick = self.pattern.as_ref().and_then(|p| p.active.map(|k| [&p.axis, &p.axis2, &p.axis3].get(k).and_then(|a| a.as_ref().map(|c| c.instance)).filter(|_| p.kind != PatternDialogKind::Mirror)));
         let picked = match pattern_pick {
             Some(pick) => pick == Some(top),
-            None => self.selected.contains(&top),
+            None => self.selected.contains(&top) && !self.picked_inside(top),
         };
         let selected = is_top && (picked || self.chip_mc_owner() == Some(top) || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&top)));
         let has_children = node.is_some_and(|n| !n.children.is_empty());
