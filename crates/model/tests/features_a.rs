@@ -158,11 +158,12 @@ fn body_ref(id: &BodyId) -> Reference {
     Reference::Body(id.clone())
 }
 
-/// A sketch on a face of a part a Transform moved is in the face's frame from before, moved with it: its origin the
-/// world origin's projection there, 50 mm up with the part, not the projection where the face is now (live
-/// c2-sm-hem-plus's Sketch 3 on a face Transform 1 turned 30°). Saved before, the sketch stays where it was.
+/// A sketch on a face of a part a Transform moved within the face's plane is in the frame of the face where it is: its
+/// origin the world origin's projection there, not moved 50 mm up with the part (live asm-rack-pinion's Sketch 4 on
+/// the SpurGear's face Transform 1 turned about its normal). A move that tilts the face takes the face's frame from
+/// before with it (live c2-sm-hem-plus's Sketch 3, the parity model).
 #[test]
-fn a_sketch_on_a_moved_parts_face_moves_its_frame_with_it() {
+fn a_sketch_on_a_parts_face_moved_in_its_plane_keeps_the_faces_frame() {
     for legacy in [false, true] {
         let mut t = T::new();
         t.ps.legacy_moved_face_frames = legacy;
@@ -175,7 +176,7 @@ fn a_sketch_on_a_moved_parts_face_moves_its_frame_with_it() {
         let sketch = t.sketch(front, circle(DVec2::ZERO, 0.002));
         let r = t.ok();
         let frame = r.context.sketch(sketch).expect("sketch").frame;
-        let want = if legacy { DVec3::ZERO } else { DVec3::new(0.0, 0.0, 0.05) };
+        let want = DVec3::ZERO;
         assert!(frame.origin.distance(want) < 1e-9, "legacy {legacy}: origin {:?}", frame.origin);
     }
 }
