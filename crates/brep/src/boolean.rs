@@ -4089,7 +4089,17 @@ impl Ctx<'_> {
             }
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
             Geo::Ell { e, t0, sweep, .. } => e.piece_box(t0, sweep),
-            Geo::Nurbs { id, t0, t1 } => free::piece_box(&self.ncurves[id as usize].c, t0, t1),
+            // (Its pieces' boxes over it, grown to the reach their test below keeps: no curve samples (infento's
+            // 1dc32b Boolean 4: 16 a span, every section piece, most of its time).)
+            Geo::Nurbs { id, t0, t1 } => {
+                let nc = &self.ncurves[id as usize];
+                let (ta, tb) = (t0.min(t1), t0.max(t1));
+                let g = DVec3::splat((GREY - 1.0) * tol_far);
+                match nc.boxes.get_or_init(|| nc.c.piece_boxes(8)).iter().filter(|x| x.1 >= ta && x.0 <= tb).fold(None, |a: Option<(DVec3, DVec3)>, x| Some(a.map_or((x.2, x.3), |(l, h)| (l.min(x.2), h.max(x.3))))) {
+                    Some((l, h)) => (l - g, h + g),
+                    None => free::piece_box(&nc.c, t0, t1),
+                }
+            }
             Geo::Apex { .. } => return Ok((vec![s.v[0], s.v[1]], vec![0.0, 1.0])),
         };
         let (lo, hi) = (lo - DVec3::splat(tol_far), hi + DVec3::splat(tol_far));
