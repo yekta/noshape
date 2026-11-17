@@ -4970,3 +4970,25 @@ fn an_opening_studio_says_what_it_is_loading(cx: &mut TestAppContext) {
     view.update(cx, |v, _| v.ui.opened_at = std::time::Instant::now() - std::time::Duration::from_secs(1));
     assert_eq!(cx.update(|cx| view.read(cx).loading_message()), Some("Loading studio data…"));
 }
+
+/// live ctx-menus-1117: on every graphics menu that names a part (here a part edge's), "Where used for Part 1…" sits
+/// in its own group right after the Create Drawing / Export… group.
+#[gpui::test]
+fn where_used_for_the_part_has_its_own_group_after_export(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "where-used-menu", Some(starts["block"].clone()));
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().any(|b| b.kind == noshape_model::display::BodyKind::Solid) && !view.read(cx).ui_busy());
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let edge = v.display.bodies.first().and_then(|b| b.edge_refs.first().cloned()).expect("an edge");
+            let target = v.built.as_ref().and_then(|b| b.picks.ids_for(&edge).first().and_then(|id| b.picks.get(*id)).cloned());
+            v.open_context_menu(target, gpui_kit::point(px(600.), px(400.)), w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let rows = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels())).expect("the menu");
+    let at = rows.iter().position(|r| r == "Where used for Part 1…").expect("Where used for Part 1…");
+    assert_eq!((rows[at - 2].as_str(), rows[at - 1].as_str(), rows.get(at + 1).map(String::as_str)), ("Export…", "———", Some("———")), "{rows:?}");
+}
