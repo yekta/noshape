@@ -16,6 +16,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (NOSHAPE_PARITY_ONLY=cf-hose-routing), rows "ours reads ours.x_t / .sat".
 
 ## qa, 2026-11-17
+- [ ] P1 REMEMBERED-VALUES-OLD-FORMAT (psui; qa 2026-11-17 17:15, confirmed on green a1383a65 = v0.4.57's base) Since
+  1313b3c9 a memory stored by an older build ("length:Millimeter" / "length:Inch": every user's existing store) is ignored: a
+  seeded fillet radius "3 mm" opens 5 mm in an mm document and 0.5 cm in a cm one (inch 0.2 in, the default, is right; an old
+  "9 mm + #wall_thickness" opens 5 mm, right). Users' remembered values reset once on updating to v0.4.57. Fix 582351aab
+  (queued, vibe7) for 05:00; check: /root/qa-scratch/uh/uf2.sh <app> <out> on vibe6 -> 3 mm, 0.3 cm, 0.2 in, 5 mm. Also for 05:00:
+  psui f6ef6a252 (the lingering parallel glyph goes after 550 ms) and f74af0d9a (glyph row and clicks).
 - [ ] P2 DOCK-TAB-SWITCH-TRAILING-FRAMES (psui; qa 2026-11-17 10:30, vibe6 :661, load 2-14: hints only) Switching between the
   user's dock document's two Part Studio tabs (both already open; pointer left resting on the clicked tab): the first frame is
   always < 160 ms, but on about half of the switches frames keep coming ~700-860 ms after the click (settle), against 76-154 ms on

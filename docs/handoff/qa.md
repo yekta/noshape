@@ -58,6 +58,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.56** published check done 11-17 06:58: clean, baseline 0.4.56. Next: the 17:00 cut (qa-cut-1615).
 
 ## Next (in this order)
+0. **05:00 checklist (psui via lead)**: REMEMBERED-VALUES-OLD-FORMAT fix 582351aab (uh/uf2.sh on its green: 3 mm, 0.3 cm,
+   0.2 in, 5 mm; v0.4.57 / a1383a65 gives 5 mm, 0.5 cm, 0.2 in, 5 mm), f6ef6a252 glyph (uh2.sh: no parallel glyph in the
+   "off" shots), f74af0d9a. psui sends main shas if the land rebases them.
 1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (12:35: GO on 7f287e52; c101c3c0 has core's
    four Split / Use / Rib lands; suites 827a23a6 clean; fan-blade-sweep Boolean 2 is now live's volume, 8x slower: core's Offset, sent to core). Still to come:
    blend's impeller Fillet 3 (when it lands: compat on its green + the impeller re-time below).
