@@ -1,6 +1,6 @@
 {
   "name": "drw-datum-target-show-all-dims",
-  "about": "A datum target's label › Show dimensions ▸ All targets",
+  "about": "A datum target on the Front view's top right vertex with its Origin at the bottom right vertex (so it has locating dimensions; without an Origin the menu has no Show dimensions), its label's menu › Show dimensions ▸ All targets",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-07: the remaining drawing menu items)",
@@ -24,7 +24,7 @@
         "view_point": {
           "view": "Front",
           "at": [
-            10,
+            40,
             0,
             10
           ]
@@ -37,9 +37,22 @@
         "view_point": {
           "view": "Front",
           "at": [
-            30,
+            60,
             0,
             30
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            40,
+            0,
+            0
           ]
         }
       }
@@ -56,7 +69,7 @@
         "view_point": {
           "view": "Front",
           "at": [
-            30,
+            60,
             0,
             30
           ]

@@ -1,0 +1,68 @@
+{
+  "name": "drw-create-drawing-tile-tips",
+  "about": "right-click Part 1 > Create Drawing of Part 1...: the Suggested views and No views tiles hovered (tooltips Drawing will automatically have recommended views / Drawing will be empty, ready for views to be added manually), Suggested views picked, OK: the drawing (the footer's Creating drawing... status is gone before a state is read)",
+  "area": "drawing",
+  "source": "studios 11-16 matrix (Create Drawing: Drawing will automatically have recommended views, Drawing will be empty, ready for views to be added manually, Creating drawing... unseen); live2 11-17",
+  "start": "block",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "part": "Part 1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Create Drawing of Part 1…"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "dialog"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "button": "Suggested views"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "button": "No views"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Suggested views"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 300
+    },
+    {
+      "do": "wait",
+      "until": "regenerated"
+    }
+  ]
+}

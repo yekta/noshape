@@ -1,0 +1,1217 @@
+{
+ "scenario": "drw-create-drawing-tile-tips",
+ "recorded": "2026-11-17T14:02:13.613Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
+ },
+ "live": {
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "3c9eccb324c7d8162fb24d8f",
+  "start": "block",
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 419.494,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.250744,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "part": "Part 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    112,
+    747
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Properties…",
+      "Assign material…",
+      "Edit appearance…",
+      "Copy here…",
+      "Copy Part 1",
+      "Create Drawing of Part 1…",
+      "Export…",
+      "Where used…",
+      "Create task…",
+      "Hide",
+      "Isolate…",
+      "Make transparent…",
+      "Add comment",
+      "Zoom to selection",
+      "Delete…"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 36146
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Create Drawing of Part 1…"
+    }
+   },
+   "ok": true,
+   "at": [
+    214,
+    527
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Onshape Loopelf Recently opened Created by me Shared with me Public AllANSIISOJIS Template Document Owner Retrieving templates… Options Suggested views No views"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 39426
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Onshape Loopelf Recently opened Created by me Shared with me Public AllANSIISOJIS Template Document Owner ANSI_A_INCH.dwt Onshape ANSI Drawing Templates Onshape ISO_A4_Portrait.dwt Onshape ISO Drawing Templates Onshape ISO_A3.dwt Onshape ISO Drawing Templates Onshape ANSI_B_MM.dwt Onshape ANSI Drawing Templates Onshape ISO_A4.dwt Onshape ISO Drawing Templates Onshape ANSI_A_MM.dwt Onshape ANSI Drawing Templates Onshape live bom asm Drawing 1.dwt noshape mm test"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 43831
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "hover",
+    "on": {
+     "button": "Suggested views"
+    }
+   },
+   "ok": true,
+   "at": [
+    885,
+    496
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Onshape Loopelf Recently opened Created by me Shared with me Public AllANSIISOJIS Template Document Owner ANSI_A_INCH.dwt Onshape ANSI Drawing Templates Onshape ISO_A4_Portrait.dwt Onshape ISO Drawing Templates Onshape ISO_A3.dwt Onshape ISO Drawing Templates Onshape ANSI_B_MM.dwt Onshape ANSI Drawing Templates Onshape ISO_A4.dwt Onshape ISO Drawing Templates Onshape ANSI_A_MM.dwt Onshape ANSI Drawing Templates Onshape live bom asm Drawing 1.dwt noshape mm test"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": "Drawing will automatically have recommended views",
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 59200
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Onshape Loopelf Recently opened Created by me Shared with me Public AllANSIISOJIS Template Document Owner ANSI_A_INCH.dwt Onshape ANSI Drawing Templates Onshape ISO_A4_Portrait.dwt Onshape ISO Drawing Templates Onshape ISO_A3.dwt Onshape ISO Drawing Templates Onshape ANSI_B_MM.dwt Onshape ANSI Drawing Templates Onshape ISO_A4.dwt Onshape ISO Drawing Templates Onshape ANSI_A_MM.dwt Onshape ANSI Drawing Templates Onshape live bom asm Drawing 1.dwt noshape mm test"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 62215
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "hover",
+    "on": {
+     "button": "No views"
+    }
+   },
+   "ok": true,
+   "at": [
+    1034,
+    496
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Onshape Loopelf Recently opened Created by me Shared with me Public AllANSIISOJIS Template Document Owner ANSI_A_INCH.dwt Onshape ANSI Drawing Templates Onshape ISO_A4_Portrait.dwt Onshape ISO Drawing Templates Onshape ISO_A3.dwt Onshape ISO Drawing Templates Onshape ANSI_B_MM.dwt Onshape ANSI Drawing Templates Onshape ISO_A4.dwt Onshape ISO Drawing Templates Onshape ANSI_A_MM.dwt Onshape ANSI Drawing Templates Onshape live bom asm Drawing 1.dwt noshape mm test"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": "Drawing will be empty, ready for views to be added manually",
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 77760
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Onshape Loopelf Recently opened Created by me Shared with me Public AllANSIISOJIS Template Document Owner ANSI_A_INCH.dwt Onshape ANSI Drawing Templates Onshape ISO_A4_Portrait.dwt Onshape ISO Drawing Templates Onshape ISO_A3.dwt Onshape ISO Drawing Templates Onshape ANSI_B_MM.dwt Onshape ANSI Drawing Templates Onshape ISO_A4.dwt Onshape ISO Drawing Templates Onshape ANSI_A_MM.dwt Onshape ANSI Drawing Templates Onshape live bom asm Drawing 1.dwt noshape mm test"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 80867
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Suggested views"
+    }
+   },
+   "ok": true,
+   "at": [
+    885,
+    496
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Create Drawing: New drawing name",
+     "fields": [
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Part 1 Drawing 1"
+      }
+     ],
+     "buttons": [
+      "OK",
+      "Cancel"
+     ],
+     "text": "Existing templates Custom template Onshape Loopelf Recently opened Created by me Shared with me Public AllANSIISOJIS Template Document Owner ANSI_A_INCH.dwt Onshape ANSI Drawing Templates Onshape ISO_A4_Portrait.dwt Onshape ISO Drawing Templates Onshape ISO_A3.dwt Onshape ISO Drawing Templates Onshape ANSI_B_MM.dwt Onshape ANSI Drawing Templates Onshape ISO_A4.dwt Onshape ISO Drawing Templates Onshape ANSI_A_MM.dwt Onshape ANSI Drawing Templates Onshape live bom asm Drawing 1.dwt noshape mm test"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "Suggested views provide only necessary views when MBD data is present.",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 419.494,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.250744,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 95659
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "at": [
+    1305,
+    582
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 150302
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 300
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 175857
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 214952
+  }
+ ]
+}

@@ -1,0 +1,80 @@
+{
+  "name": "drw-sheet-properties-custom-zones",
+  "about": "The sheet's right-click menu › Sheet properties...: the Format row's DWT button hovered (tooltip Select a DWT), Size set to Custom (Zones Start from bottom right, Horizontal / Vertical zones 4 and Include border appear), Zones set to Start from top left, Include border unticked (the zone rows go away); Escape (cancel)",
+  "area": "drawing",
+  "source": "studios 11-16 matrix (Sheet properties: Select a DWT, Zones, Start from bottom right, Start from top left, Include border unseen); live2 11-17 exploration; the DWT button and Include border by pixel, the dropdowns picked by label (screen = iframe DOM + 40)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          150,
+          110
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Sheet properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          322,
+          149
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "A",
+        "pick": "Custom"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Start from bottom right",
+        "pick": "Start from top left"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          57,
+          296
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
