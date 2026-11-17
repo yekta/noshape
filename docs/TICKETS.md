@@ -566,6 +566,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   nothing lit over the region or Front while the line tool draws); one first hover missed on vibe6 at load 48, not on vibe5
   (2 runs). Green 1775b123's authored-documents step failed (vibe5's ~/tmp pruned the staged copies; moved to ~/agents/qa-keep
   at 15:20, the hats / dock / tickets there ALL-SAME); bc58c02b is next in the compat loop.
+- 16:30: vibe5 down (~16:20), vibe3 gone: qa's compat / cut / release checks moved to vibe7 (CLIs 0.4.56 / 0.4.43 from the
+  release assets). vibe7's ~/lead-private has hat15 and hat8 only: hat15b and the dock are NOT checked until they are
+  there. The compat loop restarted on green a1383a65 (the 16:15 verdict was stuck on vibe5; it is given by hand on the
+  green with core's fixes). The scissor-lift / rack-pinion check stays on vibe6.
 - SCISSOR-LIFT: core's revert ddfea0eb1 queued 15:05; core 15:30: on vibe6 (release) BOM 59/87, no Fillet 18 / Extrude 20
   errors. Also must ship: core eb3c2bd48 (queued), asm's rack-pinion P0 from core 747c2bf0d, which is in v0.4.56 too (Studio
   ab25c5 9 -> 18/29 with the fix). qa-sl-verify runs asm-scissor-lift + asm-rack-pinion alone on the first green with the

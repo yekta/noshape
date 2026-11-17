@@ -131,6 +131,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   host, deleted after; never in the repo or tickets.
 
 ## Hosts
+**11-17 16:30: vibe5 DOWN, vibe3 gone.** qa's vibe5 work moved: compat-check / rel-* run on vibe7 (H=vibe7; CLIs in vibe7
+~/qa-rel/<v>/noshape-cli from the release's noshape-cli tarball), the nightly streams private docs from vibe7 and the saved
+corpus from vibe6, land-footer lands through vibe7. vibe7 ~/lead-private: hat15, hat8 only (hat15b, dock missing: the
+compat lists only those present). One-off vibe5 scripts in bin/retired. The local lock is still named vibe5.lock.
+Text below this note predates the move.
 vibe5: land queue, compat loop (one CLI at a time), release builds via rb.sh (worktree qa-bisect). vibe6: ad-hoc app runs
 (:661), release quit check, main's watcher since 11-17 16:20 (/tmp/lead/main-status, /root/green come from there). vibe7:
 suites (slot), fuzz :61, nightly :671. vibe3 retired 11-17 ~17:15: qa's unique files copied to vibe7 ~/agents/qa-keep/vibe3-qa
