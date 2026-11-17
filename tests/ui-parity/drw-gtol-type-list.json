@@ -1,63 +1,83 @@
 {
- "name": "drw-gtol-type-list",
- "about": "block-drawing: Geometric tolerance tool; the first frame's Type list opened and Flatness picked; + adds a second frame; Escape",
- "area": "drawing",
- "source": "studios 11-16 matrix (Datum / Datum target, Weld symbol, Geometric tolerance): live2 exploration px-datum (live/feel shots in /root/live2-scratch/px/datum); unlabelled dropdown arrows by pixel (drawing panel at the left, screen = iframe DOM + 40)",
- "start": "block-drawing",
- "steps": [
-  {
-   "do": "click",
-   "on": {
-    "tool": "Geometric tolerance"
-   }
-  },
-  {
-   "do": "wait",
-   "until": "ms",
-   "ms": 1500
-  },
-  {
-   "do": "click",
-   "on": {
-    "px": [
-     158,
-     189
-    ]
-   }
-  },
-  {
-   "do": "wait",
-   "until": "ms",
-   "ms": 1000
-  },
-  {
-   "do": "click",
-   "on": {
-    "menu": "Flatness"
-   }
-  },
-  {
-   "do": "wait",
-   "until": "ms",
-   "ms": 1000
-  },
-  {
-   "do": "click",
-   "on": {
-    "px": [
-     75,
-     237
-    ]
-   }
-  },
-  {
-   "do": "wait",
-   "until": "ms",
-   "ms": 1200
-  },
-  {
-   "do": "key",
-   "key": "Escape"
-  }
- ]
+  "name": "drw-gtol-type-list",
+  "about": "block-drawing: Geometric tolerance tool; the first frame's Type list opened and Flatness picked; + adds a second frame; Escape (live2 11-17: the Type list's scrollbar dragged 60 px first, so Flatness is visible when picked; before, the click fell through to the canvas and placed a Position frame)",
+  "area": "drawing",
+  "source": "studios 11-16 matrix (Datum / Datum target, Weld symbol, Geometric tolerance): live2 exploration px-datum (live/feel shots in /root/live2-scratch/px/datum); unlabelled dropdown arrows by pixel (drawing panel at the left, screen = iframe DOM + 40)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Geometric tolerance"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          158,
+          189
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "drag",
+      "from": {
+        "px": [
+          302,
+          240
+        ]
+      },
+      "to": {
+        "px": [
+          302,
+          300
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Flatness"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          75,
+          237
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
 }

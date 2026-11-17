@@ -1,6 +1,6 @@
 {
  "scenario": "drw-gtol-type-list",
- "recorded": "2026-11-17T12:19:36.122Z",
+ "recorded": "2026-11-17T23:13:03.540Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -9,12 +9,12 @@
    1919,
    1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.5"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.7"
  },
  "live": {
   "document": "a1e7207bcd206771836609af",
   "workspace": "6d6324b30f07aa9904363635",
-  "element": "3b7ce06a033dfd42b0f6c7d3",
+  "element": "4d3df3d933872b3072b8b34a",
   "start": "block-drawing",
   "startElement": "fec75b9b8f06f7e2fe8fa56f",
   "runner": "live2 .nstate-uip-1.json"
@@ -209,7 +209,7 @@
      "selection": []
     }
    },
-   "t": 227541
+   "t": 240763
   },
   {
    "step": 2,
@@ -313,7 +313,7 @@
      "selection": []
     }
    },
-   "t": 253267
+   "t": 266666
   },
   {
    "step": 3,
@@ -491,7 +491,7 @@
      "selection": []
     }
    },
-   "t": 277852
+   "t": 292342
   },
   {
    "step": 4,
@@ -661,10 +661,370 @@
      "selection": []
     }
    },
-   "t": 305326
+   "t": 317526
   },
   {
    "step": 5,
+   "do": {
+    "do": "drag",
+    "from": {
+     "px": [
+      302,
+      240
+     ]
+    },
+    "to": {
+     "px": [
+      302,
+      300
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    [
+     302,
+     240
+    ],
+    [
+     302,
+     300
+    ]
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Geometric tolerance",
+     "text": [
+      "Geometric tolerance",
+      "Prefix",
+      "Type",
+      "Tolerance",
+      "Datums",
+      "Suffix",
+      "+",
+      "Position",
+      "Concentricity",
+      "Symmetry",
+      "Parallelism",
+      "Perpendicularity",
+      "Angularity",
+      "Cylindricity",
+      "Flatness",
+      "Roundness",
+      "Straightness",
+      "Profile (Surface)",
+      "Profile (Line)",
+      "Circular runout",
+      "Total runout"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "cbSymbol0_Menu",
+     "rows": [
+      "Position",
+      "Concentricity",
+      "Symmetry",
+      "Parallelism",
+      "Perpendicularity",
+      "Angularity",
+      "Cylindricity",
+      "Flatness",
+      "Roundness",
+      "Straightness",
+      "Profile (Surface)",
+      "Profile (Line)",
+      "Circular runout",
+      "Total runout"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Geometric tolerance",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 346300
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Geometric tolerance",
+     "text": [
+      "Geometric tolerance",
+      "Prefix",
+      "Type",
+      "Tolerance",
+      "Datums",
+      "Suffix",
+      "+",
+      "Position",
+      "Concentricity",
+      "Symmetry",
+      "Parallelism",
+      "Perpendicularity",
+      "Angularity",
+      "Cylindricity",
+      "Flatness",
+      "Roundness",
+      "Straightness",
+      "Profile (Surface)",
+      "Profile (Line)",
+      "Circular runout",
+      "Total runout"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "cbSymbol0_Menu",
+     "rows": [
+      "Position",
+      "Concentricity",
+      "Symmetry",
+      "Parallelism",
+      "Perpendicularity",
+      "Angularity",
+      "Cylindricity",
+      "Flatness",
+      "Roundness",
+      "Straightness",
+      "Profile (Surface)",
+      "Profile (Line)",
+      "Circular runout",
+      "Total runout"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Geometric tolerance",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 371770
+  },
+  {
+   "step": 7,
    "do": {
     "do": "click",
     "on": {
@@ -674,7 +1034,7 @@
    "ok": true,
    "at": [
     217,
-    432
+    268
    ],
    "state": {
     "focus": {
@@ -766,23 +1126,14 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [
-      {
-       "kind": "gdt",
-       "text": "⌖",
-       "position": [
-        -34.2,
-        141.9
-       ]
-      }
-     ],
+     "annotations": [],
      "selection": []
     }
    },
-   "t": 356756
+   "t": 424711
   },
   {
-   "step": 6,
+   "step": 8,
    "do": {
     "do": "wait",
     "until": "ms",
@@ -879,23 +1230,14 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [
-      {
-       "kind": "gdt",
-       "text": "⌖",
-       "position": [
-        -34.2,
-        141.9
-       ]
-      }
-     ],
+     "annotations": [],
      "selection": []
     }
    },
-   "t": 381983
+   "t": 451214
   },
   {
-   "step": 7,
+   "step": 9,
    "do": {
     "do": "click",
     "on": {
@@ -1000,23 +1342,14 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [
-      {
-       "kind": "gdt",
-       "text": "⌖",
-       "position": [
-        -34.2,
-        141.9
-       ]
-      }
-     ],
+     "annotations": [],
      "selection": []
     }
    },
-   "t": 407815
+   "t": 476385
   },
   {
-   "step": 8,
+   "step": 10,
    "do": {
     "do": "wait",
     "until": "ms",
@@ -1113,23 +1446,14 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [
-      {
-       "kind": "gdt",
-       "text": "⌖",
-       "position": [
-        -34.2,
-        141.9
-       ]
-      }
-     ],
+     "annotations": [],
      "selection": []
     }
    },
-   "t": 433079
+   "t": 502268
   },
   {
-   "step": 9,
+   "step": 11,
    "do": {
     "do": "key",
     "key": "Escape"
@@ -1221,20 +1545,11 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [
-      {
-       "kind": "gdt",
-       "text": "⌖",
-       "position": [
-        -34.2,
-        141.9
-       ]
-      }
-     ],
+     "annotations": [],
      "selection": []
     }
    },
-   "t": 484476
+   "t": 530694
   }
  ]
 }
