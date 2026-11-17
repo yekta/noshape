@@ -10841,6 +10841,169 @@ OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double t
   return make_result({s.shape}, u.Shape(), hist.get());
 }
 
+OpOut op_merge_on_surfaces(const OcShape& s, const OcShapeList& ons, double tol)
+{
+  require_non_null(s.shape, "shape");
+  std::vector<std::pair<occ::handle<Geom_Surface>, TopLoc_Location>> on;
+  for (const TopoDS_Shape& o : ons.items)
+  {
+    TopLoc_Location loc;
+    on.emplace_back(BRep_Tool::Surface(as_face(o, "face"), loc), loc);
+  }
+  BRepBuilderAPI_Copy            cp(s.shape, false, false);
+  const TopoDS_Shape             c  = cp.Shape();
+  HHist                          hc = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s.shape}), cp);
+  carry_kept_marks(s.shape, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
+  ShapeIMap faces;
+  TopExp::MapShapes(c, TopAbs_FACE, faces);
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  // Each face's surface group (0: none).
+  std::vector<int> group(faces.Extent() + 1, 0);
+  BRep_Builder     B;
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    const TopoDS_Face&        f = TopoDS::Face(faces(i));
+    TopLoc_Location           floc;
+    occ::handle<Geom_Surface> fs = BRep_Tool::Surface(f, floc);
+    if (fs.IsNull() || fs->IsKind(STANDARD_TYPE(Geom_ElementarySurface)))
+      continue;
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    for (size_t k = 0; k < on.size(); ++k)
+    {
+      const auto& [os, oloc] = on[k];
+      if (os == fs && oloc.IsEqual(floc))
+      {
+        group[i] = (int)k + 1;
+        break;
+      }
+      occ::handle<Geom_Surface> a = fs, b = os;
+      while (const auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(a))
+        a = t->BasisSurface();
+      while (const auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(b))
+        b = t->BasisSurface();
+      if (a->DynamicType() != b->DynamicType())
+        continue;
+      // (Five points inside the face on the other surface; its normal's way there at the middle one.)
+      bool lies = true, same_way = true;
+      for (const auto& [su, sv] : {std::pair{0.5, 0.5}, {0.25, 0.25}, {0.75, 0.25}, {0.25, 0.75}, {0.75, 0.75}})
+      {
+        gp_Pnt p;
+        gp_Vec du, dv;
+        fs->D1(u0 + (u1 - u0) * su, v0 + (v1 - v0) * sv, p, du, dv);
+        p.Transform(floc.Transformation());
+        GeomAPI_ProjectPointOnSurf pr(p.Transformed(oloc.Transformation().Inverted()), os);
+        if (!pr.IsDone() || pr.NbPoints() == 0 || pr.LowerDistance() > tol)
+        {
+          lies = false;
+          break;
+        }
+        if (su == 0.5)
+        {
+          double pu, pv;
+          pr.LowerDistanceParameters(pu, pv);
+          gp_Pnt q;
+          gp_Vec qu, qv;
+          os->D1(pu, pv, q, qu, qv);
+          const gp_Vec n1 = du.Crossed(dv).Transformed(floc.Transformation());
+          const gp_Vec n2 = qu.Crossed(qv).Transformed(oloc.Transformation());
+          lies     = n1.Magnitude() > 1e-300 && n2.Magnitude() > 1e-300;
+          same_way = n1.Dot(n2) > 0;
+        }
+      }
+      if (!lies)
+        continue;
+      group[i]          = (int)k + 1;
+      const double ftol = BRep_Tool::Tolerance(f);
+      TopoDS_Face  g;
+      B.MakeFace(g, os, oloc, ftol);
+      for (TopoDS_Iterator it(f.Oriented(TopAbs_FORWARD)); it.More(); it.Next())
+        B.Add(g, same_way ? it.Value() : it.Value().Reversed());
+      g.Orientation(same_way ? f.Orientation() : TopAbs::Reverse(f.Orientation()));
+      for (TopExp_Explorer ex(g, TopAbs_EDGE); ex.More(); ex.Next())
+        ShapeFix_Edge().FixAddPCurve(TopoDS::Edge(ex.Current()), g, BRep_Tool::IsClosed(TopoDS::Edge(ex.Current()), f), ftol);
+      BRepLib::SameParameter(g, ftol, true);
+      rs->Replace(f, g);
+      break;
+    }
+  }
+  // Only where two faces of one group meet.
+  ShapeAncMap ef;
+  unique_ancestors(c, TopAbs_EDGE, TopAbs_FACE, ef);
+  bool any = false;
+  for (int i = 1; i <= ef.Extent() && !any; ++i)
+  {
+    const ShapeList& fs = ef(i);
+    const int        a  = fs.Extent() == 2 ? group[faces.FindIndex(fs.First())] : 0;
+    any                 = a != 0 && a == group[faces.FindIndex(fs.Last())];
+  }
+  if (!any)
+    return make_result({s.shape}, s.shape, nullptr);
+  const TopoDS_Shape in = rs->Apply(c);
+  // (Edges joined only at the ends of the edges between two faces of one group, nowhere else: a 0.05 mm edge on the
+  // housing face c2-impeller-loft's Fillet 3 extends stays.)
+  ShapeIMap                    free;
+  ShapeUpgrade_UnifySameDomain u(in, true, true, false);
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const ShapeList& fs = ef(i);
+    const int        a  = fs.Extent() == 2 ? group[faces.FindIndex(fs.First())] : 0;
+    if (a != 0 && a == group[faces.FindIndex(fs.Last())])
+      TopExp::MapShapes(ef.FindKey(i), TopAbs_VERTEX, free);
+    else if (!fs.IsEmpty() && group[faces.FindIndex(fs.First())] == 0 && group[faces.FindIndex(fs.Last())] == 0)
+      u.KeepShape(ef.FindKey(i));
+  }
+  ShapeIMap                    vs;
+  TopExp::MapShapes(in, TopAbs_VERTEX, vs);
+  for (int i = 1; i <= vs.Extent(); ++i)
+    if (!free.Contains(vs(i)))
+      u.KeepShape(vs(i));
+  keep_marked_edges(u, in);
+  u.Build();
+  carry_kept_marks(in, u);
+  if (!BRepCheck_Analyzer(u.Shape()).IsValid())
+    return make_result({s.shape}, s.shape, nullptr);
+  // (The segmented integral: OCCT's plain one is 2 % off on c2-impeller-loft's part.)
+  const double v0 = volume_props(s.shape).Mass();
+  if (std::abs(volume_props(u.Shape()).Mass() - v0) > 1e-6 * std::abs(v0))
+    return make_result({s.shape}, s.shape, nullptr);
+  // The vertices left between pieces of one curve along a merged face stay: Parasolid's pieces there are its own
+  // edges (c2-impeller-loft's Fillet 3: the chamfers' three edges on the x 5 face, live's too).
+  ShapeAncMap ve, re;
+  unique_ancestors(u.Shape(), TopAbs_VERTEX, TopAbs_EDGE, ve);
+  unique_ancestors(u.Shape(), TopAbs_EDGE, TopAbs_FACE, re);
+  auto merged = [&](const TopoDS_Shape& e) {
+    const ShapeList* fs = re.Seek(e);
+    if (fs == nullptr)
+      return false;
+    for (ShapeList::Iterator f(*fs); f.More(); f.Next())
+    {
+      TopLoc_Location                 l;
+      const occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(f.Value()), l);
+      for (const auto& [os, oloc] : on)
+        if (g == os && l.IsEqual(oloc))
+          return true;
+    }
+    return false;
+  };
+  for (int i = 1; i <= ve.Extent(); ++i)
+  {
+    const ShapeList& es = ve(i);
+    if (es.Extent() == 2 && (merged(es.First()) || merged(es.Last())))
+    {
+      mark_kept_ends(es.First());
+      mark_kept_ends(es.Last());
+    }
+  }
+  HHist hist = new BRepTools_History();
+  hist->Merge(hc);
+  if (!rs->History().IsNull())
+    hist->Merge(rs->History());
+  if (!u.History().IsNull())
+    hist->Merge(u.History());
+  return make_result({s.shape}, u.Shape(), hist.get());
+}
+
 namespace
 {
 // Surfaces of revolution that are a torus, sphere, cylinder or cone made those (an IGES writer's revolved faces: a

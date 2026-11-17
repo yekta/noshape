@@ -470,6 +470,15 @@ pub fn collapse_short_edges(shape: &Shape, points: &[DVec3], len: f64) -> Result
     Ok(OpResult::from_ffi(ck(ffi::op_collapse_short_edges(shape.raw(), &flat, len))?))
 }
 
+/// The free-form faces lying within `tol` on one of `ons`' surfaces put on it and merged where they meet, nothing else
+/// merged (a blend's pieces of a face it extended, left on copies of its surface, whose merge the unify's volume check
+/// refuses: their integrals 1e-7 apart); the shape as it was where the result isn't valid or its volume moves past
+/// 1e-6 of it.
+pub fn merge_on_surfaces(shape: &Shape, ons: &[Shape], tol: f64) -> Result<OpResult> {
+    let l = vec_to_list(ons);
+    Ok(OpResult::from_ffi(ck(ffi::op_merge_on_surfaces(shape.raw(), &l, tol))?))
+}
+
 /// A conic: an ellipse (a circle where its radii are equal) in the plane through `centre` across `normal`, its major
 /// axis along `major_dir`.
 #[derive(Debug, Clone, Copy)]

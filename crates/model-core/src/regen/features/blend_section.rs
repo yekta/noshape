@@ -662,6 +662,164 @@ fn trimmed_run_on(shape: &Shape, supports: [usize; 2], (tool, names): (Shape, Ve
     Ok((kept, refaced))
 }
 
+/// A convex round's tool with its run-on pieces past its edge's free ends (each with the edge's end and the way out).
+struct RunOnTool {
+    tool: Shape,
+    names: Vec<Name>,
+    supports: [usize; 2],
+    generated: Name,
+    run_on: Vec<(Shape, DVec3, DVec3)>,
+    len: f64,
+}
+
+/// Convex rounds' tools run on past their edges' free ends, cut back at each end by the faces the run-on meets there,
+/// in the order it meets them, each extended, until the tool's middle no longer reaches the run-on's tip: the round
+/// ends on those faces' extensions, as live's (c2-impeller-loft's Fillet 3: on the housing's face at the far end).
+/// Faces met only past the first that close it never cut (an extended bore cylinder beyond the far end ran along the
+/// whole tool). An end whose first face doesn't span the tool runs into a corner: the rounds there lose only what is
+/// behind every face of the corner (that face and its neighbours along the rounds' faces), for all the rounds at
+/// once (the impeller's near end: two rounds meeting in a ridge end on the collar's two chamfer faces and its x 5 face).
+fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f64) -> FResult<RunOn> {
+    let tol = scale * 1e-7;
+    let corner_reach = |b: k::BoundingBox, q: DVec3, out: DVec3, far: bool| -> f64 {
+        let cs = (0..8).map(|i| DVec3::new(if i & 1 == 0 { b.min.x } else { b.max.x }, if i & 2 == 0 { b.min.y } else { b.max.y }, if i & 4 == 0 { b.min.z } else { b.max.z }));
+        if far { cs.map(|c| (c - q).dot(out)).fold(f64::MIN, f64::max) } else { cs.map(|c| (c - q).dot(out)).fold(f64::MAX, f64::min) }
+    };
+    // (Tight boxes: a B-spline face's loose box follows its poles, past where a wall cut the piece.)
+    let reach = |s: &Shape, q: DVec3, out: DVec3| s.bounding_box(true).map_or(0.0, |b| corner_reach(b, q, out, true));
+    let first = |s: &Shape, q: DVec3, out: DVec3| s.bounding_box(true).map_or(f64::MAX, |b| corner_reach(b, q, out, false));
+    let body_faces = shape.faces();
+    let touches = |f: &Shape, p: &Shape| p.vertices().iter().any(|v| k::distance(v, f).is_ok_and(|d| d.distance <= tol)) || k::distance(f, p).is_ok_and(|d| d.distance <= tol);
+    let neighbours = |f: usize| -> Vec<usize> {
+        let mut n: Vec<usize> = ef.iter().filter(|fs| fs.contains(&(f as u32))).flat_map(|fs| fs.iter().map(|&g| g as usize)).filter(|&g| g != f).collect();
+        n.sort_unstable();
+        n.dedup();
+        n
+    };
+    let points_of = |run: &Shape| -> Vec<DVec3> {
+        run.edges()
+            .iter()
+            .filter_map(|e| e.edge_info().ok().map(|i| (e.clone(), i)))
+            .flat_map(|(e, i)| (0..=16).filter_map(move |k| e.point_at(i.first_param + (i.last_param - i.first_param) * k as f64 / 16.0).ok()))
+            .collect()
+    };
+    let mut refaced = Vec::new();
+    let mut pieces = Vec::new();
+    // Each corner end: its tool, the end, its faces.
+    let mut corners: Vec<(usize, Shape, DVec3, DVec3, Vec<usize>)> = Vec::new();
+    for (ti, t) in tools.iter().enumerate() {
+        let seed = t.tool.centroid()?;
+        if t.tool.classify_point(seed, tol)? != k::PointClass::Inside {
+            return Err(fail("a run-on round's tool with its centroid outside it"));
+        }
+        let mut piece = t.tool.clone();
+        // (Boxes are loose: the middle reaches the tip until a wall takes a thousandth of the edge off it.)
+        let margin = (1e-3 * t.len).max(10.0 * tol);
+        for (run, q, out) in &t.run_on {
+            let tip = reach(&piece, *q, *out).min(reach(run, *q, *out)) - margin;
+            let rb = run.bounding_box(false)?;
+            let mut met: Vec<(f64, usize)> = body_faces
+                .iter()
+                .enumerate()
+                .filter(|(i, f)| !t.supports.contains(i) && f.bounding_box(false).is_ok_and(|b| (b.min - DVec3::splat(tol)).cmple(rb.max).all() && rb.min.cmple(b.max + DVec3::splat(tol)).all()) && touches(f, run))
+                .map(|(i, f)| (first(f, *q, *out), i))
+                .collect();
+            met.sort_by(|a, b| a.0.total_cmp(&b.0));
+            let points = points_of(run);
+            for (n, &(_, i)) in met.iter().enumerate() {
+                if reach(&piece, *q, *out) < tip {
+                    break;
+                }
+                let f = &body_faces[i];
+                let free_form = !matches!(f.face_surface()?, k::Surface::Plane(_) | k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. });
+                let wall = if matches!(f.face_surface()?, k::Surface::BSpline { .. }) { k::extend_face_over(f, &points, 0.05 * t.len)? } else { k::extend_face(f, 2.0 * t.len)? };
+                let cells = k::split(std::slice::from_ref(&piece), std::slice::from_ref(&wall), &k::BooleanOptions::default())?.shape.solids();
+                if n == 0 && cells.len() == 1 {
+                    // A face its run-on meets first that doesn't cut it across: a corner, with that face's neighbours
+                    // that border a support.
+                    let mut faces = vec![i];
+                    faces.extend(neighbours(i).into_iter().filter(|&g| !t.supports.contains(&g) && neighbours(g).iter().any(|s| t.supports.contains(s))));
+                    corners.push((ti, run.clone(), *q, *out, faces));
+                    break;
+                }
+                let Some(p) = cells.into_iter().find(|p| p.classify_point(seed, tol).is_ok_and(|c| c == k::PointClass::Inside)) else {
+                    return Err(fail("a run-on round's middle lost to the faces past its end"));
+                };
+                // (A free-form wall that cut is the face the round ends on: the body's face rebuilt on its extension.)
+                if free_form && p.volume().unwrap_or(0.0) < piece.volume().unwrap_or(0.0) * (1.0 - 1e-6) {
+                    refaced.push((i, wall.clone()));
+                }
+                piece = p;
+            }
+            if corners.last().is_some_and(|c| c.0 == ti && c.2 == *q) {
+                continue;
+            }
+            if reach(&piece, *q, *out) >= tip {
+                return Err(fail("a run-on round not closed by the faces past its end"));
+            }
+        }
+        pieces.push(vec![piece]);
+    }
+    if !corners.is_empty() {
+        let mut faces: Vec<usize> = corners.iter().flat_map(|c| c.4.iter().copied()).collect();
+        faces.sort_unstable();
+        faces.dedup();
+        let points: Vec<DVec3> = corners.iter().flat_map(|c| points_of(&c.1)).collect();
+        let len = tools.iter().map(|t| t.len).fold(0.0, f64::max);
+        let mut walls = Vec::new();
+        for &i in &faces {
+            let f = &body_faces[i];
+            if matches!(f.face_surface()?, k::Surface::BSpline { .. }) {
+                let wall = k::extend_face_over(f, &points, 0.05 * len)?;
+                refaced.push((i, wall.clone()));
+                walls.push(wall);
+            } else {
+                walls.push(k::extend_face(f, 2.0 * len)?);
+            }
+        }
+        let behind = |w: &Shape, q: DVec3| w.project_point(q).is_ok_and(|pr| w.normal_at_point(pr.point).is_ok_and(|n| (q - pr.point).dot(n) < 0.0));
+        for (ti, cells) in pieces.iter_mut().enumerate() {
+            if !corners.iter().any(|c| c.0 == ti) {
+                continue;
+            }
+            // (The round less the cells behind every wall, not the cells left: those split its faces at each wall.)
+            let mut whole = Vec::new();
+            for piece in cells.iter() {
+                let (dropped, kept): (Vec<Shape>, Vec<Shape>) = k::split(std::slice::from_ref(piece), &walls, &k::BooleanOptions::default())?.shape.solids().into_iter().partition(|c| c.centroid().is_ok_and(|q| walls.iter().all(|w| behind(w, q))));
+                if dropped.is_empty() {
+                    whole.push(piece.clone());
+                    continue;
+                }
+                match k::boolean(k::BooleanOp::Cut, std::slice::from_ref(piece), &dropped, &k::BooleanOptions::default()) {
+                    Ok(r) if r.shape.count(ShapeType::Solid) == 1 => whole.push(r.shape.solids().remove(0)),
+                    _ => whole.extend(kept),
+                }
+            }
+            *cells = whole;
+        }
+        for (ti, run, q, out) in corners.iter().map(|c| (c.0, &c.1, c.2, c.3)) {
+            let margin = (1e-3 * tools[ti].len).max(10.0 * tol);
+            let tip = reach(&tools[ti].tool, q, out).min(reach(run, q, out)) - margin;
+            if pieces[ti].is_empty() || pieces[ti].iter().any(|p| reach(p, q, out) >= tip) {
+                return Err(fail("a run-on round not closed by the corner past its end"));
+            }
+        }
+    }
+    let mut kept = Vec::new();
+    for (t, cells) in tools.iter().zip(pieces) {
+        let faces = t.tool.faces();
+        let on = |f: &Shape| -> Name {
+            let q = super::helpers_a::point_on_face(f);
+            q.and_then(|q| faces.iter().zip(&t.names).find(|(g, _)| g.contains_point(q, scale * 1e-6).unwrap_or(false))).map_or_else(|| t.generated.clone(), |(_, n)| n.clone())
+        };
+        for c in cells {
+            let names = c.faces().iter().map(on).collect();
+            kept.push(NamedShape::new(c, names));
+        }
+    }
+    Ok((kept, refaced))
+}
+
 /// Whether an edge end continues tangentially into another edge of the body.
 fn tangent_continues(body: &Shape, at: DVec3, dir: DVec3, skip: usize) -> bool {
     body.edges().iter().enumerate().any(|(j, e)| {
@@ -706,7 +864,15 @@ pub fn partial_point(shape: &Shape, edges: &[usize], fraction: f64) -> Option<(D
 
 /// Blend `edges` of body `bi` with `spec` (see the module docs).
 pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec) -> FResult<()> {
-    sections(ev, bi, edges, spec, false, None)
+    let first = sections(ev, bi, edges, spec, false, None);
+    // A conic round whose sections from the faces' tangents at the edge fail: rolling balls on the faces themselves, the
+    // conic between their contacts (c2-impeller-loft's Fillet 3: R 3 on a rib's 30 deg lips curving away, each ball
+    // past the rib's middle, the two rounds meeting in a ridge as live's).
+    let conic = matches!(spec.section, Section::Conic(_)) && spec.r1 == spec.r2 && spec.width.is_none() && spec.partial.is_none() && spec.sides.is_none() && spec.reference.is_none();
+    if !conic || first.is_ok() {
+        return first;
+    }
+    sections(ev, bi, edges, spec, true, None).or(first)
 }
 
 /// A round's rolling-ball tools and contact conics ([`rolling_ball_blend`]'s), made ahead (while OCCT tries the round),
@@ -720,7 +886,7 @@ pub fn rolling_ball_tools(shape: &Shape, edges: &[usize], r: f64, stop: &std::sy
         let ef = shape.edge_faces()?;
         let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
         let chain = chain_ordered(shape, edges, true)?;
-        let tools = ball_tools(shape, &chain, &ef, &shape.faces(), r, scale, Some(stop))?;
+        let tools = ball_tools(shape, &chain, &ef, &shape.faces(), (r, Section::Circular), scale, Some(stop))?;
         Ok((tools, chain.iter().map(|c| shape.sub_shape(ShapeType::Edge, c.index)).collect::<Result<Vec<_>, _>>()))
     })();
     match made {
@@ -921,7 +1087,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                 direct = made_direct;
                 made?
             }
-            None => ball_tools(shape, &chain, &ef, &faces, spec.r1, scale, None)?,
+            None => ball_tools(shape, &chain, &ef, &faces, (spec.r1, spec.section), scale, None)?,
         };
         conics = contacts;
         // Which of each tool's faces lie on its supports (generated) and which are its blend: the tools in parallel
@@ -1247,11 +1413,50 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     eprintln!("section blend: direct build declined: {:?}", other.map(|r| (r.shape.is_valid(), r.shape.count(ShapeType::Solid))).map_err(|e| e.to_string()));
                 }
                 // (A rolling ball's sides only approximate its curved faces: a boolean by them leaves slivers.)
-                if ball {
+                if ball && !matches!(spec.section, Section::Conic(_)) {
                     return Err(fail("the rolling balls' direct build declined"));
                 }
             }
         }
+    }
+    // A conic round's rolling-ball tools for the Boolean: each run on past a free end only up to the faces it meets
+    // there, extended (c2-impeller-loft's Fillet 3: run on through the lips' collar it cut that off; live's rounds end on
+    // the chamfer faces).
+    // (The faces a concave round's run-on extended: their old edge joins the new piece; a convex one's ends stay.)
+    let joined_refaced = refaced.len();
+    if ball && matches!(spec.section, Section::Conic(_)) {
+        let near = |a: DVec3, b: DVec3| (a - b).length() < scale * 1e-9;
+        let mut trimmed = Vec::new();
+        let mut running = Vec::new();
+        for (tool, &ei) in cuts.iter().zip(&cut_edges) {
+            let Some(c) = chain.iter().find(|c| c.index == ei) else { return Err(fail("a tool with no chain edge")) };
+            let fs = &ef[c.index];
+            let supports = [fs[0] as usize, fs[1] as usize];
+            let mut run_on = Vec::new();
+            for (q, out) in [(c.start, -tangent_dir(c, true)?), (c.end, tangent_dir(c, false)?)] {
+                if chain.iter().filter(|o| near(o.start, q) || near(o.end, q)).count() > 1 {
+                    continue;
+                }
+                let plane = k::Plane { origin: q, x_dir: out.any_orthonormal_vector(), normal: out };
+                for piece in k::split_by_plane(&tool.shape, &plane)?.shape.solids() {
+                    if (piece.centroid()? - q).dot(out) > 0.0 {
+                        run_on.push((piece, q, out));
+                    }
+                }
+            }
+            if run_on.is_empty() {
+                trimmed.push(tool.clone());
+                continue;
+            }
+            let generated = Arc::new(TopoName::face(feature, Role::Generated(body.edges[c.index].clone())));
+            running.push(RunOnTool { tool: tool.shape.clone(), names: tool.names.faces.clone(), supports, generated, run_on, len: c.length });
+        }
+        if !running.is_empty() {
+            let (kept, faces_on) = closed_run_on(shape, &ef, running, scale)?;
+            trimmed.extend(kept);
+            refaced.extend(faces_on);
+        }
+        cuts = trimmed;
     }
     let mut named = body_named(&body);
     for (i, on) in &refaced {
@@ -1272,9 +1477,19 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     }
     let mut names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
     let mut shape = un.shape;
+    // (A Boolean leaves the pieces of a face a convex round's run-on extended on copies of its surface, apart: one face
+    // again.)
+    if refaced.len() > joined_refaced {
+        let ons: Vec<Shape> = refaced[joined_refaced..].iter().map(|(_, on)| on.clone()).collect();
+        let merged = k::merge_on_surfaces(&shape, &ons, scale * 1e-7)?;
+        if !merged.shape.is_same(&shape) {
+            names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &merged.history, &merged.shape, &BTreeMap::new(), None);
+            shape = merged.shape;
+        }
+    }
     // A face extended to meet the round: its old edge and the new piece running on from it one edge, as live's.
-    if !refaced.is_empty() {
-        let corners: Vec<DVec3> = refaced.iter().flat_map(|(i, _)| faces[*i].vertices()).filter_map(|v| v.vertex_point().ok()).collect();
+    if joined_refaced > 0 {
+        let corners: Vec<DVec3> = refaced[..joined_refaced].iter().flat_map(|(i, _)| faces[*i].vertices()).filter_map(|v| v.vertex_point().ok()).collect();
         let joined = k::join_edges_at(&shape, &corners, scale * 1e-7, 1e-4)?;
         names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &joined.history, &joined.shape, &BTreeMap::new(), None);
         shape = joined.shape;
@@ -1312,6 +1527,10 @@ enum Support {
     /// little from section to section; a bridge projection each took ~0.4 ms on c2-hunting-knife's lofted handle, 3772
     /// of them in Fillet 8), the first one the face's projection. `s`: the inward side of the surface's du x dv.
     Nurbs { face: Shape, n: std::sync::Arc<k::NurbsSurface>, s: f64, last: std::sync::Arc<std::sync::Mutex<Option<glam::DVec2>>> },
+    /// A face swept along `d`, the same all along it: each foot that of the point moved along `d` to `at` (a point on the
+    /// face), moved back; so past where the face is cut off too (c2-impeller-loft's rib side, cut by the channel's offset
+    /// face where Fillet 3's lips end).
+    Extruded { face: Shape, d: DVec3, at: DVec3, s: f64, last: std::sync::Arc<std::sync::Mutex<Option<glam::DVec2>>> },
 }
 
 impl Support {
@@ -1337,6 +1556,10 @@ impl Support {
                 }
                 None => Support::Face(face.clone(), if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 }, Default::default()),
             },
+            k::Surface::Extrusion { direction } if direction.length() > 0.0 => {
+                let s = if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 };
+                Support::Extruded { face: face.clone(), d: direction.normalize(), at: p, s, last: Default::default() }
+            }
             _ => Support::Face(face.clone(), if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 }, Default::default()),
         })
     }
@@ -1362,6 +1585,16 @@ impl Support {
                 };
                 *last.lock().unwrap_or_else(|e| e.into_inner()) = Some(glam::DVec2::new(pr.u, pr.v));
                 (pr.point, f.normal_at_uv(pr.u, pr.v)?.normalize() * *s)
+            }
+            Support::Extruded { face, d, at, s, last } => {
+                let shift = *d * (q - *at).dot(*d);
+                let seed = *last.lock().unwrap_or_else(|e| e.into_inner());
+                let pr = match seed {
+                    Some(uv) => face.project_point_near(q - shift, uv)?,
+                    None => face.project_point(q - shift)?,
+                };
+                *last.lock().unwrap_or_else(|e| e.into_inner()) = Some(glam::DVec2::new(pr.u, pr.v));
+                (pr.point + shift, face.normal_at_uv(pr.u, pr.v)?.normalize() * *s)
             }
             Support::Nurbs { face, n, s, last } => {
                 let seed = *last.lock().unwrap_or_else(|e| e.into_inner());
@@ -1409,7 +1642,7 @@ fn rolling_ball(origin: DVec3, normal: DVec3, sup: &[Support; 2], r: f64, guess:
 /// plane, an arc through three points on a curved face) from the contacts to the edge's point in the section's plane
 /// (the direct build's strips on the part's faces), as its wire (a loft's section; a face cost 0.8 ms). With its first
 /// vertex (for the loft).
-fn ball_section(c: DVec3, [t0, t1]: [DVec3; 2], sup: &[Support; 2], r: f64) -> FResult<(Shape, DVec3)> {
+fn ball_section(c: DVec3, [t0, t1]: [DVec3; 2], sup: &[Support; 2], r: f64, section: Section) -> FResult<(Shape, DVec3)> {
     let (v0, v1) = ((t0 - c).normalize(), (t1 - c).normalize());
     let half = v0.dot(v1).clamp(-1.0, 1.0).acos() / 2.0;
     if half < 1e-6 || half > std::f64::consts::FRAC_PI_2 - 1e-6 {
@@ -1448,17 +1681,37 @@ fn ball_section(c: DVec3, [t0, t1]: [DVec3; 2], sup: &[Support; 2], r: f64) -> F
         if (m - (from + to) / 2.0).length() < (to - from).length() * 1e-5 {
             return Ok(k::make_line(from, to)?);
         }
+        // (A swept face's section, any curve: through its feet; an arc strayed 0.04 mm and 17 deg off c2-impeller-loft's
+        // rib side at its lip, and the direct build took the round's side for no side of the part.)
+        if matches!(s, Support::Extruded { .. }) {
+            const N: usize = 8;
+            let mut pts = vec![from];
+            for i in 1..N {
+                let mut q = from + (to - from) * (i as f64 / N as f64);
+                for _ in 0..20 {
+                    q = in_plane(s.foot(q)?.0);
+                }
+                pts.push(q);
+            }
+            pts.push(to);
+            return Ok(k::make_interpolated_spline(&pts, &[], false)?);
+        }
         Ok(k::make_arc_3pts(from, m, to)?)
     };
-    let arc = k::make_arc_3pts(t0, c + (v0 + v1).normalize() * r, t1)?;
+    // (A conic's: through the contacts, tangent to the faces there, its shoulder rho of the way to where those tangents
+    // meet.)
+    let arc = match section {
+        Section::Conic(rho) => rational(t0, c + (v0 + v1).normalize() * (r / half.cos()), t1, rho / (1.0 - rho))?,
+        _ => k::make_arc_3pts(t0, c + (v0 + v1).normalize() * r, t1)?,
+    };
     Ok((k::make_wire(&[side(&sup[0], p, t0)?, arc, side(&sup[1], t1, p)?])?, p))
 }
 
 /// A shared ball's section with its contacts in the order of `own` (an edge's own contacts there).
-fn ball_section_as(shared: &(DVec3, [DVec3; 2]), own: [DVec3; 2], sup: &[Support; 2], r: f64) -> FResult<(Shape, DVec3)> {
+fn ball_section_as(shared: &(DVec3, [DVec3; 2]), own: [DVec3; 2], sup: &[Support; 2], r: f64, section: Section) -> FResult<(Shape, DVec3)> {
     let (c, [a, b]) = *shared;
     let swap = (a - own[1]).length() + (b - own[0]).length() < (a - own[0]).length() + (b - own[1]).length();
-    ball_section(c, if swap { [b, a] } else { [a, b] }, sup, r)
+    ball_section(c, if swap { [b, a] } else { [a, b] }, sup, r, section)
 }
 
 /// One chain edge's rolling ball: its supports, the normals into the material at its middle, and whether it is a line
@@ -1508,10 +1761,15 @@ fn ball_edge(c: &ChainEdge, faces: [usize; 2], ff: [&Shape; 2], scale: f64) -> F
 fn into_face(f: &Shape, p: DVec3, tangent: DVec3, step: f64) -> FResult<Option<(DVec3, DVec3)>> {
     let m = -f.normal_at_point(p)?.normalize();
     let dir = m.cross(tangent).normalize();
-    let on = |v: DVec3| f.project_point(p + v * step).is_ok_and(|q| q.distance < step * 1e-2);
-    Ok(match (on(dir), on(-dir)) {
+    let near = |v: DVec3| f.project_point(p + v * step).map(|q| q.distance).unwrap_or(f64::INFINITY);
+    let (a, b) = (near(dir), near(-dir));
+    // (On a face curving away within the step, its sag there: under a fifth of the step, where the side off the face
+    // projects back onto the edge, a step away; c2-impeller-loft's rib side, ~2 mm round at its lip.)
+    Ok(match (a < step * 1e-2, b < step * 1e-2) {
         (true, false) => Some((dir, m)),
         (false, true) => Some((-dir, m)),
+        _ if a < step * 0.2 && b > step * 0.8 => Some((dir, m)),
+        _ if b < step * 0.2 && a > step * 0.8 => Some((-dir, m)),
         _ => None,
     })
 }
@@ -1565,7 +1823,7 @@ fn tangency_ball(shape: &Shape, ef: &[Vec<u32>], [a, b]: [&BallEdge; 2], q: DVec
 /// (the straight edge's), so their tools meet exactly; at a free end the ball rolls on along its supports until it is
 /// off the part.
 /// (`stop`: given up when set, between balls and before each loft: tools made ahead that turn out not to be needed.)
-fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shape], r: f64, scale: f64, stop: Option<&std::sync::atomic::AtomicBool>) -> FResult<(Vec<Shape>, Vec<k::Conic>)> {
+fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shape], (r, kind): (f64, Section), scale: f64, stop: Option<&std::sync::atomic::AtomicBool>) -> FResult<(Vec<Shape>, Vec<k::Conic>)> {
     let halt = || -> FResult<()> {
         match stop.is_some_and(|s| s.load(std::sync::atomic::Ordering::Relaxed)) {
             true => Err(fail("not needed")),
@@ -1617,7 +1875,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             let ball = |q: DVec3| rolling_ball(q, d, &e.sup, r, q + e.inward * r);
             let section = |q: DVec3| -> FResult<(Shape, DVec3)> {
                 let (c, t) = ball(q)?;
-                ball_section(c, t, &e.sup, r)
+                ball_section(c, t, &e.sup, r, kind)
             };
             // Run on past a free end until the section is off the part.
             let mut ext = [0.0f64; 2];
@@ -1643,7 +1901,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
                 None => (c.end - c.start).dot(d) + ext[1],
             };
             let (first, _) = match &ends[0] {
-                Some(j) => ball_section_as(j, ball(c.start + d * s0)?.1, &e.sup, r)?,
+                Some(j) => ball_section_as(j, ball(c.start + d * s0)?.1, &e.sup, r, kind)?,
                 None => section(c.start + d * s0)?,
             };
             return Ok(Ball::Tool(k::extrude(&k::make_face_from_wire(&first, true)?, d * (s1 - s0))?.shape));
@@ -1687,7 +1945,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
                     *e_end = 0.5 * r * k as f64 / reach;
                     let phi = if end == 0 { -*e_end } else { span + *e_end };
                     let (cb, tb) = ball(phi)?;
-                    if off(&ball_section(cb, tb, &e.sup, r)?.0)? {
+                    if off(&ball_section(cb, tb, &e.sup, r, kind)?.0)? {
                         break;
                     }
                 }
@@ -1705,10 +1963,10 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
                 None => span + ext[1],
             };
             let (first, _) = match &ends[0] {
-                Some(j) => ball_section_as(j, ball(phi0)?.1, &e.sup, r)?,
+                Some(j) => ball_section_as(j, ball(phi0)?.1, &e.sup, r, kind)?,
                 None => {
                     let (cb, tb) = ball(phi0)?;
-                    ball_section(cb, tb, &e.sup, r)?
+                    ball_section(cb, tb, &e.sup, r, kind)?
                 }
             };
             let tool = k::revolve(&k::make_face_from_wire(&first, true)?, center, a, if closed { std::f64::consts::TAU } else { phi1 - phi0 })?.shape;
@@ -1748,8 +2006,8 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             centres.push(centre);
             let shared = if closed { None } else if k == 0 { ends[0].as_ref() } else if k == n { ends[1].as_ref() } else { None };
             let (face, start) = match shared {
-                Some(j) => ball_section_as(j, touch, &e.sup, r)?,
-                None => ball_section(centre, touch, &e.sup, r)?,
+                Some(j) => ball_section_as(j, touch, &e.sup, r, kind)?,
+                None => ball_section(centre, touch, &e.sup, r, kind)?,
             };
             secs.push(face);
             starts.push(start);
@@ -1765,7 +2023,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             for _ in 0..12 {
                 let q = last + dir * (0.5 * r);
                 let (centre, touch) = rolling_ball(q, dir, &e.sup, r, q)?;
-                let (face, start) = ball_section(centre, touch, &e.sup, r)?;
+                let (face, start) = ball_section(centre, touch, &e.sup, r, kind)?;
                 dir = (centre - last).normalize();
                 last = centre;
                 let done = off(&face)?;

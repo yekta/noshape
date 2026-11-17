@@ -259,7 +259,7 @@ bool lies_on(const std::vector<std::pair<gp_Pnt, gp_Vec>>& ts, const TopoDS_Face
     pr.LowerDistanceParameters(ug, vg);
     if (!in_g)
       in_g = std::make_unique<BRepTopAdaptor_FClass2d>(gf, 1e-9);
-    if (in_g->Perform(gp_Pnt2d(ug, vg), false) != TopAbs_IN)
+    if (in_g->Perform(gp_Pnt2d(ug, vg), true) != TopAbs_IN)
       continue;
     gp_Pnt qg;
     gp_Vec dug, dvg;
