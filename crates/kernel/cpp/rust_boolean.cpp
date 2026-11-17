@@ -2800,6 +2800,42 @@ bool crossings2d(const occ::handle<Geom2d_Curve>& a, const occ::handle<Geom2d_Cu
     const IntRes2d_IntersectionPoint& p = x.Intersector().Point(i);
     out.emplace_back(p.ParamOnFirst(), p.ParamOnSecond());
   }
+  // (A crossing the intersector's sampling misses, shallow and close to another (a profile crossing a tool's circle
+  // twice 0.3 mm apart, chamfer 26: found on Linux, missed on macOS): the B-spline's signed distance from the circle or
+  // line scanned, 64 points a span, each sign change with no crossing in it bisected.)
+  const occ::handle<Geom2d_BSplineCurve> sb = occ::down_cast<Geom2d_BSplineCurve>(b);
+  const occ::handle<Geom2d_Circle>       ca = occ::down_cast<Geom2d_Circle>(a);
+  const occ::handle<Geom2d_Line>         la = occ::down_cast<Geom2d_Line>(a);
+  if (!sb.IsNull() && (!ca.IsNull() || !la.IsNull()))
+  {
+    const auto side = [&](double u) {
+      const gp_Pnt2d q = sb->Value(u);
+      return !ca.IsNull() ? q.Distance(ca->Circ2d().Location()) - ca->Circ2d().Radius() : gp_Vec2d(la->Lin2d().Location(), q).Crossed(gp_Vec2d(la->Lin2d().Direction()));
+    };
+    const auto on_a = [&](const gp_Pnt2d& q) { return !ca.IsNull() ? ElCLib::Parameter(ca->Circ2d(), q) : ElCLib::Parameter(la->Lin2d(), q); };
+    const int    per = 64;
+    const double zero = 1e-12;
+    double       u0 = sb->FirstParameter(), f0 = side(u0);
+    for (int k = 1; k < sb->NbKnots(); ++k)
+      for (int i = 1; i <= per; ++i)
+      {
+        const double u1 = sb->Knot(k) + (sb->Knot(k + 1) - sb->Knot(k)) * i / per, f1 = side(u1);
+        if (std::abs(f1) <= zero)
+          continue;
+        if (std::abs(f0) > zero && (f0 < 0) != (f1 < 0) && std::none_of(out.begin(), out.end(), [&](const std::pair<double, double>& c) { return c.second >= u0 && c.second <= u1; }))
+        {
+          double lo = u0, hi = u1;
+          for (int it = 0; it < 200 && hi - lo > 1e-16 * (1 + std::abs(hi)); ++it)
+          {
+            const double mid = 0.5 * (lo + hi);
+            ((side(mid) < 0) == (f0 < 0) ? lo : hi) = mid;
+          }
+          const double u = 0.5 * (lo + hi);
+          out.emplace_back(on_a(sb->Value(u)), u);
+        }
+        u0 = u1, f0 = f1;
+      }
+  }
   return true;
 }
 

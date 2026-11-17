@@ -388,6 +388,46 @@ fn a_plane_along_an_extrusion_cuts_it_in_straight_lines() {
     assert!((info.length - 10.0 * mm).abs() <= 1e-12, "{} m", info.length);
 }
 
+/// A prism whose B-spline side crosses a cylinder along it twice 0.3 mm apart at a shallow angle (chamfer 26's profile
+/// and tool, exact): a ruling at each crossing. OCCT's 2D intersector found both on Linux and only the end one on
+/// macOS, so noshape's own section lost the other there (chamfer 26: 37 faces on macOS, 36 on Linux and in OCCT's).
+#[test]
+fn a_profile_crossing_a_cylinder_twice_close_by_is_cut_at_both() {
+    let _ = k::set_working_scale(1000.0);
+    let mm = 1e-3;
+    let p = |y: f64, z: f64| DVec3::new(0.0, y, z);
+    let side = k::make_bspline(
+        &[p(-0.004131576713407853, -0.0632092458037898), p(-0.0031165199699751916, -0.06175847678015433), p(-0.00051378915369193, -0.06143502173284563), p(7.536715972778328e-18, -0.043473091273635724), p(-0.0029075902162917825, -0.043015840360873574)],
+        None,
+        &[0.023242099894566604, 0.36784616245842827, 1.0232333714689639],
+        &[4, 1, 4],
+        3,
+        false,
+    )
+    .unwrap();
+    let line = |a: DVec3, b: DVec3| k::make_bspline(&[a, b], None, &[0.0, 1.0], &[2, 2], 1, false).unwrap();
+    let (a, b) = (p(-0.0029075902162917825, -0.043015840360873574), p(-0.004131576713407853, -0.0632092458037898));
+    let (c, d) = (p(-0.010, a.z), p(-0.010, b.z));
+    let face = k::make_face_from_wire(&k::make_wire(&[side, line(a, c), line(c, d), line(d, b)]).unwrap(), true).unwrap();
+    let prism = k::extrude(&face, DVec3::NEG_X * 60.0 * mm).unwrap().shape;
+    let r = 0.009473091273635603;
+    let tool = k::make_cylinder(&k::Plane::new(DVec3::new(10.0 * mm, 1.691355389077387e-17, -0.03400000000000009), DVec3::NEG_X, DVec3::Z), r, 80.0 * mm, TAU).unwrap();
+    k::set_rust_boolean_only(true);
+    let res = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&prism), std::slice::from_ref(&tool), &k::BooleanOptions::default());
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let res = res.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let ruling_at = |y: f64, z: f64| {
+        res.shape.edges().into_iter().any(|e| {
+            e.edge_info().is_ok_and(|i| {
+                matches!(i.curve, k::Curve::Line { .. }) && (i.start.x - i.end.x).abs() > 50.0 * mm && [i.start, i.end].iter().all(|q| (q.y - y).abs() < 1e-8 && (q.z - z).abs() < 1e-8)
+            })
+        })
+    };
+    assert!(ruling_at(-0.0029075902162917825, -0.043015840360873574), "the ruling at the profile's end");
+    assert!(ruling_at(-0.0026103883314493, -0.043106334794563), "the ruling where the profile crosses the circle 0.3 mm before its end");
+}
+
 /// A sheet metal part's fuse of its flanges and bends (c2-sm-corner-break, 8 tools, recorded): a flange's face 20 um
 /// off a tool's (the tolerance 1e-5, four times that the grey band) is apart from it, as OCCT's: noshape's Boolean
 /// takes it (it declined), OCCT's result and history.
