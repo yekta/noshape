@@ -112,6 +112,63 @@ const GAUSS: [(f64, f64); 8] = [
     (0.980_144_928_248_768_1, 0.050_614_268_145_188_13),
 ];
 
+/// The root of `f` between `lo` and `hi` (`flo`, `fhi` of opposite signs), down to two neighbouring numbers or an exact
+/// zero: the Illinois method's steps (a few evaluations where halving took fifty; a refitted section's point is a
+/// NURBS evaluation and a surface's parameters), halving where a step leaves more than half the bracket.
+fn bracketed_root(f: &impl Fn(f64) -> f64, mut lo: f64, mut flo: f64, mut hi: f64, mut fhi: f64) -> f64 {
+    let mut side = 0;
+    for _ in 0..200 {
+        let mid = 0.5 * (lo + hi);
+        if mid == lo || mid == hi {
+            break;
+        }
+        let width = hi - lo;
+        let mut x = (lo * fhi - hi * flo) / (fhi - flo);
+        if !(x > lo && x < hi) {
+            x = mid;
+        }
+        let fx = f(x);
+        if fx == 0.0 {
+            return x;
+        }
+        if (fx < 0.0) == (flo < 0.0) {
+            lo = x;
+            flo = fx;
+            if side == -1 {
+                fhi *= 0.5;
+            }
+            side = -1;
+        } else {
+            hi = x;
+            fhi = fx;
+            if side == 1 {
+                flo *= 0.5;
+            }
+            side = 1;
+        }
+        // (A step that kept most of the bracket: halve it as well.)
+        if hi - lo > 0.5 * width {
+            let mid = 0.5 * (lo + hi);
+            if mid == lo || mid == hi {
+                break;
+            }
+            let fm = f(mid);
+            if fm == 0.0 {
+                return mid;
+            }
+            if (fm < 0.0) == (flo < 0.0) {
+                lo = mid;
+                flo = fm;
+            } else {
+                hi = mid;
+                fhi = fm;
+            }
+            side = 0;
+        }
+    }
+    0.5 * (lo + hi)
+}
+
 fn dir(a: f64) -> DVec2 {
     DVec2::new(a.cos(), a.sin())
 }
@@ -382,22 +439,7 @@ impl C2 {
             if cur == 0.0 {
                 out.push(t1);
             } else if prev != 0.0 && (prev < 0.0) != (cur < 0.0) {
-                let (mut lo, mut hi, mut flo) = ((k - 1) as f64 / n as f64, t1, prev);
-                for _ in 0..80 {
-                    let mid = 0.5 * (lo + hi);
-                    // (Down to two neighbouring numbers: the rest of the halvings change nothing.)
-                    if mid == lo || mid == hi {
-                        break;
-                    }
-                    let fm = f(mid);
-                    if (fm < 0.0) == (flo < 0.0) {
-                        lo = mid;
-                        flo = fm;
-                    } else {
-                        hi = mid;
-                    }
-                }
-                out.push(0.5 * (lo + hi));
+                out.push(bracketed_root(&f, (k - 1) as f64 / n as f64, prev, t1, cur));
             }
             prev = cur;
         }
