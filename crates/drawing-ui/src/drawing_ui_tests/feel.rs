@@ -213,3 +213,74 @@ fn a_centerline_on_a_view_edge_gives_way_to_the_view(cx: &mut TestAppContext) {
     let lit = lit_at(cx, window, &editor, [at_inside[0], at_inside[1] + 1.0 / zoom]);
     assert_eq!(lit, Some(Sel::Annotation(id_inside)), "inside the view: the centerline");
 }
+
+/// Live2 feel/drawing.json D5: a press on a note becomes a drag only past 7 px (8 px moves it, 6 px is a click that
+/// selects it).
+#[gpui::test]
+fn a_note_moves_from_8_px_and_6_px_is_a_click(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        call(ctx, "drawing_note", json!({ "drawing": dw, "text": "BREAK ALL SHARP EDGES", "position": [30, 40] }));
+    }));
+    let (window, editor) = drawing(cx, "feel-note-drag");
+    real_sheet(cx, window, &editor);
+    let (id, at) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let a = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Note { .. })).expect("the note");
+        let (b, picks) = (e.built.clone().expect("built"), e.picks_of(Sel::Annotation(a.id)));
+        let t = b.geometry.texts.iter().find(|t| picks.contains(&t.pick)).expect("its text");
+        let q = noshape_model::drawing::font::text_box(t);
+        (a.id, [q.iter().map(|p| p[0]).sum::<f64>() / 4.0, q.iter().map(|p| p[1]).sum::<f64>() / 4.0])
+    });
+    for (dx, moves) in [(6.0, false), (8.0, true)] {
+        cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
+        cx.executor().advance_clock(std::time::Duration::from_millis(600));
+        let before = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| a.id == id).map(|a| a.position)).expect("the note");
+        let p = at_window(cx, &editor, at);
+        let q = p + Point::new(px(dx), px(0.));
+        let mut v = VisualTestContext::from_window(window, cx);
+        v.simulate_mouse_move(p, None, Modifiers::default());
+        v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
+        v.simulate_mouse_move(q, Some(MouseButton::Left), Modifiers::default());
+        v.simulate_mouse_up(q, MouseButton::Left, Modifiers::default());
+        draw(cx, window);
+        let (after, sel) = cx.update(|cx| (editor.read(cx).current_sheet().annotations.iter().find(|a| a.id == id).map(|a| a.position).expect("the note"), editor.read(cx).selection.clone()));
+        assert_eq!(after != before, moves, "{dx} px: moved {before:?} -> {after:?}");
+        if !moves {
+            assert!(sel.contains(&Sel::Annotation(id)), "{dx} px: a click, the note selected: {sel:?}");
+        } else {
+            cx.update(|cx| editor.update(cx, |e, cx| e.doc.update(cx, |d, cx| d.undo(cx))));
+            draw(cx, window);
+        }
+    }
+}
+
+/// Live2 feel/drawing.json D4: placing a note, the pointer lines up with another annotation from 7 px, not 9 (ours
+/// 8): the pink dotted line shows and the point jumps onto the alignment.
+#[gpui::test]
+fn placing_a_note_lines_up_with_another_within_8_px(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        call(ctx, "drawing_note", json!({ "drawing": dw, "text": "NOTE", "position": [30, 40] }));
+    }));
+    let (window, editor) = drawing(cx, "feel-infer");
+    real_sheet(cx, window, &editor);
+    let (note, zoom) = cx.update(|cx| editor.update(cx, |e, _| {
+        e.tool = noshape_scene::drawing_tools::Tool::Note;
+        let a = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Note { .. })).expect("the note");
+        (a.position, e.zoom)
+    }));
+    // Straight above the note, 60 mm up: off to the side by 7 and by 9 px.
+    for (off, lines_up) in [(7.0, true), (9.0, false)] {
+        let s = [note[0] + off / zoom, note[1] + 60.0];
+        let p = at_window(cx, &editor, s);
+        VisualTestContext::from_window(window, cx).simulate_mouse_move(p, None, Modifiers::default());
+        draw(cx, window);
+        let (shown, x) = cx.update(|cx| {
+            let e = editor.read(cx);
+            (e.infer_lines.iter().any(|(from, _)| (from[0] - note[0]).abs() < 1e-9), e.cursor[0])
+        });
+        assert_eq!(shown, lines_up, "{off} px off the note's x: the alignment line");
+        assert_eq!((x - note[0]).abs() < 1e-9, lines_up, "{off} px off: the point on the note's x ({x} for {})", note[0]);
+    }
+}
