@@ -111,11 +111,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## psui, 2026-11-12 (Part Studio coverage audit, batch 2's erroring features)
-- [ ] P3 OFFSET-CURVE-CURVED-FACE (psui; 2026-11-12 11:50 UTC) **Offset curve on an edge whose first neighbour isn't planar fails**:
+- [x] (core 149e29069 11-15: a circle runs down a cylinder or cone as live 2538 answered, default on the cylinder, Flip onto the top face) P3 OFFSET-CURVE-CURVED-FACE (psui; 2026-11-12 11:50 UTC) **Offset curve on an edge whose first neighbour isn't planar fails**:
   "Offset curve currently supports planar faces only" (`curves.rs` offset_curve; ui-parity offset-curve-new-edit-reedit, the
   pin's top circle: our first adjacent face is the cylinder). Asked live (REQUESTS 2026-11-12 11:50) which face Onshape offsets onto
   by default and with Flip. A cylinder or cone is developable: a geodesic offset is a flat offset in its development.
-- [ ] P3 REPLACE-FACE-SHEET-SMALL-MSG (psui; 2026-11-12 11:50 UTC) a Replace face template that doesn't cover the face fails with
+- [x] (psui 11-17: live 2538 shows "Could not replace faces as requested." too, ours already) P3 REPLACE-FACE-SHEET-SMALL-MSG (psui; 2026-11-12 11:50 UTC) a Replace face template that doesn't cover the face fails with
   "Could not replace faces as requested." (`direct.rs` replace_face maps every error to it); std's REPLACE_FACE_SHEET_SMALL
   reads "Surface to replace with needs to extend size of faces." Which one live shows: asked (REQUESTS 2026-11-12 11:50).
 - [x] (psui 11-12: our subArray dropped its input's type, so a Vector's part was a plain array that std's separatePointsAndWeights couldn't divide; T1 featurescript tests::a_sub_array_of_a_vector_is_a_vector, engine::edit_curve_elevates_a_line; model suite no document worse, 78/87, 837/947) P3 EDIT-CURVE-ELEVATE-LINE (FeatureScript host; psui 2026-11-12 11:50 UTC) **Edit curve with Elevate on a sketch line: "Error
