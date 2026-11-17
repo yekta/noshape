@@ -559,6 +559,26 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Assembly feel vs live's 11-17 capture (qa 23:45, green 16588aca3, vibex6 Xvfb, real xdotool pointer)
+live's set-up rebuilt as starts asm-feel (Part 1 40x30x10, Part 2 Ø16x20, Part 3 20x20x5, nothing fixed) and asm-feel-mated (+ Slider
+Part 2 / Part 1 along Z, Fastened Part 3 / Part 1); transforms and mates from the runner's state (qa-scratch/af: af.py, afrun.sh,
+ash.py; sheets tickets/asm-feel-sheet.png and vibex6 ~/agents/qa-keep/asm-feel/).
+Pass: no dots or connector without a mate tool (face / part outlined); in Fastened, white dots at corners and edge midpoints, a
+centroid connector, axis points on the cylinder; Fastened flow: chip on the 1st pick and nothing moves, the 2nd pick moves Part 3
+at once (by 0.3 s) as a see-through ghost with ✓ green and the floating toolbar, A flips it on top, one Esc closes with no mate and
+Part 3 back, Enter commits Fastened 1 (Part 3 at (-90, 5, 5) mm = the picked centroids); a selected row (178,221,246) fills the
+part amber (239,182,72 / 192,146,57) with the white triad; graphics hover leaves the list; a graphics click turns its row blue.
+- [ ] **P0 ASMFEEL-CONNECTOR-REACH (asm)**: in a mate tool the connector stays at the face centroid until the pointer is on the edge
+  (~10 px) or the vertex (5 px); live jumps it to the corner / edge-midpoint dot within 50 px (not at 60).
+- [ ] **P0 ASMFEEL-DRAG-GROUP (asm)**: grabbing Part 2 (Slider to Part 1, Part 3 fastened to Part 1) and dragging 140 px right / 50 up
+  slides only Part 2 (z -10 -> -7.24 mm); Part 1 and Part 3 stay. Live: the whole connected set translates with it, the slider
+  taking only the along-axis part.
+- [ ] **P1 ASMFEEL-DRAG-ROTATES (asm)**: grabbing the fastened Part 1 / Part 3 and dragging 150 left / 80 down moves all three
+  (Part 2 keeps its z: the slider absorbs it, as live) but turns each 0.54°; live: orientation never changes.
+- [ ] **P1 ASMFEEL-ROW-HOVER (asm)**: hovering an instance row fills the part tan; live outlines it (row (222,241,251) and its tooltip
+  as live).
+- Not judged: Q's 90° (a square part looks the same; transform not read), the first-change time (0.3 s shot already moved).
+
 ## Sketch line snap and inference vs live's 11-17 capture (qa 23:17, green 592b0fc9, vibex6 Xvfb, load ~24, real xdotool pointer)
 live's set-up rebuilt (block 40x30x10, Sketch 2: line, circle, point; Sketch 3 on Top, view normal, 3.53 px/mm), Line tool from
 (70,-30); the pointer in 1 px steps in to each target and back out, a crop per step (qa-scratch/sk/sweep.py, hv.py, glyphs.py;
