@@ -330,7 +330,7 @@ struct GFace {
     uvbox: [f64; 4],
     pcurves: PCurves,
     /// Its NURBS surface's samples ([`free::samples`]) and the nearest of them to a point ([`Self::uv_of`]).
-    grid: std::sync::OnceLock<(Vec<(DVec2, DVec3)>, free::Nearest)>,
+    grid: std::sync::OnceLock<std::sync::Arc<free::Grid>>,
     /// Points' parameters found so far ([`Self::uv_of`]: most are asked for again).
     uvs: std::sync::Mutex<HashMap<[u64; 3], DVec2>>,
     patches: std::sync::OnceLock<std::sync::Arc<free::Patches>>,
@@ -369,11 +369,8 @@ impl GFace {
         if let Some(uv) = self.uvs.lock().ok().and_then(|m| m.get(&key).copied()) {
             return uv;
         }
-        let (grid, near) = self.grid.get_or_init(|| {
-            let g = free::samples(ns, self.uvbox);
-            let pts = g.iter().map(|x| x.1).collect();
-            (g, free::Nearest::new(pts))
-        });
+        let g = self.grid.get_or_init(|| free::cached_grid(ns, self.uvbox));
+        let (grid, near) = (&g.pts, &g.near);
         // (The nearest by the index, the one the scan below finds; the scan where the point isn't finite.)
         let at = if p.is_finite() {
             near.of(p)

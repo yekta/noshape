@@ -206,39 +206,64 @@ pub(super) fn cached_grouped(g: &GFace) -> std::sync::Arc<Patches> {
     }
     let p = std::sync::Arc::new(grouped(g));
     if let Ok(mut c) = PATCH_CACHE.lock() {
-        c.put(key, p.clone());
+        let bytes = p.bytes();
+        c.put(key, p.clone(), bytes);
     }
     p
 }
 
-/// The patch cache's bound: its keys' and patches' bytes.
+/// A free-form surface's samples over a parameter box ([`samples`]) and their index: the seeds of points' parameters
+/// (`uv_of`), kept as [`cached_grouped`]'s patches are (c2-hunting-knife's blade, 17 x 365 samples, sampled and
+/// indexed again in each of its cuts: a quarter of Revolve 1's).
+pub(super) struct Grid {
+    pub(super) pts: Vec<(DVec2, DVec3)>,
+    pub(super) near: Nearest,
+}
+
+pub(super) fn cached_grid(ns: &FreeSurface, uv: [f64; 4]) -> std::sync::Arc<Grid> {
+    let key = surface_key(ns, uv);
+    if let Some(g) = GRID_CACHE.lock().ok().and_then(|mut c| c.get(&key)) {
+        return g;
+    }
+    let pts = samples(ns, uv);
+    let near = Nearest::new(pts.iter().map(|x| x.1).collect());
+    let g = std::sync::Arc::new(Grid { pts, near });
+    if let Ok(mut c) = GRID_CACHE.lock() {
+        let bytes = std::mem::size_of::<Grid>() + g.pts.len() * (40 + 24 + 4 + 1);
+        c.put(key, g.clone(), bytes);
+    }
+    g
+}
+
+/// Each cache's bound: its keys' and values' bytes.
 const PATCH_CACHE_BYTES: usize = 64 << 20;
 
-static PATCH_CACHE: std::sync::Mutex<PatchCache> = std::sync::Mutex::new(PatchCache { map: None, tick: 0, bytes: 0 });
+static PATCH_CACHE: std::sync::Mutex<Lru<Patches>> = std::sync::Mutex::new(Lru { map: None, tick: 0, bytes: 0 });
+static GRID_CACHE: std::sync::Mutex<Lru<Grid>> = std::sync::Mutex::new(Lru { map: None, tick: 0, bytes: 0 });
 
-/// A cached face's patches, when last used, and its bytes.
-struct CacheEntry {
-    patches: std::sync::Arc<Patches>,
+/// A cached value, when last used, and its bytes.
+struct CacheEntry<T> {
+    value: std::sync::Arc<T>,
     used: u64,
     bytes: usize,
 }
 
-struct PatchCache {
-    map: Option<HashMap<Vec<u64>, CacheEntry>>,
+struct Lru<T> {
+    map: Option<HashMap<Vec<u64>, CacheEntry<T>>>,
     tick: u64,
     bytes: usize,
 }
 
-impl PatchCache {
-    fn get(&mut self, key: &[u64]) -> Option<std::sync::Arc<Patches>> {
+impl<T> Lru<T> {
+    fn get(&mut self, key: &[u64]) -> Option<std::sync::Arc<T>> {
         self.tick += 1;
         let e = self.map.as_mut()?.get_mut(key)?;
         e.used = self.tick;
-        Some(e.patches.clone())
+        Some(e.value.clone())
     }
 
-    fn put(&mut self, key: Vec<u64>, p: std::sync::Arc<Patches>) {
-        let size = 8 * key.len() + p.bytes();
+    fn put(&mut self, key: Vec<u64>, value: std::sync::Arc<T>, bytes: usize) {
+        let size = 8 * key.len() + bytes;
         if size > PATCH_CACHE_BYTES / 4 {
             return;
         }
@@ -250,7 +275,7 @@ impl PatchCache {
                 self.bytes -= e.bytes;
             }
         }
-        if let Some(e) = map.insert(key, CacheEntry { patches: p, used: self.tick, bytes: size }) {
+        if let Some(e) = map.insert(key, CacheEntry { value, used: self.tick, bytes: size }) {
             self.bytes -= e.bytes;
         }
         self.bytes += size;
