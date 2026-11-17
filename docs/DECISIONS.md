@@ -110,3 +110,6 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-17 (user) The build hosts the lead runs are named vibexN (vibex6, vibex7, vibex8 today); vibeN names are the user's
   own servers. vibe3, vibe4 and vibe5 are gone for good. Land queue: vibex7. Main's watcher: vibex6. Private user
   documents: vibex7 ~/lead-private only.
+- 11-17 A gate or suite pair compares each changed feature's solid validity (BRepCheck) too, not only counts, status,
+  volume and area: a feature valid on main and invalid on the branch is a difference, and an invalid solid never lands
+  (blend's tighten_tolerances: Halter's input became a 36-face invalid solid while the shown counts looked SAME).
