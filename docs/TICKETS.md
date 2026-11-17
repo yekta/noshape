@@ -38,6 +38,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   builds, so Delete face 2 gets a part with the chamfer's faces and the input is not the same between the two versions. Move
   face 1 also went 3475 -> 4285 ms (0.4.48 -> 0.4.53), 3.9 s on the green. Data: /root/qa-scratch/ab1117/{ab,ab55,imp2}.jsonl
   (lead's copy /root/lead-scratch/ab1117/).
+  - core 11-17: landed ba77957ae (each feature removed apart, OCCT's defeature bounded at 300K steps). Mac (M6, release,
+    median of 3): main 2089f1170 2822 ms; on blend's Fillet 3 (4efe95564) 1825 ms; live 12 ms. OCCT's defeature spends ~75 %
+    rebuilding the whole solid (MakerVolume) after filling the gap.
+  - Plan (lead 11-17, in order): (1) core: local rebuild in the kernel (deleted faces out, neighbours swapped for their
+    trimmed images), OCCT's defeature only as the fallback; gated identical end to end, volume / area against live.
+    (2) Upstream, so Delete face 2 gets live's part (ours 37 faces there, live 63): blend: Fillet 3 (9e40ad95a, 34/95/62 as
+    live, landing) and Fillet Stevenrohr zum Halter ("Adjoining edge not filleted.", next); core: Extrude impellerraum
+    (ours 38 faces, live 59) unless bool finds it is its Boolean; then Move face 1, Fillet 4, Move face 2 (all ERROR today)
+    should follow from the right input. (3) core: re-time Delete face 2 on the Mac against live's 12 ms on the real part.
 
 ## qa, 2026-11-15
 - [x] verified 80e16e42d (qa 11-15 12:50: dae03465 on green 80e16e42d, vibe6: qa-asm-a 10/10 and qa-tabs 10/10 clean; before 6/6 and 6/8 crashed on 0.4.52) P0 QUIT-ABORT-DOCK (core; asm / studios for the tab side) The user's dock document (private: vibe5 ~/lead-private/dock.noshape,
