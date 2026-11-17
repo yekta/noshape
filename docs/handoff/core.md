@@ -142,6 +142,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Saved documents' part names are Part N, not live's.
 
 ## Waiting on others
+- **c2-config-parts-nuts Sweep 1 (14/17): sent to bool 11-17 01:2x.** The thread Cut leaves 8 edges with 3-4 faces (helices
+  on the bore cylinder r 1.62111 mm where the swept flank meets it: bore strips both sides + flank). Dumps vibe5
+  ~/agents/core-keep/nm-nuts/{target,tool0,result}.brep. Bool's if it's the Boolean.
+- c2-config-parts-standoffs Revolve 1 (13/32): Sketch 3 solved 4 x 22 mm, chamfers on the axis side; live 3 x 24 (Length),
+  outer corners chamfered (sketches.json). Already in skasm's handoff (translator takes Sketch 3 back). Variables OK.
 - **c2-sm-rocker-enclosure-body 15/28 (stable now):** Extrude 6's pocket is ~2 mm off live's and differently shaped
   (top face 89.76 vs live 66.95 mm²) because Sketch 6 isn't translated as live: its PROJECTED constraint finds no model
   geometry, its circular pattern isn't kept, and the solve (1.97 mm) is taken back. Sketch translation, not modelling
