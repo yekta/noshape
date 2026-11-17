@@ -251,8 +251,9 @@ fn bmp24(w: u32, h: u32, rgb: &[u8]) -> Vec<u8> {
 /// How close (sheet mm) a polyline's points must be to a circle or ellipse
 /// to be written as one.
 const FIT_TOL: f64 = 1e-4;
-/// How far (sheet mm) a model edge's projected points may lie off its exact conic: 1 µm.
-const CONIC_TOL: f64 = 1e-3;
+/// How far (sheet mm) a model edge's projected points may lie off its exact conic: 10 µm (HLR's points lie up to 1.3 µm
+/// off a drafted rim's ellipse, c2-housing-draft).
+const CONIC_TOL: f64 = 1e-2;
 
 /// The extremes of `points` when they all lie within `tol` of the line through them (None for a point or a curve).
 fn straight(points: &[[f64; 2]], tol: f64) -> Option<[[f64; 2]; 2]> {

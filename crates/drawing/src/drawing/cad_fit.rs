@@ -296,10 +296,12 @@ pub fn fit_curve(points: &[[f64; 2]], closed: bool, tol: f64) -> Option<FitCurve
 /// The piece of a known conic (`conic`: its centre and two conjugate semi-diameters, a point at `c + a cos t + b sin t`)
 /// that `points` run along, when they all lie on it within `tol`: a CIRCLE or ARC where it is round, else an ELLIPSE
 /// (a model edge's exact curve, as Parasolid's: live writes a piece of a circle as an ARC however few points it has).
-/// None for fewer than 3 points, a conic seen edge-on, or points off it.
+/// Two points are the shorter piece between them: the projection put no point between them, so the piece is within
+/// its deflection of their chord (c2-housing-draft's Right view: a drafted rim's ellipse ratio 0.08, live's ELLIPSE).
+/// None for a single point, a conic seen edge-on, or points off it.
 pub fn on_conic(points: &[[f64; 2]], closed: bool, conic: [[f64; 2]; 3], tol: f64) -> Option<FitCurve> {
     let [c, a, b] = conic;
-    if points.len() < 3 {
+    if points.len() < 2 || (closed && points.len() < 3) {
         return None;
     }
     // Principal axes of the conjugate pair.
@@ -323,7 +325,8 @@ pub fn on_conic(points: &[[f64; 2]], closed: bool, conic: [[f64; 2]; 3], tol: f6
     }) {
         return None;
     }
-    let first_last = (points[0][0] - points[points.len() - 1][0]).hypot(points[0][1] - points[points.len() - 1][1]) < tol;
+    // (Ends a tenth of `tol` apart meet: a nearly full arc stays an arc.)
+    let first_last = (points[0][0] - points[points.len() - 1][0]).hypot(points[0][1] - points[points.len() - 1][1]) < tol * 0.1;
     let round = rb >= ra * (1.0 - 1e-9);
     if closed || first_last {
         return Some(if round { FitCurve::Circle { center: c, radius: ra } } else { FitCurve::Ellipse { center: c, major, ratio: rb / ra, start: 0.0, end: TAU } });
@@ -362,9 +365,9 @@ mod tests {
     }
 
     /// A piece of a known conic: a circle's three points an ARC, an ellipse's an ELLIPSE over their range, both ways
-    /// round; points off it, or a conic seen edge-on, None.
+    /// round; two points the shorter piece between them; points off it, or a conic seen edge-on, None.
     #[test]
-    fn three_points_on_a_known_conic() {
+    fn points_on_a_known_conic() {
         let circle = [[1.0, 2.0], [0.0, 3.0], [3.0, 0.0]];
         let pts = ring([1.0, 2.0], 3.0, 3.0, 0.0, 0.2, 0.5, 2);
         let Some(FitCurve::Arc { radius, start, end, .. }) = on_conic(&pts, false, circle, 1e-9) else { panic!() };
@@ -378,6 +381,11 @@ mod tests {
         for (t, p) in [(start, e[0]), (end, e[2])] {
             assert!((at(t)[0] - p[0]).hypot(at(t)[1] - p[1]) < 1e-9, "{t}: {:?} for {p:?}", at(t));
         }
+        let two = [e[2], e[0]];
+        let Some(FitCurve::Ellipse { start: s2, end: e2, .. }) = on_conic(&two, false, ellipse, 1e-9) else { panic!() };
+        assert!((s2 - start).abs() < 1e-9 && (e2 - end).abs() < 1e-9, "{s2} {e2} for {start} {end}");
+        let Some(FitCurve::Arc { start, end, .. }) = on_conic(&[pts[0], pts[2]], false, circle, 1e-9) else { panic!() };
+        assert!((start - 0.2).abs() < 1e-9 && (end - 0.5).abs() < 1e-9, "{start} {end}");
         assert!(on_conic(&[[3.0, 0.0], [0.0, 3.1], [-3.0, 0.0]], false, [[0.0, 0.0], [3.0, 0.0], [0.0, 3.0]], 1e-6).is_none());
         assert!(on_conic(&pts, false, [[1.0, 2.0], [3.0, 0.0], [6.0, 0.0]], 1e-6).is_none());
     }
