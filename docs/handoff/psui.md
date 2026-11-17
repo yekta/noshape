@@ -117,10 +117,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In progress (11-17, new thread)
 
-- Full ui-parity run (all 2146 with live takes, green 793cb58e) queued on vibe6: unit psui-full1117 (systemd --user),
-  `~/bin/slot timeout 10800 ~/agents/psui-keep/full.sh ~/tmp/psui/full1117` (4 shards, displays 386-389, snapshot
-  of the scenarios in ~/tmp/psui/src-1117). Log ~/tmp/psui/full1117.log; score in full1117/score.log. 11:45: third
-  in the slot queue (qa's suite since 08:40, skasm's pair, studios' shards ahead).
+- Full ui-parity run, split (lead 11-17 11:55: a run deep in one host's queue moves): green 082bd57e staged as
+  ~/agents/psui-keep/noshape, scenarios snapshot ~/tmp/psui/src-1117, script ~/agents/psui-keep/full-half.sh
+  (/root/psui-scratch/full-half.sh). Half 0 on vibe7 (4 apps, :386-389) -> ~/agents/psui-keep/full1117-a, half 1 on
+  vibe5 (3 apps, :386-388) -> full1117-b; units psui-full1117 through each host's ~/bin/slot, logs
+  ~/agents/psui-keep/full1117-{a,b}.log. 12:00: vibe7 third in its queue, vibe5 second. When both are done: copy
+  both into one dir and `run.py --compare-only` over all names for the score; split failures by owner (area field).
+  vibe6's run cancelled.
 - Feel matrices (Mac, 11-17 10:50): 18 / 18 pass. Command: `cargo test -p noshape-part-studio-ui --lib --
   ui_tests::feel:: ui_tests::snaps:: ui_tests::list:: ui_tests::measure:: ui_tests::nav:: ui_tests::chrome::
   ui_tests::toolbar_highlight:: ui_tests::sm:: ui_tests::sketchtools:: ui_tests::editing:: ui_tests::dialogs::
