@@ -132,5 +132,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 
 ## Hosts
 vibe5: land queue, compat loop (one CLI at a time), release builds via rb.sh (worktree qa-bisect). vibe6: ad-hoc app runs
-(:661), release quit check. vibe7: suites (slot), fuzz :61, nightly :671. vibe3: watcher only. The Mac: off limits except
+(:661), release quit check, main's watcher since 11-17 16:20 (/tmp/lead/main-status, /root/green come from there). vibe7:
+suites (slot), fuzz :61, nightly :671. vibe3 retired 11-17 ~17:15: qa's unique files copied to vibe7 ~/agents/qa-keep/vibe3-qa
+(tickets, docs, perfdocs, bin, fuzz results and summaries; release binaries / update homes / sources not kept), its scripts
+moved to bin/retired, land-footer points at vibe6. The Mac: off limits except
 its single slot. Heavy runs through `~/bin/slot` (DECISIONS 11-15).
