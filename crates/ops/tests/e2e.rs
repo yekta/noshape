@@ -5469,9 +5469,10 @@ fn drawing_view_menu_edits() {
     let e = try_call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": free, "orientation": "Nope" })).unwrap_err();
     assert!(e.message.contains("isometric"), "{e:?}");
     // A projected view's View orientation ▸ turns its base so that it shows the one picked, the family following,
-    // nothing moving (live2 vo-probe: Right › Top).
-    let right = vs.iter().find(|v| v["kind"] == "projected" && v["orientation"] == "right").expect("a Right view")["id"].clone();
-    let e = try_call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": right, "orientation": "right" })).unwrap_err();
+    // nothing moving (live2 vo-probe: Right › Top). (ISO A3 is first angle: the side view right of Front shows Left.)
+    let side_view = vs.iter().find(|v| v["kind"] == "projected" && (v["orientation"] == "right" || v["orientation"] == "left")).expect("a side view").clone();
+    let (right, side) = (side_view["id"].clone(), side_view["orientation"].clone());
+    let e = try_call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": right, "orientation": side })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("orientation"), "{e:?}");
     let before: Vec<Value> = get(&mut ctx, false)["views"].as_array().unwrap().iter().map(|v| v["position"].clone()).collect();
     call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": right, "orientation": "top" }));
@@ -5482,7 +5483,7 @@ fn drawing_view_menu_edits() {
     assert_eq!(after, before, "nothing moves");
     assert_eq!(view(&mut ctx, &child)["kind"], "projected");
     call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": base, "orientation": "front" }));
-    assert_eq!(view(&mut ctx, &right)["orientation"], "right");
+    assert_eq!(view(&mut ctx, &right)["orientation"], side);
     let e = try_call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": base, "bend_lines": false })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("bend_lines"), "{e:?}");
     call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": free, "orientation": "front" }));
