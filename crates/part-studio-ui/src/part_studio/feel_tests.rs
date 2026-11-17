@@ -379,8 +379,8 @@ fn part_faces_and_vertices_light_over_the_planes_behind(cx: &mut TestAppContext)
 }
 
 /// live psui/hover-pick-1120 (lead 20:28, P0): a block wholly behind the Front plane in the default iso view. Through
-/// the transparent plane the block lights under the real pointer, never the plane: every face's middle; its left
-/// vertical edge (a silhouette with only the plane beyond) 4 px out and 3 px in (live 5–6 / 4); 14 px out the plane,
+/// the transparent plane the block lights under the real pointer, never the plane: every face's middle; its
+/// top-left edge (a silhouette with only the plane beyond) 4 px out and 3 px in (live 5–6 / 4); 14 px out the plane,
 /// which lights only where nothing is behind it, and 14 px in the face.
 #[gpui::test]
 fn a_block_behind_the_front_plane_lights_through_it(cx: &mut TestAppContext) {
@@ -405,10 +405,12 @@ fn a_block_behind_the_front_plane_lights_through_it(cx: &mut TestAppContext) {
             .map(|(first, count)| &b.mesh.indices[*first as usize..(*first + *count) as usize])
             .filter_map(|idx| vp.project(idx.iter().map(|&k| p(&b.mesh.positions[k as usize])).sum::<glam::DVec3>() / idx.len() as f64))
             .collect();
-        // The vertical edge at x 10, y 10 mm: its middle on screen and the screen direction away from the block.
-        let (r, pl) = b.edge_refs.iter().zip(&b.mesh.edges).find(|(_, pl)| pl.iter().all(|q| (q[0] - 0.01).abs() < 1e-6 && (q[1] - 0.01).abs() < 1e-6)).expect("the edge at x 10, y 10");
+        // The top face's left edge (x 10, z 10 mm, along y; a silhouette with only the plane beyond it in iso): a spot on
+        // screen a third along it and the screen direction away from the block.
+        let (r, pl) = b.edge_refs.iter().zip(&b.mesh.edges).find(|(_, pl)| pl.iter().all(|q| (q[0] - 0.01).abs() < 1e-6 && (q[2] - 0.01).abs() < 1e-6)).expect("the edge at x 10, z 10");
         let (a, z) = (vp.project(p(&pl[0])).unwrap(), vp.project(p(pl.last().unwrap())).unwrap());
-        let mid = (a + z) * 0.5;
+        // (Not its middle: a rest there lights the edge's midpoint target, live 1954.)
+        let mid = a + (z - a) / 3.0;
         let centre = vp.project(glam::DVec3::new(0.03, 0.025, 0.005)).unwrap();
         let mut out = (z - a).perp().normalize();
         if out.dot(mid - centre) < 0.0 {
@@ -438,7 +440,7 @@ fn a_block_behind_the_front_plane_lights_through_it(cx: &mut TestAppContext) {
             _ => matches!(got, Some(Reference::Face(_))),
         };
         if !ok {
-            wrong.push(format!("{d:+} px off the left edge: lit {got:?}, want the {want}"));
+            wrong.push(format!("{d:+} px off the top-left edge: lit {got:?}, want the {want}"));
         }
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));

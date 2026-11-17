@@ -170,3 +170,46 @@ fn a_sketch_circle_and_its_centre_light_over_the_planes(cx: &mut TestAppContext)
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// qa P0 USER-HOVER-STAYS-LIT: on a slow GPU the highlight trailed the pointer by several picks. Off a lit line fast
+/// to a plane, the pick at rest was asked before the frame with the line's un-lighting went out, so it came back "not
+/// current" and was asked again (each ~300 ms there). Latest wins: the first answer after the pointer rests already
+/// lights what is under it.
+#[gpui::test]
+fn the_first_pick_at_rest_lights_what_is_under_the_pointer(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-hover-first-pick", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let lines = lines_on_screen(cx, &view);
+    let (_, a, b) = *lines.iter().max_by(|x, y| (x.1.y + x.2.y).total_cmp(&(y.1.y + y.2.y))).unwrap();
+    let on = (a + b) * 0.5;
+    let pointer = Pointer::new(cx, window, &view);
+    // A spot below the rectangle where a plane lights, reached slowly.
+    let spot = [140.0, 180.0, 220.0, 100.0]
+        .iter()
+        .flat_map(|d| [DVec2::new(on.x - d, on.y + d), DVec2::new(on.x + d, on.y + d)])
+        .find(|s| {
+            pointer.move_to(cx, &view, *s);
+            matches!(hovered(cx, &view), Some(Reference::Plane(_)))
+        })
+        .expect("a plane below the sketch");
+    let want = hovered(cx, &view);
+    pointer.move_to(cx, &view, on);
+    assert!(matches!(hovered(cx, &view), Some(Reference::SketchEntity { .. })), "the line lit");
+    // Off fast: no frame drawn, no pick answered on the way.
+    for k in 1..=12 {
+        let at = pointer.window_point(cx, on + (spot - on) * (k as f64 / 12.0));
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(at, None, Modifiers::default());
+    }
+    // The pause: the pick at rest is asked; then the frame with the line un-lit goes out; then the GPU answers.
+    cx.executor().advance_clock(std::time::Duration::from_millis(300));
+    cx.run_until_parked();
+    draw(cx, window);
+    cx.update(|cx| view.read(cx).gpu.deliver_frames());
+    draw(cx, window);
+    assert_eq!(hovered(cx, &view), want, "the first answer at rest lights the plane under the pointer");
+}

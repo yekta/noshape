@@ -117,7 +117,16 @@ nothing.
 - skasm (18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6): sketch_hover_id re-resolves from vp.pointer_position() on every
   PointerMove and re-tests a region id under the pointer (their next batch). Plane / non-sketch ids pass through as
   the GPU gave them, so a stale plane pick is the viewport's. The glyph rows' linger is mine.
-- In flight: the 3 s shots run (does the right hover arrive late, or never?).
+- Measured (vibex6, load 26–37): every 3 s shot is right; a frame takes 350–450 ms to the screen, a hover pick
+  250–390 ms. The 0.7 s shots show hovers from along the path.
+- Done (queued 22:4x): viewport `pick_layout_epoch` (a hover's own redraw doesn't void a hover pick asked before it;
+  the camera, size, geometry or filter do), a hover result applied where the pointer is now, and a new pick asked as
+  soon as the pointer leaves the in-flight pick's rectangle (the render thread batches them). GPU test
+  sketch_hover::the_first_pick_at_rest_lights_what_is_under_the_pointer (the GPU answers only at rest).
+- Next, the same class (lead 22:4x): qa's selection-feel run (TICKETS 208ca8549, vibex6 ~/agents/qa-keep/sel-feel/,
+  re-run qa-scratch/sf/mini.sh): a Part 2 row click selects but Part 2 isn't drawn selected, and Part 1 keeps a stale
+  hover outline from the pointer crossing its row. skasm has the list / double-click rows of that run.
+- Then: re-run qa's flow (~/agents/psui-keep/hover/uh2.sh, 0.7 s and 3 s shots) on the green with this.
 
 ## Current order (lead 11-17 ~14:05)
 

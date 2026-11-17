@@ -286,12 +286,18 @@ pub struct Viewport {
     pick_cache: Option<Arc<PickBuffer>>,
     /// Incremented whenever a frame that invalidates the pick buffer is submitted.
     pick_epoch: u64,
+    /// Incremented when what is where in the pick buffer changes (the camera, the size, the geometry, what is
+    /// pickable), not by a hover's own redraw (a lit line holds a little further): a hover pick asked before a hover
+    /// changed still says what is under the pointer now.
+    pick_layout_epoch: u64,
     next_pick_token: u64,
-    /// Outstanding pick queries: token -> (epoch, purpose).
-    pick_requests: HashMap<u64, (u64, PickPurpose, Instant)>,
+    /// Outstanding pick queries: token -> (epoch, layout epoch, purpose).
+    pick_requests: HashMap<u64, (u64, u64, PickPurpose, Instant)>,
     /// A hover query is outstanding / another one is wanted when it returns.
     hover_query: bool,
     hover_query_again: bool,
+    /// The newest hover pick asked: its token and where (device px) it was asked.
+    hover_query_newest: (u64, (i32, i32)),
     /// The previous hover move ([`prehighlight_delay`]), the average GPU
     /// pick time (ms), and the pre-highlight pick waiting for a pause.
     last_move_at: Option<Instant>,
@@ -337,6 +343,8 @@ pub struct Viewport {
     last_presented: u64,
     dirty: bool,
     pick_dirty: bool,
+    /// Only the hover changed in the pick buffer since the last frame (see `pick_layout_epoch`).
+    pick_hover_dirty: bool,
     drag: Drag,
     press_pos: DVec2,
     /// When the press was, and how far the pointer has got from it since (live: a right press orbits from its
@@ -634,10 +642,12 @@ impl Viewport {
             ui_follows_camera: true,
             pick_cache: None,
             pick_epoch: 0,
+            pick_layout_epoch: 0,
             next_pick_token: 1,
             pick_requests: HashMap::new(),
             hover_query: false,
             hover_query_again: false,
+            hover_query_newest: (0, (0, 0)),
             last_move_at: None,
             avg_pick_ms: -1.0,
             paused_hover: None,
@@ -661,6 +671,7 @@ impl Viewport {
             last_presented: 0,
             dirty: true,
             pick_dirty: true,
+            pick_hover_dirty: false,
             drag: Drag::None,
             press_pos: DVec2::ZERO,
             press_at: Instant::now(),
@@ -747,8 +758,9 @@ impl Viewport {
         // Pick-only state (a field's filter) changes the pick buffer too, and so does the hover (a lit line holds it
         // further off: live's hold overlay).
         use noshape_render::scene::state::{HOVER, NO_PICK};
-        let picked = |s: &Scene| s.states.iter().enumerate().filter(|(_, f)| **f & (NO_PICK | HOVER) != 0).map(|(i, f)| (i, f & (NO_PICK | HOVER))).collect::<Vec<_>>();
-        let picks_changed = picked(&scene) != picked(&self.scene);
+        let picked = |s: &Scene, flags: u32| s.states.iter().enumerate().filter(|(_, f)| **f & flags != 0).map(|(i, f)| (i, f & flags)).collect::<Vec<_>>();
+        let filter_changed = picked(&scene, NO_PICK) != picked(&self.scene, NO_PICK);
+        let hover_changed = picked(&scene, HOVER) != picked(&self.scene, HOVER);
         self.scene_bounds = scene.bounds();
         self.scene = scene;
         noshape_render::perf::frame_milestone(self.seq + 1, "scene set");
@@ -760,8 +772,10 @@ impl Viewport {
         if let Some((_, need @ None)) = self.bench.as_mut().and_then(|b| b.click.as_mut()) {
             *need = Some(self.seq + 1);
         }
-        if geometry_changed || picks_changed {
+        if geometry_changed || filter_changed {
             self.pick_dirty = true;
+        } else if hover_changed {
+            self.pick_hover_dirty = true;
         }
         self.request_frame(cx);
     }
@@ -1187,7 +1201,7 @@ impl Viewport {
     fn request_pick(&mut self, rect: PickRect, purpose: PickPurpose) {
         let token = self.next_pick_token;
         self.next_pick_token += 1;
-        self.pick_requests.insert(token, (self.pick_epoch, purpose, Instant::now()));
+        self.pick_requests.insert(token, (self.pick_epoch, self.pick_layout_epoch, purpose, Instant::now()));
         self.gpu.pick(self.target_id, token, rect);
     }
 
@@ -1198,13 +1212,18 @@ impl Viewport {
         if matches!(self.drag, Drag::Nav | Drag::Box) || self.anim.is_some() || !self.pointer_inside {
             return;
         }
-        if self.hover_query {
+        let (x, y) = self.device_px(self.last_pos);
+        let half = PICK_HALF.max((PICK_RADIUS * self.scale as f64) as i32 + 1);
+        let reach = half - (PICK_RADIUS * self.scale as f64) as i32;
+        let (_, (ax, ay)) = self.hover_query_newest;
+        // One in flight while the pointer stays in its rectangle; past it, latest wins: asked again where it is now (the
+        // older answer then counts only where it still covers the pointer).
+        if self.hover_query && (x - ax).abs() < reach && (y - ay).abs() < reach {
             self.hover_query_again = true;
             return;
         }
         self.hover_query = true;
-        let (x, y) = self.device_px(self.last_pos);
-        let half = PICK_HALF.max((PICK_RADIUS * self.scale as f64) as i32 + 1);
+        self.hover_query_newest = (self.next_pick_token, (x, y));
         self.request_pick(PickRect::around(x, y, half), PickPurpose::Hover);
     }
 
@@ -1214,7 +1233,7 @@ impl Viewport {
     }
 
     fn on_pick(&mut self, token: u64, result: Result<Arc<PickBuffer>, String>, cx: &mut Context<Self>) {
-        let Some((epoch, purpose, asked)) = self.pick_requests.remove(&token) else { return };
+        let Some((epoch, layout_epoch, purpose, asked)) = self.pick_requests.remove(&token) else { return };
         noshape_render::perf::record("v.pick_latency", asked.elapsed());
         let buf = match result {
             Ok(b) => Some(b),
@@ -1239,15 +1258,30 @@ impl Viewport {
         match purpose {
             PickPurpose::Hover => {
                 self.avg_pick_ms = average_pick_ms(self.avg_pick_ms, asked.elapsed().as_secs_f64() * 1000.0);
+                // An older answer (a newer one is on its way): only what it shows where the pointer is now.
+                let newest = token == self.hover_query_newest.0;
+                if !newest {
+                    let (x, y) = self.device_px(self.last_pos);
+                    if self.pointer_inside
+                        && self.paused_hover.is_none()
+                        && layout_epoch == self.pick_layout_epoch
+                        && let Some(b) = buf.as_ref().filter(|b| b.covers(x, y, r))
+                    {
+                        self.set_hover(b.pick(x, y, r, |id| prio(id)), cx);
+                    }
+                    return;
+                }
                 self.hover_query = false;
                 if !self.pointer_inside || self.drag == Drag::Box {
                     self.hover_query_again = false;
                 } else if self.paused_hover.is_some() {
                     // A fast move: the pick waits for the pause.
-                } else if current {
-                    match self.pick_at(self.last_pos) {
-                        Some(id) => self.set_hover(id, cx),
-                        // The pointer moved out of the rectangle meanwhile.
+                } else if current || layout_epoch == self.pick_layout_epoch {
+                    // Latest wins: what the buffer shows where the pointer is now (a hover's own redraw since it was
+                    // asked moves nothing), else at once a pick where the pointer is.
+                    let (x, y) = self.device_px(self.last_pos);
+                    match buf.as_ref().filter(|b| b.covers(x, y, r)) {
+                        Some(b) => self.set_hover(b.pick(x, y, r, |id| prio(id)), cx),
                         None => self.hover_query_again = true,
                     }
                 } else {
@@ -1360,8 +1394,12 @@ impl Viewport {
         }
         // Timing two consecutive frames: draw the next one at once.
         let force_next = interactive && self.frame_timer.draw_start(now);
-        let pick = std::mem::take(&mut self.pick_dirty) | (self.last_submitted_view != Some(view));
+        let layout = std::mem::take(&mut self.pick_dirty) | (self.last_submitted_view != Some(view));
+        let pick = layout | std::mem::take(&mut self.pick_hover_dirty);
         self.last_submitted_view = Some(view);
+        if layout {
+            self.pick_layout_epoch += 1;
+        }
         if pick {
             self.pick_epoch += 1;
             self.pick_cache = None;
