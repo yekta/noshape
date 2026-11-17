@@ -1567,7 +1567,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   -wal and -shm beside each of its 124 documents). Likely the row's details / thumbnail read opens the file and the
   connection is never closed. Repro: qa-scratch/footer/sc/w-select.json with the green app (qa-scratch/footer/run.sh
   as a model). (qa 2026-11-07 23:30)
-- [ ] P2 MCP-QUOTED-VALUE (ops) **a real agent's first sketch_dimension calls fail on a quoted value**: the release agent
+- [x] (dx 2026-11-17: sketch_dimension / sketch_set_dimension take an expression sent in quotes as that expression; e2e sketch_extrude_fillet_pattern_export_render sends "\"2 * 25 mm\"") P2 MCP-QUOTED-VALUE (ops) **a real agent's first sketch_dimension calls fail on a quoted value**: the release agent
   check (bin/agent-session.sh, `claude -p` on Haiku, v0.4.35's MCP server, the fixed block-with-hole task) sent
   `"value": "\"60 mm\""` (the expression in quotes) twice and got `expected a value, found `\"` at 0..1` (param value)
   before trying `"60 mm"`. 2 of its 14 calls failed this way (a third was the agent trying Bash to look for the documents

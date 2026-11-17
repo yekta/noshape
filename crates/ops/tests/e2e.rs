@@ -165,8 +165,10 @@ fn sketch_extrude_fillet_pattern_export_render() {
     let d = call(&mut ctx, "sketch_dimension", json!({ "sketch": sketch, "kind": "diameter", "entities": [circle_id], "value": "10 mm" }));
     assert!(d["dimension"].as_str().unwrap().starts_with("dim:"));
     let bottom = rect["created"].as_array().unwrap().iter().find(|e| e["type"] == "line" && num(&e["start"][1]) < -14.0 && num(&e["end"][1]) < -14.0).unwrap()["id"].as_str().unwrap().to_string();
-    call(&mut ctx, "sketch_dimension", json!({ "sketch": sketch, "kind": "length", "entities": [bottom], "value": "2 * 25 mm" }));
+    // (Sent in quotes, as agents do: the expression; MCP-QUOTED-VALUE.)
+    call(&mut ctx, "sketch_dimension", json!({ "sketch": sketch, "kind": "length", "entities": [bottom], "value": "\"2 * 25 mm\"" }));
     let st = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }));
+    assert!(st["constraints"].as_array().unwrap().iter().any(|c| c["type"] == "Length" && c["value"] == "50"), "{st}");
     let regions = st["regions"].as_array().unwrap();
     assert_eq!(regions.len(), 2, "plate and hole regions: {st}");
     let plate = regions.iter().find(|r| r["holes"] == 1).unwrap()["id"].as_str().unwrap().to_string();

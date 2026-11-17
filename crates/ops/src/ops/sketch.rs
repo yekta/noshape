@@ -972,7 +972,12 @@ fn entity_anchor(sk: &noshape_sketch::Sketch, e: EntityId) -> Option<DVec2> {
 pub(super) fn value_text(v: &Value) -> Result<String, OpError> {
     match v {
         Value::Number(n) => Ok(n.to_string()),
-        Value::String(s) if !s.trim().is_empty() => Ok(s.trim().to_string()),
+        // An expression sent in quotes ("\"60 mm\"": agents do, MCP-QUOTED-VALUE) is that expression: a quoted text is
+        // never a dimension's value.
+        Value::String(s) if !s.trim().is_empty() => {
+            let t = s.trim();
+            Ok(t.strip_prefix('"').and_then(|x| x.strip_suffix('"')).filter(|x| !x.trim().is_empty() && !x.contains('"')).unwrap_or(t).trim().to_string())
+        }
         _ => Err(OpError::param("value", "a value or expression")),
     }
 }
