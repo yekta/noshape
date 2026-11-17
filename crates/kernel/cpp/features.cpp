@@ -11138,7 +11138,11 @@ OpOut op_offset_shape(const OcShape& s, double offset, uint8_t join)
 
 // ---------------------------------------------------------------- sew / fill / rib
 
-OpOut op_sew(const OcShapeList& shapes, double tol, bool make_solid)
+namespace
+{
+// `make_solid`: 0 the sewn shells, 1 a solid of each (failing where one isn't closed), 2 solids where every shell
+// closes, else the sewn shells as they are (one sew where callers sewed twice).
+OpOut sew_shapes(const OcShapeList& shapes, double tol, int make_solid)
 {
   if (shapes.items.empty())
     fail_invalid("sew needs at least one shape");
@@ -11170,7 +11174,10 @@ OpOut op_sew(const OcShapeList& shapes, double tol, bool make_solid)
       }
     }
   }
-  if (make_solid)
+  bool all_closed = true;
+  for (TopExp_Explorer e(result, TopAbs_SHELL); e.More() && make_solid == 2; e.Next())
+    all_closed = all_closed && BRep_Tool::IsClosed(TopoDS::Shell(e.Current()));
+  if (make_solid == 1 || (make_solid == 2 && all_closed))
   {
     std::vector<TopoDS_Shape> solids;
     for (TopExp_Explorer e(result, TopAbs_SHELL); e.More(); e.Next())
@@ -11191,6 +11198,11 @@ OpOut op_sew(const OcShapeList& shapes, double tol, bool make_solid)
   }
   return make_result(shapes.items, result, h.get());
 }
+} // namespace
+
+OpOut op_sew(const OcShapeList& shapes, double tol, bool make_solid) { return sew_shapes(shapes, tol, make_solid ? 1 : 0); }
+
+OpOut op_sew_closing(const OcShapeList& shapes, double tol) { return sew_shapes(shapes, tol, 2); }
 
 namespace
 {

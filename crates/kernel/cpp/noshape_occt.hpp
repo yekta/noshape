@@ -1001,6 +1001,8 @@ OpOut op_offset_shape(const OcShape& s, double offset, uint8_t join);
 OpOut op_round_tool(P3 a, P3 d, P3 u0, P3 u1, double half, rust::Slice<const double> knots, rust::Slice<const int32_t> mults,
                     rust::Slice<const double> radii, rust::Slice<const double> along);
 OpOut op_sew(const OcShapeList& shapes, double tol, bool make_solid);
+// op_sew making solids where every sewn shell closes, else the sewn shells (one sew for "a solid if it closes").
+OpOut op_sew_closing(const OcShapeList& shapes, double tol);
 OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
               rust::Slice<const int32_t> orders, rust::Slice<const double> points,
               const OcShapeList& guides);

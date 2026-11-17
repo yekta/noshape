@@ -262,8 +262,9 @@ pub fn join_surface(ev: &mut EvalCtx, tool: NamedShape, scope: Vec<usize>) -> FR
     }
     shapes.push(tool.shape.clone());
     // A closed sew is a solid only where it encloses volume and leaves no sheet out.
-    let res = match k::sew(&shapes, 1e-6, true) {
-        Ok(r) if encloses_all(&r.shape) => r,
+    // (One sew: solids where it closes, else its shells.)
+    let res = match k::sew_closing(&shapes, 1e-6) {
+        Ok(r) if r.shape.count(ShapeType::Solid) == 0 || encloses_all(&r.shape) => r,
         _ => k::sew(&shapes, 1e-6, false)?,
     };
     let mut args: Vec<ShapeNames> = targets.iter().map(|&i| ev.ctx.bodies[i].shape_names()).collect();

@@ -1083,7 +1083,7 @@ pub fn mutual_trim(ev: &mut EvalCtx) -> FResult<()> {
         let shapes: Vec<Shape> = kept.iter().map(|k| k.1.clone()).collect();
         let all_faces: Vec<Shape> = shapes.iter().flat_map(|s| s.faces()).collect();
         let all_names: Vec<Name> = kept.iter().flat_map(|k| k.2.clone()).collect();
-        let sewn = k::sew(&shapes, 1e-6, true).or_else(|_| k::sew(&shapes, 1e-6, false))?;
+        let sewn = k::sew_closing(&shapes, 1e-6).or_else(|_| k::sew(&shapes, 1e-6, false))?;
         let names: Vec<Name> = sewn
             .shape
             .faces()

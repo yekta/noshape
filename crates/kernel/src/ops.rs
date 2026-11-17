@@ -881,6 +881,12 @@ pub fn sew(shapes: &[Shape], tolerance: f64, make_solid: bool) -> Result<OpResul
     op(ffi::op_sew(&l, tolerance, make_solid))
 }
 
+/// [`sew`] making solids where every sewn shell closes, else the sewn shells: one sew for "a solid if it closes".
+pub fn sew_closing(shapes: &[Shape], tolerance: f64) -> Result<OpResult> {
+    let l = vec_to_list(shapes);
+    op(ffi::op_sew_closing(&l, tolerance))
+}
+
 /// Boundary continuity for [`fill_surface`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Continuity {
