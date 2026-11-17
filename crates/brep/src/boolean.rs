@@ -1216,8 +1216,28 @@ impl Ctx<'_> {
                 _ => {
                     // A piece of a straight or round edge: its ends' parameters on the edge's curve on the face.
                     let whole = C2::Nurbs { c: c.clone(), t0: *pt0, t1: *pt1 };
+                    // (On a surface going round, the place on whichever turn lies on the edge's curve: a vertex near a
+                    // torus's seam found a turn away (c2-config-parts-sprockets' rim, a tooth gap's crossing 1.9 deg
+                    // short of the circle's end, placed past its start: the piece ran back along the whole edge).)
+                    let turns: Vec<DVec2> = match g.ns.as_deref() {
+                        Some(ns) => {
+                            let [pu, pv] = ns.periodic();
+                            [(pu, DVec2::new(TAU * su, 0.0)), (pv, DVec2::new(0.0, TAU * sv))].into_iter().filter(|x| x.0).flat_map(|x| [x.1, -x.1]).collect()
+                        }
+                        None => Vec::new(),
+                    };
                     let at = |p: DVec3| {
-                        let (t, _) = whole.param_of(g.to2(p));
+                        let q = g.to2(p);
+                        let (mut t, d) = whole.param_of(q);
+                        if d > self.tol {
+                            for &k in &turns {
+                                let (tk, dk) = whole.param_of(q + k);
+                                if dk < d.min(self.tol) {
+                                    t = tk;
+                                    break;
+                                }
+                            }
+                        }
                         pt0 + (pt1 - pt0) * t
                     };
                     // (A piece of a closed circle (or a chord merged with one): by its ends' and middle's angles about
