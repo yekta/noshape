@@ -1,0 +1,63 @@
+{
+  "name": "drw-toolbar-tips-view-showhide",
+  "about": "block-drawing: the drawing toolbar's Undo, Redo, Update from this workspace and Projected view hovered (their tooltips), then the Front view's right-click menu with its Show/hide submenu opened; Escape",
+  "area": "drawing",
+  "source": "studios 11-16 matrix (Move to sheet / Replicate surface: toolbar tooltips and the view menu's Show/hide rows unseen); live2 11-17",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "hover",
+      "on": {
+        "tool": "Undo"
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "tool": "Redo"
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "tool": "Update from this workspace"
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "tool": "Projected view"
+      },
+      "ms": 1200
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Show/hide"
+      },
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
