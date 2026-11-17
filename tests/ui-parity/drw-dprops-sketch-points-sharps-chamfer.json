@@ -1,0 +1,129 @@
+{
+  "name": "drw-dprops-sketch-points-sharps-chamfer",
+  "about": "Drawing properties › Construction geometry: Virtual sharps ▾ Edge extension, Sketch points ▾ Centermark circle then Cross circle; Dimensions: 45 degree content ▾ Angle x Length (panel state; cancelled)",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (live2 11-17: the drawing matrix's Drawing properties gaps)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          150,
+          110
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Drawing properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Construction geometry"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Centermark"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Edge extension"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Circle"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Centermark circle"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Centermark circle"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Cross circle"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Dimensions"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Length x Angle"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Angle x Length"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    }
+  ]
+}

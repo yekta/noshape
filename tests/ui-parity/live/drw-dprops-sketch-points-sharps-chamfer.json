@@ -1,0 +1,4285 @@
+{
+ "scenario": "drw-dprops-sketch-points-sharps-chamfer",
+ "recorded": "2026-11-17T18:35:18.245Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.7"
+ },
+ "live": {
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "36c9b36e59a0e526687179dd",
+  "start": "block-drawing",
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "other",
+   "tag": "iframe"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": {
+   "tab": "Part 1 Drawing 1",
+   "sheet": "Sheet1",
+   "sheets": [
+    "Sheet1"
+   ],
+   "tool": null,
+   "views": [
+    {
+     "name": "Front",
+     "kind": "base",
+     "position": [
+      81,
+      81
+     ],
+     "parent": null,
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Isometric",
+     "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Right",
+     "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Top",
+     "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    }
+   ],
+   "annotations": [],
+   "selection": []
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "sheet_point": [
+      150,
+      110
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    1023,
+    569
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Paste as table",
+      "Sheet properties...",
+      "Drawing properties...",
+      "",
+      "Zoom to fit",
+      "Zoom to window",
+      "Zoom to sheet"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 228841
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Drawing properties..."
+    }
+   },
+   "ok": true,
+   "at": [
+    1095,
+    594
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Units and precision",
+      "Primary",
+      "Units",
+      "Decimal separator",
+      "Precision",
+      "Tolerance precision",
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Inches"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Period"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1234"
+      },
+      {
+       "label": "Show dual dimensions",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show dual unit",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Millimeters"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "Length leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Length tolerance leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length tolerance trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 255363
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 2000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Units and precision",
+      "Primary",
+      "Units",
+      "Decimal separator",
+      "Precision",
+      "Tolerance precision",
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Inches"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Period"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1234"
+      },
+      {
+       "label": "Show dual dimensions",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show dual unit",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Millimeters"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "Length leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Length tolerance leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length tolerance trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 281907
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "tab": "Construction geometry"
+    }
+   },
+   "ok": true,
+   "at": [
+    1720,
+    138
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Sketch geometry",
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 307337
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Sketch geometry",
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 333138
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Centermark"
+    }
+   },
+   "ok": true,
+   "at": [
+    1806,
+    253
+   ],
+   "via": "native select in the drawing: marked for the next menu step (its popup is not in the DOM)",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Sketch geometry",
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 347337
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Edge extension"
+    }
+   },
+   "ok": true,
+   "at": null,
+   "via": "native select in the drawing: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Sketch geometry",
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Edge extension"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 362052
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Sketch geometry",
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Edge extension"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 387198
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Circle"
+    }
+   },
+   "ok": true,
+   "at": [
+    1739,
+    487
+   ],
+   "via": "native select in the drawing: marked for the next menu step (its popup is not in the DOM)",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Sketch geometry",
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Edge extension"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 400886
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Centermark circle"
+    }
+   },
+   "ok": true,
+   "at": null,
+   "via": "native select in the drawing: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Sketch geometry",
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Edge extension"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 415800
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Sketch geometry",
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Edge extension"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 442178
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Centermark circle"
+    }
+   },
+   "ok": true,
+   "at": [
+    1739,
+    487
+   ],
+   "via": "native select in the drawing: marked for the next menu step (its popup is not in the DOM)",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Sketch geometry",
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Edge extension"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Centermark circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 456671
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Cross circle"
+    }
+   },
+   "ok": true,
+   "at": null,
+   "via": "native select in the drawing: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Sketch geometry",
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Edge extension"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Cross circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 471290
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Construction geometry",
+      "Created in drawing",
+      "Virtual sharps",
+      "Sketch geometry",
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Edge extension"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Cross circle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "1 mm"
+      },
+      {
+       "label": "Extended lines",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 497069
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "click",
+    "on": {
+     "tab": "Dimensions"
+    }
+   },
+   "ok": true,
+   "at": [
+    1606,
+    138
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Dimensions",
+      "All dimensions",
+      "Font",
+      "Text height",
+      "in",
+      "Color",
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "Underline overridden dimensions",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Break dimension by default",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Horizontal"
+      },
+      {
+       "label": "Lock the angle of all jogged dimensions to 45 degrees",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Note"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length x Angle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Dimensions"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length x Length"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "Dimension style",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Show dimension lines by default",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 523389
+  },
+  {
+   "step": 16,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Dimensions",
+      "All dimensions",
+      "Font",
+      "Text height",
+      "in",
+      "Color",
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "Underline overridden dimensions",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Break dimension by default",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Horizontal"
+      },
+      {
+       "label": "Lock the angle of all jogged dimensions to 45 degrees",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Note"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length x Angle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Dimensions"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length x Length"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "Dimension style",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Show dimension lines by default",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 549877
+  },
+  {
+   "step": 17,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Length x Angle"
+    }
+   },
+   "ok": true,
+   "at": [
+    1807,
+    791
+   ],
+   "via": "native select in the drawing: marked for the next menu step (its popup is not in the DOM)",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Dimensions",
+      "All dimensions",
+      "Font",
+      "Text height",
+      "in",
+      "Color",
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "Underline overridden dimensions",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Break dimension by default",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Horizontal"
+      },
+      {
+       "label": "Lock the angle of all jogged dimensions to 45 degrees",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Note"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length x Angle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Dimensions"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length x Length"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "Dimension style",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Show dimension lines by default",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 564680
+  },
+  {
+   "step": 18,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Angle x Length"
+    }
+   },
+   "ok": true,
+   "at": null,
+   "via": "native select in the drawing: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Dimensions",
+      "All dimensions",
+      "Font",
+      "Text height",
+      "in",
+      "Color",
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "Underline overridden dimensions",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Break dimension by default",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Horizontal"
+      },
+      {
+       "label": "Lock the angle of all jogged dimensions to 45 degrees",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Note"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Angle x Length"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Dimensions"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length x Length"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "Dimension style",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Show dimension lines by default",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 579455
+  },
+  {
+   "step": 19,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Dimensions",
+      "All dimensions",
+      "Font",
+      "Text height",
+      "in",
+      "Color",
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "Underline overridden dimensions",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Break dimension by default",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Horizontal"
+      },
+      {
+       "label": "Lock the angle of all jogged dimensions to 45 degrees",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Note"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Angle x Length"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Dimensions"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length x Length"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "Dimension style",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Show dimension lines by default",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 606255
+  },
+  {
+   "step": 20,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Dimensions",
+      "All dimensions",
+      "Font",
+      "Text height",
+      "in",
+      "Color",
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "Underline overridden dimensions",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Break dimension by default",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Horizontal"
+      },
+      {
+       "label": "Lock the angle of all jogged dimensions to 45 degrees",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Note"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Angle x Length"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Dimensions"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length x Length"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "Dimension style",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Show dimension lines by default",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 633734
+  },
+  {
+   "step": 21,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Dimensions",
+      "All dimensions",
+      "Font",
+      "Text height",
+      "in",
+      "Color",
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "Underline overridden dimensions",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Break dimension by default",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Horizontal"
+      },
+      {
+       "label": "Lock the angle of all jogged dimensions to 45 degrees",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Note"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Angle x Length"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Dimensions"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Length x Length"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "Dimension style",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Show dimension lines by default",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 659104
+  }
+ ]
+}
