@@ -13,6 +13,18 @@ docs/DECISIONS.md (read first; it wins over anything here).
     71e0c4fc6 straight B-spline seams join faces in shown_topology (fan-blade's right hole; T1
     core::faces_split_at_a_seam_whose_curves_are_straight_bsplines_show_as_one) + d777a79b3 no per-hit classify in
     the prism footprint patch. If clean: hats/dock A/B (udoc-cmp.sh), then land. Kernel tests 486 ok, clippy clean.
+  - **core-sing (worktree core-trace, pushed, base b47afb3b7), p6 pair queued on vibe5 + bool's gate asked 04:30:**
+    6a59c4094 surface loft to a point between guides + Thicken refuses a pinched free-form face (OCCT segfaulted;
+    singularities' Problem loft builds, area 2678.7 vs live 3425.0: guide/end derivative conditions not applied yet,
+    next step there); 235c08517 Reapply fillet: a cylinder is a fillet only touching its supports along axis lines
+    (impeller Move face 1 6.6 s -> 28 ms, still ERROR: its input differs, blend's Fillet 3 / Stevenrohr zum Halter);
+    4254e715e Delete face: each separate feature its own OCCT defeature, bounded at 300K work steps, kept if it hits
+    (impeller Delete face 2 replay 16.6 -> 8.1 s, identical result). Lead: lands only if model suites, bool's gate
+    and hats/dock are identical; p6's branch side logs "work: defeature ... (spent)" (p6res/branch.all): any spent
+    in the suites is a removal past 300K. OCCT 0034 (extension cap) dropped: /root/core-scratch/occt-0034-extension-cap.diff.
+    Impeller P0 bisect: 0.4.52 -> 0.4.53 jump = Chamfer Stevenrohr Halterung building (as live), Delete face 2 then
+    deletes stand-in faces (refs to Move face 1's SPLIT face fall back). Remeasure Delete face 2 once blend's fillets
+    build; measure on the Mac.
   - fan-blade Boolean 2 topology (57/142/86 vs live 56/143/88): our base = live's at Chamfer 1 (50/119/68). Right hole
     7 faces vs left's 6 (seam edge 99's pcurves straight B-splines: fixed by 71e0c4fc6 -> expect 56/139/84). Live
     per hole then +2 edges +2 vertices: which vertices Parasolid keeps (ours hides the flank/seam crossings) needs
@@ -30,15 +42,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - c2-surf-workshop-britatap Touch screen split (4/22): our projected split curve (BRepProj section, a degree 7
   B-spline) ends 0.116 mm from the face's corner along the rim, where the sketch edge ends exactly; live ends it on
   the corner (2/6/5 vs ours 2/7/6). Kernel projection precision at a tangent end; parked.
-- c2-config-parts-links (10/35, largest gap after paths-guides): Sketch 1's solve flips its waist arcs to the other
-  tangent branch when p goes 5 -> 8 mm, so the translator keeps the stored 5 mm sketch. Solver: in skasm's handoff
-  11-16. Not core's.
 - c2-surf-workshop-cpcurves Main pipe (thin sweep, 7/24): (1) Sketch 4's circle kept 18.8 mm off the path (translator
   take-back: in skasm's handoff). (2) Mine: live merges the faces swept along the path's three collinear lines into
   one per wall (6 faces; ours 10: a face per path edge). **Committed b173dc5bb (core-oc, NOT in the vibe7 pair):
   join_collinear_lines joins a sweep path's lines along one line into one edge (first piece's source)**: Main pipe's
   faces = live (only its box differs, the take-back). T1 features_a::a_sweep_along_collinear_lines_has_one_side_face.
-- c2-surf-workshop-manualblend Sweep 2: Sketch 5's CONCENTRIC rejected by the translator (skasm's handoff). Not core's.
 - c2-surf-intro-examples Fill 1 (5/13, parked): 4 G0 boundary edges (2 fit splines, 2 sketch splines; they match
   live's lengths). fair_g1_fill returns nothing for them, so OCCT's plate (MakeFilling) balloons: 61911 mm², box to
   x 198 mm; live 23827.4. A Coons patch (GeomFill_BSplineCurves, CoonsStyle) gives 23669.5 (-0.66 %: outside the
@@ -51,7 +59,6 @@ docs/DECISIONS.md (read first; it wins over anything here).
   changed nothing (edge count != 4 or Coons declined; not chased). Experimental coons_fill saved in
   /root/core-scratch/features-coons.cpp (full file, not a patch).
 - c2-surf-workshop-loft Loft 2: 3-profile surface loft 7e-5 off live's area (interpolation detail); skipped.
-- c2-sm-rocker-enclosure-body Extrude 6: Sketch 6 taken back by the translator (skasm's handoff 11-16). Not core's.
 - c2-hunting-knife Revolve 1 (46/52, parked): HANDLE 10/27/18, live 10/27/19. Our ring between the handle's B-spline
   face and the dome's sphere is two equal 41 mm edges (vertices at (119.65, 0, 2.99): the B-spline's seam end, and
   (104.36, 0, -27.20): the sphere seam's end), both hidden by the seam-join rule. Live's ring RvBB (81.385 mm) has its
@@ -169,7 +176,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (cylinder_turns: strips cut at u = 2 pi k, pcurves in [0, 2 pi], edges split via ReShape; wire reversed where the
   cylinder's normal opposes the B-spline's: valid with no ShapeFix). The cut is still wrong (155.4 mm3, invalid;
   TooSmallEdge, AcquiredSelfIntersection): the r 2.0 crest passes through the chamfer rims (r 2.0 at z 0 / 4.06).
-  Sent to bool 03:20 (dumps ~/agents/core-keep/nm-nuts-turns with probe.cpp). Waiting on bool.
+  bool took it (11-17 ~03:45): both Booleans trip on the shared circle; patch stays parked until bool says whether
+  the Boolean needs the cylinders as input (tool axes 2-5e-15 off z: make them exact if it lands).
 - c2-config-parts-standoffs Revolve 1 (13/32): Sketch 3 solved 4 x 22 mm, chamfers on the axis side; live 3 x 24 (Length),
   outer corners chamfered (sketches.json). Already in skasm's handoff (translator takes Sketch 3 back). Variables OK.
 - **c2-sm-rocker-enclosure-body 15/28 (stable now):** Extrude 6's pocket is ~2 mm off live's and differently shaped
