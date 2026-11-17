@@ -126,7 +126,14 @@ nothing.
 - Next, the same class (lead 22:4x): qa's selection-feel run (TICKETS 208ca8549, vibex6 ~/agents/qa-keep/sel-feel/,
   re-run qa-scratch/sf/mini.sh): a Part 2 row click selects but Part 2 isn't drawn selected, and Part 1 keeps a stale
   hover outline from the pointer crossing its row. skasm has the list / double-click rows of that run.
+- SELFEEL-PART-ROW: GPUI test feel::a_part_row_clicked_after_passing_another_leaves_no_stale_hover (Part 1 row →
+  Part 2 row → click, real GPUI events) passes on main: Part 2 lit and selected, Part 1 not. qa's state had Part 2
+  selected while the shot showed Part 1's outline: the frame on screen trails the state at load ~24 (350–450 ms per
+  frame). Re-check on a release build in a quiet window before changing anything.
 - Then: re-run qa's flow (~/agents/psui-keep/hover/uh2.sh, 0.7 s and 3 s shots) on the green with this.
+- Queue after: live's feature-dialog selection boxes (behaviours "feature dialog selection boxes",
+  live/psui/feature-dialogs-1117/: first box active, filtered hover, list row hover 121–181 ms, Radius focused keeps
+  the box active) against docs/parity/interaction-feel.md "Dialogs".
 
 ## Current order (lead 11-17 ~14:05)
 

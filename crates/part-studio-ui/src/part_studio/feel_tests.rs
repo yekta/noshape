@@ -445,3 +445,37 @@ fn a_block_behind_the_front_plane_lights_through_it(cx: &mut TestAppContext) {
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// qa SELFEEL-PART-ROW (11-17, green 592b0fc9; live2 sel-feel row 5): through the Parts list with real pointer
+/// events, Part 1's row hovered, then Part 2's, then a click on it: Part 2 is selected and lit as hovered, Part 1's
+/// hover outline doesn't stay.
+#[gpui::test]
+fn a_part_row_clicked_after_passing_another_leaves_no_stale_hover(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "part-row-hover", Some(starts["two-blocks"].clone()));
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count() == 2 && !view.read(cx).ui_busy());
+    draw(cx, window);
+    let ids: Vec<_> = cx.update(|cx| view.read(cx).display.bodies.iter().map(|b| b.id.clone()).collect());
+    let row = |cx: &mut TestAppContext, id: &noshape_model::reference::BodyId| {
+        let sel: &'static str = Box::leak(format!("part-row-{id}").into_boxed_str());
+        gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel).expect("the part's row").center()
+    };
+    let (r1, r2) = (row(cx, &ids[0]), row(cx, &ids[1]));
+    let mv = |cx: &mut TestAppContext, at: Point<gpui_kit::Pixels>| {
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(at, None, Modifiers::default());
+        draw(cx, window);
+    };
+    let hover = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).hover.clone());
+    let (p1, p2) = (Reference::Body(ids[0].clone()), Reference::Body(ids[1].clone()));
+    mv(cx, r1);
+    assert_eq!(hover(cx), Some(p1.clone()), "Part 1's row lights Part 1");
+    for k in 1..=4 {
+        mv(cx, gpui_kit::point(r1.x, r1.y + (r2.y - r1.y) * (k as f32 / 4.0)));
+    }
+    assert_eq!(hover(cx), Some(p2.clone()), "on Part 2's row, Part 2 lit and Part 1 not");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(r2, Modifiers::default());
+    draw(cx, window);
+    let selection = cx.update(|cx| view.read(cx).selection.clone());
+    assert_eq!(selection, vec![p2.clone()], "the click selects Part 2");
+    assert_ne!(hover(cx), Some(p1), "Part 1's outline doesn't stay");
+}
