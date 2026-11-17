@@ -995,7 +995,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // Hovered / selected it keeps a dark core like a part edge
                 // (live sketch/21, 22).
                 // (A handle arm on top: it runs along its spline from the end, and under it it couldn't be picked.)
-                let style = LineSegment::CORE | if c.handle { LineSegment::ON_TOP } else if c.construction { LineSegment::CONSTRUCTION } else { 0 };
+                let style = sketch_curve_style(c, editing);
                 // Graphics preferences: active 2 px, inactive 1 px by default.
                 let width = if c.handle { 1.0 } else if editing { opts.graphics.sketch_line_width } else { opts.graphics.inactive_line_width };
                 lines.push_polyline(&c.points, color, id, width, style);
@@ -1945,6 +1945,13 @@ fn pick_disc(o: DVec3, x: DVec3, y: DVec3, z: DVec3, r: f64, pick: u32) -> MeshD
 }
 
 /// The mate connectors' glyphs: `lit` gives each one's look.
+/// A sketch curve's line style. A shown sketch's curves win the tie with the part edges they lie on (live2 11-17
+/// sel-feel 3: the double-clicked face's sketch drawn blue along the part's base edges).
+fn sketch_curve_style(c: &noshape_model::display::SketchCurveDisplay, editing: bool) -> u32 {
+    let lifted = if editing { 0 } else { LineSegment::LIFTED };
+    LineSegment::CORE | lifted | if c.handle { LineSegment::ON_TOP } else if c.construction { LineSegment::CONSTRUCTION } else { 0 }
+}
+
 pub fn connector_glyphs(display: &StudioDisplay, lit: impl Fn(&Reference) -> ConnectorLook) -> Option<Arc<ConnectorGlyphs>> {
     let items: Vec<_> = display.connectors.iter().map(|c| (c.origin, c.x, c.z.cross(c.x), c.z, lit(&c.reference))).collect();
     (!items.is_empty()).then(|| Arc::new(ConnectorGlyphs { items, picks: Vec::new() }))
@@ -2231,6 +2238,15 @@ mod connector_zoom_tests {
 
     /// Live 3d.json explicit_mate_connector: an assembly connector's pick is its whole 36 px disc (the reach 18 px
     /// plus the pick square's 5: 23 across), lying in the connector's plane.
+    #[test]
+    fn a_shown_sketchs_curves_win_the_tie_with_the_edges_they_lie_on() {
+        let c = |construction: bool, handle: bool| noshape_model::display::SketchCurveDisplay { entity: 1, points: Vec::new(), construction, external: false, state: SketchEntityState::Under, handle };
+        for (curve, what) in [(c(false, false), "a line"), (c(true, false), "a construction line")] {
+            assert!(sketch_curve_style(&curve, false) & LineSegment::LIFTED != 0, "{what} of a shown sketch: lifted");
+            assert!(sketch_curve_style(&curve, true) & LineSegment::LIFTED == 0, "{what} of the edited sketch: as before");
+        }
+    }
+
     #[test]
     fn a_picked_glyphs_disc_takes_the_pointer_across_it() {
         let o = DVec3::new(0.0, 0.0, 0.01);

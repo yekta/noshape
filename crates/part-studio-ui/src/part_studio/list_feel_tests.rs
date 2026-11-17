@@ -182,6 +182,17 @@ impl List {
         }
     }
 
+    /// The hidden sketches the scene draws for now, and whether their geometry is lit as the hover.
+    fn drawn_sketches(&self, cx: &mut TestAppContext) -> (Vec<String>, bool) {
+        cx.update(|cx| {
+            let v = self.view.read(cx);
+            let shown = v.sketches_shown_for_now();
+            let drawn: Vec<String> = v.display_for_scene().sketches.iter().filter(|s| !s.hidden && shown.contains(&s.feature)).map(|s| s.name.clone()).collect();
+            let lit = !shown.is_empty() && v.highlighted_hover(cx).iter().any(|r| matches!(r, Reference::SketchEntity { sketch, .. } if shown.contains(sketch)));
+            (drawn, lit)
+        })
+    }
+
     fn lit_row(&self, cx: &mut TestAppContext) -> Option<String> {
         cx.update(|cx| {
             let v = self.view.read(cx);
@@ -510,6 +521,20 @@ fn rows() -> Vec<Row> {
             let still = l.lit_row(cx);
             l.wait(cx, 60);
             expect((early, lit, still, l.lit_row(cx)), (None, Some("Extrude 1".to_string()), Some("Extrude 1".to_string()), None), "at 60 / 120 ms in, 60 / 120 ms out")
+        } },
+        Row { id: "hover / a hidden sketch: drawn in place, lit", live: "Sketch 1 (hidden, consumed) drawn light orange where it is while its row is hovered, gone after (live2 11-17 sel-feel 4)", gap: false, check: |l, cx| {
+            l.hover(cx, "feature:Sketch 1", 150);
+            let lit = l.drawn_sketches(cx);
+            let away = l.canvas(cx);
+            l.event(cx, MouseMoveEvent { position: away, pressed_button: None, modifiers: NONE });
+            l.wait(cx, 150);
+            expect((lit, l.drawn_sketches(cx)), ((names(&["Sketch 1"]), true), (Vec::new(), false)), "drawn (and lit) while hovered, after leaving")
+        } },
+        Row { id: "click / a default plane: Default geometry related", live: "the plane's row selected, the Default geometry folder related; Space clears both (live2 11-17 sel-feel 2, 5)", gap: false, check: |l, cx| {
+            l.click(cx, "feature:Top", NONE);
+            let related = cx.update(|cx| l.view.read(cx).default_geometry_related());
+            l.keys(cx, "space");
+            expect((related, cx.update(|cx| l.view.read(cx).default_geometry_related())), (true, false), "after the plane's click, after Space clears")
         } },
         Row { id: "hover / a sweep across rows lights only where it rests", live: "the debounce: rows crossed in under 100 ms never light", gap: false, check: |l, cx| {
             let mut seen = Vec::new();

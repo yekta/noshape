@@ -3192,10 +3192,20 @@ fn a_face_double_clicked_shows_its_features_sketch(cx: &mut TestAppContext) {
     at.set(at.get() + std::time::Duration::from_millis(200));
     click_at(cx, pick);
     let (after, selected) = (shown(cx), cx.update(|cx| view.read(cx).selection.len()));
+    let related = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).related_features(cx).len());
+    let lit = related(cx);
     at.set(at.get() + std::time::Duration::from_millis(800));
     click_at(cx, pick);
-    assert_eq!((before, after, selected, shown(cx)), (0, 1, 0, 0), "sketches shown before, after the double-click (selection), after the next click");
+    assert_eq!((before, after, selected, lit, shown(cx)), (0, 1, 0, 2, 0), "sketches shown before, after the double-click (selection, related rows), after the next click");
+    // Live2 11-17 sel-feel 2: after the double-click an empty click clears the related rows and the sketch.
+    at.set(at.get() + std::time::Duration::from_millis(200));
+    click_at(cx, pick);
+    assert_eq!((shown(cx), related(cx)), (1, 2), "double-clicked again");
+    at.set(at.get() + std::time::Duration::from_millis(800));
+    click_at(cx, None);
+    assert_eq!((shown(cx), related(cx), cx.update(|cx| view.read(cx).selection.len())), (0, 0, 0), "after an empty click: no sketch, no related row");
 }
+
 
 /// Live (analysis-deviation; behaviours "psui (Deviation analysis panel, in full)"): a face preselected opens Deviation
 /// analysis on its Surface tab, the face as the Source, read-only Max / Min, "Max and min location" on, "Absolute

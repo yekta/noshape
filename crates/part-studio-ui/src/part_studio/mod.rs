@@ -1419,11 +1419,11 @@ impl PartStudioView {
         if self.built.is_none() {
             return;
         }
-        // A face double-clicked shows its feature's sketch until the selection changes: the scene's display then
-        // changes, so it is built again (which refreshes it).
-        let dbl = self.ui.dblclick_related.as_ref().is_some_and(|(_, sel)| *sel == self.selection);
-        if dbl != self.ui.dblclick_drawn {
-            self.ui.dblclick_drawn = dbl;
+        // A face double-clicked shows its feature's sketch until the next click, a hidden sketch's row hovered shows
+        // it: the scene's display then changes, so it is built again (which refreshes it).
+        let shown = self.sketches_shown_for_now();
+        if shown != self.ui.dblclick_drawn {
+            self.ui.dblclick_drawn = shown;
             return self.rebuild_scene(cx);
         }
         let (mut selection, mut accent) = match &self.edit {
@@ -2435,6 +2435,11 @@ impl PartStudioView {
                 };
                 let now = self.viewport.read(cx).now();
                 let dbl = target.as_ref().is_some_and(|t| self.edit.is_none() && self.is_double_click(&t.reference, now));
+                // A face double-clicked keeps its feature and sketch lit until the next click (live2 11-17 sel-feel 2:
+                // an empty click clears both sides).
+                if !dbl {
+                    self.ui.dblclick_related = None;
+                }
                 match target {
                     // Live ("psui (10-27, interaction 5.x)"): Mass and section
                     // properties on its Part tab takes the whole part on a
@@ -4015,9 +4020,11 @@ impl PartStudioView {
             // Onshape: a collapsible "Default geometry" folder; children are
             // indented 22 px under a 1 px guide line.
             let open = !self.ui.default_geometry_collapsed;
+            let related = self.default_geometry_related();
             rows.push(
                 crate::ui::tree_row("dg-folder", false)
                     .mr(px(5.))
+                    .when(related, |d| d.bg(pal.row_related))
                     .child(crate::ui::caret(open))
                     .child("Default geometry")
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -6965,6 +6972,12 @@ impl PartStudioView {
         let set = self.studio(cx).and_then(|s| noshape_model::interaction::filter_features(s, &self.display, &self.ui.filter_query)).map(std::rc::Rc::new);
         c.filter = Some((self.ui.filter_query.clone(), Arc::downgrade(&self.display), set.clone()));
         set
+    }
+
+    /// The "Default geometry" folder row is related while one of its items is selected (live2 11-17 sel-feel 2 and
+    /// 5: a default plane picked in the viewport or the list selects its row, the folder related).
+    pub(super) fn default_geometry_related(&self) -> bool {
+        DEFAULT_GEOMETRY.iter().any(|(_, r)| self.selection.contains(r))
     }
 
     /// Whether the list's filter keeps a Default geometry row.

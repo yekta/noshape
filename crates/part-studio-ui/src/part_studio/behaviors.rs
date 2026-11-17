@@ -280,7 +280,7 @@ pub struct UiState {
     /// stays as that left it (live 1957 (4): the related highlight stays after a face double-click).
     pub dblclick_related: Option<(HashSet<FeatureId>, Vec<Reference>)>,
     /// Whether the scene was last built with that double-click's sketch shown.
-    pub dblclick_drawn: bool,
+    pub dblclick_drawn: Vec<FeatureId>,
     /// Last viewport click (double-click detection).
     pub last_click: Option<(Reference, Instant)>,
     /// Focus of the feature list (rollback bar arrow keys).
@@ -794,7 +794,7 @@ impl UiState {
             midpoint_armed_at: None,
             midpoint_armed_since: None,
             dblclick_related: None,
-            dblclick_drawn: false,
+            dblclick_drawn: Vec::new(),
             midpoint_dwell_task: None,
             glyph_linger_task: None,
             inference: None,
@@ -1228,15 +1228,28 @@ impl PartStudioView {
         interaction::filter_features(studio, &self.display, &format!(":variable {name}")).unwrap_or_default()
     }
 
-    /// A part face double-clicked: its feature's sketch shown while that selection stands (live feel/3d.json
-    /// "double_click_face": Sketch 1 drawn in blue, feel/3d/dblclick-face.png).
+    /// Hidden sketches drawn for now: a part face double-clicked shows its feature's sketch while that selection
+    /// stands (live feel/3d.json "double_click_face": Sketch 1 drawn in blue, feel/3d/dblclick-face.png), and a
+    /// hidden sketch's list row hovered shows it in place, lit (live2 11-17 sel-feel 4: Sketch 1 light orange).
+    pub(super) fn sketches_shown_for_now(&self) -> Vec<FeatureId> {
+        let mut out: Vec<FeatureId> = match &self.ui.dblclick_related {
+            Some((lit, sel)) if *sel == self.selection => lit.iter().copied().collect(),
+            _ => Vec::new(),
+        };
+        out.extend(self.ui.list_hover);
+        out.retain(|f| self.display.sketches.iter().any(|s| s.hidden && s.feature == *f));
+        out.sort();
+        out.dedup();
+        out
+    }
+
     pub(super) fn with_dblclick_sketch(&self, d: Arc<StudioDisplay>) -> Arc<StudioDisplay> {
-        let Some((lit, sel)) = &self.ui.dblclick_related else { return d };
-        if *sel != self.selection || !d.sketches.iter().any(|s| s.hidden && lit.contains(&s.feature)) {
+        let shown = self.sketches_shown_for_now();
+        if !d.sketches.iter().any(|s| s.hidden && shown.contains(&s.feature)) {
             return d;
         }
         let mut out = (*d).clone();
-        for s in out.sketches.iter_mut().filter(|s| lit.contains(&s.feature)) {
+        for s in out.sketches.iter_mut().filter(|s| shown.contains(&s.feature)) {
             s.hidden = false;
         }
         Arc::new(out)

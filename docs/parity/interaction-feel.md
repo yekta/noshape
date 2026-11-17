@@ -45,7 +45,7 @@ GPU `feel::presses_orbit_box_and_open_the_menu_as_live`).
 | Edge midpoint target after a rest | live 1954: 9 px square, a short dwell | `update_hover`, `MIDPOINT_DWELL` | existing midpoint tests | = |
 | Click | adds; on a selected entity removes; on empty space clears; Shift+click on empty space keeps; Shift+click on an entity as a plain one | the same (`on_viewport_event`'s Click) | – | = |
 | Ctrl+click | the context menu of what is under the pointer, selects nothing (every OS; on a Mac Cmd+click is a plain click) | the same | – | = |
-| Double-click | a face: shows its feature's sketch, the two clicks select then deselect; an edge: nothing | the sketch wasn't shown (its row lit only); now shown until the selection changes (`with_dblclick_sketch`; the double click on the viewport's clock) | part-studio-ui `a_face_double_clicked_shows_its_features_sketch` | = (fixed) |
+| Double-click | a face: shows its feature's sketch (blue along the part's base edges), the two clicks select then deselect, its feature and sketch rows related until the next click (an empty click clears both: live2 11-17 sel-feel 2, 3); an edge: nothing | the same (`sketches_shown_for_now`, the next click clears `dblclick_related`; a shown sketch's curves `LIFTED` over the edges they lie on, `sketch_curve_style`). qa 11-17 208ca8549: the sketch was drawn under Part 2's base edges and the rows stayed related after an empty click | part-studio-ui `a_face_double_clicked_shows_its_features_sketch`, scene `a_shown_sketchs_curves_win_the_tie_with_the_edges_they_lie_on` | = (fixed 11-17) |
 | Select other (`) | the "Select other" panel at the pointer + (100, 51), 220 px wide (live2's chrome.json) | `SelectOther` | chrome matrix "select other / its place", "its size"; list `select_other_row` | = |
 | Box select | left → right: window (faces and edges wholly inside, hidden ones too, no vertices, no part: 18 round a block, 5 round its right half); right → left: crossing (13 over that half); adds; Ctrl at the start deselects | the same (`box_ids`) | `feel::box_select_takes_what_live_takes` | = |
 | Left press → drag (box) | more than 2 px and 50 ms after the press | the same (`press_becomes_drag`) | app-core, GPU feel | = |
@@ -348,6 +348,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Ctrl+click a feature / a part | its menu, selection kept / adds, no menu | the same | = |
 | Clearing | an empty canvas click clears; Escape and empty list space don't | the same | = |
 | Double-click a feature (name or blank right side) / a sketch | its dialog / sketch mode | the same | = |
+| Hover a hidden sketch's row / click a default plane | the sketch drawn in place, light orange, while hovered / the plane's row selected, the Default geometry folder related (live2 11-17 sel-feel 4, 2, 5) | the same (`sketches_shown_for_now`, `default_geometry_related`; were: nothing drawn / the folder unlit, qa 208ca8549) | = (fixed 11-17) |
 | Double-click a default plane / a part | nothing / two toggles, no rename | the same (a part's name renamed: removed; ui-parity parts-row-dblclick agrees) | = (fixed) |
 | Rename | only the menu's: inline, the whole name selected; Escape cancels | the same | = |
 | Y over a part row, nothing selected (after its double-click) | hides that part | the same | = (new) |
