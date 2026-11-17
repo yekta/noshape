@@ -79,7 +79,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    A/B 10:40, v0.4.48 matched 20/52 knife features. Closed; they stay on blend's slower-than-live list. blend's impeller Fillet 3
    is WIP in blend10 (not landed): when it lands, re-time c2-impeller-loft v0.4.56 vs green on vibe6
    (bin/abn-feat.py 3 <cli,cli> ~/agents/qa-keep/abc/m <work> c2-impeller-loft; full paths, `~` after a comma isn't expanded).
-5. Nightly (02:00, qa-w7-nightly): after it, check suites/window-0200-<mmdd>.log ends NIGHTLY-DONE and the SCORE row is valid
+5. Nightly (02:00, qa-w7-nightly; restarted 11:56 with two additions: live's fresh-copy times and the dock tab A/B, 0.4.53 vs
+   the release, 3 rounds, Xvfb :672 -> nightly/tabab-<mmdd>.txt). On 11-18 send psui the tabab numbers: both ~100-200 ms settle
+   at low load closes DOCK-TAB-SWITCH-TRAILING-FRAMES (psui: likely late software frames on a loaded host; vibe7 at load 17,
+   0.4.53 818 ms too). After it, check suites/window-0200-<mmdd>.log ends NIGHTLY-DONE and the SCORE row is valid
    (the guard alerts otherwise); send blend faceblend / tpd / michael and skasm corner-break from the row.
 
 ## Open items
