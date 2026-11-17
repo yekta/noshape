@@ -18,6 +18,9 @@ use noshape_model::display::{FeatureStatus, StudioDisplay};
 use noshape_model::interaction;
 use noshape_model::params::{ParamValue, QueryFilter};
 use noshape_model::reference::{BodyId, FeatureId, Reference};
+
+/// Flange's and Hem's "Edges or side faces" box (model-data's sheet metal `SM_EDGES`).
+const SM_EDGES_FILTER: QueryFilter = QueryFilter(QueryFilter::EDGE.0 | QueryFilter::PLANAR_FACE.0);
 use noshape_render::Camera;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -763,6 +766,8 @@ pub struct UiState {
     pub pick_filter: Option<Option<Vec<PickKind>>>,
     /// The plane left out of the picks with them (the open sketch's own).
     pub pick_unhovered: Option<Reference>,
+    /// The pick ids left out with them: a sheet metal wall's faces while Flange's / Hem's edges box is active.
+    pub pick_muted: Vec<u32>,
     /// The open Flatten surfaces dialog.
     pub flatten: Option<super::flatten_tool::FlattenState>,
     /// Interference detection: the hovered row of its Interferences list.
@@ -1030,6 +1035,7 @@ impl UiState {
             thickness: None,
             pick_filter: None,
             pick_unhovered: None,
+            pick_muted: Vec::new(),
             flatten: None,
             interference_hover: None,
             interference_picked: None,
@@ -1517,10 +1523,21 @@ impl PartStudioView {
         // Live (behaviours "USER P0 11-17: sketch hover vs planes"): the open sketch's own plane never hovers.
         let own_plane = self.sketch.as_ref().and(self.edit.as_ref()).and_then(|e| e.dialog.read(cx).feature.params.query("sketchPlane").first().cloned())
             .filter(|r| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }));
-        if self.ui.pick_filter.as_ref() == Some(&key) && self.ui.pick_unhovered == own_plane {
+        let Some(built) = &self.built else { return };
+        // Live 11-17 sm-feel-1117: Flange's (and Hem's) "Edges or side faces" lights rim and bend edges and a rip's
+        // thin side face, never a wall's broad faces.
+        let muted: Vec<u32> = match (self.active_field_filter(cx), &self.context) {
+            (Some(f), Some(ctx)) if f == SM_EDGES_FILTER => ctx
+                .bodies
+                .iter()
+                .filter_map(|b| Some((b, ctx.sheet_metal.get(&b.id)?)))
+                .flat_map(|(b, sm)| b.faces.iter().filter(|n| sm.wall_of_face(n).is_some()).flat_map(|n| built.picks.ids_for(&Reference::Face((**n).clone())).to_vec()).collect::<Vec<_>>())
+                .collect(),
+            _ => Vec::new(),
+        };
+        if self.ui.pick_filter.as_ref() == Some(&key) && self.ui.pick_unhovered == own_plane && self.ui.pick_muted == muted {
             return;
         }
-        let Some(built) = &self.built else { return };
         let prio = match &key {
             Some(k) => {
                 let k = k.clone();
@@ -1528,12 +1545,18 @@ impl PartStudioView {
             }
             None => built.picks.priority_fn(),
         };
-        let prio = match own_plane.as_ref().map(|r| built.picks.ids_for(r).to_vec()).filter(|ids| !ids.is_empty()) {
-            Some(ids) => std::sync::Arc::new(move |id: u32| if ids.contains(&id) { i32::MIN } else { prio(id) }) as std::sync::Arc<dyn Fn(u32) -> i32 + Send + Sync>,
-            None => prio,
+        let mut out: Vec<u32> = own_plane.as_ref().map(|r| built.picks.ids_for(r).to_vec()).unwrap_or_default();
+        out.extend(muted.iter().copied());
+        let prio = match out {
+            ids if !ids.is_empty() => {
+                let ids: std::collections::HashSet<u32> = ids.into_iter().collect();
+                std::sync::Arc::new(move |id: u32| if ids.contains(&id) { i32::MIN } else { prio(id) }) as std::sync::Arc<dyn Fn(u32) -> i32 + Send + Sync>
+            }
+            _ => prio,
         };
         self.ui.pick_filter = Some(key);
         self.ui.pick_unhovered = own_plane;
+        self.ui.pick_muted = muted;
         self.viewport.update(cx, |vp, _| vp.pick_priority = prio);
     }
 

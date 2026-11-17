@@ -153,6 +153,22 @@ fn rows() -> Vec<Row> {
             s.frames(cx);
             expect(manip, false, "a manipulator")
         } },
+        Row { id: "flange / its edges box lights edges and side faces, never a wall's faces", live: "Edges or side faces to flange: rim and bend edges and a rip's thin side face light; the walls' broad faces never (live 11-17 sm-feel-1117)", gap: false, check: |s, cx| {
+            cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| v.start_feature("sheetMetalFlange", w, cx))).unwrap();
+            s.frames(cx);
+            let got = cx.update(|cx| {
+                let v = s.view.read(cx);
+                let (ctx, built) = (v.context.as_ref()?, v.built.as_ref()?);
+                let prio = v.viewport.read(cx).pick_priority.clone();
+                let lit = |r: Reference| built.picks.ids_for(&r).first().is_some_and(|id| prio(*id) != i32::MIN);
+                let (b, sm) = ctx.bodies.iter().find_map(|b| Some((b, ctx.sheet_metal.get(&b.id)?)))?;
+                let (walls, sides): (Vec<_>, Vec<_>) = b.faces.iter().map(|n| (sm.wall_of_face(n).is_some(), lit(Reference::Face((**n).clone())))).partition(|x| x.0);
+                Some((walls.iter().any(|x| x.1), sides.iter().any(|x| x.1), b.edges.iter().any(|n| lit(Reference::Edge((**n).clone())))))
+            });
+            cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+            s.frames(cx);
+            expect(got, Some((false, true, true)), "(a wall face, a side face, an edge) lights")
+        } },
         Row { id: "flat view / a click on a bend zone", live: "selects that bend in both views and its row in the Bends table", gap: false, check: |s, cx| {
             s.escape_all(cx);
             let fv = cx.update(|cx| s.view.read(cx).flat_view.clone()).ok_or("no flat view")?;
