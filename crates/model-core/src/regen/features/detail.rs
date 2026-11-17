@@ -842,8 +842,16 @@ fn sharp_of_picked_faces(ev: &EvalCtx, refs: &[crate::reference::Reference]) -> 
     ev.resolve_edges(refs).into_iter().filter(|&(bi, ei)| picked.contains(&(bi, ei)) || !is_smooth(bi, ei)).collect()
 }
 
-/// An edge (by name) and its variable law.
-type EdgeLaw = (Name, Vec<(f64, f64)>);
+/// An edge (by name, and its ends: two edges can share a name) and its variable law.
+type EdgeLaw = (Name, Vec<(f64, f64)>, [DVec3; 2]);
+
+/// The edge named `n` whose ends are `ends`, else the first of that name: two edges can share a name (a bevel gear's
+/// tooth root, asm-isaac-ball's GearLab 90f78b: its variable fillet rounded the first one twice).
+fn edge_named_at(body: &crate::regen::context::Body, n: &Name, ends: &[DVec3; 2]) -> Option<usize> {
+    let candidates = body.find_edges(n);
+    let at_ends = |e: usize| body.shape.sub_shape(ShapeType::Edge, e).and_then(|s| s.edge_info()).is_ok_and(|i| [i.start, i.end].iter().all(|p| ends.iter().any(|q| p.distance(*q) < 1e-7)));
+    candidates.iter().copied().find(|&e| at_ends(e)).or(candidates.first().copied())
+}
 
 /// A variable fillet; false where it comes to the constant fillet (every radius the default: live 2325 A's plain
 /// cylinder), left to the caller.
@@ -1009,7 +1017,7 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<bool> {
             let knots = &law.0;
             let eval = |u: f64| hermite_at(&law, u);
             let mut laws_of_run = Vec::new();
-            for (&(e, _, _, _, forward), &(u0, u1)) in run.iter().zip(&spans) {
+            for (&(e, a, b, _, forward), &(u0, u1)) in run.iter().zip(&spans) {
                 // Samples 16 a span of the law within the edge, from its curve's first point.
                 let mut us: Vec<f64> = vec![u0];
                 let mut cuts: Vec<f64> = knots.iter().map(|k| k.0).filter(|&k| k > u0 + 1e-12 && k < u1 - 1e-12).collect();
@@ -1025,7 +1033,7 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<bool> {
                 if !forward {
                     law = law.into_iter().rev().map(|(t, r)| (1.0 - t, r)).collect();
                 }
-                laws_of_run.push((body.edges[e].clone(), law));
+                laws_of_run.push((body.edges[e].clone(), law, [a, b]));
             }
             run_laws.push(laws_of_run);
         }
@@ -1033,9 +1041,9 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<bool> {
         let occt = (|| -> FResult<()> {
         for laws_of_run in &run_laws {
             let body = ev.ctx.bodies[bi].clone();
-            let found: Option<Vec<k::Shape>> = laws_of_run.iter().map(|(n, _)| body.find_edges(n).first().and_then(|&e| body.shape.sub_shape(ShapeType::Edge, e).ok())).collect();
+            let found: Option<Vec<k::Shape>> = laws_of_run.iter().map(|(n, _, ends)| edge_named_at(&body, n, ends).and_then(|e| body.shape.sub_shape(ShapeType::Edge, e).ok())).collect();
             let Some(shapes) = found else { continue };
-            let laws_only: Vec<Vec<(f64, f64)>> = laws_of_run.iter().map(|(_, l)| l.clone()).collect();
+            let laws_only: Vec<Vec<(f64, f64)>> = laws_of_run.iter().map(|(_, l, _)| l.clone()).collect();
             let res = k::fillet_variable_edges_checked(&body.shape, &shapes, &laws_only).map_err(|e| blend_failed("Failed to fillet selections.", e))?;
             let names = body.shape_names();
             let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
@@ -1771,6 +1779,27 @@ fn coaxial_round_tool(faces: &[Shape], cyl: k::Plane, rc: f64, sides: [DVec3; 2]
 
 #[cfg(test)]
 mod tests {
+    use crate::display::BodyKind;
+    use crate::reference::{BodyId, FeatureId, Role, TopoName};
+    use crate::regen::context::Body;
+    use noshape_kernel as k;
+    use std::sync::Arc;
+
+    /// Two edges of one name (a bevel gear's tooth root): each found by its own ends, not the first one twice.
+    #[test]
+    fn a_variable_fillets_edge_of_a_shared_name_is_found_by_its_ends() {
+        let shape = k::make_box(&k::Plane::xy(), 0.04, 0.02, 0.01).unwrap();
+        let feature = FeatureId(1);
+        let faces = (0..shape.count(k::ShapeType::Face)).map(|f| Arc::new(TopoName::Face { feature, role: Role::New(f as u32) })).collect();
+        let mut body = Body::new(BodyId { feature, index: 0 }, "Part 1".into(), BodyKind::Solid, shape, faces, 0, feature);
+        let shared = body.edges[3].clone();
+        body.edges[7] = shared.clone();
+        for e in [3usize, 7] {
+            let info = body.shape.sub_shape(k::ShapeType::Edge, e).unwrap().edge_info().unwrap();
+            assert_eq!(super::edge_named_at(&body, &shared, &[info.end, info.start]), Some(e));
+        }
+    }
+
     /// Live 04:16 (c2-hunting-knife's Fillet 7): a variable fillet over a tangent run, 3 mm, 0.25 mm, 0.25 mm, 3 mm at
     /// its vertices, smooth off: one law along the run (slope 0 where the flat tip span meets a side, 1.5 x the chord at
     /// the ends), so a side's radius at its fractions as live's (within its measure's ~0.03 mm), not the straight

@@ -9247,6 +9247,21 @@ OpOut op_fillet_variable_edges(const OcShape& s, const OcShapeList& edges_in, ru
   const std::vector<TopoDS_Shape> edges = to_vec(edges_in);
   if (edges.empty() || counts.size() != edges.size() || params.size() != radii.size())
     fail_invalid("one law per edge");
+  if (std::getenv("NOSHAPE_DUMP_OPS"))
+  {
+    std::ostringstream p;
+    p.precision(17);
+    p << "fillet-variable checked " << checked << " counts";
+    for (uint32_t n : counts)
+      p << " " << n;
+    p << " params";
+    for (double x : params)
+      p << " " << x;
+    p << " radii";
+    for (double x : radii)
+      p << " " << x;
+    dump_op("fillet-variable", s.shape, edges, p.str());
+  }
   std::vector<std::vector<std::pair<double, double>>> laws;
   size_t at = 0;
   double rmax = 0;
