@@ -755,9 +755,26 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
     }
     return true;
   };
+  // Closed: the end rows of poles coincide and their weights agree (OCCT's IsUClosed wants the weights equal to the
+  // last digit: c2-rings-loft's loft walls 6e-12 apart were split, read back as two faces each). Made equal below.
+  auto closed = [&](bool in_u) {
+    const int n = in_u ? b->NbVPoles() : b->NbUPoles(), last = in_u ? b->NbUPoles() : b->NbVPoles();
+    for (int i = 1; i <= n; ++i)
+    {
+      const int    r0 = in_u ? 1 : i, c0 = in_u ? i : 1, r1 = in_u ? last : i, c1 = in_u ? i : last;
+      const double w0 = b->Weight(r0, c0), w1 = b->Weight(r1, c1);
+      if (b->Pole(r0, c0).Distance(b->Pole(r1, c1)) > kPrecision || std::abs(w0 - w1) > 1e-9 * std::max(w0, w1))
+        return false;
+    }
+    return true;
+  };
   occ::handle<Geom_BSplineSurface> ps = occ::down_cast<Geom_BSplineSurface>(b->Copy());
-  up = round_u && (b->IsUPeriodic() || (b->IsUClosed() && tangent_seam(true)));
-  vp = round_v && (b->IsVPeriodic() || (b->IsVClosed() && tangent_seam(false)));
+  up = round_u && (b->IsUPeriodic() || (closed(true) && tangent_seam(true)));
+  vp = round_v && (b->IsVPeriodic() || (closed(false) && tangent_seam(false)));
+  for (int i = 1; up && !b->IsUPeriodic() && i <= ps->NbVPoles(); ++i)
+    ps->SetWeight(ps->NbUPoles(), i, ps->Weight(1, i));
+  for (int i = 1; vp && !b->IsVPeriodic() && i <= ps->NbUPoles(); ++i)
+    ps->SetWeight(i, ps->NbVPoles(), ps->Weight(i, 1));
   // Periodic only when the seam knot comes down (a smooth seam): one left at full multiplicity is no smooth
   // periodic surface and Parasolid drops the body (exchange suite, cf-hose-routing's swept hoses: degree-12
   // single-span sections); such a face is split instead.

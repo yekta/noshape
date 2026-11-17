@@ -2083,6 +2083,21 @@ fn offset_walls_export_to_acis() {
     assert!((a - want).abs() < 5e-3 * want, "{a} vs {want}");
 }
 
+/// A loft's wall going round (a rational B-surface whose end rows' weights differ by 6e-12): one periodic face in
+/// Parasolid, not split at its seam (c2-rings-loft's Part 1 read back 275 faces for 273).
+#[test]
+fn a_loft_wall_closed_but_for_its_weights_last_digits_stays_one_face() {
+    let wall = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts/rings-loft-wall.brep")).unwrap();
+    let want = surface_properties(&wall).unwrap().mass;
+    let path = std::env::temp_dir().join(format!("noshape-xt-loft-wall-{}.x_t", std::process::id()));
+    write_parasolid(&path, std::slice::from_ref(&wall), LengthUnit::Meter, false).unwrap();
+    let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(back.count(ShapeType::Face), 1);
+    let a = surface_properties(&back).unwrap().mass;
+    assert!((a - want).abs() < 1e-6 * want, "{a} vs {want}");
+}
+
 /// A draft's cone face OCCT cut in two at its seam (shown as one face), with the four faces round it: written as one
 /// face, its rims one arc each (Parasolid has no seam), as shown: c2-housing-draft's Part 1 read back 37/82/46 for
 /// its 36/79/44.
