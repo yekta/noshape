@@ -45,6 +45,14 @@ pub fn first_view_scale(size: super::SheetSize, extent: [f64; 2]) -> f64 {
     SCALES.iter().copied().find(|s| extent[0] * s <= w + 1e-9 && extent[1] * s <= h + 1e-9).unwrap_or(*SCALES.last().expect("scales"))
 }
 
+/// The sheet scale of suggested views of a source `extent` (mm at 1:1): the Front (X by Z), Top (X by Y) and Right
+/// (Y by Z) views each fit 30 % of the frame, as a first inserted view does (live 1898: 3:1, 1:2, 1:3 on ANSI A, 1:1
+/// on A3; c2-housing-draft's watch case, 30 x 37 x 6 mm with its lugs along Y, 1:1 where its Front view alone fits
+/// at 2:1).
+pub fn suggested_scale(size: super::SheetSize, extent: DVec3) -> f64 {
+    first_view_scale(size, [extent.x, extent.z]).min(first_view_scale(size, [extent.x, extent.y])).min(first_view_scale(size, [extent.y, extent.z]))
+}
+
 /// The scale of the first view of one part inserted into an empty sheet (live 2133, Part 1 picked): the largest list
 /// scale at which the Front view's width (mm at 1:1) is under 80 mm, 80 itself only at 1:1 and 2:1 (160 wide 1:3,
 /// 20 wide 3:1, 40 wide 2:1); its height within 30 % of the frame. On other sheets than ANSI A the 80 mm in
@@ -177,9 +185,7 @@ pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>
     if src.flat {
         return flat_drawing(d, src, e, w, h);
     }
-    // The Front view (X by Z) fits 30 % of the frame, as a first inserted
-    // view does (live 1898: 3:1, 1:2, 1:3 on ANSI A; 1:1 on A3).
-    d.sheets[0].scale = first_view_scale(d.sheets[0].size, [e.x, e.z]);
+    d.sheets[0].scale = suggested_scale(d.sheets[0].size, e);
     // Live 1898 (blocks of 20 to 120 mm on ANSI A, and on ISO A3): the four
     // views' centres don't follow the part: two columns 0.42 of the sheet's
     // width apart about the frame's centre, two rows 0.3696 of its height
@@ -270,6 +276,17 @@ mod tests {
         for (l, h, want) in [(160.0, 10.0, 1.0 / 3.0), (240.0, 10.0, 0.25), (320.0, 10.0, 0.2), (20.0, 10.0, 3.0), (16.0, 5.0, 4.0), (10.0, 5.0, 6.0), (20.0, 5.0, 3.0), (40.0, 10.0, 2.0), (40.0, 20.0, 2.0), (80.0, 10.0, 1.0), (60.0, 10.0, 1.0), (100.0, 10.0, 0.5), (400.0, 10.0, 1.0 / 6.0), (90.0, 10.0, 0.5), (45.0, 10.0, 1.0)] {
             let got = first_part_view_scale(AnsiA, [l, h]);
             assert!((got - want).abs() < 1e-12, "{l} x {h}: {got} (live {want})");
+        }
+    }
+
+    /// Live 1898 (blocks L x W x H on ANSI A and ISO A3), qa 1441 (82 x 82 x 20 on ANSI A mm) and c2-housing-draft
+    /// (30 x 37 x 6, ANSI A: 1:1): suggested views' sheet scale.
+    #[test]
+    fn suggested_scale_fits_all_three_views() {
+        use crate::drawing::SheetSize::{A3, AnsiA};
+        for (size, e, want) in [(AnsiA, [20.0, 10.0, 5.0], 3.0), (AnsiA, [100.0, 50.0, 20.0], 0.5), (AnsiA, [60.0, 60.0, 120.0], 1.0 / 3.0), (A3, [100.0, 50.0, 20.0], 1.0), (AnsiA, [82.0, 82.0, 20.0], 0.5), (AnsiA, [30.5, 37.0, 6.0], 1.0)] {
+            let got = suggested_scale(size, DVec3::from_array(e));
+            assert!((got - want).abs() < 1e-12, "{size:?} {e:?}: {got} (live {want})");
         }
     }
 
