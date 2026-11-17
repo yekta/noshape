@@ -421,6 +421,9 @@ const EDGE_WAKE_REST: std::time::Duration = std::time::Duration::from_millis(60)
 pub const WOKEN_EDGE: EntityId = EntityId(u32::MAX - 1);
 /// Stand for the woken model edge's ends in an inference's alignments until the click uses the edge.
 const WOKEN_EDGE_ENDS: [EntityId; 2] = [EntityId(u32::MAX - 2), EntityId(u32::MAX - 3)];
+/// Stands for the woken point outside the sketch (another sketch's point, a model vertex) in an inference's alignments
+/// until the click uses it.
+const WOKEN_POINT: EntityId = EntityId(u32::MAX - 4);
 /// How far the pointer moves from a press, on screen, before the press is a drag (live2 "feel (sketch)" (5): a drag
 /// starts at about 5 px on an end point or a line, whatever the time; less is a click).
 const DRAG_START_PX: f64 = 5.0;
@@ -740,6 +743,12 @@ pub struct SketchEditor {
     /// The model edge woken last and its ends in the sketch (live sketch-gaps 1c: a line from a start then offers
     /// PERPENDICULAR to it; live2 wake-parallel: its ends give horizontal / vertical alignment, never a parallel).
     pub woken_edge: Option<(noshape_model::reference::Reference, DVec2, DVec2)>,
+    /// A point outside the sketch the pointer is on while drawing (an external vertex snap), and since when; the one
+    /// snapped since the last move; the one woken last (rested on [`ACQUIRE_REST`]: live 11-17 sketch-snap-1117, Sketch
+    /// 2's point then offers its horizontal / vertical alignment, as a point of the sketch does).
+    point_acquiring: Option<(noshape_model::reference::Reference, std::time::Instant)>,
+    point_seen: Option<(noshape_model::reference::Reference, DVec2)>,
+    pub woken_point: Option<(noshape_model::reference::Reference, DVec2)>,
     /// Press position of a drawing tool (press-drag-release placement).
     press: Option<DVec2>,
     /// Line tool temporarily drawing a tangent arc (Shift+A or hovering
@@ -1447,6 +1456,9 @@ impl SketchEditor {
             edge_acquiring: None,
             edge_seen: None,
             woken_edge: None,
+            point_acquiring: None,
+            point_seen: None,
+            woken_point: None,
             press: None,
             tangent_mode: false,
             left_chain_end: false,
@@ -1522,6 +1534,8 @@ impl SketchEditor {
         self.acquiring = None;
         self.edge_acquiring = None;
         self.woken_edge = None;
+        self.point_acquiring = None;
+        self.woken_point = None;
         self.press = None;
         self.tangent_mode = false;
         // Live shows no hint for a sketch tool (behaviours "qa (2026-10-28,
@@ -1694,7 +1708,7 @@ impl SketchEditor {
             exclude: Vec::new(),
             origin: true,
             woken: self.woken.clone(),
-            woken_at: self.woken_edge.as_ref().map_or(Vec::new(), |(_, a, z)| vec![(WOKEN_EDGE_ENDS[0], *a), (WOKEN_EDGE_ENDS[1], *z)]),
+            woken_at: self.woken_edge.as_ref().map_or(Vec::new(), |(_, a, z)| vec![(WOKEN_EDGE_ENDS[0], *a), (WOKEN_EDGE_ENDS[1], *z)]).into_iter().chain(self.woken_point.as_ref().map(|(_, q)| (WOKEN_POINT, *q))).collect(),
             screen: self.screen_metric(),
         };
         let mut all = noshape_sketch::infer(sk, p, &ctx);
@@ -1963,6 +1977,16 @@ impl SketchEditor {
                 }
                 _ => {}
             }
+            let seen = self.point_seen.take();
+            match (self.point_acquiring.take(), seen) {
+                (Some((r, since)), Some((on, at))) if on == r => {
+                    if now.duration_since(since) >= ACQUIRE_REST {
+                        self.woken_point = Some((r.clone(), at));
+                    }
+                    self.point_acquiring = Some((r, since));
+                }
+                _ => {}
+            }
             // (The hover only while it is still within reach: one left from an earlier place isn't rested on here,
             // sketch-trim-drag's ends aligned with the previous line's end clicked before the tool was restarted.)
             let reach = self.world_per_px * 9.0;
@@ -2129,6 +2153,12 @@ impl SketchEditor {
             self.edge_seen = Some(reference.clone());
             if self.edge_acquiring.as_ref().is_none_or(|(r, _)| r != reference) {
                 self.edge_acquiring = Some((reference.clone(), std::time::Instant::now()));
+            }
+        }
+        if let ExternalSnap::Vertex { reference, position } = &snap {
+            self.point_seen = Some((reference.clone(), *position));
+            if self.point_acquiring.as_ref().is_none_or(|(r, _)| r != reference) {
+                self.point_acquiring = Some((reference.clone(), std::time::Instant::now()));
             }
         }
         let strong = self.inference.as_ref().is_some_and(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center));
@@ -2324,6 +2354,14 @@ impl SketchEditor {
 
     /// The click takes the woken model edge's perpendicular or an end's alignment: the edge is used in `sk` as `id`.
     pub fn link_woken_edge(&mut self, sk: &Sketch, id: EntityId) {
+        if sk.point(id).is_some() {
+            if let Some(inf) = &mut self.inference {
+                for c in &mut inf.constraints {
+                    *c = retarget_auto(*c, WOKEN_POINT, id);
+                }
+            }
+            return;
+        }
         let ends = self.woken_edge.as_ref().map(|w| [w.1, w.2]);
         let used = sk.endpoints(id).and_then(|(a, b)| Some((a, sk.point(a)?, b, sk.point(b)?)));
         let Some(inf) = &mut self.inference else { return };
@@ -2337,9 +2375,12 @@ impl SketchEditor {
         }
     }
 
-    /// The inference about to be clicked needs the woken model edge used.
+    /// The inference about to be clicked needs the woken model edge (or the woken point outside the sketch) used.
     pub fn needs_woken_edge(&self) -> Option<&noshape_model::reference::Reference> {
         let i = self.inference.as_ref()?;
+        if i.constraints.iter().any(|c| auto_target(c) == Some(WOKEN_POINT)) {
+            return self.woken_point.as_ref().map(|w| &w.0);
+        }
         let woken = |e: EntityId| e == WOKEN_EDGE || WOKEN_EDGE_ENDS.contains(&e);
         i.constraints.iter().any(|c| auto_target(c).is_some_and(woken)).then(|| self.woken_edge.as_ref().map(|w| &w.0))?
     }
@@ -6648,6 +6689,7 @@ impl SketchEditor {
                 .iter()
                 .filter_map(|c| match c {
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == noshape_sketch::ORIGIN => Some(DVec2::ZERO),
+                    AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == WOKEN_POINT => self.woken_point.as_ref().map(|w| w.1),
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if WOKEN_EDGE_ENDS.contains(p) => {
                         self.woken_edge.as_ref().map(|w| if *p == WOKEN_EDGE_ENDS[0] { w.1 } else { w.2 })
                     }
@@ -11148,6 +11190,29 @@ mod tests {
         assert!(at(&mut ed, &mut d, 9.0), "9 px out: held");
         assert!(!at(&mut ed, &mut d, 10.5), "10.5 px: let go");
         assert!(!at(&mut ed, &mut d, 9.0), "back to 9 px: not lit again");
+    }
+
+    /// qa 11-17 SKSNAP-ALIGN-WOKEN-POINT (live 11-17 sketch-snap-1117 row 2): another sketch's point rested on (an
+    /// external vertex snap held 100 ms) wakes as a point of the sketch does: 60 px below it, 6 px off its vertical, a
+    /// line's end aligns with it, and the click asks for that point used (the alignment then on the used point).
+    #[test]
+    fn a_rested_point_of_another_sketch_offers_its_alignment() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        let other = noshape_model::reference::Reference::SketchEntity { sketch: FeatureId(9), entity: 3 };
+        let w = v(0.02, 0.012);
+        ed.pointer_move(&mut d, w, false, false);
+        ed.apply_external_snap(ExternalSnap::Vertex { position: w, reference: other.clone() });
+        std::thread::sleep(ACQUIRE_REST + std::time::Duration::from_millis(10));
+        ed.pointer_move(&mut d, w + v(PX, 0.0), false, false);
+        assert_eq!(ed.woken_point.as_ref().map(|p| &p.0), Some(&other), "woken once rested on");
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        ed.pointer_move(&mut d, w + v(6.0 * PX, -60.0 * PX), false, false);
+        let i = ed.inference.clone().expect("an inference");
+        assert!(i.kind == InferenceKind::AlignVertical && (i.position.x - w.x).abs() < 1e-12, "aligned under it: {i:?}");
+        assert_eq!(ed.needs_woken_edge(), Some(&other), "the click uses it");
+        let used = d.sketch.add_point(w);
+        ed.link_woken_edge(&d.sketch, used);
+        assert!(ed.inference.as_ref().unwrap().constraints.iter().any(|c| matches!(c, AutoConstraint::VerticalWith(p) if *p == used)), "aligned with the used point");
     }
 
     /// Live 11-17 sketch-snap-1117 (2) and (4): a line's own horizontal is a 7 px band at any length (40 to 320 px from
