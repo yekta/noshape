@@ -75,7 +75,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Agents back 11-17 09:25 as fresh threads (full ids): asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm
   18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
   58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2
-  3b9b1e66-33a0-4dfe-9e0a-eee216e354b2, bool 0f798808-e854-4e83-bbd0-22ae5a1a0578. Old ids stopped.
+  3b9b1e66-33a0-4dfe-9e0a-eee216e354b2, bool 0f798808-e854-4e83-bbd0-22ae5a1a0578, qa
+  132756b3-e48d-4b9f-8a0e-3d4f23629c8b. Old ids stopped.
 - skasm's sheet metal colour fix (`Context::reuse_colours_from`) lands after their suite: then recheck our flat view
   colours with fb5 sm-click.json.
 - Rerun 11-16: boundary-surface, end-caps, circular click-commit, context-create-version-update, routing match.
@@ -87,10 +88,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Queued to land
 
-- ab8a2a43 (leak fixes + NOSHAPE_SOAK) FAILED 11-16 20:59 on ops `spawn_guard` (soak.rs runs `ps` without
-  CREATE_NO_WINDOW). Fix: soak.rs added to spawn_guard.rs ALLOWED (a measuring aid, off unless set), committed with
-  this handoff and queued again 11-17 09:34 as e794a9dd (the Mac run of `spawn_guard::` hadn't finished): check
-  `tools/tiers/land.sh --status`; if it fails again, fix forward.
+- 15a48786 (11-17 10:08): Search tools' toolbar highlight as live (psui/toolbar-highlight: `.is-highlighted` on the
+  button, #fcda7f + `inset 0 0 0 2px #fab601`, no border, nothing moves; a dropdown member lights the ⌄ alone).
+  ui.rs `search_highlight`, part_studio/mod.rs `found` / `in_menu`, T1 `toolbar_highlight::` (fails with the old
+  border: Sketch 99 → 103 px). Check `land.sh --status`; fix forward if it fails.
+- Landed 11-17 09:54: 498b96a8 (leak fixes + NOSHAPE_SOAK + spawn_guard allow).
+- The Mac's one build slot can hold a test 10+ min: for a quick single test use NOSHAPE_RB_HOST=vibe6.
 
 ## Current task (lead 11-17 09:25)
 
@@ -107,6 +110,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
    it: ui.rs `shortcut_chips` / `menu_tool_item`, `shortcut_chip` removed as unused; popup_menu.rs tool_list item
    pr 7 → 6). Next: build, screenshot a Fillet ⌄ / Sheet metal ⌄ list (fb5/tb.json), compare with live's
    tooldd-fillet-page.png / tooldd-sheetmetal-page.png, then land.
+3. Sketch selection readouts, live's answer (11-17, live/psui/sketch-readouts.json + crops, behaviours.md): circle
+   alone: circle icon + "Diameter"; arc alone: arc icon + "Radius"; pairs no icon. Point+circle, point+arc,
+   line+arc: Min | Max | Center dist (line+arc Max on the arc's real extent, 94.868 not 95.44; Center line→arc
+   centre). Circle+arc, two arcs, circle+circle: Center | Max | Min (r10/r5 concentric 0/15/5; r10/r3 2 mm apart
+   2/15/5). Point on a line: "Min dist: 0.000 mm" only. Label order by the kinds, not the selection order.
+   Ours: scene/sketch_mode.rs `selection_readout` (two points, point+line, two circles done 11-16).
 
 ## Waiting on others
 
