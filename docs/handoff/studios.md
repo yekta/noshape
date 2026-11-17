@@ -27,7 +27,7 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
   - feel tests: assembly_feel_tests.rs (glyph reach + click, box rule, sub part), drawing feel.rs (F4, D3 marker,
     leader, view colours, dimension 5 px drag).
 - Not queued yet: b91a61a5 (run.py skips a step whose live page crashed; asm + section 224/224), a handoff, and in
-  the worktree (drawing-ui 57/57, drawing 242, scene 158, ops e2e 224, clippy clean; side by side with live2:
+  the worktree (drawing-ui 57 + 1 ignored, drawing 242, scene 158, ops e2e 224, clippy clean; side by side with live2:
   /root/studios-scratch/centermark-live-vs-ours.png):
   - every highlighted drawing line 3 px (`LIT_LINE_PX`, new `Style::lit_line_px` in render, 0 = the 3D band): live
     2 px solid + rim (dh0, dsel3, d-sel-view); a tool's hovered edge orange (`tool_picks_edges`, live dact-aa-d3);

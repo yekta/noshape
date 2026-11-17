@@ -604,3 +604,25 @@ fn a_holes_centre_mark_lights_from_its_circle_and_a_press_there_drags_the_view(c
     let after = position(cx);
     assert!((after[0] - before[0] - 20.0 * mm_per_px).abs() < 0.01 && (after[1] - before[1]).abs() < 0.01, "a press on the circle drags the view: {before:?} -> {after:?}");
 }
+
+/// Live2 sheet-fit (A3-start, B-start; 11-15): a drawing opens at its Zoom to fit (camera_ops `a_sheet_fits_as_live`:
+/// the paper about 47 px short of a 973 px canvas, 14.75 px below its centre); zoomed and panned, Zoom to fit puts it
+/// back where it opened.
+#[gpui::test]
+fn a_drawing_opens_fitted_and_zoom_to_fit_puts_it_back(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "feel-fit");
+    real_sheet(cx, window, &editor);
+    let camera = |cx: &mut TestAppContext| cx.update(|cx| { let e = editor.read(cx); (e.zoom, e.center) });
+    let opened = camera(cx);
+    let fit = cx.update(|cx| { let e = editor.read(cx); noshape_scene::camera_ops::drawing_fit_sheet(e.size_px(), e.current_sheet()) });
+    assert_eq!(opened, fit, "opened at the sheet's fit");
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.zoom_by(2.5, [300.0, 200.0], cx);
+        e.pan_step(1.0, -1.0, cx);
+    }));
+    draw(cx, window);
+    assert_ne!(camera(cx), opened, "zoomed and panned");
+    cx.update(|cx| editor.update(cx, |e, cx| e.zoom_to_fit(cx)));
+    draw(cx, window);
+    assert_eq!(camera(cx), opened, "Zoom to fit: back where it opened");
+}
