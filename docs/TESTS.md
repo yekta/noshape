@@ -13,8 +13,8 @@ All scripts take extra cargo args (`--locked`, `-p <crate>`, `--release`). Set `
 ## Landing: `tools/tiers/land.sh` (lead, 10-27; queued 11-01)
 
 The only way to put work on main. `land.sh` rebases on origin/main, runs clippy on the crates the change edits
-through rb.sh in your warm vibe4 dir (seconds to a minute; a clippy error refuses the queue and shows the error;
-`--no-precheck` skips it in an emergency), queues HEAD on the land server vibe4 and returns at once with `QUEUED <sha>`: **keep working, don't wait for it.** The land daemon there (`tools/tiers/land-daemon.sh`)
+through rb.sh in your warm vibe5 dir (seconds to a minute; a clippy error refuses the queue and shows the error;
+`--no-precheck` skips it in an emergency), queues HEAD on the land server vibe5 and returns at once with `QUEUED <sha>`: **keep working, don't wait for it.** The land daemon there (`tools/tiers/land-daemon.sh`)
 takes whatever is queued whenever one of its three slots frees, in arrival order (no batch waits to fill): one place
 per worktree (its newest queued change carries its older ones: one check, one result for all), 4 worktrees, 8 above
 12 queued changes, 12 above 24. It stacks them on the batches still being checked (a merge train: it lands right
@@ -36,12 +36,12 @@ rebase conflict. Deeper dependents' tests run in the watcher after the push. Doc
   commit and run land.sh again (it queues everything not yet on main). A rebase conflict: rebase on origin/main by hand
   (once the change it conflicts with has landed), then land.sh.
 - `tools/tiers/land.sh --wait`: the old blocking land (this change's checks alone, then the push), for the lead and
-  scripts; land.sh falls back to it when vibe4 is unreachable.
-- Pushes go through `tools/tiers/land-relay.sh` on this machine (vibe4 has no GitHub credentials), which also syncs
+  scripts; land.sh falls back to it when vibe5 is unreachable.
+- Pushes go through `tools/tiers/land-relay.sh` on this machine (vibe5 has no GitHub credentials), which also syncs
   the results to `/tmp/lead/land-results/<worktree>.log`; land.sh starts the relay (from `/root/lead-scratch`, log
-  `land-relay.log` there) and the daemon when they aren't running. On vibe4: `~/land/results.tsv` (every change), `~/land/history.tsv` (every check: queue wait, slot wait,
+  `land-relay.log` there) and the daemon when they aren't running. On vibe5: `~/land/results.tsv` (every change), `~/land/history.tsv` (every check: queue wait, slot wait,
   phase times, batch size), `~/land/daemon.log`.
-- Measured 11-01 on vibe4 (busy with agents' lands): workspace clippy after a model-core edit 98 s / 53 s, against
+- Measured 11-01 on vibe5 (busy with agents' lands): workspace clippy after a model-core edit 98 s / 53 s, against
   `cargo check --workspace` + clippy on model-core 53 s / 28 s. A queued brep change's check: cargo check 30–190 s,
   clippy 1–5 s, test build 7–37 s, tests 33–74 s. T0 had run on every land (`grep -w` took `noshape-brep` for
   `noshape`): 233–313 s saved on lands that don't touch the app, ops or cli or a crate they use directly.
@@ -49,11 +49,11 @@ rebase conflict. Deeper dependents' tests run in the watcher after the push. Doc
 Main red from a pushed change means land.sh wasn't used. A flaky test (passes alone, fails in parallel, or fails now
 and then) goes to T2 at once with a ticket for its owner.
 
-## Building and testing on vibe4 / vibe5: `tools/tiers/rb.sh` (lead, 11-01)
+## Building and testing on vibe5 / vibe6 / vibe7: `tools/tiers/rb.sh` (lead, 11-01)
 
-Run builds and tests on vibe4, not on this machine (agents' builds kept it at 2–3× its cores and agents spent ~80 % of
+Run builds and tests on vibe5, not on this machine (agents' builds kept it at 2–3× its cores and agents spent ~80 % of
 their day waiting on compiles). `tools/tiers/rb.sh <command>` syncs your worktree as it is (uncommitted changes too)
-to your build server (tools/tiers/rb-hosts: vibe4 for the kernel agents and the land checks, vibe5 for the UI
+to your build server (tools/tiers/rb-hosts: vibe5 for the kernel agents and the land checks, vibe6 and vibe7 for the UI
 agents), runs the command there in your worktree's own warm target dir and streams the output; its exit code is the
 command's. `--get <bin>` copies a built binary back into `$CARGO_TARGET_DIR/debug/` to run the app here (GUI checks).
 Measured: noshape-model's test build cold 188 s, unchanged 7 s, after a one-line model-core change 11 s.
@@ -61,7 +61,7 @@ Measured: noshape-model's test build cold 188 s, unchanged 7 s, after a one-line
 tools/tiers/rb.sh cargo test -p noshape-brep --lib
 tools/tiers/rb.sh --get noshape cargo build -p noshape   # then run $CARGO_TARGET_DIR/debug/noshape here
 ```
-Heavy jobs (replay corpora, long probes, sweeps) run there too: vibe4 has 62 GB of memory and 400 GB of disk.
+Heavy jobs (replay corpora, long probes, sweeps) run there too: vibe5 has 16 cores and 29 GB of memory, vibe6 and vibe7 8 cores and 29 GB each.
 
 ## CI on GitHub (`ci.yml`, cliapp 11-01)
 
@@ -220,11 +220,11 @@ delete the line to bring it back to T1. Record the move below.
   seeds 1–3 × 60 steps (1.6 s dev build); the wider default (1–5 × 80) stays T2 as
   `random_sketch_edits_never_panic_wide`.
 
-## Timing on the perf server (vibe3, 10-30)
+## Timing on the perf server (vibe6, 10-30)
 This machine's load makes local timings meaningless. Time a perf test at your commit with
 `tools/tiers/perf.sh [-n RUNS] <cargo test args>` (e.g. `tools/tiers/perf.sh -p noshape-model --test all --
 custom_features::knurl_feature_b94_on_a_cylinder --ignored --nocapture --test-threads=1`): the commit goes to a temporary
-`perf/` branch, vibe3 builds release and runs it RUNS times (3 by default) with the machine to itself (land checks wait),
+`perf/` branch, vibe6 builds release and runs it RUNS times (3 by default) with the machine to itself (land checks wait),
 and prints each run's wall time, the test's timing lines, best and median. Quote those numbers in handoffs and commits.
-vibe3 also times the standard set (knurl, big plate, pattern_second, the timed pattern checks) on every new last-green,
+vibe6 also times the standard set (knurl, big plate, pattern_second, the timed pattern checks) on every new last-green,
 every 6 h; a > 15 % slower median is flagged to the lead. perf.yml on GitHub stays the cross-platform reference.
