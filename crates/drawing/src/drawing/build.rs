@@ -254,16 +254,21 @@ impl BuiltSheet {
     /// those `accept` takes (a tool that takes only view edges sees the
     /// edge under an annotation or a centerline; qa DWG-DIM-TWO-EDGES).
     pub fn hit_where(&self, p: [f64; 2], tol: f64, accept: &dyn Fn(&PickTarget) -> bool) -> Option<u32> {
+        self.nearest_where(p, accept).filter(|(_, d)| *d <= tol).map(|(k, _)| k)
+    }
+
+    /// The closest line pick target to a sheet point among those `accept` takes, with its distance (mm).
+    pub fn nearest_where(&self, p: [f64; 2], accept: &dyn Fn(&PickTarget) -> bool) -> Option<(u32, f64)> {
         let mut best: Option<(u32, f64)> = None;
         for l in self.geometry.lines.iter().filter(|l| l.pick != 0 && self.picks.get(l.pick as usize).is_some_and(accept)) {
             let n = l.points.len();
             let segs = if l.closed { n } else { n.saturating_sub(1) };
             let d = (0..segs).map(|i| dist_to_segment(p, l.points[i], l.points[(i + 1) % n])).fold(f64::INFINITY, f64::min);
-            if d <= tol && best.is_none_or(|(_, bd)| d < bd) {
+            if best.is_none_or(|(_, bd)| d < bd) {
                 best = Some((l.pick, d));
             }
         }
-        best.map(|(k, _)| k)
+        best
     }
 
     /// Closest pick target to a sheet point within `tol` mm. Annotations win

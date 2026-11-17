@@ -76,7 +76,7 @@ impl<'a> SheetPick<'a> {
         // Select (live2 feel/drawing.json D1): an annotation's lines light within 6 px (not at 8), its text within 8 px
         // of its box (not at 10); the tools keep their own reach.
         let hover = match self.tool {
-            Tool::Select => self.built.and_then(|b| b.hit_reach(self.cursor, self.tol_mm(SELECT_LINE_REACH_PX), self.tol_mm(SELECT_TEXT_REACH_PX))),
+            Tool::Select => self.built.and_then(|b| b.hit_reach(self.cursor, self.tol_mm(SELECT_LINE_REACH_PX), self.tol_mm(SELECT_TEXT_REACH_PX))).map(|h| self.centerline_on_edge(h).unwrap_or(h)),
             _ => self.built.and_then(|b| b.hit(self.cursor, tol)),
         };
         // Tools that take only view edges (or sketch geometry) look for those
@@ -159,6 +159,21 @@ impl<'a> SheetPick<'a> {
             (None, Tool::Select, Some(b)) => self.view_under(self.cursor).and_then(|p| b.picks.iter().position(|t| *t == PickTarget::View(p.id))).map(|i| i as u32),
             (h, _, _) => h,
         }
+    }
+
+    /// A centerline lit where it runs on a view's edge: the edge instead, which stands for its view in Select (live2
+    /// feel/drawing.json D2: a centerline over a view edge, the click takes the view; 3 px inside the view, the
+    /// centerline). On the edge: no farther from the pointer than the centerline, give or take a pixel.
+    fn centerline_on_edge(&self, h: u32) -> Option<u32> {
+        let b = self.built?;
+        let PickTarget::Annotation(id) = b.picks.get(h as usize)? else { return None };
+        let a = self.current_sheet().annotations.iter().find(|a| a.id == *id)?;
+        if !matches!(a.kind, AnnotationKind::Centerline { .. } | AnnotationKind::CircleCenterline { .. }) {
+            return None;
+        }
+        let (_, dc) = b.nearest_where(self.cursor, &|t: &PickTarget| *t == PickTarget::Annotation(*id))?;
+        let (edge, de) = b.nearest_where(self.cursor, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. }))?;
+        (de <= dc + self.tol_mm(1.0)).then_some(edge)
     }
 
     pub fn placement(&self, view: ViewId) -> Option<ViewPlacement> {

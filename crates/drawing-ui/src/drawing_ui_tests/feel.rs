@@ -169,3 +169,47 @@ fn a_view_moves_from_5_px_and_4_px_is_a_click(cx: &mut TestAppContext) {
         }
     }
 }
+
+/// Live2 feel/drawing.json D2: a centerline laid on a view's edge lights the view there and a click takes the view; a
+/// centerline inside the view (3 px from any edge) lights and is taken itself.
+#[gpui::test]
+fn a_centerline_on_a_view_edge_gives_way_to_the_view(cx: &mut TestAppContext) {
+    use noshape_model::drawing::{Annotation, AnnotationKind};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-centerline-edge");
+    real_sheet(cx, window, &editor);
+    // The first view's longest straight edge (view coordinates), and a line across the view's middle.
+    let (view, on_edge, inside, zoom) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().and_then(|b| b.placements.first().copied()).expect("a view");
+        let g = e.geoms.get(&pl.id).expect("its geometry");
+        let len = |p: &[[f64; 2]]| (p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]);
+        let edge = g.edges.iter().filter(|x| x.visible && x.points.len() == 2).max_by(|a, b| len(&a.points).total_cmp(&len(&b.points))).expect("a straight edge");
+        let (a, b) = (edge.points[0], edge.points[1]);
+        let lerp = |t: f64| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+        let lo = g.edges.iter().flat_map(|x| x.points.iter()).fold([f64::MAX; 2], |m, p| [m[0].min(p[0]), m[1].min(p[1])]);
+        let hi = g.edges.iter().flat_map(|x| x.points.iter()).fold([f64::MIN; 2], |m, p| [m[0].max(p[0]), m[1].max(p[1])]);
+        let mid_y = (lo[1] + hi[1]) / 2.0;
+        (pl.id, (lerp(0.2), lerp(0.8)), ([lo[0] + (hi[0] - lo[0]) * 0.2, mid_y], [lo[0] + (hi[0] - lo[0]) * 0.8, mid_y]), e.zoom)
+    });
+    let (id_edge, id_inside) = cx.update(|cx| editor.update(cx, |e, cx| {
+        let first = e.current_sheet().next_annotation_id();
+        e.edit_sheet("Centerline", cx, |s| {
+            s.annotations.push(Annotation { id: first, kind: AnnotationKind::Centerline { view, a: on_edge.0, b: on_edge.1 }, ..Default::default() });
+            s.annotations.push(Annotation { id: first + 1, kind: AnnotationKind::Centerline { view, a: inside.0, b: inside.1 }, ..Default::default() });
+        });
+        (first, first + 1)
+    }));
+    real_sheet(cx, window, &editor);
+    let sheet_of = |cx: &mut TestAppContext, p: [f64; 2]| cx.update(|cx| editor.read(cx).placement(view).map(|pl| pl.to_sheet(p))).expect("placed");
+    let mid = |l: ([f64; 2], [f64; 2])| [(l.0[0] + l.1[0]) / 2.0, (l.0[1] + l.1[1]) / 2.0];
+    let at_edge = sheet_of(cx, mid(on_edge));
+    let lit = lit_at(cx, window, &editor, at_edge);
+    assert_eq!(view_of(&lit), Some(view), "on the edge: the view lights, not centerline {id_edge}: {lit:?}");
+    cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
+    let sel = click_at(cx, window, &editor, at_edge, Modifiers::default());
+    assert!(sel.iter().any(|s| view_of(&Some(*s)) == Some(view)) && !sel.contains(&Sel::Annotation(id_edge)), "on the edge the click takes the view: {sel:?}");
+    let at_inside = sheet_of(cx, mid(inside));
+    let lit = lit_at(cx, window, &editor, [at_inside[0], at_inside[1] + 1.0 / zoom]);
+    assert_eq!(lit, Some(Sel::Annotation(id_inside)), "inside the view: the centerline");
+}
