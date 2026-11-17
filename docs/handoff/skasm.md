@@ -38,11 +38,13 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
    drags. Landed today after that: 4a8381fc (curve drags, woken edge ends, H / V on two lines), 3621f719 (drag
    glyphs, arc-end level drop, spline rows: matrix 67 / 67), 5245720f (every constraint button on two lines).
    Pair 1117b (my stack vs main): +5 features (parting-line 5 -> 10/17), no other document changed.
-   In the tree, testing (vibex7): a chain's L2 dragged by its middle and the ellipse's minor rim (live2 run4);
-   Fix on a line holds the line, not its ends (live2 sketch-state: badge stays, ends blue); an unsolved sketch has
-   no badge and says "Sketch could not be solved." (was "Sketch has conflicting constraints"); one constraint
-   glyph selected at a time (live2 glyph-select). FIX documents traced: bezier 4/6 and cf-parameter-pattern 9/9,
-   as on main. Show constraints memory is already live's.
+   Queued 40ac5da1 (vibe2, 22:3x): the chain / ellipse drags (live2 run4), Fix on a line holds only the line, the
+   unsolved sketch's message / badge / bubble, one glyph at a time (live2 glyph-select), the snap let-go hold
+   (HOLD_PX 9.5 / 11.5), the open sketch's region resolved from the pointer (qa USER-HOVER-STAYS-LIT; the stale pick
+   itself is psui's). FIX documents traced: bezier 4/6 and cf-parameter-pattern 9/9, as on main. Next: qa's hover
+   flow (qa-scratch/uh/uh2.sh, my copy ~/tmp/skasm/uh/uh2s.sh on vibex6 :391) against my app build
+   (~/agents/skasm-keep/noshape, scratch bin/appbuild.sh); hat15b by hand (vibex7 ~/lead-private, copy to
+   ~/tmp/skasm). Hosts: builds vibex6 / vibex7, land NOSHAPE_LAND_QUEUE_HOST=vibe2. Show constraints memory is already live's.
 1. config-parts: linear-rail 26/26, links 35/35 (live fetched Derived 1's source), standoffs 32/32, sprockets 24/24
    (live's volume band carried while its volume stays: carry_volume_bands); pulleys 12/22 (Circular pattern 1, a face
    pattern ADD, fails in our op on main too: core's since 11:45); nuts 14/17 (Sweep 1, bool's). Standoffs regenerates

@@ -11149,6 +11149,45 @@ mod tests {
         assert!(!at(&mut ed, &mut d, 9.0), "back to 9 px: not lit again");
     }
 
+    /// Live 11-17 sketch-snap-1117 (2) and (4): a line's own horizontal is a 7 px band at any length (40 to 320 px from
+    /// its start), a woken point's vertical the same at 60 and 150 px from it, and Shift held while drawing infers
+    /// nothing: the end lands at the raw pointer and the click adds no constraint.
+    #[test]
+    fn drawing_a_line_snaps_in_px_bands_and_shift_snaps_nothing_as_lives() {
+        let start = v(0.0, 0.0);
+        let lit = |kind: InferenceKind, at: DVec2, wake: Option<DVec2>| {
+            let (mut ed, mut d) = editor(Tool::Line);
+            click(&mut ed, &mut d, start);
+            if let Some(w) = wake {
+                ed.woken = vec![d.sketch.add_point(w)];
+            }
+            ed.pointer_move(&mut d, at, false, false);
+            ed.inference.as_ref().is_some_and(|i| i.kind == kind)
+        };
+        for len in [40.0, 80.0, 160.0, 320.0] {
+            assert!(lit(InferenceKind::Horizontal, v(len * PX, 6.0 * PX), None), "{len} px long, 6 px off level: horizontal");
+            assert!(!lit(InferenceKind::Horizontal, v(len * PX, 8.5 * PX), None), "{len} px long, 8.5 px off level: free");
+        }
+        let w = v(0.02, 0.012);
+        for from in [60.0, 150.0] {
+            assert!(lit(InferenceKind::AlignVertical, w + v(6.0 * PX, -from * PX), Some(w)), "{from} px below the woken point, 6 px off: aligned");
+            assert!(!lit(InferenceKind::AlignVertical, w + v(8.5 * PX, -from * PX), Some(w)), "{from} px below, 8.5 px off: free");
+        }
+        let (mut ed, mut d) = editor(Tool::Line);
+        let p = d.sketch.add_point(v(0.01, 0.0021));
+        click(&mut ed, &mut d, v(0.002, 0.0021 + 2.0 * PX));
+        let end = v(0.01 + PX, 0.0021);
+        ed.pointer_move(&mut d, end, true, false);
+        assert!(ed.inference.is_none() && ed.snap_icons().is_empty(), "Shift: no snap, no glyph");
+        let h = d.sketch.pick(end, PX * 4.0);
+        ed.tool_down(&mut d, end, h, true, false);
+        ed.tool_up(&mut d, end);
+        let line = d.sketch.entities().find(|e| e.kind() == EntityKind::Line).map(|e| e.id).expect("a line");
+        let (_, b) = d.sketch.entity(line).and_then(|e| e.endpoints()).unwrap();
+        assert!((d.sketch.point(b).unwrap() - end).length() < 1e-12 && b != p, "the end at the raw pointer, 1 px from the point");
+        assert_eq!(d.sketch.constraints().count(), 0, "no constraint: not coincident, not horizontal (2 px off level)");
+    }
+
     /// Live2 11-17 part 2b (p2b2.json "apply"): two free lines picked, every constraint button as live's: Parallel,
     /// Perpendicular, Equal and Coincident add one, Horizontal, Vertical and Fix one per line, each clearing the
     /// selection with no tool left armed; Tangent, Concentric, Midpoint and Normal refuse in std's words, the selection
