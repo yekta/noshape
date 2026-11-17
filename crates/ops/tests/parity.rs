@@ -2950,7 +2950,7 @@ fn a_pierce_to_a_sketch_bezier_by_its_id_takes_that_curve() {
               { "btType": "BTMParameterQueryList-148", "parameterId": "externalEdge", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "", "deterministicIds": ["JE"] }] },
               { "btType": "BTMParameterString-149", "parameterId": "localEntity", "value": l }] })).collect::<Vec<_>>()) }
     ] });
-    let refs = json!({ "index": 1, "id": "JE", "kind": "EDGE", "curveType": "SPLINE", "body": "JX", "point": [0.0, 0.01, 0.0], "start": [-0.02, 0.01, 0.0], "end": [0.02, 0.01, 0.0], "length": 0.0405 }).to_string();
+    let refs = json!({ "index": 1, "id": "JE", "kind": "EDGE", "curveType": "SPLINE", "body": "JX", "bodyType": "SKETCH", "point": [0.0, 0.01, 0.0], "start": [-0.02, 0.01, 0.0], "end": [0.02, 0.01, 0.0], "length": 0.0405 }).to_string();
     let mut ctx = Ctx::new();
     let mut t = Translator::open(&mut ctx, &scratch("pierce-sketch-bezier.noshape"), &features, parse_refs(&refs)).unwrap();
     assert!(t.step(0).problems.is_empty());
@@ -2976,7 +2976,7 @@ fn a_solve_onto_lives_pierce_point_is_kept() {
               { "btType": "BTMParameterQueryList-148", "parameterId": "externalEdge", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "", "deterministicIds": ["JE"] }] },
               { "btType": "BTMParameterString-149", "parameterId": "localEntity", "value": "ci" }] }] }
     ] });
-    let refs = json!({ "index": 1, "id": "JE", "kind": "EDGE", "curveType": "SPLINE", "body": "JX", "point": [-0.009, 0.0105, 0.0], "start": [-0.02, 0.01, 0.0], "end": [0.0, 0.01, 0.0], "length": 0.0215 }).to_string();
+    let refs = json!({ "index": 1, "id": "JE", "kind": "EDGE", "curveType": "SPLINE", "body": "JX", "bodyType": "SKETCH", "point": [-0.009, 0.0105, 0.0], "start": [-0.02, 0.01, 0.0], "end": [0.0, 0.01, 0.0], "length": 0.0215 }).to_string();
     let mut ctx = Ctx::new();
     let mut t = Translator::open(&mut ctx, &scratch("pierce-point-kept.noshape"), &features, parse_refs(&refs)).unwrap();
     assert!(t.step(0).problems.is_empty());

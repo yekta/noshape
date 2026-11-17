@@ -4391,7 +4391,9 @@ impl<'a> Translator<'a> {
             "EDGE" if r.sketch && let Some(curve) = self.sketch_curve_at(p, r.measure, r.ends) => Ok(curve),
             // A spline on no part of live's whose ends a sketch's spline has (c2-surf-workshop-pipe's Loft profiles
             // pierce Side profile's Beziers, JHt / JHV): ours has no body for it, so no edge of ours lies there.
-            "EDGE" if r.geometry.is_none() && r.ends.is_some() && self.part_of(k, &r).is_none() && let Some(curve) = self.sketch_curve_at(p, None, r.ends) => Ok(curve),
+            // (Only live's sketch-body edges: a part's spline a split left ends where its sketch curve does too,
+            // c2-parting-line-draft-parting-line's Draft 1 parting edge JKB.)
+            "EDGE" if r.sketch && r.geometry.is_none() && r.ends.is_some() && self.part_of(k, &r).is_none() && let Some(curve) = self.sketch_curve_at(p, None, r.ends) => Ok(curve),
             "EDGE" => {
                 let part = self.part_of(k, &r);
                 self.nearest("edges", &r, part.as_deref()).ok_or_else(|| format!("{id}: no edge of ours at {:?} mm", mm(p)))
