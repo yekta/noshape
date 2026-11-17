@@ -4420,3 +4420,26 @@ skasm meanwhile; I'll list what I change here before landing.
        Needs a release pair (model-core) before landing; land 1+2+2b once bool's gate passes (bool gating since
        22:40), then 3 after its pair. Next: the +1 face / -1 edge / -2 vertex difference vs live.
     4. bool's Shell may call it for its inner walls (bool decides).
+
+## 11-17 morning (moved from handoff)
+## In flight
+- **11-17 06:1x:** core-next QUEUED f2baf491 (p5 clean, hats/dock SAME 14 studios). Lead: 6a59c4094 (point loft: wrong area
+  reported Ok) NOT to land; split -> **core-sing2** (pushed: 484875fbb reapply cylinder, df608b315 bounded per-feature
+  defeature, 67f32b275 Thicken guard + own T1). Lands after p6 (old core-sing; singularities expected = base) + its
+  hats/dock A/B (building in core-trace). **core-pipe2** (on core-sing2: 3e106dca0 N-profile guided loft only without
+  end/guide conditions, 829ac26ef intersection n1 x n2, f6aa8f16f parity pairs by type): p7 relaunched 06:1x vs core-sing2.
+  Audit (lead): 3 suite guided lofts set conditions (pipe Loft, singularities Loft with bad singularity + Loft 3), all fail
+  today, none silent. **P1 next after impeller P0: apply loft guide + end conditions** (live areas: singularities Problem
+  loft 3425.04 mm2, Surface 3 3480.95; both run to a point profile, also not built yet).
+- **11-17 04:5x f197 P0 (qa/lead): DONE, not core's.** rust-zero-solid-f197 Mirror 3 slivers bisected (debug CLIs vibe5,
+  repro `bash ~/tmp/core/f197/rep.sh <cli>`): a38f06293 (all core commits) good, blend's ba7a8d755 bad; its checked_blend
+  necks_cut hunk alone. blend reverted (2ff07685c) and re-lands with f197 as T1.
+- **core-pipe2 detail:** pipe's Loft then meets "All guides should intersect": Loft profile 3 (half ellipse, PIERCE to
+  both guides) on Plane 3 (Curve point on guide JHt at its end KHcD) sits 2.69 mm off the guide; live's stored
+  ellipse (center (0, -14.97) mm) can't hold the plane origin: REQUESTS 05:01 (+ mutualtrim Plane 1). manualblend
+  Sweep 2 5321.6 -> 8223.1 mm2 (live 8224.9; rest likely OCCT's approximate section). mutualtrim Sweep 1 = Sketch 2
+  spline solve (told skasm 05:2x). wave-washer Loft 1: solid loft, 4 profiles, one closed guide (periodic): not built.
+- **Impeller P0 (core-sing2):** bisect 0.4.52 -> 0.4.53 = Chamfer Stevenrohr Halterung building (as live); Delete face 2
+  deletes stand-in faces. Move face 1 6.6 s -> 28 ms; Delete face 2 replay 16.6 -> 8.1 s (300K bound per feature,
+  spent ones kept). OCCT 0034 dropped (/root/core-scratch/occt-0034-extension-cap.diff). Remeasure once blend's
+  Fillet 3 / Stevenrohr zum Halter build; measure on the Mac. p6res/branch.all "(spent)" lines = removals past 300K.
