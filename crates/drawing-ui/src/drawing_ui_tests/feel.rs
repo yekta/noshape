@@ -369,3 +369,46 @@ fn the_dimension_tool_snaps_to_a_vertex_within_its_reach_and_select_marks_none(c
     draw(cx, window);
     assert!(snapped(cx, 2.0).is_none(), "Select: no snap marker");
 }
+
+/// Live2 feel/drawing.json D1: a note's leader lights the note from 10 px off its stroke, not from 12.
+#[gpui::test]
+fn a_note_leader_lights_its_note_within_10_px(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        // The leader to a view's lowest-left vertex, the note down and left of it on the empty sheet.
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let num = |v: &Value| v.as_f64().unwrap_or(0.0);
+        let mut corner = [f64::MAX, f64::MAX];
+        for v in g["views"].as_array().cloned().unwrap_or_default() {
+            for e in v["edges"].as_array().cloned().unwrap_or_default().iter().filter(|e| e["type"] == "line") {
+                for k in ["a", "b"] {
+                    let p = [num(&e[k][0]), num(&e[k][1])];
+                    if p[0] + p[1] < corner[0] + corner[1] {
+                        corner = p;
+                    }
+                }
+            }
+        }
+        let at = [(corner[0] - 40.0).max(25.0), (corner[1] - 40.0).max(25.0)];
+        call(ctx, "drawing_note", json!({ "drawing": dw, "text": "DEBURR", "position": at, "leader": corner }));
+    }));
+    let (window, editor) = drawing(cx, "feel-leader-reach");
+    real_sheet(cx, window, &editor);
+    let (id, mid, n, mm_per_px) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let a = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Note { .. })).expect("the note");
+        let paths = noshape_scene::drawing_tools::annotation_edit::leader_paths(e.built.as_deref(), a);
+        let pts = &paths.first().expect("its leader").1.points;
+        let (p, q) = (pts[pts.len() - 2], pts[pts.len() - 1]);
+        let l = (q[0] - p[0]).hypot(q[1] - p[1]);
+        let (a2, b2) = (e.sheet_to_local([0.0, 0.0]), e.sheet_to_local([100.0, 0.0]));
+        (a.id, [(p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0], [-(q[1] - p[1]) / l, (q[0] - p[0]) / l], 100.0 / (b2[0] - a2[0]).abs())
+    });
+    for (d, lit) in [(0.0, true), (6.0, true), (10.0, true), (12.0, false)] {
+        for side in [1.0, -1.0] {
+            let at = [mid[0] + side * n[0] * d * mm_per_px, mid[1] + side * n[1] * d * mm_per_px];
+            let got = lit_at(cx, window, &editor, at);
+            assert_eq!(got == Some(Sel::Annotation(id)), lit, "{d} px off the leader ({side}): {got:?}");
+        }
+    }
+}
