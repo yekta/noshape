@@ -2566,6 +2566,13 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 g.texts.push(Text2 { pos: [(pl.min[0] + pl.max[0]) / 2.0 + at[0], y + at[1]], height, text, angle: 0.0, anchor: Anchor::BottomCenter, pick: label_pick });
                 y -= 2.0;
             }
+            // A base or pictorial view keeps its label when it says nothing: live's DXF has an empty MTEXT there (the
+            // exchange suite's drawings: Front and Isometric each one, the Right and Top projected beside Front none).
+            // Nothing to pick or drag on the sheet.
+            let pictorial = matches!(v.kind, ViewKind::Projected { .. }) && views::projected_direction(sheet, v.id).is_some_and(|d| d[0] != 0.0 && d[1] != 0.0);
+            if g.texts.len() == label_mark && (matches!(v.kind, ViewKind::Base { .. }) || pictorial) {
+                g.texts.push(Text2 { pos: [(pl.min[0] + pl.max[0]) / 2.0 + at[0], pl.min[1] - 6.0 + at[1]], height: lh, text: String::new(), angle: 0.0, anchor: Anchor::TopCenter, pick: 0 });
+            }
             g.cad_text_style_since(label_mark, CadTextStyle::ViewLabel);
             // Live's DXF: a label of several lines is one MTEXT ("DETAIL A ^JSCALE 2:1").
             if g.texts.len() > label_mark + 1 {

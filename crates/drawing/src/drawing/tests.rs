@@ -4086,6 +4086,40 @@ fn concentric_circles_share_one_centermark() {
     }
 }
 
+/// A base view and a pictorial projection keep their label in the DXF when it says nothing, an orthographic projection
+/// doesn't (live's exchange-suite drawings: Front and Isometric each one empty MTEXT in -View-Label on ANNOTATION_TEXT,
+/// attached top centre under the view; Right and Top none).
+#[test]
+fn cad_export_writes_empty_labels_of_base_and_pictorial_views() {
+    use super::cad_export::to_dxf_version;
+    use acadrust::{DxfVersion, EntityType};
+    let (doc, _) = demo();
+    let studio = studio_tab(&doc);
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, studio, ViewOrientation::Front, [100.0, 100.0]));
+    drawing.sheets[0].views.push(DrawingView { id: ViewId(2), kind: ViewKind::Projected { parent: ViewId(1), direction: Some([1.0, 0.0]) }, position: [200.0, 100.0], ..Default::default() });
+    drawing.sheets[0].views.push(DrawingView { id: ViewId(3), kind: ViewKind::Projected { parent: ViewId(1), direction: Some([1.0, 1.0]) }, position: [200.0, 200.0], ..Default::default() });
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let built = render_sheet(&drawing, 0, &sources, &cache, true).unwrap();
+    let g = export::prepare(&built.geometry, &export::ExportOptions { strokes: true, ..Default::default() });
+    let d = acadrust::DxfReader::from_reader(std::io::Cursor::new(to_dxf_version(&g, 4, DxfVersion::AC1032).unwrap())).unwrap().read().unwrap();
+    let labels: Vec<f64> = d
+        .entities()
+        .filter_map(|e| match e {
+            EntityType::MText(m) if m.style == "Onshape-Standard-View-Label" || m.style.ends_with("-View-Label") => {
+                assert!(m.value.is_empty() && m.common.layer == "ANNOTATION_TEXT" && m.attachment_point == acadrust::entities::mtext::AttachmentPoint::TopCenter, "{m:?}");
+                Some(m.insertion_point.x)
+            }
+            _ => None,
+        })
+        .collect();
+    // Under the base view (x 100 mm) and under the isometric (x 200 mm, above the Right view): one each.
+    let mut labels = labels;
+    labels.sort_by(f64::total_cmp);
+    assert!(labels.len() == 2 && (labels[1] / labels[0] - 2.0).abs() < 0.3, "{labels:?}");
+}
+
 /// Live drw2-en-ansi-a / drw2-k-dxf2018: the full text style table (36
 /// with Standard, Noto Sans in the ACAD xdata, the fixed-height styles at
 /// the text height) and one style per kind of text: title block values in
