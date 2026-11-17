@@ -1,60 +1,62 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-17 15:46 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
-docs/DECISIONS.md (read first; it wins over anything here).
+Updated 11-17 23:28 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
+NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
+/opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight
-- **11-17 P0s (afternoon):**
-  - SCISSOR-LIFT-BOM-ROWS (bool's bisect): my 41f62884a (pattern / Mirror Add joins surface copies) made asm-scissor-lift
-    fed22d's Fillet 18 / Extrude 20 fail, BOM 59 -> 57/87. The joins happen in studios 56d3a6 / b7e381 / 37a1a7 (Mirror 2:
-    PART, ADD, surface copies). REVERT queued ddfea0eb (15:14; verified on vibe6: 59/87, no errors). makeSolid=false for
-    the pattern join (std's) did NOT fix it (/root/core-scratch/sl-makesolid-wip.patch): find what live's
-    joinSurfaceBodiesWithAutoMatching does with those Mirror 2s (maybe the copies don't match edges fully) before re-landing
-    with fed22d as its test (repro: vibe6 ~/agents/bool-keep/sl, NOSHAPE_PARITY_ASSEMBLIES=NOSHAPE_PARITY_MODELS=that dir,
-    ops parity::parity_assemblies --exact; release binaries ~/tmp/core/ops-*). 5b2807501 is innocent.
-  - asm-rack-pinion (asm): my 747c2bf0d moved Sketch 4's frame 22.5 deg on the SpurGear's face after Transform 1 (a turn
-    about the face's normal). Fix queued eb3c2bd4: a move that leaves the face's plane as it was keeps the frame of the
-    face where it is; a tilt keeps the moved frame (hem-plus 6/6). ab25c5 9 -> 18/29 (asm's model vibe7 ~/agents/asm-keep/mab).
-  - Projection classification (knife Fillet 5 vs periodic faces): face_project_point's ON within the face tolerance
-    takes points 0.005 mm past a corner as on the face; WIP /root/core-scratch/proj-tight.patch (tight ON when moved by a
-    period) didn't fix knife Fillet 5's extra face; not needed now (scissor wasn't it). Parked.
-- **Impeller P0 (TICKETS IMPELLER-DELETE-FACE-2-SLOW):**
-  - Extrude impellerraum is OURS (not the Boolean): the sketch lies on the part's face; live splits the sketch's circles
-    at the face's vertices on them (IMPRINT edges) and keeps each piece's side face. Fix 00279fbca (core-oc, on main
-    744d23a0e): SketchResult.imprint_points (face edges' ends + imprinted pieces' ends), region_profile splits lines /
-    arcs there (split_at_points), Profile.split_points, extrude marks its tool's edges there kept (k::mark_kept_edges)
-    and clears them after its own operation (new k::clear_kept_marks_at: live's Boolean 1 merges Extrude 1's pieces
-    later). T1 sketch_assoc::a_ring_imprinted_by_the_faces_edge_extrudes_split_walls. Impeller 29/48 kept, Extrude
-    impellerraum 38 -> 43 faces (live 59: the rest waits on blend's Halter, a multi-day build; our sketch face differs),
-    Extrude 6's Part 2 2337.34 mm3 = live's. Move face 1 now ERRORS (was Ok-but-wrong). Suite pair running (vibe5
-    ~/tmp/core/pair-{base,new}.log, scripts /root/core-scratch/pair-run.sh); then the g++-13 kernel build, then land.
-  - Then: measure Delete face 2 on our 35-face input (blend: Halter is days away), local rebuild on live's faces
-    (prototypes vibe5 ~/agents/core-keep/localrm, src /root/core-scratch/brepq/lr*.cpp: B-spline neighbour 1.55 mm2 off).
-  - Probes vibe5 ~/tmp/core/probefan (src /root/core-scratch/brepq; static libs: g++-15 -O1 -w
-    -I/opt/occt/include/opencascade x.cpp -L/opt/occt/lib -Wl,--start-group $(ls /opt/occt/lib/libTK*.a ...) ...): cy
-    (faces per child, cylinders), onc (edges on the ring's cylinders), xa, df2/df4, lr, lr2, uc.
-- **Queue after the impeller (from the 11-17 messages, in order):**
-  1. knifehandle Move face 1/2 (lead): both ERROR in ours after 2.3 s (live OK, 16 / 14 ms): ROTATE 0.3 deg of a blade's
-     B-spline side goes through move_rigid = defeature of the whole side (0.5 / 1.1 s) + 2 Booleans, which fail. Upstream
-     Fillet 3 7 faces vs live 6 (Sweep 2 area 1.4 mm2 off). Fix = a face tweak (rotated surface, neighbours re-intersected):
-     the same kernel work as the local Delete face rebuild.
-  2. c2-parting-line-draft-parting-line Split 3 (bool2, lead): Info "does not split" (live BOTTOM / TOP 13/34/24 each);
-     our Draft 1/2 walls are B-spline approximations (Shell 1 -25 mm3) so the parting edges sit um off Extrude 2's surface;
-     fuzzy 1e-5 splits but 13/49/39 + 17/53/39. Dumps vibe5 ~/tmp/bool2/spd, doc ~/tmp/bool2/pl-save.
-  3. qa: c2-fan-blade-sweep Boolean 2 75-88 -> 647-655 ms (my exact offsets; live 364): offsets ~85 ms each (parallel),
-     brep fast path ~90 ms before declining, OCCT subtract ~340 ms.
-  4. skasm: c2-config-parts-pulleys Circular pattern 1 (FACE pattern of one tooth groove's 5 faces, 24x): "Failed to
-     create pattern" (live 12 -> 150 faces, 9130.291 mm3); trace vibe6 ~/agents/skasm/trace-c2-config-parts-pulleys.log;
-     script core-oc/.pul.sh (RUST_LOG debug shows pattern_faces' real error).
-  5. bool2: c2-loft-paths-guides Loft 3 17/37/26 vs live 15/33/23 (my c064b550a); Mirror 1 then Ok-but-wrong (13/33/25,
-     5269155 vs 6325198 mm3): check whether Mirror 1 failed before c064b550a (DECISIONS 11-17); tell bool2 when Loft 3
-     matches (it takes the fuse, case vibe5 ~/agents/bool2-keep/lp-rec/61b92e93c065aeed).
-  6. asm (P2, on its unlanded asm-partorigin): robot-relations 0c3466 Thicken 1 of live's sheet JFD's 28 faces gives 11
-     tiny parts (8.5 mm3) vs live one part 223.99 mm3: silent wrong geometry until it makes one part or errors; repro
-     vibe7 ~/agents/asm-keep/m0c with ~/agents/asm-keep/bin/ops-c05.
-  7. dx (P2): asm-isaac-ball 8f5622 GearLab Helical 1M 40T 363 vs live 283 faces: our sweep's start cap is tilted 5e-9
-     rad off the planar profile's plane, so the union's unify won't merge it; fix = a sweep's cap on a planar profile keeps
-     its plane (and its image). 8.1 s vs 1.15. Repro vibe6 ~/agents/dx-keep/gearlab (body 8f5622-0.brep).
+- **LANDED f824d120 (11-17 23:26; 3 commits; first try failed on a flaky assembly-ui GPU feel test, re-queued as is):**
+  - knifehandle Move face 1/2 (live 16 / 14 ms; ours errored after 2 s): kernel op_tweak_faces / k::tweak_faces
+    (features.cpp class FaceTweak, a BRepTools_Modification: moved surfaces; moved/staying edges = GeomAPI_IntSS branch
+    nearest the moved old edge, oriented as it, unbounded/periodic ones trimmed to the new vertices; vertices = a
+    staying edge x the moved surface, else the new curves' closest points; pcurves GeomProjLib; BRepLib::SameParameter);
+    direct.rs `tweak()` before move_rigid in ROTATE's non-planar branch (kept only when valid, one solid). Move face 1's
+    mate connector on a sweep start-cap edge: Z along the sketch line start->end (refgeom.rs sketch_line_direction), as
+    live. Now 76 / 79 ms, 13241.65 / 10679.41 mm3 (live 13241.87 / 10679.73). Left: Fillet 3's 7th face upstream;
+    Chamfer 1 after them 9285.8 vs live 10423.8 mm3 (was 15664.7, also wrong). Probe brepq/tw2.cpp (+facetweak.inc).
+    Next: TRANSLATE's rigid branch through the tweak; Delete face 2.
+  - pulleys Circular pattern 1: the face tool's cap on a rim loop bordering several faces tries each neighbour's surface,
+    both wire directions (pattern.rs faces_tool `beside`). 12/22 -> 22/22. Speed: bool's (their 23-tool cut 26 ms Mac).
+  - revert of my c064b550a (path-loft smooth-side merge): loft-paths Mirror 1 back to live's volume (Loft 3 20 faces).
+  - Dropped from it (branch core-parting-dropped): parting-line sketch-curve parting edges + exact near curve: skasm's
+    translator fix 902915361 already gives 10/17 and Split 3's halves; mine changed nothing.
+  - Told bool (a04711 theirs to instrument), dx, bool2, lead.
+- **core-oc stack, pair queued in vibex7's slot (23:20, base3 vs oc, ~/tmp/core/p2-cmp.out):** 482163a60 offset volume check
+  adaptive (30 -> 8 ms a B-spline solid; fan-blade), 074b9b7ed sweep start cap on the profile's plane (GearLab 8f5622
+  363 -> 283 faces = live; T1 features_c::a_helical_sweeps_start_cap_merges_with_the_face_it_starts_on). g++-13 OK.
+- **Impeller Extrude impellerraum split walls: DROPPED.** Live (behaviours.md, live/core/q-imprint-walls/README.md): the
+  face's edges split the sketch's regions but Extrude never keeps walls split where they cross a curve = main.
+  00279fbca (branch core-imprint-dropped) was wrong. impellerraum's missing faces (38 vs 59) come from its input (our 35
+  faces vs live 39 after Halter, blend's build).
+- **Shipped in v0.4.57:** scissor-lift revert + rack-pinion frame fix (on main since 7a174ae2). Re-land the pattern
+  surface join later with fed22d as its test (/root/core-scratch/sl-makesolid-wip.patch).
+- **(4) local Delete face rebuild** once Delete face 2 sees live's faces (blend's Halter build feeds it); src
+  /root/core-scratch/brepq/lr*.cpp (B-spline neighbour 1.55 mm2 off). Projection WIP parked:
+  /root/core-scratch/proj-tight.patch.
+- **Queue after those:**
+  1. qa: c2-fan-blade-sweep Boolean 2 (~1.2 s loaded vs live 364; 75-88 ms before my exact offsets, which fixed the
+     volume): offsets 2 x ~176 ms in parallel (edges 73, volume check 62 -> ~17 with adaptive GProp: core-oc 482163a60), noshape Boolean decline ~300 ms + OCCT ~1.3 s on the exact offset faces (bool's). B-spline
+     approximation of the offsets: slower, dropped.
+  2. pulleys Circular pattern 1 speed (273 ms unloaded vs live 23): bool took the Boolean (arc across a seam).
+  3. c2-loft-paths-guides: my c064b550a (path loft merges smooth sides: Loft 3 20 -> 17 faces, live 15) made Mirror 1's
+     fuse silently wrong (5269155 vs live 6325198 mm3; before it volume/area = live, 37 vs 27 faces). REVERTED in core-tw
+     (a01ada59c, with the stack). Loft 3's 5 extra faces (live has 4 tiny ~6.7 mm2 faces) want a merge that keeps the
+     mirror's fuse right; tell bool2 (their fuse case is moot after the revert).
+  4. dx (11-17 21:15, live's 18:0x retake): c2-config-parts-nuts Sweep 1 "non-manifold body" (23:00: bool's 43335ce3 on
+     main; my turn patch re-applied in core-rp, on/off run on vibex8 ~/tmp/core/nuts-{on,off}.log; the case below: the
+     crest strip one face over ~7 turns of the bore cylinder).
+  4b. asm a04711 Extrude 4 "non-manifold" (asm's c22): our op_boolean's OCCT path cuts Part 3 to 422.23 mm3 (13 faces,
+     non-manifold) where plain BRepAlgoAPI_Cut on the recorded case gives live's 213.964: sent to bool 22:40 (case
+     vibex8 ~/tmp/core/a04rec/ad565563c0275193, probe ~/tmp/core/probefan/cutp, src brepq/cutp.cpp).
+  5. asm (P2, on its unlanded asm-partorigin): robot-relations 0c3466 Thicken 1 of live's sheet JFD's 28 faces gives 11
+     tiny parts (8.5 mm3) vs live one part 223.99 mm3 (silent wrong geometry until one part or an error); repro vibex7
+     ~/agents/asm-keep/m0c with ~/agents/asm-keep/bin/ops-c05.
+  6. dx (P2): GearLab 8f5622 faces fixed in core-oc (074b9b7ed); its speed 12.9 s vs live 1.15 s is next after it.
+  7. asm (low): asm-pattern-std 36b90f Extrude 12 (feature 41; ADD, both directions UP_TO_SURFACE to RCBW, draft 3 deg;
+     twin Extrude 11 matches): AR-S1/S2-108.2 17/43/28 vs live 14/36/24, volume/area = live (3 faces split where live's
+     caps merge; not the Boolean per bool). Repro vibex8 ~/agents/asm-keep/mps/run.sh <bin tag> (mps/36b90f).
+  8. asm (low): asm-robotic-arm 21ab69 Extrude 2 523/1504/992 vs live 540/1574/1032; repro vibex7 ~/agents/asm-keep/mra/run.sh.
 - **core-pipe2 (core-trace; HELD by lead until Split 1's Surface 1 = live 9608 mm2):** 3e106dca0 N-profile guided loft
   without conditions, 829ac26ef intersection n1 x n2, f6aa8f16f parity pairs by type, bd2a1af82 sheet halves,
   a1142dcfb Move boundary on free-form sheets (extend_face_sides) + Keep front by a sheet piece's area (T1s).
@@ -75,7 +77,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - mutualtrim Sweep 1 (skasm 11-17, back to core): Sketch 2 = live (Bezier P0 (-53.717,-28.813) -> P3 (-27.212,55.050)
   sketch mm = live JHR; Plane 1 on JHE). Our Surface 2's rails 36.508 mm vs live 94.15: the profile moves (22.13,
   28.81) not (26.50, 83.86): the path cut at world z = 0, y -31.59 (where it crosses Surface 1). trimEnds is Thin-only
-  in std and in ours, so not that. Repro vibe6 ~/tmp/skasm/save/q.noshape (query_entities edges).
+  in std and in ours, so not that. Repro vibex6 ~/tmp/skasm/save/q.noshape (query_entities edges).
 - Curve point plane sketches (live 05:01, behaviours.md "core (05:01)…", live/core/q-curvepoint/frames.json): the plane
   = ours; a sketch on it measures from the WORLD ORIGIN projected onto it (pipe (-39.2748,0,25.7771), x (0,1,0);
   mutualtrim (0,-21.5364,-44.4163), x (1,0,0)); pipe ellipse centre (-46.0366,0,15.4747), major 5.0451 along Y,
@@ -90,8 +92,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   not Coons; centre (1.6244, 68.5723, 20.9206). A fresh skew-quad G0 fill (Precise) = BILINEAR 1x1 patch of its 4
   corners, 10293.9930 mm2, centre (50,50,7.5). Next after the impeller.
 - fan-blade Boolean 2: 56/139/84 with core-next (live 56/143/88): +2 edges +2 vertices per hole need live's x_t
-  (now at /root/parity/models/c2-fan-blade-sweep/live-base.x_t, 11-17). Probe vibe5 ~/tmp/core/probefan (src /root/core-scratch/brepq).
-- Worktrees: core-trace (core-pipe2; probe /root/core-scratch/probe-wip.patch), core-oc (00279fbca impeller split walls, on main), core-rv (scissor revert), core-rp (rack-pinion), core-bis: docs
+  (now at /root/parity/models/c2-fan-blade-sweep/live-base.x_t, 11-17). Probe vibe5 (down 11-17) ~/tmp/core/probefan (src /root/core-scratch/brepq).
+- Worktrees: core-trace (core-pipe2; probe /root/core-scratch/probe-wip.patch), core-oc (00279fbca impeller), core-rv (7a174ae2), core-rp (pulleys traces), core-tw (tweak + parting draft), core-bis: docs
   lands + Mac timing (.mac.sh, .macdoc = qa's impeller copy).
 - rocker-enclosure-sm Extrude 2 (next): Sketch 4's four Use circles (PROJECTED, live's external edges at x 45-60 mm,
   not on our part) come out as two: Extrude 2 names one region twice and cuts 2 holes of 4. Sketch translation:
@@ -101,7 +103,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   the corner (2/6/5 vs ours 2/7/6). Kernel projection precision at a tangent end; parked.
 - c2-surf-workshop-cpcurves Main pipe (thin sweep, 7/24): (1) Sketch 4's circle kept 18.8 mm off the path (translator
   take-back: in skasm's handoff). (2) Mine: live merges the faces swept along the path's three collinear lines into
-  one per wall (6 faces; ours 10: a face per path edge). **Committed b173dc5bb (core-oc, NOT in the vibe7 pair):
+  one per wall (6 faces; ours 10: a face per path edge). **Committed b173dc5bb (core-oc, NOT in the vibex7 pair):
   join_collinear_lines joins a sweep path's lines along one line into one edge (first piece's source)**: Main pipe's
   faces = live (only its box differs, the take-back). T1 features_a::a_sweep_along_collinear_lines_has_one_side_face.
 - c2-surf-intro-examples Fill 1 (5/13, parked): 4 G0 boundary edges (2 fit splines, 2 sketch splines; they match
@@ -133,7 +135,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   /root/core-scratch/loft-closed-path-wip.patch closes it round the path but comes out −11279 mm³: two profiles sit
   83 mm off the 26 mm ring, so MakePipeShell's carried sections twist. c2-surf-workshop-pipe: guided loft of more than
   two profiles unsupported (a Gordon surface over n profiles: big kernel item).
-- Extrude 33 (asm-pattern-std 36b90f) P0: 150 ms on main (debug, loaded vibe5); re-time once asm's Boolean feature
+- Extrude 33 (asm-pattern-std 36b90f) P0: 150 ms on main (debug, loaded vibe5 (down 11-17)); re-time once asm's Boolean feature
   pattern fix lands (Linear pattern 1 still errors upstream).
 - **Handed off 11-16:** c2-config-parts-screws memory (14.8 GB): Revolve 9's unify (usd_kept_volume -> OCCT UnifyFaces)
   on the invalid body Sweep 1's OCCT fallback left: bool takes Sweep 1's cut, bool2 the unify bound.
@@ -154,7 +156,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   a B-spline (1 x 11) exactly on the bore's cylinder (r 1.621113885844308 mm); OCCT intersects instead of seeing one
   surface, and its Cut removes more than the tool. Rust Boolean declines. Live 135.268 mm3 (29/59/32), target
   143.883, tool 11.888. WIP /root/core-scratch/sweep-cylinders-wip*.patch (op_pipe_shell faces_on_cylinders: strips
-  made exact cylinders, unwrapped pcurves; ShapeFix_Shape makes it valid). Probe (vibe5 ~/tmp/core/probefan/nuts,
+  made exact cylinders, unwrapped pcurves; ShapeFix_Shape makes it valid). Probe (vibe5 (down 11-17) ~/tmp/core/probefan/nuts,
   src /root/core-scratch/brepq/nuts.cpp, dumps ~/agents/core-keep/nm-nuts-cyl): with exact cylinders the cut is
   still wrong (144.384 mm3, 18 non-manifold edges): each strip is ONE face spanning ~7 turns (u -21.3..23.6), which
   OCCT's Booleans can't place points on (they project into one period). ShapeUpgrade can't split it
@@ -175,7 +177,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - **GearLab 90f78b:** with ae8b7f751 plus asm's unlanded 93346d03d (custom features with a `def` map; std 1777/1793)
   the loft builds; Gear Lab 1 then fails at an opFillet on the 157-face toothed solid ("Failed to fillet
   selections."): blend's. 4.3 s vs live 2.4 s, mostly 2 Booleans (1.7 s, bool's) and 1.2 M edge_point_at calls
-  (0.53 s; not looked at). Repro vibe7: `NOSHAPE_FS_TRACE=1 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/m90
+  (0.53 s; not looked at). Repro vibex7: `NOSHAPE_FS_TRACE=1 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/m90
   <ops test binary> parity::parity_models --ignored --nocapture`.
 - **1dc32b (asm-infento-subs):** Draft 1 = live on dx's corrected input (-1306.543 vs -1306.54 mm³; OCCT 0030 +
   draft work bound landed af81dda05). Left: Fillet 2 / 3 / 12, Chamfer 3 (blend's); Extrude 42 17.6 s (bool's
@@ -184,7 +186,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (3 plain Ø2.2 holes, 3704.237 -> 3745.156 mm³, offset faces 454.835 -> 454.462 mm²); at false live leaves the part
   unchanged; ours offsets at false (dx's translation). Check our offset against the true numbers once dx has that input.
   Shell 1 is dx's. Extrude 55 (3.8 s vs 333 ms) is bool's fuse / unify.
-- **e53bba:** bool's slit re-cut; then re-test the band-end patch vibe5 ~/agents/core-keep/e53bba-band-end.patch.
+- **e53bba:** bool's slit re-cut; then re-test the band-end patch vibe5 (down 11-17) ~/agents/core-keep/e53bba-band-end.patch.
 - **c2-hunting-knife feature 24:** live's own lines disagree (16-23 LINE, 24 OTHER, no geometry change); live asked
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
@@ -241,7 +243,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   steps), NOSHAPE_SHELL_DEBUG=1 (shell path chosen), NOSHAPE_DEFEATURE_DEBUG=1, NOSHAPE_GUARD_TRACE=1.
 - Private user documents (hats, dock, qa's tickets): only mode-700 copies in ~/tmp/core, deleted after;
   /root/qa-scratch/bin/userdocs.py compares two CLIs on them.
-- C++: g++-13 build of noshape-kernel on vibe5 before landing (`CC='ccache gcc-13' CXX='ccache g++-13' cargo build
+- C++: g++-13 build of noshape-kernel on vibe5 (down 11-17) before landing (`CC='ccache gcc-13' CXX='ccache g++-13' cargo build
   -p noshape-kernel`); direct-initialise OCCT handles; never name a variable `near` / `far` (empty macros on some
   platforms); never build a gp_Dir from a vector that can be zero (OCCT 8: std::terminate); signal-handler state needs
   `std::atomic_signal_fence` after it is set.
