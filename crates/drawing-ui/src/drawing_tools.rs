@@ -159,6 +159,14 @@ impl DrawingEditor {
             self.redraw(cx);
             return;
         }
+        // Hatch region with a profile tool on (Corner rectangle …): the first Esc ends the tool, the next closes the
+        // panel (live2 drw-hatch-panel-tips s14, behaviours "studios (11-17, low)").
+        if self.hatch_dlg.is_some() && matches!(self.tool, Tool::Sketch { .. }) {
+            self.tool = Tool::Select;
+            self.status = None;
+            self.redraw(cx);
+            return;
+        }
         if self.zoom_window.take().is_some() || self.rotate_to_edge.take().is_some() || self.align_views.take().is_some() || self.sheet_props.take().is_some() || self.shortcut_toolbar.take().is_some() || self.measure.take().is_some() || self.painter.take().is_some() || self.cancel_inspection(cx) || self.cancel_hatch(cx) {
             self.status = None;
             cx.notify();

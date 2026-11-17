@@ -3,7 +3,7 @@
 
 use super::*;
 use gpui_kit::{Focusable as _, MouseButton, VisualTestContext};
-use noshape_scene::drawing_tools::Sel;
+use noshape_scene::drawing_tools::{Sel, Tool};
 
 /// The window point of sheet point `s` (mm).
 fn at_window(cx: &mut TestAppContext, editor: &Entity<DrawingEditor>, s: [f64; 2]) -> Point<gpui_kit::Pixels> {
@@ -339,7 +339,7 @@ fn a_dragged_view_lands_where_released_with_no_alignment_snap(cx: &mut TestAppCo
 /// Select puts no snap marker on it.
 #[gpui::test]
 fn the_dimension_tool_snaps_to_a_vertex_within_its_reach_and_select_marks_none(cx: &mut TestAppContext) {
-    use noshape_scene::drawing_tools::{DimTool, Tool};
+    use noshape_scene::drawing_tools::DimTool;
     SUGGESTED.set(true);
     let (window, editor) = drawing(cx, "feel-snap-mark");
     real_sheet(cx, window, &editor);
@@ -575,6 +575,27 @@ fn a_styles_text_gap_is_set_on_enter_and_esc_after_it_keeps_the_dimension_select
     cx.update(|cx| editor.update(cx, |e, cx| e.doc.update(cx, |d, cx| d.undo(cx))));
     draw(cx, window);
     assert_eq!(gap(cx), None, "one undo takes the gap back: leaving the field added no step");
+}
+
+/// Live2 drw-hatch-panel-tips s14 (behaviours "studios (11-17, low)"): in Hatch region with Corner rectangle on, the
+/// first Esc ends the profile tool and the panel stays; the second closes it.
+#[gpui::test]
+fn esc_in_hatch_region_ends_its_profile_tool_first_then_closes_the_panel(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "feel-hatch-esc");
+    cx.update_window(window, |_, w, cx| {
+        editor.update(cx, |e, cx| {
+            e.open_hatch_dialog(None, w, cx);
+            e.set_tool(Tool::Sketch { tool: crate::drawing_sketch::SkTool::CornerRect, pts: vec![], from: None }, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let state = |cx: &mut TestAppContext| cx.update(|cx| (editor.read(cx).hatch_dlg.is_some(), matches!(editor.read(cx).tool, Tool::Sketch { .. })));
+    assert_eq!(state(cx), (true, true), "Hatch region open, Corner rectangle on");
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    assert_eq!(state(cx), (true, false), "the first Esc ends the tool, the panel stays");
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    assert_eq!(state(cx), (false, false), "the second closes the panel");
 }
 
 /// Live2 drw-centermark (behaviours "studios (11-17, P0 drawing feel)"): a hole's centre mark lights from its circle, its
