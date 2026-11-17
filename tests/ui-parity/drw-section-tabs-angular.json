@@ -1,0 +1,19 @@
+{
+ "name": "drw-section-tabs-angular",
+ "about": "Section view tool: the Vertical, Horizontal and Angular tabs hovered (tooltips Vertical / Horizontal / Angular cut line), then Angular clicked (the panel adds Cut angle under Show cut geometry only) and Cut angle ticked; Escape",
+ "area": "drawing",
+ "source": "studios 11-16 matrix (Section view: Vertical / Horizontal / Angular cut line, Cut angle unseen); live2 11-17 exploration",
+ "start": "block-drawing",
+ "steps": [
+  {"do": "click", "on": {"tool": "Section view"}},
+  {"do": "wait", "until": "ms", "ms": 1000},
+  {"do": "hover", "on": {"tab": "Vertical"}},
+  {"do": "hover", "on": {"tab": "Horizontal"}},
+  {"do": "hover", "on": {"tab": "Angular"}},
+  {"do": "click", "on": {"tab": "Angular"}},
+  {"do": "wait", "until": "ms", "ms": 1000},
+  {"do": "click", "on": {"checkbox": "Cut angle"}},
+  {"do": "wait", "until": "ms", "ms": 1000},
+  {"do": "key", "key": "Escape"}
+ ]
+}

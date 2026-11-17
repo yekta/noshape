@@ -1,0 +1,25 @@
+{
+ "name": "drw-section-edit-depth-direction",
+ "about": "A section view's menu › Edit section...: the panel's Edit cutting line and Opposite direction buttons hovered (tooltips), Opposite direction clicked, Section depth ticked (Up to entity and the Depth of section cut field appear; the field hovered: Up to geometry), then Escape",
+ "area": "drawing",
+ "source": "studios 11-16 matrix (Section view: Edit cutting line, Opposite direction, Up to geometry unseen); live2 11-17 exploration; unlabelled icon buttons by pixel (drawing panel at the left, screen = iframe DOM + 40)",
+ "start": "block-drawing",
+ "steps": [
+  {"do": "click", "on": {"tool": "Section view"}},
+  {"do": "click", "on": {"tab": "Horizontal"}},
+  {"do": "click", "on": {"view_edge": {"view": "Top", "at": [0, 15, 10]}}},
+  {"do": "click", "on": {"sheet_point": [81, 125]}},
+  {"do": "key", "key": "Escape"},
+  {"do": "rclick", "on": {"view": "Section"}},
+  {"do": "click", "on": {"menu": "Edit section..."}},
+  {"do": "wait", "until": "ms", "ms": 1500},
+  {"do": "hover", "on": {"px": [58, 153]}},
+  {"do": "hover", "on": {"px": [223, 153]}},
+  {"do": "click", "on": {"px": [223, 153]}},
+  {"do": "wait", "until": "ms", "ms": 1500},
+  {"do": "click", "on": {"checkbox": "Section depth"}},
+  {"do": "wait", "until": "ms", "ms": 1000},
+  {"do": "hover", "on": {"px": [140, 238]}},
+  {"do": "key", "key": "Escape"}
+ ]
+}
