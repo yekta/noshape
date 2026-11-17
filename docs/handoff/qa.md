@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, rewritten 2026-11-17 09:35 for the move to the Ubeyd account at ~10:02)
+# QA handoff (agent qa; current state only, updated 2026-11-17 10:10 on the Ubeyd account)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -34,12 +34,15 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   Fixed 11-17 04:25: cut-check waits for the loop's run under vibe5.lock (two runs at once gave "Text file busy" and a void GO);
   cut-verdict says NO VERDICT unless the green's compat file has COMPAT-DONE, 4 USERDOCS lines and no Traceback. Ticket documents
   are listed, not blocking, in the script, but read them: a ticket doc's wrong geometry is a HOLD (11-17 f197).
-- **qa-tabab-verify**: lat/hat/tabab-verify.sh 9beedeac (psui's hover card): on the first green with it, dock tab-B A/B vs 0.4.53 on vibe6.
+- **qa-tabab-verify2**: lat/hat/tabab-verify.sh 2219c4373 (psui's hover card; the old unit waited on 9beedeac, a handoff
+  commit never on main, since 11-15): dock tab-B A/B green f7c318a5 vs 0.4.53 on vibe6 (loaded: a hint) -> lat/hat/tabab-verify.out (TABAB-DONE).
 - **qa-land-footer**: bin/land-footer.sh (land-queue footer checks).
 - vibe7 user units **qa-fzloop** + **qa-fz-xvfb** (`systemctl --user` there): the GUI fuzz, ~/qa/bin/fzloop.sh :61 on
   ~/qa/rel/noshape-green (green 35baa32f since 11-17 03:34; refresh by copying a newer app to that path), seeds from ~/qa/fzseed.next,
   results ~/qa/fz*-result.txt. fzrun.sh kills the app's own `--reopen` restarts after each run. Pause: touch
-  ~/tmp/qa-fz-pause-61; it also idles 01:50-04:05 every night (the window runs alone).
+  ~/tmp/qa-fz-pause-61; it also idles 01:50-04:05 every night (the window runs alone). App refreshed to green f7c318a5 11-17 10:08.
+  w7-quiet.sh end (local bin/ copy, scp'd each night) now recreates the transient unit with systemd-run when `start` fails:
+  the stopped unit was gone, so the fuzz was down 11-17 02:01-10:08.
 
 ## Release checks (per release; lead cuts 05:00 / 17:00)
 1. Candidate: bin/rel-cand.sh <prev> <tag> (checks out nothing: check out the candidate in worktree qa-bisect first; builds
