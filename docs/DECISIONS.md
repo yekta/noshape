@@ -98,3 +98,7 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-17 Never wait for an idle host: an A/B on a busy host alternates A and B in one run (ABAB…, ≥5 rounds, medians).
   Absolute speed comes from the Mac or vibe7's 02:00–04:00 window. A run fifth in one host's slot queue moves to the
   least-loaded host.
+- 11-17 (user) Interaction feel is P0: hover, select, pick priority and sketch interactions (constraints, inference,
+  drag, dimensions) as live, within a frame, ahead of geometry tails. In sketch mode the active sketch's entities win the
+  hover over planes and faces. Every fix comes with an interaction-feel scenario; a suite that passes while the user hits
+  a broken hover is missing coverage, which is part of the bug. live2's lanes serve these captures first.
