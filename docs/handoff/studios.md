@@ -9,43 +9,31 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 18:47 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45 and ~18:15.
+Updated 2026-11-17 20:19 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45 and ~18:15.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
-- Landed 11-17: 7abd9bdf (doc-open timing), b5d11ad7 (box select), 01fb280e (panel text form, versions flows,
-  manual-4), 1db5e57e's fix forward (coverage.rs scans files only).
-- Queued on vibex7 18:14 as 09af37a6 (#1; carries 358ab7a3 / 66eee5f9 / a457a82b):
-  - mate glyphs per type at live's size (`MateGlyphs`, 18 px unit, pick disc), no triads at rest; hovered: a
-    translucent white square, the face outlined; a hovered face shows its part's silhouette #FFC20E
-    (`Scene::hover_outline_rgb`); a part picked inside a sub leaves the sub's row related (`picked_inside`);
-    every instance row tooltips its name (GPUI patch: warm switching for delays up to the default);
-  - drawing look as live (D1, 2068): a hovered view framed tan ~8 px out, edges as they are; a selected one
-    orange edges + an orange frame once the pointer leaves (`view_frames`); a note's leader lights the note from
-    10 px; the unticked Angular section takes 3 clicks; Section / Detail label inputs read with placeholders (.7);
-  - feel tests: assembly_feel_tests.rs (glyph reach + click, box rule, sub part), drawing feel.rs (F4, D3 marker,
-    leader, view colours, dimension 5 px drag).
-- Not queued yet: b91a61a5 (run.py skips a step whose live page crashed; asm + section 224/224), a handoff, and in
-  the worktree (drawing-ui 57 + 1 ignored, drawing 242, scene 158, ops e2e 224, clippy clean; side by side with live2:
-  /root/studios-scratch/centermark-live-vs-ours.png):
-  - every highlighted drawing line 3 px (`LIT_LINE_PX`, new `Style::lit_line_px` in render, 0 = the 3D band): live
-    2 px solid + rim (dh0, dsel3, d-sel-view); a tool's hovered edge orange (`tool_picks_edges`, live dact-aa-d3);
-  - the old 1 mm orange frame of a selected view gone (`push_aux_states`; push_view_frames draws live's);
-  - centre marks (live2 drw-centermark, behaviours "studios (11-17, P0 drawing feel)"): automatic marks get grips;
-    `centermark_looks` / `push_centermark_looks` (10 px orange grips, 11 px blue dot, circle blue 3 px; with the
-    view selected grips only); the hole circle lights / takes its mark (`SheetPick::centermark_of_edge`), a press on
-    it drags the view (`hole_press_view`); feel test `a_holes_centre_mark_lights_from_its_circle_and_a_press_there_drags_the_view`;
-  - the matrix drops the hole callout palette's hidden dimension controls and «Varies» (live2 11-17).
-- Sheet fit checked 11-17 19:05: on open = Zoom to fit = live (feel `a_drawing_opens_fitted_and_zoom_to_fit_puts_it_back`,
-  queued ccab6c95).
-- Centre mark grip drags and window resize done per live2's answers (queued 19:4x; drawing-ui 60, ops e2e 225, coverage, drawing, scene, model-data, clippy green): automatic
-  marks drag from hover (`DrawingView::centermark_extensions`, never below the default, ⊘), Single marks from hover
-  (no snap to their own hole), op `drawing_centermark_resize`, drawing_get views list `centermarks`; `resize_canvas`
-  refits a fitted sheet, else scales the zoom with the canvas width. Versions panel feel scenarios committed (91025dd1);
-  next there: the release Add Items tree (rel-flow-two-parts: opens expanded, a row click selects).
-- Side-by-side crops for the lead: /root/studios-scratch/mate-glyphs-live-vs-ours.png, dimhover-sbs.png,
-  view-sbs.png, sel-sbs.png.
+- Landed 11-17: 7abd9bdf, b5d11ad7, 01fb280e, 1db5e57e's fix; 19:31 as 539aeb9b: 09af37a6 (+358ab7a3, 66eee5f9,
+  a457a82b): mate glyphs per type, part silhouette, instance row tooltips, drawing view frames, leader reach.
+- Queued on vibex7 (`NOSHAPE_LAND_QUEUE_HOST=vibex7 tools/tiers/land.sh --no-precheck`, clippy run on vibex6 first):
+  - ccab6c95 (+c8d30fce): run.py skips a live step whose page crashed (asm + section 224/224); drawing highlights
+    3 px (`Style::lit_line_px`, `LIT_LINE_PX`), a tool's hovered edge orange, centre mark looks (grips, blue dot and
+    circle; the hole circle lights / takes its mark, a press drags the view), no second frame on a selected view;
+    the sheet fit scenario.
+  - b6c54cdd (+bc2eda52 / fdfd19ae, 0bf67e29, 91025dd1): centre mark grip drags from hover (automatic marks never below
+    their default, `DrawingView::centermark_extensions`, op `drawing_centermark_resize`, drawing_get `centermarks`),
+    `resize_canvas` (refit at fit, else zoom with the canvas width); Versions panel / Compare / Add to Release feel
+    scenarios; the Styles panel's full reading (drw-styles-dimension 29/31); the inspection table's 8 columns.
+- Full drawing run on vibex8, outside its slot (lead 20:18; 2 apps, 334 takes, binary 20:08 relayed from vibex6):
+  ~/agents/studios-keep/drw1117c (log drw1117c.log); memguard.sh pauses its process group under 6 GB available
+  (drw1117c-mem.log). Then the matrix refresh (`drawing_matrix.py --run`) and the differences.
+- Asked live2 (20:0x): drw-styles-dimension s29 (does Escape after Enter in Text gap deselect? ours does, the take's
+  panel keeps the fields); whether "Synchronize breaks from parent" shows without a parent break (ours: always).
+- live2's 868bbb6c (simplification Absolute, synchronize breaks, inspection ISO scrolled) and the 8 drw-revision-*
+  retakes: run when they land.
+- Side-by-side crops for the lead: /root/studios-scratch/mate-glyphs-live-vs-ours.png, centermark-live-vs-ours.png,
+  dimhover-sbs.png, view-sbs.png.
 
 ## Lead's queue (11-17, restated after compaction)
 1. Land what is green. 2. User P0: hover / select parity in Assemblies (instances, mate connectors, mates list <->
