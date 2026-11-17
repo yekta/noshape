@@ -59,7 +59,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 
 ## Next (in this order)
 1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (11:25: GO on c101c3c0, which has core's
-   four Split / Use / Rib lands; suites 827a23a6 clean apart from fan-blade-sweep Boolean 2, sent to bool). Still to come:
+   four Split / Use / Rib lands; suites 827a23a6 clean; fan-blade-sweep Boolean 2 is now live's volume, 8x slower: core's Offset, sent to core). Still to come:
    blend's impeller Fillet 3 (when it lands: compat on its green + the impeller re-time below).
    The qa-cut-1615 timer runs cut-verdict.sh at 16:15 -> one line in /tmp/lead/qa-alerts + compat/cut-1117-1615.txt. Read
    the ticket section of that compat file too (a ticket doc's wrong geometry is a HOLD), then update the entry with the
@@ -105,6 +105,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   split.py <name> [tabs] (one round per file: the runner's 180 s cap); lat-priv.sh <doc name> <scenario prefix> <open rounds>
   (APP, XD, DOC env; NOSHAPE_FRAME_LOG + NOSHAPE_PERF=1); lat-open.py <dir>; ../lat-steps.py <scenario> <frames log>.
   quitv.sh <runs> <scenario> <app>... (XD, SD env) for crash loops; quit scenarios qa-asm-a / qa-tabs / qa-edit.
+- One feature's own result: bin/feat-at.sh <doc> <feature> <cli>... (on a vibe host: later features suppressed on a copy, status, ms, parts).
 - A/B: bin/ab-feat.py (2 CLIs), bin/abn-feat.py <runs> <cli,cli,..> (n CLIs; full paths, no ~), bin/ab-sum.py <jsonl> [live-regen.json].
   Since 11-17 10:50 both write "parts_same" (each CLI's final parts on a fresh copy, outside the timed runs; scp sig.py + nscli.py
   beside them, else None). parts_same False = the builds model different geometry: no regression claim from such an A/B.
