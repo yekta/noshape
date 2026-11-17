@@ -1097,14 +1097,28 @@ struct Open
   TopoDS_Wire                            wire;
   double                                 t0 = 0, t1 = 0, len = 0;
 
+  // A point profile (a loft to a vertex): no curve, every abscissa the point.
+  bool   point = false;
+  gp_Pnt apex;
+
   explicit Open(const TopoDS_Wire& w) : c(new BRepAdaptor_CompCurve(w)), wire(w)
   {
     t0  = c->FirstParameter();
     t1  = c->LastParameter();
     len = GCPnts_AbscissaPoint::Length(*c, t0, t1);
   }
+  explicit Open(const gp_Pnt& p) : point(true), apex(p) {}
+  // `s` as a profile: a vertex is a point profile.
+  static Open of(const TopoDS_Shape& s)
+  {
+    if (s.ShapeType() == TopAbs_VERTEX)
+      return Open(BRep_Tool::Pnt(TopoDS::Vertex(s)));
+    return Open(outer_wire(s));
+  }
   gp_Pnt at(double s) const
   {
+    if (point)
+      return apex;
     s = std::clamp(s, 0.0, len);
     if (s < 1e-15)
       return c->Value(t0);
@@ -1116,6 +1130,8 @@ struct Open
   double abscissa_of(double t) const { return GCPnts_AbscissaPoint::Length(*c, t0, std::clamp(t, t0, t1)); }
   double abscissa(const gp_Pnt& p) const
   {
+    if (point)
+      return 0;
     Extrema_ExtPC ext(p, *c);
     double        best = 1e300, t = t0;
     if (ext.IsDone())
@@ -1136,6 +1152,8 @@ struct Open
   // Arc lengths of the interior corners (tangent breaks between edges).
   std::vector<double> corners() const
   {
+    if (point)
+      return {};
     std::vector<double>      out;
     std::vector<TopoDS_Edge> edges;
     for (BRepTools_WireExplorer x(wire); x.More(); x.Next())
@@ -1503,7 +1521,11 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
 {
   require_non_null(profile_a.shape, "first profile");
   require_non_null(profile_b.shape, "second profile");
-  Open         A(outer_wire(profile_a.shape)), B(outer_wire(profile_b.shape));
+  // (A point profile last: the loft runs from the curve to it.)
+  const bool   a_point = profile_a.shape.ShapeType() == TopAbs_VERTEX;
+  Open         A = Open::of(a_point ? profile_b.shape : profile_a.shape), B = Open::of(a_point ? profile_a.shape : profile_b.shape);
+  if (A.point)
+    fail_op("Select at least two profiles, a closed guide curve or a closed path.");
   const double size = std::max(A.len, B.len);
   const double tol  = 1e-7 * (1 + size);
   // B runs the way A does (its ends nearest A's).
@@ -1571,7 +1593,23 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
     g.shape = gx;
     g.tabulate();
     gp_Pnt pa, pb;
-    if (meet(*g.c, *A.c, A.wire, tol, g.ta, pa) > tol || meet(*g.c, *B.c, B.wire, tol, g.tb, pb) > tol || std::abs(g.ta - g.tb) < 1e-12)
+    // (To a point profile: where the guide passes through it.)
+    auto meet_b = [&]() {
+      if (!B.point)
+        return meet(*g.c, *B.c, B.wire, tol, g.tb, pb);
+      double best = 1e300;
+      for (const double e : {g.c->FirstParameter(), g.c->LastParameter()})
+        if (g.c->Value(e).Distance(B.apex) < best)
+          best = g.c->Value(e).Distance(B.apex), g.tb = e;
+      Extrema_ExtPC ext(B.apex, *g.c);
+      if (ext.IsDone())
+        for (int i = 1; i <= ext.NbExt(); ++i)
+          if (std::sqrt(ext.SquareDistance(i)) < best)
+            best = std::sqrt(ext.SquareDistance(i)), g.tb = ext.Point(i).Parameter();
+      pb = B.apex;
+      return best;
+    };
+    if (meet(*g.c, *A.c, A.wire, tol, g.ta, pa) > tol || meet_b() > tol || std::abs(g.ta - g.tb) < 1e-12)
       fail_op("All guides should intersect each profile boundary.");
     const double lo = g.c->FirstParameter(), hi = g.c->LastParameter();
     g.len    = GCPnts_AbscissaPoint::Length(*g.c, std::min(g.ta, g.tb), std::max(g.ta, g.tb));
@@ -1668,7 +1706,7 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
     };
     // One patch between two guides along its sides (c2-hunting-knife's Loft 3, closing a hole): bounded by the
     // profiles' and guides' own edges, as Parasolid's face (it shares them with the faces around the hole).
-    if (sa.size() == 2 && cols.front() >= 0 && cols.back() >= 0 && vlo == 0 && vhi == 1 && !trim_profiles)
+    if (sa.size() == 2 && cols.front() >= 0 && cols.back() >= 0 && vlo == 0 && vhi == 1 && !trim_profiles && !B.point)
     {
       const TopoDS_Face exact = face_on_edges({A.wire, gs[cols.back()].shape, B.wire, gs[cols.front()].shape}, tol);
       if (!exact.IsNull())

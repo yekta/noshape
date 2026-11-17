@@ -1120,7 +1120,9 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         guide_conditions(ev, &shapes)?;
         // Surface lofts of open profiles (live "psb (10-26 c)"): Trim guides
         // and Trim profiles.
-        let open = !solid && shapes.iter().all(|s| s.shape_type() != ShapeType::Face && s.is_closed().is_ok_and(|c| !c));
+        // (A point profile with an open one: the surface runs to the point, c2-surf-workshop-singularities' Problem loft.)
+        let point = |s: &Shape| s.shape_type() == ShapeType::Vertex;
+        let open = !solid && shapes.iter().any(|s| !point(s)) && shapes.iter().all(|s| point(s) || (s.shape_type() != ShapeType::Face && s.is_closed().is_ok_and(|c| !c)));
         let shape = if open {
             let [a, b] = shapes.as_slice() else { return err("Loft guides with more than two profiles are not supported yet") };
             k::loft_guided_open(a, b, &guides, ev.bool("trimGuidesByProfiles"), ev.bool("trimProfiles")).map_err(guided_error)?

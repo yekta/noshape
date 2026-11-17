@@ -135,6 +135,26 @@ fn a_loft_along_guides_of_several_curves_runs_through_them() {
     assert!(faces[0].is_valid());
 }
 
+/// A surface loft from an open profile to a point between two guides (c2-surf-workshop-singularities' Problem loft):
+/// one face pinched at the point, bounded by the profile and the guides (live 1/3/3). Thickened where its normal has
+/// no one direction at the point (here a cone over a bent profile), it fails as Parasolid's does, where OCCT's offset
+/// crashed.
+#[test]
+fn a_surface_loft_to_a_point_between_guides_pinches_there() {
+    let v = |x: f64, y: f64, z: f64| DVec3::new(x, y, z);
+    let (a0, a1, apex) = (v(-10., 0., 0.), v(10., 0., 0.), v(0., 20., 0.));
+    let profile = make_bspline(&[a0, v(0., 0., 8.), a1], None, &[0.0, 1.0], &[3, 3], 2, false).unwrap();
+    let guides = [make_wire(&[make_line(a0, apex).unwrap()]).unwrap(), make_wire(&[make_line(a1, apex).unwrap()]).unwrap()];
+    let r = loft_guided_open(&make_wire(&[profile]).unwrap(), &make_vertex(apex).unwrap(), &guides, true, false).unwrap();
+    let faces = r.faces();
+    assert!(faces.len() == 1 && faces[0].is_valid());
+    assert!(faces[0].project_point(apex).unwrap().distance < 1e-6);
+    let t = r.shown_topology().unwrap();
+    let edges = (0..t.edges.len()).filter(|&i| t.edges[i] && t.joined[i] == i).count();
+    assert_eq!((edges, t.vertices.iter().filter(|x| **x).count()), (3, 3), "the profile and the two guides");
+    assert!(thicken(&r, 1.0, 0.0).is_err());
+}
+
 /// Live 2291 (c2-hunting-knife's Loft 3, its face to 0.01 µm): between two profiles and two guides along its sides
 /// the face blends the profiles linearly and fades each guide's difference from that across by the cubic Hermite
 /// 1 - 3u² + 2u³; a guide of several curves pairs by each piece's share of its length, a spline in its own parameter.
