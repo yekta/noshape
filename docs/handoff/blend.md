@@ -51,8 +51,10 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   prints (blend_section.rs, boolean.cpp ZZ_USD, closed_run_on), probes in kernel tests/blend.rs zz_*. Then
   Stevenrohr zum Halter ("Adjoining edge not filleted.", 2 ms), then tell core. Live's chamfer extension reaches
   x 0.097 at the deep contact, ours 1.5 (OCCT's B-spline extension vs Parasolid's): areas 1.6 mm2 apart, counts same.
-- asm, skasm, bool2, studios, live, live2 paused until ~11-17 10:15 UTC: no messages to them, write into their
-  handoffs or live/REQUESTS.md (lead 11-16).
+- Agent ids (11-17 09:25, fresh threads): asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm
+  18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
+  58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2
+  3b9b1e66-33a0-4dfe-9e0a-eee216e354b2, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core 6692ae35-758a-4442-81c8-29f67be2e21a.
 - Queued from asm (after the current items): asm-gearbox-std 6a912b / a470167 Fillet 2 (EDGE fillet of 2 faces' edges,
   tangent, 0.125 in: ours 38/92/56, live 38/88/52, -12.1 mm3; repro vibe6/7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/mgb
   NOSHAPE_PARITY_ONLY=m6a912b); asm-scissor-lift fed22d Fillet 3 (Top - Side 2 45/110/64 vs 48/116/64; Motor Mount
