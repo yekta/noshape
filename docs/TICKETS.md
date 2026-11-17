@@ -567,6 +567,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   with the wrong part (fa6f90cc: 13/33/25 faces/edges/vertices, 5269155 mm³; live 27/67/47, 6325199 mm³). qa-lp-verify runs
   that document alone on the first green with core's revert (vibex6) -> qa-alerts and here.
 - Green 592b0fc9 vs v0.4.57: hat8, hat15, hat15b, the dock, ticket and authored documents ALL-SAME.
+- [ ] **P0 USER-HOVER-STAYS-LIT (psui / skasm; qa 22:12, v0.4.57 Linux release, vibex6 Xvfb, load ~23, real xdotool moves)**:
+  the user's flow (new Part Studio, Sketch 1 on Top, a rectangle, default iso, planes shown; each line hovered, the pointer moved
+  off onto empty space over the Front plane, then back, a shot 700 ms after each rest; uh/uh2.sh), 3 runs: every line lights
+  when hovered (never a plane over a line), but after leaving the top line **all four lines stay lit** with the pointer at rest
+  away from the sketch (3/3 runs); once the return to the top line lit nothing (1/3); once leaving the bottom line lit the **Right
+  plane** though the pointer isn't over it (1/3). v0.4.56, same flow and host: the same, plus 5 missed line hovers in 3 runs
+  (0.4.57 is better, not fixed). Shots: qa-scratch/uh/h57*, h56-*; sheet tickets/hover57-evidence.png (vibex6
+  ~/agents/qa-keep/hover57/): top row top line / off (all lit) / back; bottom row off (all lit) / back (unlit) / off (Right lit).
+- **v0.4.57 "Highlight tool in toolbar" (qa 22:05, Linux release, vibex6 Xvfb)**: pass. Alt+C, "Fillet": the Fillet button gets the
+  orange box; "Linear pattern": the pattern dropdown's button does; unticking removes the box; no toolbar button moves in any
+  state (pixel diff of the toolbar row against before the search: only the boxed button's 32 px). Shots
+  qa-scratch/mac/t0-t4.png, toolbar57.png.
 - **v0.4.57 macOS app on the user's Mac (qa 21:59, release .app.zip SHA OK, ~/noshape-host, slot, nice 19)**: a new mm
   document's Fillet opens empty (Entities to fillet empty and active, Radius 5 mm, no red value) with fresh settings, with an
   old build's "9 mm + #wall_thickness" memory, and with an old-format "3 mm" memory (5 mm: REMEMBERED-VALUES-OLD-FORMAT, fixed
