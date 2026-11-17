@@ -8208,6 +8208,65 @@ fn choice_inputs<'v>(features: &Value, instances: impl Iterator<Item = &'v Value
         .collect()
 }
 
+/// Configuration variables as an insert's `configuration` ({"Length": "0.014 m"}).
+fn config_var_args(vars: &[(String, f64, String)]) -> Value {
+    let unit = |u: &str| match u {
+        "meter" => " m",
+        "radian" => " rad",
+        _ => "",
+    };
+    Value::Object(vars.iter().map(|(n, v, u)| (n.clone(), json!(format!("{v}{}", unit(u))))).collect())
+}
+
+/// Standard content one fetched studio holds at several sizes (its instances' configuration variables): each size's
+/// name and material as the part's configured properties, as live names each size's part (asm-bjr-config's cap screws
+/// M2.5 x 8, M2 x 5 and M3 x 12 of one studio). The material is the insert dialog's choice, hidden in live's @scp: live's
+/// BOM row of that size, else the catalogue's (asm-pinslot's M3 x 14 cap screws: Steel Class 8.8).
+fn configure_standard_sizes<'a>(t: &mut Translator, asm: &Value, element: &str, pid: &str, part: &str, instances: impl Iterator<Item = &'a Value>) -> Vec<String> {
+    let mut sizes: Vec<(String, &Value)> = Vec::new();
+    for i in instances.filter(|i| i["elementId"] == element && i["partId"] == pid && i["isStandardContent"] == true) {
+        let Some(name) = i["name"].as_str().map(|n| n.rsplit_once(" <").map_or(n, |(base, _)| base)) else { continue };
+        if !sizes.iter().any(|(n, _)| n == name) {
+            sizes.push((name.to_string(), i));
+        }
+    }
+    let bom = asm["liveBom"]["root"]["bom"]["bomTable"]["items"].as_array();
+    let live_material = |i: &Value| -> Option<String> {
+        let row = bom.into_iter().flatten().find(|r| {
+            let s = &r["itemSource"];
+            s["elementId"] == element && s["partId"] == pid && s["fullConfiguration"] == i["fullConfiguration"]
+        });
+        row.and_then(|r| r["material"]["displayName"].as_str()).map(|m| m.trim().to_string()).filter(|m| !m.is_empty())
+    };
+    let material = |i: &Value, name: &str| live_material(i).or_else(|| standard_spec_by_part_name(name).map(|s| s.material().to_string()));
+    // One size: the part's own material.
+    if let [(_, i)] = sizes.as_slice() {
+        return match live_material(i) {
+            Some(m) => t.call("part_set_material", json!({ "tab": t.tab, "parts": [part], "material": m })).err().map(|e| format!("part {pid}'s material {m}: {e}")).into_iter().collect(),
+            None => Vec::new(),
+        };
+    }
+    if sizes.is_empty() {
+        return Vec::new();
+    }
+    for prop in ["Name", "Material"] {
+        if let Err(e) = t.call("part_configured_properties", json!({ "tab": t.tab, "part": part, "action": "add_property", "property": prop })) {
+            return vec![format!("part {pid}'s configured {prop}: {e}")];
+        }
+    }
+    let mut errors = Vec::new();
+    for (name, i) in &sizes {
+        let configuration = config_var_args(&instance_config_values(i));
+        for (prop, value) in [("Name", Some(name.clone())), ("Material", material(i, name))] {
+            let Some(value) = value else { continue };
+            if let Err(e) = t.call("part_configured_properties", json!({ "tab": t.tab, "part": part, "action": "set", "property": prop, "value": value, "configuration": configuration })) {
+                errors.push(format!("part {pid}'s configured {prop} \"{value}\": {e}"));
+            }
+        }
+    }
+    errors
+}
+
 /// An instance's configuration variables (name, value, unit): its entries with a number.
 fn instance_config_values(i: &Value) -> Vec<(String, f64, String)> {
     instance_config_entries(i)
@@ -8655,15 +8714,17 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         // (A composite part is placed as one too: asm-infento-subs' 7" Wheel asm on Composite part 4.)
         let queried: Vec<&Value> = queried.iter().flat_map(|q| q["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid" || p["kind"] == "Composite")).collect();
         let solids: Vec<(String, f64, String)> = queried.iter().filter_map(|p| Some((p["name"].as_str()?.to_string(), p["volume"].as_f64().unwrap_or(0.0) * k * k * k, p["id"].as_str()?.to_string()))).collect();
-        let ours_parts: Vec<(String, f64)> = solids.iter().map(|(n, v, _)| (n.clone(), *v)).collect();
-        // Their centroids (m).
-        let centroids: HashMap<String, glam::DVec3> = queried.iter().filter_map(|p| Some((p["name"].as_str()?.to_string(), glam::DVec3::from(f3(&p["centroid"])?) * k))).collect();
+        trace(&format!("{element}: our parts {:?}", solids.iter().map(|(n, v, id)| format!("{id} \"{n}\" {:.6} mm³", v * 1e9)).collect::<Vec<_>>()));
+        // Their centroids (m), by body id.
+        let centroids: HashMap<String, glam::DVec3> = queried.iter().filter_map(|p| Some((p["id"].as_str()?.to_string(), glam::DVec3::from(f3(&p["centroid"])?) * k))).collect();
         let our_ids: Vec<String> = solids.iter().map(|(_, _, id)| id.clone()).collect();
         // Parts of the same volume are taken one each (alike parts place alike), then shared. Those whose volume
         // fits one of ours first; the others then by the feature that made them (ids in creation order), not taking
         // a part another fits (asm-clamp-pattern's Pin, ours off in volume, took the Spacer's part by its creator).
+        // Ours by body id: several of ours may share a name (asm-robotic-arm 07d06e's Derived copies, four "Part 1").
+        let name_of = |id: &str| solids.iter().find(|s| s.2 == id).map_or("", |s| s.0.as_str());
         let fits_of = |p: &Value| -> Vec<String> {
-            volume_band(p).map(|(lo, hi)| ours_parts.iter().filter(|(_, v)| *v >= lo * (1.0 - 1e-6) && *v <= hi * (1.0 + 1e-6)).map(|(n, _)| n.clone()).collect()).unwrap_or_default()
+            volume_band(p).map(|(lo, hi)| solids.iter().filter(|(_, v, _)| *v >= lo * (1.0 - 1e-6) && *v <= hi * (1.0 + 1e-6)).map(|s| s.2.clone()).collect()).unwrap_or_default()
         };
         // (Not live's wire parts, a Helix's "Curve 1": none of ours is a solid of them, and no BOM row.)
         let listed: Vec<&Value> = parts.as_array().into_iter().flatten().filter(|p| p["partId"].is_string() && p["name"].is_string() && p["bodyType"] != "wire").collect();
@@ -8673,10 +8734,10 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let by_centroid = |p: &Value, taken: &[String]| -> Option<String> {
             let c = glam::DVec3::from(f3(&p["centroid"])?);
             let (lo, hi) = volume_band(p)?;
-            ours_parts
+            solids
                 .iter()
-                .filter(|(n, v)| !taken.contains(n) && !fitting.contains(n) && *v >= lo * 0.95 && *v <= hi * 1.05)
-                .filter_map(|(n, _)| Some((n, centroids.get(n)?.distance(c))))
+                .filter(|(_, v, n)| !taken.contains(n) && !fitting.contains(n) && *v >= lo * 0.95 && *v <= hi * 1.05)
+                .filter_map(|(.., n)| Some((n, centroids.get(n)?.distance(c))))
                 .filter(|(_, d)| *d < 1e-3)
                 .min_by(|a, b| a.1.total_cmp(&b.1))
                 .map(|(n, _)| n.clone())
@@ -8692,19 +8753,23 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 }
                 let fits = fits_of(p);
                 // By its name unless its volume fits other parts of ours and not that one (default names shift when
-                // ours has a part fewer: asm-welding-config's "Part 7" is our Part 6).
-                let by_name = ours_parts.iter().any(|(n, _)| n == pname) && (fits.is_empty() || fits.iter().any(|n| n == pname));
+                // ours has a part fewer: asm-welding-config's "Part 7" is our Part 6). (Not one another live part of that
+                // name took: asm-robotic-arm 07d06e's three "Part 1".)
+                let named: Vec<&(String, f64, String)> = solids.iter().filter(|(n, ..)| n == pname).collect();
+                let by_name = !named.is_empty() && named.iter().any(|s| !taken.contains(&s.2)) && (fits.is_empty() || fits.iter().any(|n| name_of(n) == pname));
                 // Several of ours by that name (asm-rack-pinion's two "Spur gear (8 teeth)"): one each, in order, by id;
                 // the first whose volume fits live's (asm-tvc-mount's SG90 import: 13 parts "….1_Peça", 2 to 2821 mm³).
-                let same: Vec<&(String, f64, String)> = solids.iter().filter(|(n, ..)| n == pname).collect();
+                let same = named;
                 let band = volume_band(p);
                 let fits_volume = |v: f64| band.is_some_and(|(lo, hi)| v >= lo * (1.0 - 1e-6) && v <= hi * (1.0 + 1e-6));
                 let ours = if by_name && same.len() > 1 {
                     let free = |s: &&&(String, f64, String)| !taken.contains(&s.2);
                     same.iter().filter(free).find(|s| fits_volume(s.1)).or_else(|| same.iter().find(free)).unwrap_or(&same[0]).2.clone()
-                } else if by_name || ours_parts.is_empty() {
+                } else if by_name {
+                    same[0].2.clone()
+                } else if solids.is_empty() {
                     pname.to_string()
-                } else if let [(only, _)] = ours_parts.as_slice() {
+                } else if let [(.., only)] = solids.as_slice() {
                     only.clone()
                 } else if let Some(n) = fits.iter().find(|n| !taken.contains(n)).or(fits.first()) {
                     n.clone()
@@ -8716,7 +8781,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     // our copy made.
                     let first_line = studio["live"].as_array().into_iter().flatten().find(|l| l["parts"].as_array().is_some_and(|ps| ps.iter().any(|p| p["partId"] == pid)));
                     let maker = first_line.and_then(|l| l["featureId"].as_str()).or_else(|| studio["firstMakers"][pid]["featureId"].as_str());
-                    let by_creator = || t.part_by_creator(t.len(), pid, &our_ids).and_then(|id| solids.iter().find(|s| s.2 == id).map(|s| s.0.clone()));
+                    let by_creator = || t.part_by_creator(t.len(), pid, &our_ids).filter(|id| solids.iter().any(|s| &s.2 == id));
                     // (Several made by it: the one its part id's order names, else the one not taken nearest live's
                     // volume: asm-suspension's Body from an Extrude of two regions; asm-pattern-std's AR-S1 / AR-S2 of
                     // one Extrude, alike in volume, by their ids.)
@@ -8724,26 +8789,26 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                         let head = format!("body:{ours}.");
                         let made: Vec<_> = solids.iter().filter(|s| s.2.starts_with(&head)).collect();
                         if let [one] = made.as_slice() {
-                            return Some(one.0.clone());
+                            return Some(one.2.clone());
                         }
-                        if let Some(n) = by_creator().filter(|n| made.iter().any(|s| &s.0 == n)) {
+                        if let Some(n) = by_creator().filter(|n| made.iter().any(|s| &s.2 == n)) {
                             return Some(n);
                         }
                         let (lo, hi) = volume_band(p)?;
                         let mid = (lo + hi) * 0.5;
-                        made.into_iter().filter(|s| !taken.contains(&s.0)).min_by(|a, b| (a.1 - mid).abs().total_cmp(&(b.1 - mid).abs())).map(|s| s.0.clone())
+                        made.into_iter().filter(|s| !taken.contains(&s.2)).min_by(|a, b| (a.1 - mid).abs().total_cmp(&(b.1 - mid).abs())).map(|s| s.2.clone())
                     });
                     match by_maker.or_else(|| by_centroid(p, &taken)) {
                         Some(n) => n,
                         None => match by_creator() {
-                            Some(n) if fitting.contains(&n) => ours_parts.iter().map(|(n, _)| n).find(|n| !taken.contains(n) && !fitting.contains(n)).cloned().unwrap_or(n),
+                            Some(n) if fitting.contains(&n) => solids.iter().map(|s| &s.2).find(|n| !taken.contains(n) && !fitting.contains(n)).cloned().unwrap_or(n),
                             Some(n) => n,
                             None => pname.to_string(),
                         },
                     }
                 };
                 taken.push(ours.clone());
-                trace(&format!("{element}: live part {pid} \"{pname}\" -> ours {ours} (volume fits {fits:?})"));
+                trace(&format!("{element}: live part {pid} \"{pname}\" -> ours {ours} \"{}\" (volume fits {fits:?})", name_of(&ours)));
                 chosen[ix] = Some(ours);
             }
         }
@@ -8754,9 +8819,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let configuration = levels.iter().flat_map(|l| l.instances.iter()).find(|i| i["elementId"] == element.as_str()).and_then(|i| i["fullConfiguration"].as_str()).map(str::to_string);
         for (p, ours) in listed.iter().zip(chosen) {
             if let (Some(pid), Some(ours)) = (p["partId"].as_str(), ours) {
-                if let Some((.., id)) = solids.iter().find(|(n, _, id)| *n == ours || *id == ours) {
+                if let Some((our_name, _, id)) = solids.iter().find(|s| s.2 == ours).or_else(|| solids.iter().find(|s| s.0 == ours)) {
                     part_bodies.insert((element.clone(), pid.to_string()), id.clone());
-                    if let Some(live) = p["name"].as_str().filter(|l| default_name(&ours) && *l != ours && !l.is_empty())
+                    if let Some(live) = p["name"].as_str().filter(|l| default_name(our_name) && l != our_name && !l.is_empty())
                         && let Err(e) = t.call("part_rename", json!({ "tab": t.tab, "part": id, "name": live }))
                     {
                         res.untranslated.push(format!("{element}: part {pid} not renamed \"{live}\": {e}"));
@@ -8775,6 +8840,10 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                         && let Err(e) = t.call("part_set_material", json!({ "tab": t.tab, "parts": [id], "material": spec.material() }))
                     {
                         res.untranslated.push(format!("{element}: part {pid}'s material {}: {e}", spec.material()));
+                    }
+                    if standard {
+                        let errors = configure_standard_sizes(&mut t, asm, element, pid, id, levels.iter().flat_map(|l| l.instances.iter().copied()));
+                        res.untranslated.extend(errors.into_iter().map(|e| format!("{element}: {e}")));
                     }
                 }
                 part_names.insert((element.clone(), pid.to_string()), ours);
@@ -8997,12 +9066,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             // Its configuration variables (see the studio's synthesized configuration).
             let vars = instance_config_values(i);
             if i["type"] == "Part" && !vars.is_empty() {
-                let unit = |u: &str| match u {
-                    "meter" => " m",
-                    "radian" => " rad",
-                    _ => "",
-                };
-                args["configuration"] = Value::Object(vars.iter().map(|(n, v, u)| (n.clone(), json!(format!("{v}{}", unit(u))))).collect());
+                args["configuration"] = config_var_args(&vars);
             }
             // Its List and Checkbox choices, for the inputs its Part Studio has in ours.
             let choices: Vec<(String, Value)> = instance_config_entries(i)

@@ -3873,6 +3873,36 @@ fn an_assembly_is_rebuilt_as_lives() {
     assert!(r.differences.iter().any(|d| d.starts_with("Part 1 <2>: freed at live's place, our mates move it 10.000000 mm")), "{r:?}");
 }
 
+/// Live's two parts of one name ("Part 1" twice, alike in volume: asm-robotic-arm 07d06e's) go to two parts of ours, not
+/// both to our "Part 1": each instance its own BOM row, as live's.
+#[test]
+fn alike_named_live_parts_take_two_of_ours() {
+    let circle = |id: &str, x: f64| json!({ "btType": "BTMSketchCurve-4", "entityId": id, "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": x, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } });
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [circle("c1", 0.0), circle("c2", 0.02)], "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": "FS1", "entityType": "FACE" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "20 mm" }] }
+    ] });
+    let v = std::f64::consts::PI * 0.004 * 0.004 * 0.02;
+    let parts = json!([{ "partId": "JHD", "name": "Part 1", "volume": [v * 0.999, v * 1.001] }, { "partId": "JiD", "name": "Part 1", "volume": [v * 0.999, v * 1.001] }]);
+    let at = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    let row = json!({ "itemSource": { "indentLevel": 0 }, "name": "Part 1", "quantity": 1, "partNumber": "", "description": "", "material": { "displayName": "" } });
+    let asm = json!({
+        "rootAssembly": {
+            "instances": [{ "id": "IA", "name": "Part 1 <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }, { "id": "IB", "name": "Part 1 <2>", "type": "Part", "partId": "JiD", "elementId": "E1" }],
+            "occurrences": [{ "path": ["IA"], "fixed": true, "transform": at }, { "path": ["IB"], "fixed": true, "transform": at }] },
+        "features": { "features": [], "featureStates": {} },
+        "liveBom": { "root": { "bom": { "bomTable": { "items": [row.clone(), row] } } } } });
+    let mut ctx = Ctx::new();
+    let r = rebuild_assembly(&mut ctx, &scratch("alike-named-parts.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    assert_eq!((r.bom_matching, r.bom_rows), (2, 2), "{r:?}");
+}
+
 /// A subassembly rebuilt from live's definition: "Sub" holds the cylinder (fixed inside it); the root has a fixed
 /// cylinder and Sub's instance, turned 30° and stacked on it by a Revolute from the root cylinder's top edge to the
 /// nested cylinder's bottom edge (its connector's path through Sub). Every occurrence, the nested one too, placed as
