@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 01:40 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 02:30 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -47,20 +47,31 @@ offset_walls_export_to_acis, area 0.17 % off: the B-surface approximation, open)
 closed but for its end rows' weights' last digits (6e-12) is one periodic face (rings-loft Part 1 x_t matches).
 4620ccea a sketch ellipse of equal radii is a circle (o-ring generator's round rings are tori, 19 as live; psui's
 rust_mesh o-ring test now asserts the torus). 25ca889a suggested views' scale fits Front, Top and Right in 30 % of the
-frame (housing-draft 1:1 as live, was 2:1; T1 suggested_scale_fits_all_three_views). Queued fbb87314: DXF writes a
-model edge straight in its view as a LINE (sm-louver SPLINE 31 -> 0, live 0; LINE +31).
+frame (housing-draft 1:1 as live, was 2:1; T1 suggested_scale_fits_all_three_views). 7c76c77f DXF writes a model edge
+straight in its view as a LINE (sm-louver SPLINE 31 -> 0). Queued f582154e: a model edge whose curve is a true circle /
+ellipse is written as its exact conic's piece (ModelEdge.conic -> SheetGeometry.conic_lines -> cad_fit::on_conic;
+B-splines on a conic keep the fitted path: live writes SPLINE where its model has a B-spline). Mac, 4 docs: sm-louver
+ARC 101 -> 66 (live 68), ELLIPSE 50 -> 96 (86); housing-draft ELLIPSE 9 -> 11 (15), SPLINE 16 -> 14 (7); rings-loft
+ARC 40 -> 35 (91), ELLIPSE 96 -> 112 (95), SPLINE 217 -> 200 (211) (our 7 true circles where live's model has
+B-splines); extension-spring same. ui-parity drawing exports 84/84 still match (vibe6 exp-conic).
 Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live imports ours 46/48, ours reads ours
 112/119, times 49/50, drawings' DXF 0/4.
 Open, ranked:
-1. Drawings DXF 0/4. housing-draft (now 1:1): ARC 0/3, CIRCLE 5/6, ELLIPSE 9/15, SPLINE 16/7, LINE 161/154: its 12
-   plane x torus B-spline edges (both models have them) are ELLIPSE / ARC in live's views. sm-louver: scale 1:40 for
-   live's 1:50 (whole-studio bounds 2678 x 841 x 978 mm fit 1:40 by every rule matching 1898's data: parked), ARC
+1. Drawings DXF 0/4. housing-draft per view (/root/dx-scratch/bin/dxfdiff.py ours live drawing.json: bbox-aligned
+   per view, unmatched entities and matched pairs of other types; handles live's -Z extrusion ELLIPSE / ARC, which
+   my earlier plots drew mirrored, so the "iso hidden-line" difference was mine): the iso view matches entity for
+   entity. Left: Front view lug bottoms, ours a SPLINE (a 12.7 mm plane x revolution edge, 0.29 mm off straight in
+   that view, same plane normals in both models) where live writes a straight LINE between the same ends; Right view
+   one live-only LINE (0.198 in at 8.413, 3.138); views placed 0.037-0.046 in lower than live's (Front, Right, Iso;
+   Top exact); types ours -> live: SPLINE -> ELLIPSE 5, LINE -> CIRCLE / ARC pieces (the radial hole, lug ends). sm-louver: scale 1:40 for
+   live's 1:50 (whole-studio bounds 2678 x 841 x 978 mm fit 1:40 by every rule matching 1898's data; lead: no special
+   case, REQUESTS 11-17 01:47 asks live for blocks across the boundary), ARC
    101/68, ELLIPSE 50/86, LINE 2552/2472 (Mac; vibe6 draws 20 fewer). extension-spring SPLINE 37/47 (live splits
    more), LINE 120/117. rings-loft ARC: model (below).
    rings-loft own x_t Part 2 133/338/208 for 132/335/206: a 0.007 mm² cylinder piece shares part of the big face's seam
    edge (three uses), so UnifySameDomain leaves it: parked.
    SAT: live's own SAT splits periodic faces (rings-loft live.sat 445 faces for the model's 439), so the SAT rows wait
-   on live's import of its SAT (REQUESTS 13:31 "ACIS"). Ours writes closed B-surfaces split at mid (hose, o-ring's 4
+   on live's import of its SAT (REQUESTS 11-17 01:47, item 2, for live2). Ours writes closed B-surfaces split at mid (hose, o-ring's 4
    elliptic rings, motor-mount, rings-loft); ACIS has periodic B-surfaces (clamped knots + "periodic" form, faces with
    no seam): writer + reader would be needed.
 2. Probes: a saved rings-loft doc on the Mac (~/noshape-host/dx-keep/rl-save; copy it before each use, export_parts
