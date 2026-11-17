@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, rewritten 2026-11-15 18:00)
+# QA handoff (agent qa; current state only, rewritten 2026-11-17 03:45; this thread replaced the one that stalled 11-17 02:30)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -10,7 +10,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **qa-compat-loop**: bin/compat-loop.sh <baseline>, now **0.4.54**. On every watcher green, bin/compat-check.sh runs userdocs.py
   on vibe5 (hats, dock, 47 ticket docs, 16 authored docs from compat-docs/v0443) with the baseline's CLI against the green.
   A feature that gets worse writes compat/ALERT-<sha> and one line per feature to /tmp/lead/qa-alerts. Move the baseline by
-  restarting the unit with the new version (rel-published.sh does it).
+  restarting the unit with the new version (rel-published.sh does it). Baseline now **0.4.55** (11-16 21:16).
 - **qa-w7-nightly**: bin/w7-nightly.sh. Sleeps to 02:00 UTC, then on vibe7 with the newest release (downloaded to vibe7
   ~/qa-rel/<v>/) runs: (1) opentime.py (hat8, hat15, hat15b, dock) and modeltime.py (84 suite docs), 3 runs, the previous release's CLI
   alternating with the current one (DECISIONS db4db21a0; the row shows the same-session sums and docs > 1.25x slower, details
@@ -19,12 +19,17 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   hat15 / dock UI-script rounds + cold / reopen + rotate / pan / zoom, block baseline) -> nightly/lat-<mmdd>.txt; (3) the
   QUIT-ABORT-DOCK guard (qa-asm-a x5) -> nightly/quit-<mmdd>.txt. Failures and a crash append to /tmp/lead/qa-alerts. Log:
   suites/window-0200-<mmdd>.log. Skip a night: touch nightly/skip-<mmdd>. Runs alone (no slot: the window must be quiet).
+  Restarted 11-17 03:33 with the fixed script: the clean A/B step (nightly/ab-<mmdd>.args) and the latency step now
+  `cd … || exit 1;` (the A/B's `cd … && ( load loop ) &` backgrounded the cd, ab-feat.py ran in ~ and the loop held the ssh).
 - **qa-suites**: bin/qa-suites-loop.sh, every 4 h: interaction suite, model suite (speed, debug) and assembly / exchange
   suites of the newest green, all on **vibe7** (lead 11-15: vibe5 is the land queue), each through `~/bin/slot` there.
   Results suites/<mmdd-hhmm-sha>/; host overrides QA_UI_HOST / QA_SPEED_HOST / QA_SUITES_HOST.
+- **qa-cut-0415 / qa-cut-1615** timers: bin/cut-verdict.sh (cut-check.sh: newest green's compat vs the baseline) -> one GO /
+  NO-GO line in /tmp/lead/qa-alerts and compat/cut-<mmdd-hhmm>.txt. Add the verdict as a "Release blockers" section in TICKETS.md.
+- **qa-tabab-verify**: lat/hat/tabab-verify.sh 9beedeac (psui's hover card): on the first green with it, dock tab-B A/B vs 0.4.53 on vibe6.
 - **qa-land-footer**: bin/land-footer.sh (land-queue footer checks).
 - vibe7 user units **qa-fzloop** + **qa-fz-xvfb** (`systemctl --user` there): the GUI fuzz, ~/qa/bin/fzloop.sh :61 on
-  ~/qa/rel/noshape-green (0.4.52-era green; refresh by copying a newer app to that path), seeds from ~/qa/fzseed.next,
+  ~/qa/rel/noshape-green (green 35baa32f since 11-17 03:34; refresh by copying a newer app to that path), seeds from ~/qa/fzseed.next,
   results ~/qa/fz*-result.txt. fzrun.sh kills the app's own `--reopen` restarts after each run. Pause: touch
   ~/tmp/qa-fz-pause-61; it also idles 01:50-04:05 every night (the window runs alone).
 
@@ -38,9 +43,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    the previous release) -> compat/rel-<v>.txt; any user-document worse = P0 to the lead at once.
 3. The app spot-check rows (archive "Release checks: the app spot-check list"): user cases + 8 interaction-feel rows in
    rotation (next: rows 9-16).
-- **v0.4.53** (145ad9e67): candidate go 11-15 17:50 (72 docs all same vs 0.4.52; CLI vibe5
-  ~/agents/qa-bisect/target/release/noshape-cli). Next: when published, `rel-published.sh 0.4.53
-  /home/ngyekta/agents/qa-bisect/target/release/noshape-cli`, then `rel-compat.sh 0.4.52 0.4.53`.
+- **v0.4.55** published check done 11-16 21:16: 3 SHA OK, userdocs ALL-SAME, quit rc0 5/5, baseline 0.4.55. Next: the 05:00 cut.
 
 ## Open items
 - **Speed (P0)**: owners got their slower-than-live documents 11-15 (from 11-14's vibe7 window, v0.4.48): blend (faceblend,
@@ -54,7 +57,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   ms on a block), dock's first switch to B 14.7 s settle. psui owns the hat15 fillet edit (Tab not applying a variable-bound
   Radius; ✓ leaving the dialog open); my 7.9 / 4.4 s were the caret blink (lat-steps now 450 ms quiet). Send owners only
   what the nightly confirms slow, or > 3x a PLAN 2.7 target.
-- Clean A/B v0.4.48 vs v0.4.53 (impeller, helical, knife incl. Fillet 5): bin/ab-clean.sh as unit qa-ab-clean, after asm's
+- **Clean A/B 11-17** (lead ran it by hand on vibe7 02:55-03:31; ab1117/ here and in lead-scratch): 0.4.48 -> 0.4.53 -> 0.4.55 ms:
+  helical 159 / 398 | 380 / 96 (Sweep 1 fixed in 0.4.55, no ticket); knife 1700 / 3154 | 2947 / 2207 (0.4.48 had 9 features
+  in error); impeller 15643 / 28592 | 27584 / 25314; live 40 / 408 / 2773. Green 35baa32f: knife 1803 (Mirror 1 128 / 220 /
+  140 ms for 0.4.53 / 0.4.55 / green: sent to bool), impeller 23190 with Delete face 2 still 12.1 s -> P0
+  IMPELLER-DELETE-FACE-2-SLOW (core bisects it; qa doesn't).
+- Old: clean A/B v0.4.48 vs v0.4.53 (impeller, helical, knife incl. Fillet 5): bin/ab-clean.sh as unit qa-ab-clean, after asm's
   full7 on vibe7, `SLOT_QUIET_OK=1 ~/bin/slot`, load every 30 s, removes ~/.slot-quiet -> nightly/ab-clean-<mmdd>.*; valid if
   load < ~1.5. Owners so far: impeller Delete face 2 is upstream (core: Move face 1 fails where live builds; blend Fillet 28/29),
   impeller fillet failure cost (blend 29c1841df), helical Sweep 1 fixed on main (bool2 895c8e3b / e47268f2).
@@ -73,6 +81,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   split.py <name> [tabs] (one round per file: the runner's 180 s cap); lat-priv.sh <doc name> <scenario prefix> <open rounds>
   (APP, XD, DOC env; NOSHAPE_FRAME_LOG + NOSHAPE_PERF=1); lat-open.py <dir>; ../lat-steps.py <scenario> <frames log>.
   quitv.sh <runs> <scenario> <app>... (XD, SD env) for crash loops; quit scenarios qa-asm-a / qa-tabs / qa-edit.
+- A/B: bin/ab-feat.py (2 CLIs), bin/abn-feat.py <runs> <cli,cli,..> (n CLIs; full paths, no ~), bin/ab-sum.py <jsonl> [live-regen.json].
 - Speed: mac/opentime.py, mac/modeltime.py (vibe7 copies in ~/agents/qa-keep), bin/nightly-sum.py, mac/live-regen.json.
 - Private documents (hat8, hat15, hat15b, dock in vibe5 / vibe7 ~/lead-private) only as mode-700 copies in ~/tmp/qa on a
   host, deleted after; never in the repo or tickets.

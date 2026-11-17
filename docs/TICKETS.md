@@ -5,6 +5,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa, 2026-11-17
+- [ ] P0 IMPELLER-DELETE-FACE-2-SLOW (core; qa 2026-11-17 03:40, lead's clean A/B; core bisects) c2-impeller-loft's "Delete face 2"
+  (deleteFace, Ok in every build) went from 2.1 s to 14.4 s: vibe7, quiet window (load ≤ 1.3), `feature list` medians of 3
+  alternating runs. v0.4.48 2136 ms -> v0.4.53 14369 ms (same session); v0.4.53 13790 -> v0.4.55 13718 ms; v0.4.55 13687 ->
+  green 35baa32f 12068 ms. Document total: 15.6 s (0.4.48) -> 28.6 s (0.4.53) -> 23.2 s (green); live 2.8 s for the whole
+  document. Note: in v0.4.48, "Chamfer Stevenrohr Halterung" (feature 27 of 48, before Delete face 2) failed. Since then it
+  builds, so Delete face 2 gets a part with the chamfer's faces and the input is not the same between the two versions. Move
+  face 1 also went 3475 -> 4285 ms (0.4.48 -> 0.4.53), 3.9 s on the green. Data: /root/qa-scratch/ab1117/{ab,ab55,imp2}.jsonl
+  (lead's copy /root/lead-scratch/ab1117/).
+
 ## qa, 2026-11-15
 - [x] verified 80e16e42d (qa 11-15 12:50: dae03465 on green 80e16e42d, vibe6: qa-asm-a 10/10 and qa-tabs 10/10 clean; before 6/6 and 6/8 crashed on 0.4.52) P0 QUIT-ABORT-DOCK (core; asm / studios for the tab side) The user's dock document (private: vibe5 ~/lead-private/dock.noshape,
   only as a mode-700 copy in ~/tmp/<agent>) aborts the app as it quits: glibc "corrupted size vs. prev_size while consolidating" /
