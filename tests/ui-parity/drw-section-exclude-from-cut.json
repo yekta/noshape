@@ -1,0 +1,164 @@
+{
+  "name": "drw-section-exclude-from-cut",
+  "about": "An assembly drawing's section view › Edit section...: the Section id field's tooltip, Exclude from cut ticked (the Excluded parts list and its caption tooltip), both parts picked into it, then the label emptied",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (live2 11-17: the drawing matrix's Section view gaps)",
+  "start": "pin-block-asm-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Section view"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Horizontal"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          812,
+          350
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          726,
+          530
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Section"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Edit section..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          140,
+          121
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          54,
+          234
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          140,
+          262
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          726,
+          328
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          641,
+          390
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          220,
+          283
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          140,
+          121
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "mod+a"
+    },
+    {
+      "do": "key",
+      "key": "BackSpace"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          140,
+          121
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

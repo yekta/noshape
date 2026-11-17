@@ -1,0 +1,152 @@
+{
+  "name": "drw-detail-id-profile-tips",
+  "about": "A detail view's menu › Edit detail...: the View label field's tooltip (Detail id), the label emptied, then the profile deleted: the Edit closed profile caption's tooltip",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (live2 11-17: the drawing matrix's Detail view gaps)",
+  "start": "hole-plate-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Detail view"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            -20,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            -20,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          70,
+          150
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Detail"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Edit detail..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          182,
+          229
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          182,
+          229
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "mod+a"
+    },
+    {
+      "do": "key",
+      "key": "BackSpace"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          182,
+          229
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          140,
+          153
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          220,
+          174
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          140,
+          153
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
