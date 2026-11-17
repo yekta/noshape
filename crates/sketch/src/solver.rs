@@ -154,6 +154,10 @@ pub(crate) enum DragTarget {
 enum Owner {
     Ent(EntityId, u8),
     Aux(ConstraintId, u8),
+    /// A held-direction line's direction (see [`Sketch::held_line`]).
+    Held(EntityId, u8),
+    /// The fixed 0 a held direction's length is measured from.
+    Zero,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -168,6 +172,8 @@ struct Params {
     owner: Vec<Owner>,
     ent_base: Vec<u32>,
     aux_base: HashMap<ConstraintId, u32>,
+    held_base: HashMap<EntityId, u32>,
+    zero: u32,
 }
 
 impl Params {
@@ -178,6 +184,8 @@ impl Params {
             owner: Vec::new(),
             ent_base: vec![NONE; sk.max_entity_id() as usize + 1],
             aux_base: HashMap::new(),
+            held_base: HashMap::new(),
+            zero: NONE,
         };
         for e in sk.entities() {
             let own = e.own_params();
@@ -202,6 +210,22 @@ impl Params {
                 p.values.push(*v);
                 p.fixed.push(false);
                 p.owner.push(Owner::Aux(c.id, k as u8));
+            }
+        }
+        // A line a sketch fillet consumed: the direction it keeps.
+        for e in sk.entities() {
+            let Some((_, dir)) = sk.held_line(e.id) else { continue };
+            if p.zero == NONE {
+                p.zero = p.values.len() as u32;
+                p.values.push(0.0);
+                p.fixed.push(true);
+                p.owner.push(Owner::Zero);
+            }
+            p.held_base.insert(e.id, p.values.len() as u32);
+            for (k, v) in [dir.x, dir.y].into_iter().enumerate() {
+                p.values.push(v);
+                p.fixed.push(e.external);
+                p.owner.push(Owner::Held(e.id, k as u8));
             }
         }
         p
@@ -232,6 +256,9 @@ impl Lookup for Lk<'_> {
     }
     fn aux(&self, k: usize) -> u32 {
         self.cid.and_then(|c| self.p.aux_base.get(&c)).map_or(0, |b| b + k as u32)
+    }
+    fn held_dir(&self, id: EntityId) -> Option<([u32; 2], u32)> {
+        self.p.held_base.get(&id).map(|b| ([*b, b + 1], self.p.zero))
     }
     fn same(&self, a: EntityId, b: EntityId) -> bool {
         if a == b {
@@ -290,6 +317,8 @@ pub(crate) struct System {
 
 /// Weight of the parameters outside `SolveOptions::light`.
 const STILL_WEIGHT: f64 = 100.0;
+/// Weight of a held-direction line's direction ([`Owner::Held`]).
+const HELD_WEIGHT: f64 = 1e-10;
 
 impl System {
     /// Representative free parameters not owned by `opts.light` (or its
@@ -318,7 +347,7 @@ impl System {
             }
         }
         (0..self.weight.len())
-            .filter(|&i| find(&mut self.uf, i as u32) as usize == i && !light_reps.contains(&(i as u32)) && !self.p.fixed[i] && self.weight[i] < DRAG_WEIGHT)
+            .filter(|&i| find(&mut self.uf, i as u32) as usize == i && !light_reps.contains(&(i as u32)) && !self.p.fixed[i] && self.weight[i] < DRAG_WEIGHT && !matches!(self.p.owner[i], Owner::Held(..)))
             .collect()
     }
 
@@ -362,6 +391,12 @@ impl System {
             invalid: Vec::new(),
             drag_target: HashMap::new(),
         };
+        // Turning a zero-length line's kept direction moves nothing drawn: it costs (almost) nothing.
+        for (w, o) in sys.weight.iter_mut().zip(&sys.p.owner) {
+            if matches!(o, Owner::Held(..)) {
+                *w = HELD_WEIGHT;
+            }
+        }
         let mut aliased: HashSet<ConstraintId> = HashSet::new();
         for c in sk.constraints() {
             if !c.driving || excluded.contains(&c.id) {
@@ -739,6 +774,7 @@ impl System {
     }
 
     fn write_back(&mut self, sk: &mut Sketch) {
+        let mut held: HashMap<EntityId, [f64; 2]> = HashMap::new();
         for i in 0..self.p.values.len() {
             let r = find(&mut self.uf, i as u32) as usize;
             let v = self.p.values[r];
@@ -755,6 +791,17 @@ impl System {
                             *a = v;
                         }
                 }
+                Owner::Held(id, slot) => held.entry(id).or_default()[slot as usize & 1] = v,
+                Owner::Zero => {}
+            }
+        }
+        for (id, [x, y]) in held {
+            let dir = DVec2::new(x, y);
+            if let Some(e) = sk.entity_mut_silent(id)
+                && !e.external
+                && dir.length() > 1e-12
+            {
+                e.held_direction = Some(dir.normalize());
             }
         }
     }

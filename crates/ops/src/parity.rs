@@ -65,6 +65,9 @@ pub struct LiveRef {
     /// The sketch constraints and their parameters live evaluated it for (refs.jsonl `constraintId`, `parameter`): a
     /// constraint's model query live's fetch gave no ids for (c2-hunting-knife's co-edge queries) is these.
     pub constraints: Vec<(String, String)>,
+    /// Live's sketch makes it itself (refs.jsonl `method`: "the sketch creates it itself"): what an orphaned Use's ids
+    /// name once its model geometry is gone, the Use's own point (bracket03-mattie's Sketch 2).
+    pub self_made: bool,
 }
 
 /// What became of one Onshape feature.
@@ -281,7 +284,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         // A curved face's normal is its tangent plane's at a point: no filter for planar faces of ours (c2-hunting-knife's
         // Extrude 10 took the blade's flat spine for the handle's B-spline side through the same point).
         let normal = f3(&v["normal"]).filter(|_| v["surfaceType"].as_str().is_none_or(|t| t.eq_ignore_ascii_case("plane")));
-        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new() };
+        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")) };
         let key = (k as usize, id.to_string());
         if let Some(old) = out.remove(&key) {
             r.constraints = old.constraints;
@@ -376,7 +379,13 @@ impl<'a> Translator<'a> {
         }
     }
 
-    fn new(ctx: &'a mut Ctx, doc: &Value, refs: HashMap<(usize, String), LiveRef>) -> Result<Self, String> {
+    fn new(ctx: &'a mut Ctx, doc: &Value, mut refs: HashMap<(usize, String), LiveRef>) -> Result<Self, String> {
+        // An id of a sketch's body (live's bodies lines) is a sketch's later too, where a refs line doesn't say so
+        // (exercise-chino's Sketch 3 ends its slot on Side sketch's line JFV, not the part's edge beside it).
+        let sketch_ids: HashSet<String> = refs.iter().filter(|(_, r)| r.sketch).map(|((_, id), _)| id.clone()).collect();
+        for ((_, id), r) in refs.iter_mut() {
+            r.sketch |= sketch_ids.contains(id);
+        }
         let features = doc["features"].as_array().ok_or("features.json has no `features`")?.clone();
         let mut frames = HashMap::new();
         let mut solved = HashMap::new();
@@ -1433,8 +1442,7 @@ impl<'a> Translator<'a> {
             studios.retain(|e, _| !self.studios.keys().any(|k| k == e || k.starts_with(&format!("{e}@"))));
         }
         let parent_studios = self.studios.clone();
-        let mut refs = refs_from_bodies(&lines);
-        refs.extend(parse_refs(src["refs"].as_str().unwrap_or("")));
+        let mut refs = live_refs(&lines, src["refs"].as_str().unwrap_or(""));
         // (Another studio built in the same session: our queries read go.)
         self.query_cache.clear();
         // (Its sketches' bodies, when fetched with it: an assembly's studio.)
@@ -4724,7 +4732,6 @@ impl<'a> Translator<'a> {
         // Onshape's start and end of each curve (sketch metres): ours may
         // run the other way (an arc is counter-clockwise).
         let mut ends: Vec<Option<[[f64; 2]; 2]>> = Vec::new();
-        let mut zero_lines: Vec<String> = Vec::new();
         let mut texts: Vec<Value> = Vec::new();
         // Live's Use (PROJECTED): the entity's model geometry, used after the drawing as live's sketch uses it.
         for c in f["constraints"].as_array().into_iter().flatten().filter(|c| c["constraintType"] == "SILHOUETTED") {
@@ -4765,12 +4772,13 @@ impl<'a> Translator<'a> {
                 texts.push(e.clone());
                 continue;
             }
-            // A line of zero length: a point where it is, its ends that point (asm-infento-subs' wheel sketches: their
-            // coincidences hold on them).
+            // A line of zero length (a sketch fillet consumed it): there, keeping its direction (Onshape's, turned into
+            // our frame before drawing); its ends one point (asm-infento-subs' wheel sketches, c2-fan-blade-sweep's
+            // Sketch 2 and 5: their Parallel, Tangent and point-on-line hold on its direction).
             if gt.starts_with("BTCurveGeometryLine") && (e["endParam"].as_f64().unwrap_or(0.0) - e["startParam"].as_f64().unwrap_or(0.0)).abs() < 1e-9 {
                 let t = e["startParam"].as_f64().unwrap_or(0.0);
-                shapes.push(json!({ "tool": "point", "points": [at(num("pntX") + t * num("dirX"), num("pntY") + t * num("dirY"))], "construction": construction }));
-                zero_lines.push(eid.clone());
+                let q = at(num("pntX") + t * num("dirX"), num("pntY") + t * num("dirY"));
+                shapes.push(json!({ "tool": "line", "points": [q, q], "direction": [num("dirX"), num("dirY")], "construction": construction }));
                 local.push(eid);
                 ends.push(None);
                 continue;
@@ -4918,8 +4926,17 @@ impl<'a> Translator<'a> {
         // Curves first, then the free points, so each reply lists ours in
         // Onshape's order.
         let map = self.sketch_map;
-        for points in [false, true] {
-            let (batch, ids): (Vec<Value>, Vec<String>) = shapes.iter().zip(&local).filter(|(s, _)| (s["tool"] == "point") == points).map(|(s, e)| (s.clone(), e.clone())).unzip();
+        for s in shapes.iter_mut().filter(|s| s["direction"].is_array()) {
+            let d = [s["direction"][0].as_f64().unwrap_or(0.0), s["direction"][1].as_f64().unwrap_or(0.0)];
+            let (o, t) = (map.local([0.0, 0.0]), map.local(d));
+            s["direction"] = json!([t[0] - o[0], t[1] - o[1]]);
+        }
+        // (Zero-length lines after the curves: an arc ending there snaps to neither of their two points, which live's
+        // Coincidents name apart: c2-fan-blade-sweep's fillet arcs.)
+        let pass = |s: &Value| if s["tool"] == "point" { 2 } else if s["direction"].is_array() { 1 } else { 0 };
+        for k in 0..3 {
+            let points = k == 2;
+            let (batch, ids): (Vec<Value>, Vec<String>) = shapes.iter().zip(&local).filter(|(s, _)| pass(s) == k).map(|(s, e)| (s.clone(), e.clone())).unzip();
             let ends_of: HashMap<&String, [[f64; 2]; 2]> = local.iter().zip(&ends).filter_map(|(e, x)| Some((e, (*x)?))).collect();
             if batch.is_empty() {
                 continue;
@@ -4944,15 +4961,6 @@ impl<'a> Translator<'a> {
                 let made: Vec<&Value> = r["created"].as_array().into_iter().flatten().filter(|c| (c["type"] == "point") == points && c.get("handle_of").is_none()).collect();
                 for (eid, c) in ids.iter().zip(made) {
                     self.map_drawn(&oid, eid, c, points, ends_of.get(eid).copied());
-                }
-            }
-        }
-        // (Its ends only: the line itself, a direction (a sketch fillet's leftover side, its sharp corner on it), isn't
-        // a point.)
-        for eid in &zero_lines {
-            if let Some(pid) = self.sketch_entities.remove(&(oid.clone(), eid.clone())) {
-                for end in ["start", "end"] {
-                    self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}")), pid.clone());
                 }
             }
         }
@@ -5008,6 +5016,7 @@ impl<'a> Translator<'a> {
             let first = self.first_move.take().unwrap_or_default();
             problems.push(format!("its constraints and dimensions moved the geometry by up to {:.6} mm (first {first}): taken back ({undone} edits undone; {:.6} mm left)", moved * 1e3, back * 1e3));
         }
+        self.solved_circles(&oid, &id);
         let st = self.call("feature_list", json!({}))?;
         let row = st["features"].as_array().into_iter().flatten().find(|x| x["id"] == id).cloned().unwrap_or_default();
         Ok((id, row["status"].as_str().unwrap_or("Ok").to_string(), row["message"].as_str().map(str::to_string)))
@@ -5057,6 +5066,28 @@ impl<'a> Translator<'a> {
         let own = format!("{want}{}", c["entity"].as_str().unwrap_or_default());
         let x = cands["connectors"].as_array()?.iter().find(|x| x["reference"].as_str().is_some_and(|r| if exact { r == own } else { r.starts_with(&want) }))?;
         Some((q.inverse() * v3(&x["z"], 1.0)?, q.inverse() * (v3(&x["position"], kc)? - t)))
+    }
+
+    /// Sketch `oid`'s circles as ours solved them (`curves`, for later queries naming them), where a dimension made one
+    /// another size about its centre: its stored geometry stale (knob-kraut's Sketch 2, stored Ø8.8, solved Ø9.1; Extrude
+    /// 2's end cap edge named by it).
+    fn solved_circles(&mut self, oid: &str, id: &str) {
+        let Ok(g) = self.call("sketch_get", json!({ "sketch": id })) else { return };
+        let map = self.sketch_map;
+        let uv = |v: &Value| Some([v[0].as_f64()? * map.k, v[1].as_f64()? * map.k]);
+        let ours: HashMap<&str, ([f64; 2], f64)> = g["entities"].as_array().into_iter().flatten().filter(|e| e["type"] == "circle").filter_map(|e| Some((e["id"].as_str()?, (uv(&e["center"])?, e["radius"].as_f64()? * map.k)))).collect();
+        for ((o, eid), our) in &self.sketch_entities {
+            let (Some(&(c, r)), Some(poly)) = (ours.get(our.as_str()).filter(|_| o == oid), self.curves.get_mut(&(o.clone(), eid.clone()))) else { continue };
+            // (Through three points a third apart: a whole circle's first and last are one.)
+            let Some((at, was)) = circle_through(&[poly[0], poly[poly.len() / 3], poly[2 * poly.len() / 3]]) else { continue };
+            let here = map.local(at);
+            if (r - was).abs() < 1e-9 || (here[0] - c[0]).hypot(here[1] - c[1]) > 1e-9 || was < 1e-12 {
+                continue;
+            }
+            for p in poly.iter_mut() {
+                *p = [at[0] + (p[0] - at[0]) * r / was, at[1] + (p[1] - at[1]) * r / was];
+            }
+        }
     }
 
     /// The areas of live's regions of sketch `oid` (its sketch bodies file), m².
@@ -5330,7 +5361,8 @@ impl<'a> Translator<'a> {
                 "PROJECTED" | "SILHOUETTED" => {
                     let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name);
                     let local = par("localFirst").or(par("localCurve")).and_then(|p| p["value"].as_str());
-                    let orphan = par("externalSecond").or(par("externalFace")).is_none_or(|p| p["queries"].as_array().is_none_or(|q| q.is_empty()));
+                    // An orphan: no model reference in live either, or only ids naming what the sketch made itself.
+                    let orphan = par("externalSecond").or(par("externalFace")).is_none_or(|p| p["queries"].as_array().is_none_or(|q| q.iter().all(|q| self.self_made(k, q))));
                     let used = |l: &str| self.used.contains(&(oid.to_string(), l.to_string()));
                     let made = local.is_some_and(|l| used(l) || l.strip_suffix(".start").or_else(|| l.strip_suffix(".end")).is_some_and(used));
                     if !made && !orphan {
@@ -5358,6 +5390,9 @@ impl<'a> Translator<'a> {
                 "pierce" => &["localEntity"],
                 _ => &["localFirst", "localSecond"],
             };
+            if self.names_only_own(k, c) {
+                continue;
+            }
             let mut entities: Vec<String> = Vec::new();
             let mut external = false;
             let mut unmapped = false;
@@ -5391,7 +5426,7 @@ impl<'a> Translator<'a> {
                 let ext = n.replacen("local", "external", 1);
                 if let Some(p) = param(&ext).filter(|p| p["queries"].as_array().is_some_and(|q| !q.is_empty())) {
                     placed.push(ext);
-                    match self.external_ref(k, c["entityId"].as_str().unwrap_or(""), &p) {
+                    match self.use_entity(oid, f, &p).or_else(|| self.external_ref(k, c["entityId"].as_str().unwrap_or(""), &p)) {
                         Some(e) => {
                             if p["queries"][0]["faceQuery"].is_object() {
                                 co_edges.push((entities.len(), p.clone()));
@@ -5403,7 +5438,7 @@ impl<'a> Translator<'a> {
                 }
             }
             for p in c["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external") && !placed.iter().any(|x| x == n))) {
-                match self.external_ref(k, c["entityId"].as_str().unwrap_or(""), p) {
+                match self.use_entity(oid, f, p).or_else(|| self.external_ref(k, c["entityId"].as_str().unwrap_or(""), p)) {
                     Some(e) => {
                         if p["queries"][0]["faceQuery"].is_object() {
                             co_edges.push((entities.len(), p.clone()));
@@ -5499,6 +5534,11 @@ impl<'a> Translator<'a> {
             // Sketch 3: a slot's line with both ends on a model line, which live keeps without a conflict).
             let to_model = c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external")));
             if (linked || to_model) && reply.as_ref().is_some_and(|r| r["status"].as_str().is_some_and(|t| t.starts_with("over defined"))) {
+                if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                    let g = self.call("sketch_get", json!({ "sketch": id })).unwrap_or_default();
+                    let kinds: Vec<String> = g["constraints"].as_array().into_iter().flatten().map(|c| format!("{} {}", c["type"].as_str().unwrap_or("?"), c["entities"])).collect();
+                    eprintln!("TRACE {ty} {} taken back (over defined): ours now {kinds:?}", c["entityId"].as_str().unwrap_or(""));
+                }
                 let _ = self.call("history_undo", json!({}));
                 *missed.entry(format!("{ty} to external geometry")).or_default() += 1;
                 continue;
@@ -5549,6 +5589,47 @@ impl<'a> Translator<'a> {
             Ok(ids) if ids.len() == 1 => ids.into_iter().next(),
             _ => None,
         }
+    }
+
+    /// Our entity for a Use of sketch `f` naming the same model entity as external parameter `p` (live's ids alone): a
+    /// Coincident to a vertex the sketch also Uses (c2-hex-bookcase-derived's clip, its imported part's corners).
+    fn use_entity(&self, oid: &str, f: &Value, p: &Value) -> Option<String> {
+        let ids = |p: &Value| match p["queries"].as_array().map(Vec::as_slice) {
+            Some([q]) if q["queryString"].as_str().is_none_or(str::is_empty) => q["deterministicIds"].as_array().filter(|a| a.len() == 1).cloned(),
+            _ => None,
+        };
+        let want = ids(p)?;
+        let param = |c: &Value, n: &str| c["parameters"].as_array().into_iter().flatten().find(|q| q["parameterId"] == n).cloned();
+        let used = f["constraints"].as_array()?.iter().find(|c| c["constraintType"] == "PROJECTED" && param(c, "externalSecond").and_then(|q| ids(&q)).is_some_and(|i| i == want))?;
+        let eid = param(used, "localFirst")?["value"].as_str()?.to_string();
+        self.sketch_entities.get(&(oid.to_string(), eid)).cloned()
+    }
+
+    /// Constraint or dimension `c`'s model references name only what its sketch made itself (exercise-chino's Sketch 3
+    /// MIDPOINT, c2-extension-spring's Spring 2 DISTANCE to IH): live's reference is gone, the geometry stays where it
+    /// was solved, as ours.
+    fn names_only_own(&self, k: usize, c: &Value) -> bool {
+        let models: Vec<&Value> = c["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external"))).collect();
+        !models.is_empty() && models.iter().all(|p| p["queries"].as_array().is_some_and(|qs| !qs.is_empty() && qs.iter().all(|q| self.self_made(k, q) || self.names_gone(q))))
+    }
+
+    /// A query that names only what a feature no longer in the document made (live's `DUMMY` query of its operation:
+    /// c2-hunting-knife's Sketch 10 dimension to FTYadrak9FEMPiG's point, a feature since deleted): live's reference is
+    /// gone. (Not the default planes' and the Origin's dummy queries.)
+    fn names_gone(&self, q: &Value) -> bool {
+        if q["deterministicIds"].as_array().is_some_and(|ids| !ids.is_empty()) {
+            return false;
+        }
+        let strings = packed_strings_of(q["queryString"].as_str().unwrap_or(""));
+        let ops: Vec<&str> = strings.iter().filter_map(|s| s.split_once('.').filter(|(_, op)| op.ends_with("Op")).map(|(f, _)| f)).collect();
+        strings.iter().any(|s| s == "DUMMY")
+            && !ops.is_empty()
+            && ops.iter().all(|f| !["Origin", "Top", "Front", "Right"].contains(f) && !self.features.iter().any(|x| x["featureId"].as_str().is_some_and(|id| id == *f || id.split('_').next() == Some(*f))))
+    }
+
+    /// Live's query names only what sketch feature `k` made itself: its deterministic ids, by live's refs.
+    fn self_made(&self, k: usize, q: &Value) -> bool {
+        q["deterministicIds"].as_array().is_some_and(|ids| !ids.is_empty() && ids.iter().all(|id| id.as_str().is_some_and(|id| self.refs.get(&(k, id.to_string())).is_some_and(|r| r.self_made))))
     }
 
     /// A co-edge model reference's face (`faceQuery`), as [`Self::external_ref`] takes its edge.
@@ -5822,6 +5903,9 @@ impl<'a> Translator<'a> {
                 "ANGLE" => "angle",
                 _ => continue,
             };
+            if self.names_only_own(k, c) {
+                continue;
+            }
             let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned();
             let measure = ["length", "angle"].iter().find_map(|n| par(n));
             // A configured dimension: the default configuration's value, configured once made.
@@ -6737,6 +6821,18 @@ fn our_type(t: Option<&str>) -> Option<String> {
 /// k + 1 references. Faces get a point on their surface near their box
 /// centre (planes: the projection; others: the box centre), edges their
 /// midpoint, vertices their point.
+/// Live's references: refs.jsonl over its bodies lines (its geometry wins), keeping what the bodies lines say of a
+/// sketch's entity (`sketch`: c2-extension-spring's Spring 2 EQUAL to the Spring sketch's line JFN, its refs line
+/// without `bodyType`).
+pub fn live_refs(lines: &[Value], refs: &str) -> HashMap<(usize, String), LiveRef> {
+    let mut all = refs_from_bodies(lines);
+    for (key, mut r) in parse_refs(refs) {
+        r.sketch |= all.get(&key).is_some_and(|b| b.sketch);
+        all.insert(key, r);
+    }
+    all
+}
+
 pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
     // bodydetails' `{x, y, z}`, or `[x, y, z]` (live's compact fetch).
     let xyz = |v: &Value| Some([v["x"].as_f64()?, v["y"].as_f64()?, v["z"].as_f64()?]);
@@ -8197,9 +8293,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         }
         let studio = &studio;
         // Live's per-feature geometry (the studio's `live` lines, `<element>.live.jsonl`) for its id-only queries.
-        let mut refs = studio["live"].as_array().map(|lines| refs_from_bodies(lines)).unwrap_or_default();
-        // Live's evaluated references (`<element>.refs.jsonl`, as a model's refs.jsonl) win over them.
-        refs.extend(parse_refs(&refs_in_configuration(studio["refs"].as_str().unwrap_or_default(), first_encoded.as_deref())));
+        // Live's evaluated references (`<element>.refs.jsonl`, as a model's refs.jsonl) win over its bodies lines.
+        let mut refs = live_refs(studio["live"].as_array().map(Vec::as_slice).unwrap_or_default(), &refs_in_configuration(studio["refs"].as_str().unwrap_or_default(), first_encoded.as_deref()));
         let features = studio["features"].as_array().map(Vec::as_slice).unwrap_or_default();
         // Its sketches' bodies at the final state (live 2267, `<element>.sketches.json`).
         add_sketch_refs(&mut refs, &studio["sketchBodies"], features);

@@ -94,7 +94,14 @@ pub struct Entity {
     /// dimensioned as a line; it goes with its spline.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handle_of: Option<EntityId>,
+    /// A line a sketch fillet consumed (Onshape keeps it at zero length): its unit direction, which Parallel, Tangent,
+    /// point-on-line and the other direction constraints use while its length is below [`HELD_LENGTH`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub held_direction: Option<DVec2>,
 }
+
+/// A held-direction line shorter than this (m) has no direction of its own: it keeps [`Entity::held_direction`].
+pub const HELD_LENGTH: f64 = 1e-9;
 
 impl Entity {
     pub fn kind(&self) -> EntityKind {

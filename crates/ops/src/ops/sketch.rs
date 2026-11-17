@@ -98,7 +98,7 @@ pub fn ops() -> Vec<Op> {
                 req("sketch", s(), "Sketch feature id or name."),
                 opt("tool", json!({ "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Drawing tool (required without `shapes`)."),
                 opt("points", json!({ "type": "array", "items": click_point.clone() }), "The clicks, in order: [[x, y], ...] in sketch coordinates, or [[x, y, z], ...] model positions (required without `shapes`)."),
-                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } }, "start_derivative": click_point.clone(), "end_derivative": click_point.clone(), "degree": { "type": "integer", "minimum": 1 }, "knots": { "type": "array", "items": { "type": "number" } }, "weights": { "type": "array", "items": { "type": "number" } } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes."),
+                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } }, "start_derivative": click_point.clone(), "end_derivative": click_point.clone(), "degree": { "type": "integer", "minimum": 1 }, "knots": { "type": "array", "items": { "type": "number" } }, "weights": { "type": "array", "items": { "type": "number" } }, "direction": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. A line's `direction` [x, y] with its two clicks at one point: a line a sketch fillet consumed, which keeps that direction."),
                 opt("construction", json!({ "type": "boolean" }), "Make the new geometry construction geometry."),
                 opt("sides", json!({ "type": "integer", "minimum": 3, "maximum": 1000 }), "Polygon sides."),
                 opt("start_derivative", click_point.clone(), "spline: the open spline's derivative at its start, [x, y] (per unit of its 0–1 parameter, as Onshape stores `startDerivative`; its end handle placed for it). With `end_derivative`."),
@@ -462,7 +462,13 @@ fn geometry_json(data: &SketchData, sketch: FeatureId, e: &noshape_sketch::Entit
     let eid = |id: EntityId| json!(entity_id(sketch, id));
     let mut v = match &e.geometry {
         Geometry::Point { pos } => json!({ "type": "point", "at": [r9(pos.x * k), r9(pos.y * k)] }),
-        Geometry::Line { start, end } => json!({ "type": "line", "start": p(*start), "end": p(*end), "start_point": eid(*start), "end_point": eid(*end) }),
+        Geometry::Line { start, end } => {
+            let mut v = json!({ "type": "line", "start": p(*start), "end": p(*end), "start_point": eid(*start), "end_point": eid(*end) });
+            if let Some(d) = e.held_direction {
+                v["direction"] = json!([d.x, d.y]);
+            }
+            v
+        }
         Geometry::Circle { center, radius } => json!({ "type": "circle", "center": p(*center), "radius": r9(radius * k), "center_point": eid(*center) }),
         Geometry::Arc { center, start, end } => json!({ "type": "arc", "center": p(*center), "start": p(*start), "end": p(*end), "center_point": eid(*center), "start_point": eid(*start), "end_point": eid(*end) }),
         Geometry::Ellipse { center, major, minor } => json!({ "type": "ellipse", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k), "center_point": eid(*center) }),
@@ -714,7 +720,15 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 let switches = switch_list(obj.get("tangent_arc_switch"), &format!("{p}tangent_arc_switch"))?;
                 let ends = end_derivatives(obj.get("start_derivative"), obj.get("end_derivative"), &units, &p)?;
                 let knots = knot_args(obj.get("degree"), obj.get("knots"), obj.get("weights"), &p)?;
-                draw_shape(&mut t, &units, &p, tool, points, sides, construction, &switches, ends, knots)?;
+                let direction = obj
+                    .get("direction")
+                    .filter(|v| !v.is_null())
+                    .map(|v| match v.as_array().map(Vec::as_slice) {
+                        Some([x, y]) => x.as_f64().zip(y.as_f64()).map(|(x, y)| DVec2::new(x, y)).ok_or_else(|| OpError::param(&format!("{p}direction"), "two numbers [x, y]")),
+                        _ => Err(OpError::param(&format!("{p}direction"), "two numbers [x, y]")),
+                    })
+                    .transpose()?;
+                draw_shape(&mut t, &units, &p, tool, points, sides, construction, &switches, ends, knots, direction)?;
             }
         }
         None => {
@@ -722,7 +736,7 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let switches = switch_list(a.get("tangent_arc_switch"), "tangent_arc_switch")?;
             let ends = end_derivatives(a.get("start_derivative"), a.get("end_derivative"), &units, "")?;
             let knots = knot_args(a.get("degree"), a.get("knots"), a.get("weights"), "")?;
-            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?, &switches, ends, knots)?;
+            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?, &switches, ends, knots, None)?;
         }
     }
     let (id, tab) = (t.id, t.tab);
@@ -773,7 +787,7 @@ fn switch_list(v: Option<&Value>, param: &str) -> Result<Vec<usize>, OpError> {
 /// `sketch_draw` call does (`p`: the parameter prefix for errors).
 /// `switches`: the line tool's Shift+A before those clicks.
 #[allow(clippy::too_many_arguments)]
-fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool, switches: &[usize], ends: Option<(DVec2, DVec2)>, knots: Option<Knots>) -> Result<(), OpError> {
+fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool, switches: &[usize], ends: Option<(DVec2, DVec2)>, knots: Option<Knots>, direction: Option<DVec2>) -> Result<(), OpError> {
     let tool = DRAW_TOOLS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| {
         let names: Vec<&str> = DRAW_TOOLS.iter().map(|t| t.0).collect();
         OpError::param(&format!("{p}tool"), &format!("`{name}` is not a drawing tool{}; tools: {}", crate::error::did_you_mean(name, names.iter().copied()), names.join(", ")))
@@ -793,6 +807,25 @@ fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, poin
         if let Err(e) = t.data.sketch.set_bspline_knots(id, degree, knots, weights) {
             let _ = t.data.sketch.remove_entity(id);
             return Err(OpError::param(&format!("{p}knots"), &e.to_string()));
+        }
+        if construction {
+            let _ = t.data.sketch.set_construction(id, true);
+        }
+        t.data.sketch.solve();
+        return Ok(());
+    }
+    // A line a sketch fillet consumed (Onshape's stored zero-length line): at its point, keeping its direction.
+    if let Some(dir) = direction {
+        let (Some(a), Some(b), true) = (points.first(), points.get(1), name == "line" && points.len() == 2) else {
+            return Err(OpError::param(&format!("{p}direction"), "a line's of two clicks at one point"));
+        };
+        if a.distance(*b) >= noshape_sketch::entities::HELD_LENGTH {
+            return Err(OpError::param(&format!("{p}direction"), "a line's of zero length (its two clicks at one point)"));
+        }
+        let id = t.data.sketch.add_line(*a, *a);
+        if let Err(e) = t.data.sketch.keep_direction(id, dir) {
+            let _ = t.data.sketch.remove_entity(id);
+            return Err(OpError::param(&format!("{p}direction"), &e.to_string()));
         }
         if construction {
             let _ = t.data.sketch.set_construction(id, true);

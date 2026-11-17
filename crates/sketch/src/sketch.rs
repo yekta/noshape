@@ -236,7 +236,7 @@ impl Sketch {
 
     /// Adds an entity with validated references.
     pub fn add_entity(&mut self, geometry: Geometry, construction: bool, external: bool) -> Result<EntityId> {
-        let probe = Entity { id: EntityId(u32::MAX), geometry, construction, external, reference_only: false, handle_of: None };
+        let probe = Entity { id: EntityId(u32::MAX), geometry, construction, external, reference_only: false, handle_of: None, held_direction: None };
         for r in probe.point_refs() {
             if self.kind(r) != Some(EntityKind::Point) {
                 return Err(SketchError::InvalidGeometry(format!("{r} is not a point")));
@@ -318,7 +318,7 @@ impl Sketch {
                 continue;
             }
             let id = self.alloc_entity();
-            self.entities.insert(id, Entity { id, geometry: Geometry::Line { start: at, end: tip }, construction: true, external: false, reference_only: false, handle_of: Some(curve) });
+            self.entities.insert(id, Entity { id, geometry: Geometry::Line { start: at, end: tip }, construction: true, external: false, reference_only: false, handle_of: Some(curve), held_direction: None });
         }
         self.touch();
     }
@@ -340,7 +340,7 @@ impl Sketch {
         if id.0 < self.next_entity || self.entities.contains_key(&id) {
             return Err(SketchError::InvalidGeometry(format!("entity id {id} is already allocated")));
         }
-        let probe = Entity { id, geometry, construction, external, reference_only: false, handle_of: None };
+        let probe = Entity { id, geometry, construction, external, reference_only: false, handle_of: None, held_direction: None };
         for r in probe.point_refs() {
             if self.kind(r) != Some(EntityKind::Point) {
                 return Err(SketchError::InvalidGeometry(format!("{r} is not a point")));
@@ -403,7 +403,7 @@ impl Sketch {
         // (A pasted spline brings its own handle arms; the copied ones' constraints go to those.)
         for e in other.entities.values().filter(|e| e.kind() != EntityKind::Point && e.handle_of.is_none()) {
             let mut g = e.geometry.clone();
-            let mut probe = Entity { id: e.id, geometry: g.clone(), construction: e.construction, external: false, reference_only: false, handle_of: None };
+            let mut probe = Entity { id: e.id, geometry: g.clone(), construction: e.construction, external: false, reference_only: false, handle_of: None, held_direction: None };
             for p in e.point_refs() {
                 if let Some(n) = map.get(&p) {
                     probe.replace_point(p, *n);
@@ -411,6 +411,9 @@ impl Sketch {
             }
             g = probe.geometry;
             if let Ok(id) = self.add_entity(g, e.construction, false) {
+                if let Some(n) = self.entities.get_mut(&id) {
+                    n.held_direction = e.held_direction;
+                }
                 map.insert(e.id, id);
                 created.push(id);
             }
@@ -616,6 +619,24 @@ impl Sketch {
         let c = self.add_point(control);
         let e = self.add_point(end);
         self.add_entity(Geometry::Conic { start: s, control: c, end: e, rho }, false, false)
+    }
+
+    /// Line `id` keeps direction `dir` while a sketch fillet has consumed it (see [`Entity::held_direction`]).
+    pub fn keep_direction(&mut self, id: EntityId, dir: DVec2) -> Result<()> {
+        let e = self.entities.get_mut(&id).ok_or(SketchError::UnknownEntity(id))?;
+        if !matches!(e.geometry, Geometry::Line { .. }) || dir.length() < 1e-12 {
+            return Err(SketchError::OperationFailed("a direction is kept by a line".into()));
+        }
+        e.held_direction = Some(dir.normalize());
+        self.touch();
+        Ok(())
+    }
+
+    /// Line `id`'s start and the direction it keeps, while it is shorter than [`crate::entities::HELD_LENGTH`].
+    pub fn held_line(&self, id: EntityId) -> Option<(EntityId, DVec2)> {
+        let e = self.entities.get(&id)?;
+        let (Geometry::Line { start, end }, Some(dir)) = (&e.geometry, e.held_direction) else { return None };
+        ((self.point(*end)? - self.point(*start)?).length() < crate::entities::HELD_LENGTH).then_some((*start, dir))
     }
 
     /// Marks an entity (and its defining points) as construction geometry.

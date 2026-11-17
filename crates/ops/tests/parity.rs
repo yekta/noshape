@@ -2,7 +2,7 @@
 //! rebuilt feature by feature and compared with live after each feature.
 
 use noshape_ops::Ctx;
-use noshape_ops::parity::{PartState, Translator, add_sketch_refs, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, model_topology, refs_from_bodies, refs_from_sketches, standard_spec_by_part_name, within_edge_tolerance};
+use noshape_ops::parity::{LiveRef, PartState, live_refs, Translator, add_sketch_refs, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, model_topology, refs_from_bodies, refs_from_sketches, standard_spec_by_part_name, within_edge_tolerance};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -316,8 +316,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     let path = scratch(&format!("{name}.noshape"));
     let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, differing: Vec::new(), untranslated: Vec::new(), regen_ms: None, wall_ms: 0.0, open_ms: 0.0, list_ms: 0.0, features_ms: None, slowest: Vec::new(), slow_features: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
     // refs.jsonl wins over the geometry read from live's bodydetails.
-    let mut all = refs_from_bodies(live);
-    all.extend(parse_refs(refs));
+    let mut all = live_refs(live, refs);
     // Live's sketch bodies at the final state (sketches.json, live 2267) under both.
     add_sketch_refs(&mut all, &features["sketchBodies"], features["features"].as_array().map(Vec::as_slice).unwrap_or_default());
     let mut t = match Translator::open(&mut ctx, &path, features, all) {
@@ -534,7 +533,9 @@ pub(crate) fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
     if source["fetchedBy"]["live.jsonl"].as_str().is_some_and(|f| f.starts_with("UI")) {
         live.iter_mut().filter(|l| l.get("index").is_some()).for_each(|l| l["looseBoxes"] = json!(true));
     }
-    let refs = std::fs::read_to_string(dir.join("refs.jsonl")).unwrap_or_default();
+    // Sketch constraints' model references (refs-sk.jsonl, live's sketch fetch) under refs.jsonl's, which win: a
+    // refetched refs.jsonl may lack some (c2-hunting-knife's Sketch 6 points Ic, Id).
+    let refs = ["refs-sk.jsonl", "refs.jsonl"].map(|f| std::fs::read_to_string(dir.join(f)).unwrap_or_default()).join("\n");
     // The Part Studios its Derived features take parts from (derived/<element id>/, fetched like a document at the
     // version they use): their features and states, for the translator to build first.
     for d in std::fs::read_dir(dir.join("derived")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.join("features.json").is_file()) {
@@ -805,8 +806,7 @@ fn exchange_round_trip() {
         let Some((features, live, refs)) = read_model(&models.join(&name)) else { continue };
         let mut ctx = Ctx::new();
         let path = scratch(&format!("{name}-export.noshape"));
-        let mut all = refs_from_bodies(&live);
-        all.extend(parse_refs(&refs));
+        let all = live_refs(&live, &refs);
         let mut t = match Translator::open(&mut ctx, &path, &features, all) {
             Ok(t) => t,
             Err(e) => {
@@ -2677,6 +2677,108 @@ fn a_used_spline_is_used() {
     assert!(curves.len() == 1 && curves[0]["external"] == true, "{g}");
 }
 
+/// An orphaned Use whose ids name only what the sketch made itself (bracket03-mattie's Sketch 2: live's refs resolve
+/// them only after the sketch): drawn where it is stored, as live keeps it, not counted as a Use ours missed.
+#[test]
+fn an_orphaned_use_naming_its_own_point_is_an_orphan() {
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }]);
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1", "parameters": top,
+          "entities": [{ "btType": "BTMSketchPoint-158", "entityId": "u", "isConstruction": false, "x": -0.0315, "y": -0.058 }],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "PROJECTED", "parameters": [
+              { "btType": "BTMParameterEnum-145", "parameterId": "projectionType", "value": "USE" },
+              { "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "u" },
+              { "btType": "BTMParameterQueryList-148", "parameterId": "externalSecond", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "", "deterministicIds": ["II"] }] }
+          ] }] }
+    ] });
+    let own = LiveRef { kind: "VERTEX".into(), point: Some([-0.0315, -0.058, 0.0]), self_made: true, ..Default::default() };
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("orphan-own-point.noshape"), &features, [((0, "II".to_string()), own)].into()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    assert!(g["entities"].as_array().unwrap().iter().any(|e| e["type"] == "point" && e["at"] == json!([-31.5, -58.0])), "{g}");
+}
+
+/// A dimension whose model reference names only a point its sketch made itself (c2-extension-spring's Spring 2 DISTANCE
+/// to IH) is an orphan, as such a constraint is: not counted, the geometry as solved.
+#[test]
+fn a_dimension_naming_its_own_point_is_an_orphan() {
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }]);
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1", "parameters": top,
+          "entities": [segment("ln", (0.0, 0.0), (0.01, 0.0))],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "DISTANCE", "entityId": "d", "parameters": [
+              { "btType": "BTMParameterQueryList-148", "parameterId": "externalFirst", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "", "deterministicIds": ["IH"] }] },
+              { "btType": "BTMParameterString-149", "parameterId": "localSecond", "value": "ln" },
+              { "btType": "BTMParameterQuantity-147", "parameterId": "length", "expression": "2.5 mm" }
+          ] }] }
+    ] });
+    let own = LiveRef { kind: "VERTEX".into(), point: Some([0.0, -0.0025, 0.0]), self_made: true, ..Default::default() };
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("orphan-own-dimension.noshape"), &features, [((0, "IH".to_string()), own)].into()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+}
+
+/// A refs line naming a sketch's edge without `bodyType`, at the index of the bodies line that lists it in a SKETCH body,
+/// is still a sketch's (c2-extension-spring's Spring 2 EQUAL to Spring's 1 mm line JFN).
+#[test]
+fn a_refs_line_keeps_its_bodies_lines_sketch() {
+    let lines = [json!({ "index": 5, "type": "newSketch", "bodies": [{ "type": "SKETCH", "ids": ["JFP"], "edges": [{ "id": "JFN", "length": 0.001, "midPoint": [0.0127, 0.0, 0.0] }] }] })];
+    let refs = json!({ "index": 6, "id": "JFN", "kind": "EDGE", "body": "JFP", "curveType": "LINE", "point": [0.0127, 0.0, 0.0], "length": 0.001 }).to_string();
+    let all = live_refs(&lines, &refs);
+    assert!(all[&(6, "JFN".to_string())].sketch && all[&(6, "JFN".to_string())].measure == Some(0.001));
+}
+
+/// A dimension to a point a deleted feature made (live's `DUMMY` query of its operation: c2-hunting-knife's Sketch 10)
+/// is an orphan: live's reference is gone, the geometry as solved.
+#[test]
+fn a_dimension_to_a_deleted_features_point_is_an_orphan() {
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }]);
+    let gone = "query=qCompressed(1.0,\"%B5$QueryM4Sa$entityTypeBa$EntityTypeS6$VERTEXSb$historyTypeS8$CREATIONSb$operationIdB2$IdA1Sf.7$FTYadrak9FEMPiGpointOpS9$queryTypeS5$DUMMY\",id);";
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1", "parameters": top,
+          "entities": [segment("ln", (0.0, 0.0), (0.01, 0.0))],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "DISTANCE", "entityId": "d", "parameters": [
+              { "btType": "BTMParameterQueryList-148", "parameterId": "externalFirst", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": gone, "deterministicIds": [] }] },
+              { "btType": "BTMParameterString-149", "parameterId": "localSecond", "value": "ln" },
+              { "btType": "BTMParameterQuantity-147", "parameterId": "length", "expression": "0.5 mm" }
+          ] }] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("orphan-gone-dimension.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+}
+
+/// A Coincident to a model vertex live names by its id alone, which the sketch also Uses: on our Use's point, not left
+/// to the solved geometry (c2-hex-bookcase-derived's clip: its imported part's corners, no live geometry for them).
+#[test]
+fn a_coincident_to_a_used_vertex_is_on_the_use() {
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }]);
+    let ia = json!({ "btType": "BTMParameterQueryList-148", "parameterId": "externalSecond", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "", "deterministicIds": ["Ia"] }] });
+    let mut first = ia.clone();
+    first["parameterId"] = json!("externalFirst");
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1", "parameters": top,
+          "entities": [{ "btType": "BTMSketchPoint-158", "entityId": "u", "isConstruction": false, "x": 0.01, "y": 0.01 }, segment("ln", (0.0, 0.0), (0.01, 0.01))],
+          "constraints": [
+              { "btType": "BTMSketchConstraint-2", "constraintType": "PROJECTED", "entityId": "u.project", "parameters": [
+                  { "btType": "BTMParameterEnum-145", "parameterId": "projectionType", "value": "USE" },
+                  { "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "u" }, ia] },
+              { "btType": "BTMSketchConstraint-2", "constraintType": "COINCIDENT", "entityId": "c", "parameters": [first,
+                  { "btType": "BTMParameterString-149", "parameterId": "localSecond", "value": "ln.end" }] }
+          ] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("coincident-used-vertex.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(!step.problems.iter().any(|p| p.contains("COINCIDENT")), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    assert!(g["constraints"].as_array().unwrap().iter().any(|c| c["type"] == "Coincident"), "{g}");
+}
+
 /// A text converted to an expression (c2-valve-config's Sketch 3: `toString(roundToPrecision(#espesor_material/mm, 0))`,
 /// live's "6"): ours an expression text, evaluated on regeneration, not live's empty value; its height dimensioned on
 /// the box's left side by live's name for it.
@@ -2950,8 +3052,7 @@ fn an_old_symmetric_extrude_is_read() {
 #[test]
 fn a_second_part_studio_goes_into_its_own_tab() {
     let (features, live, refs) = block_model();
-    let mut all = refs_from_bodies(&live);
-    all.extend(parse_refs(&refs));
+    let all = live_refs(&live, &refs);
     let mut ctx = Ctx::new();
     let path = scratch("two-studios.noshape");
     {
@@ -3615,6 +3716,58 @@ fn a_sketch_arc_is_found_by_lives_midpoint_and_length() {
     let entities = t.call("sketch_get", json!({ "sketch": sketch })).unwrap()["entities"].clone();
     let kind = entities.as_array().unwrap().iter().find(|e| e["id"] == found[0]).map(|e| e["type"].clone());
     assert_eq!(kind, Some(json!("arc")), "{found:?}");
+}
+
+/// An id live's bodies lines give as a sketch's edge is that sketch's line where a later refs line names it without
+/// saying so, not the part's edge of its length beside it (exercise-chino's Sketch 3 ends its slot on Side sketch's JFV).
+#[test]
+fn a_sketch_edge_stays_the_sketchs_in_later_refs() {
+    let sketch = |id: &str, entities: Vec<Value>| json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": id, "name": id,
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+        "entities": entities, "constraints": [] });
+    let (a, b, c, d) = ((0.0, 0.002), (0.02, 0.002), (0.02, 0.005), (0.0, 0.005));
+    let features = json!({ "features": [
+        sketch("FS1", vec![segment("line", (0.0, 0.0), (0.02, 0.0))]),
+        sketch("FS2", vec![segment("r1", a, b), segment("r2", b, c), segment("r3", c, d), segment("r4", d, a)]),
+    ] });
+    let mut refs = refs_from_bodies(&[json!({ "index": 0, "type": "newSketch", "bodies": [{ "type": "SKETCH", "ids": ["JS"], "edges": [{ "id": "JA", "length": 0.02, "midPoint": [0.01, 0.0, 0.0] }] }] })]);
+    refs.extend(parse_refs(&json!({ "index": 2, "id": "JA", "kind": "EDGE", "body": "JS", "curveType": "LINE", "point": [0.01, 0.0, 0.0], "length": 0.02 }).to_string()));
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("sketch-edge-later.noshape"), &features, refs).unwrap();
+    assert!(t.step(0).ours.is_some() && t.step(1).ours.is_some());
+    let ids: Vec<Value> = t.call("feature_list", json!({})).unwrap()["features"].as_array().unwrap().iter().map(|f| f["id"].clone()).collect();
+    let region = t.call("sketch_get", json!({ "sketch": ids[1] })).unwrap()["regions"][0]["id"].clone();
+    t.call("feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } })).unwrap();
+    let found = t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JA"], "queryString": "" })).unwrap();
+    let entities = t.call("sketch_get", json!({ "sketch": ids[0] })).unwrap()["entities"].clone();
+    assert!(entities.as_array().unwrap().iter().any(|e| e["id"] == found[0] && e["type"] == "line"), "{found:?}");
+}
+
+/// An extrude's cap edge named by its sketch's circle, which a dimension solved to another size than its stored
+/// geometry (knob-kraut's Sketch 2: stored Ø8.8, `#rod_diameter` 9.1 mm): found by the solved circle (Sketch 3's
+/// Concentric to Extrude 2's end cap edge).
+#[test]
+fn a_cap_edge_follows_its_circles_solved_size() {
+    let q = |id: &str, v: &str| json!({ "btType": "BTMParameterQuantity-147", "parameterId": id, "expression": v });
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FBiiKdrNhQZPCD6_1", "name": "Sketch 2",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "a8Nqda5ccAdd", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.0044, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "DIAMETER", "parameters": [{ "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "a8Nqda5ccAdd" }, q("length", "9.1 mm")] }] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "F9VR8HWoxlFeNmq_1", "name": "Extrude 2", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterEnum-145", "parameterId": "domain", "value": "MODEL" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "deterministicIds": [], "featureId": "FBiiKdrNhQZPCD6_1", "queryString": "query = qSketchRegion(id + \"FBiiKdrNhQZPCD6_1\", true);" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" }, q("depth", "60 mm")] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("cap-edge-solved-circle.noshape"), &features, Default::default()).unwrap();
+    assert!(t.step(0).ours.is_some() && t.step(1).ours.is_some());
+    let cap = "query=qCompressed(1.0,\"%B5$QueryM5Sb$derivedFromC0M6S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA1C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FBiiKdrNhQZPCD6_1wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdSc$a8Nqda5ccAddR5R6R7R8S7$isStartFR9CcA1S11.9$F9VR8HWoxlFeNmq_1opExtrudeRcS8$CAP_EDGER5R6R7R8R9CcA1S-15.7.9$booleanopBooleanRcS4$COPY\",id);";
+    let found = t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [], "queryString": cap })).unwrap();
+    let edges = t.call("query_entities", json!({ "kind": "edges", "curve": "circle" })).unwrap();
+    let edge = edges["edges"].as_array().unwrap().iter().find(|e| e["id"] == found[0]).cloned().unwrap_or_default();
+    assert_eq!((edge["radius"].as_f64().map(|r| (r * 1e6).round() / 1e6), edge["center"][2].as_f64().map(f64::round)), (Some(4.55), Some(60.0)), "{found:?} {edges}");
 }
 
 /// A face none of ours near live's point matches in area (live's is its tessellation's, here 1 % off), whose point

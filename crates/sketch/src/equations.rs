@@ -29,6 +29,11 @@ pub(crate) enum Term {
     PLDistMid,
     /// Length of a vector (2 inputs).
     Norm,
+    /// Signed distance from point to the line through a point along a direction (6 inputs: p, a, d): a line a sketch
+    /// fillet consumed, its direction its own (see [`crate::Sketch::held_line`]).
+    PLDistDir,
+    /// [`Term::PLDistDir`] from the midpoint of (p, q) (8 inputs).
+    PLDistMidDir,
 }
 
 impl Term {
@@ -39,6 +44,8 @@ impl Term {
             Term::PLDist => 6,
             Term::PLDistMid => 8,
             Term::Norm => 2,
+            Term::PLDistDir => 6,
+            Term::PLDistMidDir => 8,
         }
     }
 }
@@ -238,7 +245,11 @@ pub(crate) struct Eq {
 
 #[inline]
 fn pld<T: Num>(p: V2<T>, a: V2<T>, b: V2<T>) -> T {
-    let d = b.sub(a);
+    pldd(p, a, b.sub(a))
+}
+
+#[inline]
+fn pldd<T: Num>(p: V2<T>, a: V2<T>, d: V2<T>) -> T {
     d.cross(p.sub(a)) / floor_len(d.norm())
 }
 
@@ -293,6 +304,8 @@ fn kernel<T: Num>(kind: &EqKind, x: &[T]) -> T {
                     Term::PLDist => pld(V2::at(x, i), V2::at(x, i + 2), V2::at(x, i + 4)),
                     Term::PLDistMid => pld(V2::at(x, i).add(V2::at(x, i + 2)).scale(0.5), V2::at(x, i + 4), V2::at(x, i + 6)),
                     Term::Norm => V2::at(x, i).norm(),
+                    Term::PLDistDir => pldd(V2::at(x, i), V2::at(x, i + 2), V2::at(x, i + 4)),
+                    Term::PLDistMidDir => pldd(V2::at(x, i).add(V2::at(x, i + 2)).scale(0.5), V2::at(x, i + 4), V2::at(x, i + 6)),
                 };
                 i += t.arity();
                 acc = acc + v.scale(*coef);
@@ -948,6 +961,11 @@ pub(crate) trait Lookup {
     fn point(&self, id: EntityId) -> [u32; 2];
     fn own(&self, id: EntityId, slot: usize) -> u32;
     fn aux(&self, k: usize) -> u32;
+    /// A line a sketch fillet consumed: the direction it keeps (see [`crate::Sketch::held_line`]) and a fixed 0, the
+    /// direction's other end as two points.
+    fn held_dir(&self, _id: EntityId) -> Option<([u32; 2], u32)> {
+        None
+    }
     /// Are two point entities the same point (shared or aliased)?
     fn same(&self, a: EntityId, b: EntityId) -> bool;
     /// Is point `p` constrained to lie on `curve` by a coincident constraint?
@@ -990,6 +1008,33 @@ impl Lin {
         self.inputs.extend_from_slice(&l);
         self
     }
+    /// Point `p`'s signed distance to line `l`.
+    fn pl(mut self, k: f64, p: [u32; 2], l: &LineArg) -> Self {
+        match l {
+            LineArg::Pts(l) => self.pld(k, p, *l),
+            LineArg::Held(a, d) => {
+                self.terms.push((k, Term::PLDistDir));
+                self.inputs.extend_from_slice(&p);
+                self.inputs.extend_from_slice(a);
+                self.inputs.extend_from_slice(d);
+                self
+            }
+        }
+    }
+    /// The midpoint of `p` and `q`'s signed distance to line `l`.
+    fn plm(mut self, k: f64, p: [u32; 2], q: [u32; 2], l: &LineArg) -> Self {
+        match l {
+            LineArg::Pts(l) => self.pldm(k, p, q, *l),
+            LineArg::Held(a, d) => {
+                self.terms.push((k, Term::PLDistMidDir));
+                self.inputs.extend_from_slice(&p);
+                self.inputs.extend_from_slice(&q);
+                self.inputs.extend_from_slice(a);
+                self.inputs.extend_from_slice(d);
+                self
+            }
+        }
+    }
     fn norm(mut self, k: f64, v: [u32; 2]) -> Self {
         self.terms.push((k, Term::Norm));
         self.inputs.extend_from_slice(&v);
@@ -1021,6 +1066,13 @@ enum Rad {
 }
 
 /// A direction at a curve end, pointing away from the joint.
+/// A line as an endless line: through two points, or a line a sketch fillet consumed, through its start along the
+/// direction it keeps.
+enum LineArg {
+    Pts([u32; 4]),
+    Held([u32; 2], [u32; 2]),
+}
+
 enum Dir {
     Pts([u32; 4]),
     Fit { pts: SmallVec<[u32; 8]>, n: usize, at_end: bool },
@@ -1061,6 +1113,22 @@ impl<'a, L: Lookup> Builder<'a, L> {
         match self.geom(id)? {
             Geometry::Line { start, end } => Ok(l4(self.lk.point(*start), self.lk.point(*end))),
             _ => Err(format!("{id} is not a line")),
+        }
+    }
+
+    /// Line `id` as a direction: the one it keeps while a sketch fillet has consumed it (zero length), else
+    /// [`Self::line`].
+    fn dir_line(&self, id: EntityId) -> Result<[u32; 4], String> {
+        match self.lk.held_dir(id) {
+            Some((d, zero)) => Ok(l4([zero, zero], d)),
+            None => self.line(id),
+        }
+    }
+    /// Line `id` as an endless line (point-on-line, distances to it).
+    fn line_arg(&self, id: EntityId) -> Result<LineArg, String> {
+        match (self.lk.held_dir(id), self.geom(id)?) {
+            (Some((d, _)), Geometry::Line { start, .. }) => Ok(LineArg::Held(self.lk.point(*start), d)),
+            _ => self.line(id).map(LineArg::Pts),
         }
     }
     fn center(&self, id: EntityId) -> Result<[u32; 2], String> {
@@ -1195,13 +1263,13 @@ impl<'a, L: Lookup> Builder<'a, L> {
     }
 
     fn collinear(&mut self, a: EntityId, b: EntityId) -> R {
-        let la = self.line(a)?;
+        let la = self.line_arg(a)?;
         let lb = self.line(b)?;
         let (Some((a0, a1)), Some((b0, b1))) = (self.sk.endpoints(a), self.sk.endpoints(b)) else { unreachable!() };
         // an endpoint shared with `a` lies on it trivially (zero equation)
         for (q, qq) in [(b0, [lb[0], lb[1]]), (b1, [lb[2], lb[3]])] {
             if !self.lk.same(q, a0) && !self.lk.same(q, a1) {
-                self.lin(Lin::new().pld(1.0, qq, la));
+                self.lin(Lin::new().pl(1.0, qq, &la));
             }
         }
         Ok(())
@@ -1226,8 +1294,8 @@ impl<'a, L: Lookup> Builder<'a, L> {
                     self.lin(Lin::new().p(1.0, pp[1]).p(-1.0, qq[1]));
                 }
                 EntityKind::Line => {
-                    let l = self.line(q)?;
-                    self.lin(Lin::new().pld(1.0, pp, l));
+                    let l = self.line_arg(q)?;
+                    self.lin(Lin::new().pl(1.0, pp, &l));
                 }
                 EntityKind::Circle | EntityKind::Arc => {
                     let cc = self.center(q)?;
@@ -1336,7 +1404,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
             let dir_s = self.spline_dir(b, h.end_b)?;
             return match ka {
                 EntityKind::Line => {
-                    let l = self.line(a)?;
+                    let l = self.dir_line(a)?;
                     self.dir_rel(dir_s, Dir::Pts(l), false)
                 }
                 // Not joined to the spline: touching it along its length
@@ -1357,15 +1425,14 @@ impl<'a, L: Lookup> Builder<'a, L> {
         match (ka, kb) {
             (EntityKind::Line, EntityKind::Line) => self.collinear(a, b),
             (EntityKind::Line, k) if k.is_circular() => {
-                let l = self.line(a)?;
                 let cc = self.center(b)?;
                 if let Some(q) = self.contact_point(a, b) {
-                    let qq = self.lk.point(q);
+                    let (qq, l) = (self.lk.point(q), self.dir_line(a)?);
                     self.push(EqKind::Perpendicular, cat(&[&cc, &qq, &l]));
                     return Ok(());
                 }
-                let r = self.radius(b)?;
-                self.lin(Lin::new().pld(h.sign, cc, l).rad(-1.0, &r));
+                let (r, l) = (self.radius(b)?, self.line_arg(a)?);
+                self.lin(Lin::new().pl(h.sign, cc, &l).rad(-1.0, &r));
                 Ok(())
             }
             (x, y) if x.is_circular() && y.is_circular() => {
@@ -1560,15 +1627,15 @@ impl<'a, L: Lookup> Builder<'a, L> {
             }
             (0, 1) => {
                 let p = self.pt(a)?;
-                let l = self.line(b)?;
+                let l = self.line_arg(b)?;
                 let k = crate::constraints::centerline_factor(mode);
-                self.lin(Lin::new().pld(h.sign * k, p, l).cst(-v));
+                self.lin(Lin::new().pl(h.sign * k, p, &l).cst(-v));
             }
             (1, 1) => {
-                let la = self.line(a)?;
+                let la = self.line_arg(a)?;
                 let lb = self.line(b)?;
                 let k = crate::constraints::centerline_factor(mode);
-                self.lin(Lin::new().pldm(h.sign * k, [lb[0], lb[1]], [lb[2], lb[3]], la).cst(-v));
+                self.lin(Lin::new().plm(h.sign * k, [lb[0], lb[1]], [lb[2], lb[3]], &la).cst(-v));
             }
             (0, 2) if circ_ok(kb) => {
                 let p = self.pt(a)?;
@@ -1582,14 +1649,14 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 self.lin(l.cst(-v));
             }
             (1, 2) if circ_ok(kb) => {
-                let l = self.line(a)?;
+                let l = self.line_arg(a)?;
                 let cc = self.center(b)?;
                 let r = self.radius(b)?;
                 let e = match mode {
-                    DistanceMode::Center => Lin::new().pld(h.sign, cc, l),
-                    DistanceMode::Centerline => Lin::new().pld(2.0 * h.sign, cc, l),
-                    DistanceMode::Minimum => Lin::new().pld(h.sign, cc, l).rad(-1.0, &r),
-                    DistanceMode::Maximum => Lin::new().pld(h.sign, cc, l).rad(1.0, &r),
+                    DistanceMode::Center => Lin::new().pl(h.sign, cc, &l),
+                    DistanceMode::Centerline => Lin::new().pl(2.0 * h.sign, cc, &l),
+                    DistanceMode::Minimum => Lin::new().pl(h.sign, cc, &l).rad(-1.0, &r),
+                    DistanceMode::Maximum => Lin::new().pl(h.sign, cc, &l).rad(1.0, &r),
                 };
                 self.lin(e.cst(-v));
             }
@@ -1609,8 +1676,8 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 let ca = if ka == EntityKind::Point { self.pt(a)? } else { self.center(a)? };
                 let cb = self.center(b)?;
                 if ka == EntityKind::Line {
-                    let l = self.line(a)?;
-                    self.lin(Lin::new().pld(h.sign, cb, l).cst(-v));
+                    let l = self.line_arg(a)?;
+                    self.lin(Lin::new().pl(h.sign, cb, &l).cst(-v));
                 } else {
                     self.lin(Lin::new().dist(1.0, ca, cb).cst(-v));
                 }
@@ -1641,7 +1708,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 Ok(())
             }
             K::Parallel { a, b } | K::Perpendicular { a, b } => {
-                let (la, lb) = (self.line(*a)?, self.line(*b)?);
+                let (la, lb) = (self.dir_line(*a)?, self.dir_line(*b)?);
                 let k = if matches!(c.kind, K::Parallel { .. }) { EqKind::Parallel } else { EqKind::Perpendicular };
                 self.push(k, cat(&[&la, &lb]));
                 Ok(())
@@ -1652,7 +1719,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 match b {
                     None => match self.kind(*a)? {
                         EntityKind::Line => {
-                            let l = self.line(*a)?;
+                            let l = self.dir_line(*a)?;
                             self.lin(Lin::new().p(1.0, l[comp]).p(-1.0, l[2 + comp]));
                             Ok(())
                         }
@@ -1809,7 +1876,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 Ok(())
             }
             K::Normal { line, curve } => {
-                let l = self.line(*line)?;
+                let l = self.dir_line(*line)?;
                 match self.kind(*curve)? {
                     k if k.is_circular() => {
                         let cc = self.center(*curve)?;
@@ -1817,7 +1884,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
                         Ok(())
                     }
                     EntityKind::Line => {
-                        let l2 = self.line(*curve)?;
+                        let l2 = self.dir_line(*curve)?;
                         self.push(EqKind::Perpendicular, cat(&[&l, &l2]));
                         Ok(())
                     }
@@ -1892,7 +1959,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 Ok(())
             }
             K::Angle { a, b, value } => {
-                let (la, lb) = (self.line(*a)?, self.line(*b)?);
+                let (la, lb) = (self.dir_line(*a)?, self.dir_line(*b)?);
                 let h = &c.hints;
                 let u = if h.flip_a { [la[2], la[3], la[0], la[1]] } else { la };
                 let v = if h.flip_b { [lb[2], lb[3], lb[0], lb[1]] } else { lb };
@@ -1981,6 +2048,14 @@ impl<'a, L: Lookup> Builder<'a, L> {
     pub fn internal(&mut self, id: EntityId) {
         let Some(e) = self.sk.entity(id) else { return };
         match &e.geometry {
+            // A kept direction: a unit long, the end on the line through the start along it.
+            Geometry::Line { start, end } => {
+                if let Some((d, _)) = self.lk.held_dir(id) {
+                    let (s, en) = (self.lk.point(*start), self.lk.point(*end));
+                    self.lin(Lin::new().norm(1.0, d).cst(-1.0));
+                    self.lin(Lin::new().pl(1.0, en, &LineArg::Held(s, d)));
+                }
+            }
             Geometry::Arc { center, start, end } => {
                 let (c, s, en) = (self.lk.point(*center), self.lk.point(*start), self.lk.point(*end));
                 self.lin(Lin::new().dist(1.0, c, en).dist(-1.0, c, s));

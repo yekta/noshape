@@ -534,14 +534,19 @@ fn project_edge_with(edge: &noshape_kernel::Shape, frame: &crate::display::Plane
         // another edge's exact end missed it by 3 nm, c2-fan-blade-sweep's Sketch 5): the edge's ends, a circle's
         // points farthest along the line.
         let mut exact: Vec<DVec2> = vec![frame.to_local(info.start), frame.to_local(info.end)];
+        // How far the tessellation may stop short of an exact extreme: a circle's samples (0.05 rad apart) miss its
+        // farthest point by up to r (1 - cos 0.05) (c2-valve-config's Sketch 3: an R 56 circle seen edge-on reached
+        // 55.990 mm, so its Use missed live's line).
+        let mut reach = 1e-6;
         if let k::Curve::Circle { center, axis, radius, .. } = info.curve {
             let d3 = frame.x * d.x + frame.y * d.y;
             let a = axis.normalize();
             if let Some(v) = (d3 - a * a.dot(d3)).try_normalize() {
                 exact.extend([frame.to_local(center + v * radius), frame.to_local(center - v * radius)]);
             }
+            reach += 1e-5 + radius * (1.0 - 0.05f64.cos());
         }
-        let snap = |t: f64| exact.iter().map(along).filter(|e| (e - t).abs() <= 1e-6).min_by(|x, y| (x - t).abs().total_cmp(&(y - t).abs())).unwrap_or(t);
+        let snap = |t: f64| exact.iter().map(along).filter(|e| (e - t).abs() <= reach).min_by(|x, y| (x - t).abs().total_cmp(&(y - t).abs())).unwrap_or(t);
         let foot = |t: f64| exact.iter().find(|p| (along(p) - t).abs() <= 1e-12).copied().unwrap_or(pl[0] + d * t);
         let (lo, hi) = (snap(lo), snap(hi));
         return Some(SectionCurve::Exact(noshape_sketch::Curve2::Line { a: foot(lo), b: foot(hi) }));

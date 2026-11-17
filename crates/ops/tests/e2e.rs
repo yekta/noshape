@@ -2766,6 +2766,47 @@ fn use_takes_another_sketchs_spline_ellipse_and_conic() {
     }
 }
 
+/// A circle edge seen edge-on is used as the line between its extremes, exactly (c2-valve-config's Sketch 3: an R 56
+/// circle used on Front reached only 55.990 mm, sampled, so it missed live's line).
+#[test]
+fn use_of_a_circle_seen_edge_on_spans_its_diameter() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "use-edge-on.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[0, 0], [56, 0]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "circle", "near": [56, 0, 10], "limit": 1 }))["edges"][0]["id"].clone();
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }))["sketch"].as_str().unwrap().to_string();
+    let used = call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": [top] }));
+    let line = used["created"].as_array().unwrap().iter().find(|e| e["type"] == "line").cloned().unwrap_or_else(|| panic!("{used}"));
+    let x = [num(&line["start"][0]), num(&line["end"][0])];
+    assert!((x[0].min(x[1]) + 56.0).abs() < 1e-9 && (x[0].max(x[1]) - 56.0).abs() < 1e-9, "{line}");
+    assert!((num(&line["start"][1]) - 10.0).abs() < 1e-9 && (num(&line["end"][1]) - 10.0).abs() < 1e-9, "{line}");
+}
+
+/// A line a sketch fillet consumed (Onshape keeps it at zero length, as c2-fan-blade-sweep's Sketch 2): drawn at one
+/// point with the direction it keeps, which a Parallel to it uses.
+#[test]
+fn a_zero_length_line_keeps_its_direction() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "zero-line.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "line", "points": [[10, 0], [10, 0]], "direction": [0, 1] }, { "tool": "line", "points": [[20, 0], [30, 10]] }] }));
+    let lines: Vec<Value> = r["created"].as_array().unwrap().iter().filter(|e| e["type"] == "line").cloned().collect();
+    assert_eq!(lines[0]["direction"], json!([0.0, 1.0]), "{r}");
+    call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "parallel", "entities": [lines[1]["id"], lines[0]["id"]] }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    let of = |id: &Value| g["entities"].as_array().unwrap().iter().find(|e| e["id"] == *id).cloned().unwrap();
+    let (zero, other) = (of(&lines[0]["id"]), of(&lines[1]["id"]));
+    let d = [num(&other["end"][0]) - num(&other["start"][0]), num(&other["end"][1]) - num(&other["start"][1])];
+    let held = [num(&zero["direction"][0]), num(&zero["direction"][1])];
+    assert!((d[0] * held[1] - d[1] * held[0]).abs() < 1e-6 * d[0].hypot(d[1]), "parallel to the kept direction: {other} {zero}");
+    // Turning the kept direction moves nothing drawn: it turns, the lines stay.
+    assert_eq!((zero["start"].clone(), zero["end"].clone()), (json!([10.0, 0.0]), json!([10.0, 0.0])), "{zero}");
+    assert!((num(&other["start"][0]) - 20.0).abs() < 1e-3 && (num(&other["end"][1]) - 10.0).abs() < 1e-3, "{other}");
+    let e = try_call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "line", "points": [[0, 0], [5, 0]], "direction": [1, 0] }] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("shapes[0].direction"), "{e:?}");
+}
+
 /// Add custom features (live 2213): a Feature Studio's feature at another document's version, listed by
 /// feature_types with `document` and `version`, works in a document without Feature Studios.
 #[test]

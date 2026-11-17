@@ -2037,6 +2037,67 @@ fn a_bend_beside_a_rolled_wall() {
     assert!(parts == 1 && faces == 14 && (volume_mm3(&r) - want).abs() < 1e-3, "{parts} parts, {faces} faces, {} mm³ (want {want}): {:#?}", volume_mm3(&r), face_report(&r));
 }
 
+/// Move face › Offset of an active sheet metal part's end (c2-sm-tablet-stand's Move face 1): std's sheet metal move
+/// face lengthens the model's wall, the part stays active sheet metal, a Flange on it then works (natively the part's
+/// solid was offset, its sheet metal lost: "Selected edges should be from active sheet metal models.").
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn move_face_offsets_a_sheet_metal_wall() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let end = face_at(&r, DVec3::new(60.0, 20.0, 1.0));
+    s.add("moveFace", |p| {
+        p.set("moveFaces", ParamValue::Query(vec![end]));
+        p.set("moveFaceType", en("OFFSET"));
+        p.set("offsetDistance", expr("1 mm"));
+    });
+    let r = s.ok();
+    let active = r.context.sheet_metal.get(&r.context.bodies[part(&r)].id).is_some_and(|d| d.active);
+    assert!(active && (volume_mm3(&r) - 61.0 * 40.0 * 2.0).abs() < 1e-6, "{active}, {} mm³", volume_mm3(&r));
+    let e = edge_at(&r, DVec3::new(30.0, 0.0, 2.0));
+    s.add("sheetMetalFlange", |p| p.set("edges", ParamValue::Query(vec![e])));
+    s.ok();
+}
+
+/// A curved wall tangent to both its walls (c2-sm-tablet-stand's Sheet metal model 1: a line, an R6 sketch fillet, a
+/// line; TANGENT joints, no bend): its flat lays the three in a row, the arc developed, no collision (live OK).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_rolled_wall_tangent_to_its_walls_flattens_in_a_row() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(0.0, 0.0), (50.0, 0.0), (60.0, 10.0), (50.0, 10.0), (60.0, 40.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    let first = sk.add_line_between(p[0], p[1]).unwrap();
+    let arc = sk.add_arc_between(p[3], p[1], p[2]).unwrap();
+    let last = sk.add_line_between(p[2], p[4]).unwrap();
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("EXTRUDE"));
+        pv.set("sketchCurves", ParamValue::Query([first, arc, last].iter().map(|e| Reference::SketchEntity { sketch, entity: e.0 }).collect()));
+        pv.set("depth", expr("18 mm"));
+        pv.set("thickness", expr("3 mm"));
+        pv.set("radius", expr("3 mm"));
+    });
+    let r = s.ok();
+    let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    let (lo, hi) = flat.bounds();
+    // 50 + 30 mm of walls and the R10 arc developed at its neutral radius, 10 + 0.5 × 3 (kFactorRolled), by 18.
+    let length = 80.0 + std::f64::consts::FRAC_PI_2 * 11.5;
+    let size = (hi - lo) * 1e3;
+    assert!(!flat.collides && flat.loops.len() == 1 && (size.x - length).abs() < 1e-6 && (size.y - 18.0).abs() < 1e-6, "{size:?}, {} loops, collides {}", flat.loops.len(), flat.collides);
+}
+
 /// The same with a second bend of the other hand after the rolled wall: on to (40,0), a 45° turn the material lies
 /// inside of (its definition radius 3). The definition curve: 19.045549 + (π/2 − φ) + 10 (π/2 − φ − θ) +
 /// 3 (θ + π/4) + (10√2 − 1.3766489), φ = atan(1/√120), θ = 0.1647326 (the R3 fillet's tangent on the arc), turning

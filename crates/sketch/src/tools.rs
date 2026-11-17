@@ -534,8 +534,16 @@ impl Sketch {
         let pc = self.add_point(center);
         res.created.extend([pa, pb, pc]);
         for (id, old, new) in [(a, ca, pa), (b, cb, pb)] {
+            let dir = self.endpoints(id).filter(|_| self.kind(id) == Some(EntityKind::Line)).and_then(|(s, e)| Some(self.point(e)? - self.point(s)?));
             if let Some(ent) = self.entity_mut(id) {
                 ent.replace_point(old, new);
+            }
+            // A line the fillet consumed stays at zero length, keeping its direction (live: c2-fan-blade-sweep's
+            // Sketch 2, a side of twice the radius filleted at both ends).
+            if let Some(dir) = dir
+                && self.endpoints(id).and_then(|(s, e)| Some((self.point(e)? - self.point(s)?).length())).is_some_and(|l| l < crate::entities::HELD_LENGTH)
+            {
+                let _ = self.keep_direction(id, dir);
             }
             res.modified.push(id);
             self.drop_shape_constraints(id, &mut res);

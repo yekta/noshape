@@ -126,6 +126,28 @@ fn split_and_extend() {
     assert!((c.start_point() - v(-0.01, 0.06)).length() < 1e-9, "the start reaches the left boundary: {c:?}");
 }
 
+/// A side of twice the fillet radius, filleted at both ends: live keeps it at zero length with its direction, which its
+/// Tangents to both arcs still use (c2-fan-blade-sweep's Sketch 2), through a resize too.
+#[test]
+fn a_side_two_fillets_consume_keeps_its_direction() {
+    let mut sk = Sketch::new();
+    let r = sk.corner_rectangle(v(0.0, 0.0), v(4.0, 2.0));
+    sk.fillet(r.curves[1], r.curves[2], 1.0).unwrap();
+    sk.fillet(r.curves[0], r.curves[1], 1.0).unwrap();
+    let held = sk.entity(r.curves[1]).and_then(|e| e.held_direction);
+    assert!(held.is_some_and(|d| d.x.abs() < 1e-9 && (d.y.abs() - 1.0).abs() < 1e-9), "{held:?}");
+    let rep = sk.solve();
+    assert!(rep.is_solved(), "{rep:?}");
+    let cut = 2.0 * (1.0 - PI / 4.0);
+    let area = |sk: &Sketch| sk.regions().first().map_or(0.0, |r| r.area());
+    assert!(close(area(&sk), 8.0 - cut, 1e-9), "{}", area(&sk));
+    sk.add_constraint(ConstraintKind::Length { curve: r.curves[3], value: 3.0 }).unwrap();
+    let rep = sk.solve();
+    assert!(rep.is_solved(), "{rep:?}");
+    // Taller: the side grows back along its direction between the two arcs.
+    assert!(close(area(&sk), 12.0 - cut, 1e-6), "{}", area(&sk));
+}
+
 #[test]
 fn fillet_lines() {
     let mut sk = Sketch::new();
