@@ -9002,7 +9002,12 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 found => found,
             };
             let found = match (found, connector_origins.get(key)) {
-                (Err(_), Some(o)) => t.connector_entity(inference, *o),
+                // (By live's point alone: the instance's own entity there first, as parts touching share a circle:
+                // asm-tvc-mount's SG90 pin through three of its parts, Cylindrical 1.)
+                (Err(_), Some(o)) => match own.as_ref().and_then(|part| t.connector_candidates(inference, *o).ok()?.into_iter().find(|(_, p)| p == part)) {
+                    Some((id, _)) => Ok(id),
+                    None => t.connector_entity(inference, *o),
+                },
                 // Nothing on its part there: the query read as another part's edge (asm-welding-config's Part 8 cap
                 // edge read as a hole of another part): the one at live's point.
                 (Ok(e), Some(o)) if matches!(inference.as_str(), "CENTER" | "MID_POINT") && e.starts_with("edge:") => match t.connector_entities_on_part_of(&e, inference, *o) {
