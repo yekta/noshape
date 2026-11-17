@@ -1,19 +1,23 @@
 {
  "scenario": "drw-note-editor",
- "recorded": "2026-11-15T05:02:32.871Z",
+ "recorded": "2026-11-17T14:20:33.608Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "16968dce0ba93bff0672b65d",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "c63dee15b785878faa8b7798",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -41,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (1)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -137,7 +141,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -193,7 +197,7 @@
      "selection": []
     }
    },
-   "t": 229970
+   "t": 232499
   },
   {
    "step": 2,
@@ -208,8 +212,8 @@
    },
    "ok": true,
    "at": [
-    636,
-    870
+    667,
+    799
    ],
    "state": {
     "focus": {
@@ -217,39 +221,13 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Note",
-     "text": [
-      "Note",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans ( Note )",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
-      "Flag notes",
-      "None",
-      "Circle",
-      "Diamond",
-      "Double circle",
-      "Flag (Drawing)",
-      "Hexagon"
+     "rect": [
+      666,
+      582,
+      394,
+      160
      ],
      "fields": [
       {
@@ -258,9 +236,88 @@
        "value": "Noto Sans ( Note )"
       },
       {
-       "label": "Flag notes",
-       "kind": "checkbox",
-       "value": false
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
       },
       {
        "label": "Border shape",
@@ -294,7 +351,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -350,7 +407,7 @@
      "selection": []
     }
    },
-   "t": 256211
+   "t": 259502
   },
   {
    "step": 3,
@@ -366,39 +423,13 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Note",
-     "text": [
-      "Note",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans ( Note )",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
-      "Flag notes",
-      "None",
-      "Circle",
-      "Diamond",
-      "Double circle",
-      "Flag (Drawing)",
-      "Hexagon"
+     "rect": [
+      666,
+      582,
+      394,
+      160
      ],
      "fields": [
       {
@@ -407,9 +438,88 @@
        "value": "Noto Sans ( Note )"
       },
       {
-       "label": "Flag notes",
-       "kind": "checkbox",
-       "value": false
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
       },
       {
        "label": "Border shape",
@@ -443,7 +553,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -499,7 +609,7 @@
      "selection": []
     }
    },
-   "t": 283040
+   "t": 286839
   },
   {
    "step": 4,
@@ -514,39 +624,13 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Note",
-     "text": [
-      "Note",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans ( Note )",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
-      "Flag notes",
-      "None",
-      "Circle",
-      "Diamond",
-      "Double circle",
-      "Flag (Drawing)",
-      "Hexagon"
+     "rect": [
+      666,
+      582,
+      394,
+      160
      ],
      "fields": [
       {
@@ -555,9 +639,88 @@
        "value": "Noto Sans ( Note )"
       },
       {
-       "label": "Flag notes",
-       "kind": "checkbox",
-       "value": false
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
       },
       {
        "label": "Border shape",
@@ -591,7 +754,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -647,7 +810,7 @@
      "selection": []
     }
    },
-   "t": 309023
+   "t": 313184
   },
   {
    "step": 5,
@@ -662,64 +825,7 @@
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Note",
-     "text": [
-      "Note",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans ( Note )",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
-      "Flag notes",
-      "None",
-      "Circle",
-      "Diamond",
-      "Double circle",
-      "Flag (Drawing)",
-      "Hexagon"
-     ],
-     "fields": [
-      {
-       "label": "Font",
-       "kind": "select",
-       "value": "Noto Sans ( Note )"
-      },
-      {
-       "label": "Flag notes",
-       "kind": "checkbox",
-       "value": false
-      },
-      {
-       "label": "Border shape",
-       "kind": "select",
-       "value": "Flag (Drawing)"
-      },
-      {
-       "label": "Border size",
-       "kind": "select",
-       "value": "2 Characters"
-      }
-     ]
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -740,63 +846,10 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
-     "sheet": "Sheet1",
-     "sheets": [
-      "Sheet1"
-     ],
-     "tool": "Note",
-     "views": [
-      {
-       "name": "Front",
-       "kind": "base",
-       "position": [
-        81,
-        81
-       ],
-       "parent": null,
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Isometric",
-       "kind": "isometric",
-       "position": [
-        198.4,
-        160.8
-       ],
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Right",
-       "kind": "projected",
-       "position": [
-        198.4,
-        81
-       ],
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Top",
-       "kind": "projected",
-       "position": [
-        81,
-        160.8
-       ],
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      }
-     ],
-     "annotations": [],
-     "selection": []
+     "error": "translation failed An internal error has occurred; support code 40429962e856905c299116a7"
     }
    },
-   "t": 334356
+   "t": 332315
   },
   {
    "step": 6,
@@ -839,7 +892,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -895,7 +948,7 @@
      "selection": []
     }
    },
-   "t": 360345
+   "t": 358753
   }
  ]
 }

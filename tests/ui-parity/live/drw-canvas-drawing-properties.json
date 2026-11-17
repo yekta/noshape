@@ -1,19 +1,23 @@
 {
  "scenario": "drw-canvas-drawing-properties",
- "recorded": "2026-11-07T23:02:37.213Z",
+ "recorded": "2026-11-17T11:21:45.696Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.10"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.5"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "2397c7e47caf6e0882db7ea7",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "4f924d745431d55f37e17c23",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -41,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (1)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -51,6 +55,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -58,6 +66,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -65,6 +77,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -72,6 +88,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -96,7 +116,7 @@
    "ok": true,
    "at": [
     1019,
-    524
+    525
    ],
    "state": {
     "focus": {
@@ -106,7 +126,38 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Paste as table",
+      "Sheet properties...",
+      "Drawing properties...",
+      "",
+      "Zoom to fit",
+      "Zoom to window",
+      "Zoom to sheet"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -124,7 +175,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -134,6 +185,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -141,6 +196,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -148,6 +207,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -155,6 +218,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -164,7 +231,7 @@
      "selection": []
     }
    },
-   "t": 224359
+   "t": 228075
   },
   {
    "step": 2,
@@ -176,7 +243,7 @@
    },
    "ok": true,
    "at": [
-    1060,
+    1091,
     550
    ],
    "state": {
@@ -192,32 +259,124 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Inches"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Period"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1234"
+      },
+      {
+       "label": "Show dual dimensions",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show dual unit",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Millimeters"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "Length leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Length tolerance leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length tolerance trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -240,7 +399,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -250,6 +409,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -257,6 +420,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -264,6 +431,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -271,6 +442,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -280,7 +455,7 @@
      "selection": []
     }
    },
-   "t": 238630
+   "t": 254091
   },
   {
    "step": 3,
@@ -303,32 +478,124 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Inches"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Period"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1234"
+      },
+      {
+       "label": "Show dual dimensions",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show dual unit",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Millimeters"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "Length leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Length tolerance leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length tolerance trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -351,7 +618,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -361,6 +628,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -368,6 +639,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -375,6 +650,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -382,6 +661,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -391,7 +674,7 @@
      "selection": []
     }
    },
-   "t": 255004
+   "t": 279384
   },
   {
    "step": 4,
@@ -400,6 +683,11 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -413,32 +701,124 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Inches"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Period"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1234"
+      },
+      {
+       "label": "Show dual dimensions",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show dual unit",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Millimeters"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "Length leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Length tolerance leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length tolerance trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -461,7 +841,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -471,6 +851,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -478,6 +862,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -485,6 +873,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -492,6 +884,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -501,7 +897,7 @@
      "selection": []
     }
    },
-   "t": 270274
+   "t": 305847
   }
  ]
 }

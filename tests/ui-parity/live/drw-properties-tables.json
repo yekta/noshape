@@ -1,19 +1,23 @@
 {
  "scenario": "drw-properties-tables",
- "recorded": "2026-11-15T04:37:54.990Z",
+ "recorded": "2026-11-17T14:18:06.311Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "a3b98429bd0b6947bf83459d",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "77037231659fa75c5496f057",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -41,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (2)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -112,7 +116,7 @@
    "ok": true,
    "at": [
     980,
-    526
+    485
    ],
    "state": {
     "focus": {
@@ -122,7 +126,38 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Paste as table",
+      "Sheet properties...",
+      "Drawing properties...",
+      "",
+      "Zoom to fit",
+      "Zoom to window",
+      "Zoom to sheet"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -140,7 +175,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -196,7 +231,7 @@
      "selection": []
     }
    },
-   "t": 228170
+   "t": 233568
   },
   {
    "step": 2,
@@ -208,8 +243,8 @@
    },
    "ok": true,
    "at": [
-    1021,
-    551
+    1052,
+    511
    ],
    "state": {
     "focus": {
@@ -224,32 +259,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -369,7 +399,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -425,7 +455,7 @@
      "selection": []
     }
    },
-   "t": 254094
+   "t": 259169
   },
   {
    "step": 3,
@@ -448,32 +478,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -593,7 +618,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -649,7 +674,7 @@
      "selection": []
     }
    },
-   "t": 280706
+   "t": 285567
   },
   {
    "step": 4,
@@ -681,28 +706,58 @@
       "in",
       "BOM tables",
       "Line thickness",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm",
-      "0.25 mm",
-      "0.30 mm",
-      "0.35 mm",
-      "0.40 mm",
-      "0.50 mm",
-      "0.53 mm",
-      "0.60 mm",
-      "0.70 mm",
-      "0.80 mm",
-      "0.90 mm",
-      "1.00 mm",
-      "1.20 mm",
-      "1.40 mm",
-      "1.60 mm",
-      "2.00 mm",
       "Font",
-      "APMONO",
-      "ARComp"
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Custom tables",
+      "Line thickness",
+      "Font",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Cut list tables",
+      "Line thickness",
+      "Font",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Hole tables",
+      "Line thickness",
+      "Font",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Indicator style",
+      "Indicator arrowhead",
+      "in",
+      "Indicator lines",
+      "Tags",
+      "in",
+      "Revision tables",
+      "Line thickness",
+      "Font",
+      "Title row text",
+      "in",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Revision callouts",
+      "in",
+      "Tables",
+      "Line thickness",
+      "Font",
+      "Title row text",
+      "in",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in"
      ],
      "fields": [
       {
@@ -817,7 +872,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -873,7 +928,7 @@
      "selection": []
     }
    },
-   "t": 305319
+   "t": 312291
   },
   {
    "step": 5,
@@ -900,28 +955,58 @@
       "in",
       "BOM tables",
       "Line thickness",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm",
-      "0.25 mm",
-      "0.30 mm",
-      "0.35 mm",
-      "0.40 mm",
-      "0.50 mm",
-      "0.53 mm",
-      "0.60 mm",
-      "0.70 mm",
-      "0.80 mm",
-      "0.90 mm",
-      "1.00 mm",
-      "1.20 mm",
-      "1.40 mm",
-      "1.60 mm",
-      "2.00 mm",
       "Font",
-      "APMONO",
-      "ARComp"
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Custom tables",
+      "Line thickness",
+      "Font",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Cut list tables",
+      "Line thickness",
+      "Font",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Hole tables",
+      "Line thickness",
+      "Font",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Indicator style",
+      "Indicator arrowhead",
+      "in",
+      "Indicator lines",
+      "Tags",
+      "in",
+      "Revision tables",
+      "Line thickness",
+      "Font",
+      "Title row text",
+      "in",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Revision callouts",
+      "in",
+      "Tables",
+      "Line thickness",
+      "Font",
+      "Title row text",
+      "in",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in"
      ],
      "fields": [
       {
@@ -1036,7 +1121,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1092,7 +1177,7 @@
      "selection": []
     }
    },
-   "t": 332261
+   "t": 338848
   },
   {
    "step": 6,
@@ -1123,28 +1208,58 @@
       "in",
       "BOM tables",
       "Line thickness",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm",
-      "0.25 mm",
-      "0.30 mm",
-      "0.35 mm",
-      "0.40 mm",
-      "0.50 mm",
-      "0.53 mm",
-      "0.60 mm",
-      "0.70 mm",
-      "0.80 mm",
-      "0.90 mm",
-      "1.00 mm",
-      "1.20 mm",
-      "1.40 mm",
-      "1.60 mm",
-      "2.00 mm",
       "Font",
-      "APMONO",
-      "ARComp"
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Custom tables",
+      "Line thickness",
+      "Font",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Cut list tables",
+      "Line thickness",
+      "Font",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Hole tables",
+      "Line thickness",
+      "Font",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Indicator style",
+      "Indicator arrowhead",
+      "in",
+      "Indicator lines",
+      "Tags",
+      "in",
+      "Revision tables",
+      "Line thickness",
+      "Font",
+      "Title row text",
+      "in",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in",
+      "Revision callouts",
+      "in",
+      "Tables",
+      "Line thickness",
+      "Font",
+      "Title row text",
+      "in",
+      "Header row text",
+      "in",
+      "Content row text",
+      "in"
      ],
      "fields": [
       {
@@ -1259,7 +1374,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1315,7 +1430,7 @@
      "selection": []
     }
    },
-   "t": 357977
+   "t": 365183
   }
  ]
 }

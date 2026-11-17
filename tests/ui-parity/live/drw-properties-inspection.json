@@ -1,19 +1,23 @@
 {
  "scenario": "drw-properties-inspection",
- "recorded": "2026-11-15T04:56:21.995Z",
+ "recorded": "2026-11-17T14:24:26.575Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "2af0166de3fbec952948d475",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "e11814d5a267d3f0980fe54f",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -41,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (2)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -112,7 +116,7 @@
    "ok": true,
    "at": [
     980,
-    526
+    485
    ],
    "state": {
     "focus": {
@@ -122,7 +126,38 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Paste as table",
+      "Sheet properties...",
+      "Drawing properties...",
+      "",
+      "Zoom to fit",
+      "Zoom to window",
+      "Zoom to sheet"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -140,7 +175,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -196,7 +231,7 @@
      "selection": []
     }
    },
-   "t": 227875
+   "t": 237671
   },
   {
    "step": 2,
@@ -208,8 +243,8 @@
    },
    "ok": true,
    "at": [
-    1021,
-    551
+    1052,
+    511
    ],
    "state": {
     "focus": {
@@ -224,32 +259,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -369,7 +399,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -425,7 +455,7 @@
      "selection": []
     }
    },
-   "t": 254507
+   "t": 263092
   },
   {
    "step": 3,
@@ -448,32 +478,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -593,7 +618,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -649,7 +674,7 @@
      "selection": []
     }
    },
-   "t": 281822
+   "t": 289544
   },
   {
    "step": 4,
@@ -677,32 +702,17 @@
       "Inspection",
       "Inspection items",
       "Item parsing",
-      "Row",
-      "Parameter",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
-      "Text"
+      "Text",
+      "in",
+      "Border shape",
+      "Border size",
+      "Border color",
+      "Solid fill",
+      "Automatic inspection items",
+      "Exclude callouts",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -762,7 +772,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -818,7 +828,7 @@
      "selection": []
     }
    },
-   "t": 306750
+   "t": 313995
   },
   {
    "step": 5,
@@ -841,32 +851,17 @@
       "Inspection",
       "Inspection items",
       "Item parsing",
-      "Row",
-      "Parameter",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
-      "Text"
+      "Text",
+      "in",
+      "Border shape",
+      "Border size",
+      "Border color",
+      "Solid fill",
+      "Automatic inspection items",
+      "Exclude callouts",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -926,7 +921,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -982,7 +977,7 @@
      "selection": []
     }
    },
-   "t": 332922
+   "t": 339628
   },
   {
    "step": 6,
@@ -1009,32 +1004,17 @@
       "Inspection",
       "Inspection items",
       "Item parsing",
-      "Row",
-      "Parameter",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
-      "Text"
+      "Text",
+      "in",
+      "Border shape",
+      "Border size",
+      "Border color",
+      "Solid fill",
+      "Automatic inspection items",
+      "Exclude callouts",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -1094,7 +1074,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1150,7 +1130,7 @@
      "selection": []
     }
    },
-   "t": 359193
+   "t": 365810
   }
  ]
 }

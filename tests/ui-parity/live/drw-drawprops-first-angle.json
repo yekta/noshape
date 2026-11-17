@@ -1,19 +1,23 @@
 {
  "scenario": "drw-drawprops-first-angle",
- "recorded": "2026-11-08T05:33:14.477Z",
+ "recorded": "2026-11-17T12:41:35.717Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "38bf09bbdbeca89cb583bcde",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "7d718729c97bcd1474972536",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -41,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (1)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -51,6 +55,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -58,6 +66,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -65,6 +77,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -72,6 +88,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -96,7 +116,7 @@
    "ok": true,
    "at": [
     1019,
-    524
+    525
    ],
    "state": {
     "focus": {
@@ -106,7 +126,38 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Paste as table",
+      "Sheet properties...",
+      "Drawing properties...",
+      "",
+      "Zoom to fit",
+      "Zoom to window",
+      "Zoom to sheet"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -124,7 +175,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -134,6 +185,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -141,6 +196,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -148,6 +207,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -155,6 +218,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -164,7 +231,7 @@
      "selection": []
     }
    },
-   "t": 251019
+   "t": 231286
   },
   {
    "step": 2,
@@ -176,7 +243,7 @@
    },
    "ok": true,
    "at": [
-    1060,
+    1091,
     550
    ],
    "state": {
@@ -192,32 +259,124 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Inches"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Period"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1234"
+      },
+      {
+       "label": "Show dual dimensions",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show dual unit",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Millimeters"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "Length leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Length tolerance leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length tolerance trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -240,7 +399,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -250,6 +409,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -257,6 +420,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -264,6 +431,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -271,6 +442,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -280,7 +455,7 @@
      "selection": []
     }
    },
-   "t": 267803
+   "t": 258312
   },
   {
    "step": 3,
@@ -303,32 +478,124 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Inches"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Period"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.1234"
+      },
+      {
+       "label": "Show dual dimensions",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show dual unit",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Top"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Millimeters"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.12"
+      },
+      {
+       "label": "Length leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Length tolerance leading zeros",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Length tolerance trailing zeros",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Lock drawing properties",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -351,7 +618,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -361,6 +628,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -368,6 +639,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -375,6 +650,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -382,6 +661,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -391,7 +674,7 @@
      "selection": []
     }
    },
-   "t": 282946
+   "t": 283295
   },
   {
    "step": 4,
@@ -418,33 +701,286 @@
       "Views",
       "All views",
       "Projection angle",
-      "First angle",
-      "Third angle",
       "Visible edges",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm",
-      "0.25 mm",
-      "0.30 mm",
-      "0.35 mm",
-      "0.40 mm",
-      "0.50 mm",
-      "0.53 mm",
-      "0.60 mm",
-      "0.70 mm",
-      "0.80 mm",
-      "0.90 mm",
-      "1.00 mm",
-      "1.20 mm",
-      "1.40 mm",
-      "1.60 mm",
-      "2.00 mm",
       "View labels",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal"
+      "in",
+      "Insert view defaults",
+      "View simplification",
+      "Hidden lines",
+      "Tangent edges",
+      "Scale label",
+      "Auto centermarks (Parts)",
+      "Auto centerlines (Parts)",
+      "Threads (Parts)",
+      "Bend lines (Parts)",
+      "Bend notes (Parts)",
+      "Hidden edges",
+      "Thickness",
+      "Dashes",
+      "Tangent edges",
+      "Thickness",
+      "Dashes",
+      "Exploded lines",
+      "Thickness",
+      "Dashes",
+      "Section views",
+      "Cutting lines",
+      "Arrowhead",
+      "in",
+      "Cutting line label",
+      "in",
+      "View and region hatches",
+      "Hatch pattern",
+      "ANSI31 general",
+      "Detail views",
+      "Detail profile lines",
+      "Arrowhead",
+      "in",
+      "Detail profile label",
+      "in",
+      "Detail profile style",
+      "Show detail view profile",
+      "Clip border to geometry",
+      "Auxiliary views",
+      "Show view reference indicator",
+      "View reference format",
+      "Viewing lines",
+      "Arrowhead",
+      "in",
+      "Viewing line label",
+      "in",
+      "View label prefix",
+      "View label style",
+      "View label suffix",
+      "Break views",
+      "Break lines",
+      "Cosmetic threads",
+      "Thread style",
+      "Thickness",
+      "Dashes",
+      "Flat pattern views",
+      "All bend lines",
+      "Up bend lines",
+      "Down bend lines",
+      "Bend tangent edges",
+      "Counterbore/Countersink up",
+      "Counterbore/Countersink down",
+      "Form tear",
+      "Form up",
+      "Form down",
+      "Form centermarks"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Third angle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Hidden"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Off"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Off"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Shown"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Phantom"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "In line"
+      },
+      {
+       "label": "Show detail view profile",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Clip border to geometry",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show view reference indicator",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "A-A"
+      },
+      {
+       "label": "Break lines",
+       "kind": "select",
+       "value": "0.25 mm"
+      },
+      {
+       "label": "Thread style Thickness Dashes",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Thread style Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      }
      ]
     },
     "dialogs": [],
@@ -467,7 +1003,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -477,6 +1013,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -484,6 +1024,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -491,6 +1035,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -498,6 +1046,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -507,7 +1059,7 @@
      "selection": []
     }
    },
-   "t": 300818
+   "t": 309691
   },
   {
    "step": 5,
@@ -535,33 +1087,286 @@
       "Views",
       "All views",
       "Projection angle",
-      "First angle",
-      "Third angle",
       "Visible edges",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm",
-      "0.25 mm",
-      "0.30 mm",
-      "0.35 mm",
-      "0.40 mm",
-      "0.50 mm",
-      "0.53 mm",
-      "0.60 mm",
-      "0.70 mm",
-      "0.80 mm",
-      "0.90 mm",
-      "1.00 mm",
-      "1.20 mm",
-      "1.40 mm",
-      "1.60 mm",
-      "2.00 mm",
       "View labels",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal"
+      "in",
+      "Insert view defaults",
+      "View simplification",
+      "Hidden lines",
+      "Tangent edges",
+      "Scale label",
+      "Auto centermarks (Parts)",
+      "Auto centerlines (Parts)",
+      "Threads (Parts)",
+      "Bend lines (Parts)",
+      "Bend notes (Parts)",
+      "Hidden edges",
+      "Thickness",
+      "Dashes",
+      "Tangent edges",
+      "Thickness",
+      "Dashes",
+      "Exploded lines",
+      "Thickness",
+      "Dashes",
+      "Section views",
+      "Cutting lines",
+      "Arrowhead",
+      "in",
+      "Cutting line label",
+      "in",
+      "View and region hatches",
+      "Hatch pattern",
+      "ANSI31 general",
+      "Detail views",
+      "Detail profile lines",
+      "Arrowhead",
+      "in",
+      "Detail profile label",
+      "in",
+      "Detail profile style",
+      "Show detail view profile",
+      "Clip border to geometry",
+      "Auxiliary views",
+      "Show view reference indicator",
+      "View reference format",
+      "Viewing lines",
+      "Arrowhead",
+      "in",
+      "Viewing line label",
+      "in",
+      "View label prefix",
+      "View label style",
+      "View label suffix",
+      "Break views",
+      "Break lines",
+      "Cosmetic threads",
+      "Thread style",
+      "Thickness",
+      "Dashes",
+      "Flat pattern views",
+      "All bend lines",
+      "Up bend lines",
+      "Down bend lines",
+      "Bend tangent edges",
+      "Counterbore/Countersink up",
+      "Counterbore/Countersink down",
+      "Form tear",
+      "Form up",
+      "Form down",
+      "Form centermarks"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Third angle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Hidden"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Off"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Off"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Shown"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Phantom"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "In line"
+      },
+      {
+       "label": "Show detail view profile",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Clip border to geometry",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show view reference indicator",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "A-A"
+      },
+      {
+       "label": "Break lines",
+       "kind": "select",
+       "value": "0.25 mm"
+      },
+      {
+       "label": "Thread style Thickness Dashes",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Thread style Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      }
      ]
     },
     "dialogs": [],
@@ -584,7 +1389,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -594,6 +1399,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -601,6 +1410,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -608,6 +1421,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -615,6 +1432,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -624,7 +1445,7 @@
      "selection": []
     }
    },
-   "t": 315650
+   "t": 323616
   },
   {
    "step": 6,
@@ -649,33 +1470,286 @@
       "Views",
       "All views",
       "Projection angle",
-      "First angle",
-      "Third angle",
       "Visible edges",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm",
-      "0.25 mm",
-      "0.30 mm",
-      "0.35 mm",
-      "0.40 mm",
-      "0.50 mm",
-      "0.53 mm",
-      "0.60 mm",
-      "0.70 mm",
-      "0.80 mm",
-      "0.90 mm",
-      "1.00 mm",
-      "1.20 mm",
-      "1.40 mm",
-      "1.60 mm",
-      "2.00 mm",
       "View labels",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal"
+      "in",
+      "Insert view defaults",
+      "View simplification",
+      "Hidden lines",
+      "Tangent edges",
+      "Scale label",
+      "Auto centermarks (Parts)",
+      "Auto centerlines (Parts)",
+      "Threads (Parts)",
+      "Bend lines (Parts)",
+      "Bend notes (Parts)",
+      "Hidden edges",
+      "Thickness",
+      "Dashes",
+      "Tangent edges",
+      "Thickness",
+      "Dashes",
+      "Exploded lines",
+      "Thickness",
+      "Dashes",
+      "Section views",
+      "Cutting lines",
+      "Arrowhead",
+      "in",
+      "Cutting line label",
+      "in",
+      "View and region hatches",
+      "Hatch pattern",
+      "ANSI31 general",
+      "Detail views",
+      "Detail profile lines",
+      "Arrowhead",
+      "in",
+      "Detail profile label",
+      "in",
+      "Detail profile style",
+      "Show detail view profile",
+      "Clip border to geometry",
+      "Auxiliary views",
+      "Show view reference indicator",
+      "View reference format",
+      "Viewing lines",
+      "Arrowhead",
+      "in",
+      "Viewing line label",
+      "in",
+      "View label prefix",
+      "View label style",
+      "View label suffix",
+      "Break views",
+      "Break lines",
+      "Cosmetic threads",
+      "Thread style",
+      "Thickness",
+      "Dashes",
+      "Flat pattern views",
+      "All bend lines",
+      "Up bend lines",
+      "Down bend lines",
+      "Bend tangent edges",
+      "Counterbore/Countersink up",
+      "Counterbore/Countersink down",
+      "Form tear",
+      "Form up",
+      "Form down",
+      "Form centermarks"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "First angle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Hidden"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Off"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Off"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Shown"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Phantom"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "In line"
+      },
+      {
+       "label": "Show detail view profile",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Clip border to geometry",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show view reference indicator",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "A-A"
+      },
+      {
+       "label": "Break lines",
+       "kind": "select",
+       "value": "0.25 mm"
+      },
+      {
+       "label": "Thread style Thickness Dashes",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Thread style Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      }
      ]
     },
     "dialogs": [],
@@ -698,7 +1772,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -708,6 +1782,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -715,6 +1793,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -722,6 +1804,10 @@
       {
        "name": "Left",
        "kind": "projected",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -729,6 +1815,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -738,7 +1828,7 @@
      "selection": []
     }
    },
-   "t": 332023
+   "t": 338717
   },
   {
    "step": 7,
@@ -760,33 +1850,286 @@
       "Views",
       "All views",
       "Projection angle",
-      "First angle",
-      "Third angle",
       "Visible edges",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm",
-      "0.25 mm",
-      "0.30 mm",
-      "0.35 mm",
-      "0.40 mm",
-      "0.50 mm",
-      "0.53 mm",
-      "0.60 mm",
-      "0.70 mm",
-      "0.80 mm",
-      "0.90 mm",
-      "1.00 mm",
-      "1.20 mm",
-      "1.40 mm",
-      "1.60 mm",
-      "2.00 mm",
       "View labels",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal"
+      "in",
+      "Insert view defaults",
+      "View simplification",
+      "Hidden lines",
+      "Tangent edges",
+      "Scale label",
+      "Auto centermarks (Parts)",
+      "Auto centerlines (Parts)",
+      "Threads (Parts)",
+      "Bend lines (Parts)",
+      "Bend notes (Parts)",
+      "Hidden edges",
+      "Thickness",
+      "Dashes",
+      "Tangent edges",
+      "Thickness",
+      "Dashes",
+      "Exploded lines",
+      "Thickness",
+      "Dashes",
+      "Section views",
+      "Cutting lines",
+      "Arrowhead",
+      "in",
+      "Cutting line label",
+      "in",
+      "View and region hatches",
+      "Hatch pattern",
+      "ANSI31 general",
+      "Detail views",
+      "Detail profile lines",
+      "Arrowhead",
+      "in",
+      "Detail profile label",
+      "in",
+      "Detail profile style",
+      "Show detail view profile",
+      "Clip border to geometry",
+      "Auxiliary views",
+      "Show view reference indicator",
+      "View reference format",
+      "Viewing lines",
+      "Arrowhead",
+      "in",
+      "Viewing line label",
+      "in",
+      "View label prefix",
+      "View label style",
+      "View label suffix",
+      "Break views",
+      "Break lines",
+      "Cosmetic threads",
+      "Thread style",
+      "Thickness",
+      "Dashes",
+      "Flat pattern views",
+      "All bend lines",
+      "Up bend lines",
+      "Down bend lines",
+      "Bend tangent edges",
+      "Counterbore/Countersink up",
+      "Counterbore/Countersink down",
+      "Form tear",
+      "Form up",
+      "Form down",
+      "Form centermarks"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "First angle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Hidden"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Off"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Off"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Shown"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Phantom"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "In line"
+      },
+      {
+       "label": "Show detail view profile",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Clip border to geometry",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show view reference indicator",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "A-A"
+      },
+      {
+       "label": "Break lines",
+       "kind": "select",
+       "value": "0.25 mm"
+      },
+      {
+       "label": "Thread style Thickness Dashes",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Thread style Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      }
      ]
     },
     "dialogs": [],
@@ -809,7 +2152,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -819,6 +2162,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -826,6 +2173,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -833,6 +2184,10 @@
       {
        "name": "Left",
        "kind": "projected",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -840,6 +2195,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -849,7 +2208,7 @@
      "selection": []
     }
    },
-   "t": 346998
+   "t": 363313
   },
   {
    "step": 8,
@@ -875,33 +2234,286 @@
       "Views",
       "All views",
       "Projection angle",
-      "First angle",
-      "Third angle",
       "Visible edges",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm",
-      "0.25 mm",
-      "0.30 mm",
-      "0.35 mm",
-      "0.40 mm",
-      "0.50 mm",
-      "0.53 mm",
-      "0.60 mm",
-      "0.70 mm",
-      "0.80 mm",
-      "0.90 mm",
-      "1.00 mm",
-      "1.20 mm",
-      "1.40 mm",
-      "1.60 mm",
-      "2.00 mm",
       "View labels",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal"
+      "in",
+      "Insert view defaults",
+      "View simplification",
+      "Hidden lines",
+      "Tangent edges",
+      "Scale label",
+      "Auto centermarks (Parts)",
+      "Auto centerlines (Parts)",
+      "Threads (Parts)",
+      "Bend lines (Parts)",
+      "Bend notes (Parts)",
+      "Hidden edges",
+      "Thickness",
+      "Dashes",
+      "Tangent edges",
+      "Thickness",
+      "Dashes",
+      "Exploded lines",
+      "Thickness",
+      "Dashes",
+      "Section views",
+      "Cutting lines",
+      "Arrowhead",
+      "in",
+      "Cutting line label",
+      "in",
+      "View and region hatches",
+      "Hatch pattern",
+      "ANSI31 general",
+      "Detail views",
+      "Detail profile lines",
+      "Arrowhead",
+      "in",
+      "Detail profile label",
+      "in",
+      "Detail profile style",
+      "Show detail view profile",
+      "Clip border to geometry",
+      "Auxiliary views",
+      "Show view reference indicator",
+      "View reference format",
+      "Viewing lines",
+      "Arrowhead",
+      "in",
+      "Viewing line label",
+      "in",
+      "View label prefix",
+      "View label style",
+      "View label suffix",
+      "Break views",
+      "Break lines",
+      "Cosmetic threads",
+      "Thread style",
+      "Thickness",
+      "Dashes",
+      "Flat pattern views",
+      "All bend lines",
+      "Up bend lines",
+      "Down bend lines",
+      "Bend tangent edges",
+      "Counterbore/Countersink up",
+      "Counterbore/Countersink down",
+      "Form tear",
+      "Form up",
+      "Form down",
+      "Form centermarks"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "First angle"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.40 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Hidden"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Off"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Off"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Shown"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "On"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "Thickness Dashes",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Phantom"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "In line"
+      },
+      {
+       "label": "Show detail view profile",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Clip border to geometry",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show view reference indicator",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "A-A"
+      },
+      {
+       "label": "Break lines",
+       "kind": "select",
+       "value": "0.25 mm"
+      },
+      {
+       "label": "Thread style Thickness Dashes",
+       "kind": "select",
+       "value": "ANSI"
+      },
+      {
+       "label": "Thread style Thickness Dashes",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.13 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "0.15 mm"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Center"
+      }
      ]
     },
     "dialogs": [],
@@ -924,7 +2536,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -934,6 +2546,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -941,6 +2557,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -948,6 +2568,10 @@
       {
        "name": "Left",
        "kind": "projected",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -955,6 +2579,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -964,7 +2592,7 @@
      "selection": []
     }
    },
-   "t": 363471
+   "t": 389299
   }
  ]
 }

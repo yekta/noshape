@@ -1,0 +1,6175 @@
+{
+  "scenario": "drw-hcallout-palette-fit-tips",
+  "recorded": "2026-11-17T11:57:16.081Z",
+  "app": {
+    "name": "live",
+    "version": "web runtime 303901ce5388bd1d8370",
+    "platform": "linux (Chrome over CDP, software GL)",
+    "viewport": [
+      1919,
+      992
+    ],
+    "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.5"
+  },
+  "live": {
+    "document": "5337f675c06cff98a9e89387",
+    "workspace": "43a8565f5c2f4c8c1459dc4f",
+    "element": "20744a96a66ae0e8033a18e2",
+    "start": "holes-plate-drawing",
+    "startElement": "beaf48ecb256fc95fb522a05",
+    "runner": "live2 .nstate-uip-3.json"
+  },
+  "start": {
+    "focus": {
+      "kind": "other",
+      "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+      "count": 0,
+      "items": []
+    },
+    "features": {
+      "rows": [],
+      "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+      "undo": false,
+      "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+      "tab": "Part 1 Drawing 1 (2)",
+      "sheet": "Sheet1",
+      "sheets": [
+        "Sheet1"
+      ],
+      "tool": null,
+      "views": [
+        {
+          "name": "Front",
+          "kind": "base",
+          "position": [
+            81,
+            81
+          ],
+          "parent": null,
+          "scale": "1:1",
+          "brokenOut": 0
+        },
+        {
+          "name": "Isometric",
+          "kind": "isometric",
+          "position": [
+            198.4,
+            160.8
+          ],
+          "parent": "Front",
+          "scale": "1:1",
+          "brokenOut": 0
+        },
+        {
+          "name": "Right",
+          "kind": "projected",
+          "position": [
+            198.4,
+            81
+          ],
+          "parent": "Front",
+          "scale": "1:1",
+          "brokenOut": 0
+        },
+        {
+          "name": "Top",
+          "kind": "projected",
+          "position": [
+            81,
+            160.8
+          ],
+          "parent": "Front",
+          "scale": "1:1",
+          "brokenOut": 0
+        }
+      ],
+      "annotations": [],
+      "selection": []
+    }
+  },
+  "steps": [
+    {
+      "step": 1,
+      "do": {
+        "do": "click",
+        "on": {
+          "tool": "Hole/thread callout"
+        }
+      },
+      "ok": true,
+      "at": [
+        570,
+        59
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": "Hole/thread callout",
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [],
+          "selection": []
+        }
+      },
+      "t": 228530
+    },
+    {
+      "step": 2,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": "Hole/thread callout",
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [],
+          "selection": []
+        }
+      },
+      "t": 253837
+    },
+    {
+      "step": 3,
+      "do": {
+        "do": "click",
+        "on": {
+          "view_edge": {
+            "view": "Top",
+            "at": [
+              11.7678,
+              11.7678,
+              0
+            ]
+          }
+        }
+      },
+      "ok": true,
+      "at": [
+        678,
+        358
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": "Hole/thread callout",
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 282561
+    },
+    {
+      "step": 4,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": "Hole/thread callout",
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 308412
+    },
+    {
+      "step": 5,
+      "do": {
+        "do": "click",
+        "on": {
+          "view_point": {
+            "view": "Top",
+            "at": [
+              30,
+              25,
+              0
+            ]
+          }
+        }
+      },
+      "ok": true,
+      "at": [
+        749,
+        306
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": "Hole/thread callout",
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": []
+        }
+      },
+      "t": 334511
+    },
+    {
+      "step": 6,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 1500
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": "Hole/thread callout",
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": []
+        }
+      },
+      "t": 363347
+    },
+    {
+      "step": 7,
+      "do": {
+        "do": "key",
+        "key": "Escape"
+      },
+      "ok": true,
+      "pointer": {
+        "at": [
+          856,
+          33
+        ],
+        "hover": [],
+        "element": "div.navbar-document-and-workspace-names.os-row"
+      },
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 390674
+    },
+    {
+      "step": 8,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 1500
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 417847
+    },
+    {
+      "step": 9,
+      "do": {
+        "do": "rclick",
+        "on": {
+          "sheet_point": [
+            97.8,
+            166.1
+          ]
+        }
+      },
+      "ok": true,
+      "at": [
+        815,
+        305
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": {
+          "kind": "menu",
+          "name": "RmbMenu",
+          "rows": [
+            "Edit...",
+            "Copy",
+            "Paste as table",
+            "Add leader",
+            "",
+            "Add comment",
+            "",
+            "Clear selection",
+            "Zoom to fit",
+            "Delete"
+          ],
+          "checked": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "disabled": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "highlighted": 1
+        },
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 444320
+    },
+    {
+      "step": 10,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 1200
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": {
+          "kind": "menu",
+          "name": "RmbMenu",
+          "rows": [
+            "Edit...",
+            "Copy",
+            "Paste as table",
+            "Add leader",
+            "",
+            "Add comment",
+            "",
+            "Clear selection",
+            "Zoom to fit",
+            "Delete"
+          ],
+          "checked": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "disabled": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "highlighted": 1
+        },
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 470403
+    },
+    {
+      "step": 11,
+      "do": {
+        "do": "click",
+        "on": {
+          "menu": "Edit..."
+        }
+      },
+      "ok": true,
+      "at": [
+        871,
+        283
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": false
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 495838
+    },
+    {
+      "step": 12,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 2500
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": false
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 523226
+    },
+    {
+      "step": 13,
+      "do": {
+        "do": "click",
+        "on": {
+          "checkbox": "Override precision/tolerance"
+        }
+      },
+      "ok": true,
+      "at": [
+        1020,
+        383
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 548786
+    },
+    {
+      "step": 14,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 1500
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 574414
+    },
+    {
+      "step": 15,
+      "do": {
+        "do": "click",
+        "on": {
+          "px": [
+            1005,
+            412
+          ]
+        },
+        "ours_on": {
+          "dropdown": "Tolerance"
+        }
+      },
+      "ok": true,
+      "at": [
+        1005,
+        412
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": {
+          "kind": "menu",
+          "name": "DimPal_HoleParameterToleranceDisplayMenu",
+          "rows": [
+            "None",
+            "Symmetrical",
+            "Deviation",
+            "Limits",
+            "MIN",
+            "MAX",
+            "Fit",
+            "Fit with tolerance",
+            "Fit (Tolerance only)"
+          ],
+          "checked": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "disabled": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "highlighted": -1
+        },
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 600734
+    },
+    {
+      "step": 16,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 1000
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": {
+          "kind": "menu",
+          "name": "DimPal_HoleParameterToleranceDisplayMenu",
+          "rows": [
+            "None",
+            "Symmetrical",
+            "Deviation",
+            "Limits",
+            "MIN",
+            "MAX",
+            "Fit",
+            "Fit with tolerance",
+            "Fit (Tolerance only)"
+          ],
+          "checked": [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "disabled": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "highlighted": -1
+        },
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 626724
+    },
+    {
+      "step": 17,
+      "do": {
+        "do": "click",
+        "on": {
+          "menu": "Fit"
+        }
+      },
+      "ok": true,
+      "at": [
+        1065,
+        599
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 654429
+    },
+    {
+      "step": 18,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 1500
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 680320
+    },
+    {
+      "step": 19,
+      "do": {
+        "do": "hover",
+        "on": {
+          "px": [
+            1025,
+            380
+          ]
+        },
+        "ours_on": {
+          "button": "Toggle stacked visibility"
+        }
+      },
+      "ok": true,
+      "at": [
+        1025,
+        380
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": "Toggle stacked visibility",
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 705966
+    },
+    {
+      "step": 20,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 734206
+    },
+    {
+      "step": 21,
+      "do": {
+        "do": "hover",
+        "on": {
+          "px": [
+            1071,
+            412
+          ]
+        },
+        "ours_on": {
+          "dropdown": "Fit type"
+        }
+      },
+      "ok": true,
+      "at": [
+        1071,
+        412
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": "Fit type",
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 760787
+    },
+    {
+      "step": 22,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 788119
+    },
+    {
+      "step": 23,
+      "do": {
+        "do": "click",
+        "on": {
+          "px": [
+            1123,
+            412
+          ]
+        },
+        "ours_on": {
+          "dropdown": "Fit class"
+        }
+      },
+      "ok": true,
+      "at": [
+        1123,
+        412
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": {
+          "kind": "menu",
+          "name": "Hole_FitClassTypes_Menu",
+          "rows": [
+            "User defined",
+            "Clearance",
+            "Transition",
+            "Interference"
+          ],
+          "checked": [
+            false,
+            true,
+            false,
+            false
+          ],
+          "disabled": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "highlighted": -1
+        },
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 813483
+    },
+    {
+      "step": 24,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 1000
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": {
+          "kind": "menu",
+          "name": "Hole_FitClassTypes_Menu",
+          "rows": [
+            "User defined",
+            "Clearance",
+            "Transition",
+            "Interference"
+          ],
+          "checked": [
+            false,
+            true,
+            false,
+            false
+          ],
+          "disabled": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "highlighted": -1
+        },
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 839070
+    },
+    {
+      "step": 25,
+      "do": {
+        "do": "click",
+        "on": {
+          "px": [
+            1123,
+            412
+          ]
+        },
+        "ours_on": {
+          "dropdown": "Fit class"
+        }
+      },
+      "ok": true,
+      "at": [
+        1123,
+        412
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 867488
+    },
+    {
+      "step": 26,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 1000
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 892807
+    },
+    {
+      "step": 27,
+      "do": {
+        "do": "hover",
+        "on": {
+          "px": [
+            1157,
+            412
+          ]
+        },
+        "ours_on": {
+          "dropdown": "Hole class"
+        }
+      },
+      "ok": true,
+      "at": [
+        1157,
+        412
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": "Hole class",
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 918761
+    },
+    {
+      "step": 28,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 944417
+    },
+    {
+      "step": 29,
+      "do": {
+        "do": "hover",
+        "on": {
+          "px": [
+            1265,
+            412
+          ]
+        },
+        "ours_on": {
+          "dropdown": "Fit standard"
+        }
+      },
+      "ok": true,
+      "at": [
+        1265,
+        412
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": "Fit standard",
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 970359
+    },
+    {
+      "step": 30,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 998454
+    },
+    {
+      "step": 31,
+      "do": {
+        "do": "click",
+        "on": {
+          "px": [
+            1005,
+            412
+          ]
+        },
+        "ours_on": {
+          "dropdown": "Tolerance"
+        }
+      },
+      "ok": true,
+      "at": [
+        1005,
+        412
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": {
+          "kind": "menu",
+          "name": "DimPal_HoleParameterToleranceDisplayMenu",
+          "rows": [
+            "None",
+            "Symmetrical",
+            "Deviation",
+            "Limits",
+            "MIN",
+            "MAX",
+            "Fit",
+            "Fit with tolerance",
+            "Fit (Tolerance only)"
+          ],
+          "checked": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            false
+          ],
+          "disabled": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "highlighted": -1
+        },
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 1023186
+    },
+    {
+      "step": 32,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 1000
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": {
+          "kind": "menu",
+          "name": "DimPal_HoleParameterToleranceDisplayMenu",
+          "rows": [
+            "None",
+            "Symmetrical",
+            "Deviation",
+            "Limits",
+            "MIN",
+            "MAX",
+            "Fit",
+            "Fit with tolerance",
+            "Fit (Tolerance only)"
+          ],
+          "checked": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            false
+          ],
+          "disabled": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "highlighted": -1
+        },
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 1051051
+    },
+    {
+      "step": 33,
+      "do": {
+        "do": "click",
+        "on": {
+          "menu": "Fit with tolerance"
+        }
+      },
+      "ok": true,
+      "at": [
+        1065,
+        625
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 1079402
+    },
+    {
+      "step": 34,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 1500
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 1108213
+    },
+    {
+      "step": 35,
+      "do": {
+        "do": "hover",
+        "on": {
+          "px": [
+            1224,
+            412
+          ]
+        },
+        "ours_on": {
+          "dropdown": "Fit tolerance precision"
+        }
+      },
+      "ok": true,
+      "at": [
+        1224,
+        412
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": "Fit tolerance precision",
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 1135684
+    },
+    {
+      "step": 36,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 1161452
+    },
+    {
+      "step": 37,
+      "do": {
+        "do": "shot",
+        "name": "end"
+      },
+      "ok": true,
+      "shot": "/root/live-scratch/hc/new-shots/drw-hcallout-palette-fit-tips-end.png",
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "palette",
+          "title": "Dimension palette",
+          "fields": [
+            {
+              "label": "Text above",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Prefix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Quantity",
+              "kind": "combo",
+              "value": "3X"
+            },
+            {
+              "label": "Value",
+              "kind": "text",
+              "value": "∅ .197 THRU"
+            },
+            {
+              "label": "Units",
+              "kind": "select",
+              "value": "(in)"
+            },
+            {
+              "label": "Suffix",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Text below",
+              "kind": "input",
+              "value": ""
+            },
+            {
+              "label": "Override precision/tolerance",
+              "kind": "checkbox",
+              "value": true
+            },
+            {
+              "label": "Precision",
+              "kind": "combo",
+              "value": ".197"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 1186374
+    },
+    {
+      "step": 38,
+      "do": {
+        "do": "key",
+        "key": "Escape"
+      },
+      "ok": true,
+      "pointer": {
+        "at": [
+          856,
+          33
+        ],
+        "hover": [],
+        "element": "div.navbar-document-and-workspace-names.os-row"
+      },
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 1214076
+    },
+    {
+      "step": 39,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": [
+            {
+              "kind": "EDGE",
+              "owner": "Top"
+            }
+          ]
+        }
+      },
+      "t": 1239491
+    },
+    {
+      "step": 40,
+      "do": {
+        "do": "key",
+        "key": "Escape"
+      },
+      "ok": true,
+      "pointer": {
+        "at": [
+          856,
+          33
+        ],
+        "hover": [],
+        "element": "div.navbar-document-and-workspace-names.os-row"
+      },
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": []
+        }
+      },
+      "t": 1267281
+    },
+    {
+      "step": 41,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 600
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (2)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "callout",
+              "text": "3X %%c.197",
+              "position": [
+                97.9,
+                166
+              ]
+            }
+          ],
+          "selection": []
+        }
+      },
+      "t": 1294366
+    }
+  ]
+}

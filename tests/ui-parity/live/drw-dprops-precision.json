@@ -1,23 +1,23 @@
 {
  "scenario": "drw-dprops-precision",
- "recorded": "2026-11-16T00:56:04.996Z",
+ "recorded": "2026-11-17T12:11:10.082Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
   "viewport": [
    1919,
-   1079
+   992
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.5"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "c32a4bfbe63b90fe3a7eb7ac",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "b07d56c03d866589a9b1665b",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1 (3)",
+   "tab": "Part 1 Drawing 1 (1)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -141,7 +141,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -197,7 +197,7 @@
      "selection": []
     }
    },
-   "t": 232193
+   "t": 230290
   },
   {
    "step": 2,
@@ -216,8 +216,8 @@
    },
    "ok": true,
    "at": [
-    727,
-    672
+    749,
+    619
    ],
    "state": {
     "focus": {
@@ -245,7 +245,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -306,7 +306,7 @@
      ]
     }
    },
-   "t": 259142
+   "t": 256429
   },
   {
    "step": 3,
@@ -325,8 +325,8 @@
    },
    "ok": true,
    "at": [
-    727,
-    637
+    749,
+    587
    ],
    "state": {
     "focus": {
@@ -354,7 +354,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -412,14 +412,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 287272
+   "t": 282947
   },
   {
    "step": 4,
@@ -462,7 +462,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -520,14 +520,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 315432
+   "t": 308757
   },
   {
    "step": 5,
@@ -537,7 +537,6 @@
     "ms": 1500
    },
    "ok": true,
-   "closedTab": "https://cad.onshape.com/documents?nodeId=0&resourceType=filter",
    "state": {
     "focus": {
      "kind": "other",
@@ -564,7 +563,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -622,14 +621,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 342836
+   "t": 334344
   },
   {
    "step": 6,
@@ -644,8 +643,8 @@
    },
    "ok": true,
    "at": [
-    1023,
-    569
+    1019,
+    525
    ],
    "state": {
     "focus": {
@@ -704,7 +703,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -762,14 +761,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 369922
+   "t": 359734
   },
   {
    "step": 7,
@@ -781,8 +780,8 @@
    },
    "ok": true,
    "at": [
-    1095,
-    594
+    1091,
+    550
    ],
    "state": {
     "focus": {
@@ -797,32 +796,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -942,7 +936,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1000,14 +994,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 397114
+   "t": 385855
   },
   {
    "step": 8,
@@ -1030,32 +1024,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -1175,7 +1164,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1233,14 +1222,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 425651
+   "t": 411982
   },
   {
    "step": 9,
@@ -1252,7 +1241,7 @@
    },
    "ok": true,
    "at": [
-    1826,
+    1817,
     307
    ],
    "via": "native select in the drawing: marked for the next menu step (its popup is not in the DOM)",
@@ -1269,32 +1258,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -1414,7 +1398,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1472,14 +1456,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 444101
+   "t": 426656
   },
   {
    "step": 10,
@@ -1505,32 +1489,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -1650,7 +1629,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1708,14 +1687,14 @@
        "text": "1.57",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 460109
+   "t": 440688
   },
   {
    "step": 11,
@@ -1738,32 +1717,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -1883,7 +1857,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1941,14 +1915,14 @@
        "text": "1.57",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 487995
+   "t": 466683
   }
  ]
 }

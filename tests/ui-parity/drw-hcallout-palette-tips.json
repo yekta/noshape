@@ -1,0 +1,316 @@
+{
+ "name": "drw-hcallout-palette-tips",
+ "about": "holes-plate-drawing: Hole/thread callout (3X ∅.197 THRU) › Edit...: hover each palette control (tooltips: Count type, Dimension units, Insert symbol, Inspection dimension, Dual dimension, the override checkbox) and open/close the Count type, units and Dual dimension lists. Palette controls have no labels: by screen point (px), valid for this placement only",
+ "area": "drawing",
+ "source": "studios drawing matrix (Hole/thread callout: 27 unseen), live 11-17: palette mapped on lane 3 (live/feel notes /root/live-scratch/hc/palette-notes.md)",
+ "start": "holes-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole/thread callout"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      11.7678,
+      11.7678,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      30,
+      25,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     97.8,
+     166.1
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1056,
+     321
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Count type"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1056,
+     321
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Count type"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1056,
+     321
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Count type"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1250,
+     321
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Units"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1250,
+     321
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Units"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1250,
+     321
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Units"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     899,
+     380
+    ]
+   },
+   "ours_on": {
+    "button": "Symbols"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     938,
+     380
+    ]
+   },
+   "ours_on": {
+    "button": "Inspection dimension"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     978,
+     380
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Dual dimension"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     978,
+     380
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Dual dimension"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     978,
+     380
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Dual dimension"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1099,
+     382
+    ]
+   },
+   "ours_on": {
+    "checkbox": "Override precision/tolerance"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "shot",
+   "name": "end"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  }
+ ]
+}

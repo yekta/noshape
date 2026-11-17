@@ -1,23 +1,23 @@
 {
  "scenario": "drw-dprops-chamfer",
- "recorded": "2026-11-16T00:37:11.742Z",
+ "recorded": "2026-11-17T11:47:31.824Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
   "viewport": [
    1919,
-   1079
+   992
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.5"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "999cc5ba31308f3d23369e77",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "fae3ca9093287747f022f5cd",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1 (3)",
+   "tab": "Part 1 Drawing 1 (1)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -115,8 +115,8 @@
    },
    "ok": true,
    "at": [
-    1023,
-    569
+    1019,
+    525
    ],
    "state": {
     "focus": {
@@ -175,7 +175,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -231,7 +231,7 @@
      "selection": []
     }
    },
-   "t": 237418
+   "t": 233031
   },
   {
    "step": 2,
@@ -243,8 +243,8 @@
    },
    "ok": true,
    "at": [
-    1095,
-    594
+    1091,
+    550
    ],
    "state": {
     "focus": {
@@ -259,32 +259,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -404,7 +399,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -460,7 +455,7 @@
      "selection": []
     }
    },
-   "t": 263969
+   "t": 259765
   },
   {
    "step": 3,
@@ -483,32 +478,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -628,7 +618,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -684,7 +674,7 @@
      "selection": []
     }
    },
-   "t": 291608
+   "t": 286708
   },
   {
    "step": 4,
@@ -706,38 +696,40 @@
     },
     "dialog": {
      "kind": "drawing-panel",
-     "title": "Drawing properties",
+     "title": "Dimensions",
      "text": [
-      "Drawing properties",
       "Dimensions",
       "All dimensions",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
-      "Arrowhead"
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default"
      ],
      "fields": [
       {
@@ -814,11 +806,6 @@
        "label": "Show dimension lines by default",
        "kind": "checkbox",
        "value": false
-      },
-      {
-       "label": "Lock drawing properties",
-       "kind": "checkbox",
-       "value": false
       }
      ]
     },
@@ -842,7 +829,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -898,7 +885,7 @@
      "selection": []
     }
    },
-   "t": 317210
+   "t": 311568
   },
   {
    "step": 5,
@@ -915,38 +902,40 @@
     },
     "dialog": {
      "kind": "drawing-panel",
-     "title": "Drawing properties",
+     "title": "Dimensions",
      "text": [
-      "Drawing properties",
       "Dimensions",
       "All dimensions",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
-      "Arrowhead"
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default"
      ],
      "fields": [
       {
@@ -1023,11 +1012,6 @@
        "label": "Show dimension lines by default",
        "kind": "checkbox",
        "value": false
-      },
-      {
-       "label": "Lock drawing properties",
-       "kind": "checkbox",
-       "value": false
       }
      ]
     },
@@ -1051,7 +1035,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1107,7 +1091,7 @@
      "selection": []
     }
    },
-   "t": 343560
+   "t": 337471
   },
   {
    "step": 6,
@@ -1130,38 +1114,40 @@
     },
     "dialog": {
      "kind": "drawing-panel",
-     "title": "Drawing properties",
+     "title": "Dimensions",
      "text": [
-      "Drawing properties",
       "Dimensions",
       "All dimensions",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
-      "Arrowhead"
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default"
      ],
      "fields": [
       {
@@ -1238,11 +1224,6 @@
        "label": "Show dimension lines by default",
        "kind": "checkbox",
        "value": false
-      },
-      {
-       "label": "Lock drawing properties",
-       "kind": "checkbox",
-       "value": false
       }
      ]
     },
@@ -1266,7 +1247,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1322,7 +1303,7 @@
      "selection": []
     }
    },
-   "t": 359030
+   "t": 351616
   },
   {
    "step": 7,
@@ -1342,38 +1323,40 @@
     },
     "dialog": {
      "kind": "drawing-panel",
-     "title": "Drawing properties",
+     "title": "Dimensions",
      "text": [
-      "Drawing properties",
       "Dimensions",
       "All dimensions",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
-      "Arrowhead"
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default"
      ],
      "fields": [
       {
@@ -1450,11 +1433,6 @@
        "label": "Show dimension lines by default",
        "kind": "checkbox",
        "value": false
-      },
-      {
-       "label": "Lock drawing properties",
-       "kind": "checkbox",
-       "value": false
       }
      ]
     },
@@ -1478,7 +1456,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1534,7 +1512,7 @@
      "selection": []
     }
    },
-   "t": 373178
+   "t": 366074
   },
   {
    "step": 8,
@@ -1551,38 +1529,40 @@
     },
     "dialog": {
      "kind": "drawing-panel",
-     "title": "Drawing properties",
+     "title": "Dimensions",
      "text": [
-      "Drawing properties",
       "Dimensions",
       "All dimensions",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
-      "Arrowhead"
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default"
      ],
      "fields": [
       {
@@ -1659,11 +1639,6 @@
        "label": "Show dimension lines by default",
        "kind": "checkbox",
        "value": false
-      },
-      {
-       "label": "Lock drawing properties",
-       "kind": "checkbox",
-       "value": false
       }
      ]
     },
@@ -1687,7 +1662,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1743,7 +1718,7 @@
      "selection": []
     }
    },
-   "t": 399085
+   "t": 390890
   },
   {
    "step": 9,
@@ -1766,38 +1741,40 @@
     },
     "dialog": {
      "kind": "drawing-panel",
-     "title": "Drawing properties",
+     "title": "Dimensions",
      "text": [
-      "Drawing properties",
       "Dimensions",
       "All dimensions",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
-      "Arrowhead"
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default"
      ],
      "fields": [
       {
@@ -1874,11 +1851,6 @@
        "label": "Show dimension lines by default",
        "kind": "checkbox",
        "value": false
-      },
-      {
-       "label": "Lock drawing properties",
-       "kind": "checkbox",
-       "value": false
       }
      ]
     },
@@ -1902,7 +1874,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1958,7 +1930,7 @@
      "selection": []
     }
    },
-   "t": 414468
+   "t": 405922
   },
   {
    "step": 10,
@@ -1978,38 +1950,40 @@
     },
     "dialog": {
      "kind": "drawing-panel",
-     "title": "Drawing properties",
+     "title": "Dimensions",
      "text": [
-      "Drawing properties",
       "Dimensions",
       "All dimensions",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
-      "Arrowhead"
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default"
      ],
      "fields": [
       {
@@ -2086,11 +2060,6 @@
        "label": "Show dimension lines by default",
        "kind": "checkbox",
        "value": false
-      },
-      {
-       "label": "Lock drawing properties",
-       "kind": "checkbox",
-       "value": false
       }
      ]
     },
@@ -2114,7 +2083,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2170,7 +2139,7 @@
      "selection": []
     }
    },
-   "t": 429233
+   "t": 420445
   },
   {
    "step": 11,
@@ -2187,38 +2156,40 @@
     },
     "dialog": {
      "kind": "drawing-panel",
-     "title": "Drawing properties",
+     "title": "Dimensions",
      "text": [
-      "Drawing properties",
       "Dimensions",
       "All dimensions",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
-      "Arrowhead"
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default"
      ],
      "fields": [
       {
@@ -2295,11 +2266,6 @@
        "label": "Show dimension lines by default",
        "kind": "checkbox",
        "value": false
-      },
-      {
-       "label": "Lock drawing properties",
-       "kind": "checkbox",
-       "value": false
       }
      ]
     },
@@ -2323,7 +2289,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2379,7 +2345,7 @@
      "selection": []
     }
    },
-   "t": 456349
+   "t": 445628
   },
   {
    "step": 12,
@@ -2400,38 +2366,40 @@
     },
     "dialog": {
      "kind": "drawing-panel",
-     "title": "Drawing properties",
+     "title": "Dimensions",
      "text": [
-      "Drawing properties",
       "Dimensions",
       "All dimensions",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
-      "Arrowhead"
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default"
      ],
      "fields": [
       {
@@ -2508,11 +2476,6 @@
        "label": "Show dimension lines by default",
        "kind": "checkbox",
        "value": false
-      },
-      {
-       "label": "Lock drawing properties",
-       "kind": "checkbox",
-       "value": false
       }
      ]
     },
@@ -2536,7 +2499,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2592,7 +2555,7 @@
      "selection": []
     }
    },
-   "t": 483653
+   "t": 472412
   },
   {
    "step": 13,
@@ -2609,38 +2572,40 @@
     },
     "dialog": {
      "kind": "drawing-panel",
-     "title": "Drawing properties",
+     "title": "Dimensions",
      "text": [
-      "Drawing properties",
       "Dimensions",
       "All dimensions",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
-      "Arrowhead"
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Underline overridden dimensions",
+      "Break dimension by default",
+      "Fit standard",
+      "Gaps and extensions",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Lock the angle of all jogged dimensions to 45 degrees",
+      "Chamfer dimensions",
+      "45 degree style",
+      "45 degree content",
+      "Non 45 degree style",
+      "Non 45 degree content",
+      "Length precision",
+      "Angle precision",
+      "Ordinate dimensions",
+      "Dimension style",
+      "Diameter and radial dimensions",
+      "Show dimension lines by default"
      ],
      "fields": [
       {
@@ -2717,11 +2682,6 @@
        "label": "Show dimension lines by default",
        "kind": "checkbox",
        "value": false
-      },
-      {
-       "label": "Lock drawing properties",
-       "kind": "checkbox",
-       "value": false
       }
      ]
     },
@@ -2745,7 +2705,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (3)",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2801,7 +2761,7 @@
      "selection": []
     }
    },
-   "t": 510577
+   "t": 497908
   }
  ]
 }

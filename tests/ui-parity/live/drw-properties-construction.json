@@ -1,19 +1,23 @@
 {
  "scenario": "drw-properties-construction",
- "recorded": "2026-11-15T04:50:10.927Z",
+ "recorded": "2026-11-17T14:42:51.214Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "eaefcf1d778d0130518bf3be",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "94358593a0b17193f23c9609",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -41,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (2)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -112,7 +116,7 @@
    "ok": true,
    "at": [
     980,
-    526
+    485
    ],
    "state": {
     "focus": {
@@ -122,7 +126,38 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Paste as table",
+      "Sheet properties...",
+      "Drawing properties...",
+      "",
+      "Zoom to fit",
+      "Zoom to window",
+      "Zoom to sheet"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -140,7 +175,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -196,7 +231,7 @@
      "selection": []
     }
    },
-   "t": 228448
+   "t": 230448
   },
   {
    "step": 2,
@@ -208,8 +243,8 @@
    },
    "ok": true,
    "at": [
-    1021,
-    551
+    1052,
+    511
    ],
    "state": {
     "focus": {
@@ -224,32 +259,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -369,7 +399,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -425,7 +455,7 @@
      "selection": []
     }
    },
-   "t": 255093
+   "t": 255933
   },
   {
    "step": 3,
@@ -448,32 +478,27 @@
       "Units and precision",
       "Primary",
       "Units",
-      "Millimeters",
-      "Centimeters",
-      "Meters",
-      "Inches",
-      "Inches fractional",
-      "Feet and inches",
-      "Feet",
-      "Yards",
       "Decimal separator",
-      "Period",
-      "Comma",
       "Precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345",
-      "0.123456",
       "Tolerance precision",
-      "0",
-      "0.1",
-      "0.12",
-      "0.123",
-      "0.1234",
-      "0.12345"
+      "Angular precision",
+      "Angular tolerance precision",
+      "Fit class tolerance precision",
+      "Dual",
+      "Show dual dimensions",
+      "Show dual unit",
+      "Dimension location",
+      "Hole/thread callout location",
+      "Units",
+      "Precision",
+      "Tolerance precision",
+      "Leading and trailing zeros",
+      "Length leading zeros",
+      "Length trailing zeros",
+      "Length tolerance leading zeros",
+      "Length tolerance trailing zeros",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -593,7 +618,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -649,7 +674,7 @@
      "selection": []
     }
    },
-   "t": 282449
+   "t": 283447
   },
   {
    "step": 4,
@@ -677,32 +702,25 @@
       "Construction geometry",
       "Created in drawing",
       "Virtual sharps",
-      "Centermark",
-      "Edge extension",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm",
-      "0.25 mm",
-      "0.30 mm",
-      "0.35 mm",
-      "0.40 mm",
-      "0.50 mm",
-      "0.53 mm",
-      "0.60 mm",
-      "0.70 mm",
-      "0.80 mm",
-      "0.90 mm",
-      "1.00 mm",
-      "1.20 mm",
-      "1.40 mm",
-      "1.60 mm",
-      "2.00 mm",
       "Sketch geometry",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm"
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -792,7 +810,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -848,7 +866,7 @@
      "selection": []
     }
    },
-   "t": 308352
+   "t": 308252
   },
   {
    "step": 5,
@@ -871,32 +889,25 @@
       "Construction geometry",
       "Created in drawing",
       "Virtual sharps",
-      "Centermark",
-      "Edge extension",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm",
-      "0.25 mm",
-      "0.30 mm",
-      "0.35 mm",
-      "0.40 mm",
-      "0.50 mm",
-      "0.53 mm",
-      "0.60 mm",
-      "0.70 mm",
-      "0.80 mm",
-      "0.90 mm",
-      "1.00 mm",
-      "1.20 mm",
-      "1.40 mm",
-      "1.60 mm",
-      "2.00 mm",
       "Sketch geometry",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm"
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -986,7 +997,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1042,7 +1053,7 @@
      "selection": []
     }
    },
-   "t": 335252
+   "t": 335532
   },
   {
    "step": 6,
@@ -1069,32 +1080,25 @@
       "Construction geometry",
       "Created in drawing",
       "Virtual sharps",
-      "Centermark",
-      "Edge extension",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm",
-      "0.25 mm",
-      "0.30 mm",
-      "0.35 mm",
-      "0.40 mm",
-      "0.50 mm",
-      "0.53 mm",
-      "0.60 mm",
-      "0.70 mm",
-      "0.80 mm",
-      "0.90 mm",
-      "1.00 mm",
-      "1.20 mm",
-      "1.40 mm",
-      "1.60 mm",
-      "2.00 mm",
       "Sketch geometry",
-      "0.13 mm",
-      "0.15 mm",
-      "0.18 mm",
-      "0.20 mm"
+      "Sketch driven dimensions color",
+      "Part Studio sketches",
+      "Solid lines",
+      "Construction lines",
+      "Sketch points",
+      "Centermarks",
+      "Extended lines",
+      "Thickness",
+      "Mark size",
+      "in",
+      "Gap size",
+      "in",
+      "Color",
+      "Centerlines",
+      "Thickness",
+      "Dashes",
+      "Update properties from a template...",
+      "Lock drawing properties"
      ],
      "fields": [
       {
@@ -1184,7 +1188,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1240,7 +1244,7 @@
      "selection": []
     }
    },
-   "t": 361569
+   "t": 361614
   }
  ]
 }

@@ -1,0 +1,298 @@
+{
+ "name": "drw-hcallout-palette-fit-tips",
+ "about": "holes-plate-drawing: Hole/thread callout › Edit...: Override precision/tolerance, Tolerance › Fit; hover Toggle stacked visibility, Fit type, Hole class, Fit standard; the Fit type list opened/closed; Tolerance › Fit with tolerance; hover Fit tolerance precision. Palette by screen point (px), valid for this placement only",
+ "area": "drawing",
+ "source": "studios drawing matrix (Hole/thread callout: 27 unseen), live 11-17: palette mapped on lane 3 (live/feel notes /root/live-scratch/hc/palette-notes.md)",
+ "start": "holes-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole/thread callout"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      11.7678,
+      11.7678,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      30,
+      25,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     97.8,
+     166.1
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Override precision/tolerance"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1005,
+     412
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Tolerance"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Fit"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1025,
+     380
+    ]
+   },
+   "ours_on": {
+    "button": "Toggle stacked visibility"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1071,
+     412
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Fit type"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1123,
+     412
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Fit class"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1123,
+     412
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Fit class"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1157,
+     412
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Hole class"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1265,
+     412
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Fit standard"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1005,
+     412
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Tolerance"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Fit with tolerance"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1224,
+     412
+    ]
+   },
+   "ours_on": {
+    "dropdown": "Fit tolerance precision"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "shot",
+   "name": "end"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  }
+ ]
+}

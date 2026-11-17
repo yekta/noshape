@@ -1,23 +1,23 @@
 {
  "scenario": "drw-hatch-panel",
- "recorded": "2026-11-16T05:59:33.873Z",
+ "recorded": "2026-11-17T12:54:54.524Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
   "viewport": [
    1919,
-   1079
+   992
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "87f82baec0521bad4e3797af",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "d138d7e3e4e4e5af9b572b92",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (1)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -164,7 +164,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -220,7 +220,7 @@
      "selection": []
     }
    },
-   "t": 226181
+   "t": 232032
   },
   {
    "step": 2,
@@ -279,7 +279,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -335,7 +335,7 @@
      "selection": []
     }
    },
-   "t": 253468
+   "t": 257824
   },
   {
    "step": 3,
@@ -399,7 +399,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -455,7 +455,7 @@
      "selection": []
     }
    },
-   "t": 278073
+   "t": 282001
   },
   {
    "step": 4,
@@ -514,7 +514,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -570,7 +570,7 @@
      "selection": []
     }
    },
-   "t": 304052
+   "t": 306822
   },
   {
    "step": 5,
@@ -585,8 +585,8 @@
    },
    "ok": true,
    "at": [
-    636,
-    870
+    667,
+    799
    ],
    "state": {
     "focus": {
@@ -637,7 +637,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -693,7 +693,7 @@
      "selection": []
     }
    },
-   "t": 329738
+   "t": 332858
   },
   {
    "step": 6,
@@ -752,7 +752,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -808,7 +808,7 @@
      "selection": []
     }
    },
-   "t": 355067
+   "t": 357233
   },
   {
    "step": 7,
@@ -823,8 +823,8 @@
    },
    "ok": true,
    "at": [
-    765,
-    784
+    784,
+    720
    ],
    "state": {
     "focus": {
@@ -877,7 +877,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -933,7 +933,7 @@
      "selection": []
     }
    },
-   "t": 381190
+   "t": 382199
   },
   {
    "step": 8,
@@ -994,7 +994,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1050,7 +1050,7 @@
      "selection": []
     }
    },
-   "t": 406683
+   "t": 409024
   },
   {
    "step": 9,
@@ -1061,6 +1061,9 @@
       288,
       249
      ]
+    },
+    "ours_on": {
+     "dropdown": "Pattern"
     }
    },
    "ok": true,
@@ -1165,7 +1168,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1221,7 +1224,7 @@
      "selection": []
     }
    },
-   "t": 431200
+   "t": 433953
   },
   {
    "step": 10,
@@ -1328,7 +1331,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1384,7 +1387,7 @@
      "selection": []
     }
    },
-   "t": 457259
+   "t": 459056
   },
   {
    "step": 11,
@@ -1395,6 +1398,9 @@
       288,
       249
      ]
+    },
+    "ours_on": {
+     "dropdown": "Pattern"
     }
    },
    "ok": true,
@@ -1453,7 +1459,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1509,7 +1515,7 @@
      "selection": []
     }
    },
-   "t": 483086
+   "t": 484103
   },
   {
    "step": 12,
@@ -1570,7 +1576,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1626,7 +1632,7 @@
      "selection": []
     }
    },
-   "t": 509289
+   "t": 512953
   },
   {
    "step": 13,
@@ -1637,6 +1643,9 @@
       288,
       280
      ]
+    },
+    "ours_on": {
+     "dropdown": "Scale"
     }
    },
    "ok": true,
@@ -1749,7 +1758,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1805,7 +1814,7 @@
      "selection": []
     }
    },
-   "t": 533664
+   "t": 538375
   },
   {
    "step": 14,
@@ -1920,7 +1929,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1976,7 +1985,7 @@
      "selection": []
     }
    },
-   "t": 559337
+   "t": 566190
   },
   {
    "step": 15,
@@ -1987,6 +1996,9 @@
       288,
       280
      ]
+    },
+    "ours_on": {
+     "dropdown": "Scale"
     }
    },
    "ok": true,
@@ -2045,7 +2057,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2101,7 +2113,7 @@
      "selection": []
     }
    },
-   "t": 584529
+   "t": 592500
   },
   {
    "step": 16,
@@ -2162,7 +2174,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2218,7 +2230,7 @@
      "selection": []
     }
    },
-   "t": 610088
+   "t": 618016
   },
   {
    "step": 17,
@@ -2229,6 +2241,9 @@
       288,
       314
      ]
+    },
+    "ours_on": {
+     "dropdown": "Angle"
     }
    },
    "ok": true,
@@ -2353,7 +2368,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2409,7 +2424,7 @@
      "selection": []
     }
    },
-   "t": 634472
+   "t": 643134
   },
   {
    "step": 18,
@@ -2536,7 +2551,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2592,7 +2607,7 @@
      "selection": []
     }
    },
-   "t": 659510
+   "t": 668118
   },
   {
    "step": 19,
@@ -2603,6 +2618,9 @@
       288,
       314
      ]
+    },
+    "ours_on": {
+     "dropdown": "Angle"
     }
    },
    "ok": true,
@@ -2661,7 +2679,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2717,7 +2735,7 @@
      "selection": []
     }
    },
-   "t": 685540
+   "t": 694007
   },
   {
    "step": 20,
@@ -2778,7 +2796,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2834,7 +2852,7 @@
      "selection": []
     }
    },
-   "t": 710583
+   "t": 719466
   },
   {
    "step": 21,
@@ -2900,7 +2918,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2956,7 +2974,7 @@
      "selection": []
     }
    },
-   "t": 735812
+   "t": 745309
   },
   {
    "step": 22,
@@ -3017,7 +3035,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3073,7 +3091,7 @@
      "selection": []
     }
    },
-   "t": 762040
+   "t": 770472
   },
   {
    "step": 23,
@@ -3084,6 +3102,9 @@
       288,
       249
      ]
+    },
+    "ours_on": {
+     "dropdown": "Pattern"
     }
    },
    "ok": true,
@@ -3208,7 +3229,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3264,7 +3285,7 @@
      "selection": []
     }
    },
-   "t": 787284
+   "t": 795409
   },
   {
    "step": 24,
@@ -3391,7 +3412,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3447,7 +3468,7 @@
      "selection": []
     }
    },
-   "t": 812252
+   "t": 821197
   },
   {
    "step": 25,
@@ -3458,6 +3479,9 @@
       288,
       249
      ]
+    },
+    "ours_on": {
+     "dropdown": "Pattern"
     }
    },
    "ok": true,
@@ -3516,7 +3540,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3572,7 +3596,7 @@
      "selection": []
     }
    },
-   "t": 837274
+   "t": 845963
   },
   {
    "step": 26,
@@ -3633,7 +3657,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3689,7 +3713,7 @@
      "selection": []
     }
    },
-   "t": 862882
+   "t": 871709
   },
   {
    "step": 27,
@@ -3753,7 +3777,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3809,7 +3833,7 @@
      "selection": []
     }
    },
-   "t": 889409
+   "t": 896112
   },
   {
    "step": 28,
@@ -3868,7 +3892,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3924,7 +3948,7 @@
      "selection": []
     }
    },
-   "t": 915130
+   "t": 921603
   },
   {
    "step": 29,
@@ -3935,6 +3959,9 @@
       288,
       249
      ]
+    },
+    "ours_on": {
+     "dropdown": "Pattern"
     }
    },
    "ok": true,
@@ -3980,7 +4007,19 @@
       "Honeycomb",
       "Houndstooth",
       "Insulation",
-      "Iron"
+      "Iron",
+      "Mud/ Sand",
+      "Netting",
+      "Parallel lines",
+      "Plastic",
+      "Squares",
+      "Stars",
+      "Steel",
+      "Titanium",
+      "Triangles",
+      "Wood",
+      "Zigzag",
+      "Zinc"
      ],
      "fields": [
       {
@@ -4113,7 +4152,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4169,7 +4208,7 @@
      "selection": []
     }
    },
-   "t": 940382
+   "t": 947264
   },
   {
    "step": 30,
@@ -4217,7 +4256,19 @@
       "Honeycomb",
       "Houndstooth",
       "Insulation",
-      "Iron"
+      "Iron",
+      "Mud/ Sand",
+      "Netting",
+      "Parallel lines",
+      "Plastic",
+      "Squares",
+      "Stars",
+      "Steel",
+      "Titanium",
+      "Triangles",
+      "Wood",
+      "Zigzag",
+      "Zinc"
      ],
      "fields": [
       {
@@ -4350,7 +4401,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4406,7 +4457,7 @@
      "selection": []
     }
    },
-   "t": 966677
+   "t": 972846
   },
   {
    "step": 31,
@@ -4417,6 +4468,9 @@
       288,
       249
      ]
+    },
+    "ours_on": {
+     "dropdown": "Pattern"
     }
    },
    "ok": true,
@@ -4473,7 +4527,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4529,7 +4583,7 @@
      "selection": []
     }
    },
-   "t": 991542
+   "t": 997838
   },
   {
    "step": 32,
@@ -4588,7 +4642,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4644,7 +4698,7 @@
      "selection": []
     }
    },
-   "t": 1016245
+   "t": 1022740
   },
   {
    "step": 33,
@@ -4710,7 +4764,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4766,7 +4820,7 @@
      "selection": []
     }
    },
-   "t": 1041223
+   "t": 1047020
   },
   {
    "step": 34,
@@ -4827,7 +4881,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4883,7 +4937,7 @@
      "selection": []
     }
    },
-   "t": 1066862
+   "t": 1071959
   },
   {
    "step": 35,
@@ -4924,7 +4978,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4981,7 +5035,7 @@
        "kind": "hatch",
        "text": null,
        "position": [
-        74.8,
+        74.6,
         50.2
        ]
       },
@@ -5009,7 +5063,7 @@
      "selection": []
     }
    },
-   "t": 1092176
+   "t": 1097643
   },
   {
    "step": 36,
@@ -5045,7 +5099,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -5102,7 +5156,7 @@
        "kind": "hatch",
        "text": null,
        "position": [
-        74.8,
+        74.6,
         50.2
        ]
       },
@@ -5130,7 +5184,7 @@
      "selection": []
     }
    },
-   "t": 1120311
+   "t": 1124924
   },
   {
    "step": 37,
@@ -5173,7 +5227,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -5230,7 +5284,7 @@
        "kind": "hatch",
        "text": null,
        "position": [
-        74.8,
+        74.6,
         50.2
        ]
       },
@@ -5258,7 +5312,7 @@
      "selection": []
     }
    },
-   "t": 1145866
+   "t": 1151007
   },
   {
    "step": 38,
@@ -5294,7 +5348,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -5351,7 +5405,7 @@
        "kind": "hatch",
        "text": null,
        "position": [
-        74.8,
+        74.6,
         50.2
        ]
       },
@@ -5379,7 +5433,7 @@
      "selection": []
     }
    },
-   "t": 1170617
+   "t": 1175459
   }
  ]
 }

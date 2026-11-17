@@ -1,19 +1,23 @@
 {
  "scenario": "drw-view-properties-esc-cancels-name",
- "recorded": "2026-11-12T18:16:48.696Z",
+ "recorded": "2026-11-17T12:32:02.226Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
  },
  "live": {
-  "document": "38e54affc51d506498f8ecd2",
-  "workspace": "24db5f467e1ccbd8d405a2a9",
-  "element": "503d70c1b6b9670111357e05",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "028e42e5ee878d0bca2a8f15",
   "start": "block-drawing",
-  "startElement": "ff2245ce846878221ff975e1",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -41,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (2)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -116,7 +120,7 @@
    "ok": true,
    "at": [
     749,
-    618
+    619
    ],
    "state": {
     "focus": {
@@ -129,7 +133,7 @@
      "text": [
       "View properties",
       "Document",
-      "noshape ui parity live2-4",
+      "noshape ui parity live2-3b",
       "Workspace",
       "Main",
       "Type",
@@ -138,25 +142,87 @@
       "Part 1",
       "In progress",
       "View orientation",
-      "Top",
-      "Left",
-      "Right",
-      "Front",
-      "Back",
-      "Bottom",
-      "Isometric",
       "Scale",
       "Rotation angle",
       "Tangent edges",
-      "Hidden",
-      "Solid",
-      "Phantom",
       "View render mode",
-      "Best performance",
-      "Best quality",
       "View simplification",
-      "None",
-      "Absolute"
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
      ]
     },
     "dialogs": [],
@@ -179,7 +245,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -240,7 +306,7 @@
      ]
     }
    },
-   "t": 227291
+   "t": 232534
   },
   {
    "step": 2,
@@ -261,7 +327,7 @@
      "text": [
       "View properties",
       "Document",
-      "noshape ui parity live2-4",
+      "noshape ui parity live2-3b",
       "Workspace",
       "Main",
       "Type",
@@ -270,25 +336,87 @@
       "Part 1",
       "In progress",
       "View orientation",
-      "Top",
-      "Left",
-      "Right",
-      "Front",
-      "Back",
-      "Bottom",
-      "Isometric",
       "Scale",
       "Rotation angle",
       "Tangent edges",
-      "Hidden",
-      "Solid",
-      "Phantom",
       "View render mode",
-      "Best performance",
-      "Best quality",
       "View simplification",
-      "None",
-      "Absolute"
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
      ]
     },
     "dialogs": [],
@@ -311,7 +439,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -372,7 +500,7 @@
      ]
     }
    },
-   "t": 251900
+   "t": 258005
   },
   {
    "step": 3,
@@ -398,7 +526,7 @@
      "text": [
       "View properties",
       "Document",
-      "noshape ui parity live2-4",
+      "noshape ui parity live2-3b",
       "Workspace",
       "Main",
       "Type",
@@ -407,25 +535,87 @@
       "Part 1",
       "In progress",
       "View orientation",
-      "Top",
-      "Left",
-      "Right",
-      "Front",
-      "Back",
-      "Bottom",
-      "Isometric",
       "Scale",
       "Rotation angle",
       "Tangent edges",
-      "Hidden",
-      "Solid",
-      "Phantom",
       "View render mode",
-      "Best performance",
-      "Best quality",
       "View simplification",
-      "None",
-      "Absolute"
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
      ]
     },
     "dialogs": [],
@@ -448,7 +638,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -509,7 +699,7 @@
      ]
     }
    },
-   "t": 276764
+   "t": 282434
   },
   {
    "step": 4,
@@ -534,7 +724,7 @@
      "text": [
       "View properties",
       "Document",
-      "noshape ui parity live2-4",
+      "noshape ui parity live2-3b",
       "Workspace",
       "Main",
       "Type",
@@ -543,25 +733,87 @@
       "Part 1",
       "In progress",
       "View orientation",
-      "Top",
-      "Left",
-      "Right",
-      "Front",
-      "Back",
-      "Bottom",
-      "Isometric",
       "Scale",
       "Rotation angle",
       "Tangent edges",
-      "Hidden",
-      "Solid",
-      "Phantom",
       "View render mode",
-      "Best performance",
-      "Best quality",
       "View simplification",
-      "None",
-      "Absolute"
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
      ]
     },
     "dialogs": [],
@@ -584,7 +836,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -645,7 +897,7 @@
      ]
     }
    },
-   "t": 301367
+   "t": 306702
   },
   {
    "step": 5,
@@ -665,7 +917,7 @@
      "text": [
       "View properties",
       "Document",
-      "noshape ui parity live2-4",
+      "noshape ui parity live2-3b",
       "Workspace",
       "Main",
       "Type",
@@ -674,25 +926,87 @@
       "Part 1",
       "In progress",
       "View orientation",
-      "Top",
-      "Left",
-      "Right",
-      "Front",
-      "Back",
-      "Bottom",
-      "Isometric",
       "Scale",
       "Rotation angle",
       "Tangent edges",
-      "Hidden",
-      "Solid",
-      "Phantom",
       "View render mode",
-      "Best performance",
-      "Best quality",
       "View simplification",
-      "None",
-      "Absolute"
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
      ]
     },
     "dialogs": [],
@@ -715,7 +1029,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -776,7 +1090,7 @@
      ]
     }
    },
-   "t": 327572
+   "t": 341160
   },
   {
    "step": 6,
@@ -816,63 +1130,10 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
-     "sheet": "Sheet1",
-     "sheets": [
-      "Sheet1"
-     ],
-     "tool": null,
-     "views": [
-      {
-       "name": "Front",
-       "kind": "base",
-       "position": [
-        81,
-        81
-       ],
-       "parent": null,
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Isometric",
-       "kind": "isometric",
-       "position": [
-        198.4,
-        160.8
-       ],
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Right",
-       "kind": "projected",
-       "position": [
-        198.4,
-        81
-       ],
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Top",
-       "kind": "projected",
-       "position": [
-        81,
-        160.8
-       ],
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      }
-     ],
-     "annotations": [],
-     "selection": []
+     "error": "translation failed An internal error has occurred; support code c7064678beb271ce499e97e3"
     }
    },
-   "t": 353634
+   "t": 360609
   },
   {
    "step": 7,
@@ -892,7 +1153,7 @@
    "ok": true,
    "at": [
     749,
-    618
+    619
    ],
    "state": {
     "focus": {
@@ -905,7 +1166,7 @@
      "text": [
       "View properties",
       "Document",
-      "noshape ui parity live2-4",
+      "noshape ui parity live2-3b",
       "Workspace",
       "Main",
       "Type",
@@ -914,25 +1175,87 @@
       "Part 1",
       "In progress",
       "View orientation",
-      "Top",
-      "Left",
-      "Right",
-      "Front",
-      "Back",
-      "Bottom",
-      "Isometric",
       "Scale",
       "Rotation angle",
       "Tangent edges",
-      "Hidden",
-      "Solid",
-      "Phantom",
       "View render mode",
-      "Best performance",
-      "Best quality",
       "View simplification",
-      "None",
-      "Absolute"
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
      ]
     },
     "dialogs": [],
@@ -955,7 +1278,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1016,7 +1339,7 @@
      ]
     }
    },
-   "t": 378285
+   "t": 401240
   },
   {
    "step": 8,
@@ -1037,7 +1360,7 @@
      "text": [
       "View properties",
       "Document",
-      "noshape ui parity live2-4",
+      "noshape ui parity live2-3b",
       "Workspace",
       "Main",
       "Type",
@@ -1046,25 +1369,87 @@
       "Part 1",
       "In progress",
       "View orientation",
-      "Top",
-      "Left",
-      "Right",
-      "Front",
-      "Back",
-      "Bottom",
-      "Isometric",
       "Scale",
       "Rotation angle",
       "Tangent edges",
-      "Hidden",
-      "Solid",
-      "Phantom",
       "View render mode",
-      "Best performance",
-      "Best quality",
       "View simplification",
-      "None",
-      "Absolute"
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
      ]
     },
     "dialogs": [],
@@ -1087,7 +1472,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1148,7 +1533,7 @@
      ]
     }
    },
-   "t": 404407
+   "t": 427355
   },
   {
    "step": 9,
@@ -1188,7 +1573,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1244,7 +1629,7 @@
      "selection": []
     }
    },
-   "t": 429902
+   "t": 454739
   }
  ]
 }
