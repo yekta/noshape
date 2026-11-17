@@ -1,23 +1,23 @@
 {
  "scenario": "drw-styles-dimension",
- "recorded": "2026-11-16T06:54:12.276Z",
+ "recorded": "2026-11-17T16:02:57.912Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
   "viewport": [
    1919,
-   1079
+   992
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.4"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "6be94c4c1d5dabe7ca7e2a29",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "0429dd4ddea2784905b438e9",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (2)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -141,7 +141,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -197,7 +197,7 @@
      "selection": []
     }
    },
-   "t": 227529
+   "t": 231578
   },
   {
    "step": 2,
@@ -216,8 +216,8 @@
    },
    "ok": true,
    "at": [
-    727,
-    672
+    749,
+    619
    ],
    "state": {
     "focus": {
@@ -245,7 +245,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -306,7 +306,7 @@
      ]
     }
    },
-   "t": 252745
+   "t": 257542
   },
   {
    "step": 3,
@@ -325,8 +325,8 @@
    },
    "ok": true,
    "at": [
-    727,
-    637
+    749,
+    587
    ],
    "state": {
     "focus": {
@@ -354,7 +354,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -412,14 +412,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 278465
+   "t": 284587
   },
   {
    "step": 4,
@@ -462,7 +462,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -520,14 +520,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 304049
+   "t": 311408
   },
   {
    "step": 5,
@@ -563,7 +563,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -621,14 +621,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 329453
+   "t": 338278
   },
   {
    "step": 6,
@@ -640,8 +640,8 @@
    },
    "ok": true,
    "at": [
-    727,
-    637
+    749,
+    587
    ],
    "state": {
     "focus": {
@@ -669,7 +669,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -727,14 +727,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 366825
+   "t": 376165
   },
   {
    "step": 7,
@@ -770,7 +770,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -828,14 +828,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 391829
+   "t": 402471
   },
   {
    "step": 8,
@@ -844,14 +844,17 @@
     "on": {
      "px": [
       1904,
-      545
+      501
      ]
+    },
+    "ours_on": {
+     "button": "Styles"
     }
    },
    "ok": true,
    "at": [
     1904,
-    545
+    501
    ],
    "state": {
     "focus": {
@@ -864,34 +867,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -946,7 +938,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1004,14 +996,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 420003
+   "t": 427777
   },
   {
    "step": 9,
@@ -1032,34 +1024,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -1114,7 +1095,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1172,14 +1153,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 448096
+   "t": 455268
   },
   {
    "step": 10,
@@ -1206,34 +1187,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -1288,7 +1258,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1346,14 +1316,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 463540
+   "t": 470893
   },
   {
    "step": 11,
@@ -1374,34 +1344,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -1456,7 +1415,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1514,14 +1473,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 489688
+   "t": 496922
   },
   {
    "step": 12,
@@ -1545,34 +1504,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -1627,7 +1575,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1685,14 +1633,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 505411
+   "t": 511513
   },
   {
    "step": 13,
@@ -1713,34 +1661,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -1795,7 +1732,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1853,14 +1790,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 531179
+   "t": 540753
   },
   {
    "step": 14,
@@ -1887,34 +1824,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -1969,7 +1895,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2027,14 +1953,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 546585
+   "t": 555391
   },
   {
    "step": 15,
@@ -2055,34 +1981,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -2137,7 +2052,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2195,14 +2110,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 572613
+   "t": 580823
   },
   {
    "step": 16,
@@ -2226,34 +2141,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -2308,7 +2212,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2366,14 +2270,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 587241
+   "t": 595727
   },
   {
    "step": 17,
@@ -2394,34 +2298,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -2476,7 +2369,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2534,14 +2427,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 613212
+   "t": 623187
   },
   {
    "step": 18,
@@ -2568,34 +2461,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -2650,7 +2532,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2708,14 +2590,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 628134
+   "t": 638497
   },
   {
    "step": 19,
@@ -2736,34 +2618,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -2818,7 +2689,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -2876,14 +2747,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 653530
+   "t": 664437
   },
   {
    "step": 20,
@@ -2907,34 +2778,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -2989,7 +2849,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3047,14 +2907,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 668255
+   "t": 678983
   },
   {
    "step": 21,
@@ -3075,34 +2935,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -3157,7 +3006,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3215,14 +3064,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 694168
+   "t": 706252
   },
   {
    "step": 22,
@@ -3248,34 +3097,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -3330,7 +3168,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3388,14 +3226,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 718971
+   "t": 731114
   },
   {
    "step": 23,
@@ -3416,34 +3254,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -3498,7 +3325,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3556,14 +3383,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 746186
+   "t": 757869
   },
   {
    "step": 24,
@@ -3589,34 +3416,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -3671,7 +3487,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3729,14 +3545,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 772508
+   "t": 782466
   },
   {
    "step": 25,
@@ -3764,34 +3580,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -3846,7 +3651,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -3904,14 +3709,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 797351
+   "t": 806435
   },
   {
    "step": 26,
@@ -3931,34 +3736,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -4013,7 +3807,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4071,14 +3865,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 822289
+   "t": 831326
   },
   {
    "step": 27,
@@ -4106,34 +3900,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -4188,7 +3971,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4246,14 +4029,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 847250
+   "t": 855378
   },
   {
    "step": 28,
@@ -4274,34 +4057,23 @@
      "text": [
       "Styles",
       "Font",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos",
       "Text height",
       "in",
       "Color",
       "Arrowhead",
       "in",
-      "Text justification"
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
+      "Revert to drawing properties"
      ],
      "fields": [
       {
@@ -4356,7 +4128,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4414,14 +4186,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 873355
+   "t": 882315
   },
   {
    "step": 29,
@@ -4448,9 +4220,56 @@
      "title": "Styles",
      "text": [
       "Styles",
-      "Select a dimension or annotation or hatch region to change its style",
-      "Select any dimension or annotation or hatch region to apply a different style from the drawing property.",
+      "Font",
+      "Text height",
+      "in",
+      "Color",
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
       "Revert to drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Left"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Align with dimension line"
+      },
+      {
+       "label": "Show first extension line",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show second extension line",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Break dimension",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -4473,7 +4292,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4531,14 +4350,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 952493
+   "t": 907833
   },
   {
    "step": 30,
@@ -4558,9 +4377,56 @@
      "title": "Styles",
      "text": [
       "Styles",
-      "Select a dimension or annotation or hatch region to change its style",
-      "Select any dimension or annotation or hatch region to apply a different style from the drawing property.",
+      "Font",
+      "Text height",
+      "in",
+      "Color",
+      "Arrowhead",
+      "in",
+      "Text justification",
+      "Text alignment",
+      "Text gap",
+      "in",
+      "Geometry gap",
+      "in",
+      "Extension past line",
+      "in",
+      "Show first extension line",
+      "Show second extension line",
+      "Break dimension",
       "Revert to drawing properties"
+     ],
+     "fields": [
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Open Sans"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Left"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Align with dimension line"
+      },
+      {
+       "label": "Show first extension line",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show second extension line",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Break dimension",
+       "kind": "checkbox",
+       "value": true
+      }
      ]
     },
     "dialogs": [],
@@ -4583,7 +4449,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -4641,14 +4507,14 @@
        "text": "1.575",
        "position": [
         81,
-        94.2
+        94.1
        ]
       }
      ],
      "selection": []
     }
    },
-   "t": 977431
+   "t": 933914
   }
  ]
 }
