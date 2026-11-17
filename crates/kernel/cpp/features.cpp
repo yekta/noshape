@@ -2038,6 +2038,39 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
   {
     if (!mk.MakeSolid())
       fail_op("sweep: could not make a solid");
+    // The start cap on the planar profile's own plane: the first section as the sweep placed it lies a hair off it
+    // (asm-isaac-ball's GearLab helical gear: 7e-12 m), and the cap then merged with nothing coplanar (live: one face
+    // with the gear's end, 283 faces; ours 363).
+    gp_Pln pp;
+    if (used.size() == 1 && used[0].ShapeType() == TopAbs_WIRE && profile_plane(used[0], pp))
+      for (TopExp_Explorer f(mk.Shape(), TopAbs_FACE); f.More(); f.Next())
+      {
+        const TopoDS_Face             face = TopoDS::Face(f.Current());
+        TopLoc_Location               l;
+        const occ::handle<Geom_Plane> cp = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(face, l));
+        if (cp.IsNull())
+          continue;
+        gp_Pln c = cp->Pln();
+        if (!l.IsIdentity())
+          c.Transform(l.Transformation());
+        const gp_Dir cn = c.Axis().Direction(), pn = pp.Axis().Direction();
+        bool   on = std::abs(std::abs(cn.Dot(pn)) - 1) <= 1e-12;
+        double off = 0;
+        for (TopExp_Explorer v(face, TopAbs_VERTEX); v.More(); v.Next())
+          off = std::max(off, pp.Distance(BRep_Tool::Pnt(TopoDS::Vertex(v.Current()))));
+        on = on && off <= 1e-7;
+        if (!on)
+          continue;
+        gp_Ax3 ax = pp.Position();
+        if (cn.Dot(pn) < 0)
+          ax.ZReverse();
+        BRep_Builder().UpdateFace(face, new Geom_Plane(ax), TopLoc_Location(), BRep_Tool::Tolerance(face));
+        // Its edges' curves on the old plane go: on a plane OCCT finds them from the 3D curves.
+        for (TopExp_Explorer e(face, TopAbs_EDGE); e.More(); e.Next())
+          BRep_Builder().UpdateEdge(TopoDS::Edge(e.Current()), occ::handle<Geom2d_Curve>(), cp, l, 0.0);
+        BRepLib::SameParameter(face, 1e-7, true);
+        break;
+      }
   }
   // History is keyed on the wires actually swept; map faces of face profiles
   // through their outer wires (the wires are sub-shapes of the faces).

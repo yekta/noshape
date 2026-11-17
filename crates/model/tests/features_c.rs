@@ -4517,3 +4517,46 @@ fn a_connector_on_a_cap_edge_points_along_its_sketch_line() {
         assert!((z - want).length() < 1e-9, "edge {i}: z {z} vs the line's {want}");
     }
 }
+
+/// A sweep's start cap lies on its planar profile's own plane, so a sweep added to a part whose face lies there merges
+/// its cap into that face (asm-isaac-ball's GearLab helical gear: its teeth's caps a hair off the gear's ends stayed
+/// 80 faces of their own, 363 faces, live 283): a square swept along a helix from a block's y = 0 face leaves one face
+/// there.
+#[test]
+fn a_helical_sweeps_start_cap_merges_with_the_face_it_starts_on() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, -20.0), (40.0, -20.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let block = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let region = s.region(block);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("15 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let ring = sk.add_circle(DVec2::ZERO, mm(20.0));
+    let base = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.add("helix", move |p| {
+        p.set("axisType", en("CIRCLE"));
+        p.set("edge", q(Reference::SketchEntity { sketch: base, entity: ring.0 }));
+        p.set("pathType", en("TURNS"));
+        p.set("revolutions", expr("0.25"));
+        p.set("height", expr("10 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(18.0, -2.0), (22.0, -2.0), (22.0, 2.0), (18.0, 2.0)], true);
+    let square = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let square = s.region(square);
+    let r = s.ok();
+    let helix = r.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Wire).map(|b| Reference::Body(b.id.clone())).expect("the helix");
+    s.add("sweep", move |p| {
+        p.set("profiles", q(square));
+        p.set("path", q(helix));
+        p.set("operationType", en("ADD"));
+        p.set("defaultScope", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let b = r.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+    let on_front = b.shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Plane(p)) if p.unit_normal().y.abs() > 1.0 - 1e-12 && p.origin.y.abs() < 1e-9)).count();
+    assert_eq!(on_front, 1, "the block's face and the cap one face");
+}
