@@ -751,6 +751,11 @@ def recorder_form(b, live):
         return
     full = m is not None and (m.group(1), int(m.group(2))) >= ("2026-11-17", 3)
     panel_text_form(d, full)
+    # Text inputs with a placeholder are fields since 2026-11-17.7 (live2: Section id, Detail id).
+    if not (m is not None and (m.group(1), int(m.group(2))) >= ("2026-11-17", 7)):
+        for x in [d, d.get("old")]:
+            if isinstance(x, dict) and isinstance(x.get("fields"), list):
+                x["fields"] = [f for f in x["fields"] if not (isinstance(f, dict) and f.get("kind") == "text" and "placeholder" in f)]
     if "old" not in d:
         return
     old = d.pop("old")

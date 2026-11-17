@@ -316,6 +316,7 @@ impl DrawingEditor {
                 .tooltip(crate::ui::tooltip(["Vertical cut line", "Horizontal cut line", "Angular cut line"][m as usize % 3]))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_section_mode(m, cx)))
         };
+        let label_value = d.label.read(cx).value().to_string();
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings"; live 2063), the checkboxes and End type as fields
             // (live's recorder since 11-14; End type's options left out since 2026-11-17.3).
@@ -324,7 +325,8 @@ impl DrawingEditor {
             if d.placed.is_none() {
                 t.texts(["Vertical", "Horizontal", "Angular"]);
             }
-            let mut fields = Vec::new();
+            // The unlabelled label input with its placeholder first (live's recorder since 2026-11-17.7).
+            let mut fields = vec![serde_json::json!({ "label": "", "kind": "text", "value": label_value, "placeholder": "Section id" })];
             let check = |t: &mut crate::drawing_panels::PanelText, fields: &mut Vec<serde_json::Value>, label: &'static str, on: bool| {
                 t.text(label);
                 fields.push(serde_json::json!({ "label": label, "kind": "checkbox", "value": on }));

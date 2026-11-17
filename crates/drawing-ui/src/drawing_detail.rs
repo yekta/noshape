@@ -54,7 +54,7 @@ impl DrawingEditor {
         match (self.detail_dlg.is_some(), active) {
             (false, true) => {
                 let next = self.current_sheet().next_label();
-                let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(next));
+                let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Detail id").default_value(next));
                 self.detail_dlg = Some(DetailDlg { shape: 0, pts: Vec::new(), view: None, profile: None, scale: None, label, style: self.drawing.props.view_tab.detail_style, show_profile: self.drawing.props.view_tab.detail_show_profile, clip_border: self.drawing.props.view_tab.detail_clip_border, pick_region: false, picked: Vec::new(), edit: None });
             }
             (true, false) if self.detail_dlg.as_ref().is_some_and(|d| d.edit.is_none()) => self.detail_dlg = None,
@@ -173,7 +173,7 @@ impl DrawingEditor {
     pub fn open_detail_edit(&mut self, id: ViewId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(v) = self.current_sheet().view(id).cloned() else { return };
         let noshape_model::drawing::ViewKind::Detail { parent, label: text, .. } = &v.kind else { return };
-        let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text.clone()));
+        let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Detail id").default_value(text.clone()));
         let profile = v.detail_profile.clone().filter(|p| p.len() >= 3);
         self.cancel(cx);
         self.tool = Tool::Select;
@@ -450,6 +450,7 @@ impl DrawingEditor {
                 _ => "Create circle",
             }
         };
+        let label_value = self.detail_dlg.as_ref().map(|d| d.label.read(cx).value().to_string()).unwrap_or_default();
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings"; live 2131).
             let mut text = crate::drawing_panels::PanelText::default();
@@ -459,7 +460,9 @@ impl DrawingEditor {
             }
             text.texts(["View scale", "View label", "Profile style"]).options(STYLES).texts(["Show detail view profile", "Clip border to geometry"]);
             // Profile style and the checkboxes as fields (live2 drw-detail-profile-types).
+            // The label input with its placeholder (live's recorder since 2026-11-17.7).
             let fields = serde_json::json!([
+                { "label": "View label", "kind": "text", "value": label_value, "placeholder": "Detail id" },
                 { "label": "Profile style", "kind": "select", "value": STYLES[style as usize] },
                 { "label": "Show detail view profile", "kind": "checkbox", "value": show },
                 { "label": "Clip border to geometry", "kind": "checkbox", "value": clip },

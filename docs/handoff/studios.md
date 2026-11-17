@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 17:45 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45.
+Updated 2026-11-17 17:46 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45.
 
 ## In flight
 
@@ -17,9 +17,9 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
 - Landed 11-17: 7abd9bdf (doc-open timing), b5d11ad7 (box select), 01fb280e (panel text form, versions flows,
   manual-4). 57dc3ed4 failed 13:06 (ops e2e: first angle's side view); fixed forward (drawing_get "isometric",
   e2e takes either side view; ops e2e 222/222 on vibe5).
-- Queued on vibe7 17:4x as 358ab7a3 (21 commits, carries 66eee5f9; vibe5 down, ff75508e lost;
-  `NOSHAPE_LAND_QUEUE_HOST=vibe7 tools/tiers/land.sh [--no-precheck]` until main's land.sh): 1db5e57e's 11 (failed twice, 14:54 and 15:44, on coverage reading the
-  drawing_ui_tests/ folder as a file: coverage.rs now scans files only; ops --test all green on vibe6) plus:
+- Queued on vibex7 17:4x as 358ab7a3 (21 commits, carries 66eee5f9; vibe5 down, ff75508e lost;
+  `NOSHAPE_LAND_QUEUE_HOST=vibex7 tools/tiers/land.sh [--no-precheck]` until main's land.sh): 1db5e57e's 11 (failed twice, 14:54 and 15:44, on coverage reading the
+  drawing_ui_tests/ folder as a file: coverage.rs now scans files only; ops --test all green on vibex6) plus:
   - mate glyphs at screen size (asm_scene::MateGlyphs, 26 px, a pick disc 2 px past it), backing square on hover,
     the part outlined; a hovered face shows its part's silhouette #FFC20E (Scene::hover_outline_rgb); a part picked
     inside a sub leaves the sub's row related (picked_inside); every instance row tooltips its name;
@@ -31,13 +31,14 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
     little small), no triads at rest; hovered: a translucent white square, the face outlined; the
     row tooltip right of the list and warm (GPUI patch: warm switching for delays up to the default); tests
     every_instance_row_tooltips_its_name, the face hover look in the sub test.
-- vibe6 slot (behind psui's run): all 224 asm + section takes with the 15:50 binary (~/tmp/studios/asmsec, log
+- vibex6 slot (behind psui's run): all 224 asm + section takes with the 15:50 binary (~/tmp/studios/asmsec, log
   ~/agents/studios-keep/asmsec.log).
 - live2 takes to run when landed: 2fdb573f (datum-target / hatch tips), 07e23f09 (section exclude-from-cut, detail
   id profile tips); asked live2 to record unlabelled inputs' placeholders (Section id / Detail id) under a new
-  recorder version.
+  recorder version: in (.7); ours reads the Section / Detail label inputs as text fields with their placeholders
+  (run.py drops them for older takes); section 10/10 and detail 7/7 match. Run 42b92d8a's two takes once landed.
 - After live's 43 re-recorded takes land: one full drawing run, then the matrix refresh (`drawing_matrix.py --run`).
-  Speed: absolute numbers come from the Mac (DECISIONS 11-17), when its slot is free; speed1117.sh is vibe6-only. The weld take waits on live2's metric-position fix. Live re-records the 52 panel takes (.5): then
+  Speed: absolute numbers come from the Mac (DECISIONS 11-17), when its slot is free; speed1117.sh is vibex6-only. The weld take waits on live2's metric-position fix. Live re-records the 52 panel takes (.5): then
   fill panel texts past line 30.
 
 ## Lead's queue (11-17, restated after compaction)
@@ -91,21 +92,21 @@ Builds and crate tests on the Mac:
   tools/tiers/prune-target.py reads /proc and fails on macOS, so between builds delete target/debug/deps
   and target/debug/incremental (16 of 24 GB on 11-16) once `du -sh` passes ~15 GB.
 
-App build on vibe6:
+App build on vibex6:
 ```
-NOSHAPE_RB_HOST=vibe6 tools/tiers/rb.sh bash -c 'cargo build -p noshape; cp $CARGO_TARGET_DIR/debug/noshape ~/tmp/studios/noshape'
+NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh bash -c 'cargo build -p noshape; cp $CARGO_TARGET_DIR/debug/noshape ~/tmp/studios/noshape'
 ```
-An rb.sh build to vibe6 deletes untracked takes there: put them back after it.
+An rb.sh build to vibex6 deletes untracked takes there: put them back after it.
 
-ui-parity on vibe5 (lead 11-15 19:50: vibe6 loaded; ≤3 apps, always through `~/bin/slot <cmd>`):
+ui-parity on vibe5 (lead 11-15 19:50: vibex6 loaded; ≤3 apps, always through `~/bin/slot <cmd>`):
 - Sync: `rsync -a tools/ui-parity/ tests/ui-parity/` to `vibe5:agents/studios/src/…`. The app binary is
-  `~/tmp/studios/noshape` there: build with `NOSHAPE_RB_HOST=vibe5 rb.sh …` (as for vibe6 above), or relay a built
-  one (`ssh vibe6 'zstd -c …' | ssh vibe5 'zstd -d > …'`; the hosts have no keys to each other).
+  `~/tmp/studios/noshape` there: build with `NOSHAPE_RB_HOST=vibe5 rb.sh …` (as for vibex6 above), or relay a built
+  one (`ssh vibex6 'zstd -c …' | ssh vibe5 'zstd -d > …'`; the hosts have no keys to each other).
 - Run: `~/bin/slot bash ~/agents/studios-keep/shards-names.sh ~/tmp/studios/noshape <out> <names file> 3 381`.
 - Compare again without a run: `python3 tools/ui-parity/run.py --compare-only --out <out> <names…>` in
   ~/agents/studios/src.
 - The script's master copy is /root/studios-scratch/bin/shards-names.sh. The hosts' ~/tmp is pruned after 6-12 h,
-  so keep the script in ~/agents/studios-keep (on vibe5 and vibe6).
+  so keep the script in ~/agents/studios-keep (on vibe5 and vibex6).
 - NOSHAPE_UIP_LOGS=1 keeps the app's stderr per take.
 
 Land:
@@ -115,7 +116,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe5 NOSHAPE_LAND_HOSTS="vibe5 vibe3" tools/tiers/land.
 It runs a clippy -D warnings precheck. Status: `tools/tiers/land.sh --status`.
 
 Scratch tools (/root/studios-scratch):
-- cmp.py <take> [out dir on vibe6]: a take's drawing state, live against ours, step by step
+- cmp.py <take> [out dir on vibex6]: a take's drawing state, live against ours, step by step
 - ac_ties.py, ac_cand.py: Ace tie pairs and candidate needles
 - dxfdim.py <dxf…>: a DXF's DIMENSION / MTEXT / ARC entities
 
