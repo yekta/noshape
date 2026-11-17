@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 02:30 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 03:58 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -48,26 +48,45 @@ closed but for its end rows' weights' last digits (6e-12) is one periodic face (
 4620ccea a sketch ellipse of equal radii is a circle (o-ring generator's round rings are tori, 19 as live; psui's
 rust_mesh o-ring test now asserts the torus). 25ca889a suggested views' scale fits Front, Top and Right in 30 % of the
 frame (housing-draft 1:1 as live, was 2:1; T1 suggested_scale_fits_all_three_views). 7c76c77f DXF writes a model edge
-straight in its view as a LINE (sm-louver SPLINE 31 -> 0). Queued f582154e: a model edge whose curve is a true circle /
+straight in its view as a LINE (sm-louver SPLINE 31 -> 0). 35baa32f: a model edge whose curve is a true circle /
 ellipse is written as its exact conic's piece (ModelEdge.conic -> SheetGeometry.conic_lines -> cad_fit::on_conic;
 B-splines on a conic keep the fitted path: live writes SPLINE where its model has a B-spline). Mac, 4 docs: sm-louver
 ARC 101 -> 66 (live 68), ELLIPSE 50 -> 96 (86); housing-draft ELLIPSE 9 -> 11 (15), SPLINE 16 -> 14 (7); rings-loft
 ARC 40 -> 35 (91), ELLIPSE 96 -> 112 (95), SPLINE 217 -> 200 (211) (our 7 true circles where live's model has
 B-splines); extension-spring same. ui-parity drawing exports 84/84 still match (vibe6 exp-conic).
+a38f0629 (landed 11-17 03:24): on_conic also takes a 2-point piece (the shorter way) and HLR points within 10 µm
+(ends 1 µm apart close it): housing-draft's drafted rims Right 2 LINE / Front 2 SPLINE / Iso 1 SPLINE -> ELLIPSE;
+sm-louver ARC 68 / CIRCLE 2 as live. ops e2e 222/222 (Mac), ui-parity drawing exports 84/84 (vibe6 exp-tol).
+In progress (dx worktree, commit 561d8704a, not landed): SAT writes a face going round its B-surface in ACIS's
+periodic form (clamped knots, "periodic", no seam: live's own SAT) and reads that form back periodic (shared
+bsurface_as_periodic, xt_read); RoundSplines {Split, Parasolid, Acis} replaces the periodic_splines bool, prepared()
+takes `offsets` apart and converts extrusions for ACIS; a vertex where only seams cross isn't shown; a free-form
+face's box holds the highest point its climb finds (OCCT's was 1.9 µm short). Mac exs-sat: o-ring generator 4/7/2 ->
+1/0/0 and motor-mount-jack 24/26/2 -> 16/24/0 read back as the model; hose unchanged (sections split, as in x_t).
+T1 export::a_loft_wall_goes_round_as_one_acis_face. Full Mac suite exs-all running (03:58), then kernel tests, land.
 Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live imports ours 46/48, ours reads ours
 112/119, times 49/50, drawings' DXF 0/4.
 Open, ranked:
-1. Drawings DXF 0/4. housing-draft per view (/root/dx-scratch/bin/dxfdiff.py ours live drawing.json: bbox-aligned
-   per view, unmatched entities and matched pairs of other types; handles live's -Z extrusion ELLIPSE / ARC, which
-   my earlier plots drew mirrored, so the "iso hidden-line" difference was mine): the iso view matches entity for
-   entity. Left: Front view lug bottoms, ours a SPLINE (a 12.7 mm plane x revolution edge, 0.29 mm off straight in
-   that view, same plane normals in both models) where live writes a straight LINE between the same ends; Right view
-   one live-only LINE (0.198 in at 8.413, 3.138); views placed 0.037-0.046 in lower than live's (Front, Right, Iso;
-   Top exact); types ours -> live: SPLINE -> ELLIPSE 5, LINE -> CIRCLE / ARC pieces (the radial hole, lug ends). sm-louver: scale 1:40 for
-   live's 1:50 (whole-studio bounds 2678 x 841 x 978 mm fit 1:40 by every rule matching 1898's data; lead: no special
-   case, REQUESTS 11-17 01:47 asks live for blocks across the boundary), ARC
-   101/68, ELLIPSE 50/86, LINE 2552/2472 (Mac; vibe6 draws 20 fewer). extension-spring SPLINE 37/47 (live splits
-   more), LINE 120/117. rings-loft ARC: model (below).
+1. Drawings DXF 0/4 (Mac exs-d, 4 docs, with the queued conic-tolerance commit): sm-louver ARC 68 / CIRCLE 2 as live,
+   ELLIPSE 96/86, LINE 2539/2472, MTEXT 52/54 (scale 1:40 for live's 1:50: whole-studio bounds 2678 x 841 x 978 mm fit
+   1:40 by every rule matching 1898's data; lead: no special case, REQUESTS 11-17 01:47 asks live for blocks across
+   the boundary). housing-draft ARC 0/3, CIRCLE 5/6, ELLIPSE 16/15, LINE 159/154, SPLINE 11/7. extension-spring SPLINE
+   37/47 (live splits more), LINE 120/117. rings-loft ARC 37/91, ELLIPSE 135/95, SPLINE 189/211: model (item 4; our
+   true circles where live's model has B-splines get conics, live writes SPLINE).
+   Tools: /root/dx-scratch/bin/dxfdiff.py ours live drawing.json (per view, bbox-aligned; live's -Z extrusion
+   ELLIPSE / ARC handled), dxfplot2.py (a view side by side by type), dxfboxes.py / dxflayers.py (per-view boxes).
+   housing-draft findings (11-17 03:00):
+   - Placement: live centres each suggested view on the projection of the part's loose Parasolid box (live.jsonl
+     final bbox z -3.685..5.0 mm, x +-16.44, from Rotieren 1's torus; the geometry is z -1.37..5.0, x +-15.3), ours on
+     the exact box: Front / Right 1.158 mm (0.0456 in) and Iso 0.946 mm lower, Top exact. Matching it needs
+     Parasolid's loose box of a torus face: left (counts unaffected).
+   - Lug bottoms (torus x plane B-spline edges): live writes chords of a 3D tessellation (LINEs up to 0.13 mm off the
+     curve; one chord where 1.8 mm shows) in Front and Right, cubic SPLINEs in Iso; ours SPLINE everywhere. No rule.
+   - Right-view radial hole rim: live one CIRCLE (a B-spline rim on the hole's cylinder, seen along its axis); ours a
+     70-point free SPLINE + an 8-point piece + three 2-point bits (our model has 8 LINE edges between cylinders, live
+     none). Idea, unproven on other docs: a curve on a cylinder seen end-on is that circle's arc.
+   - Model: our Rotieren 1 face is a surface of revolution (STEP SURFACE_OF_REVOLUTION + 8 extra plane / SoR LINEs)
+     where live's is a degenerate torus; Iso lug-end LINE vs live ARC x2 follow from that.
    rings-loft own x_t Part 2 133/338/208 for 132/335/206: a 0.007 mm² cylinder piece shares part of the big face's seam
    edge (three uses), so UnifySameDomain leaves it: parked.
    SAT: live's own SAT splits periodic faces (rings-loft live.sat 445 faces for the model's 439), so the SAT rows wait
@@ -188,9 +207,10 @@ Open, ranked:
   a configured part). Run them alone once in, sort first differences to owners.
 
 ## Next, in order
-1. Curve pattern 1 path (driven-pattern, above): translator, mine.
-2. Rank x1116n's gaps and fix the largest; set 2 after live2's refetch.
-3. Drawing conics in the iso view (Open 1).
+1. Ours reads ours back 112/119 (x1117a): the SAT rows (hose, motor-mount-jack, o-ring Part 3: closed B-surfaces
+   written split at mid, Open 3); then the drawing hole-rim idea (Open 1) if another doc shows it.
+2. After ~10:17: live's answers to REQUESTS 01:47 (sm-louver scale, live's own SAT import); set 2 after live2's refetch.
+3. Curve pattern 1 path (driven-pattern, above): translator, mine.
 4. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## How to run
