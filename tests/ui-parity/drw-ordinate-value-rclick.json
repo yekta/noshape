@@ -1,0 +1,82 @@
+{
+  "name": "drw-ordinate-value-rclick",
+  "about": "An ordinate dimension group (origin + one point) right-clicked on its 1.575 value label: the value's menu (with Reset ordinate)",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (live2 11-17: the drawing matrix's Ordinate dimension gap; drw-ordinate-rclick right-clicks the view point, whose menu has no Reset ordinate)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Ordinate dimension"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            0,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            0,
+            -10,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            40,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "px": [
+          813,
+          490
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
