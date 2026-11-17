@@ -36,7 +36,7 @@ cj=${NOSHAPE_GATE_BUILD_JOBS:-6}
 # Each build through the host's ~/bin/slot where it has one, with 12 GB free (two of bool's builds were killed by
 # earlyoom on vibe5 compiling model-core's single-unit LTO at load 31-39, 2 GB free; lead 11-16).
 bslot='$([ -x "$HOME/bin/slot" ] && echo env SLOT_MIN_GB=12 "$HOME/bin/slot")'
-jobs=8; threads=2; suite=1; spd=1; host=${NOSHAPE_GATE_HOST:-${NOSHAPE_RB_HOST:-vibe5}}; nightly=0; mainonly=0
+jobs=8; threads=2; suite=1; spd=1; host=${NOSHAPE_GATE_HOST:-${NOSHAPE_RB_HOST:-vibex8}}; nightly=0; mainonly=0
 [ "$target" = --nightly-kall ] && { nightly=1; target=origin/main; suite=0; spd=0; }
 [ "$target" = --main ] && { mainonly=1; target=origin/main; spd=0; }
 while [ $# -gt 0 ]; do

@@ -1,17 +1,17 @@
 #!/bin/bash
 # land.sh: the only way to put work on main (docs/TESTS.md "Landing"). Rebases on origin/main, queues HEAD on the land
-# server (vibe7) and returns at once ("QUEUED <sha>"): keep working. The land daemon there (tools/tiers/land-daemon.sh)
+# server (vibex7) and returns at once ("QUEUED <sha>"): keep working. The land daemon there (tools/tiers/land-daemon.sh)
 # checks queued changes in batches (cargo check over the workspace, clippy on the crates you edit, the full tests of
 # those crates and of the crates that use them directly, T0 when the app or the agent API is affected), pushes the
 # green ones to main and finds the change at fault in a red batch (11-01: agents spent ~25 h a day waiting on their
 # own lands). Your results: `land.sh --status`, or the lead's message. A failed land is your next task: fix forward
 # (work you stacked on it stays in your worktree; the next land.sh queues all of it). Docs-only changes push at once.
 #   tools/tiers/land.sh            queue HEAD, once clippy is clean on the crates it edits (run through rb.sh in your
-#                                  warm vibe5 dir, ~1 min; a clippy error refuses the queue, with the error)
+#                                  warm vibex7 dir, ~1 min; a clippy error refuses the queue, with the error)
 #   tools/tiers/land.sh --no-precheck   queue without that clippy run (emergencies)
 #   tools/tiers/land.sh --status   this worktree's queued, landed and failed changes
-#   tools/tiers/land.sh --wait     land now and wait (the lead, scripts; also when vibe5 is unreachable): this change's
-#                                  checks alone on vibe5, else vibe7, else here (env: OCCT_ROOT, CARGO_TARGET_DIR,
+#   tools/tiers/land.sh --wait     land now and wait (the lead, scripts; also when vibex7 is unreachable): this change's
+#                                  checks alone on vibe5, else vibex7, else here (env: OCCT_ROOT, CARGO_TARGET_DIR,
 #                                  CC/CXX), then the push. Re-run after a rejected push (main moved).
 # NOSHAPE_LAND_TARGET (default main) and NOSHAPE_LAND_DIR (the daemon's dir on vibe5, default land) try a test branch.
 set -uo pipefail
@@ -22,7 +22,7 @@ for a in "$@"; do
   case "$a" in --wait) mode=wait;; --status) mode=status;; --no-precheck) precheck=0;; *) sed -n '2,/^set /p' "$0" | grep '^#'; exit 2;; esac
 done
 name=$(basename "$PWD"); target=${NOSHAPE_LAND_TARGET:-main}
-qhost=${NOSHAPE_LAND_QUEUE_HOST:-vibe7}; qdir=${NOSHAPE_LAND_DIR:-land}
+qhost=${NOSHAPE_LAND_QUEUE_HOST:-vibex7}; qdir=${NOSHAPE_LAND_DIR:-land}
 results=/tmp/lead/land-results/$name.log; [ "$qdir" = land ] || results=/tmp/lead/$qdir-results/$name.log
 SSH=(ssh -o BatchMode=yes -o ConnectTimeout=5)
 
@@ -167,11 +167,11 @@ fi
 
 # --wait: this change's checks alone, then the push.
 echo "== crates: $pkgs"
-# The checks (tools/tiers/land-checks.sh) run on the land server (vibe5, else vibe7), so agents' full test runs don't
+# The checks (tools/tiers/land-checks.sh) run on the land server (vibe5, else vibex7), so agents' full test runs don't
 # load this machine (10-28): the commit goes to a temporary land/ branch, the server checks it in one of its slots.
 # NOSHAPE_LAND_LOCAL=1, or no land server reachable: here.
 cf=$(mktemp); echo "$changed" > "$cf"
-host=""; [ "${NOSHAPE_LAND_LOCAL:-0}" = 1 ] || for h in ${NOSHAPE_LAND_HOSTS:-vibe7 vibe6}; do "${SSH[@]}" "$h" true 2>/dev/null && { host=$h; break; }; done
+host=""; [ "${NOSHAPE_LAND_LOCAL:-0}" = 1 ] || for h in ${NOSHAPE_LAND_HOSTS:-vibex7 vibex6}; do "${SSH[@]}" "$h" true 2>/dev/null && { host=$h; break; }; done
 if [ -n "$host" ]; then
   branch="land/$name-$(git rev-parse --short HEAD)"
   git push -q -f origin "HEAD:refs/heads/$branch" 2>/dev/null || fail "push to $branch"

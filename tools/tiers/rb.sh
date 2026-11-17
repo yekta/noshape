@@ -21,8 +21,8 @@ if [ -z "$host" ]; then
     case "$name" in $pat) host=$h; break;; esac
   done < tools/tiers/rb-hosts 2>/dev/null
 fi
-host=${host:-vibe7}
-[ "$host" != vibe7 ] && ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$host" true 2>/dev/null && { echo "== rb: $host unreachable, using vibe7" >&2; host=vibe7; }
+host=${host:-vibex7}
+[ "$host" != vibex7 ] && ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$host" true 2>/dev/null && { echo "== rb: $host unreachable, using vibex7" >&2; host=vibex7; }
 get=()
 while [ "${1:-}" = --get ]; do get+=("$2"); shift 2; done
 [ $# -gt 0 ] || { echo "usage: rb.sh [--get <bin>]... <command...>"; exit 2; }

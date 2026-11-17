@@ -49,11 +49,11 @@ rebase conflict. Deeper dependents' tests run in the watcher after the push. Doc
 Main red from a pushed change means land.sh wasn't used. A flaky test (passes alone, fails in parallel, or fails now
 and then) goes to T2 at once with a ticket for its owner.
 
-## Building and testing on vibe5 / vibe6 / vibe7: `tools/tiers/rb.sh` (lead, 11-01)
+## Building and testing on vibe5 / vibex6 / vibex7: `tools/tiers/rb.sh` (lead, 11-01)
 
 Run builds and tests on vibe5, not on this machine (agents' builds kept it at 2–3× its cores and agents spent ~80 % of
 their day waiting on compiles). `tools/tiers/rb.sh <command>` syncs your worktree as it is (uncommitted changes too)
-to your build server (tools/tiers/rb-hosts: vibe5 for the kernel agents and the land checks, vibe6 and vibe7 for the UI
+to your build server (tools/tiers/rb-hosts: vibe5 for the kernel agents and the land checks, vibex6 and vibex7 for the UI
 agents), runs the command there in your worktree's own warm target dir and streams the output; its exit code is the
 command's. `--get <bin>` copies a built binary back into `$CARGO_TARGET_DIR/debug/` to run the app here (GUI checks).
 Measured: noshape-model's test build cold 188 s, unchanged 7 s, after a one-line model-core change 11 s.
@@ -61,7 +61,7 @@ Measured: noshape-model's test build cold 188 s, unchanged 7 s, after a one-line
 tools/tiers/rb.sh cargo test -p noshape-brep --lib
 tools/tiers/rb.sh --get noshape cargo build -p noshape   # then run $CARGO_TARGET_DIR/debug/noshape here
 ```
-Heavy jobs (replay corpora, long probes, sweeps) run there too: vibe5 has 16 cores and 29 GB of memory, vibe6 and vibe7 8 cores and 29 GB each.
+Heavy jobs (replay corpora, long probes, sweeps) run there too: vibe5 has 16 cores and 29 GB of memory, vibex6 and vibex7 8 cores and 29 GB each.
 
 ## CI on GitHub (`ci.yml`, cliapp 11-01)
 
@@ -220,11 +220,11 @@ delete the line to bring it back to T1. Record the move below.
   seeds 1–3 × 60 steps (1.6 s dev build); the wider default (1–5 × 80) stays T2 as
   `random_sketch_edits_never_panic_wide`.
 
-## Timing on the perf server (vibe6, 10-30)
+## Timing on the perf server (vibex6, 10-30)
 This machine's load makes local timings meaningless. Time a perf test at your commit with
 `tools/tiers/perf.sh [-n RUNS] <cargo test args>` (e.g. `tools/tiers/perf.sh -p noshape-model --test all --
 custom_features::knurl_feature_b94_on_a_cylinder --ignored --nocapture --test-threads=1`): the commit goes to a temporary
-`perf/` branch, vibe6 builds release and runs it RUNS times (3 by default) with the machine to itself (land checks wait),
+`perf/` branch, vibex6 builds release and runs it RUNS times (3 by default) with the machine to itself (land checks wait),
 and prints each run's wall time, the test's timing lines, best and median. Quote those numbers in handoffs and commits.
-vibe6 also times the standard set (knurl, big plate, pattern_second, the timed pattern checks) on every new last-green,
+vibex6 also times the standard set (knurl, big plate, pattern_second, the timed pattern checks) on every new last-green,
 every 6 h; a > 15 % slower median is flagged to the lead. perf.yml on GitHub stays the cross-platform reference.

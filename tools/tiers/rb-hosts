@@ -1,26 +1,26 @@
 # rb.sh's build server per worktree (11-01): the first line whose pattern matches the worktree's directory name
 # 11-12 (lead): vibe4 removed by the user; its work and the land queue moved to vibe5.
-# 11-12 21:30 (lead): vibe6 and vibe7 added (8 cores, 29 GB each): psui/studios/skasm on vibe6, blend/dx/asm on vibe7;
+# 11-12 21:30 (lead): vibex6 and vibex7 added (8 cores, 29 GB each): psui/studios/skasm on vibex6, blend/dx/asm on vibex7;
 # vibe5 keeps the land queue, bool and core.
-# 11-17 (lead): vibe3 removed by the user; main's watcher moved to vibe6 (with psui, skasm, studios). 16:20 vibe5 went
-# down too: the land queue moved to vibe7; bool and bool2 build on vibe6, core and the rest on vibe7.
-# 11-17 17:05 (lead): vibe8 added (8 cores, 29 GB): bool, dx and asm build there (vibe7 at load 48 with the land queue).
+# 11-17 (lead): vibe3 removed by the user; main's watcher moved to vibex6 (with psui, skasm, studios). 16:20 vibe5 went
+# down too: the land queue moved to vibex7; bool and bool2 build on vibex6, core and the rest on vibex7.
+# 11-17 17:05 (lead): vibex8 added (8 cores, 29 GB): bool, dx and asm build there (vibex7 at load 48 with the land queue).
 # (a bash glob) wins; no match: vibe5. Each worktree keeps its warm target dir on its own host.
 # 11-06 (lead): spread so no host sits idle. vibe4 (16 cores, 62 GB): the land checks plus bool (replay corpora).
 # vibe5 (16 cores, 29 GB): psui, skasm, core (11-07 17:55: vibe2 at 23 with core + qa, vibe5 at 2). vibe4 also dx.
 # vibe2 (8 cores, 31 GB): qa's model suite and heavy one-off probes.
 # vibe3 (8 cores, 31 GB): asm and qa. This machine runs Chrome for live/live2: build on your host through rb.sh, not here.
 # Heavy one-off probes: NOSHAPE_RB_HOST=<the idlest host>.
-bool* vibe8
-core*     vibe7
-blend*    vibe7
-dev* vibe7
-psui*     vibe6
-skasm*    vibe6
-dx*       vibe8
-asm*      vibe8
-studios*  vibe6
-cliapp*   vibe7
-appicon*  vibe7
-bool2*    vibe6
-* vibe7
+bool* vibex8
+core*     vibex7
+blend*    vibex7
+dev* vibex7
+psui*     vibex6
+skasm*    vibex6
+dx*       vibex8
+asm*      vibex8
+studios*  vibex6
+cliapp*   vibex7
+appicon*  vibex7
+bool2*    vibex6
+* vibex7
