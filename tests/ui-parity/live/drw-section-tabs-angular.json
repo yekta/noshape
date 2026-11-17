@@ -1,6 +1,6 @@
 {
  "scenario": "drw-section-tabs-angular",
- "recorded": "2026-11-17T11:07:54.735Z",
+ "recorded": "2026-11-17T11:33:04.941Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -9,12 +9,12 @@
    1919,
    1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.4"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.5"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "b9c090a110703ded0987b1a4",
+  "element": "92071d0d05957a6328f60170",
   "start": "block-drawing",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -220,7 +220,7 @@
      "selection": []
     }
    },
-   "t": 229845
+   "t": 228458
   },
   {
    "step": 2,
@@ -335,7 +335,7 @@
      "selection": []
     }
    },
-   "t": 255590
+   "t": 253678
   },
   {
    "step": 3,
@@ -455,7 +455,7 @@
      "selection": []
     }
    },
-   "t": 282422
+   "t": 279808
   },
   {
    "step": 4,
@@ -575,7 +575,7 @@
      "selection": []
     }
    },
-   "t": 308379
+   "t": 305182
   },
   {
    "step": 5,
@@ -695,7 +695,7 @@
      "selection": []
     }
    },
-   "t": 334541
+   "t": 331791
   },
   {
    "step": 6,
@@ -821,7 +821,7 @@
      "selection": []
     }
    },
-   "t": 359408
+   "t": 356281
   },
   {
    "step": 7,
@@ -942,7 +942,7 @@
      "selection": []
     }
    },
-   "t": 385098
+   "t": 381221
   },
   {
    "step": 8,
@@ -1068,7 +1068,7 @@
      "selection": []
     }
    },
-   "t": 410342
+   "t": 406213
   },
   {
    "step": 9,
@@ -1189,7 +1189,7 @@
      "selection": []
     }
    },
-   "t": 436191
+   "t": 431440
   },
   {
    "step": 10,
@@ -1317,7 +1317,7 @@
      "selection": []
     }
    },
-   "t": 463081
+   "t": 457366
   }
  ]
 }
