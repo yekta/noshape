@@ -252,6 +252,25 @@ fn bmp24(w: u32, h: u32, rgb: &[u8]) -> Vec<u8> {
 /// to be written as one.
 const FIT_TOL: f64 = 1e-4;
 
+/// The extremes of `points` when they all lie within `tol` of the line through them (None for a point or a curve).
+fn straight(points: &[[f64; 2]], tol: f64) -> Option<[[f64; 2]; 2]> {
+    let first = points.first()?;
+    let far = points.iter().max_by(|p, q| ((p[0] - first[0]).hypot(p[1] - first[1])).total_cmp(&(q[0] - first[0]).hypot(q[1] - first[1])))?;
+    let d = [far[0] - first[0], far[1] - first[1]];
+    let len = d[0].hypot(d[1]);
+    if len <= tol {
+        return None;
+    }
+    let u = [d[0] / len, d[1] / len];
+    let along = |p: &[f64; 2]| (p[0] - first[0]) * u[0] + (p[1] - first[1]) * u[1];
+    if points.iter().any(|p| ((p[0] - first[0]) * u[1] - (p[1] - first[1]) * u[0]).abs() > tol) {
+        return None;
+    }
+    let lo = points.iter().min_by(|p, q| along(p).total_cmp(&along(q)))?;
+    let hi = points.iter().max_by(|p, q| along(p).total_cmp(&along(q)))?;
+    Some([*lo, *hi])
+}
+
 /// File units per mm for an INSUNITS code (1 inch, 2 foot, 4 mm, 5 cm, 6 m,
 /// 10 yard).
 pub fn units_per_mm(insunits: u8) -> f64 {
@@ -792,6 +811,11 @@ impl Sheet<'_> {
             }
             None if l.points.len() == 2 && !l.closed => EntityType::Line(Line::from_points(p3(l.points[0]), p3(l.points[1]))),
             None if poly => EntityType::Polyline2D(self.polyline(&l.points, l.closed, true)),
+            // A model edge straight in the view (a curve seen edge-on: c2-sm-louver's bend edges at the louvers' ends):
+            // a LINE between its extremes, as live's (it had 31 short SPLINEs there, live none).
+            None if !l.closed && MODEL_EDGES.contains(&self.g.cad_line_layer(li)) && let Some([a, b]) = straight(&l.points, FIT_TOL) => {
+                EntityType::Line(Line::from_points(p3(a), p3(b)))
+            }
             // A model edge of another curve: a cubic SPLINE (live 1857's
             // VISIBLE / TANGENT_LINES) through the projected points.
             None if MODEL_EDGES.contains(&self.g.cad_line_layer(li)) => {
@@ -1627,6 +1651,20 @@ pub fn to_dxf_version(g: &SheetGeometry, insunits: u8, version: DxfVersion) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A curve seen edge-on (its points on one line, even doubling back) is a LINE between its extremes; a curve or a
+    /// point isn't.
+    #[test]
+    fn a_curve_seen_edge_on_is_straight() {
+        let edge_on: Vec<[f64; 2]> = (0..=10).map(|i| [1.0 + 2.0 * (i as f64 * 0.3).sin(), 2.0 + 4.0 * (i as f64 * 0.3).sin()]).collect();
+        let [a, b] = straight(&edge_on, 1e-4).unwrap();
+        let lo = edge_on.iter().map(|p| p[0]).fold(f64::MAX, f64::min);
+        let hi = edge_on.iter().map(|p| p[0]).fold(f64::MIN, f64::max);
+        assert!((a[0].min(b[0]) - lo).abs() < 1e-12 && (a[0].max(b[0]) - hi).abs() < 1e-12, "{a:?} {b:?}");
+        let arc: Vec<[f64; 2]> = (0..=10).map(|i| [(i as f64 * 0.1).cos(), (i as f64 * 0.1).sin()]).collect();
+        assert!(straight(&arc, 1e-4).is_none());
+        assert!(straight(&[[1.0, 1.0]; 4], 1e-4).is_none());
+    }
     use crate::drawing::sheet::LineStyle;
     use crate::drawing::{DimOrientation, Sheet};
 
