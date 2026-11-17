@@ -2213,3 +2213,52 @@ fn a_seam_piece_across_a_seam_segment_is_written_with_its_face() {
     assert!((a - want).abs() < 1e-6 * want, "sat: {a} vs {want}");
     assert_eq!(s.count(ShapeType::Face), 2, "the model's shape is left as it was");
 }
+
+/// A STEP solid whose one shell is two boxes meeting nowhere imports as a part per piece, both named "<part>__<solid>"
+/// (live2 q-step-twopiece: two solid parts "Part 2__Two pieces", 6 / 12 / 8 each, 4800 and 1000 mm³; ours was one part
+/// "Part 2" of two solids).
+#[test]
+fn a_solid_of_disconnected_pieces_imports_as_a_part_each() {
+    let a = make_box_corners(DVec3::ZERO, DVec3::new(0.01, 0.01, 0.01)).unwrap();
+    let b = make_box_corners(DVec3::new(0.02, 0.0, 0.0), DVec3::new(0.03, 0.02, 0.01)).unwrap();
+    let path = std::env::temp_dir().join(format!("noshape-step-pieces-{}.step", std::process::id()));
+    write_step(&path, &[ExportShape { shape: Shape::compound(&[a, b]), name: Some("Combine1".into()), color: None }], LengthUnit::Meter).unwrap();
+    // The two solids' shells as one shell of the first solid; the second solid dropped from the representation.
+    let text = std::fs::read_to_string(&path).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    let id = |l: &str| l.split('=').next().unwrap().trim().to_string();
+    let shells: Vec<&str> = lines.iter().copied().filter(|l| l.contains("CLOSED_SHELL")).collect();
+    let solids: Vec<&str> = lines.iter().copied().filter(|l| l.contains("MANIFOLD_SOLID_BREP")).collect();
+    assert_eq!((shells.len(), solids.len()), (2, 2), "{text}");
+    let faces = |l: &str| l[l.rfind('(').unwrap() + 1..l.find(')').unwrap()].to_string();
+    let merged = shells[0].replacen(&faces(shells[0]), &format!("{},{}", faces(shells[0]), faces(shells[1])), 1);
+    let gone = id(solids[1]);
+    let rename = |l: &str| {
+        let (at, name) = (l.find("MANIFOLD_SOLID_BREP").unwrap(), l.find('\'').unwrap());
+        assert!(name > at, "{l}");
+        format!("{}'Two pieces'{}", &l[..name], &l[name + 1 + l[name + 1..].find('\'').unwrap() + 1..])
+    };
+    let mut out = String::new();
+    for l in &lines {
+        let l = if *l == shells[0] { merged.clone() } else if *l == solids[0] { rename(l) } else { l.to_string() };
+        if l.starts_with(&gone) || l.starts_with(&id(shells[1])) {
+            continue;
+        }
+        out += &l.replace(&format!("{gone},"), "").replace(&format!(",{gone})"), ")");
+        out.push('\n');
+    }
+    std::fs::write(&path, out).unwrap();
+    let parts = read_step(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    // (One part: the reader's healing makes two solids of the shell.)
+    assert_eq!((parts.len(), parts[0].shape.count(ShapeType::Face)), (1, 12));
+    let pieces = split_connected_pieces(parts);
+    assert_eq!(pieces.len(), 2);
+    for p in &pieces {
+        assert_eq!(p.name.as_deref(), Some("Combine1__Two pieces"));
+        assert_eq!((p.shape.count(ShapeType::Solid), p.shape.count(ShapeType::Face)), (1, 6));
+        assert!(volume_properties(&p.shape).unwrap().mass > 0.0, "a piece inside out");
+    }
+    let v: f64 = pieces.iter().map(|p| volume_properties(&p.shape).unwrap().mass).sum();
+    assert!((v - 3e-6).abs() < 1e-12, "{v}");
+}

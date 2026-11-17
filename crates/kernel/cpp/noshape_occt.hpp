@@ -777,6 +777,7 @@ struct P3;
 struct HistRec;
 struct OpOut;
 struct MergedFaces;
+struct ShapePieces;
 struct SurfaceInfo;
 struct CurveInfo;
 struct BSplineF;
@@ -846,6 +847,7 @@ std::unique_ptr<OcShape>     fix_shape(const OcShape& s, double tolerance);
 std::unique_ptr<OcShape>     elementary_surfaces(const OcShape& s);
 std::unique_ptr<OcShape>     shape_seam_pieces_joined(const OcShape& s);
 std::unique_ptr<OcShape>     orient_faces_consistently(const OcShape& s);
+ShapePieces                  connected_pieces(const OcShape& s);
 rust::String                 dump_shape(const OcShape& s);
 
 // ---- geometry queries (geom.cpp)

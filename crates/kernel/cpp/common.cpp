@@ -4,6 +4,7 @@
 #include <Geom_BSplineSurface.hxx>
 #include <numeric>
 #include "internal.hpp"
+#include <BRepLib.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
@@ -2328,6 +2329,117 @@ std::unique_ptr<OcShape> fix_shape(const OcShape& s, double tolerance)
   }
   fix->Perform();
   return wrap(fix->Shape());
+}
+
+// A part of several solids, or of a solid whose one shell is pieces meeting at no edge (live2 q-step-twopiece: one STEP
+// solid of two separate blocks), as one solid per piece: live's import makes a part of each.
+// A solid of several shells (voids) is one piece; a part with anything besides solids, or a piece that isn't closed,
+// stays as it is.
+ShapePieces connected_pieces(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  const ShapeIMap& fm = s.map(TopAbs_FACE);
+  auto             as_is = [&] {
+    ShapePieces one;
+    one.shapes = std::make_unique<OcShapeList>();
+    one.shapes->items.push_back(s.shape);
+    for (int i = 0; i < fm.Extent(); ++i)
+      one.face_piece.push_back(0), one.face_index.push_back((uint32_t)i);
+    return one;
+  };
+  std::vector<TopoDS_Shape> solids;
+  for (TopExp_Explorer e(s.shape, TopAbs_SOLID); e.More(); e.Next())
+    solids.push_back(e.Current());
+  int in_solids = 0;
+  for (const TopoDS_Shape& x : solids)
+    for (TopExp_Explorer f(x, TopAbs_FACE); f.More(); f.Next())
+      ++in_solids;
+  if (solids.empty() || in_solids != fm.Extent())
+    return as_is();
+  BRep_Builder              b;
+  std::vector<TopoDS_Shape> pieces;
+  std::vector<uint32_t>     from; // each piece's solid
+  for (size_t si = 0; si < solids.size(); ++si)
+  {
+    const TopoDS_Shape& solid = solids[si];
+    std::vector<TopoDS_Shape> shells;
+    for (TopoDS_Iterator it(solid); it.More(); it.Next())
+      shells.push_back(it.Value());
+    if (shells.size() != 1)
+    {
+      pieces.push_back(solid), from.push_back((uint32_t)si);
+      continue;
+    }
+    ShapeIMap faces;
+    TopExp::MapShapes(shells[0], TopAbs_FACE, faces);
+    // Faces joined by an edge they share (a degenerate edge joins nothing).
+    std::vector<int> parent((size_t)faces.Extent());
+    std::iota(parent.begin(), parent.end(), 0);
+    std::function<int(int)> root = [&](int i) { return parent[(size_t)i] == i ? i : parent[(size_t)i] = root(parent[(size_t)i]); };
+    ShapeAncMap ef;
+    TopExp::MapShapesAndAncestors(shells[0], TopAbs_EDGE, TopAbs_FACE, ef);
+    for (int i = 1; i <= ef.Extent(); ++i)
+    {
+      if (BRep_Tool::Degenerated(TopoDS::Edge(ef.FindKey(i))))
+        continue;
+      int first = -1;
+      for (const TopoDS_Shape& f : ef(i))
+      {
+        const int k = faces.FindIndex(f) - 1;
+        if (first < 0)
+          first = k;
+        else
+          parent[(size_t)root(k)] = root(first);
+      }
+    }
+    std::map<int, int> piece_of;
+    for (int i = 0; i < faces.Extent(); ++i)
+      piece_of.emplace(root(i), (int)piece_of.size());
+    if (piece_of.size() < 2)
+    {
+      pieces.push_back(solid), from.push_back((uint32_t)si);
+      continue;
+    }
+    std::vector<TopoDS_Shell> sh(piece_of.size());
+    for (TopoDS_Shell& x : sh)
+      b.MakeShell(x);
+    for (int i = 0; i < faces.Extent(); ++i)
+      b.Add(sh[(size_t)piece_of[root(i)]], faces(i + 1));
+    for (TopoDS_Shell& x : sh)
+    {
+      if (!BRep_Tool::IsClosed(x))
+        return as_is();
+      x.Closed(true);
+      TopoDS_Solid piece;
+      b.MakeSolid(piece);
+      b.Add(piece, x);
+      BRepLib::OrientClosedSolid(piece);
+      pieces.push_back(piece), from.push_back((uint32_t)si);
+    }
+  }
+  if (pieces.size() < 2)
+    return as_is();
+  ShapePieces out;
+  out.shapes = std::make_unique<OcShapeList>();
+  for (uint32_t k : from)
+    out.piece_solid.push_back(k);
+  std::vector<ShapeIMap> maps(pieces.size());
+  for (size_t k = 0; k < pieces.size(); ++k)
+  {
+    out.shapes->items.push_back(pieces[k]);
+    TopExp::MapShapes(pieces[k], TopAbs_FACE, maps[k]);
+  }
+  for (int i = 1; i <= fm.Extent(); ++i)
+  {
+    size_t k = 0;
+    while (k < maps.size() && !maps[k].Contains(fm(i)))
+      ++k;
+    if (k == maps.size())
+      return as_is();
+    out.face_piece.push_back((uint32_t)k);
+    out.face_index.push_back((uint32_t)(maps[k].FindIndex(fm(i)) - 1));
+  }
+  return out;
 }
 
 std::unique_ptr<OcShape> orient_faces_consistently(const OcShape& s)

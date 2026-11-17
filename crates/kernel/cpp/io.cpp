@@ -83,6 +83,7 @@
 #include <DESTEP_Parameters.hxx>
 #include <STEPCAFControl_Writer.hxx>
 #include <STEPControl_Reader.hxx>
+#include <StepShape_ManifoldSolidBrep.hxx>
 #include <STEPControl_Writer.hxx>
 #include <TDF_Label.hxx>
 #include <TDataStd_Name.hxx>
@@ -816,6 +817,30 @@ StepImport read_step(rust::Str path)
           out.face_colors.push_back((float)fg);
           out.face_colors.push_back((float)fb);
         }
+      }
+      // Each solid's own name and body (MANIFOLD_SOLID_BREP), by its transferred shape: a split solid's pieces are
+      // named "<part>__<solid>" (live2 q-step-twopiece).
+      std::map<const TopoDS_TShape*, std::pair<std::string, int>> solid_names; // name, entity
+      const occ::handle<XSControl_WorkSession>&     ws    = r.Reader().WS();
+      const occ::handle<Transfer_TransientProcess>& tp    = ws->TransferReader()->TransientProcess();
+      const occ::handle<Interface_InterfaceModel>   model = ws->Model();
+      for (int i = 1; !model.IsNull() && !tp.IsNull() && i <= model->NbEntities(); ++i)
+        if (const auto e = occ::down_cast<StepShape_ManifoldSolidBrep>(model->Value(i)); !e.IsNull() && !e->Name().IsNull() && !e->Name()->IsEmpty())
+          if (const occ::handle<Transfer_Binder> bd = tp->Find(e); !bd.IsNull())
+            if (const TopoDS_Shape sh = TransferBRep::ShapeResult(bd); !sh.IsNull())
+              for (TopExp_Explorer so(sh, TopAbs_SOLID); so.More(); so.Next())
+                solid_names.emplace(so.Current().TShape().get(), std::make_pair(std::string(e->Name()->ToCString()), i));
+      for (size_t li = 0; li < leaves.size(); ++li)
+      {
+        uint32_t k = 0;
+        for (TopExp_Explorer so(leaves[li].shape, TopAbs_SOLID); so.More(); so.Next(), ++k)
+          if (const auto it = solid_names.find(so.Current().TShape().get()); it != solid_names.end())
+          {
+            out.solid_part.push_back((uint32_t)li);
+            out.solid_index.push_back(k);
+            out.solid_names.push_back(rust::String(it->second.first));
+            out.solid_body.push_back((uint32_t)it->second.second);
+          }
       }
       cafOk = !leaves.empty();
       clock.lap("step collect");

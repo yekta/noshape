@@ -235,6 +235,7 @@ fn read_shape(path: &Path, units: &UnitPrefs, iges_post: bool) -> anyhow::Result
     // Parts with names and colours: one compound child each, described in `info`.
     let mut info: Vec<noshape_model::features::importing::ImportPartInfo> = Vec::new();
     let mut compound = |parts: Vec<k::ImportedShape>| {
+        let parts = k::split_connected_pieces(parts);
         info = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), color: p.color, opacity: p.opacity, faces: p.face_colors.clone() }).collect();
         k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>())
     };

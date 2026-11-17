@@ -63,6 +63,49 @@ pub struct ImportedShape {
     /// Colours of single faces (index into the shape's faces, sRGB 0..1)
     /// where the file gives them; they override `color`.
     pub face_colors: Vec<(usize, [f32; 3])>,
+    /// Names the file gives the shape's solids (STEP's MANIFOLD_SOLID_BREP): (solid index in the shape, the file's
+    /// body it came from, name); two solids of one body are its pieces.
+    pub solid_names: Vec<(usize, u32, String)>,
+}
+
+/// Imported parts with each solid, and each solid's pieces meeting at no edge, a part of its own, coloured as the part
+/// and named after it, a split solid's pieces "<part>__<solid>" (live2 q-step-twopiece: one STEP solid "Two pieces" of
+/// two separate blocks in "Part 2" imports as two solid parts "Part 2__Two pieces"); a part that can't be split stays
+/// whole.
+pub fn split_connected_pieces(parts: Vec<ImportedShape>) -> Vec<ImportedShape> {
+    let mut out = Vec::with_capacity(parts.len());
+    for p in parts {
+        let Ok(r) = ffi::connected_pieces(p.shape.raw()) else {
+            out.push(p);
+            continue;
+        };
+        let pieces = list_to_vec(&r.shapes);
+        if pieces.len() < 2 {
+            out.push(p);
+            continue;
+        }
+        for (k, shape) in pieces.into_iter().enumerate() {
+            let face_colors = p.face_colors.iter().filter(|(f, _)| r.face_piece.get(*f) == Some(&(k as u32))).filter_map(|(f, c)| r.face_index.get(*f).map(|&i| (i as usize, *c))).collect();
+            // A piece of a solid split here, or of a file body that came in as several solids.
+            let solid = r.piece_solid.get(k).map(|&s| s as usize);
+            let named = p.solid_names.iter().find(|(i, ..)| Some(*i) == solid);
+            let split = r.piece_solid.iter().filter(|&&s| Some(s as usize) == solid).count() > 1
+                || named.is_some_and(|(_, body, _)| p.solid_names.iter().filter(|(_, b, _)| b == body).count() > 1);
+            let solid_name = named.filter(|_| split).map(|(.., n)| n.clone());
+            let name = match (solid_name, &p.name) {
+                (Some(s), Some(n)) => Some(format!("{n}__{s}")),
+                (Some(s), None) => Some(s),
+                (None, n) => n.clone(),
+            };
+            out.push(ImportedShape { shape, name, face_colors, solid_names: Vec::new(), ..p.clone() });
+        }
+    }
+    out
+}
+
+/// The solid names of shape `i` of an import.
+fn solid_names_of(r: &ffi::StepImport, i: usize) -> Vec<(usize, u32, String)> {
+    (0..r.solid_part.len()).filter(|&k| r.solid_part[k] as usize == i).map(|k| (r.solid_index[k] as usize, r.solid_body[k], r.solid_names[k].clone())).collect()
 }
 
 /// The face colours of shape `i` of an import.
@@ -92,7 +135,7 @@ fn step_shapes(r: &ffi::StepImport, f: f64) -> Result<Vec<ImportedShape>> {
             let name = r.names.get(i).filter(|n| !n.is_empty()).cloned();
             let color = (r.has_color.get(i).copied().unwrap_or(false))
                 .then(|| [r.colors[3 * i], r.colors[3 * i + 1], r.colors[3 * i + 2]]);
-            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, opacity: r.opacity.get(i).copied().filter(|&o| o < 1.0), face_colors: face_colors_of(r, i) })
+            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, opacity: r.opacity.get(i).copied().filter(|&o| o < 1.0), face_colors: face_colors_of(r, i), solid_names: solid_names_of(r, i) })
         })
         .collect()
 }
@@ -181,18 +224,18 @@ pub fn read_iges_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShap
             let solids = shape.solids();
             let names = tree.as_ref().and_then(|t| t.members_matching(p.name.as_deref(), solids.len())).filter(|_| solids.len() > 1);
             let Some(names) = names else {
-                placed.push(merged_faces(ImportedShape { shape, name: p.name.clone(), color: p.color, opacity: p.opacity, face_colors: p.face_colors.clone() }, true)?);
+                placed.push(merged_faces(ImportedShape { shape, name: p.name.clone(), color: p.color, opacity: p.opacity, face_colors: p.face_colors.clone(), solid_names: p.solid_names.clone() }, true)?);
                 continue;
             };
             for (shape, name) in solids.into_iter().zip(names) {
-                placed.push(merged_faces(ImportedShape { shape, name: Some(name), color: p.color, opacity: p.opacity, face_colors: Vec::new() }, true)?);
+                placed.push(merged_faces(ImportedShape { shape, name: Some(name), color: p.color, opacity: p.opacity, face_colors: Vec::new(), solid_names: Vec::new() }, true)?);
             }
         }
         if !placed.is_empty() {
             return Ok(placed);
         }
     }
-    Ok(vec![merged_faces(ImportedShape { shape: read_iges(path, unit)?, name: None, color: None, opacity: None, face_colors: Vec::new() }, true)?])
+    Ok(vec![merged_faces(ImportedShape { shape: read_iges(path, unit)?, name: None, color: None, opacity: None, face_colors: Vec::new(), solid_names: Vec::new() }, true)?])
 }
 
 /// A STEP or IGES part's faces on one plane merged, as Onshape imports them (its Parasolid import doesn't: a sheet metal
@@ -233,7 +276,7 @@ pub fn read_iges_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option
         match members {
             Some(names) if solids.len() > 1 => {
                 for (shape, name) in solids.into_iter().zip(names) {
-                    parts.push(ImportedShape { shape, name: Some(name), color: part.color, opacity: part.opacity, face_colors: Vec::new() });
+                    parts.push(ImportedShape { shape, name: Some(name), color: part.color, opacity: part.opacity, face_colors: Vec::new(), solid_names: Vec::new() });
                 }
             }
             _ => parts.push(part),
@@ -288,7 +331,7 @@ fn iges_placed_tree(tree: &IgesTree, protos: Vec<ImportedShape>, instances: &[Pv
             Some(k) if solids.len() > 1 => {
                 for (shape, name) in solids.into_iter().zip(members(k)) {
                     children.push((Some(k), NestChild { part: Some(parts.len()), sub: None, name: name.clone(), transform: glam::DMat4::IDENTITY }));
-                    parts.push(ImportedShape { shape, name: Some(name), color: proto.color, opacity: proto.opacity, face_colors: Vec::new() });
+                    parts.push(ImportedShape { shape, name: Some(name), color: proto.color, opacity: proto.opacity, face_colors: Vec::new(), solid_names: Vec::new() });
                 }
                 kinds.push(Proto::Sub(k));
             }
@@ -1062,7 +1105,7 @@ fn imported(r: ffi::StepImport, unit: LengthUnit) -> Result<Vec<ImportedShape>> 
         .map(|(i, s)| {
             let name = r.names.get(i).filter(|n| !n.is_empty()).cloned();
             let color = (r.has_color.get(i).copied().unwrap_or(false)).then(|| [r.colors[3 * i], r.colors[3 * i + 1], r.colors[3 * i + 2]]);
-            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, opacity: r.opacity.get(i).copied().filter(|&o| o < 1.0), face_colors: face_colors_of(&r, i) })
+            Ok(ImportedShape { shape: scaled(&s, f)?, name, color, opacity: r.opacity.get(i).copied().filter(|&o| o < 1.0), face_colors: face_colors_of(&r, i), solid_names: solid_names_of(&r, i) })
         })
         .collect()
 }

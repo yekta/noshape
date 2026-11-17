@@ -53,6 +53,15 @@ pub(crate) mod ffi {
         face_map: Vec<u32>,
     }
 
+    /// A shape split into its connected pieces: each input face's piece and index in it (the input's face order), and
+    /// each piece's solid (the input's solid order).
+    struct ShapePieces {
+        shapes: UniquePtr<OcShapeList>,
+        face_piece: Vec<u32>,
+        face_index: Vec<u32>,
+        piece_solid: Vec<u32>,
+    }
+
     /// Surface description. kind: 0 plane, 1 cylinder, 2 cone, 3 sphere,
     /// 4 torus, 5 bezier, 6 bspline, 7 revolution, 8 extrusion, 9 offset, 10 other.
     #[derive(Debug, Clone, Copy)]
@@ -250,6 +259,12 @@ pub(crate) mod ffi {
         face_part: Vec<u32>,
         face_index: Vec<u32>,
         face_colors: Vec<f32>,
+        /// Names the file gives a shape's solids (STEP's MANIFOLD_SOLID_BREP): (shape index, solid index, name, the
+        /// file's body it came from: two solids of one body are its pieces).
+        solid_part: Vec<u32>,
+        solid_index: Vec<u32>,
+        solid_names: Vec<String>,
+        solid_body: Vec<u32>,
     }
 
     /// A STEP assembly: its distinct parts (own coordinates, OCCT mm) and
@@ -510,6 +525,7 @@ pub(crate) mod ffi {
         fn elementary_surfaces(s: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn shape_seam_pieces_joined(s: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn orient_faces_consistently(s: &OcShape) -> Result<UniquePtr<OcShape>>;
+        fn connected_pieces(s: &OcShape) -> Result<ShapePieces>;
         fn dump_shape(s: &OcShape) -> Result<String>;
 
         // ---- geometry
