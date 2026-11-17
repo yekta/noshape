@@ -164,6 +164,17 @@ const LIVE_IMPORT_FAILURES: &[LiveImportFailure] = &[
     LiveImportFailure { doc: "0c3466", from_feature: "Import 1", part: "REV-21-1650" },
 ];
 
+/// Live's imports of its own mesh files that make sheets of a good mesh (lead 11-17, as [`LIVE_IMPORT_FAILURES`]: parity,
+/// not shortcomings): the exchange suite holds ours, and live's import of ours, to the model's solids instead (its
+/// Parasolid's parts, each volume within its area times [`LIVE_STL_CHORD_MM`]).
+const LIVE_MESH_SHEETS: &[&str] = &[
+    // dx 11-17: the bottle's two solid halves touch along edges; live's import of its STL / OBJ / 3MF makes 148 sheet
+    // bodies, ours the model's 2 solids.
+    "c2-bottle-split",
+    // dx 11-17: live 9 sheet bodies; ours 2 solids for the model's 4 (its parts overlap: a difference still counted).
+    "c2-duct-multipart",
+];
+
 /// Live's parts and ours with [`LIVE_IMPORT_FAILURES`]' parts left out where a failed import named is reached.
 fn drop_live_import_failures(doc: &str, reached: &[&str], live: Vec<PartState>, ours: Vec<PartState>) -> (Vec<PartState>, Vec<PartState>) {
     let gone: Vec<&str> = LIVE_IMPORT_FAILURES.iter().filter(|r| doc.contains(r.doc) && reached.contains(&r.from_feature)).map(|r| r.part).collect();
@@ -836,6 +847,15 @@ fn exchange_round_trip() {
         // `ours`: what live's import of our file is held to (an STL of live's off its model by over 1 %: the model's).
         // (No own import of ACIS, OBJ or 3MF: its Parasolid's or its STL's, the same model and mesher.)
         let expected = |format: &str, ours: bool| -> Option<Vec<PartState>> {
+            if mesh(format) && LIVE_MESH_SHEETS.contains(&name.as_str()) {
+                let chord = LIVE_STL_CHORD_MM * 1e-3;
+                return xt.as_ref().map(|x| {
+                    mesh_counts(x.clone())
+                        .into_iter()
+                        .map(|p| PartState { volume_band: p.volume.zip(p.area).map(|(v, a)| [v - a * chord, v + a * chord]), area: None, area_band: None, ..p })
+                        .collect()
+                });
+            }
             let key = match format {
                 "ACIS" if selfs[format].is_null() => "PARASOLID",
                 "OBJ" | "3MF" if selfs[format].is_null() => "STL",
