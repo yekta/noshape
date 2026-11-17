@@ -1207,3 +1207,6 @@ fn print_in_a_drawing_opens_its_pdf_without_a_banner(cx: &mut TestAppContext) {
     let bytes = std::fs::read(path).expect("written");
     assert!(bytes.starts_with(b"%PDF"), "a PDF");
 }
+
+/// Interaction feel (pointer reach, click, drag): its own file.
+mod feel;
