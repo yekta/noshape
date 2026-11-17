@@ -4,30 +4,31 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 12:05 UTC.
+Updated 11-17 14:15 UTC.
 
 ## In flight
-- P0 SCISSOR-LIFT-BOM-ROWS (lead 07:30; asm d8d597e0 owns the BOM, waits for my culprit): fed22d alone as a model gives
-  the same at both ends; only the assembly run shows it. Unit bool-bisect-sl2 (/root/bool-scratch/bisect-sl-run2.sh, git
-  bisect run in worktree 776dfea9; step script bisect-sl.sh: debug ops tests built on vibe6 (target ~/agents/776dfea9),
-  the binary copied to vibe7 ~/agents/bool-keep/ops-sl, asm-scissor-lift alone (vibe7 snapshot ~/agents/bool-keep/sl)
-  through vibe7's ~/bin/slot; judged by "Studio fed22d › Fillet 18: Error"). Log /root/bool-scratch/sl-bisect.log.
-  Good: 684e77e2e, 06a56de82, 5e976a640. Bad: ecf8c33ab, 6c18ffe92. Skipped (slot timeouts): 41f62884a, 14727ed62.
-  Left: 41f62884a / 5b2807501 (core), 9ece8f66d (OCCT 0033), 7c76c77f9 (dx DXF, testing now), 905a789b4, bdd418e2c,
-  5b9064e1b, 3b5b8af3b (my knife stack). Each step waits for vibe7's slot (asm's / qa's suites). Culprit -> owner, asm.
-- bool-usd-precise 8e4759462 (bool-hat): op_unify keeps USD's merge whose volume change fits in the merged faces'
-  tolerant edges (sum of tol^2 x length), capped at 1e-8 of the volume, only where every face USD made of two or more
-  is on an elementary surface (trims unwrapped). infento 1dc32b Boolean 4 (dx): Part 4 232/632/400 -> 216/600/384 as
-  live, same volume; Mac 904 -> 789 ms. The knurl grooves test cd1c58431ab4a62c 9 -> 8 faces (the cylinder's two
-  pieces sharing an edge merged; valid, volume in its bound). walls_usd tests unchanged (their merges 5e-5 off:
-  rejected). T1 bool_patterns::quarter_cylinders_bounded_by_tolerant_edges_are_merged (tests/data/unify, 275 KB).
-  All 489 kernel tests pass on the Mac; g++-13 clean. Gate unit bool-gate-usd2 -> chain-8e4759462.out (12:03, queued
-  behind bool2's gates). Then: knurl corpora ours-only with the gate's base/new binaries, hats/dock + hat15b, land, dx.
-- Shared-shape decline ("a shared shape OCCT may keep or remake"): with it off (/root/bool-scratch/shared-decline-off.diff)
-  the 68 recorded cases (Mac ~/noshape-host/agents/bool-hat/shared74) replay ours-only with "0 differ", but
-  NOSHAPE_BREP_OURS_ONLY lets history-only differences pass: corpus2 4006f865 gives "history differs" in its T1. Next:
-  the exact study (OCCT run, NOSHAPE_BREP_EXACT) per case: which shared vertices OCCT keeps vs remakes, then a rule.
-  infento Boolean 4 our way: 32 ms vs OCCT's ~650, same counts/volume (history unchecked). Case Mac infb4.
+- Gate unit bool-gate-shared3 -> /root/bool-hat-scratch/chain-a1d7ca0b4.out (14:15, queued behind bool2's on vibe5),
+  run by /root/bool-scratch/gate-chain-own.sh (gate.sh / gate-host.py from the branch itself: its replay statuses).
+  Branch bool-shared2 (bool-hat), three commits on main f6274d94e:
+  1. e61278b1d usd: op_unify keeps USD's merge whose volume change fits in the merged faces' tolerant edges (sum of
+     tol^2 x length, capped at 1e-8 of the volume, only where every face USD made of two or more is on an elementary
+     surface). infento 1dc32b Boolean 4 Part 4 232/632/400 -> 216/600/384 as live. Grooves cd1c58431ab4a62c 9 -> 8.
+  2. 8a9351e4b shared: solids' Booleans no longer decline "a shared shape OCCT may keep or remake": ours remakes those
+     shapes in place (Modified where OCCT, by rounding, says Kept). Lead 11-17 conditions: (a) model suite identical
+     end to end, (b) hats/dock SAME, (c) replay differs only in those labels, listed by case ("shared shapes
+     relabelled"; also "seam placement only": a unify's closed-face seam elsewhere, lead-approved, e.g. impeller
+     7cb79697), (d) T1 split_names::a_shared_edge_of_split_pieces_keeps_its_name_through_a_boolean (declined on main).
+     Sheets keep the decline (corpus 1230858b: their faces turned otherwise). Mac shared74: 62/68 taken, 41 relabelled,
+     0 differ. Boolean 4: 751 -> 392 ms (parts unchanged).
+  3. a1d7ca0b4 split_params boxes a NURBS section piece by its curve's cached piece boxes (grown GREY x tol_far), not
+     16 samples a span: Boolean 4's real inputs (Mac rec1 3b82079bd90565b5, exact recording) ours 137 -> 84 ms.
+  After the gate: knurl corpora ours-only with the gate's base/new binaries, hats/dock (udoc-ab.sh) + hat15b by hand,
+  land, tell dx (f93a1292). Note: the old infb4 recording (3af1878c, 85 KB) is not Boolean 4's real input.
+- SCISSOR-LIFT-BOM-ROWS: culprit core's 41f62884a (pattern/Mirror Add joins surface copies): bad vs its parent
+  5e976a640 good, same debug build on vibe6 (5b2807501 innocent: core's revert on 7c76 still bad). core (P0), asm, qa,
+  lead told 14:1x. Bisect done; logs /root/bool-scratch/sl-*.out, steps now run on vibe6 (bisect-sl.sh).
+- impeller 02f2f58d (bool2's): Linux "unified differently" only; on the Mac history differs with or without my change
+  (platform). 7cb79697: seam placement only.
 - Not mine (11-17): impeller 38073a30 (bool2: live wins, OCCT's the outlier), impeller Extrude impellerraum (core),
   c2-fan-blade-sweep Boolean 2 (qa: core's Subtract with Offset range; main 1d77cd633 back to 56/139/84).
 - Landed 11-17: bool-knife (ecf8c33a), OCCT 0033 (9ece8f66), bool-knife2 (cf5a9aff), bool-march (d3f24a83), nuts
@@ -102,9 +103,11 @@ cf-snap-hook 866 / 274 (suite run 18:5x); c2-bottle-split Split 1 ~12 ms in rele
 ## How to run
 - Worktrees: bool-split (builds via rb.sh on vibe5, target ~/agents/bool-split; kernel test binary
   target/release/deps/all-71797ea96afb1f39, ops test binary all-a79b487bf0dd0b06), bool-tube (docs / handoff),
-  bool-hat (Mac builds: NOSHAPE_RB_HOST=mac). Before a commit: `git checkout crates/kernel/tests/all.rs`; after:
-  `git apply /root/bool-scratch/probe-allrs.patch` (probe module xprobe.rs and sampler.rs are untracked scratch).
-- Gate: `systemd-run --unit=bool-gate-<sha> --collect /root/bool-scratch/gate-chain.sh <sha>` (the branch's gate only;
+  bool-hat (Mac builds: NOSHAPE_RB_HOST=mac). Probes parked outside the tree while branches rebase: copy
+  /root/bool-scratch/probes/{xprobe,sampler}.rs into crates/kernel/tests and `git apply
+  /root/bool-scratch/probes/all-rs.patch`; undo before a commit. Mac binaries: ~/noshape-host/agents/bool-hat/oc33.
+- Gate: `systemd-run --unit=bool-gate-<sha> --collect /root/bool-scratch/gate-chain.sh <sha>` (gate-chain-own.sh: the
+  branch's own gate.sh / gate-host.py, for changes to them; the branch's gate only;
   NOSHAPE_GATE_HOST to change host, default vibe5). Output /root/bool-hat-scratch/chain-<sha>.out (VERDICT,
   "CHAIN DONE rc N") and gate-<sha>.log; read with grep. gate.sh runs its replays through the host's ~/bin/slot
   (bool2's ff43a8c95). A crates/brep or Boolean change needs a clean gate and identical results end to end.
