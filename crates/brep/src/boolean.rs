@@ -2874,15 +2874,18 @@ impl Ctx<'_> {
         if made.is_empty() || canon == (a, b) {
             return Ok((made.clone(), from));
         }
+        // (Their spans' lengths, made once for all the copies.)
+        for c in made {
+            if let (Some(&k0), Some(&k1)) = (c.curve.knots.first(), c.curve.knots.last()) {
+                let _ = c.curve.length(k0, k1);
+            }
+        }
         let ids = src.moved(&made.iter().map(|c| c.id).collect::<Vec<_>>(), a, b, m)?;
         let moved = made
             .iter()
             .zip(ids)
             .map(|(c, id)| {
-                let mut curve = c.curve.clone();
-                for p in &mut curve.poles {
-                    *p = r.point(*p);
-                }
+                let curve = c.curve.moved(|p| r.point(p));
                 SectionCurve { curve, t0: c.t0, t1: c.t1, on: c.on.clone(), id, tol: c.tol, accuracy: c.accuracy }
             })
             .collect();
