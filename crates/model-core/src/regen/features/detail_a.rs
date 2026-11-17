@@ -151,19 +151,23 @@ fn blend_radius(shape: &Shape, faces: &[Shape], names: &[Name], ef: &[Vec<u32>],
         return Some(r);
     }
     let surf = faces[f].face_surface().ok()?;
-    let r = match surf {
-        k::Surface::Cylinder { radius, .. } => radius,
-        k::Surface::Torus { minor_radius, .. } => minor_radius,
-        k::Surface::Sphere { radius, .. } => radius,
+    let (r, axis) = match surf {
+        k::Surface::Cylinder { radius, axis, .. } => (radius, Some(axis)),
+        k::Surface::Torus { minor_radius, .. } => (minor_radius, None),
+        k::Surface::Sphere { radius, .. } => (radius, None),
         _ => return None,
     };
+    // A cylinder rolls along its supports: it touches them along lines down its axis, not round it (c2-impeller-loft's
+    // Stevenrohr tube, meeting the housing smoothly round its ends, was taken for a 29.5 mm fillet: Move face 1's
+    // Reapply fillet spent 6.6 s deleting it and failed).
+    let along = |ei: usize| axis.is_none_or(|a| shape.sub_shape(ShapeType::Edge, ei).ok().and_then(|e| e.edge_curve().ok()).is_some_and(|c| matches!(c, k::Curve::Line { direction, .. } if direction.normalize().cross(a.normalize()).length() < 1e-6)));
     let mut tangent: Vec<u32> = Vec::new();
     for (ei, fs) in ef.iter().enumerate() {
         if fs.len() != 2 || !fs.contains(&(f as u32)) {
             continue;
         }
         let other = if fs[0] as usize == f { fs[1] } else { fs[0] };
-        if tangent.contains(&other) || faces[other as usize].face_surface().is_ok_and(|o| o == surf) {
+        if tangent.contains(&other) || faces[other as usize].face_surface().is_ok_and(|o| o == surf) || !along(ei) {
             continue;
         }
         if edge_normals(shape, faces, ef, ei).is_some_and(|(a, b)| a.dot(b) > 0.999) {
