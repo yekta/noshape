@@ -383,3 +383,37 @@ fn a_one_sided_split_keeps_or_drops_a_part_it_doesnt_cut_by_its_side() {
         assert_eq!(nothing, info, "both sides {both}, front {front}: {:?}", split.message);
     }
 }
+
+/// An edge two split pieces share (the cut face's top edge, between the pieces' tops on one plane), picked on one
+/// piece, keeps its name through a Boolean of the two that leaves it in place: noshape's Boolean takes it (it reports
+/// the shared edge remade at the same place where OCCT, as its rounding falls, may say kept; lead 11-17) and a Fillet of
+/// it rounds that edge alone.
+#[test]
+fn a_shared_edge_of_split_pieces_keeps_its_name_through_a_boolean() {
+    let mut t = T::new();
+    t.block();
+    let p = t.plane(DatumPlane::Right, "20 mm");
+    let r = t.regen();
+    let bodies = r.context.bodies.iter().map(|b| Reference::Body(b.id.clone())).collect();
+    t.add("splitPart", &[("targets", q(bodies)), ("tool", q(vec![p]))]);
+    let r = t.ok();
+    assert_eq!(r.context.bodies.len(), 2);
+    let near = |s: &noshape_kernel::Shape, at: glam::DVec3| -> Option<usize> {
+        s.edges().iter().position(|e| e.edge_info().is_ok_and(|i| ((i.start + i.end) * 0.5 - at).length() < 1e-9))
+    };
+    let top = glam::DVec3::new(0.02, 0.02, 0.02);
+    let left = r.context.bodies.iter().find(|b| b.shape.centroid().is_ok_and(|c| c.x < 0.02)).expect("the piece left of the cut");
+    let (right, edge) = (r.context.bodies.iter().find(|b| b.id != left.id).unwrap().id.clone(), Reference::Edge((*left.edges[near(&left.shape, top).expect("the cut's top edge")]).clone()));
+    t.add("booleanBodies", &[("operationType", en("SUBTRACTION")), ("targets", q(vec![Reference::Body(left.id.clone())])), ("tools", q(vec![Reference::Body(right)]))]);
+    let r = t.ok();
+    assert_eq!(noshape_kernel::last_rust_decline(), "", "noshape's Boolean declined");
+    assert_eq!(r.context.bodies.len(), 1);
+    let before = r.context.bodies[0].shape.volume().unwrap();
+    t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("1 mm"))]);
+    let r = t.ok();
+    let b = &r.context.bodies[0];
+    // (1 - π/4) r² along the 40 mm edge, and no edge left there.
+    let lost = before - b.shape.volume().unwrap();
+    assert!((lost - (1.0 - std::f64::consts::FRAC_PI_4) * 1e-6 * 0.04).abs() < 1e-12, "{lost:e} m³");
+    assert!(near(&b.shape, top).is_none(), "the edge still sharp");
+}

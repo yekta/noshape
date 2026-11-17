@@ -7083,7 +7083,9 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   // changes an input's tolerance), with the edges and faces on it: ours remakes it too; where they only touch it (their
   // section is it), OCCT keeps it, ours too (788f0e94: two plates sharing an edge, fused). Where only faces on one plane
   // meet it, OCCT keeps or remakes it as its rounding falls (corpus2 4006f865 kept, 1b2319a3 one corner remade, its
-  // mirror image kept), and other surfaces aren't read here: declined.
+  // mirror image kept), and other surfaces aren't read here: ours remakes it, the same shapes at the same places (lead
+  // 11-17; the replay's "shared shapes relabelled"). Sheets' are declined (corpus2 1230858b: our sheets' faces turned
+  // otherwise than OCCT's).
   if (!shared.empty())
   {
     NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> in_args;
@@ -7204,6 +7206,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
           }
       return unknown ? -1 : reach ? 0 : touch ? 2 : 1;
     };
+    const bool sheets = std::any_of(srcs.begin(), srcs.end(), [](const auto& x) { return x->map(TopAbs_SOLID).Extent() == 0; });
     const TopAbs_ShapeEnum kinds[] = {TopAbs_VERTEX, TopAbs_EDGE, TopAbs_FACE};
     std::vector<uint32_t> steady;
     for (size_t k = 0; k + 4 < shared.size(); k += 5)
@@ -7212,8 +7215,8 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       const int q = shared[k] < 2 ? quiet(x, shared[k] == 0) : 0;
       if ((shared[k] == 0 ? vertex_kept(x) : shared[k] == 1 ? edge_kept(x) : face_kept(x)) || q == 2)
         steady.insert(steady.end(), shared.begin() + static_cast<std::ptrdiff_t>(k), shared.begin() + static_cast<std::ptrdiff_t>(k + 5));
-      else if (shared[k] < 2 && q != 0)
-        return decline("a shared shape OCCT may keep or remake");
+      else if (sheets && shared[k] < 2 && q != 0)
+        return decline("a shared shape of sheets OCCT may keep or remake");
     }
     shared = std::move(steady);
   }
