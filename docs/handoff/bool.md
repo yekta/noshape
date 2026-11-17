@@ -4,27 +4,52 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-16 21:58 UTC.
+Updated 11-17 00:14 UTC.
 
 ## In flight
-- Landed 11-16: 765b2281 (screws P0: OCCT 0031 + 0032, T1 a_wire_that_never_closes_leaves_the_unify_its_input; libs
-  installed on every host), 8e3067d8 (shell.cpp -Wexceptions), 9d68c081 (cylinder sectors merge; asm told in its
-  handoff), a8b8f1851, a2952b329.
-- Gating on vibe5 (unit bool-gate-apart, then bool-gate-core-offset): a53d2240d (branch bool-apart in bool-hat):
-  hulls_apart, free-form faces shown apart by their control points' hulls (closest pair first, 400 halvings, margin
-  2 x tolerances), knife Chamfer 1's cut Mac 60.6-63.6 -> 48.3 ms, same results; T1
-  faces_apart_across_a_slanted_gap_cut_as_occt. Then core's 148d531e6 (core-offset step 1: quad declarations into
-  offset_quad.hpp, no code change): tell core when clean.
-- cp2 e5c584e35 (branch bool-cp2-ahead, bool-split): gate replays clean, suite rerun without screws identical
-  (138 docs); hats/dock running (unit bool-udoc-e5c584e35), then land.
-- Knife: plane x B-spline pairs ~2 ms each in its Booleans (Mac release), not the lever; Fillet 2's 15-18 ms ones are
-  in blend's run-on split (OCCT's splitter). Touching B-spline pairs stay OCCT's (DECISIONS 11-15; lead 11-16: a
-  pre-check may skip only what it proves apart).
-- core's offset_solid (one free-form offset on quad, Shell's inner walls later): API asks sent 11-16 (sign, NaN =
-  removed faces, OpResult history, break hook, tolerance per face, per-worker surface copies); switch by_quadrics's
-  walls only when the Shell corpora are identical.
-- Not mine, handed back 11-16: tablet-stand Extrude 1 (std builds no bend tool), parting-line Rib (core bb61a968).
-- Next: qa's speed list (knife Split 4, then bottle Shell), profiled on the Mac (release, quiet, median of 3).
+- Landed 11-16: 190a71558 (cp2), 7d1b8799 (kernel profile per feature), 765b2281 (screws P0: OCCT 0031 + 0032),
+  8e3067d8, 9d68c081, a8b8f1851, a2952b329.
+- bool-knife (bool-hat; = bool-stack + 2, on main 8782214de): gate unit bool-gate-knife -> chain-cd9ad917c.out (queued
+  in vibe5's slot). Then hats/dock (/root/bool-hat-scratch/udoc-ab.sh cd9ad917c), land.sh, and a one-line note under
+  DECISIONS' 11-15 tangent ruling (lead 11-17: the face / face section margin may be 2 x the two faces' own
+  tolerances; edge / vertex checks keep theirs; 21.6 um apart isn't a tangent contact). Commits:
+  - 7e282fb90 hulls_apart (crossing patches given up past 8 halvings; knurl k25-15 hull CPU 473 -> 59 ms).
+  - ce56b4632 Shell check (planes' open pairs by exact distance, vertex walk on non-plane faces, regions' pocket cut
+    skipped when a cone / sphere / torus face would bound a pocket): Shell corpus 211/211 same, bottle Shell 1 Mac
+    12-13 -> 8-9 ms; snap-hook neutral.
+  - 3c8caba4f uv_of seed by k-d tree (T1 nearest_samples_are_the_scans); 7bc18f34b patch-grid cache (bit-exact key,
+    LRU 64 MB); 7da692d7d rust_boolean.cpp:2703 parentheses.
+  - 898c72461 unify's cylinder-group merges check the whole part once at the end (merge by merge again if the end
+    isn't valid): Mirror 1's unify 151-158 -> 104-107 ms vibe5; the knife's 28 unify dumps identical
+    (vibe5 ~/tmp/bool/kdump, probe_unify_dump).
+  - cd9ad917c hulls_apart's margin from the faces' own tolerances (T1 a_blade_and_its_mirror_image_fuse_as_occt,
+    case 682aa19d75e30e09): Mirror 1's fuse 115 -> 43 ms vibe5, same result.
+  - Mac A/B main vs bool-stack (same session): knife 1042/1427/1443 -> 934/1307/1318 ms; bottle 48-51 -> 40-43 (live 40).
+- OCCT 0033: commit f4ceaa2ff on branch bool-oc33 (patch only touches the non-MSVC branch; CI key hashes
+  patches/occt/**). Libs: vibe5 ~/agents/bool-keep/occt-0033, Mac ~/noshape-host/occt-0033 (no OCC_CONVERT_SIGNALS).
+  Done: crash_inputs:: 4/4 Linux + Mac; qa's 3 segv docs SAME (Mac); knife Mac A/B: Split 4 129-158 -> 60-80 ms
+  (half its projection was setjmp's sigprocmask / sigaltstack in GeomLib_CheckCurveOnSurface's PSO), Revolve 1
+  87-111 -> 60-84, knife -10-15 %. Running: vibe5 unit bool-v5-oc33ident2 (corpora + parity56 + suite base vs new,
+  /root/bool-hat-scratch/v5-oc33ident.log), then unit bool-udoc-oc33 (hats/dock with ~/agents/bool-keep/oc33/cli-*,
+  /root/bool-hat-scratch/udoc-oc33.out). When both clean: tell the lead the libs are staged (paths above); after the
+  lead installs them everywhere, land bool-oc33.
+- Knife, mine (Mac): Fillet 2 85 ms vs live 10 (fuse: four plane x grind B-spline pairs 15-18 ms each, 1 line each,
+  case c1d9f750d291ba85 / 17b8bafce508d06d; run-on tool op_split 25), next. Then core's handover: Revolve 1 (op_boolean
+  63 ms Mac, sections ahead 44 vibe5), Extrude 8/9 (55/51), Extrude 2 (sections ahead 34), Extrude 3. Recorded cases:
+  vibe5 ~/tmp/bool/knrec (Mac ~/noshape-host/agents/bool-hat/knrec; feature order by mtime: 17b8 c1d9 (Fillet 2),
+  a3f9 (Chamfer 1), 682a (Mirror 1), then the cuts). Per-pair OCCT timing: /root/bool-scratch/ahead-debug3.diff
+  (NOSHAPE_AHEAD_DEBUG). Chamfer 1's hulls: ~15 ms CPU a run; kind pre-check / plane give-up gained <= 3 ms: dropped.
+- Fan-blade Boolean 2 (core-offset): OCCT's (tangent by design: thread crest r 4.000 along the 4 mm chamfer circle);
+  no safe early decline ("one-face section" decline lost hundreds of taken cases). Lead agreed 11-17.
+- Snap-hook Shell 1 (after the knife): SI check 35 %, BRepCheck 23 %, add_pcurve projections 19 % (vibe7 sample);
+  lead's question: can either check be skipped where our builder guarantees the property? Then rings-loft Shell 1.
+- core: offset steps 1+2 gate passed (told 11-16 23:4x); offset_solid takes removed faces since 0c328e3b7: try on the
+  Shell corpora (k::last_offset_report()).
+- Scratch worktree with switches (ZZ_*): /root/bool-scratch/wt/bool-hat (rb.sh dir ~/agents/bool-hat on vibe5 / Mac,
+  shared with bool-hat: never build both at once), never landed. Probes in untracked crates/kernel/tests/xprobe.rs
+  (probe_shell_dump PROBE_REPS, probe_shell_corpus_ab, probe_unify_dump, probe_edge_off_face); before a build
+  `git apply /root/bool-scratch/probe-allrs.patch`, after it `git checkout crates/kernel/tests/all.rs`.
+- Not mine, handed back 11-16: tablet-stand Extrude 1, parting-line Rib (core bb61a968).
 
 ## Parked (branches / diffs, not landing as they are)
 - Plane x B-spline marcher + our own least-squares fit (branch bool-free-sections-wip: 71efdd87e, f6c77c748, ...):
