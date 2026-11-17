@@ -2815,6 +2815,17 @@ void crash_inside_kernel(uint8_t kind)
   else if (kind == 14)
     // Outside any budget: no deadline (after kind 8 recovered past one).
     fail_op(t_deadline == nullptr ? "no deadline" : "a deadline left behind");
+  else if (kind == 15)
+  {
+    // A fault inside a ScopedWork (a Draft's, HLR's): its bound, on the dead frame, put back as well. Left behind, the
+    // next stop check on the thread wrote into the stack there (the display mesher's garbage indices).
+    WorkBudget* const before = t_work;
+    const bool        ok     = run_guarded([] {
+      const ScopedWork work(1000);
+      std::raise(SIGSEGV);
+    });
+    fail_op(std::string(ok ? "no fault" : "fault") + (t_work == before ? ", work bound restored" : ", a work bound left behind"));
+  }
   else if (kind == 3)
   {
     // A loop that never ends, under a 0.3 s budget (run_budgeted).

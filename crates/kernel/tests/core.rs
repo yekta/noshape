@@ -629,6 +629,15 @@ fn a_fault_inside_a_budget_leaves_no_deadline_behind() {
     assert!(e.contains("fault, deadline restored"), "{e}");
 }
 
+/// The same for a ScopedWork's bound (a Draft's, a defeature's, HLR's): left behind after a recovered fault, every
+/// later stop check on the thread counted into the dead frame (the display mesher read garbage indices after it).
+#[cfg(not(windows))]
+#[test]
+fn a_fault_inside_a_work_bound_leaves_no_bound_behind() {
+    let e = crash_inside_kernel(15).unwrap_err().to_string();
+    assert!(e.contains("fault, work bound restored"), "{e}");
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn a_budget_never_stops_a_call_inside_the_allocator() {

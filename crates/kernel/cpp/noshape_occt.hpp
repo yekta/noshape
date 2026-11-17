@@ -460,13 +460,16 @@ bool run_guarded(F&& f) noexcept
       ok = false;
     }
   };
-  // A recovered fault inside run_budgeted leaves its deadline (on its dead frame) as the thread's: restored, or the
-  // next check writes into whatever the stack holds there now (CRASH-1388: op_prism's canary).
-  Deadline* const deadline = t_deadline;
+  // A recovered fault inside run_budgeted or a ScopedWork leaves its deadline / work bound (on its dead frame) as the
+  // thread's: restored, or the next check writes into whatever the stack holds there now (CRASH-1388: op_prism's
+  // canary; the display mesher's garbage indices after a fault in a Draft's or HLR's ScopedWork).
+  Deadline* const   deadline = t_deadline;
+  WorkBudget* const work     = t_work;
 #if defined(_WIN32) && defined(_MSC_VER)
   if (seh_run(guarded) != 0)
   {
     t_deadline = deadline;
+    t_work     = work;
     return false;
   }
   return ok;
@@ -485,6 +488,7 @@ bool run_guarded(F&& f) noexcept
   {
     crash_guard = outer;
     t_deadline  = deadline;
+    t_work      = work;
 #ifdef __linux__
     budget.restore();
 #endif
@@ -550,15 +554,18 @@ static void trycatch(Try&& func, Fail&& fail) noexcept
 template <typename Try, typename Fail>
 static void trycatch_timed(Try&& func, Fail&& fail) noexcept
 {
-  // A recovered fault inside run_budgeted leaves its deadline (on its dead frame) as the thread's: restored, or the
-  // next check writes into whatever the stack holds there now (CRASH-1388: a fillet's fault, then op_prism's canary).
-  noshape::Deadline* const deadline = noshape::t_deadline;
+  // A recovered fault inside run_budgeted or a ScopedWork leaves its deadline / work bound (on its dead frame) as the
+  // thread's: restored, or the next check writes into whatever the stack holds there now (CRASH-1388: a fillet's
+  // fault, then op_prism's canary; the display mesher's garbage indices).
+  noshape::Deadline* const   deadline = noshape::t_deadline;
+  noshape::WorkBudget* const work     = noshape::t_work;
 #if defined(_WIN32) && defined(_MSC_VER)
   auto                guarded = [&] { trycatch_guarded(func, fail); };
   const unsigned long code    = noshape::seh_run(guarded);
   if (code != 0)
   {
     noshape::t_deadline = deadline;
+    noshape::t_work     = work;
     char hex[16];
     std::snprintf(hex, sizeof hex, "%08lx", code);
     fail(std::string("occt: the kernel crashed (exception 0x") + hex + ")");
@@ -577,6 +584,7 @@ static void trycatch_timed(Try&& func, Fail&& fail) noexcept
   {
     noshape::crash_guard = outer;
     noshape::t_deadline  = deadline;
+    noshape::t_work      = work;
 #ifdef __linux__
     budget.restore();
 #endif
