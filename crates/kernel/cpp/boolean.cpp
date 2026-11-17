@@ -1547,7 +1547,7 @@ thread_local std::vector<occ::handle<Geom_Surface>> t_joined_pieces;
 
 std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, const std::vector<TopoDS_Shape>& image,
                                         const std::vector<FaceShare>& share, const TopoDS_Shape& out, double diag,
-                                        std::optional<std::pair<ChangeKey, double>>* memo = nullptr)
+                                        std::optional<std::pair<ChangeKey, double>>* memo = nullptr, double* slack = nullptr)
 {
   ShapeIMap outf;
   for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
@@ -1567,6 +1567,25 @@ std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, con
   for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
     if (!kept.Contains(x.Current()))
       after.push_back(x.Current());
+  // What the changed faces' edges' tolerances leave room for: a merged face's new curves on its surface within an
+  // edge's tolerance of its neighbour's, a sliver of at most the tolerance squared along the edge.
+  if (slack != nullptr)
+  {
+    *slack = 0;
+    ShapeIMap seen;
+    for (const TopoDS_Shape& f : after)
+      for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+      {
+        const TopoDS_Edge& x = TopoDS::Edge(e.Current());
+        const double       t = BRep_Tool::Tolerance(x);
+        if (t <= Precision::Confusion() || BRep_Tool::Degenerated(x) || seen.Contains(x))
+          continue;
+        seen.Add(x);
+        GProp_GProps g;
+        BRepGProp::LinearProperties(x, g);
+        *slack += t * t * g.Mass();
+      }
+  }
   ChangeKey key;
   if (memo != nullptr)
   {
@@ -1938,6 +1957,32 @@ TopoDS_Shape recut_arc_seams(const TopoDS_Shape& s, HHist& hist)
   return out;
 }
 
+// Whether every face USD's `u` made of two or more of `in`'s is on an elementary surface.
+static bool merges_elementary(const TopoDS_Shape& in, ShapeUpgrade_UnifySameDomain& u)
+{
+  const occ::handle<BRepTools_History> h = u.History();
+  if (h.IsNull())
+    return false;
+  NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> from;
+  for (TopExp_Explorer x(in, TopAbs_FACE); x.More(); x.Next())
+    for (const TopoDS_Shape& m : h->Modified(x.Current()))
+      if (int* n = from.ChangeSeek(m))
+        ++*n;
+      else
+        from.Bind(m, 1);
+  for (NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher>::Iterator it(from); it.More(); it.Next())
+  {
+    if (it.Value() < 2)
+      continue;
+    occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(it.Key()));
+    while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(g))
+      g = t->BasisSurface();
+    if (g.IsNull() || !g->IsKind(STANDARD_TYPE(Geom_ElementarySurface)))
+      return false;
+  }
+  return true;
+}
+
 // Whether a usd_kept_volume on this thread since unify_in reset it found the faces' order doesn't change USD's
 // rejected merge (the same one three times running).
 thread_local bool t_usd_order_moot = false;
@@ -2077,8 +2122,16 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     u.Build();
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
-    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag, &memo);
-    if (!keeps_volume(change, u.Shape()))
+    double                      slack  = 0;
+    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag, &memo, &slack);
+    // (The room only where every face USD made of two or more is on an elementary surface: the merged face on its
+    // pieces' own surface exactly, only its edges' curves new.)
+    if (slack > 0 && !merges_elementary(in, u))
+      slack = 0;
+    // (Within its tolerant edges' room and 1e-8 of the volume: asm-infento's 1dc32b Boolean 4, 16 pairs of quarter
+    // cylinders bounded by 5 um B-spline edges, 1.5e-13 m³ (3.1e-9 of its volume) where they allow 1.6e-11; live
+    // merges them. A Shell's walls' merges 1b121fc3, 5e-5 of theirs: rejected.)
+    if (!keeps_volume(change, u.Shape()) && !(change && std::abs(*change) <= std::min(slack, 1e-8 * std::abs(volume0()))))
     {
       // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
       // rest: cf-spur-gear's Boolean 2 tried eight, 86 ms each. A notched cylinder fused with its mirror is kept at

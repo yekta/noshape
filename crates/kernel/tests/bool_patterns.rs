@@ -1030,7 +1030,8 @@ fn grooves_crossing_just_above_the_end() {
     assert!(r.shape.is_valid());
     // (Where they cross: a sliver of ~1e-4 mm³.)
     assert!(v >= want && v - want <= 1e-3 * 1e-9, "volume {v}, the two grooves' own {want}");
-    assert_eq!(r.shape.count(k::ShapeType::Face), 9);
+    // (The cylinder's two pieces sharing an edge one face: USD's merge, its 1.8e-14 m³ within its edges' room.)
+    assert_eq!(r.shape.count(k::ShapeType::Face), 8);
 }
 
 /// Two grooves of the Ø25 × 34 knurl at 45° / 45° (its tools 30 and 51; recorded) crossing 37 µm above the end face,
@@ -1352,6 +1353,21 @@ fn walls_usd_leaves_apart_are_merged_after_it() {
     let u = k::unify_same_domain(&ours).expect("unified").shape;
     assert!(u.is_valid(), "unified invalid");
     assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (32, 77));
+}
+
+/// asm-infento's 1dc32b Boolean 4 (16 pattern copies fused with a hub), one copy's corner cropped (tests/data/unify): two
+/// quarter cylinders bounded by 5 um B-spline edges, merged by USD with the volume changed by 7.9e-16 m³ (a sliver
+/// within those edges' tolerance), 1.1e-9 of the piece's. Kept within the edges' room, as live merges them.
+#[test]
+fn quarter_cylinders_bounded_by_tolerant_edges_are_merged() {
+    let _ = k::set_working_scale(1000.0);
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/quarter-cylinders-tolerant-edges.brep");
+    let s = k::read_brep(&path).expect("the cropped corner");
+    let u = k::unify_same_domain_whole(&s).expect("unified").shape;
+    assert!(u.is_valid(), "valid");
+    assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge), u.count(k::ShapeType::Vertex)), (18, 47, 31));
+    let (v0, v1) = (s.volume().unwrap(), u.volume().unwrap());
+    assert!((v1 - v0).abs() <= 1e-9 * v0, "volume {v0} -> {v1}");
 }
 
 /// c2-sm-louver's Linear pattern 3 fuse (bool's trace, 11-06), its result (tests/data/unify): 1382 faces, invalid (ten
