@@ -594,6 +594,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   screen or move the pointer there (TCC: no Screen Recording / Accessibility for sshd), and the runner's state has neither
   the hovered item nor toolbar positions.
 - Main RED at a71c2f11b (21:32, psui's sketch_glyph linger test): the candidate must be a green.
+- **Known issue unless psui's fix is in (lead 22:20)**: P0 USER-HOVER-STAYS-LIT (psui owns it: latest-wins picking). qa re-runs the hover flow
+  (uh/uh2.sh, 3 runs, vibex6 Xvfb) on the candidate: listed as known if it still fails, closed if all 3 runs are clean.
 - Speed: the 21:03 suite run on vibex7 (load ~60) is LOADED, not counted (suites-diff now skips speed and marks timing states
   above load 16); absolute numbers from the 02:00-04:00 nightly only.
 

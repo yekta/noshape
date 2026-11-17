@@ -57,6 +57,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    the previous release) -> compat/rel-<v>.txt; any user-document worse = P0 to the lead at once.
 3. The app spot-check rows (archive "Release checks: the app spot-check list"): user cases + 8 interaction-feel rows in
    rotation (next: rows 9-16).
+4. Hover flow (lead 11-17 22:20, every release): uh/uh2.sh <release app> <out> on vibex6 Xvfb, 3 runs, xsheet.py for the sheet;
+   USER-HOVER-STAYS-LIT is listed as known in the cut's entry until psui's latest-wins picking fix passes 3 clean runs.
 - **v0.4.56** published check done 11-17 06:58: clean, baseline 0.4.56. Next: the 17:00 cut (qa-cut-1615).
 
 ## Next (in this order)
