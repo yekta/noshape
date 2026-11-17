@@ -160,6 +160,9 @@ HIDDEN_IS_ABSENT = {"Hole table"}
 # Texts live never lets a user reach (live2 11-17): display:none in every drawing panel dump (Reorder items, Cut from
 # section), or options of the note editor's Flag notes lists, which are disabled in every note and table cell.
 NEVER_SHOWN = {"Reorder items", "Cut from section", "Double circle", "Square circle", "Tight fit"}
+# Per surface (live2 11-17): the general dimension palette's controls, display:none in every hole callout palette
+# dump; «Varies» only as the read-only Hole class value with Fit type User defined, which no recorder reads.
+NEVER_SHOWN_IN = {"Hole/thread callout": {"Precision:", "Tolerance: None", "Shaft class", "Reset text position", "Parentheses", "Toggle radius/diameter dimension", "Varies", "«Varies»"}}
 
 
 def texts_of(path, visible_only=False):
@@ -391,7 +394,8 @@ def main():
         texts = []
         for g in globs_:
             for p in sorted(glob.glob(f"{args.dom}/{g}")):
-                texts += [t for t in texts_of(p, surface in HIDDEN_IS_ABSENT) if t not in texts]
+                hidden = {norm(x) for x in NEVER_SHOWN_IN.get(surface, ())}
+                texts += [t for t in texts_of(p, surface in HIDDEN_IS_ABSENT) if t not in texts and t not in hidden]
         recorded = {t for (title, t) in text_seen if title in titles}
         for t in sorted(recorded):
             if NOISE.match(t) or USER.search(t) or len(t) < 2:

@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 18:25 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45 and ~18:15.
+Updated 2026-11-17 18:47 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45 and ~18:15.
 
 ## In flight
 
@@ -26,13 +26,19 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
     10 px; the unticked Angular section takes 3 clicks; Section / Detail label inputs read with placeholders (.7);
   - feel tests: assembly_feel_tests.rs (glyph reach + click, box rule, sub part), drawing feel.rs (F4, D3 marker,
     leader, view colours, dimension 5 px drag).
-- Not queued yet: b91a61a5 (run.py skips a step whose live page crashed; asm + section 224/224) + this handoff.
-- vibex6 slot (behind psui, qa, skasm): the full drawing run, 329 takes, binary 18:09
-  (~/agents/studios-keep/drw1117b, log drw1117b.log). Then the matrix refresh (`drawing_matrix.py --run`) and
-  any differences. live's 43 re-records (ebb3f3159) and live2's datum / hatch takes (348d841f) are in it;
-  42b92d8a (section exclude-from-cut, detail ids) once landed.
-- Asked live2 (18:2x) about the selected view's centre handle (circle, dashed cross, 4 grips; ours has none): its
-  sizes, when it shows, what dragging it does. Implement with a feel test when answered.
+- Not queued yet: b91a61a5 (run.py skips a step whose live page crashed; asm + section 224/224), a handoff, and in
+  the worktree (drawing-ui 57/57, drawing 242, scene 158, ops e2e 224, clippy clean; side by side with live2:
+  /root/studios-scratch/centermark-live-vs-ours.png):
+  - every highlighted drawing line 3 px (`LIT_LINE_PX`, new `Style::lit_line_px` in render, 0 = the 3D band): live
+    2 px solid + rim (dh0, dsel3, d-sel-view); a tool's hovered edge orange (`tool_picks_edges`, live dact-aa-d3);
+  - the old 1 mm orange frame of a selected view gone (`push_aux_states`; push_view_frames draws live's);
+  - centre marks (live2 drw-centermark, behaviours "studios (11-17, P0 drawing feel)"): automatic marks get grips;
+    `centermark_looks` / `push_centermark_looks` (10 px orange grips, 11 px blue dot, circle blue 3 px; with the
+    view selected grips only); the hole circle lights / takes its mark (`SheetPick::centermark_of_edge`), a press on
+    it drags the view (`hole_press_view`); feel test `a_holes_centre_mark_lights_from_its_circle_and_a_press_there_drags_the_view`;
+  - the matrix drops the hole callout palette's hidden dimension controls and «Varies» (live2 11-17).
+- Asked live2 (18:45): centre mark grip drags (inward outside the circle, an automatic mark's stored length, hover-only
+  drags). Ours: automatic marks don't drag; a Single mark's selected grip moves all four arms. Then implement + test.
 - Side-by-side crops for the lead: /root/studios-scratch/mate-glyphs-live-vs-ours.png, dimhover-sbs.png,
   view-sbs.png, sel-sbs.png.
 
@@ -55,7 +61,7 @@ live e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-b43a-da61a4f
 Paused agents are not messaged (DECISIONS 11-17).
 
 ## Waiting on others
-- live2 (79ae5cdb): the centre handle answer; the weld retake (metric positions). live (e8549719): the 8
+- live2 (79ae5cdb): the centre mark drag answers; the weld retake (metric positions). live (e8549719): the 8
   drw-revision-* and drw-styles-dimension retakes (failed: no Revision table tool, .6 dropdowns).
 
 ## Open (no owner action possible yet)

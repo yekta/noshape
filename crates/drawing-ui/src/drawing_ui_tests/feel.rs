@@ -450,6 +450,48 @@ fn a_hovered_view_is_framed_in_tan_and_a_click_turns_its_edges_orange(cx: &mut T
     assert!(frames(cx).is_empty(), "nothing selected or hovered: no frame");
 }
 
+/// Live drw/dact-aa-d3, behaviours "drawing Dimension tool": with the Dimension tool a view's edge lights alone, in
+/// orange, 2 px solid and antialiased as every highlighted drawing line (live dh0, dsel3); Select keeps tan.
+#[gpui::test]
+fn the_dimension_tool_lights_a_hovered_edge_alone_in_orange(cx: &mut TestAppContext) {
+    use crate::drawing_view::{DRAWING_HOVER, DRAWING_SELECTED};
+    use noshape_render::state;
+    use noshape_scene::drawing_tools::{DimTool, Tool};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-tool-edge");
+    real_sheet(cx, window, &editor);
+    // The middle of a view's longest visible straight edge.
+    let mid = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let len = |p: &[[f64; 2]]| (p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]);
+        let edge = g.edges.iter().filter(|x| x.visible && x.points.len() == 2).max_by(|a, b| len(&a.points).total_cmp(&len(&b.points))).expect("a straight edge");
+        let (a, b) = (pl.to_sheet(edge.points[0]), pl.to_sheet(edge.points[1]));
+        [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]
+    });
+    let look = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            (e.build_scene().states.iter().filter(|s| **s & state::HOVER != 0).count(), e.render_style())
+        })
+    };
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)));
+    draw(cx, window);
+    let lit = lit_at(cx, window, &editor, mid);
+    assert!(matches!(lit, Some(Sel::Edge(..))), "the Dimension tool lights the edge: {lit:?}");
+    let (hovered, style) = look(cx);
+    assert_eq!(hovered, 1, "the edge alone, not its view");
+    assert_eq!(style.hover_color, crate::theme::lin(DRAWING_SELECTED), "in orange");
+    assert_eq!(style.lit_line_px, 3.0, "2 px solid with an antialiased pixel each side");
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Select, cx)));
+    draw(cx, window);
+    let lit = lit_at(cx, window, &editor, mid);
+    assert!(view_of(&lit).is_some(), "Select: the edge stands for its view: {lit:?}");
+    let (hovered, style) = look(cx);
+    assert_eq!((hovered, style.hover_color), (0, crate::theme::lin(DRAWING_HOVER)), "Select: the view's tan frame, its edges as they are");
+}
+
 /// Live2 feel/drawing.json D5: a dimension's text moves from 5 px of drag (4 px is a click, which selects it); no hold
 /// needed.
 #[gpui::test]
@@ -489,4 +531,76 @@ fn a_dimension_moves_from_5_px_and_4_px_is_a_click(cx: &mut TestAppContext) {
             assert_eq!(sel, vec![Sel::Annotation(id)], "{dx} px: a click, the dimension selected");
         }
     }
+}
+
+/// Live2 drw-centermark (behaviours "studios (11-17, P0 drawing feel)"): a hole's centre mark lights from its circle, its
+/// centre or an arm (its view not framed), its circle light blue, its grips shown; hovering the view alone shows none;
+/// with the view selected the grips show and the circle is the view's orange; a press on the circle drags the view.
+#[gpui::test]
+fn a_holes_centre_mark_lights_from_its_circle_and_a_press_there_drags_the_view(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    SUGGESTED.set(true);
+    HOLED.set(true);
+    let (window, editor) = drawing(cx, "feel-centermark");
+    HOLED.set(false);
+    real_sheet(cx, window, &editor);
+    let (view, key, c, r, reach, mm_per_px, circle) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        let (view, key) = b.picks.iter().find_map(|t| if let PickTarget::AutoCentermark { view, center } = t { Some((*view, *center)) } else { None }).expect("the hole's automatic centre mark");
+        let pl = b.placement(view).copied().expect("its view");
+        let c = pl.to_sheet([key[0] as f64 / 1e9, key[1] as f64 / 1e9]);
+        let circle = e.pk().centermark_circle_picks(view, key);
+        let l = b.geometry.lines.iter().find(|l| circle.contains(&l.pick)).expect("the hole's circle");
+        let r = (l.points[0][0] - c[0]).hypot(l.points[0][1] - c[1]);
+        let reach = b.geometry.grips.iter().filter(|g| b.picks.get(g.pick as usize) == Some(&PickTarget::AutoCentermark { view, center: key })).map(|g| (g.pos[0] - c[0]).hypot(g.pos[1] - c[1])).fold(0.0, f64::max);
+        let (a, z) = (e.sheet_to_local([0.0, 0.0]), e.sheet_to_local([100.0, 0.0]));
+        (view, key, c, r, reach, 100.0 / (z[0] - a[0]).abs(), circle)
+    });
+    assert!(reach > r, "grips at the arm ends, past the circle: {reach} vs {r}");
+    let mark = Sel::AutoCentermark(view, key);
+    let looks = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).centermark_looks());
+    let frames = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).view_frames());
+    let d = std::f64::consts::FRAC_1_SQRT_2;
+    let on_circle = [c[0] + r * d, c[1] + r * d];
+    let on_arm = [c[0] + (r + reach) / 2.0, c[1]];
+    for (at, what) in [(on_circle, "its circle"), (c, "its centre"), (on_arm, "an arm")] {
+        assert_eq!(lit_at(cx, window, &editor, at), Some(mark), "{what} lights the centre mark");
+        let (grips, blue) = looks(cx);
+        assert!(!grips.is_empty() && blue == circle, "{what}: its grips, its circle light blue ({grips:?}, {blue:?})");
+        assert!(frames(cx).is_empty(), "{what}: the view not framed");
+    }
+    let blank = [c[0] + reach + 12.0 * mm_per_px, c[1] + reach + 12.0 * mm_per_px];
+    assert_eq!(view_of(&lit_at(cx, window, &editor, blank)), Some(view), "the view's blank inside lights the view");
+    assert_eq!(looks(cx), (vec![], vec![]), "the view hovered: no grips");
+    assert_eq!(click_at(cx, window, &editor, on_arm, Modifiers::default()), vec![mark], "a click on an arm takes the centre mark");
+    lit_at(cx, window, &editor, [5.0, 5.0]);
+    let (grips, blue) = looks(cx);
+    assert!(!grips.is_empty() && blue == circle, "selected: grips, the circle light blue");
+    cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
+    assert_eq!(click_at(cx, window, &editor, on_circle, Modifiers::default()), vec![mark], "a click on the circle takes the centre mark too");
+    cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
+    assert_eq!(click_at(cx, window, &editor, blank, Modifiers::default()), vec![Sel::View(view)], "a click inside takes the view");
+    lit_at(cx, window, &editor, [5.0, 5.0]);
+    let (grips, blue) = looks(cx);
+    assert!(!grips.is_empty() && blue.is_empty(), "the view selected: its centre mark's grips, the circle the view's orange");
+    let lit_arms = cx.update(|cx| {
+        let e = editor.read(cx);
+        let scene = e.build_scene();
+        e.picks_of(mark).iter().filter(|p| scene.states.get(**p as usize).is_some_and(|s| *s & (noshape_render::state::SELECTED | noshape_render::state::HOVER) != 0)).count()
+    });
+    assert_eq!(lit_arms, 0, "the view selected: its centre mark's arms as they are");
+    cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
+    let position = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).current_sheet().view(view).map(|v| v.position).expect("the view"));
+    let before = position(cx);
+    cx.executor().advance_clock(std::time::Duration::from_millis(600));
+    let (p, q) = (at_window(cx, &editor, on_circle), at_window(cx, &editor, [on_circle[0] + 20.0 * mm_per_px, on_circle[1]]));
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(p, None, Modifiers::default());
+    v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
+    v.simulate_mouse_move(q, Some(MouseButton::Left), Modifiers::default());
+    v.simulate_mouse_up(q, MouseButton::Left, Modifiers::default());
+    draw(cx, window);
+    let after = position(cx);
+    assert!((after[0] - before[0] - 20.0 * mm_per_px).abs() < 0.01 && (after[1] - before[1]).abs() < 0.01, "a press on the circle drags the view: {before:?} -> {after:?}");
 }

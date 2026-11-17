@@ -19,7 +19,7 @@ struct Globals {
     specular: vec4<f32>,     // rgb specular color, w shininess 0..1 (Graphics preferences)
     dash: vec4<f32>,         // construction lines: dash, gap, dash, gap (px)
     room: vec4<f32>,         // zebra stripes room: center xyz, radius
-    depth_unit: vec4<f32>,   // x = our depth per unit of Onshape's depth buffer (perspective: per w)
+    depth_unit: vec4<f32>,   // x = our depth per unit of Onshape's depth buffer (perspective: per w), y = a lit line's width px (0: the band)
     compare: vec4<f32>,      // compare mode: xyz Onshape's eye, w its near distance
     compare2: vec4<f32>,     // x its far distance, y on (1), z mix alpha
 };
@@ -955,7 +955,7 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     // From at most a part edge's width: a 2 px sketch line highlights like
     // an edge (live sketch/21, 22: the same 5 rows as selection/06b).
     // (The band as measured against live with 1.25 px edges, whatever the line's own width.)
-    if (lit) { width = (1.25 * inst.extra.x + g.viewport.w) * 1.8 + 2.2; }
+    if (lit) { width = select((1.25 * inst.extra.x + g.viewport.w) * 1.8 + 2.2, max(width, g.depth_unit.y), g.depth_unit.y > 0.0); }
     // Live (EDGE-HIGHLIGHT-LOOK): a hovered or selected face's boundary is an opaque line 2 device px wide at any
     // pixel ratio; a part edge hovered or selected itself a 5 CSS px band (fs_line).
     let face_band = lit && (st & OUTLINE) != 0u;

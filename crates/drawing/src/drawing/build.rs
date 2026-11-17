@@ -68,7 +68,7 @@ pub fn centermark_key(c: [f64; 2]) -> [i64; 2] {
 }
 
 /// Two centermark keys within 100 nm (a picked circle's centre and the view's, found apart).
-fn same_centre(a: [i64; 2], b: [i64; 2]) -> bool {
+pub fn same_centre(a: [i64; 2], b: [i64; 2]) -> bool {
     (a[0] - b[0]).abs() <= 100 && (a[1] - b[1]).abs() <= 100
 }
 
@@ -2219,6 +2219,13 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             g.lines.push(Polyline2 { points: vec![at(u, a + gap), at(u, r + a + gap)], style: LineStyle::Centerline, closed: false, pick: view_pick });
                         }
                     }
+                    // Shown while it is hovered or selected or its view is (live2 drw-centermark): orange at the
+                    // arm ends, blue at the centre.
+                    let reach = if vt.centermark_extended { r + a + gap } else { a };
+                    for u in [ux, uy, [-ux[0], -ux[1]], [-uy[0], -uy[1]]] {
+                        g.grips.push(super::sheet::Grip { pick: view_pick, pos: at(u, reach), kind: super::sheet::GripKind::Jog });
+                    }
+                    g.grips.push(super::sheet::Grip { pick: view_pick, pos: c, kind: super::sheet::GripKind::Origin });
                     auto_marks.push((v.id, key, first..g.lines.len()));
                 }
                 g.cad_since(mark, CadLayer::Centermarks);
@@ -2814,11 +2821,15 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // A Single centermark on an automatic one's circle picks as that mark's lines (live: Delete in its menu).
     for a in &resolved.annotations {
         if let AnnotationKind::Centermark { view, center, .. } = &a.kind
-            && let Some((_, _, r)) = auto_marks.iter().find(|(v, k, _)| v == view && same_centre(*k, centermark_key(*center)))
+            && let Some((_, k, r)) = auto_marks.iter().find(|(v, k, _)| v == view && same_centre(*k, centermark_key(*center)))
         {
             let pick = picks.id(PickTarget::Annotation(a.id));
             for l in &mut g.lines[r.clone()] {
                 l.pick = pick;
+            }
+            let auto = picks.id(PickTarget::AutoCentermark { view: *view, center: *k });
+            for gr in g.grips.iter_mut().filter(|gr| gr.pick == auto) {
+                gr.pick = pick;
             }
         }
     }

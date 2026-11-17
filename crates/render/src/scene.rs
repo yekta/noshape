@@ -708,6 +708,8 @@ pub struct Style {
     /// What Onshape's interactive detail reduction can leave out (ambient
     /// occlusion is `ambient_occlusion` 0).
     pub detail: Detail,
+    /// A hovered or selected line's width in CSS px (drawings: live's 2 px solid + antialiasing); 0: the 3D band.
+    pub lit_line_px: f32,
 }
 
 /// Graphics Onshape drops while the camera moves too slowly (webgl
@@ -865,6 +867,7 @@ impl Default for Style {
             show_edges: true,
             detail: Detail::default(),
             msaa: 4,
+            lit_line_px: 0.0,
         }
     }
 }

@@ -87,7 +87,11 @@ impl<'a> SheetPick<'a> {
         // Select (live2 feel/drawing.json D1): an annotation's lines light within 6 px (not at 8), its text within 8 px
         // of its box (not at 10); the tools keep their own reach.
         let hover = match self.tool {
-            Tool::Select => self.built.and_then(|b| b.hit_reach(self.cursor, self.tol_mm(SELECT_LINE_REACH_PX), self.tol_mm(SELECT_TEXT_REACH_PX))).map(|h| self.centerline_on_edge(h).unwrap_or(h)).or_else(|| self.leader_reach()),
+            Tool::Select => self
+                .built
+                .and_then(|b| b.hit_reach(self.cursor, self.tol_mm(SELECT_LINE_REACH_PX), self.tol_mm(SELECT_TEXT_REACH_PX)))
+                .map(|h| self.centerline_on_edge(h).or_else(|| self.centermark_of_edge(h)).unwrap_or(h))
+                .or_else(|| self.leader_reach()),
             _ => self.built.and_then(|b| b.hit(self.cursor, tol)),
         };
         // Tools that take only view edges (or sketch geometry) look for those
@@ -185,6 +189,40 @@ impl<'a> SheetPick<'a> {
         let (_, dc) = b.nearest_where(self.cursor, &|t: &PickTarget| *t == PickTarget::Annotation(*id))?;
         let (edge, de) = b.nearest_where(self.cursor, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. }))?;
         (de <= dc + self.tol_mm(1.0)).then_some(edge)
+    }
+
+    /// The centre mark of the circle edge `h` is (live2 drw-centermark: hovering or clicking a hole lights and takes
+    /// its centre mark; a press on it still drags the view): a Single mark on it first, else the view's own.
+    pub fn centermark_of_edge(&self, h: u32) -> Option<u32> {
+        use noshape_model::drawing::build::{centermark_key, same_centre};
+        let b = self.built?;
+        let PickTarget::Edge { view, edge } = b.picks.get(h as usize)? else { return None };
+        let Some(EdgeGeom::Circle { center, .. }) = self.edge_geom(*view, *edge) else { return None };
+        let key = centermark_key(center);
+        let sheet = self.current_sheet();
+        let single = |t: &PickTarget| match t {
+            PickTarget::Annotation(id) => sheet.annotations.iter().any(|a| a.id == *id && matches!(&a.kind, AnnotationKind::Centermark { view: v, center: c, .. } if v == view && same_centre(centermark_key(*c), key))),
+            _ => false,
+        };
+        let auto = |t: &PickTarget| matches!(t, PickTarget::AutoCentermark { view: v, center: c } if v == view && same_centre(*c, key));
+        b.picks.iter().position(single).or_else(|| b.picks.iter().position(auto)).map(|i| i as u32)
+    }
+
+    /// Pick ids of `view`'s circle edges round the centre mark key `key` (the hole a centre mark marks).
+    pub fn centermark_circle_picks(&self, view: ViewId, key: [i64; 2]) -> Vec<u32> {
+        use noshape_model::drawing::build::{centermark_key, same_centre};
+        let Some(b) = self.built else { return Vec::new() };
+        let round = |v: ViewId, e: u32| matches!(self.edge_geom(v, e), Some(EdgeGeom::Circle { center, .. }) if same_centre(centermark_key(center), key));
+        b.picks.iter().enumerate().filter(|(_, t)| matches!(t, PickTarget::Edge { view: v, edge } if *v == view && round(*v, *edge))).map(|(i, _)| i as u32).collect()
+    }
+
+    /// The view a Select press at `at` drags when it lands on a hole circle that lights its centre mark (live2
+    /// drw-centermark t5: the circle is the view's geometry).
+    pub fn hole_press_view(&self, at: [f64; 2]) -> Option<ViewId> {
+        let b = self.built?;
+        let e = b.hit_reach(at, self.tol_mm(SELECT_LINE_REACH_PX), self.tol_mm(SELECT_TEXT_REACH_PX))?;
+        self.centermark_of_edge(e)?;
+        b.picks.get(e as usize)?.view()
     }
 
     pub fn placement(&self, view: ViewId) -> Option<ViewPlacement> {

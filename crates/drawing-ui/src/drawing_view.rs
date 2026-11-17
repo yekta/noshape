@@ -111,13 +111,15 @@ pub enum Panel {
     ImageProps { rows: Vec<(&'static str, String)>, tab: Option<TabId> },
 }
 
-/// The Note panel of a general table cell edited in place: its style (font,
-/// bold, italic, underline, strikethrough, alignments) and text height.
 /// A drawing's hover and selection colours (live feel/drawing.json "colours": tan rgb(204,178,146), orange
 /// rgb(204,146,92)).
 pub(crate) const DRAWING_HOVER: u32 = 0xccb292;
 pub(crate) const DRAWING_SELECTED: u32 = 0xcc925c;
+/// A highlighted line's width, px: live's 2 px solid with an antialiased pixel each side.
+pub(crate) const LIT_LINE_PX: f32 = 3.0;
 
+/// The Note panel of a general table cell edited in place: its style (font,
+/// bold, italic, underline, strikethrough, alignments) and text height.
 pub struct CellNote {
     pub style: noshape_model::drawing::note::NoteStyle,
     pub height: Entity<InputState>,
@@ -1627,12 +1629,7 @@ impl DrawingEditor {
                 }
             }
             if let Some(h) = self.hover {
-                // Tools that pick edges highlight the hovered edge alone, not its
-                // view (qa DWG-E2E-SILHOUETTE: Edge to edge centerline tinted the view).
-                let single = matches!(
-                    self.tool,
-                    Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::SurfaceFinish | Tool::Sketch { .. } | Tool::Constrain { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }
-                );
+                let single = self.tool_picks_edges();
                 match self.sel_of_pick(h) {
                     // Onshape (drawing/14): a hovered annotation turns tan with
                     // a tan label box and its grips, drawn on top below.
@@ -1653,6 +1650,7 @@ impl DrawingEditor {
             // The hovered / selected annotations' referenced edges (blue) and
             // group members (yellow).
             self.push_related_highlights(&mut scene);
+            self.push_centermark_looks(&mut scene);
             self.push_replicate_overlay(&mut scene);
             self.push_label_highlights(&mut scene);
             self.push_datum_selection(&mut scene);
@@ -1660,6 +1658,34 @@ impl DrawingEditor {
             self.push_aux_states(&mut scene);
         }
         scene
+    }
+
+    /// The drawing's render style: the gray area round the sheet and Onshape's drawing highlight colours.
+    pub(crate) fn render_style(&self) -> Style {
+        let mut style = Style::default();
+        // Gray drawing area around the white sheet; Onshape highlight colors.
+        let bg = crate::theme::lin(self.model_bg.unwrap_or(crate::theme::viewport::DRAWING_BG));
+        style.background_top = bg;
+        style.background_bottom = bg;
+        // Drawings use their own (behaviours 1480, asb/u-906/907): hover #CCB292, selected #CC925C; a tool's hovered
+        // edge orange too (live drw/dact-aa-d3); highlighted lines 2 px solid, antialiased (live dh0, dsel3, d-sel-view).
+        style.hover_color = crate::theme::lin(if self.tool_picks_edges() { DRAWING_SELECTED } else { DRAWING_HOVER });
+        style.select_color = crate::theme::lin(DRAWING_SELECTED);
+        style.lit_line_px = LIT_LINE_PX;
+        // Other members of a hovered / selected annotation group (live
+        // drawing/423: #EBEB92).
+        style.accent_color = crate::theme::lin(0xebeb92);
+        style.show_edges = false;
+        style
+    }
+
+    /// Tools that pick edges highlight the hovered edge alone, not its view (qa DWG-E2E-SILHOUETTE: Edge to edge
+    /// centerline tinted the view), in orange (behaviours "drawing Dimension tool", live drw/dact-aa-d3).
+    fn tool_picks_edges(&self) -> bool {
+        matches!(
+            self.tool,
+            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::SurfaceFinish | Tool::Sketch { .. } | Tool::Constrain { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }
+        )
     }
 
     /// The hovered view's frame (live D1, 2068: tan rgb(204,178,146) ~8 px outside its geometry, its edges as they
@@ -1670,7 +1696,7 @@ impl DrawingEditor {
         if frames.is_empty() {
             return;
         }
-        let (off, width) = (self.tol_mm(8.0), 3.0);
+        let (off, width) = (self.tol_mm(8.0), LIT_LINE_PX);
         let mut lines = LineData::default();
         for (v, rgb) in frames {
             let Some(pl) = self.placement(v) else { continue };
@@ -1717,7 +1743,7 @@ impl DrawingEditor {
         let g = &built.geometry;
         let mut lines = LineData::default();
         for l in g.lines.iter().filter(|l| picks.contains(&l.pick)) {
-            let width = drawing_scene::px_width(l.style, self.zoom).max(1.5);
+            let width = drawing_scene::px_width(l.style, self.zoom).max(LIT_LINE_PX);
             for w in l.points.windows(2) {
                 lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.4], b: [w[1][0] as f32, w[1][1] as f32, 0.4], color: TAN, pick_id: 0, width, style: LineSegment::ON_TOP });
             }
@@ -1794,19 +1820,7 @@ impl DrawingEditor {
             }
         }
         self.rebuild_overlay();
-        let mut style = Style::default();
-        // Gray drawing area around the white sheet; Onshape highlight colors.
-        let bg = crate::theme::lin(self.model_bg.unwrap_or(crate::theme::viewport::DRAWING_BG));
-        style.background_top = bg;
-        style.background_bottom = bg;
-        // Drawings use their own (behaviours 1480, asb/u-906/907): hover
-        // #CCB292, selected #CC925C.
-        style.hover_color = crate::theme::lin(DRAWING_HOVER);
-        style.select_color = crate::theme::lin(DRAWING_SELECTED);
-        // Other members of a hovered / selected annotation group (live
-        // drawing/423: #EBEB92).
-        style.accent_color = crate::theme::lin(0xebeb92);
-        style.show_edges = false;
+        let style = self.render_style();
         self.seq += 1;
         let armed = noshape_render::perf::take_armed();
         if !armed.is_empty() {

@@ -478,7 +478,7 @@ impl DrawingEditor {
     }
 
     /// Selection looks of views and indicators (live u-905…907, behaviours
-    /// 2815): a selected view gets an orange frame, its indicator and parent
+    /// 2815): a selected view (its orange frame: push_view_frames) has its indicator and parent
     /// edge turn light blue; a selected indicator turns orange (the pick
     /// state), its parent edge orange with light-blue end dots and its view
     /// a light-blue frame. The indicator's five dots show while the view or
@@ -508,16 +508,16 @@ impl DrawingEditor {
         };
         let frame = |l: &mut LineData, v: ViewId, color: [u8; 4], seg: &mut SegFn| {
             let Some(pl) = self.placement(v) else { return };
-            let m = 1.0;
+            // Where a selected view's own frame goes (push_view_frames).
+            let m = self.tol_mm(8.0);
             let (x0, y0, x1, y1) = (pl.min[0] - m, pl.min[1] - m, pl.max[0] + m, pl.max[1] + m);
             for (a, c) in [([x0, y0], [x1, y0]), ([x1, y0], [x1, y1]), ([x1, y1], [x0, y1]), ([x0, y1], [x0, y0])] {
-                seg(l, a, c, color, 2.0);
+                seg(l, a, c, color, crate::drawing_view::LIT_LINE_PX);
             }
         };
         for s in &self.selection {
             match s {
                 Sel::View(v) if !v.is_ghost() => {
-                    frame(&mut lines, *v, ORANGE, &mut seg);
                     // An auxiliary view's indicator in light blue.
                     let is_ind = |p: u32| matches!(b.picks.get(p as usize), Some(PickTarget::AuxIndicator(x)) if x == v);
                     for l in b.geometry.lines.iter().filter(|l| is_ind(l.pick)) {

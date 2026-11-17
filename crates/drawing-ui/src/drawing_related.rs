@@ -120,6 +120,64 @@ impl DrawingEditor {
 
     /// Add the related-entity highlights of the hovered / selected
     /// annotations to the scene.
+    /// A centre mark's looks (live2 drw-centermark): hovered (Select) or selected, its hole circle light blue at 3 px
+    /// (dark orange while its view is selected: the view's geometry); then and while its view is selected, 10 px
+    /// orange grips at its arm ends and an 11 px blue dot at its centre. The picks whose grips show, the blue circles.
+    pub(crate) fn centermark_looks(&self) -> (Vec<u32>, Vec<u32>) {
+        use noshape_model::drawing::build::centermark_key;
+        let Some(b) = &self.built else { return (Vec::new(), Vec::new()) };
+        let sheet = self.current_sheet();
+        let mark_of = |s: &Sel| -> Option<(ViewId, [i64; 2])> {
+            match s {
+                Sel::AutoCentermark(v, k) => Some((*v, *k)),
+                Sel::Annotation(id) => sheet.annotations.iter().find(|a| a.id == *id).and_then(|a| match &a.kind {
+                    AnnotationKind::Centermark { view, center, .. } => Some((*view, centermark_key(*center))),
+                    _ => None,
+                }),
+                _ => None,
+            }
+        };
+        let hovered = self.hover.and_then(|h| self.sel_of_pick(h)).filter(|_| matches!(self.tool, Tool::Select));
+        let lit: Vec<Sel> = self.selection.iter().copied().chain(hovered).filter(|s| mark_of(s).is_some()).collect();
+        let views: Vec<ViewId> = self.selection.iter().filter_map(|s| if let Sel::View(v) = s { Some(*v) } else { None }).collect();
+        let mut picks: Vec<u32> = lit.iter().flat_map(|s| self.picks_of(*s)).collect();
+        picks.extend(b.picks.iter().enumerate().filter(|(_, t)| match t {
+            PickTarget::AutoCentermark { view, .. } => views.contains(view),
+            PickTarget::Annotation(id) => sheet.annotations.iter().any(|a| a.id == *id && matches!(&a.kind, AnnotationKind::Centermark { view, .. } if views.contains(view))),
+            _ => false,
+        }).map(|(i, _)| i as u32));
+        let pk = self.pk();
+        let circles = lit.iter().filter_map(mark_of).filter(|(v, _)| !views.contains(v)).flat_map(|(v, k)| pk.centermark_circle_picks(v, k)).collect();
+        (picks, circles)
+    }
+
+    pub fn push_centermark_looks(&self, scene: &mut Scene) {
+        use noshape_model::drawing::sheet::GripKind;
+        let Some(b) = &self.built else { return };
+        let (picks, circles) = self.centermark_looks();
+        if picks.is_empty() && circles.is_empty() {
+            return;
+        }
+        let up = self.gpu.uploader();
+        let mut lines = LineData::default();
+        for l in b.geometry.lines.iter().filter(|l| circles.contains(&l.pick)) {
+            for w in l.points.windows(2) {
+                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width: LIT_LINE_PX, style: LineSegment::ON_TOP });
+            }
+        }
+        if !lines.segments.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
+        }
+        let mut grips = PointData::default();
+        for gr in b.geometry.grips.iter().filter(|g| picks.contains(&g.pick)) {
+            let (color, size) = if gr.kind == GripKind::Origin { (REFERENCE_BLUE, 11.0) } else { ([0xcc, 0x92, 0x5c, 255], 10.0) };
+            grips.points.push(PointSprite { position: [gr.pos[0] as f32, gr.pos[1] as f32, 0.75], color, pick_id: 0, size, style: LineSegment::ON_TOP, _pad: 0 });
+        }
+        if !grips.points.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&grips))).per_primitive_color().unpickable().layer(23));
+        }
+    }
+
     pub fn push_related_highlights(&self, scene: &mut Scene) {
         let Some(b) = &self.built else { return };
         // The Hatch region dialog's closed profiles and the selected hatch
@@ -155,7 +213,7 @@ impl DrawingEditor {
         let aux = self.aux_edge_highlight();
         if !aux.is_empty() {
             let mut lines = LineData::default();
-            let width = drawing_scene::px_width(noshape_model::drawing::sheet::LineStyle::Visible, self.zoom).max(2.0);
+            let width = drawing_scene::px_width(noshape_model::drawing::sheet::LineStyle::Visible, self.zoom).max(LIT_LINE_PX);
             for (a, c) in aux {
                 lines.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.6], b: [c[0] as f32, c[1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width, style: LineSegment::ON_TOP });
             }
@@ -170,7 +228,9 @@ impl DrawingEditor {
         if anns.is_empty() && row_callouts.is_empty() && row_geometry.is_empty() {
             return;
         }
-        let mut edges: Vec<u32> = anns.iter().flat_map(|a| self.reference_edge_picks(*a)).collect();
+        // (A centre mark's circle: push_centermark_looks.)
+        let mark = |id: &u64| sheet.annotations.iter().any(|a| a.id == *id && matches!(a.kind, AnnotationKind::Centermark { .. }));
+        let mut edges: Vec<u32> = anns.iter().filter(|a| !mark(a)).flat_map(|a| self.reference_edge_picks(*a)).collect();
         let touches: Vec<(Vec<u32>, Vec<[f64; 2]>)> = anns.iter().map(|a| self.leader_touches(*a)).collect();
         edges.extend(touches.iter().flat_map(|(e, _)| e.iter().copied()));
         // A hovered BOM row's callouts (live drawing/421: blue).
@@ -183,7 +243,7 @@ impl DrawingEditor {
             const TAN: [u8; 4] = [0xcc, 0xb2, 0x92, 255];
             let mut lines = LineData::default();
             for l in b.geometry.lines.iter().filter(|l| row_geometry.contains(&l.pick)) {
-                let width = drawing_scene::px_width(l.style, self.zoom).max(2.0);
+                let width = drawing_scene::px_width(l.style, self.zoom).max(LIT_LINE_PX);
                 for w in l.points.windows(2) {
                     lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: TAN, pick_id: 0, width, style: LineSegment::ON_TOP });
                 }
@@ -196,7 +256,7 @@ impl DrawingEditor {
         if !edges.is_empty() {
             let mut lines = LineData::default();
             for l in b.geometry.lines.iter().filter(|l| edges.contains(&l.pick)) {
-                let width = drawing_scene::px_width(l.style, self.zoom).max(2.0);
+                let width = drawing_scene::px_width(l.style, self.zoom).max(LIT_LINE_PX);
                 for w in l.points.windows(2) {
                     lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width, style: LineSegment::ON_TOP });
                 }

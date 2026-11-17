@@ -1951,6 +1951,16 @@ impl DrawingEditor {
         if let Some(orig) = self.centerline_middle_at(start) {
             return Drag::MoveAnnotation { start, orig };
         }
+        // A hole's circle lights its centre mark but a press on it drags the view (live2 drw-centermark t5).
+        if matches!(self.tool, Tool::Select)
+            && let Some(view) = self.pk().hole_press_view(start)
+        {
+            let fresh = !self.selection.contains(&Sel::View(view));
+            if fresh {
+                self.selection = vec![Sel::View(view)];
+            }
+            return Drag::MoveViews { start, view, fresh };
+        }
         // Nothing there: a box select (qa DRAWING-BOX-SELECT).
         let Some(sel) = self.sel_at(pick, start) else { return Drag::SelectBox { start } };
         let fresh = !self.selection.contains(&sel);

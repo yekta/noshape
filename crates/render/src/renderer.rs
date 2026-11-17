@@ -214,7 +214,8 @@ struct Globals {
     /// Zebra stripes room: center xyz and radius (around the scene).
     room: [f32; 4],
     /// x = this frame's depth per unit of Onshape's depth buffer
-    /// ([`onshape_depth_unit`]; perspective: clip z per unit and per w).
+    /// ([`onshape_depth_unit`]; perspective: clip z per unit and per w);
+    /// y = `Style::lit_line_px`.
     depth_unit: [f32; 4],
     /// Compare mode: Onshape's eye (xyz) and near distance (w).
     compare: [f32; 4],
@@ -1527,7 +1528,7 @@ fn make_globals(scene: &Scene, camera: &Camera, width: u32, height: u32, dpr: f3
         dash: s.construction_dash,
         room: room_of(bounds),
         error: s.error_color,
-        depth_unit: [onshape_depth_unit(camera, bounds, aspect, scene_radius) as f32, 0.0, 0.0, 0.0],
+        depth_unit: [onshape_depth_unit(camera, bounds, aspect, scene_radius) as f32, s.lit_line_px, 0.0, 0.0],
         compare,
         compare2,
     }
