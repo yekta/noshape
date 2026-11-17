@@ -34,9 +34,11 @@ ssh -o BatchMode=yes "$host" "mkdir -p ~/$dir/src" && rsync -a --delete --exclud
   || { echo "== rb: sync to $host failed" >&2; exit 1; }
 cmd=$(printf '%q ' "$@")
 # The remote run stops when this ssh does (-tt gives it a terminal, so a killed rb.sh kills the build there too).
+# On the user's Mac our runs take the lowest priority: the user's own apps (and Noshape itself) stay responsive.
+nl=5; [ "$host" = mac ] && nl=19
 ssh -q -tt -o BatchMode=yes "$host" ". ~/noshape-env.sh; export CARGO_TARGET_DIR=~/$dir/target; \
   [ -n \"\${NOSHAPE_CONFIG_DIR:-}\" ] || export NOSHAPE_CONFIG_DIR=\$(mktemp -d -t noshape-config-XXXXXX); \
-  cd ~/$dir/src && nice -n 5 $cmd" 2>&1 | tr -d '\r'
+  cd ~/$dir/src && nice -n $nl $cmd" 2>&1 | tr -d '\r'
 rc=${PIPESTATUS[0]}
 # A binary built there has that build's source paths compiled in (the app's icons and assets): make the same path
 # here point at this worktree, so the copied app finds them (skasm 11-01).
