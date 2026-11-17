@@ -4,37 +4,25 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 01:13 UTC.
+Updated 11-17 02:05 UTC.
 
 ## In flight
 - Landed 11-16: 190a71558 (cp2), 7d1b8799 (kernel profile per feature), 765b2281 (screws P0: OCCT 0031 + 0032),
   8e3067d8, 9d68c081, a8b8f1851, a2952b329.
-- bool-knife (bool-hat; = bool-stack + 2, on main 8782214de): gate unit bool-gate-knife -> chain-cd9ad917c.out (queued
-  in vibe5's slot). Then hats/dock (/root/bool-hat-scratch/udoc-ab.sh cd9ad917c), land.sh, and a one-line note under
-  DECISIONS' 11-15 tangent ruling (lead 11-17: the face / face section margin may be 2 x the two faces' own
-  tolerances; edge / vertex checks keep theirs; 21.6 um apart isn't a tangent contact). Commits:
-  - 7e282fb90 hulls_apart (crossing patches given up past 8 halvings; knurl k25-15 hull CPU 473 -> 59 ms).
-  - ce56b4632 Shell check (planes' open pairs by exact distance, vertex walk on non-plane faces, regions' pocket cut
-    skipped when a cone / sphere / torus face would bound a pocket): Shell corpus 211/211 same, bottle Shell 1 Mac
-    12-13 -> 8-9 ms; snap-hook neutral.
-  - 3c8caba4f uv_of seed by k-d tree (T1 nearest_samples_are_the_scans); 7bc18f34b patch-grid cache (bit-exact key,
-    LRU 64 MB); 7da692d7d rust_boolean.cpp:2703 parentheses.
-  - 898c72461 unify's cylinder-group merges check the whole part once at the end (merge by merge again if the end
-    isn't valid): Mirror 1's unify 151-158 -> 104-107 ms vibe5; the knife's 28 unify dumps identical
-    (vibe5 ~/tmp/bool/kdump, probe_unify_dump).
-  - cd9ad917c hulls_apart's margin from the faces' own tolerances (T1 a_blade_and_its_mirror_image_fuse_as_occt,
-    case 682aa19d75e30e09): Mirror 1's fuse 115 -> 43 ms vibe5, same result.
-  - Mac A/B main vs bool-stack (same session): knife 1042/1427/1443 -> 934/1307/1318 ms; bottle 48-51 -> 40-43 (live 40).
-- OCCT 0033: commit f4ceaa2ff on branch bool-oc33 (patch only touches the non-MSVC branch; CI key hashes
-  patches/occt/**). Libs STAGED (told the lead 11-17 01:1x): vibe5 ~/agents/bool-keep/occt-0033, Mac
-  ~/noshape-host/occt-0033 (no OCC_CONVERT_SIGNALS). All checks clean: crash_inputs:: 4/4 Linux + Mac; qa's 3 segv
-  docs SAME (Mac); identity vibe5 (replay 3025/6 -> 3025/6, parity56 512/0 -> 512/0, suite 1194/1573 both, only the
-  sprockets / rocker region-order flake); hats/dock 12/12 SAME. Knife Mac: Split 4 129-158 -> 60-80 ms. Land
-  bool-oc33 once the lead has installed the libs on every host.
+- bool-knife landing (queued 01:47 as b0739092, 7 commits + the DECISIONS note under the 11-15 near-tangent ruling):
+  gate cd9ad917c clean (all corpora + parity56 0 differences; suite only the sprockets / rocker region-order flake),
+  hats/dock 12/12 SAME, g++-13 clean.
+- GATE GAP: the knurl corpora (kall, k10-25, k10-25-12, k25-15, k25-25, k25-71-12) need a 48 GB host for OCCT's
+  cut (35-50 GB); none is left (vibe3/5/6/7 29-31 GB, vibe4 gone), so gate-host.py skips them and says so in the
+  VERDICT. Instead (lead 11-17 ok): ours-only replay of each on main and branch, e.g.
+  NOSHAPE_BOOL_CORPUS=~/agents/bool-corpora/<k> NOSHAPE_BREP_OURS_ONLY=1 <kernel tests> brep_replay::brep_corpus_replay
+  (compares with the recorded OCCT result; knife: all taken, 0 differ, kall 15/15).
+- OCCT 0033 landed 11-17 01:24 as 9ece8f66 (libs on every host; Mac build dirs removed).
 - bool-knife2 (bool-hat, on bool-knife): a5c287f9a free-form samples + k-d index kept across Booleans (GRID_CACHE,
   same LRU as the patches; knife Extrude 8 22-34 -> 12-17, Extrude 9 24-34 -> 14-20, Revolve 1 58-76 -> 49-59 Mac);
   dc060ff1c Shell's wall checked once (it was checked twice), parallel past 16 faces (snap-hook Shell 1 dump
-  -15 %, same faces / edges). Needs the gate + Shell corpus A/B + hats/dock after bool-knife lands.
+  -15 %, same faces / edges). Gate dc060ff1c running (unit bool-gate-knife2, /root/bool-hat-scratch/chain-dc060ff1c.out); Shell corpus A/B
+  (ZZ_OLDCHECK scratch switch, vibe5 ~/tmp/bool/shab-kern, /root/bool-hat-scratch/v5-shab.out) in the slot; then hats/dock, land.
 - Fillet 2 (11-17, Mac 100 ms vs live 9): op_boolean 30 (cut + fuse), op_split 28 (dump split-11: the 5-face
   run-on tool split by 2 planes + the grind B-spline, OCCT's splitter 25 ms), min_distance x31 11, op_fillet 10,
   props_surface x11 6. A cross-Boolean exact-box cache can't hit: the cut trims the grind face (a new face, a
@@ -42,6 +30,12 @@ Updated 11-17 01:13 UTC.
 - Revolve 1 (54f29c1fecb98afe) after the grid cache: 60 % OCCT's sections ahead (ComputeTolReached3d PSO 24,
   CheckSingularPoints' Extrema grid on the whole blade 14, WLApprox 10, ImpPrm 8), free::apart 8.5. Extrude 8 =
   5d62643e95aabaa7, Extrude 9 = b58272a7dbba8cc5 (all cut the blade's one B-spline face, x 6-122 mm).
+- learning-center-michael (11-17 Mac): 88 ms vs live 96, under live (the 363 was loaded vibe5). Only Fillet 2 over
+  (82 vs 46): its by_tools cuts 1447eaf22e0cd418 (12 tools, 34 ms in place) + 694e9aab23f65697 (9.8), seams 12.6;
+  the cut half OCCT's plane / cylinder x torus walking (ImpPrm). Cases: vibe5 ~/agents/bool-keep/lcmrec.
+- cf-spur-gear Boolean 1 (11-17 Mac): ~48 ms vs live 34 (fuse f30adc1991797392, 186 + 56 faces: ours 20, build 9,
+  check 8; unify 14, usd.build 9.5); diffuse, no single lever. Doc 467 ms vs live 2112. Case: vibe5
+  ~/agents/bool-keep/sgrec.
 - blend FYI 11-17: cf-spur-gear's Boolean 1 54 ms vs live 34 (others under live); raw /root/blend-scratch/sg.log.
 - Knife, mine (Mac): Fillet 2 85 ms vs live 10 (fuse: four plane x grind B-spline pairs 15-18 ms each, 1 line each,
   case c1d9f750d291ba85 / 17b8bafce508d06d; run-on tool op_split 25), next. Then core's handover: Revolve 1 (op_boolean
