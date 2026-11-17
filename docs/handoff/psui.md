@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-17 23:22 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-17 23:26 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -141,6 +141,24 @@ nothing.
 - Red main at 22:06 (sketch_glyph tests, also CI on 592b0fc9 21:22) predates f2348fa9 (22:12: linger on the app's
   clock, tests on the test clock); 3 / 3 green on vibex6 with 2 threads.
 - Left from live's feature-dialogs-1117: list-row hover timing (121–181 ms, ours not measured).
+- 23:26 queued with this handoff: graphics part menus' "Where used for Part 1…" in its own group after Export… (live
+  ctx-menus-1117; test where_used_for_the_part_has_its_own_group_after_export). The Parts list row already has
+  "Where used…"; the Top plane row already has "Section view…" (live's row also lists Rename, Offset plane…, Add
+  comment, Show dependencies…: not compared row by row yet, do it next with menus-a.json "row-top-plane").
+
+## Next queue (lead 23:2x)
+1. Re-run qa's hover flow on the first green with 5e498ffb (uh2.sh, 0.7 / 3 s shots); qa reruns too.
+2. SELFEEL-PART-ROW stale outline: test passes on main; re-check on a release build in a quiet window (qa's state had
+   Part 2 selected: screen lag at load).
+3. Graphics / row menus against live2's ctx-menus-1117 (menus-a.json, menus-sk.json): the Top plane row in full,
+   then every context in the dump; open times rows 66–95 ms, graphics 150–270 ms.
+4. live2's feature-list feel (behaviours "psui (11-17, interaction feel): feature list: rollback bar drags, refused
+   reorder, edit dialog place, rename keys, suppress", live/psui/featurelist-feel/steps.json) against the list
+   matrix (list_feel_tests): rollback chip while held, rolled-back colours rgb(200,217,226) / end rgb(184,184,184),
+   Fillet dragged above its Extrude accepted then red + triangle, dialog at (246,79) 220×352, rename 178×24 all
+   selected (Enter / click commit, F2 nothing), renamed tooltip "Bar [Extrude] <- Sketch 1", suppress strike-through.
+5. Done tonight, for reference: nav gaps (below 20 fps a view jumps: 6f9f391f; wheel / Ctrl+wheel / pinch were live's),
+   dialogs matrix 23 / 23 + hover filter test (f03552c2).
 
 ## Current order (lead 11-17 ~14:05)
 
