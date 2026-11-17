@@ -5,6 +5,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## dx, 2026-11-17
+- [ ] P2 SWEEP-SEAM-KINK (core, lead 11-17; dx 2026-11-17 09:17) cf-hose-routing's hoses (Festo PUN 6 x 1, a sweep of
+  an annulus along the routing curve): each tube face's closed section is one degree-12 B-spline span whose seam isn't
+  tangent: its two end derivatives are 0.41 mrad (0.023°) apart, equal in length (|dS/du| 1.972 mm, about the tube's 2 mm inner
+  radius). The model shows 12/12/0 faces/edges/vertices (seams hidden), but no exporter can write those faces round:
+  ours reads our x_t back as 12/14/4 and our SAT as 22/44/24, and live imports our x_t as 12/24/24 (its STEP / IGES
+  imports heal it). A swept circle should give a closed, tangent (periodic) section, as Parasolid's does. dx's exporter
+  smooths such seams only as a guard (under 1 mrad, export only). Repro: corpus cf-hose-routing, exchange suite
+  (NOSHAPE_PARITY_ONLY=cf-hose-routing), rows "ours reads ours.x_t / .sat".
+
 ## qa, 2026-11-17
 - [ ] P0 SCISSOR-LIFT-BOM-ROWS (bool bisects, lead 07:30; asm owns the BOM; qa 2026-11-17 07:20, assembly suite 1117-0227 on green ecf8c33a vs 1116-1642 on 684e77e2)
   asm-scissor-lift: BOM rows as live 59 -> 57 of 87 (rows 63 -> 62; occurrences 214/242 and mates 13/19 unchanged). New
