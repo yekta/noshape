@@ -10096,6 +10096,35 @@ mod tests {
         assert!(wrong.is_empty(), "{wrong:?}");
     }
 
+    /// Live2 11-17 part 2 (hover-p0, iso view): a corner rectangle (-30, -20)–(30, 20) mm. Its corner (30, -20) dragged
+    /// to (39.19, -14.22): the opposite corner stays, the bottom and right lines follow. Its right line dragged right:
+    /// it moves along its normal only, to x = 39.20, the top and bottom lines stretch.
+    #[test]
+    fn a_rectangles_corner_and_side_drag_as_lives() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let corners = |d: &SketchData| {
+            let mut c: Vec<DVec2> = d.sketch.entities().filter(|e| e.kind() == EntityKind::Point).filter_map(|e| d.sketch.point(e.id)).filter(|p| p.length() > 1e-9).collect();
+            c.dedup_by(|a, b| (*a - *b).length() < 1e-9);
+            c
+        };
+        let near = |got: &[DVec2], want: &[DVec2]| got.len() == want.len() && want.iter().all(|w| got.iter().any(|g| (*g - *w).length() < 0.01e-3));
+        for side in [false, true] {
+            let (mut ed, mut d) = editor(Tool::CornerRect);
+            click(&mut ed, &mut d, mm(-30.0, -20.0));
+            click(&mut ed, &mut d, mm(30.0, 20.0));
+            ed.set_tool(Tool::Select);
+            let want = if side {
+                drag(&mut ed, &mut d, mm(30.0, 0.0), mm(39.2, 0.0));
+                [mm(-30.0, -20.0), mm(-30.0, 20.0), mm(39.2, -20.0), mm(39.2, 20.0)]
+            } else {
+                drag(&mut ed, &mut d, mm(30.0, -20.0), mm(39.19, -14.22));
+                [mm(-30.0, -14.22), mm(-30.0, 20.0), mm(39.19, -14.22), mm(39.19, 20.0)]
+            };
+            let got = corners(&d);
+            assert!(near(&got, &want), "side {side}: {:?}", got.iter().map(|p| *p * 1e3).collect::<Vec<_>>());
+        }
+    }
+
     /// Live (feel/sketch.json "boxA": A selected, then a right-to-left box over B): a box adds to the selection.
     #[test]
     fn a_box_adds_to_the_selection() {
