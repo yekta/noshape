@@ -1540,6 +1540,13 @@ impl Ctx<'_> {
         }
     }
 
+    /// [`Self::seg_param`], a B-spline's foot found from `seed` (its parameter on `s`, of a point near `p`).
+    fn seg_param_from(&self, s: &Seg, p: DVec3, seed: f64) -> (f64, f64) {
+        let Geo::Nurbs { id, t0, t1 } = s.g else { return self.seg_param(s, p) };
+        let (t, d) = self.ncurves[id as usize].c.param_from(p, t0 + seed * (t1 - t0));
+        ((t - t0) / (t1 - t0), d)
+    }
+
     /// Whether `s` is at most `len` long: past it by its chord at once (a B-spline's length is a sum over its spans).
     fn seg_within(&self, s: &Seg, len: f64) -> bool {
         (self.seg_at(s, 1.0) - self.seg_at(s, 0.0)).length() <= len && self.seg_length(s) <= len
@@ -2280,12 +2287,21 @@ impl Ctx<'_> {
     }
 
     /// Where a curve (its point at `t` from `point`, `lo` to `hi`) comes nearest edge `x`: its parameter, the distance
-    /// and the edge's point there (the nearest of 17 points along it, then golden sections about that).
+    /// and the edge's point there (the nearest of 17 points along it, then golden sections about that, each point's
+    /// foot on a B-spline edge found from the last one's).
     fn nearest_to_edge(&self, x: usize, point: &dyn Fn(f64) -> DVec3, lo: f64, hi: f64) -> (f64, f64, DVec3) {
-        let dist = |t: f64| self.edge_point_near(x, point(t)).0;
         const M: usize = 16;
         let at = |i: usize| lo + (hi - lo) * i as f64 / M as f64;
-        let k = (0..=M).min_by(|&i, &j| dist(at(i)).total_cmp(&dist(at(j)))).unwrap_or(0);
+        let coarse: Vec<f64> = (0..=M).map(|i| self.edge_point_near(x, point(at(i))).0).collect();
+        let k = (0..=M).min_by(|&i, &j| coarse[i].total_cmp(&coarse[j])).unwrap_or(0);
+        let sx = self.edge_seg(x);
+        let seed = std::cell::Cell::new(self.seg_param(&sx, point(at(k))).0);
+        let dist = |t: f64| {
+            let p = point(t);
+            let u = self.seg_param_from(&sx, p, seed.get()).0;
+            seed.set(u);
+            (self.seg_at(&sx, u.clamp(0.0, 1.0)) - p).length()
+        };
         let (mut a, mut c) = (at(k.saturating_sub(1)), at((k + 1).min(M)));
         const G: f64 = 0.381_966_011_250_105_1;
         let (mut m1, mut m2) = (a + G * (c - a), c - G * (c - a));

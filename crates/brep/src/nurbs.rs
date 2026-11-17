@@ -524,6 +524,30 @@ impl NurbsCurve {
         aw / w
     }
 
+    /// The parameter of the curve's point nearest `p` by Newton's steps from `seed` (a point found for a point near
+    /// `p`), and its distance; [`Self::param_of`]'s search where they don't settle or end farther than `seed`'s point.
+    pub fn param_from(&self, p: DVec3, seed: f64) -> (f64, f64) {
+        let (t0, t1) = self.range();
+        let (lo, hi) = (t0.min(t1), t0.max(t1));
+        let mut t = seed.clamp(lo, hi);
+        let start = (self.at(t) - p).length();
+        for _ in 0..20 {
+            let [c, d1, d2] = self.derivs(t);
+            let q = c - p;
+            let gp = d1.length_squared() + q.dot(d2);
+            if gp <= 0.0 {
+                return self.param_of(p);
+            }
+            let nt = (t - q.dot(d1) / gp).clamp(lo, hi);
+            if (nt - t).abs() <= 1e-15 * (1.0 + t.abs()) {
+                let d = (self.at(nt) - p).length();
+                return if d <= start { (nt, d) } else { self.param_of(p) };
+            }
+            t = nt;
+        }
+        self.param_of(p)
+    }
+
     /// The parameter of the point of it nearest `p` (from 16 samples a span, then Newton's method), and the
     /// distance.
     pub fn param_of(&self, p: DVec3) -> (f64, f64) {
