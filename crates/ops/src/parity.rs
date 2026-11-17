@@ -2730,8 +2730,17 @@ impl<'a> Translator<'a> {
             k
         };
         if use_ids && !ids.is_empty() && ids.iter().all(|id| self.refs.contains_key(&(k, id.clone()))) {
-            let found: Vec<String> = match ids.iter().map(|id| self.by_geometry(k, id)).collect::<Result<_, _>>() {
-                Ok(found) => found,
+            let found: Vec<String> = match ids.iter().map(|id| self.by_geometry(k, id)).collect::<Result<Vec<_>, _>>() {
+                Ok(found) => {
+                    let mut out = Vec::new();
+                    for (id, e) in ids.iter().zip(found) {
+                        match self.sheet_as_faces(k, id, &e) {
+                            Some(faces) => out.extend(faces),
+                            None => out.push(e),
+                        }
+                    }
+                    out
+                }
                 Err(e) => self.regions_by_sum(k, &ids).ok_or(e)?,
             };
             // A swept edge a Boolean split: Onshape's query keeps every piece.
@@ -4387,6 +4396,34 @@ impl<'a> Translator<'a> {
             return self.extrude_entity(name, is_start, crossing, op, sk, &curves[1..]);
         }
         pick.map(|c| c.0.clone()).ok_or_else(|| format!("{name} of {op}: no entity of ours matches"))
+    }
+
+    /// Live's sheet body `id` where `ours` is a solid of the same faces (asm-robot-relations 0c3466's Import 1: live's
+    /// import of a good STEP falls apart into six sheets, ours is one valid solid, lead 11-17): our faces at live's faces
+    /// of that sheet (its Thicken 1 thickens one sheet).
+    fn sheet_as_faces(&mut self, k: usize, id: &str, ours: &str) -> Option<Vec<String>> {
+        let r = self.refs.get(&(k, id.to_string()))?;
+        if r.kind != "BODY" || r.geometry.as_deref() != Some("Surface") {
+            return None;
+        }
+        let parts = self.call("query_parts", json!({})).ok()?;
+        if parts["parts"].as_array()?.iter().any(|p| p["id"] == ours && p["kind"] == "Surface") {
+            return None;
+        }
+        let mut faces: Vec<String> = self.refs.iter().filter(|((j, _), f)| *j == k && f.kind == "FACE" && f.body.as_deref() == Some(id)).map(|((_, f), _)| f.clone()).collect();
+        faces.sort();
+        let mut found: Vec<String> = Vec::new();
+        for f in &faces {
+            if let Ok(e) = self.by_geometry(k, f)
+                && !found.contains(&e)
+            {
+                found.push(e);
+            }
+        }
+        if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+            eprintln!("TRACE sheet {id}: {} of its {} faces found on our solid {ours}", found.len(), faces.len());
+        }
+        (!found.is_empty()).then_some(found)
     }
 
     /// The entity of ours at live's geometry of `id`.
@@ -7128,6 +7165,12 @@ pub fn live_refs(lines: &[Value], refs: &str) -> HashMap<(usize, String), LiveRe
     let mut all = refs_from_bodies(lines);
     for (key, mut r) in parse_refs(refs) {
         r.sketch |= all.get(&key).is_some_and(|b| b.sketch);
+        // (A body keeps the line's word that it is a sheet: asm-robot-relations 0c3466's six imported sheets.)
+        if r.geometry.is_none()
+            && let Some(b) = all.get(&key).filter(|b| b.kind == r.kind && b.geometry.as_deref() == Some("Surface"))
+        {
+            r.geometry = b.geometry.clone();
+        }
         all.insert(key, r);
     }
     all
