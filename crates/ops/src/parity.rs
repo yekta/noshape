@@ -9473,9 +9473,12 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     // Inside each subassembly instance its instances where live has that one's (a flexible subassembly's instances
     // differ): set in the tab holding the subassembly instance, relative to that tab's occurrence; a subassembly
     // used more than once there takes its first occurrence's.
+    // Deepest first: a level's own nested places are in before the level above reads where its parts land.
     let mut placed_inside: HashSet<(String, String)> = HashSet::new();
     let mut tab_lists: HashMap<String, Value> = HashMap::new();
-    for o in &occurrences {
+    let mut deepest_first = occurrences.clone();
+    deepest_first.sort_by_key(|o| std::cmp::Reverse(ids(&o["path"]).len()));
+    for o in deepest_first {
         let p = ids(&o["path"]);
         if p.len() < 2 {
             continue;
@@ -9493,21 +9496,35 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         // A subassembly whose own parts don't follow its occurrence but move together (a flexible one turned inside:
         // asm-xdev-subs' SFRRGA3-29-P25 in Latch pusher linkage <1>, its parts turned over against <2>'s): where its parts
         // land with their places in our tab of it, when they all agree on it.
+        // (Its parts as the tab of `sub` has them inside it, that tab's own nested places included: three levels deep,
+        // asm-xdev-subs' FXAA3-7-F5-SET <2> in linkage in Latch pusher linkage; else as its own tab has them.)
         let mut frames: Vec<glam::DMat4> = Vec::new();
-        if let Some((sub_element, sub_tab)) = element_at("", &p).and_then(|e| levels.iter().find(|l| l.element == e).map(|l| (e, l.tab.clone()))) {
-            if !tab_lists.contains_key(&sub_tab)
-                && let Ok(list) = placer.call("assembly_list", json!({ "tab": sub_tab }))
+        let mut list_of = |tab: &str| -> Option<Value> {
+            if !tab_lists.contains_key(tab)
+                && let Ok(list) = placer.call("assembly_list", json!({ "tab": tab }))
             {
-                tab_lists.insert(sub_tab.clone(), list);
+                tab_lists.insert(tab.to_string(), list);
             }
-            let list = tab_lists.get(&sub_tab);
+            tab_lists.get(tab).cloned()
+        };
+        let pose = |i: &Value, k: f64| -> Option<glam::DMat4> {
+            let r: Vec<f64> = i["rotation"].as_array().into_iter().flatten().filter_map(Value::as_f64).collect();
+            let (&[x, y, z, w], Some(t)) = (r.as_slice(), f3(&i["translation"])) else { return None };
+            Some(glam::DMat4::from_rotation_translation(glam::DQuat::from_xyzw(x, y, z, w), glam::DVec3::from(t) * k))
+        };
+        let holder = element_at("", &p[..p.len() - 1]).and_then(|e| levels.iter().find(|l| l.element == e).map(|l| l.tab.clone())).and_then(|t| list_of(&t));
+        let child_in_holder = holder.as_ref().and_then(|l| l["instances"].as_array()?.iter().find(|i| i["name"] == child.as_str()).and_then(|i| pose(i, per_unit(&l["units"]))));
+        if let Some((sub_element, sub_tab)) = element_at("", &p).and_then(|e| levels.iter().find(|l| l.element == e).map(|l| (e, l.tab.clone()))) {
+            let list = list_of(&sub_tab);
             for q in occurrences.iter().map(|o| ids(&o["path"])).filter(|q| q.len() == p.len() + 1 && q[..p.len()] == p[..]) {
                 let Some(leaf) = q.last().and_then(|id| ours.get(&(sub_element.clone(), id.clone()))) else { continue };
-                let Some(i) = list.and_then(|l| l["instances"].as_array()).and_then(|a| a.iter().find(|i| i["name"] == leaf.as_str())) else { continue };
-                let k = list.map_or(1.0, |l| per_unit(&l["units"]));
-                let r: Vec<f64> = i["rotation"].as_array().into_iter().flatten().filter_map(Value::as_f64).collect();
-                let (&[x, y, z, w], Some(t)) = (r.as_slice(), f3(&i["translation"])) else { continue };
-                let local = glam::DMat4::from_rotation_translation(glam::DQuat::from_xyzw(x, y, z, w), glam::DVec3::from(t) * k);
+                let in_holder = holder.as_ref().zip(child_in_holder).and_then(|(l, c)| {
+                    let path = format!("{child} > {leaf}");
+                    let o = l["occurrences"].as_array()?.iter().find(|o| o["path"] == path.as_str())?;
+                    Some(c.inverse() * pose(o, per_unit(&l["units"]))?)
+                });
+                let own = || list.as_ref().and_then(|l| l["instances"].as_array()?.iter().find(|i| i["name"] == leaf.as_str()).and_then(|i| pose(i, per_unit(&l["units"]))));
+                let Some(local) = in_holder.or_else(own) else { continue };
                 if let Some(c) = transform_of(&q).and_then(|m| mat(&m)) {
                     frames.push(c * local.inverse());
                 }
@@ -9526,6 +9543,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             },
             _ => continue,
         };
+        tab_lists.remove(&tab);
         if let Err(e) = placer.place(&tab, &name, &row_major(m)) {
             res.differences.push(format!("{tab} › {name}: not moved to live's place: {e}"));
         }
