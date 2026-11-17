@@ -27,6 +27,7 @@
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_ConicalSurface.hxx>
+#include <Geom2d_Curve.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Ellipse.hxx>
 #include <Geom_Line.hxx>
@@ -46,6 +47,7 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <algorithm>
 #include <vector>
 
 namespace noshape {
@@ -144,6 +146,33 @@ struct Sat
     std::function<gp_Vec(const gp_Pnt&, double, double)> normal; // point, OCCT (u, v)
   };
 
+  // A cylinder's or cone's reference direction for face `f`: its own, but for a face reaching past one period (a seam
+  // piece joined across its seam, seam_pieces_joined: c2-rings-loft Part 2) the middle of the widest angle no edge of
+  // the face crosses, so that the reader's seam there meets no cut and doesn't split the face again.
+  static gp_Dir seam_direction(const TopoDS_Face& f, const gp_Ax3& a)
+  {
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    if (u1 - u0 <= 2 * M_PI + 1e-9)
+      return a.XDirection();
+    std::vector<double> us;
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+    {
+      double                          p0, p1;
+      const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Current()), f, p0, p1);
+      for (int i = 0; !c.IsNull() && i <= 16; ++i)
+        us.push_back(std::fmod(std::fmod(c->Value(p0 + (p1 - p0) * i / 16).X(), 2 * M_PI) + 2 * M_PI, 2 * M_PI));
+    }
+    if (us.empty())
+      return a.XDirection();
+    std::sort(us.begin(), us.end());
+    double best = us.front() + 2 * M_PI - us.back(), at = std::fmod(us.back() + best / 2, 2 * M_PI);
+    for (size_t i = 1; i < us.size(); ++i)
+      if (us[i] - us[i - 1] > best)
+        best = us[i] - us[i - 1], at = us[i - 1] + best / 2;
+    return gp_Dir(a.XDirection().XYZ() * std::cos(at) + a.YDirection().XYZ() * std::sin(at));
+  }
+
   Surf surface(const TopoDS_Face& f)
   {
     TopLoc_Location           loc;
@@ -169,7 +198,7 @@ struct Sat
     {
       const gp_Ax3 a = c->Position();
       const double r = c->Radius();
-      return {add("cone-surface", vec(a.Location().XYZ()) + " " + vec(a.Direction().XYZ()) + " " + vec(a.XDirection().XYZ() * r) + " 1 I I 0 1 " + num(r) + " forward I I I I "),
+      return {add("cone-surface", vec(a.Location().XYZ()) + " " + vec(a.Direction().XYZ()) + " " + vec(seam_direction(f, a).XYZ() * r) + " 1 I I 0 1 " + num(r) + " forward I I I I "),
               radial(a.Location(), a.Direction())};
     }
     if (auto c = occ::down_cast<Geom_ConicalSurface>(s))

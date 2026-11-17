@@ -839,7 +839,8 @@ fn names_colours(parts: &[ExportShape]) -> (Vec<String>, Vec<f64>) {
 /// millimetres. Shapes are in `unit`.
 pub fn write_acis(path: &Path, shapes: &[Shape], unit: LengthUnit) -> Result<()> {
     let f = unit.mm_per_unit();
-    let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
+    // Seam pieces joined before scaling: the scaled copy keeps one curve of a seam edge on the face's surface.
+    let v = shapes.iter().map(|s| scaled(&Shape::from_res(ffi::shape_seam_pieces_joined(s.raw()))?, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
     ck(ffi::write_acis(&l, path_str(path)?))
 }

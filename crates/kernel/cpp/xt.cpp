@@ -38,6 +38,7 @@
 #include <algorithm>
 
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepTools_Modifier.hxx>
 #include <BRepTools_Modification.hxx>
 #include <Geom_OffsetSurface.hxx>
@@ -45,6 +46,7 @@
 #include <BRepClass3d.hxx>
 #include <BRepLProp_SLProps.hxx>
 #include <BRepTools.hxx>
+#include <TopoDS_Iterator.hxx>
 #include <BRep_Tool.hxx>
 #include <Geom2dConvert.hxx>
 #include <Geom2d_BSplineCurve.hxx>
@@ -2619,6 +2621,94 @@ std::pair<std::string, const double*> name_colour(rust::Slice<const rust::String
   return {name, rgb};
 }
 
+// Face `a` with seam piece `b` in the place of the seam edge it uses on one side only, `b`'s other edges' curves on
+// the surface moved by the period to `a`'s side (c2-rings-loft Part 2: a 0.007 mm² cylinder triangle over a seam
+// segment its 510 mm² face meets once, which UnifySameDomain leaves). Null when the pair isn't that; `apply` false
+// only checks, `apply` true changes the edges' curves (on a copy).
+static TopoDS_Face across_seam(const TopoDS_Face& a, const TopoDS_Face& b, bool apply)
+{
+  if (a.Orientation() != b.Orientation())
+    return {};
+  const TopoDS_Face fa = TopoDS::Face(a.Oriented(TopAbs_FORWARD)), fb = TopoDS::Face(b.Oriented(TopAbs_FORWARD));
+  TopLoc_Location   la, lb;
+  const occ::handle<Geom_Surface> S = BRep_Tool::Surface(fa, la), Sb = BRep_Tool::Surface(fb, lb);
+  if (la != lb || fb.NbChildren() != 1 || S->DynamicType() != Sb->DynamicType())
+    return {};
+  // One surface, or equal copies of it (each face its own): `b`'s curves on it serve `a`.
+  double bu0, bu1, bv0, bv1;
+  BRepTools::UVBounds(fb, bu0, bu1, bv0, bv1);
+  for (int i = 0; i <= 2 && S != Sb; ++i)
+    for (int j = 0; j <= 2; ++j)
+      if (S->Value(bu0 + (bu1 - bu0) * i / 2, bv0 + (bv1 - bv0) * j / 2).Distance(Sb->Value(bu0 + (bu1 - bu0) * i / 2, bv0 + (bv1 - bv0) * j / 2)) > Precision::Confusion())
+        return {};
+  ShapeIMap ea, eb;
+  TopExp::MapShapes(fa, TopAbs_EDGE, ea);
+  TopExp::MapShapes(fb, TopAbs_EDGE, eb);
+  TopoDS_Edge E;
+  int         shared = 0;
+  for (int i = 1; i <= eb.Extent(); ++i)
+    if (ea.Contains(eb(i)))
+      ++shared, E = TopoDS::Edge(eb(i));
+  if (shared != 1 || !BRep_Tool::IsClosed(E, fa))
+    return {};
+  auto uses = [&](const TopoDS_Face& f, TopoDS_Wire& w, TopoDS_Edge& e) {
+    int n = 0;
+    for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
+      for (TopoDS_Iterator ei(wi.Value()); ei.More(); ei.Next())
+        if (ei.Value().IsSame(E))
+          ++n, w = TopoDS::Wire(wi.Value()), e = TopoDS::Edge(ei.Value());
+    return n;
+  };
+  TopoDS_Wire wa, wb;
+  TopoDS_Edge ua, ub;
+  if (uses(fa, wa, ua) != 1 || uses(fb, wb, ub) != 1 || ua.Orientation() == ub.Orientation())
+    return {};
+  double                            f, l;
+  const occ::handle<Geom2d_Curve>   ca = BRep_Tool::CurveOnSurface(ua, fa, f, l);
+  const occ::handle<Geom2d_Curve>   cb = BRep_Tool::CurveOnSurface(ub, fb, f, l);
+  const BRepAdaptor_Surface         as(fa, false);
+  if (ca.IsNull() || cb.IsNull())
+    return {};
+  const gp_Vec2d d(cb->Value((f + l) / 2), ca->Value((f + l) / 2));
+  auto           period = [](double x, bool periodic, double p) { return periodic ? p * std::round(x / p) : 0.0; };
+  const gp_Vec2d shift(period(d.X(), as.IsUPeriodic(), as.IsUPeriodic() ? as.UPeriod() : 0),
+                       period(d.Y(), as.IsVPeriodic(), as.IsVPeriodic() ? as.VPeriod() : 0));
+  if (shift.Magnitude() < 1e-9 || (d - shift).Magnitude() > 1e-7)
+    return {};
+  std::vector<TopoDS_Edge> loop;
+  for (TopoDS_Iterator ei(wb); ei.More(); ei.Next())
+    loop.push_back(TopoDS::Edge(ei.Value()));
+  const size_t k = std::find_if(loop.begin(), loop.end(), [&](const TopoDS_Edge& e) { return e.IsSame(E); }) - loop.begin();
+  for (const TopoDS_Edge& e : loop)
+    if (!e.IsSame(E) && (BRep_Tool::IsClosed(e, fb) || BRep_Tool::CurveOnSurface(e, fb, f, l).IsNull()))
+      return {};
+  if (!apply)
+    return fa;
+  BRep_Builder bb;
+  TopoDS_Wire  nw;
+  bb.MakeWire(nw);
+  for (TopoDS_Iterator ei(wa); ei.More(); ei.Next())
+  {
+    if (!ei.Value().IsSame(E))
+    {
+      bb.Add(nw, ei.Value());
+      continue;
+    }
+    for (size_t j = 1; j < loop.size(); ++j)
+    {
+      const TopoDS_Edge&        e = loop[(k + j) % loop.size()];
+      occ::handle<Geom2d_Curve> c = occ::down_cast<Geom2d_Curve>(BRep_Tool::CurveOnSurface(e, fb, f, l)->Translated(shift));
+      bb.UpdateEdge(e, c, fa, BRep_Tool::Tolerance(e));
+      bb.Add(nw, e);
+    }
+  }
+  TopoDS_Face nf;
+  bb.MakeFace(nf, S, la, BRep_Tool::Tolerance(fa));
+  for (TopoDS_Iterator wi(fa); wi.More(); wi.Next())
+    bb.Add(nf, wi.Value().IsSame(wa) ? TopoDS_Shape(nw.Oriented(wa.Orientation())) : wi.Value());
+  return TopoDS::Face(nf.Oriented(a.Orientation()));
+}
+
 // Pieces of one periodic face OCCT split only at its seam (shown as one face: face_joins) as the one face Parasolid has
 // (c2-housing-draft's draft cone read back as two faces, 37 for live's 36). Only the pieces and their edges merge.
 TopoDS_Shape seam_pieces_joined(const TopoDS_Shape& s)
@@ -2632,17 +2722,52 @@ TopoDS_Shape seam_pieces_joined(const TopoDS_Shape& s)
       piece[i] = piece[fj[i]] = true;
   if (std::find(piece.begin(), piece.end(), true) == piece.end())
     return s;
+  // Pairs across a seam edge used once by the big face (across_seam), on a copy: the edges' curves change.
+  std::vector<std::pair<int, int>> across;
+  for (size_t i = 0; i < fj.size(); ++i)
+  {
+    if (fj[i] == i || std::count(fj.begin(), fj.end(), fj[i]) != 2)
+      continue;
+    const int p = (int)fj[i] + 1, q = (int)i + 1;
+    if (!across_seam(TopoDS::Face(fm(p)), TopoDS::Face(fm(q)), false).IsNull())
+      across.emplace_back(p, q);
+    else if (!across_seam(TopoDS::Face(fm(q)), TopoDS::Face(fm(p)), false).IsNull())
+      across.emplace_back(q, p);
+  }
+  TopoDS_Shape                         base = s;
+  std::vector<bool>                    left = piece;
+  std::unique_ptr<BRepBuilderAPI_Copy> cp;
+  if (!across.empty())
+  {
+    cp = std::make_unique<BRepBuilderAPI_Copy>(s, false, false);
+    occ::handle<ShapeBuild_ReShape> r = new ShapeBuild_ReShape;
+    for (const auto& [p, q] : across)
+    {
+      const TopoDS_Face A = TopoDS::Face(cp->ModifiedShape(fm(p))), B = TopoDS::Face(cp->ModifiedShape(fm(q)));
+      const TopoDS_Face nf = across_seam(A, B, true);
+      if (nf.IsNull())
+        continue;
+      r->Replace(A, nf);
+      r->Remove(B);
+      left[(size_t)p - 1] = left[(size_t)q - 1] = false;
+    }
+    base = r->Apply(cp->Shape());
+    if (base.IsNull() || !BRepCheck_Analyzer(base).IsValid())
+      return s;
+    if (std::find(left.begin(), left.end(), true) == left.end())
+      return base;
+  }
   ShapeIMap mine;
   for (int i = 1; i <= fm.Extent(); ++i)
-    if (piece[(size_t)i - 1])
-      TopExp::MapShapes(fm(i), TopAbs_EDGE, mine);
-  ShapeUpgrade_UnifySameDomain u(s, true, true, false);
-  for (TopExp_Explorer e(s, TopAbs_EDGE); e.More(); e.Next())
+    if (left[(size_t)i - 1])
+      TopExp::MapShapes(cp ? cp->ModifiedShape(fm(i)) : fm(i), TopAbs_EDGE, mine);
+  ShapeUpgrade_UnifySameDomain u(base, true, true, false);
+  for (TopExp_Explorer e(base, TopAbs_EDGE); e.More(); e.Next())
     if (!mine.Contains(e.Current()))
       u.KeepShape(e.Current());
   u.Build();
   const TopoDS_Shape out = u.Shape();
-  return out.IsNull() || !BRepCheck_Analyzer(out).IsValid() ? s : out;
+  return out.IsNull() || !BRepCheck_Analyzer(out).IsValid() ? base : out;
 }
 
 // One part's BODY, as write_parasolid writes it.
@@ -2944,6 +3069,12 @@ std::unique_ptr<OcShape> elementary_surfaces(const OcShape& s)
 {
   require_non_null(s.shape, "shape");
   return wrap(swept_to_elementary(s.shape));
+}
+
+std::unique_ptr<OcShape> shape_seam_pieces_joined(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  return wrap(seam_pieces_joined(s.shape));
 }
 
 } // namespace noshape

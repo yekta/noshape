@@ -2153,3 +2153,31 @@ fn a_cone_face_cut_at_its_seam_writes_as_one_face() {
     let a = surface_properties(&back).unwrap().mass;
     assert!((a - area).abs() < 1e-6 * area, "{a} vs {area}");
 }
+
+/// c2-rings-loft Part 2's 510 mm² cylinder face and the 0.007 mm² piece of it across a seam segment the big face meets
+/// once (shown as one face; UnifySameDomain leaves them): written as the one face of live's model, in x_t and SAT (ours
+/// read both back with 133 faces for 132; the SAT cylinder's reference now lies where no cut crosses, so the reader's
+/// seam doesn't split the face again).
+#[test]
+fn a_seam_piece_across_a_seam_segment_is_written_with_its_face() {
+    let s = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/seam/rings-loft-seam-piece.brep")).unwrap();
+    assert_eq!(s.count(ShapeType::Face), 2);
+    let want = surface_properties(&s).unwrap().mass;
+    let path = std::env::temp_dir().join(format!("noshape-seam-piece-{}.x_t", std::process::id()));
+    write_parasolid(&path, std::slice::from_ref(&s), LengthUnit::Meter, false).unwrap();
+    let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(back.count(ShapeType::Face), 1);
+    let a = surface_properties(&back).unwrap().mass;
+    assert!((a - want).abs() < 1e-6 * want, "{a} vs {want}");
+    let path = path.with_extension("sat");
+    write_acis(&path, std::slice::from_ref(&s), LengthUnit::Meter).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let back = read_acis_parts(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(text.lines().filter(|l| l.starts_with("face ")).count(), 1);
+    assert_eq!(back.iter().map(|p| p.shape.count(ShapeType::Face)).sum::<usize>(), 1);
+    let a: f64 = back.iter().map(|p| surface_properties(&p.shape).unwrap().mass).sum();
+    assert!((a - want).abs() < 1e-6 * want, "sat: {a} vs {want}");
+    assert_eq!(s.count(ShapeType::Face), 2, "the model's shape is left as it was");
+}
