@@ -1183,3 +1183,27 @@ fn a_single_centermark_over_an_automatic_one_goes_with_escape(cx: &mut TestAppCo
     draw(cx, window);
     assert_eq!(marks(cx), before, "Esc drops it over the automatic mark");
 }
+
+/// Live2 manual-4: ☰ › Print… in a drawing opens the drawing's PDF (live, pop-ups allowed: "<drawing>.pdf" in a new
+/// tab ~1 s after the click), with no export banner; the bubble live shows when the browser blocks pop-ups is the
+/// browser's.
+#[gpui::test]
+fn print_in_a_drawing_opens_its_pdf_without_a_banner(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "print");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.print(cx)));
+    assert!(cx.update(|cx| editor.read(cx).toast.is_none()), "no banner");
+    for _ in 0..500 {
+        if cx.opened_url().is_some() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.run_until_parked();
+    }
+    let url = cx.opened_url().expect("the PDF opened");
+    let path = url.strip_prefix("file://").expect("a file");
+    assert!(path.ends_with("Drawing 1.pdf"), "{path}");
+    let bytes = std::fs::read(path).expect("written");
+    assert!(bytes.starts_with(b"%PDF"), "a PDF");
+}

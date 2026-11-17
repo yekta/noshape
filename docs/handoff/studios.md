@@ -14,51 +14,39 @@ Updated 2026-11-17 09:50 UTC. Restarted 11-17 09:20 after the lead's pause.
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
-- Landed 11-17: 7abd9bdf (document-open timing + paused handoff).
-- Queued 10:10: 8abe1654 box select (queue item 4): `select_in_box` per live2's rule, `BOX_VIEW_FRAME_PX` 7, GPUI
-  tests `a_box_takes_a_view_by_a_whole_edge_or_by_crossing_its_frame`, `a_box_takes_a_dimension_by_…` (drawing-ui 40/40);
-  drw-notes-box-select-delete, -copy-annotation-drag, -view-drag-undo match on vibe6. Row 106 =. The press rule was
-  already ours (VIEW_REACH_MM 3.6 mm = live D1's 14 px).
-- vibe6 slot queue (behind qa's suites-rest since 08:40), binary ~/tmp/studios/noshape (10:04, with box select):
-  speed1117.sh (mkperf + perf-open-30 / perf-open-hist / perf-fs-large x5, log ~/agents/studios-keep/speed1117.log),
-  then the drawing run (315 names drwall-1117.txt, out ~/tmp/studios/drw1117, log drw1117.log); then
-  `drawing_matrix.py --run` on it and copy the run to ~/agents/studios-keep.
-- New speed fixture fs-large (std query.fs in a Feature Studio) in mkperf.py, scenario perf/perf-fs-large.json.
+- Landed 11-17: 7abd9bdf (doc-open timing), b5d11ad7 (box select by live2's rule; row 106 =).
+- Committed f16defe3, not landed: drawing panels report every text with the selects' options' indices (`options`,
+  `drawing_panels::panel_text`); run.py `panel_text_form`: recorder < live2 2026-11-17.3: first 30 with options; from
+  .3: no options, 120 (live's decision 11-17; live re-records the 52 takes whose panel text hit 30). Check: panel12 run
+  on vibe6 (~/tmp/studios/panel12). Once live's .3 takes land: fill each panel's texts past line 30 (Drawing properties
+  tabs, Note, Styles, Revision table, View properties) from them.
+- Uncommitted: Add Items to Release tree opens expanded (`collapsed`, live2 rel-flow-two-parts); manual-4: FS Ctrl-hover
+  link (`CtrlLink`, `link_at`, `render_ctrl_link`, vendor `offset_for_point`, icon ui-arrow-up-right), quick tab
+  switcher look + mouse-up off the card closes (backdrop), Print in a drawing without the export banner; tests:
+  feature-studio-ui `ctrl_over_a_defined_identifier_shows_a_link_that_goes_to_it`, app workspace_tests.rs
+  (`the_tab_switcher_takes_a_hovered_thumbnail_…`, `a_shortcut_works_with_the_focus_on_the_top_bar`), drawing-ui
+  `print_in_a_drawing_opens_its_pdf_without_a_banner`. Then set `manual.test` in universe documents.json (3) and
+  feature-studio.json (1).
+- vibe6 slot queue (behind qa's suites-rest since 08:40): speed1117.sh (mkperf + perf-open-30 / perf-open-hist /
+  perf-fs-large x5, ~/agents/studios-keep/speed1117.log), then the drawing run (drwall-1117.txt, out
+  ~/tmp/studios/drw1117, drw1117.log) -> `drawing_matrix.py --run`, copy the run to ~/agents/studios-keep.
+- live2's 4 flow takes landed (793cb58e): run them after the next vibe6 build (B1's name wins a same-feature merge,
+  revision B offered after A, Add Items expanded with row clicks).
 
-## Lead's queue (11-16 ~09:00), in order
+## Lead's queue (11-16 ~09:00), state 11-17
 
-1. Versions, branches and merge as full flows vs live; release management (Professional account).
-   - 154 versions / release takes exist and matched (01:30-02:30); qa's 00:32 misses in my areas 16/16 on today's build.
-   - New: ver-flow-branch-version-merge, ver-flow-merge-same-feature, rel-flow-revision-b, rel-flow-two-parts (on main);
-     live2 asked (REQUESTS 09:06). Ours runs the first three end to end; rel-flow-two-parts stops at "Part 2": ours'
-     Add Items tree opens Part Studio 1 collapsed (live2 to say how live's opens; then match).
-   - Approve / reject: not capturable with one account (live2 11-14).
-2. Speed in my areas vs PLAN 2.7 and live (behaviours.md "speed: studios" (1)-(4), "speed: studios, part 2",
-   "speed: drawings"). vibe6 11-16 09:07-09:40, load 3-12 (hints, not the quiet window), medians of 5,
-   ~/agents/studios-keep/perf-1116.log:
-   | operation | ours frame / idle ms | live ms |
-   |---|---|---|
-   | drawing tab open (30-feature part, 4 views) | 11 / 37-41 | 3200-3700 (first 23000) |
-   | tab switch PS / Asm / VS / FS | 13-29 / 11-79 | 1578-2705 |
-   | Versions and history open (2000 entries) | 13-32 / 63-241 | 771 |
-   | Compare V10 / Open B1 / Main / V40 | 26-33 / 11-149 | 7135 / 4551 / 4087 / 3668 |
-   | Variable Studio 500 vars open / repeat | 37 / 85-87 | 5315 (200 vars) |
-   None slower than live. Still to do: document open (perf-open-30 / perf-open-hist scenarios, needs bdab0ef9 in the
-   app build: `python3 ~/agents/studios-keep/perfrun.py ~/tmp/studios/noshape :389 5 ~/tmp/studios/perf/perf-open-30.json`
-   with an Xvfb on :389); Feature Studio open on a large studio. Fixtures: `python3 ~/agents/studios-keep/mkperf.py
-   ~/tmp/studios/noshape ~/tmp/studios/perf` (vibe6 ~/tmp is pruned after 12 h; scripts + scenarios kept in
-   ~/agents/studios-keep/{perf,perfrun.py,mkperf.py}, local masters /root/studios-scratch/{bin,perf}).
-3. The 4 manual captures (lead 11-16: no recorder work): live2 asked (REQUESTS 08:47, live/feel/manual-4): FS Ctrl-hover
-   cursor; quick tab switcher hover + mouse-up; Print… pop-up toast; shortcuts with focus on the top bar. When it lands:
-   implement each, a GPUI test each, set `manual.test` in tools/ui-parity/universe/{documents,feature-studio}.json.
-4. Box select (interaction-feel row 106): ANSWERED by live2 (live/feel/box-select-rule/README.md): L→R takes a view
-   only with a whole model edge of it inside (part of an edge or the frame corner: nothing); R→L when the box meets its
-   frame (geometry box + ~7 px); a dimension L→R when its whole text or an arrow end is inside (not an extension line's
-   foot alone), R→L when touched; a press within ~7 px of a view's geometry drags the view, not a box. Implement in
-   crates/drawing-ui/src/drawing_cells.rs `select_in_box` + the press rule, GPUI tests, update row 106.
-5. Drawing matrix refresh: the full drawing run (306 takes) never got vibe6's slot (queue 2nd at 07:58); live2 landed
-   15533efc (6 Move to sheet / Replicate retakes); Datum target / Weld / GTOL takes + 12 retakes after 18:50 UTC.
-   Then drawing_matrix.py --run on the fresh run.
+1. Versions / branches / merge / release flows vs live: live2's 4 flow takes landed (793cb58e). Fixed in the tree:
+   compare names a modified feature by the base side's name (`compare_features`: a.or(b)); a Merge's feature changed on
+   both sides takes the source's (`merge_from_source`, `merge_part_studio_with`; session rebases keep ours); Add Items
+   rows expanded and never "checked"; runner `late_modal` (a modal live fills after its server's answer when the next
+   step only waits). Verify: verrel run (158 ver-/rel- takes) on vibe6 ~/tmp/studios/verrel. Approve / reject: not
+   capturable with one account.
+2. Speed: table in the archive's / perf-1116.log (none slower than live). Document open + fs-large queued in vibe6's
+   slot (speed1117.sh). Decision asked of the lead: the judged numbers on the Mac (opens app windows there).
+3. Manual-4 (live2 11-17 09:47, behaviours "studios manual-4"): implemented, see In flight; universe tests set.
+4. Box select: landed (b5d11ad7).
+5. Drawing matrix refresh: drawing run queued in vibe6's slot (315 takes); live re-records the 52 panel takes in the
+   .5 form (done ~17:30); then fill the panels' texts past 30 lines.
 
 ## Agents (lead's roster 11-17 10:30; only these ids)
 psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, core 6692ae35-758a-4442-81c8-29f67be2e21a,

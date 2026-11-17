@@ -220,3 +220,70 @@ fn the_completion_list_shows_250_ms_after_the_key(cx: &mut TestAppContext) {
     assert!(open(cx), "after ~250 ms");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live2 manual-4: Ctrl (Cmd) over a defined identifier shows it as a link at once, in either order, and releasing
+/// the key takes it away; std's gets an arrow; nothing over an import; a click on the link goes to the declaration.
+#[gpui::test]
+fn ctrl_over_a_defined_identifier_shows_a_link_that_goes_to_it(cx: &mut TestAppContext) {
+    use gpui_kit::{Modifiers, VisualTestContext};
+    cx.update(gpui_kit::init);
+    let dir = std::env::temp_dir().join(format!("noshape-ui-fs-ctrl-link-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    let source = "FeatureScript 2581;\nimport(path : \"onshape/std/geometry.fs\", version : \"2581.0\");\n\nconst plateLength = 10;\n\nfunction doubled(n) { return 2 * n; }\n\nexport const f = function() { var x = doubled(3) * plateLength; opExtrude; };\n";
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+        call(&mut ctx, "featurestudio_edit", json!({ "tab": "Feature Studio 1", "source": source }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))).unwrap().id;
+    let (window, view) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1600.), px(900.)) };
+        let mut view = None;
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| FeatureStudioView::new(doc, tab, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap())
+    });
+    draw(cx, window);
+    let last = source.rfind("doubled(3)").unwrap();
+    let at = |cx: &mut TestAppContext, needle_at: usize, len: usize| {
+        cx.update(|cx| view.read(cx).editor.read(cx).range_to_bounds(&(needle_at..needle_at + len))).expect("laid out").center()
+    };
+    let (use_at, std_at, import_at) = (at(cx, last, 7), at(cx, source.find("opExtrude").unwrap(), 9), at(cx, source.find("geometry").unwrap(), 8));
+    let link = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ctrl_link.as_ref().map(|l| (l.name.clone(), l.std)));
+    let ctrl = Modifiers::secondary_key();
+    // (The code has the keyboard, as after a click in it.)
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.editor.update(cx, |e, cx| e.focus(w, cx)))).unwrap();
+    let mut vcx = VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_move(use_at, None, Modifiers::default());
+    draw(cx, window);
+    assert_eq!(link(cx), None, "no Ctrl: no link");
+    VisualTestContext::from_window(window, cx).simulate_modifiers_change(ctrl);
+    draw(cx, window);
+    assert_eq!(link(cx), Some(("doubled".into(), false)), "hover, then Ctrl: the link");
+    VisualTestContext::from_window(window, cx).simulate_modifiers_change(Modifiers::default());
+    draw(cx, window);
+    assert_eq!(link(cx), None, "Ctrl released: gone");
+    for (p, want) in [(std_at, Some(("opExtrude".to_string(), true))), (import_at, None), (use_at, Some(("doubled".to_string(), false)))] {
+        VisualTestContext::from_window(window, cx).simulate_mouse_move(p, None, ctrl);
+        draw(cx, window);
+        assert_eq!(link(cx), want, "Ctrl, then hover");
+    }
+    let mut vcx = VisualTestContext::from_window(window, cx);
+    let on = vcx.debug_bounds("fs-ctrl-link").expect("the link drawn").center();
+    vcx.simulate_click(on, ctrl);
+    draw(cx, window);
+    let caret = cx.update(|cx| view.read(cx).editor.read(cx).cursor_position());
+    assert_eq!((caret.line, caret.character), (5, 9), "at `doubled` in its declaration");
+    let _ = std::fs::remove_dir_all(&dir);
+}

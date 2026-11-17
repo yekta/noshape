@@ -3378,6 +3378,11 @@ impl<M: InputModeKind> InputBaseState<M> {
     /// end of that row rather than at the start of the next one. Callers that place or extend a
     /// selection must pass it on, or clicking past the last glyph of a wrapped row leaves a
     /// caret one row below the pointer.
+    /// The text offset under a window point (as a click there would place the caret).
+    pub fn offset_for_point(&self, position: Point<Pixels>) -> usize {
+        self.index_for_mouse_position(position).0
+    }
+
     pub(crate) fn index_for_mouse_position(&self, position: Point<Pixels>) -> (usize, bool) {
         let (offset, line_end_affinity, _) = self.resolve_mouse_position(position);
         (offset, line_end_affinity)

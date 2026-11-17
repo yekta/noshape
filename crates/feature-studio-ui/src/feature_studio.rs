@@ -499,6 +499,41 @@ fn column_of(line: &str, name: &str) -> usize {
 /// Where `name` is defined in a studio's text: a top-level or nested
 /// `function` / `predicate` / `const` / `enum` / `type` / `operator`
 /// declaration (the first one), at the name.
+/// An identifier shown as a link while Ctrl (Cmd) is held over it: its byte range, whether it is a standard library
+/// symbol (an arrow after it) and where it is drawn.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CtrlLink {
+    pub range: std::ops::Range<usize>,
+    pub std: bool,
+    pub name: String,
+    pub bounds: Bounds<Pixels>,
+}
+
+/// The identifier around byte `at` of `src` that Ctrl+click would follow: its range, its name and whether it is std's
+/// (not one in an import line, a string or a comment; one this studio or std defines).
+fn link_at(src: &str, at: usize) -> Option<(std::ops::Range<usize>, String, bool)> {
+    let is_id = |c: char| c.is_alphanumeric() || c == '_';
+    let line_start = src[..at.min(src.len())].rfind('\n').map_or(0, |i| i + 1);
+    let line_end = src[line_start..].find('\n').map_or(src.len(), |i| line_start + i);
+    let line = &src[line_start..line_end];
+    let col = at - line_start;
+    let start = line[..col].char_indices().rev().take_while(|(_, c)| is_id(*c)).last().map_or(col, |(i, _)| i);
+    let end = line[col..].char_indices().find(|(_, c)| !is_id(*c)).map_or(line.len(), |(i, _)| col + i);
+    let name = &line[start..end];
+    if name.is_empty() || name.starts_with(|c: char| c.is_ascii_digit()) || line.trim_start().starts_with("import") {
+        return None;
+    }
+    let before = &line[..start];
+    if before.contains("//") || before.matches('"').count() % 2 == 1 {
+        return None;
+    }
+    let std = match definition_of(src, name) {
+        Some(_) => false,
+        None => crate::std_source::std_definition(name).is_some(),
+    };
+    (std || definition_of(src, name).is_some()).then(|| (line_start + start..line_start + end, name.to_string(), std))
+}
+
 fn definition_of(src: &str, name: &str) -> Option<Position> {
     for (i, l) in src.lines().enumerate() {
         let t = l.trim_start();
@@ -560,6 +595,10 @@ pub struct FeatureStudioView {
     outline_anchor: BoundsCell,
     /// The pointer over the code (the diagnostic tooltip follows it).
     hover_at: Option<Point<Pixels>>,
+    /// The pointer over the code, for the Ctrl link.
+    pointer: Option<Point<Pixels>>,
+    /// Ctrl (Cmd) held over a defined identifier: its link (live2 manual-4).
+    pub ctrl_link: Option<CtrlLink>,
     /// The toolbar as a cached view (see `render`).
     toolbar: Option<Entity<crate::cached_slice::Slice<FeatureStudioView>>>,
     /// Onshape Labs › FeatureScript Co-complete switch for this session (live:
@@ -694,7 +733,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, _subs: subs };
         this.recompile(source, cx);
         // std's names, read for the completion list off the UI thread before the first key needs them.
         cx.background_spawn(async {
@@ -1048,6 +1087,36 @@ impl FeatureStudioView {
     }
 
     /// Ace's tooltip over a squiggle (live document/fs-gutter-tooltip): see [`ace_tooltip`].
+    /// The Ctrl link under the pointer (Ctrl held: `ctrl`); notifies when it changes.
+    fn update_ctrl_link(&mut self, ctrl: bool, cx: &mut Context<Self>) {
+        let link = self.pointer.filter(|_| ctrl).and_then(|p| {
+            let e = self.editor.read(cx);
+            let text = e.value().to_string();
+            let (range, name, std) = link_at(&text, e.offset_for_point(p))?;
+            let bounds = e.range_to_bounds(&range).filter(|b| b.contains(&p))?;
+            Some(CtrlLink { range, std, name, bounds })
+        });
+        if link != self.ctrl_link {
+            self.ctrl_link = link;
+            cx.notify();
+        }
+    }
+
+    /// Live2 manual-4: the identifier under the pointer as a link while Ctrl is held: white, rgb(22,81,176) with a 2 px
+    /// underline, a pointer cursor, std's with an arrow after it.
+    fn render_ctrl_link(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let link = self.ctrl_link.clone()?;
+        let blue = gpui_kit::rgb(0x1651b0);
+        // (Not occluding: the click reaches the code under it, whose Ctrl+click follows the name.)
+        let body = h_flex()
+            .debug_selector(|| "fs-ctrl-link".into())
+            .h(px(16.))
+            .cursor(CursorStyle::PointingHand)
+            .child(div().h(px(16.)).bg(gpui_kit::rgb(0xffffff)).border_b_2().border_color(blue).text_color(blue).font_family(cx.theme().mono_font_family.clone()).text_size(px(14.)).line_height(px(14.)).child(link.name.clone()))
+            .when(link.std, |d| d.child(div().w(px(14.)).h(px(16.)).bg(gpui_kit::rgb(0xffffff)).flex().items_center().justify_center().child(crate::assets::icon("ui-arrow-up-right", 12., cx))));
+        Some(deferred(anchored().position(link.bounds.origin).child(body)).with_priority(1).into_any_element())
+    }
+
     fn render_diagnostic_tooltip(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let at = self.hover_at?;
         let entry = self.editor.read(cx).hovered_diagnostic()?;
@@ -2074,6 +2143,8 @@ impl Render for FeatureStudioView {
         v_flex()
             .size_full()
             .key_context("FeatureStudio")
+            // Ctrl pressed or released with the pointer over the code: the link shows or goes at once (live2 manual-4).
+            .on_modifiers_changed(cx.listener(|this, e: &ModifiersChangedEvent, _, cx| this.update_ctrl_link(e.modifiers.secondary(), cx)))
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &Commit, _, cx| this.commit(cx)))
             .on_action(cx.listener(|this, _: &CommitAll, _, cx| this.commit_all(cx)))
@@ -2138,6 +2209,8 @@ impl Render for FeatureStudioView {
                     // The diagnostic tooltip follows the pointer (re-render only
                     // while one shows or just hid).
                     .on_mouse_move(cx.listener(|this, e: &MouseMoveEvent, _, cx| {
+                        this.pointer = Some(e.position);
+                        this.update_ctrl_link(e.modifiers.secondary(), cx);
                         let shown = this.editor.read(cx).hovered_diagnostic().is_some();
                         let was = this.hover_at.is_some();
                         this.hover_at = shown.then_some(e.position);
@@ -2149,7 +2222,12 @@ impl Render for FeatureStudioView {
                         if !*hovered && this.hover_at.take().is_some() {
                             cx.notify();
                         }
+                        if !*hovered {
+                            this.pointer = None;
+                            this.update_ctrl_link(false, cx);
+                        }
                     }))
+
                     // Before the editor moves the caret: where it was.
                     .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, _, cx| {
                         this.caret_before_click = Some(this.editor.read(cx).cursor_position());
@@ -2169,6 +2247,7 @@ impl Render for FeatureStudioView {
             )
             .children(outline)
             .children(self.render_diagnostic_tooltip(cx))
+            .children(self.render_ctrl_link(cx))
             .children(self.import_panel.as_ref().map(|(panel, _)| {
                 let b = self.import_anchor.get();
                 // (Occluding: a click on the panel never reaches the code under it; it takes the keyboard, live

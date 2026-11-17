@@ -259,8 +259,11 @@ impl DrawingEditor {
         let cache = self.cache.clone();
         let info = self.info.clone();
         // Live (qa4 r5 s11): a blue banner, closed after about 2–3 s
-        // whether or not the file is ready.
-        self.show_message(format!("{name} is being prepared for export. You will receive a notification with its status."), crate::os_ui::BubbleKind::Info, Some(std::time::Duration::from_millis(2500)), cx);
+        // whether or not the file is ready; none for Print, which opens the PDF (live2 manual-4, pop-ups allowed: the
+        // PDF in a new tab ~1 s after the click; the blocked pop-up's bubble is the browser's, not copied).
+        if !s.print {
+            self.show_message(format!("{name} is being prepared for export. You will receive a notification with its status."), crate::os_ui::BubbleKind::Info, Some(std::time::Duration::from_millis(2500)), cx);
+        }
         cx.notify();
         let settings = s.clone();
         cx.spawn(async move |this, cx| {

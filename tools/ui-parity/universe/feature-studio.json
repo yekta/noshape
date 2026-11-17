@@ -924,7 +924,7 @@
    "source": "behaviours.md:34759",
    "manual": {
     "capture": "live2 manual capture (REQUESTS 2026-11-16 08:47, live/feel/manual-4)",
-    "test": null
+    "test": "feature-studio-ui ctrl_over_a_defined_identifier_shows_a_link_that_goes_to_it"
    }
   },
   {

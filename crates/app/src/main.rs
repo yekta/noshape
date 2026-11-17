@@ -38,6 +38,8 @@ mod tooltip_rehover_tests;
 mod notification_job_tests;
 #[cfg(test)]
 mod tab_manager_tests;
+#[cfg(test)]
+mod workspace_tests;
 mod cli_mode;
 mod live_server;
 mod doc_dialogs;

@@ -3299,7 +3299,7 @@
    "source": "behaviours.md:1494",
    "manual": {
     "capture": "live2 manual capture (REQUESTS 2026-11-16 08:47, live/feel/manual-4)",
-    "test": null
+    "test": "drawing-ui print_in_a_drawing_opens_its_pdf_without_a_banner (the blocked pop-up bubble is the browser's; ours opens the PDF as live with pop-ups allowed)"
    }
   },
   {
@@ -6644,7 +6644,7 @@
    "source": "behaviours.md:20869",
    "manual": {
     "capture": "live2 manual capture (REQUESTS 2026-11-16 08:47, live/feel/manual-4)",
-    "test": null
+    "test": "app workspace_tests::the_tab_switcher_takes_a_hovered_thumbnail_and_closes_on_a_mouse_up_off_it"
    }
   },
   {
@@ -6837,7 +6837,7 @@
    "source": "behaviours.md:7366",
    "manual": {
     "capture": "live2 manual capture (REQUESTS 2026-11-16 08:47, live/feel/manual-4)",
-    "test": null
+    "test": "app workspace_tests::a_shortcut_works_with_the_focus_on_the_top_bar"
    }
   },
   {

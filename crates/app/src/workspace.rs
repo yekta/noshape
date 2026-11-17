@@ -44,14 +44,14 @@ pub struct Workspace {
     behind_task: Option<Task<()>>,
     pub doc: Entity<DocModel>,
     gpu: Gpu,
-    active: Option<TabId>,
+    pub(crate) active: Option<TabId>,
     views: HashMap<TabId, TabView>,
     focus: FocusHandle,
     /// Cached chrome (navbar, rail, tab bar): see `cached_slice`.
     slices: Option<WsSlices>,
     /// The navbar logo (Onshape's documents link) as a Tab stop: where Tab
     /// past a feature dialog's last control lands (live psb 10-19 h).
-    logo_focus: FocusHandle,
+    pub(crate) logo_focus: FocusHandle,
     /// The top bar's `{ }` button: where Tab goes after a dialog's last
     /// control, or from the page (live: Share, in the same spot).
     notices_focus: FocusHandle,
@@ -65,7 +65,7 @@ pub struct Workspace {
     recent: Vec<TabId>,
     /// The Ctrl+Space tab switcher while Ctrl is held: the session's tabs,
     /// most recently used first (the active one), and the selected one.
-    switcher: Option<(Vec<TabId>, usize)>,
+    pub(crate) switcher: Option<(Vec<TabId>, usize)>,
     /// Tab manager (Alt+T), docked left like Onshape's.
     tab_manager: Option<(Entity<crate::tab_manager::TabManager>, Subscription)>,
     /// Pictures for the tab hover card.
@@ -1242,7 +1242,7 @@ impl Workspace {
         cx.notify();
     }
 
-    fn active_studio(&self) -> Option<Entity<PartStudioView>> {
+    pub(crate) fn active_studio(&self) -> Option<Entity<PartStudioView>> {
         match self.active.and_then(|a| self.views.get(&a)) {
             Some(TabView::PartStudio(v)) => Some(v.clone()),
             _ => None,
@@ -2543,7 +2543,6 @@ impl Render for Workspace {
                                     div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(crate::theme::p().panel).occlude().flex().justify_center().child(banner)
                                 }))
                                 .children(self.render_toast(cx))
-                                .children(self.render_switcher(cx))
                                 // Onshape: at the feature dialog's place (below the toolbar, right of the list).
                                 .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(self.active.map_or(crate::ui::LEFT_PANEL_W, crate::ui::left_panel_w))).child(p.clone()))),
                         )
@@ -2555,6 +2554,7 @@ impl Render for Workspace {
             )
             .children(self.fs_search.as_ref().map(|(p, _)| p.clone()))
             .children(self.create_drawing.as_ref().map(|(d, _)| d.clone()))
+            .children(self.render_switcher(cx))
             // The bell's panel under the navbar's right end.
             .children(self.notifications_open.then(|| {
                 let ws = cx.entity();
@@ -2575,7 +2575,7 @@ impl Render for Workspace {
 impl Workspace {
     /// Ctrl+Space: opens the switcher on the previously used tab, or moves it
     /// one tab on (back to the first after the last).
-    fn switcher_step(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn switcher_step(&mut self, cx: &mut Context<Self>) {
         let opening = self.switcher.is_none();
         let tabs: Vec<TabId> = self.doc.read(cx).session.doc.ordered_tabs().iter().map(|t| t.id).collect();
         self.switcher = switcher_next(self.switcher.take(), self.active, &self.recent, &tabs);
@@ -2626,22 +2626,26 @@ impl Workspace {
                     _ => div().into_any_element(),
                 };
                 let label = on.then(|| h_flex().h(px(29.)).gap(px(3.)).items_center().text_size(px(11.)).text_color(pal.text_muted).child(crate::assets::icon(tab_icon(kind_of(&tab.content)), 16., cx)).child(crate::ui::user_text(tab.name.clone())));
+                // Live2 manual-4: 190 px per thumbnail, its 180 x 122 box; the selected one blue-grey with a #999 border, the
+                // others at 0.6.
                 Some(
                     v_flex()
-                        .w(px(180.))
+                        .w(px(190.))
                         .flex_none()
                         .items_center()
+                        .when(!on, |d| d.opacity(0.6))
                         .child(
                             div()
                                 .id(("tab-switch", n))
+                                .debug_selector(move || format!("tab-switch-{n}"))
                                 .w(px(180.))
-                                .h(px(121.))
+                                .h(px(122.))
                                 .flex()
                                 .items_center()
                                 .justify_center()
-                                .rounded(px(4.))
+                                .rounded(px(6.))
                                 .border_1()
-                                .border_color(if on { gpui_kit::rgb(0xaaaaaa) } else { gpui_kit::transparent_white().into() })
+                                .border_color(if on { gpui_kit::rgb(0x999999) } else { gpui_kit::transparent_white().into() })
                                 .when(on, |d| d.bg(crate::theme::themed(0xcedbe5, 0x4b5761)))
                                 .child(picture)
                                 .on_hover(cx.listener(move |this, h: &bool, _, cx| {
@@ -2662,19 +2666,38 @@ impl Workspace {
                 )
             })
             .collect();
+        // Live2 manual-4: white at 0.95, a #ccc border, 6 px corners, three soft shadows.
+        let shade = |x: f32, y: f32, blur: f32| BoxShadow { color: hsla(0., 0., 0., 0.098), offset: point(px(x), px(y)), blur_radius: px(blur), spread_radius: px(0.), inset: false };
         let card = h_flex()
+            .id("tab-switcher")
             .occlude()
             .pt(px(11.))
+            .px(px(10.))
             .items_start()
-            .bg(pal.panel)
+            .bg(crate::theme::with_alpha(crate::theme::themed(0xffffff, 0x2b2b2b), 0.95))
             .border_1()
             .border_color(crate::theme::themed(0xcccccc, 0x666666))
-            .rounded(px(4.))
-            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.15), offset: point(px(0.), px(1.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }])
-            .child(div().h(px(121.)).flex().items_center().child(end(sel > 0, true, cx)))
-            .child(h_flex().gap(px(20.)).items_start().children(items))
-            .child(div().h(px(121.)).flex().items_center().child(end(sel + 1 < list.len(), false, cx)));
-        Some(div().absolute().left_0().right_0().bottom(px(10.)).flex().justify_center().child(card).into_any_element())
+            .rounded(px(6.))
+            .shadow(vec![shade(0., 10., 28.), shade(5., 10., 10.), shade(20., 0., 20.)])
+            .child(div().h(px(122.)).flex().items_center().child(end(sel > 0, true, cx)))
+            .child(h_flex().items_start().children(items))
+            .child(div().h(px(122.)).flex().items_center().child(end(sel + 1 < list.len(), false, cx)));
+        // Over a faint backdrop on the whole window: a mouse-up off the card closes it without switching (live2
+        // manual-4); its bottom edge 11 px above the tab bar.
+        Some(
+            div()
+                .id("tab-switcher-backdrop")
+                .absolute()
+                .inset_0()
+                .bg(gpui_kit::rgba(0xbababa1a))
+                .on_mouse_up(MouseButton::Left, cx.listener(|this, _: &MouseUpEvent, _, cx| {
+                    if this.switcher.take().is_some() {
+                        cx.notify();
+                    }
+                }))
+                .child(div().absolute().left_0().right_0().bottom(px(crate::ui::TAB_BAR_H + 11.)).flex().justify_center().child(card))
+                .into_any_element(),
+        )
     }
 
     /// Runs a customized shortcut (Preferences › Keyboard shortcuts) in the
