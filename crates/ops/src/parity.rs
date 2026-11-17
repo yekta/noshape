@@ -74,6 +74,9 @@ pub struct LiveRef {
     pub ends: Option<[[f64; 3]; 2]>,
     /// A circular edge's centre (refs.jsonl `center`).
     pub center: Option<[f64; 3]>,
+    /// A body live's per-feature line calls a sheet ("Surface") where refs.jsonl doesn't say (asm-robot-relations
+    /// 0c3466's six imported sheets): only [`Translator::sheet_as_faces`] reads it, not the body's own resolution.
+    pub sheet: bool,
 }
 
 /// What became of one Onshape feature.
@@ -328,7 +331,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         // A curved face's normal is its tangent plane's at a point: no filter for planar faces of ours (c2-hunting-knife's
         // Extrude 10 took the blade's flat spine for the handle's B-spline side through the same point).
         let normal = f3(&v["normal"]).filter(|_| v["surfaceType"].as_str().is_none_or(|t| t.eq_ignore_ascii_case("plane")));
-        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")), ends: f3(&v["start"]).zip(f3(&v["end"])).map(|(a, b)| [a, b]), center: f3(&v["center"]) };
+        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")), ends: f3(&v["start"]).zip(f3(&v["end"])).map(|(a, b)| [a, b]), center: f3(&v["center"]), sheet: false };
         let key = (k as usize, id.to_string());
         if let Some(old) = out.remove(&key) {
             r.constraints = old.constraints;
@@ -4403,11 +4406,18 @@ impl<'a> Translator<'a> {
     /// of that sheet (its Thicken 1 thickens one sheet).
     fn sheet_as_faces(&mut self, k: usize, id: &str, ours: &str) -> Option<Vec<String>> {
         let r = self.refs.get(&(k, id.to_string()))?;
-        if r.kind != "BODY" || r.geometry.as_deref() != Some("Surface") {
+        if r.kind != "BODY" || !(r.sheet || r.geometry.as_deref() == Some("Surface")) {
             return None;
         }
         let parts = self.call("query_parts", json!({})).ok()?;
         if parts["parts"].as_array()?.iter().any(|p| p["id"] == ours && p["kind"] == "Surface") {
+            return None;
+        }
+        // Only an Import's solid (live's import made sheets where ours heals a solid, DECISIONS 11-17): a solid of ours
+        // that live builds as a sheet otherwise is ours to fix, not to read as faces (c2-surf-workshop-manualblend's
+        // Split 1 then ran on a wrong tool, Ok).
+        let maker = self.call("query_entities", json!({ "kind": "faces", "part": ours, "limit": 1 })).ok()?["faces"][0]["created_by"].as_str()?.to_string();
+        if !self.features.iter().any(|f| f["name"] == maker.as_str() && f["featureType"] == "importForeign") {
             return None;
         }
         let mut faces: Vec<String> = self.refs.iter().filter(|((j, _), f)| *j == k && f.kind == "FACE" && f.body.as_deref() == Some(id)).map(|((_, f), _)| f.clone()).collect();
@@ -7166,11 +7176,7 @@ pub fn live_refs(lines: &[Value], refs: &str) -> HashMap<(usize, String), LiveRe
     for (key, mut r) in parse_refs(refs) {
         r.sketch |= all.get(&key).is_some_and(|b| b.sketch);
         // (A body keeps the line's word that it is a sheet: asm-robot-relations 0c3466's six imported sheets.)
-        if r.geometry.is_none()
-            && let Some(b) = all.get(&key).filter(|b| b.kind == r.kind && b.geometry.as_deref() == Some("Surface"))
-        {
-            r.geometry = b.geometry.clone();
-        }
+        r.sheet = r.geometry.is_none() && all.get(&key).is_some_and(|b| b.kind == r.kind && b.geometry.as_deref() == Some("Surface"));
         all.insert(key, r);
     }
     all
