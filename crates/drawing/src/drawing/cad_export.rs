@@ -251,6 +251,8 @@ fn bmp24(w: u32, h: u32, rgb: &[u8]) -> Vec<u8> {
 /// How close (sheet mm) a polyline's points must be to a circle or ellipse
 /// to be written as one.
 const FIT_TOL: f64 = 1e-4;
+/// How far (sheet mm) a model edge's projected points may lie off its exact conic: 1 µm.
+const CONIC_TOL: f64 = 1e-3;
 
 /// The extremes of `points` when they all lie within `tol` of the line through them (None for a point or a curve).
 fn straight(points: &[[f64; 2]], tol: f64) -> Option<[[f64; 2]; 2]> {
@@ -797,7 +799,13 @@ impl Sheet<'_> {
         let poly = l.points.len() > 2 && self.g.polyline_lines.binary_search(&li).is_ok();
         // Live writes a detail view's border as its closed polyline, not a CIRCLE.
         let fitted = !free && !poly && self.g.cad_line_layer(li) != CadLayer::DetailViewBorder;
-        let mut e = match if fitted { fit_curve(&l.points, l.closed, FIT_TOL) } else { None } {
+        // A model edge on a circle or ellipse: that conic's piece, as live writes them (exact, however few points;
+        // c2-sm-louver's bends: ARC 101 for 68, ELLIPSE 50 for 86 when fitted).
+        let exact = (!free && !poly)
+            .then(|| self.g.conic_lines.binary_search_by_key(&li, |c| c.0).ok())
+            .flatten()
+            .and_then(|i| crate::drawing::cad_fit::on_conic(&l.points, l.closed, self.g.conic_lines[i].1, CONIC_TOL));
+        let mut e = match exact.or_else(|| if fitted { fit_curve(&l.points, l.closed, FIT_TOL) } else { None }) {
             Some(FitCurve::Circle { center, radius }) => EntityType::Circle(Circle::from_center_radius(p3(center), radius * k)),
             Some(FitCurve::Arc { center, radius, start, end }) => {
                 let mut e = Arc::new();

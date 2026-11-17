@@ -1898,6 +1898,14 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     if e.model.and_then(|m| geo.model_edges.get(m as usize)).is_some_and(|me| me.freeform) {
                         g.freeform_lines.extend(l0..g.lines.len());
                     }
+                    if let Some(c) = e.model.and_then(|m| geo.model_edges.get(m as usize)).and_then(|me| me.conic)
+                        && pl.breaks().is_empty()
+                    {
+                        let k = pl.scale * 1000.0;
+                        let v = |w: [f64; 2]| rotate2([w[0] * k, w[1] * k], pl.rotation);
+                        let on_sheet = [pl.to_sheet(c[0]), v(c[1]), v(c[2])];
+                        g.conic_lines.extend((l0..g.lines.len()).map(|i| (i, on_sheet)));
+                    }
                     if e.profile {
                         g.polyline_lines.extend(l0..g.lines.len());
                     }
@@ -3089,6 +3097,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // Looked up by binary search on export.
     g.freeform_lines.sort_unstable();
     g.freeform_lines.dedup();
+    g.conic_lines.sort_unstable_by_key(|c| c.0);
+    g.conic_lines.dedup_by_key(|c| c.0);
     g.polyline_lines.sort_unstable();
     g.polyline_lines.dedup();
     BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, lost, tables: table_layouts, title_rect, title_cells, title_hits }

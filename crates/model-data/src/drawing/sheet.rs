@@ -153,6 +153,10 @@ pub struct SheetGeometry {
     /// Lines of model edges whose curve is free-form (no line, circle or
     /// ellipse): CAD files write them as splines, whatever shape they make.
     pub freeform_lines: Vec<usize>,
+    /// Lines of model edges on a circle or ellipse, with that conic on the sheet (centre and two conjugate
+    /// semi-diameters: `c + a cos t + b sin t`), sorted by line: CAD files write them as CIRCLE / ARC / ELLIPSE.
+    #[serde(default)]
+    pub conic_lines: Vec<(usize, [[f64; 2]; 3])>,
     /// Lines a CAD file writes as they are, a POLYLINE (a crop's profile through material, live drw-crop-spline.dxf),
     /// sorted.
     #[serde(default)]

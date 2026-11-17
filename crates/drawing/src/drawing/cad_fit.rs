@@ -293,6 +293,51 @@ pub fn fit_curve(points: &[[f64; 2]], closed: bool, tol: f64) -> Option<FitCurve
     Some(FitCurve::Ellipse { center, major, ratio, start: wrap(start), end: wrap(end) })
 }
 
+/// The piece of a known conic (`conic`: its centre and two conjugate semi-diameters, a point at `c + a cos t + b sin t`)
+/// that `points` run along, when they all lie on it within `tol`: a CIRCLE or ARC where it is round, else an ELLIPSE
+/// (a model edge's exact curve, as Parasolid's: live writes a piece of a circle as an ARC however few points it has).
+/// None for fewer than 3 points, a conic seen edge-on, or points off it.
+pub fn on_conic(points: &[[f64; 2]], closed: bool, conic: [[f64; 2]; 3], tol: f64) -> Option<FitCurve> {
+    let [c, a, b] = conic;
+    if points.len() < 3 {
+        return None;
+    }
+    // Principal axes of the conjugate pair.
+    let (aa, bb, ab) = (a[0] * a[0] + a[1] * a[1], b[0] * b[0] + b[1] * b[1], a[0] * b[0] + a[1] * b[1]);
+    let th = 0.5 * (2.0 * ab).atan2(aa - bb);
+    let (ct, st) = (th.cos(), th.sin());
+    let p1 = [a[0] * ct + b[0] * st, a[1] * ct + b[1] * st];
+    let p2 = [b[0] * ct - a[0] * st, b[1] * ct - a[1] * st];
+    let (r1, r2) = (p1[0].hypot(p1[1]), p2[0].hypot(p2[1]));
+    let (major, ra, rb) = if r1 >= r2 { (p1, r1, r2) } else { (p2, r2, r1) };
+    if ra <= 0.0 || rb < 1e-6 * ra {
+        return None;
+    }
+    let u = [major[0] / ra, major[1] / ra];
+    let v = [-u[1], u[0]];
+    let param = |d: [f64; 2]| ((d[0] * v[0] + d[1] * v[1]) / rb).atan2((d[0] * u[0] + d[1] * u[1]) / ra);
+    let at = |t: f64| [c[0] + u[0] * ra * t.cos() + v[0] * rb * t.sin(), c[1] + u[1] * ra * t.cos() + v[1] * rb * t.sin()];
+    if !points.iter().all(|p| {
+        let q = at(param([p[0] - c[0], p[1] - c[1]]));
+        (q[0] - p[0]).hypot(q[1] - p[1]) <= tol
+    }) {
+        return None;
+    }
+    let first_last = (points[0][0] - points[points.len() - 1][0]).hypot(points[0][1] - points[points.len() - 1][1]) < tol;
+    let round = rb >= ra * (1.0 - 1e-9);
+    if closed || first_last {
+        return Some(if round { FitCurve::Circle { center: c, radius: ra } } else { FitCurve::Ellipse { center: c, major, ratio: rb / ra, start: 0.0, end: TAU } });
+    }
+    if round {
+        let (a0, total) = sweep(points, c, |d| d[1].atan2(d[0]))?;
+        let (start, end) = if total > 0.0 { (a0, a0 + total) } else { (a0 + total, a0) };
+        return Some(FitCurve::Arc { center: c, radius: ra, start: wrap(start), end: wrap(end) });
+    }
+    let (t0, total) = sweep(points, c, param)?;
+    let (start, end) = if total > 0.0 { (t0, t0 + total) } else { (t0 + total, t0) };
+    Some(FitCurve::Ellipse { center: c, major, ratio: rb / ra, start: wrap(start), end: wrap(end) })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -314,6 +359,27 @@ mod tests {
                 [c[0] + x * rot.cos() - y * rot.sin(), c[1] + x * rot.sin() + y * rot.cos()]
             })
             .collect()
+    }
+
+    /// A piece of a known conic: a circle's three points an ARC, an ellipse's an ELLIPSE over their range, both ways
+    /// round; points off it, or a conic seen edge-on, None.
+    #[test]
+    fn three_points_on_a_known_conic() {
+        let circle = [[1.0, 2.0], [0.0, 3.0], [3.0, 0.0]];
+        let pts = ring([1.0, 2.0], 3.0, 3.0, 0.0, 0.2, 0.5, 2);
+        let Some(FitCurve::Arc { radius, start, end, .. }) = on_conic(&pts, false, circle, 1e-9) else { panic!() };
+        assert!((radius - 3.0).abs() < 1e-12 && (start - 0.2).abs() < 1e-9 && (end - 0.5).abs() < 1e-9, "{start} {end}");
+        let back: Vec<[f64; 2]> = pts.iter().rev().copied().collect();
+        assert!(matches!(on_conic(&back, false, circle, 1e-9), Some(FitCurve::Arc { start, end, .. }) if (start - 0.2).abs() < 1e-9 && (end - 0.5).abs() < 1e-9));
+        let ellipse = [[0.0, 0.0], [4.0, 0.0], [0.5, 2.0]];
+        let e: Vec<[f64; 2]> = (0..3).map(|i| 1.0 + 0.2 * i as f64).map(|t| [4.0 * t.cos() + 0.5 * t.sin(), 2.0 * t.sin()]).collect();
+        let Some(FitCurve::Ellipse { major, ratio, start, end, .. }) = on_conic(&e, false, ellipse, 1e-9) else { panic!() };
+        let at = |t: f64| [major[0] * t.cos() - major[1] * ratio * t.sin(), major[1] * t.cos() + major[0] * ratio * t.sin()];
+        for (t, p) in [(start, e[0]), (end, e[2])] {
+            assert!((at(t)[0] - p[0]).hypot(at(t)[1] - p[1]) < 1e-9, "{t}: {:?} for {p:?}", at(t));
+        }
+        assert!(on_conic(&[[3.0, 0.0], [0.0, 3.1], [-3.0, 0.0]], false, [[0.0, 0.0], [3.0, 0.0], [0.0, 3.0]], 1e-6).is_none());
+        assert!(on_conic(&pts, false, [[1.0, 2.0], [3.0, 0.0], [6.0, 0.0]], 1e-6).is_none());
     }
 
     /// A cubic through points on a circle: it passes through them and between them stays on the circle.

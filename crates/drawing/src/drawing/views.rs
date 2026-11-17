@@ -1283,6 +1283,10 @@ pub struct ModelEdge {
     pub body: BodyId,
     pub name: Name,
     pub geom: EdgeGeom,
+    /// The edge's circle or ellipse, in the view: its centre and two conjugate semi-diameters (a point at
+    /// `c + a cos t + b sin t`). Parasolid keeps them exact, so live's CAD files write a piece of one as a CIRCLE /
+    /// ARC / ELLIPSE however few points it has (c2-sm-louver: ARC 101 for 68, ELLIPSE 50 for 86).
+    pub conic: Option<[[f64; 2]; 3]>,
     /// Endpoint references (start, end) with their projected positions.
     pub ends: [Option<(PointRef, [f64; 2])>; 2],
     /// Not an edge in Onshape's topology: the seam of a periodic face or a
@@ -2667,33 +2671,55 @@ struct ProjBody<'a> {
     edge_map: Option<HashMap<usize, usize>>,
 }
 
-/// An edge on a B-spline (or another curve) that is a circle or ellipse arc to within a micrometre (a loft's profile
-/// circles, a cut's ellipses): Parasolid keeps those exact, so live's drawing writes them as ARC / ELLIPSE where the
-/// view shows them so; a free-form curve stays a SPLINE (c2-rings-loft: ARC 30 for live's 89, ELLIPSE 15 for 62).
-fn on_a_conic(e: &Shape, t0: f64, t1: f64) -> bool {
+/// The circle or ellipse an edge on a B-spline (or another curve) is to within a micrometre (a loft's profile circles,
+/// a cut's ellipses), as its centre and two conjugate semi-diameters: Parasolid keeps those exact, so live's drawing
+/// writes them as ARC / ELLIPSE where the view shows them so; a free-form curve stays a SPLINE (c2-rings-loft: ARC 30
+/// for live's 89, ELLIPSE 15 for 62).
+fn conic_of(e: &Shape, t0: f64, t1: f64) -> Option<(DVec3, DVec3, DVec3)> {
     const N: usize = 48;
-    let Ok(pts) = (0..=N).map(|i| e.point_at(t0 + (t1 - t0) * i as f64 / N as f64)).collect::<Result<Vec<_>, _>>() else { return false };
+    let pts = (0..=N).map(|i| e.point_at(t0 + (t1 - t0) * i as f64 / N as f64)).collect::<Result<Vec<_>, _>>().ok()?;
     let c = pts.iter().copied().sum::<DVec3>() / pts.len() as f64;
     let mut n = DVec3::ZERO;
     for w in pts.windows(2) {
         n += (w[0] - c).cross(w[1] - c);
     }
-    let Some(n) = n.try_normalize() else { return false };
+    let n = n.try_normalize()?;
     let tol = 1e-6;
     if pts.iter().any(|p| (*p - c).dot(n).abs() > tol) {
-        return false;
+        return None;
     }
     let x = n.any_orthonormal_vector();
     let y = n.cross(x);
     let flat: Vec<[f64; 2]> = pts.iter().map(|p| [(*p - c).dot(x), (*p - c).dot(y)]).collect();
     let closed = pts[0].distance(pts[N]) <= tol;
-    crate::drawing::cad_fit::fit_curve(&flat, closed, tol).is_some()
+    let lift = |q: [f64; 2]| x * q[0] + y * q[1];
+    match crate::drawing::cad_fit::fit_curve(&flat, closed, tol)? {
+        crate::drawing::cad_fit::FitCurve::Circle { center, radius } | crate::drawing::cad_fit::FitCurve::Arc { center, radius, .. } => Some((c + lift(center), x * radius, y * radius)),
+        crate::drawing::cad_fit::FitCurve::Ellipse { center, major, ratio, .. } => Some((c + lift(center), lift(major), lift([-major[1] * ratio, major[0] * ratio]))),
+    }
 }
 
 fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &BodyTopo) -> Option<ModelEdge> {
     let e = body.shape.sub_shape(ShapeType::Edge, edge_index).ok()?;
     let info = e.edge_info().ok()?;
-    let freeform = !matches!(info.curve, Curve::Line { .. } | Curve::Circle { .. } | Curve::Ellipse { .. }) && !on_a_conic(&e, info.first_param, info.last_param);
+    let conic3 = match info.curve {
+        Curve::Line { .. } => None,
+        Curve::Circle { center, axis, x_dir, radius } => {
+            let (n, x) = (axis.normalize(), x_dir.normalize());
+            Some((center, x * radius, n.cross(x) * radius))
+        }
+        Curve::Ellipse { center, axis, x_dir, major_radius, minor_radius } => {
+            let (n, x) = (axis.normalize(), x_dir.normalize());
+            Some((center, x * major_radius, n.cross(x) * minor_radius))
+        }
+        _ => conic_of(&e, info.first_param, info.last_param),
+    };
+    let exact = matches!(info.curve, Curve::Circle { .. } | Curve::Ellipse { .. });
+    let freeform = !exact && !matches!(info.curve, Curve::Line { .. }) && conic3.is_none();
+    // (Only a true circle or ellipse: a B-spline on one stays the fitted points' curve, live's SPLINE where its own
+    // model has a B-spline there; c2-rings-loft ELLIPSE 217 for 95, c2-extension-spring 16 for 0 otherwise.)
+    let v2 = |v: DVec3| [v.dot(frame.right), v.dot(frame.up)];
+    let conic = conic3.filter(|_| exact).map(|(c, a, b)| [frame.project(c), v2(a), v2(b)]);
     let geom = match info.curve {
         Curve::Line { .. } => EdgeGeom::Line { a: frame.project(info.start), b: frame.project(info.end) },
         Curve::Circle { center, axis, radius, .. } => {
@@ -2735,7 +2761,7 @@ fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &Bod
     }
     // Not an edge in Onshape (a seam or degenerated edge; a sheet's boundary is one).
     let seam = !topo.shown.edges.get(edge_index).copied().unwrap_or(true);
-    Some(ModelEdge { body: body.id.clone(), name: body.edges[edge_index].clone(), geom, ends, seam, freeform })
+    Some(ModelEdge { body: body.id.clone(), name: body.edges[edge_index].clone(), geom, conic, ends, seam, freeform })
 }
 
 /// Axes of (at least half) cylindrical faces perpendicular to the view
@@ -3854,10 +3880,10 @@ mod tests {
         let bs = noshape_kernel::make_bspline_edge(&circle.edge_bspline().unwrap()).unwrap();
         let i = bs.edge_info().unwrap();
         assert!(!matches!(i.curve, Curve::Circle { .. }), "{:?}", i.curve);
-        assert!(on_a_conic(&bs, i.first_param, i.last_param));
+        assert!(conic_of(&bs, i.first_param, i.last_param).is_some());
         let free = noshape_kernel::make_bspline(&[DVec3::ZERO, DVec3::new(0.01, 0.004, 0.0), DVec3::new(0.02, -0.003, 0.0), DVec3::new(0.03, 0.0, 0.0)], None, &[0.0, 1.0], &[4, 4], 3, false).unwrap();
         let j = free.edge_info().unwrap();
-        assert!(!on_a_conic(&free, j.first_param, j.last_param));
+        assert!(conic_of(&free, j.first_param, j.last_param).is_none());
     }
 
     /// Centermarks: a hole whole or in pieces, a radial hole's half bore; not a quarter round, nor c2-sm-louver's two
