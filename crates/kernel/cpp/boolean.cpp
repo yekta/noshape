@@ -10969,12 +10969,19 @@ OpOut op_merge_on_surfaces(const OcShape& s, const OcShapeList& ons, double tol)
   keep_marked_edges(u, in);
   u.Build();
   carry_kept_marks(in, u);
+  // (Only edges between faces on one surface go: the same points bounded, so a valid result has the same volume. Its
+  // integrals were no check: the precise ones of c2-impeller-loft's housing faces took 3.4 s, OCCT's adaptive ones
+  // on the faces alone were 15 % apart.)
   if (!BRepCheck_Analyzer(u.Shape()).IsValid())
     return make_result({s.shape}, s.shape, nullptr);
-  // (The segmented integral: OCCT's plain one is 2 % off on c2-impeller-loft's part.)
-  const double v0 = volume_props(s.shape).Mass();
-  if (std::abs(volume_props(u.Shape()).Mass() - v0) > 1e-6 * std::abs(v0))
-    return make_result({s.shape}, s.shape, nullptr);
+  auto on_surface = [&](const TopoDS_Face& f) {
+    TopLoc_Location                 l;
+    const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f, l);
+    for (const auto& [os, oloc] : on)
+      if (g == os && l.IsEqual(oloc))
+        return true;
+    return false;
+  };
   // The vertices left between pieces of one curve along a merged face stay: Parasolid's pieces there are its own
   // edges (c2-impeller-loft's Fillet 3: the chamfers' three edges on the x 5 face, live's too).
   ShapeAncMap ve, re;
@@ -10985,13 +10992,8 @@ OpOut op_merge_on_surfaces(const OcShape& s, const OcShapeList& ons, double tol)
     if (fs == nullptr)
       return false;
     for (ShapeList::Iterator f(*fs); f.More(); f.Next())
-    {
-      TopLoc_Location                 l;
-      const occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(f.Value()), l);
-      for (const auto& [os, oloc] : on)
-        if (g == os && l.IsEqual(oloc))
-          return true;
-    }
+      if (on_surface(TopoDS::Face(f.Value())))
+        return true;
     return false;
   };
   for (int i = 1; i <= ve.Extent(); ++i)

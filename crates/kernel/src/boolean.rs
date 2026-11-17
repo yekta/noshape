@@ -434,15 +434,15 @@ pub fn split_on(shape: &Shape, edges: &[Shape], tol: f64) -> Result<OpResult> {
 /// Parasolid does (c2-fan-blade-sweep's thread band).
 pub fn imprint_kept(shape: &Shape, curves: &[Shape]) -> Result<OpResult> {
     let res = imprint(shape, curves)?;
-    mark_kept_edges(&res.shape, curves)?;
+    mark_kept_edges(&res.shape, curves, false)?;
     Ok(res)
 }
 
-/// Marks the edges of `shape` lying along `along` (their midpoints within 1e-7 of them) as kept by every later unify;
-/// the count marked.
-pub fn mark_kept_edges(shape: &Shape, along: &[Shape]) -> Result<usize> {
+/// Marks the edges of `shape` lying along `along` (their midpoints within 1e-7 of them) as kept by every later unify,
+/// with `ends` their ends too (no loop join takes them); the count marked.
+pub fn mark_kept_edges(shape: &Shape, along: &[Shape], ends: bool) -> Result<usize> {
     let l = vec_to_list(along);
-    Ok(ck(ffi::mark_kept_edges(shape.raw(), &l, 1e-7))? as usize)
+    Ok(ck(ffi::mark_kept_edges(shape.raw(), &l, 1e-7, ends))? as usize)
 }
 
 /// Merge same-domain faces/edges (ShapeUpgrade_UnifySameDomain) with history.
@@ -472,8 +472,7 @@ pub fn collapse_short_edges(shape: &Shape, points: &[DVec3], len: f64) -> Result
 
 /// The free-form faces lying within `tol` on one of `ons`' surfaces put on it and merged where they meet, nothing else
 /// merged (a blend's pieces of a face it extended, left on copies of its surface, whose merge the unify's volume check
-/// refuses: their integrals 1e-7 apart); the shape as it was where the result isn't valid or its volume moves past
-/// 1e-6 of it.
+/// refuses: their integrals 1e-7 apart); the shape as it was where the result isn't valid.
 pub fn merge_on_surfaces(shape: &Shape, ons: &[Shape], tol: f64) -> Result<OpResult> {
     let l = vec_to_list(ons);
     Ok(OpResult::from_ffi(ck(ffi::op_merge_on_surfaces(shape.raw(), &l, tol))?))

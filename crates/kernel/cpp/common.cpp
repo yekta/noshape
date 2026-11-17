@@ -3294,7 +3294,7 @@ void carry_kept_marks(const TopoDS_Shape& from, const std::function<std::vector<
   }
 }
 
-uint32_t mark_kept_edges(const OcShape& s, const OcShapeList& along, double tol)
+uint32_t mark_kept_edges(const OcShape& s, const OcShapeList& along, double tol, bool ends)
 {
   require_non_null(s.shape, "shape");
   TopoDS_Compound c;
@@ -3323,6 +3323,8 @@ uint32_t mark_kept_edges(const OcShape& s, const OcShapeList& along, double tol)
     if (d.IsDone() && d.NbSolution() > 0 && d.Value() <= tol)
     {
       mark_kept_edge(e);
+      if (ends)
+        mark_kept_ends(e);
       ++n;
     }
   }

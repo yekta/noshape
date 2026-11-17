@@ -1458,6 +1458,16 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
         }
         cuts = trimmed;
     }
+    // (Where convex rounds end on faces, the faces they reach keep their edges away from the rounds as they were: the
+    // unify joined the three arcs round c2-impeller-loft's front face, live's three. The rounds' tight boxes: a lofted
+    // tool's loose one reached the bottom arc.)
+    let kept_along: Vec<Shape> = if refaced.len() > joined_refaced {
+        let boxes: Vec<k::BoundingBox> = cuts.iter().filter_map(|t| t.shape.bounding_box(true).ok()).collect();
+        let meets = |b: k::BoundingBox| boxes.iter().any(|t| t.min.cmple(b.max).all() && b.min.cmple(t.max).all());
+        faces.iter().filter(|f| f.bounding_box(true).is_ok_and(meets)).flat_map(|f| f.edges()).filter(|e| e.bounding_box(true).is_ok_and(|b| !meets(b))).collect()
+    } else {
+        Vec::new()
+    };
     let mut named = body_named(&body);
     for (i, on) in &refaced {
         named.shape = k::reface_on(&named.shape, *i, on)?;
@@ -1468,6 +1478,10 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
         }
         let (s, n) = bool_named(ev, op, &named, &tools)?;
         named = NamedShape::new(s, n);
+    }
+    // (Marked after the Booleans, which drop marks.)
+    if !kept_along.is_empty() {
+        k::mark_kept_edges(&named.shape, &kept_along, true)?;
     }
     // A hold line is the user's split of its face: it stays (live 2233: the top's strip beyond an r 6 round).
     let held = spec.sides.as_ref().is_some_and(|s| !s.hold.is_empty());
