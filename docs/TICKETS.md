@@ -508,7 +508,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-17 05:00 release (qa list 04:42, newest green 5875109e; the latest release is v0.4.55)
-- **HOLD, P0 MIRROR3-UNION-LOSES-PART (blend ba7a8d755, bisected by core 11-17: a38f06293 good, 44 faces / 32,264.11 mm³;
+- [x] **HOLD cleared 05:57 (qa): blend reverted ba7a8d755 in b596da51b; green b596da51 complete check: user, ticket (f197 SAME) and authored documents ALL-SAME vs 0.4.55, verdict GO; 827a23a6 the same.** Was: **HOLD, P0 MIRROR3-UNION-LOSES-PART (blend ba7a8d755, bisected by core 11-17: a38f06293 good, 44 faces / 32,264.11 mm³;
   ba7a8d755 "a full round across a strip comes out one face over it" gives the 4 slivers; fix or revert coming with a T1
   case): wrong geometry in a saved ticket document**, new between greens 35baa32f (= 0.4.55)
   and ba7a8d75, still on 5875109e. rust-zero-solid-f197 (vibe5 ~/qa/tickets) feature 19 "Mirror 3" (part mirror, ADD, merge
