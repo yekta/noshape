@@ -145,6 +145,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   host, deleted after; never in the repo or tickets.
 
 ## Hosts
+**11-17 21:23: land queue on vibe2 (user's server; `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`); vibex7 drains its
+queued changes. land-footer lands through vibe2. No suites on vibe2. Private docs stay on vibex7 ~/lead-private.**
 **11-17 17:45: hosts renamed (user): vibex6 (watcher), vibex7 (land queue, ~/lead-private: hat8, hat15, hat15b, the dock),
 vibex8; vibeN names are the user's own servers. qa's scripts, units and this handoff use vibexN.**
 **11-17 17:20: vibe5 gone for good (lead), vibe3 gone; no qa script names either (the lock is qa-scratch/qa-host.lock).
