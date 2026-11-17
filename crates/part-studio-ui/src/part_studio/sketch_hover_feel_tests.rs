@@ -213,3 +213,55 @@ fn the_first_pick_at_rest_lights_what_is_under_the_pointer(cx: &mut TestAppConte
     draw(cx, window);
     assert_eq!(hovered(cx, &view), want, "the first answer at rest lights the plane under the pointer");
 }
+
+/// qa USER-HOVER-STAYS-LIT (v0.4.57, the user's flow): from each line of the rectangle the pointer sweeps off in 12
+/// quick steps (16 ms apart) to a spot well outside it, crossing the rectangle on the way, and rests; nothing of the
+/// sketch stays lit (the region the sweep crossed included), and back on the line the line lights again.
+#[gpui::test]
+fn a_quick_sweep_off_a_line_leaves_nothing_lit(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-hover-sweep", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let feature = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+    let lines = lines_on_screen(cx, &view);
+    let pointer = Pointer::new(cx, window, &view);
+    let centre = lines.iter().fold(DVec2::ZERO, |c, (_, a, b)| c + *a + *b) / (2.0 * lines.len() as f64);
+    let lit_sketch = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let region = v.sketch.as_ref().and_then(|s| s.hover_region.clone());
+            let ours = matches!(&v.hover, Some(Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. }) if *sketch == feature);
+            (ours || region.is_some()).then(|| format!("{:?} / region {region:?}", v.hover))
+        })
+    };
+    let mut wrong = Vec::new();
+    for (id, a, b) in &lines {
+        let mid = (*a + *b) * 0.5;
+        pointer.move_to(cx, &view, mid);
+        // Off through the rectangle to 250 px beyond its centre, the other side.
+        let far = centre + (centre - mid).normalize() * 250.0;
+        for k in 1..=12 {
+            let at = mid + (far - mid) * (k as f64 / 12.0);
+            let win = pointer.window_point(cx, at);
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, None, Modifiers::default());
+            cx.update(|cx| view.read(cx).gpu.deliver_frames());
+            draw(cx, window);
+            cx.executor().advance_clock(std::time::Duration::from_millis(16));
+        }
+        pointer.move_to(cx, &view, far);
+        pointer.frames(cx, &view);
+        if let Some(lit) = lit_sketch(cx) {
+            wrong.push(format!("line {id}: after the sweep off it, still lit: {lit}"));
+        }
+        pointer.move_to(cx, &view, mid);
+        let got = hovered(cx, &view);
+        if !matches!(&got, Some(Reference::SketchEntity { sketch, entity }) if *sketch == feature && entity == id) {
+            wrong.push(format!("line {id}: back on it, lit {got:?}"));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}

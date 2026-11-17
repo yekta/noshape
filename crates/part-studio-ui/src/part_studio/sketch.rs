@@ -684,8 +684,14 @@ impl PartStudioView {
         let (o, d) = vp.ray(vp.pointer_position());
         let Some(p) = ed.plane_point(o, d) else { return id };
         let pick_of = |e: noshape_sketch::EntityId| built.picks.ids_for(&Reference::SketchEntity { sketch: ed.feature, entity: e.0 }).first().copied();
-        // Nothing of the sketch under the GPU's pick (a plane, a region, the background): what a click there takes.
-        let Some(e) = id.and_then(own) else { return self.sketch_pick_at(p, cx).and_then(pick_of).or(id) };
+        // Nothing of the sketch under the GPU's pick (a plane, a region, the background): what a click there takes. The
+        // open sketch's region is the one under the pointer now, not the GPU's (a pick made mid-sweep, qa
+        // USER-HOVER-STAYS-LIT: the loop stayed lit with the pointer at rest outside it).
+        let Some(e) = id.and_then(own) else {
+            let region = id.and_then(|i| built.picks.get(i)).is_some_and(|t| matches!(&t.reference, Reference::SketchRegion { sketch, .. } if *sketch == ed.feature));
+            let near = self.sketch_pick_at(p, cx).and_then(pick_of);
+            return if region { near.or_else(|| self.sketch_region_pick_at(p)) } else { near.or(id) };
+        };
         // A point in its reach beats the line the GPU picked (live2 11-17 hover-p0: 8 px off a corner, the corner).
         let near = self.sketch_pick_at(p, cx);
         if self.in_sketch_reach(e, p, cx) {
