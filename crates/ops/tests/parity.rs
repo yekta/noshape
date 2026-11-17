@@ -4028,6 +4028,53 @@ fn a_mate_to_an_assembly_origin_connector_is_translated() {
     assert_eq!((r.occurrences_matching, r.occurrences, r.mates_matching, r.mates), (1, 1, 1, 1));
 }
 
+/// Two live parts alike in volume (asm-tvc-mount's SG90 import, no centroid) take ours in order; each instance's mate
+/// connector (its query, else live's point), on the other of ours, swaps them: both pins' Planar mates to the
+/// assembly's XY plane resolve and hold.
+#[test]
+fn alike_parts_are_settled_by_their_mate_connectors() {
+    let circle = |id: &str, x: f64| json!({ "btType": "BTMSketchCurve-4", "entityId": id, "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": x, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } });
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [circle("c1", 0.0), circle("c2", 0.03)], "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": "FS1", "entityType": "FACE" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "20 mm" }] }
+    ] });
+    let v = std::f64::consts::PI * 0.004 * 0.004 * 0.02;
+    let parts = json!([{ "partId": "JHD", "name": "Pin", "volume": [v * 0.999, v * 1.001] }, { "partId": "JiD", "name": "Pin", "volume": [v * 0.999, v * 1.001] }]);
+    let origin = json!({ "btType": "BTMMateConnector-66", "featureType": "mateConnector", "featureId": "MXY", "name": "Assembly XY plane", "parameters": [
+        { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "originQuery", "queries": [{ "btType": "BTMFeatureQueryWithOccurrence-157", "path": [], "queryData": "ORIGIN_Z", "featureId": "Origin" }] }] });
+    // Its query, or (an import's, not read) live's point: the mate's matedEntities.
+    let query = |x: f64, readable: bool| if readable { format!("query=qContainsPoint(qEverything(EntityType.EDGE), vector({}, 0, 0) * millimeter);", x * 1e3 + 4.0) } else { "query=qCompressed(1.0,\"%B5$unread\",id);".to_string() };
+    let rim = |id: &str, instance: &str, x: f64, readable: bool| json!({ "btType": "BTMMateConnector-66", "featureId": id, "implicit": true, "parameters": [
+        { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "originQuery", "queries": [{ "btType": "BTMInferenceQueryWithOccurrence-1083", "inferenceType": "CENTER", "path": [instance], "entityQuery": query(x, readable) }] }] });
+    let mated = |instance: &str, x: f64| json!({ "matedOccurrence": [instance], "mateConnectorCS": { "origin": [x, 0.0, 0.0], "xAxis": [1.0, 0.0, 0.0], "yAxis": [0.0, 1.0, 0.0], "zAxis": [0.0, 0.0, 1.0] } });
+    let origin_cs = json!({ "matedOccurrence": [], "mateConnectorCS": { "origin": [0.0, 0.0, 0.0], "xAxis": [1.0, 0.0, 0.0], "yAxis": [0.0, 1.0, 0.0], "zAxis": [0.0, 0.0, 1.0] } });
+    let planar = |id: &str, name: &str, connector: Value| json!({ "btType": "BTMMate-64", "featureId": id, "name": name, "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "mateType", "value": "PLANAR" },
+        { "btType": "BTMParameterBoolean-144", "parameterId": "primaryAxisAlignment", "value": true },
+        { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "mateConnectorsQuery", "queries": [{ "featureId": connector["featureId"] }, { "btType": "BTMFeatureQueryWithOccurrence-157", "path": [], "featureId": "MXY" }] }],
+        "mateConnectors": [connector] });
+    let at = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    // JHD (listed first, so first in order) is the pin at x = 30 mm by its connector, JiD the one at 0.
+    for readable in [true, false] {
+        let asm = json!({
+            "rootAssembly": {
+                "instances": [{ "id": "IA", "name": "Pin <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }, { "id": "IB", "name": "Pin <2>", "type": "Part", "partId": "JiD", "elementId": "E1" }],
+                "occurrences": [{ "path": ["IA"], "fixed": false, "transform": at }, { "path": ["IB"], "fixed": false, "transform": at }],
+                "features": [{ "id": "M1", "featureData": { "matedEntities": [mated("IA", 0.03), origin_cs.clone()] } }, { "id": "M2", "featureData": { "matedEntities": [mated("IB", 0.0), origin_cs.clone()] } }] },
+            "features": { "features": [origin.clone(), planar("M1", "Planar 1", rim("MA", "IA", 0.03, readable)), planar("M2", "Planar 2", rim("MB", "IB", 0.0, readable))],
+              "featureStates": { "M1": { "featureStatus": "OK" }, "M2": { "featureStatus": "OK" } } } });
+        let mut ctx = Ctx::new();
+        let r = rebuild_assembly(&mut ctx, &scratch(&format!("alike-parts-by-connector-{readable}.noshape")), &asm, &[("E1".into(), studio.clone(), parts.clone())]);
+        assert_eq!((r.mates_matching, r.mates), (2, 2), "readable query {readable}: {r:?}");
+    }
+}
+
 #[test]
 fn a_subassembly_is_rebuilt_as_lives() {
     let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [

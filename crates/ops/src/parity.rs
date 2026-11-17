@@ -8855,6 +8855,30 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 chosen[ix] = Some(ours);
             }
         }
+        // Live parts alike in volume (no centroid to tell them apart) took ours in order; a mate connector on one's
+        // instance, found on another of that group, settles which is which (asm-tvc-mount's SG90 import: JF/ and KFDB,
+        // 22.1 mm³ each, Parallel 1's face on our .384, not the .448 KFDB took).
+        for (ix, p) in listed.iter().enumerate() {
+            let group = fits_of(p);
+            let (Some(pid), Some(mine)) = (p["partId"].as_str(), chosen[ix].clone()) else { continue };
+            if group.len() < 2 {
+                continue;
+            }
+            let on_it = connectors.iter().filter(|(key, (path, ..))| element_at(&key.0, path).as_ref() == Some(element) && instance_at(&key.0, path).is_some_and(|i| i["partId"] == pid));
+            // (Its query, else live's point: an import's queries aren't read, asm-tvc-mount.)
+            let on_it: Vec<(&Key, &Connector)> = on_it.collect();
+            let ends: Vec<String> = on_it.iter().filter_map(|(_, (_, _, q))| t.resolve(q).ok()?.into_iter().next()).collect();
+            let found = ends.iter().find_map(|e| t.part_of_entity(e).filter(|b| group.contains(b))).or_else(|| {
+                on_it.iter().find_map(|(key, (_, inference, _))| {
+                    let at: Vec<String> = t.connector_candidates(inference, *connector_origins.get(*key)?).ok()?.into_iter().map(|(_, b)| b).filter(|b| group.contains(b)).collect();
+                    at.first().filter(|b| at.iter().all(|x| x == *b)).cloned()
+                })
+            });
+            let Some(body) = found.filter(|b| *b != mine) else { continue };
+            let Some(jx) = chosen.iter().position(|c| c.as_deref() == Some(body.as_str())).filter(|jx| fits_of(listed[*jx]) == group) else { continue };
+            trace(&format!("{element}: live part {pid} -> ours {body} by its mate connector (was {mine})"));
+            chosen.swap(ix, jx);
+        }
         // (Our part named as live's where ours still has its default name: a name is the part's, not a feature's; a
         // part a feature names, as the nut's custDesc per size, keeps it.)
         let default_name = |n: &str| n.strip_prefix("Part ").is_some_and(|k| k.parse::<u32>().is_ok());
