@@ -1974,6 +1974,25 @@ fn move_face_offset_and_translate() {
     assert_eq!(res.display.features[2].status, FeatureStatus::Error);
 }
 
+/// Move face Offset names the part's faces as it always has, so references saved before still find them
+/// (c2-impeller-loft: its Flansch (vorne) verbreitern named another way left Move face 2's face, Delete face 2 and a
+/// fillet's edges unresolved, IMPELLER-MOVE-FACE-2-REF): every face is the Offset of the one it was.
+#[test]
+fn move_face_offset_keeps_the_parts_face_names() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
+    let res = t.ok();
+    let before: Vec<String> = res.context.bodies[0].faces.iter().map(|n| format!("{n:?}")).collect();
+    let top = face_with_normal(&res.context.bodies[0], DVec3::Z);
+    t.add("moveFace", &[("moveFaces", q(vec![top])), ("offsetDistance", e("5 mm"))]);
+    let res = t.ok();
+    let after: Vec<String> = res.context.bodies[0].faces.iter().map(|n| format!("{n:?}")).collect();
+    assert_eq!(after.len(), before.len());
+    for b in &before {
+        assert!(after.iter().any(|a| a.contains(&format!("role: Offset({b})"))), "no Offset of {b} in {after:#?}");
+    }
+}
+
 /// A face moved through the far side of the part fails with Onshape's
 /// texts (was: Ok with an empty part, or an inverted 1333 mm³ one).
 #[test]
