@@ -148,6 +148,28 @@ const LIVE_SLIVER_EDGES: &[LiveSliverEdges] = &[
     LiveSliverEdges { doc: "c2-impeller-loft", from_feature: "Boolean 1", part: "Part 1", edges: 1, vertices: 1 },
 ];
 
+/// Imports live fails on a good file (PARITY-SUITES.md "Live's failed imports"; lead 11-17, parity, not shortcomings): in a
+/// document whose name holds `doc`, from `from_feature` on, live's parts named `part` (its sheets) and ours (the solid)
+/// are left out; every other part is compared as usual.
+struct LiveImportFailure {
+    doc: &'static str,
+    from_feature: &'static str,
+    part: &'static str,
+}
+const LIVE_IMPORT_FAILURES: &[LiveImportFailure] = &[
+    // dx 11-17: asm-robot-relations studio 0c3466's Import 1 (a SolidWorks STEP, one solid of one closed shell, 174
+    // faces, every edge on two): live makes six sheet bodies (147 faces, no volume), ours a valid solid (BRepCheck,
+    // no self-intersection), 171986.6 mm³. Thicken 1's part is compared as usual.
+    LiveImportFailure { doc: "0c3466", from_feature: "Import 1", part: "REV-21-1650" },
+];
+
+/// Live's parts and ours with [`LIVE_IMPORT_FAILURES`]' parts left out where a failed import named is reached.
+fn drop_live_import_failures(doc: &str, reached: &[&str], live: Vec<PartState>, ours: Vec<PartState>) -> (Vec<PartState>, Vec<PartState>) {
+    let gone: Vec<&str> = LIVE_IMPORT_FAILURES.iter().filter(|r| doc.contains(r.doc) && reached.contains(&r.from_feature)).map(|r| r.part).collect();
+    let keep = |v: Vec<PartState>| v.into_iter().filter(|p| !gone.contains(&p.name.as_str())).collect::<Vec<_>>();
+    (keep(live), keep(ours))
+}
+
 /// Live's parts after a feature, `reached` the names of the features up to it: its bands widened where
 /// [`LIVE_VOLUME_ALLOWANCES`] names a feature reached, the importer's refit parts ([`LIVE_IMPORT_REFITS`]) held to their
 /// tolerances, lines counted with others where [`LIVE_LINES_AS_OTHER`] names a feature reached, and sliver edges taken
@@ -296,6 +318,22 @@ fn live_volume_allowances_widen_from_their_feature_on_upward() {
     assert!(differences(&allow_live_readings("c2-impeller-loft", &["Shell Gehäuse", "Extrude Flansch"], vec![live(45272.919231)]), &ours(45277.36, 40)).is_empty(), "and on after it");
 }
 
+/// asm-robot-relations studio 0c3466: live's six sheets from Import 1 and our solid are left out from that feature on,
+/// Thicken 1's part still compared; other documents and earlier features compare them.
+#[test]
+fn a_failed_live_import_leaves_its_parts_out() {
+    let sheet = |faces: u64| PartState { name: "REV-21-1650".into(), faces, ..Default::default() };
+    let solid = PartState { name: "REV-21-1650".into(), faces: 147, edges: 325, vertices: 195, volume: Some(171986.6e-9), ..Default::default() };
+    let part1 = PartState { name: "Part 1".into(), faces: 60, edges: 90, vertices: 42, ..Default::default() };
+    let live = vec![sheet(28), sheet(4), sheet(4), sheet(4), sheet(106), sheet(1), part1.clone()];
+    let (l, o) = drop_live_import_failures("st-0c3466", &["Import 1", "Thicken 1"], live.clone(), vec![solid.clone(), part1.clone()]);
+    assert!(differences(&l, &o).is_empty());
+    let (l, o) = drop_live_import_failures("st-0c3466", &["Import 1", "Thicken 1"], live.clone(), vec![solid.clone(), PartState { faces: 61, ..part1.clone() }]);
+    assert!(!differences(&l, &o).is_empty(), "Thicken 1's part still compared");
+    let (l, o) = drop_live_import_failures("st-5d8bc1", &["Import 1"], live, vec![solid, part1]);
+    assert!(!differences(&l, &o).is_empty(), "only the document named");
+}
+
 #[test]
 fn live_import_refits_hold_the_studs_counts() {
     let stud = |v: f64, a: f64, faces: u64| PartState { name: "PEM FH4-M3-18_7".into(), faces, edges: 223, vertices: 145, volume: Some(v * 1e-9), area: Some(a * 1e-6), centroid: Some([0.121667, 0.098672, 0.013186]), ..Default::default() };
@@ -374,7 +412,11 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         }
         diff.extend(step.frame.clone());
         match our_parts(&mut t) {
-            Ok(parts) => diff.extend(differences(&allow_live_readings(name, &reached.iter().map(String::as_str).collect::<Vec<_>>(), live_parts(line)), &parts)),
+            Ok(parts) => {
+                let reached: Vec<&str> = reached.iter().map(String::as_str).collect();
+                let (live, parts) = drop_live_import_failures(name, &reached, live_parts(line), parts);
+                diff.extend(differences(&allow_live_readings(name, &reached, live), &parts))
+            }
             Err(e) => diff.push(format!("parts: {e}")),
         }
         // An input we couldn't place (live's geometry missing or a query

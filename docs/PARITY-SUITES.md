@@ -99,6 +99,13 @@ sweep of curvePattern.fs's 0.1 mm line along the helix's 9° arcs. Ours are exac
 comes from the fitted helix's axis. The suite is not loosened for this, and live's tilt is not chased. Since 11-17
 the document matches to the end (11/11).
 
+**Live's failed imports (dx, lead 11-17: parity, not shortcomings).** asm-robot-relations studio 0c3466's Import 1
+reads a SolidWorks STEP whose one solid is a single closed shell (174 faces, every edge on two of them). Live's import
+fails to make a solid from it and keeps six sheet bodies named REV-21-1650 (147 faces, no volume). Ours makes a valid
+solid (BRepCheck passes, no self-intersection), 171986.6 mm³. From Import 1 on, live's sheets and our solid of that
+name are left out of the comparison (`LIVE_IMPORT_FAILURES`, crates/ops/tests/parity.rs). Thicken 1's part is compared
+as usual; its face of live's sheet JFD maps to the same face of our solid by geometry (asm's translator).
+
 ## 2. Interaction suite: the same steps in live and in noshape
 
 **Scenarios (qa, live).** `tests/ui-parity/<name>.json`: short scripts of what a user does: keys, typed text, clicks

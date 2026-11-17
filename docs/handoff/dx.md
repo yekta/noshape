@@ -214,7 +214,11 @@ Open, ranked:
    text). Live imports it as 6 SHEET bodies "REV-21-1650": 28/44/22 (box -31..30, -30..31, -58..35 mm), three 4/4/0
    (~-37..-17, 21..43, -148..-3: tubes), 106/278/184, 1/10/7: 147 faces, no volume; Thicken 1 thickens a face of the
    28-face one (Part 1 solid 60 faces 223.99 mm³). Ours: one solid, 147 faces (merge_same_surface_faces 174 -> 147),
-   28 edges on one face only (open: not a valid solid), 171986.6 mm³; Thicken 1 fails. Decision asked (lead 11:4x):
+   valid closed solid (11-17 12:0x: BRepCheck valid, no self-intersection, every one of 325 edges on 2 faces; the
+   28 'one-face' edges were seams), 171986.6 mm³; live's sheets are its own import failing. Thicken 1 fails in ours
+   (reference to a face of live's sheet JFD). Lead 11-17 12:1x: keep our solid (live's import failing); suite leaves
+   both out from Import 1 on (tests/parity.rs LIVE_IMPORT_FAILURES, PARITY-SUITES); asm maps Thicken 1's JFD face to
+   ours by geometry (sent 12:2x).
    an imported solid whose healed shell is open -> sheet bodies, one per connected piece (ours would be 1 piece of 147
    faces; live's 6 split where Parasolid didn't sew: find those edges, e.g. gaps over tolerance). Uncommitted in
    dx-land: kernel connected_pieces / split_connected_pieces (a part of several solids or of a solid of disconnected
