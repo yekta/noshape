@@ -1,0 +1,58 @@
+{
+  "name": "drw-view-properties-simplification-absolute",
+  "about": "An assembly view's View properties: View simplification ▾ Absolute shows the Threshold field; its tooltip; then cancelled",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (live2 11-17: the drawing matrix's View properties gap 'Simplification threshold')",
+  "start": "pin-block-asm-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "View properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Auto",
+        "pick": "Absolute"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          231,
+          468
+        ]
+      },
+      "ms": 1500
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    }
+  ]
+}

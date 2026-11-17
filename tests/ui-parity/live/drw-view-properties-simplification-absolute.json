@@ -1,0 +1,1945 @@
+{
+ "scenario": "drw-view-properties-simplification-absolute",
+ "recorded": "2026-11-17T19:32:52.849Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.7"
+ },
+ "live": {
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "53e3184d1f19bd42267fb3c9",
+  "start": "pin-block-asm-drawing",
+  "startElement": "2e8be4ded96940b21ba2941d",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "other",
+   "tag": "iframe"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "assembly": {
+   "instances": [
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      -60,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      -5,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": [
+    {
+     "name": "Revolute 1",
+     "type": "REVOLUTE",
+     "status": "OK"
+    }
+   ]
+  },
+  "drawing": {
+   "tab": "start pin-block asm Copy 1 Drawing 1",
+   "sheet": "Sheet1",
+   "sheets": [
+    "Sheet1"
+   ],
+   "tool": null,
+   "views": [
+    {
+     "name": "Front",
+     "kind": "base",
+     "position": [
+      81,
+      81
+     ],
+     "parent": null,
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Isometric",
+     "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Right",
+     "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Top",
+     "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    }
+   ],
+   "annotations": [],
+   "selection": []
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "view": "Front"
+    }
+   },
+   "ok": true,
+   "at": [
+    727,
+    693
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Show/hide",
+      "View orientation",
+      "Explode/Position",
+      "Display state",
+      "Tangent edges",
+      "Adjust linestyle...",
+      "Insert BOM for start pin-block asm Copy 1 ...",
+      "",
+      "View properties...",
+      "Order",
+      "Align views",
+      "",
+      "Switch to start pin-block asm Copy 1",
+      "Move to sheet...",
+      "Copy",
+      "Paste as table",
+      "Select for replication",
+      "Replicate annotations",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ]
+    }
+   },
+   "t": 241765
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "View properties..."
+    }
+   },
+   "ok": true,
+   "at": [
+    852,
+    354
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape ui parity live2-2",
+      "Workspace",
+      "Main",
+      "Type",
+      "Assembly",
+      "Reference",
+      "start pin-block asm Copy 1",
+      "In progress",
+      "View orientation",
+      "Explode/Position",
+      "Display state",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "BOM table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": "Default"
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": "Show all"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "VIEW",
+       "owner": "Front"
+      }
+     ]
+    }
+   },
+   "t": 270821
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 2000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape ui parity live2-2",
+      "Workspace",
+      "Main",
+      "Type",
+      "Assembly",
+      "Reference",
+      "start pin-block asm Copy 1",
+      "In progress",
+      "View orientation",
+      "Explode/Position",
+      "Display state",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "BOM table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": "Default"
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": "Show all"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "VIEW",
+       "owner": "Front"
+      }
+     ]
+    }
+   },
+   "t": 300361
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Auto",
+     "pick": "Absolute"
+    }
+   },
+   "ok": true,
+   "at": [
+    231,
+    442
+   ],
+   "via": "native select in the drawing: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape ui parity live2-2",
+      "Workspace",
+      "Main",
+      "Type",
+      "Assembly",
+      "Reference",
+      "start pin-block asm Copy 1",
+      "In progress",
+      "View orientation",
+      "Explode/Position",
+      "Display state",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Threshold",
+      "in",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "BOM table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": "Default"
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": "Show all"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Absolute"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "VIEW",
+       "owner": "Front"
+      }
+     ]
+    }
+   },
+   "t": 316945
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape ui parity live2-2",
+      "Workspace",
+      "Main",
+      "Type",
+      "Assembly",
+      "Reference",
+      "start pin-block asm Copy 1",
+      "In progress",
+      "View orientation",
+      "Explode/Position",
+      "Display state",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Threshold",
+      "in",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "BOM table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": "Default"
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": "Show all"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Absolute"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "VIEW",
+       "owner": "Front"
+      }
+     ]
+    }
+   },
+   "t": 346082
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "hover",
+    "on": {
+     "px": [
+      231,
+      468
+     ]
+    },
+    "ms": 1500
+   },
+   "ok": true,
+   "at": [
+    231,
+    468
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape ui parity live2-2",
+      "Workspace",
+      "Main",
+      "Type",
+      "Assembly",
+      "Reference",
+      "start pin-block asm Copy 1",
+      "In progress",
+      "View orientation",
+      "Explode/Position",
+      "Display state",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Threshold",
+      "in",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "BOM table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": "Default"
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": "Show all"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Absolute"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": "Simplification threshold: Features below this value will be simplified",
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "VIEW",
+       "owner": "Front"
+      }
+     ]
+    }
+   },
+   "t": 375193
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 404395
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 432951
+  }
+ ]
+}
