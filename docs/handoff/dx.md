@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 07:13 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 08:19 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -196,13 +196,12 @@ Open, ranked:
    - cf-setback-fillet: parked (lead 11-05, skasm's RABC fill patch; TICKETS SETBACK-FILL-PATCH).
 2. After ~10:17: live's answers to REQUESTS 01:47 (sm-louver scale, live's own SAT import) and 05:46; set 2 after
    live2's refetch.
-3. Landing (dx-land): curve pattern along a helix, frames from the helix's axis, plus the kernel fit's fallback pair
-   when n/3 and 2n/3 fall on whole turns (old pair kept when it works: a new pair moved fan-blade's Boolean 2).
-   driven-pattern 7/11 -> 11/11; 8 helix docs A/B on vibe6 (~/tmp/dx/hab-A/B2.log): nothing else changes. T1
-   features_b::a_curve_pattern_along_a_helix_screws_its_seed (49 -> 0.42 µm), kernel thread::a_helix_of_whole_turns_
-   is_fitted. g++-13 against /opt/occt clean. SM-BOOLEAN-SPEED closed (lead): Mac release median Up to Part 66 ms /
-   live 160, document 92 / 917. Studios 06:27: 1dc32b 27/349 (was 17), first difference Boolean 4 "4" wheel hub"
-   232/632/400 vs 216/600/384 (bool's area, to look at); 74d3d6 9/180, Extrude 4 (core's, parked).
+3. Landed 11-17: 4ddf9f2d curve pattern along a helix (frames from the helix's axis; kernel fit's fallback pair, old
+   pair kept when it works): driven-pattern 7/11 -> 11/11, the other 7 helix docs unchanged (vibe6 A/B). 2089f117
+   Parasolid import heals a bodies-only file once (the assembly check stopped healing): rings-loft x_t suite import
+   on the Mac 7.9 -> 6.6 s (live 8.6); qa's `documents import` on vibe6 not re-timed. SM-BOOLEAN-SPEED closed (Mac
+   Up to Part 66 ms / live 160). Studios 06:27: 1dc32b 27/349 (was 17), Boolean 4 hub 232/632/400 vs 216/600/384,
+   2666 ms vs 135: sent to bool 7fa8ceab 08:10 (repro vibe7 ~/agents/dx-keep/repro/1dc32b-b4); 74d3d6 9/180 (core's).
 4. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## How to run
