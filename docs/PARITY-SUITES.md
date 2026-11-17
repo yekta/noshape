@@ -151,6 +151,14 @@ live.igs: ours 275 faces, live's own import 279, the model 273).
 Its last line is the score: `exchange score: ours imports live's files m/n; live imports ours m/n; ours reads ours
 back m/n`.
 
+Live's mesh imports that make sheets (lead 11-17, as robot-relations' import): where live's import of its own STL /
+OBJ / 3MF of a good closed mesh gives sheet bodies and ours gives valid solids, that is live's failure, not a target.
+Those rows hold ours to the model's solids, each volume within its area times live's STL chord (`LIVE_MESH_SHEETS`):
+c2-bottle-split (two solid halves touching along edges; live 148 sheets, ours the model's 2) and c2-duct-multipart
+(live 9 sheets; ours 2 solids for the model's 4 overlapping parts, a difference still counted). Formats that can't
+hold a mesh part (IGES, ACIS: live drops it) are compared with live's own import of that file, held to the parts it
+keeps.
+
 Reading our own files back (lead 11-14): the parts read back are compared with the model's, counts exact. A volume
 within the largest edge tolerance (of the model's parts or the file's) times the part's area, and an area within it
 times the edges' total length (`query_parts`' `edge_tolerance`, `edge_length`), is no difference. Our models carry
