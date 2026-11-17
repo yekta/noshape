@@ -11,11 +11,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   on vibe5 (hats, dock, 47 ticket docs, 16 authored docs from compat-docs/v0443) with the baseline's CLI against the green.
   A feature that gets worse writes compat/ALERT-<sha> and one line per feature to /tmp/lead/qa-alerts. Move the baseline by
   restarting the unit with the new version (rel-published.sh does it).
-- **qa-w7-nightly**: bin/w7-nightly.sh. Sleeps to 02:00 UTC, then on vibe7 with the newest release (downloaded to vibe7
+- **qa-w7-nightly**: bin/w7-nightly.sh. Sleeps to 02:00 UTC, then on vibex7 with the newest release (downloaded to vibex7
   ~/qa-rel/<v>/) runs: (1) opentime.py (hat8, hat15, hat15b, dock) and modeltime.py (84 suite docs), 3 runs, the previous release's CLI
   alternating with the current one (DECISIONS db4db21a0; the row shows the same-session sums and docs > 1.25x slower, details
   nightly/<mmdd>.json vs_prev); nightly-sum.py
-  -> a row in SCORE.md "Nightly, vibe7 02:00" (pushed from the qa worktree); (2) the latency set (bin/../lat/hat/lat-priv.sh:
+  -> a row in SCORE.md "Nightly, vibex7 02:00" (pushed from the qa worktree); (2) the latency set (bin/../lat/hat/lat-priv.sh:
   hat15 / dock UI-script rounds + cold / reopen + rotate / pan / zoom, block baseline) -> nightly/lat-<mmdd>.txt; (3) the
   QUIT-ABORT-DOCK guard (qa-asm-a x5) -> nightly/quit-<mmdd>.txt. Failures and a crash append to /tmp/lead/qa-alerts. Log:
   suites/window-0200-<mmdd>.log. Skip a night: touch nightly/skip-<mmdd>. Runs alone (no slot: the window must be quiet).
@@ -23,8 +23,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   84 timed) and a guard: < 90 % of the docs timed or < 6 opens -> alert, no SCORE row. Earlier, 03:33: the clean A/B step (nightly/ab-<mmdd>.args) and the latency step now
   `cd … || exit 1;` (the A/B's `cd … && ( load loop ) &` backgrounded the cd, ab-feat.py ran in ~ and the loop held the ssh).
 - **qa-suites**: bin/qa-suites-loop.sh, every 4 h: interaction suite, model suite (speed, debug) and assembly / exchange
-  suites of the newest green, each through `~/bin/slot`: ui + models on **vibe7**, assemblies / exchange (suites-rest) on
-  **vibe6** beside them since 11-17 04:51 (vibe7's slot was held 4 h by dx). 1117-0227-ecf8c33a's stage re-run as unit
+  suites of the newest green, each through `~/bin/slot`: ui + models on **vibex7**, assemblies / exchange (suites-rest) on
+  **vibex6** beside them since 11-17 04:51 (vibex7's slot was held 4 h by dx). 1117-0227-ecf8c33a's stage re-run as unit
   qa-suites-redo-0227 (QA_REDO), done 07:07: models 85/126 1233/1585 (5 better, none worse), assemblies 5/24 1614/1709
   664/755 (scissor-lift BOM 59 -> 57: P0 to asm), exchange 58/74. The models report.json is written beside the corpus
   snapshot (~/tmp/qa/report.json): qa-suites.sh copies it from there since 07:15 (lost since 11-16's snapshot change).
@@ -38,7 +38,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - tab-B hover-card A/B DONE 10:29 (units qa-tabab-verify2, qa-tabab-rel finished): B's first open ~5.0 s green vs ~6.4 s 0.4.53
   (hint, load 2-14); the ~700 ms trailing frames after a switch are in 0.4.54-0.4.56 too -> P2 DOCK-TAB-SWITCH-TRAILING-FRAMES (psui).
 - **qa-land-footer**: bin/land-footer.sh (land-queue footer checks).
-- vibe7 user units **qa-fzloop** + **qa-fz-xvfb** (`systemctl --user` there): the GUI fuzz, ~/qa/bin/fzloop.sh :61 on
+- vibex7 user units **qa-fzloop** + **qa-fz-xvfb** (`systemctl --user` there): the GUI fuzz, ~/qa/bin/fzloop.sh :61 on
   ~/qa/rel/noshape-green (green 35baa32f since 11-17 03:34; refresh by copying a newer app to that path), seeds from ~/qa/fzseed.next,
   results ~/qa/fz*-result.txt. fzrun.sh kills the app's own `--reopen` restarts after each run. Pause: touch
   ~/tmp/qa-fz-pause-61; it also idles 01:50-04:05 every night (the window runs alone). App refreshed to green f7c318a5 11-17 10:08.
@@ -51,7 +51,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    compat/cand-<tag>.txt. Reply go / no-go. A user-document regression is reverted on the branch, never shipped.
 2. Published: bin/rel-published.sh <v> <candidate CLI on vibe5> -> compat/published-<v>.txt: SHA256SUMS of the Linux
    assets, CLI installed as vibe5 ~/qa-rel/<v>/noshape-cli, userdocs candidate vs released (must be ALL-SAME), qa-asm-a x5
-   on the released app (vibe6, slot), then the compat baseline moved. Then bin/rel-compat.sh <prev> <v> (released CLI vs
+   on the released app (vibex6, slot), then the compat baseline moved. Then bin/rel-compat.sh <prev> <v> (released CLI vs
    the previous release) -> compat/rel-<v>.txt; any user-document worse = P0 to the lead at once.
 3. The app spot-check rows (archive "Release checks: the app spot-check list"): user cases + 8 interaction-feel rows in
    rotation (next: rows 9-16).
@@ -68,7 +68,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    9e40ad95a, bool2 555bcb4c (queue/bool2-555bcb4c): compat on each green as it lands. Watcher: bin/watch-lands.sh <state>
    <commit>... (matches by subject, exits when one is in a green with COMPAT-DONE; state compat/lands-1700.state).
    App user-flow checks: /root/qa-scratch/uh/uh2.sh <app> <out> (sketch hover, real xdotool moves after a UI-script setup)
-   and uf.sh (seeded feature_settings.json; NOSHAPE_UI_REMEMBERED=1 or the runner ignores the memory), on vibe6 :663.
+   and uf.sh (seeded feature_settings.json; NOSHAPE_UI_REMEMBERED=1 or the runner ignores the memory), on vibex6 :663.
    The qa-cut-1615 timer runs cut-verdict.sh at 16:15 -> one line in /tmp/lead/qa-alerts + compat/cut-1117-1615.txt. Read
    the ticket section of that compat file too (a ticket doc's wrong geometry is a HOLD), then update the entry with the
    verdict and the green it names, commit docs-only. HOLD only for a real P0 (crash, wrong geometry, speed regression, a user
@@ -87,11 +87,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    IMPELLER-DELETE-FACE-2-SLOW reclassified 10:55: slower than live (~19 s vs 2.8 s), not a regression (v0.4.48 built other
    parts); core told. The knife Chamfer 2 / Fillet 5 / Fillet 3 "regressions" (v0.4.48 -> v0.4.53) were the same: blend's Mac
    A/B 10:40, v0.4.48 matched 20/52 knife features. Closed; they stay on blend's slower-than-live list. blend's impeller Fillet 3
-   is WIP in blend10 (not landed): when it lands, re-time c2-impeller-loft v0.4.56 vs green on vibe6
+   is WIP in blend10 (not landed): when it lands, re-time c2-impeller-loft v0.4.56 vs green on vibex6
    (bin/abn-feat.py 3 <cli,cli> ~/agents/qa-keep/abc/m <work> c2-impeller-loft; full paths, `~` after a comma isn't expanded).
 5. Nightly (02:00, qa-w7-nightly; restarted 11:56 with two additions: live's fresh-copy times and the dock tab A/B, 0.4.53 vs
    the release, 3 rounds, Xvfb :672 -> nightly/tabab-<mmdd>.txt). On 11-18 send psui the tabab numbers: both ~100-200 ms settle
-   at low load closes DOCK-TAB-SWITCH-TRAILING-FRAMES (psui: likely late software frames on a loaded host; vibe7 at load 17,
+   at low load closes DOCK-TAB-SWITCH-TRAILING-FRAMES (psui: likely late software frames on a loaded host; vibex7 at load 17,
    0.4.53 818 ms too). After it, check suites/window-0200-<mmdd>.log ends NIGHTLY-DONE and the SCORE row is valid
    (the guard alerts otherwise); send blend faceblend / tpd / michael and skasm corner-break from the row.
 
@@ -122,7 +122,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - A/B: bin/ab-feat.py (2 CLIs), bin/abn-feat.py <runs> <cli,cli,..> (n CLIs; full paths, no ~), bin/ab-sum.py <jsonl> [live-regen.json].
   Since 11-17 10:50 both write "parts_same" (each CLI's final parts on a fresh copy, outside the timed runs; scp sig.py + nscli.py
   beside them, else None). parts_same False = the builds model different geometry: no regression claim from such an A/B.
-- Speed: mac/opentime.py, mac/modeltime.py (vibe7 copies in ~/agents/qa-keep), bin/nightly-sum.py, mac/live-regen.json.
+- Speed: mac/opentime.py, mac/modeltime.py (vibex7 copies in ~/agents/qa-keep), bin/nightly-sum.py, mac/live-regen.json.
 - Live's times (live 11-17): bin/livetime.py reads <models>/<doc>/live.jsonl: the last "fresh-copy" line (median of 3
   fresh copies) else "open-sum" (no timing_kind); per_feature_ms by name or featureId, mapped to names. The nightly rebuilds
   mac/live-regen.json from it (its 84-doc set kept; .kinds beside it) and the SCORE row says "live: N of 84 fresh-copy";
@@ -130,20 +130,22 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   livetime.asm_open(<doc dir>): live's "assembly-open-solved" (open_solved_ms, the assembly's tab clicked in the open
   document until the Instances (N) count is final; 5 of 24 at 14:20, e.g. corexy 6125 ms). Ours isn't timed yet: the
   assembly suite saves no documents (NOSHAPE_PARITY_SAVE is Part Studios only); decision asked of the lead 14:20. qa-w7-nightly restarted 11:29 to take it.
-- Private documents (hat8, hat15, hat15b, dock in vibe5 / vibe7 ~/lead-private) only as mode-700 copies in ~/tmp/qa on a
+- Private documents (hat8, hat15, hat15b, dock in vibe5 / vibex7 ~/lead-private) only as mode-700 copies in ~/tmp/qa on a
   host, deleted after; never in the repo or tickets.
 
 ## Hosts
+**11-17 17:45: hosts renamed (user): vibex6 (watcher), vibex7 (land queue, ~/lead-private: hat8, hat15, hat15b, the dock),
+vibex8; vibeN names are the user's own servers. qa's scripts, units and this handoff use vibexN.**
 **11-17 17:20: vibe5 gone for good (lead), vibe3 gone; no qa script names either (the lock is qa-scratch/qa-host.lock).
-vibe7 ~/lead-private has all four user documents again (hat15b restored 17:17 from the user's upload).** Earlier note: qa's vibe5 work moved: compat-check / rel-* run on vibe7 (H=vibe7; CLIs in vibe7
-~/qa-rel/<v>/noshape-cli from the release's noshape-cli tarball), the nightly streams private docs from vibe7 and the saved
-corpus from vibe6, land-footer lands through vibe7. vibe7 ~/lead-private: hat15, hat8 and the dock (16:40, under
+vibex7 ~/lead-private has all four user documents again (hat15b restored 17:17 from the user's upload).** Earlier note: qa's vibe5 work moved: compat-check / rel-* run on vibex7 (H=vibex7; CLIs in vibex7
+~/qa-rel/<v>/noshape-cli from the release's noshape-cli tarball), the nightly streams private docs from vibex7 and the saved
+corpus from vibex6, land-footer lands through vibex7. vibex7 ~/lead-private: hat15, hat8 and the dock (16:40, under
 another file name: compat-check / w7-nightly / tabab-* use it); hat15b out until vibe5 returns (reports say "hat15b not run
 (vibe5 down)", enough to land: lead via bool2). One-off vibe5 scripts in bin/retired. The local lock is still named vibe5.lock.
 Text below this note predates the move.
-vibe5: land queue, compat loop (one CLI at a time), release builds via rb.sh (worktree qa-bisect). vibe6: ad-hoc app runs
-(:661), release quit check, main's watcher since 11-17 16:20 (/tmp/lead/main-status, /root/green come from there). vibe7:
-suites (slot), fuzz :61, nightly :671. vibe3 retired 11-17 ~17:15: qa's unique files copied to vibe7 ~/agents/qa-keep/vibe3-qa
+vibe5: land queue, compat loop (one CLI at a time), release builds via rb.sh (worktree qa-bisect). vibex6: ad-hoc app runs
+(:661), release quit check, main's watcher since 11-17 16:20 (/tmp/lead/main-status, /root/green come from there). vibex7:
+suites (slot), fuzz :61, nightly :671. vibe3 retired 11-17 ~17:15: qa's unique files copied to vibex7 ~/agents/qa-keep/vibe3-qa
 (tickets, docs, perfdocs, bin, fuzz results and summaries; release binaries / update homes / sources not kept), its scripts
-moved to bin/retired, land-footer points at vibe6. The Mac: off limits except
+moved to bin/retired, land-footer points at vibex6. The Mac: off limits except
 its single slot. Heavy runs through `~/bin/slot` (DECISIONS 11-15).
