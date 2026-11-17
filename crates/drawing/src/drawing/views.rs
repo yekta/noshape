@@ -2918,7 +2918,13 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
         g.update_bounds();
         return g;
     }
-    let shapes: Vec<Shape> = bodies.iter().map(|b| b.shape.clone()).collect();
+    // Mesh parts (an imported STL's) left out of the hidden line removal, which crashed on their faces' missing
+    // surfaces and failed the whole view (c2-hex-bookcase-derived's drawing: all four views an error box).
+    let shapes: Vec<Shape> = bodies.iter().filter(|b| !b.shape.is_mesh()).map(|b| b.shape.clone()).collect();
+    if shapes.is_empty() {
+        g.update_bounds();
+        return g;
+    }
     let compound = if shapes.len() == 1 { shapes[0].clone() } else { Shape::compound(&shapes) };
     // Compound edge index -> (body index, body edge index).
     let mut cmap: HashMap<usize, (usize, usize)> = HashMap::new();
@@ -3892,6 +3898,30 @@ mod tests {
         let free = noshape_kernel::make_bspline(&[DVec3::ZERO, DVec3::new(0.01, 0.004, 0.0), DVec3::new(0.02, -0.003, 0.0), DVec3::new(0.03, 0.0, 0.0)], None, &[0.0, 1.0], &[4, 4], 3, false).unwrap();
         let j = free.edge_info().unwrap();
         assert!(conic_of(&free, j.first_param, j.last_param).is_none());
+    }
+
+    /// A view of a part beside a mesh part (an imported STL's) draws the part: the hidden line removal crashed on the
+    /// mesh's faces and every view failed (c2-hex-bookcase-derived's drawing).
+    #[test]
+    fn a_mesh_part_leaves_its_view_drawn() {
+        let dir = std::env::temp_dir().join(format!("noshape-view-mesh-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let stl = dir.join("tet.stl");
+        let tri = |a: [i32; 3], b: [i32; 3], c: [i32; 3]| format!(" facet normal 0 0 0\n  outer loop\n   vertex {} {} {}\n   vertex {} {} {}\n   vertex {} {} {}\n  endloop\n endfacet\n", a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+        let (o, x, y, z) = ([0, 0, 0], [10, 0, 0], [0, 10, 0], [0, 0, 10]);
+        std::fs::write(&stl, format!("solid t\n{}{}{}{}endsolid t\n", tri(o, y, x), tri(o, x, z), tri(o, z, y), tri(x, y, z))).unwrap();
+        let mesh = noshape_kernel::read_mesh_bodies(&stl, noshape_kernel::LengthUnit::Millimeter).unwrap();
+        assert!(mesh.is_mesh());
+        let block = noshape_kernel::make_box_corners(DVec3::new(0.02, 0.0, 0.0), DVec3::new(0.03, 0.01, 0.01)).unwrap();
+        let f = crate::reference::FeatureId(1);
+        let body = |i: u32, s: Shape| Arc::new(Body::new(BodyId { feature: f, index: i }, format!("Part {i}"), BodyKind::Solid, s, Vec::new(), 0, f));
+        let bodies = [body(0, block), body(1, mesh)];
+        let pbs: Vec<ProjBody> = bodies.iter().map(|b| ProjBody { body: b, shape: b.shape.clone(), edge_map: None }).collect();
+        let frame = ViewFrame::new(DVec3::NEG_Y, DVec3::Z);
+        let g = project_bodies(ViewId(1), &pbs, &frame, true, &|_, _| true);
+        assert!(g.error.is_none(), "{:?}", g.error);
+        assert_eq!(g.edges.iter().filter(|e| e.visible).count(), 4, "the block's front outline");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Centermarks: a hole whole or in pieces, a radial hole's half bore; not a quarter round, nor c2-sm-louver's two
