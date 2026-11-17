@@ -559,7 +559,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
-## Assembly feel vs live's 11-17 capture (qa 23:45, green 16588aca3, vibex6 Xvfb, real xdotool pointer)
+## Assembly feel vs live's 11-17 capture (qa 23:37, green 16588aca3, vibex6 Xvfb, real xdotool pointer)
 live's set-up rebuilt as starts asm-feel (Part 1 40x30x10, Part 2 Ø16x20, Part 3 20x20x5, nothing fixed) and asm-feel-mated (+ Slider
 Part 2 / Part 1 along Z, Fastened Part 3 / Part 1); transforms and mates from the runner's state (qa-scratch/af: af.py, afrun.sh,
 ash.py; sheets tickets/asm-feel-sheet.png and vibex6 ~/agents/qa-keep/asm-feel/).

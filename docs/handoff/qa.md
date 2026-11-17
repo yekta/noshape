@@ -86,6 +86,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 0e. **Sketch snap (lead 22:50)**: live's sketch-snap rows on 592b0fc9 -> TICKETS "Sketch line snap and inference", 2 P0 / 1 P1 / 2 P2 to
    skasm. qa-scratch/sk: sks.sh (session :666, SNAP=snapg for the glyph run that ends before the runner's 180 s watchdog), batch.sh,
    sweep.py / hv.py / glyphs.py, ana.py. The runner's watchdog (180 s) ends every session: keep each batch under ~150 s.
+0g. **Assembly feel (lead 23:20)**: live's asm feel rows on 16588aca3 -> TICKETS "Assembly feel", 2 P0 + 2 P1 to asm. qa-scratch/af:
+   starts.json (asm-feel, asm-feel-mated), afs.sh (session :668), af.py groups hover / colours / mate-esc / mate-enter / drag-p2 /
+   drag-p3, afrun.sh <scenario> <out> <groups> (state at the runner's end: instance transforms, mates). EMPTY must avoid the view cube.
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
