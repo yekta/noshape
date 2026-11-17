@@ -4595,6 +4595,8 @@ impl SketchEditor {
         }
         let out = match self.drag.take() {
             Some(DragState::Pending { entity, .. }) => {
+                // A curve or point clicked drops a selected constraint glyph (live2 glyph-select (b)).
+                self.selected_constraints.retain(|c| data.sketch.constraint(*c).is_some_and(|k| k.kind.is_dimension()));
                 if let Some(pos) = self.selection.iter().position(|e| *e == entity) {
                     self.selection.remove(pos);
                 } else {
@@ -4695,15 +4697,18 @@ impl SketchEditor {
             }
             Some(DragState::Glyph { constraint, moved, additive, .. }) => {
                 if moved {
-                    EditOutcome::changed()
-                } else {
-                    // A glyph click replaces the selected constraints (live2 Part 2); Shift adds.
-                    if !additive && !self.selected_constraints.contains(&constraint) {
-                        self.selected_constraints.clear();
-                    }
-                    self.toggle_constraint_selection(constraint, additive);
-                    EditOutcome::redraw()
+                    return EditOutcome::changed();
                 }
+                // Live2 glyph-select: one glyph at a time, a click (Shift too) on another replaces it and drops the
+                // selected curves and points; Shift+click on the selected one deselects it.
+                if additive && self.selected_constraints.contains(&constraint) {
+                    self.selected_constraints.retain(|c| *c != constraint);
+                } else {
+                    self.selected_constraints = vec![constraint];
+                    self.selection.clear();
+                    self.selected_regions.clear();
+                }
+                EditOutcome::redraw()
             }
             Some(DragState::Handle(_)) | Some(DragState::TrimPath { .. }) => EditOutcome::redraw(),
             Some(DragState::FilletRadius { arc }) => {
@@ -10298,6 +10303,21 @@ mod tests {
         let (sk, e) = run(&ellipse, (260.0, 0.0), (d, 0.0));
         let Some(noshape_sketch::Geometry::Ellipse { center, major, minor }) = sk.entity(e).map(|x| x.geometry.clone()) else { panic!() };
         assert!(near(sk.point(center), (230.0, 0.0)) && (major.length() * 1e3 - 40.525).abs() < 0.3 && (minor * 1e3 - 20.263).abs() < 0.15, "ellipse: {major:?} {minor}");
+        // live2 run4 (8.41 mm a 40 px): the minor-axis rim follows the pointer's distance from the centre, the ratio
+        // kept; a chain's L2 dragged by its middle keeps its direction and moves across itself through the pointer, its
+        // free end straight across, the shared end along L1 (L1's far end and direction kept).
+        let (sk, e) = run(&ellipse, (229.899, 15.033), (0.0, 8.41));
+        let Some(noshape_sketch::Geometry::Ellipse { major, minor, .. }) = sk.entity(e).map(|x| x.geometry.clone()) else { panic!() };
+        assert!((minor * 1e3 - 23.41).abs() < 0.1 && (major.length() * 1e3 - 46.82).abs() < 0.2, "ellipse minor rim: {major:?} {minor}");
+        let chain2 = |sk: &mut Sketch| {
+            let (a, o, c) = (sk.add_point(mm(-30.0, -50.0)), sk.add_point(mm(0.0, -60.0)), sk.add_point(mm(20.0, -40.0)));
+            sk.add_line_between(a, o).unwrap();
+            sk.add_line_between(o, c).unwrap()
+        };
+        let (sk, l2) = run(&chain2, (10.0, -50.0), (8.41, 0.0));
+        let Some(Curve2::Line { a, b }) = sk.curve(l2) else { panic!() };
+        let far = sk.entities().filter(|e| e.kind() == EntityKind::Point).filter_map(|e| sk.point(e.id)).any(|p| (p - mm(-30.0, -50.0)).length() < 1e-9);
+        assert!(near(Some(a), (6.3075, -62.1025)) && near(Some(b), (24.205, -44.205)) && far, "chain L2 by its middle: {:?} {:?}", a * 1e3, b * 1e3);
         // An arc's end dragged level with its other end: the horizontal glyph by the pointer, HORIZONTAL on release
         // (live2 b1x); 25 px below, none (b1y).
         for (by, level) in [((d, 0.0), true), ((d, -6.7469), false)] {
@@ -11031,6 +11051,57 @@ mod tests {
             assert!(((b - a).length() - mm(45.05, 20.89).length()).abs() < 1e-9 || c == ConstraintTool::Equal, "{c:?}: length kept");
             assert!(off < tol, "{c:?}: L2 {:?} → {:?}, live ({}, {}) → ({}, {}): {:.4} mm off", a * 1e3, b * 1e3, want[0], want[1], want[2], want[3], off * 1e3);
         }
+    }
+
+    /// Live2 glyph-select (11-17): one constraint glyph selected at a time: a click (Shift too) on another replaces it
+    /// and Delete takes only that one; a glyph click drops a selected line and a line click drops the glyph;
+    /// Shift+click on the selected glyph and a click on empty space deselect it.
+    #[test]
+    fn constraint_glyphs_select_one_at_a_time_as_lives() {
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        click(&mut ed, &mut d, v(-0.03, -0.02));
+        click(&mut ed, &mut d, v(0.03, 0.02));
+        ed.set_tool(Tool::Select);
+        let find = |d: &SketchData, par: bool| {
+            d.sketch.constraints().find(|c| if par { matches!(c.kind, ConstraintKind::Parallel { .. }) } else { matches!(c.kind, ConstraintKind::Perpendicular { .. }) }).map(|c| (c.id, c.kind.entities()[0])).expect("the rectangle's glyph")
+        };
+        let ((perp, pe), (par, pa)) = (find(&d, false), find(&d, true));
+        let empty = v(0.1, 0.1);
+        let glyph = |ed: &mut SketchEditor, d: &mut SketchData, g: (ConstraintId, EntityId), shift: bool| {
+            ed.pressed_glyph = Some((g.0, g.1, shift));
+            ed.tool_down(d, empty, None, shift, false);
+            ed.tool_up(d, empty);
+        };
+        glyph(&mut ed, &mut d, (perp, pe), false);
+        glyph(&mut ed, &mut d, (par, pa), false);
+        assert_eq!(ed.selected_constraints, vec![par], "the second replaces the first");
+        glyph(&mut ed, &mut d, (perp, pe), true);
+        assert_eq!(ed.selected_constraints, vec![perp], "Shift+click on another replaces it too");
+        glyph(&mut ed, &mut d, (perp, pe), true);
+        assert!(ed.selected_constraints.is_empty(), "Shift+click on the selected one deselects it");
+        glyph(&mut ed, &mut d, (par, pa), false);
+        let n = d.sketch.constraints().count();
+        assert!(ed.delete_selection(&mut d));
+        assert!(d.sketch.constraint(par).is_none() && d.sketch.constraint(perp).is_some() && d.sketch.constraints().count() == n - 1, "Delete takes the selected glyph's alone");
+        // A glyph click drops a selected line; a line click drops the glyph.
+        let line = d.sketch.entities().find(|e| e.kind() == EntityKind::Line).map(|e| e.id).unwrap();
+        ed.selection = vec![line];
+        glyph(&mut ed, &mut d, (perp, pe), false);
+        assert!(ed.selection.is_empty() && ed.selected_constraints == vec![perp], "the glyph click drops the line");
+        let Some(Curve2::Line { a, b }) = d.sketch.curve(line) else { panic!() };
+        let mid = (a + b) * 0.5;
+        ed.pointer_move(&mut d, mid, false, false);
+        ed.hover = Some(line);
+        ed.tool_down(&mut d, mid, Some(line), false, false);
+        ed.tool_up(&mut d, mid);
+        assert!(ed.selection == vec![line] && ed.selected_constraints.is_empty(), "the line click drops the glyph");
+        // An empty click deselects.
+        glyph(&mut ed, &mut d, (perp, pe), false);
+        ed.pointer_move(&mut d, empty, false, false);
+        ed.hover = None;
+        ed.tool_down(&mut d, empty, None, false, false);
+        ed.tool_up(&mut d, empty);
+        assert!(ed.selected_constraints.is_empty() && ed.selection.is_empty(), "an empty click deselects");
     }
 
     /// Live2 11-17 part 2b (p2b2.json "apply"): two free lines picked, every constraint button as live's: Parallel,

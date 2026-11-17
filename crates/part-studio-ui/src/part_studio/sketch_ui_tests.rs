@@ -5,7 +5,7 @@
 use super::super::PartStudioView;
 use crate::doc_model::DocModel;
 use crate::gpu::Gpu;
-use crate::sketch_mode::Tool;
+use crate::sketch_mode::{ConstraintTool, Tool};
 use crate::viewport::ViewportEvent;
 use glam::DVec2;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, Focusable as _, IntoElement, Keystroke, Modifiers, InteractiveElement as _, ParentElement as _, Point, Render, Styled as _, TestAppContext, Window, WindowBounds, WindowOptions, div, px, size};
@@ -1594,6 +1594,89 @@ fn an_open_under_defined_sketch_has_the_rows_badge(cx: &mut TestAppContext) {
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
     wait_until(cx, window, |cx| view.read(cx).edit.is_none() && view.read(cx).display.feature_state(id).is_some_and(|s| s.status != noshape_model::display::FeatureStatus::RolledBack));
     assert_eq!(cx.update(|cx| view.read(cx).display.feature_state(id).map(|s| s.underdefined)), Some(true), "closed");
+}
+
+/// Live2 sketch-state (11-17): a free line's sketch is under defined (the row's badge, the line and its ends blue);
+/// Fix on the line holds the line (black) but not its ends (blue, free along it), the badge stays; a HORIZONTAL on
+/// that slanted line can't be solved: the row red ("Sketch could not be solved."), no badge, the bubble, the line
+/// where it was; deleting it goes back to the fixed state, deleting the Fix to the free one; all with the sketch open.
+#[gpui::test]
+fn an_open_sketchs_state_follows_its_constraints(cx: &mut TestAppContext) {
+    use noshape_model::display::FeatureStatus;
+    use noshape_sketch::ConstraintState::{FullyConstrained as Full, UnderConstrained as Under};
+    let (window, view) = line_then_dimension_tool(cx, "open-states");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    draw(cx, window);
+    let (line, ends, at) = cx.update(|cx| {
+        let sk = view.read(cx).sketch_data(cx).unwrap().sketch.clone();
+        let l = sk.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).map(|e| e.id).unwrap();
+        let (s, e) = sk.endpoints(l).unwrap();
+        (l, [s, e], sk.curve(l))
+    });
+    let row = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        let id = v.sketch.as_ref().unwrap().feature;
+        v.display.feature_state(id).map(|s| (s.status, s.underdefined, s.message.clone())).unwrap()
+    });
+    let states = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        let id = v.sketch.as_ref().unwrap().feature;
+        let r = v.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == id)).map(|s| s.report.clone()).unwrap();
+        (r.state(line), ends.map(|e| r.state(e)))
+    });
+    let settle = |cx: &mut TestAppContext| {
+        draw(cx, window);
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    };
+    let constrain = |cx: &mut TestAppContext, c: ConstraintTool| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.sketch.as_mut().unwrap().selection = vec![line];
+                v.constraint(c, w, cx);
+            })
+        })
+        .unwrap();
+        settle(cx);
+    };
+    let delete = |cx: &mut TestAppContext, horizontal: bool| {
+        let cid = cx.update(|cx| {
+            view.read(cx).sketch_data(cx).unwrap().sketch.constraints().find(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Horizontal { .. }) == horizontal).map(|c| c.id).unwrap()
+        });
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let ed = v.sketch.as_mut().unwrap();
+                ed.selection.clear();
+                ed.selected_constraints = vec![cid];
+                v.sketch_delete(w, cx);
+            })
+        })
+        .unwrap();
+        settle(cx);
+    };
+    let free = |cx: &mut TestAppContext, what: &str| {
+        assert_eq!((row(cx).0, row(cx).1), (FeatureStatus::Ok, true), "{what}: the badge");
+        assert_eq!(states(cx), (Some(Under), [Some(Under); 2]), "{what}: all blue");
+    };
+    let fixed = |cx: &mut TestAppContext, what: &str| {
+        assert_eq!((row(cx).0, row(cx).1), (FeatureStatus::Ok, true), "{what}: the badge stays");
+        assert_eq!(states(cx), (Some(Full), [Some(Under); 2]), "{what}: the line black, its ends blue");
+    };
+    free(cx, "free");
+    constrain(cx, ConstraintTool::Fix);
+    fixed(cx, "fixed");
+    constrain(cx, ConstraintTool::Horizontal);
+    let r = row(cx);
+    assert!(r.0 == FeatureStatus::Error && !r.1 && r.2.as_deref() == Some("Sketch could not be solved."), "conflict: {r:?}");
+    let bubble = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).message.as_ref().map(|m| m.1.clone()));
+    assert_eq!(bubble(cx).as_deref(), Some("Sketch could not be solved."), "the bubble");
+    let now = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.curve(line));
+    assert_eq!(now, at, "the line stays where it was");
+    delete(cx, true);
+    fixed(cx, "the conflict deleted");
+    assert_eq!(bubble(cx), None, "the bubble goes");
+    delete(cx, false);
+    free(cx, "the Fix deleted");
 }
 
 /// Parity sketch.md 7.3: the Dimension tool's pick and placement clicks open

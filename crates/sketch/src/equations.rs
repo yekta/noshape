@@ -1856,6 +1856,17 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 if items.len() != c.hints.anchor.len() {
                     return Err("fix constraint anchor does not match entity".into());
                 }
+                // Live (live2 sketch-state 11-17): Fix on a line holds the line where it lies, its ends free to slide
+                // along it (black line, blue ends, the sketch still under defined).
+                if let (Some(Geometry::Line { start, end }), [x0, y0, x1, y1]) = (self.sk.entity(*entity).map(|e| &e.geometry), c.hints.anchor.as_slice()) {
+                    let (a, b) = (glam::DVec2::new(*x0, *y0), glam::DVec2::new(*x1, *y1));
+                    let n = (b - a).try_normalize().map(|d| d.perp()).ok_or("fix constraint on a zero-length line")?;
+                    for p in [*start, *end] {
+                        let pp = self.lk.point(p);
+                        self.lin(Lin::new().p(n.x, pp[0]).p(n.y, pp[1]).cst(-n.dot(a)));
+                    }
+                    return Ok(());
+                }
                 for (item, v) in items.iter().zip(c.hints.anchor.iter()) {
                     match *item {
                         FixItem::PointCoord(p, k) => {

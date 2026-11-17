@@ -470,6 +470,13 @@ impl PartStudioView {
         self.apply_display(Arc::new(result.display), window, cx);
         // The profile inspector follows every edit (resolved issues disappear).
         self.update_profile_issues(cx);
+        // "Sketch could not be solved." goes once the sketch solves again (live2 sketch-state (4)).
+        if let Some(id) = editing_sketch
+            && self.message.as_ref().is_some_and(|m| m.1 == crate::sketch_mode::SKETCH_NOT_SOLVED)
+            && self.display.feature_state(id).is_some_and(|s| s.status != noshape_model::display::FeatureStatus::Error)
+        {
+            self.message = None;
+        }
     }
 
     fn apply_outcome(&mut self, out: EditOutcome, window: &mut Window, cx: &mut Context<Self>) {

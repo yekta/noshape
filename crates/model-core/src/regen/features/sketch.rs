@@ -252,7 +252,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if let noshape_sketch::SolveStatus::Overconstrained { .. } = report.status {
-        ev.warnings.push("Sketch has conflicting constraints".into());
+        ev.warnings.push("Sketch could not be solved.".into());
     }
     if !problems.is_empty() {
         ev.warnings.push(problems.join("; "));

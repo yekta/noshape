@@ -704,14 +704,16 @@ impl Regenerator {
                                 if f.type_id == "sketch"
                                     && let Some(s) = ev.ctx.sketch(f.id)
                                 {
-                                    state.underdefined = s.report.dof.is_some_and(|d| d > 0);
                                     // Live (qa5 SK1): a sketch that can't be solved is in
-                                    // error (red title and feature row), its geometry kept.
+                                    // error (red title and feature row), its geometry kept, and
+                                    // has no under-defined badge (live2 sketch-state (3)).
+                                    let solved = matches!(s.report.status, noshape_sketch::SolveStatus::Solved);
+                                    state.underdefined = solved && s.report.dof.is_some_and(|d| d > 0);
                                     if !matches!(s.report.status, noshape_sketch::SolveStatus::Solved) {
                                         state.status = FeatureStatus::Error;
                                         state.message = Some(match &s.report.status {
                                             noshape_sketch::SolveStatus::Failed { .. } => "Sketch could not be solved.".to_string(),
-                                            _ => state.message.clone().unwrap_or_else(|| "Sketch has conflicting constraints".into()),
+                                            _ => state.message.clone().unwrap_or_else(|| "Sketch could not be solved.".into()),
                                         });
                                     }
                                 }

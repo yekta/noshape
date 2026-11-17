@@ -1715,6 +1715,9 @@ impl Sketch {
     /// the chord); an arc's centre keeps the end, the start sliding onto the new circle; a LENGTH line's end
     /// translates the line. Only where nothing else holds the curve; `None`: the solver's own drag.
     fn lives_drag(&self, handles: &[(DragHandle, DVec2)]) -> Option<Vec<(DragHandle, DVec2)>> {
+        if let [(DragHandle::Entity { id, grab }, t)] = handles {
+            return self.lives_line_body_drag(*id, *grab, *t);
+        }
         let [(DragHandle::Point(p), t)] = handles else { return None };
         let (p, t) = (*p, *t);
         // Nothing but `ok` constraints on `ids`, and their points used by `curve` alone.
@@ -1764,6 +1767,46 @@ impl Sketch {
             }
         }
         None
+    }
+
+    /// A line dragged by its body with an end shared with another line (live2 sketch-drags run4 c2): it keeps its
+    /// direction and moves across itself through the pointer; a free end moves straight across, a shared end slides
+    /// along the other line, which keeps its direction and far end. Only where nothing else holds them; `None` (a line
+    /// free at both ends translates whole) otherwise.
+    fn lives_line_body_drag(&self, id: EntityId, grab: DVec2, t: DVec2) -> Option<Vec<(DragHandle, DVec2)>> {
+        let Geometry::Line { start, end } = self.entity(id)?.geometry else { return None };
+        let (a, b) = (self.point(start)?, self.point(end)?);
+        let n = (b - a).try_normalize()?.perp();
+        let shift = n * (t - grab).dot(n);
+        let constrained = |ids: &[EntityId]| self.constraints().any(|c| c.kind.entities().iter().any(|e| ids.contains(e)));
+        let mut out = Vec::new();
+        let mut shared = false;
+        for (p, q) in [(start, a), (end, b)] {
+            let others: Vec<&crate::entities::Entity> = self.entities().filter(|e| e.id != id && e.point_refs().contains(&p)).collect();
+            match others.as_slice() {
+                [] => out.push((DragHandle::Point(p), q + shift)),
+                [m] => {
+                    let Geometry::Line { start: ms, end: me } = m.geometry else { return None };
+                    let far = if ms == p { me } else { ms };
+                    if constrained(&[m.id, far]) || self.entities().any(|e| e.id != m.id && e.point_refs().contains(&far)) {
+                        return None;
+                    }
+                    let f = self.point(far)?;
+                    let u = (q - f).try_normalize()?;
+                    // Where the other line (kept) meets the moved one.
+                    let den = u.dot(n);
+                    if den.abs() < 1e-9 {
+                        return None;
+                    }
+                    let k = (q + shift - f).dot(n) / den;
+                    out.push((DragHandle::Point(p), f + u * k));
+                    out.push((DragHandle::Point(far), f));
+                    shared = true;
+                }
+                _ => return None,
+            }
+        }
+        (shared && !constrained(&[id, start, end])).then_some(out)
     }
 
     /// Whether a body drag of curve `id` (not a circle or an arc: those resize) can't translate it: one of its points is

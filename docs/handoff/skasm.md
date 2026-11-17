@@ -35,11 +35,14 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
    Dimension 8.5 px straight out from the pointer; a point beats the GPU's line; the region past every reach; no plane /
    face / region hover while drawing; the second-picked line moves as live2's 2b; range errors from a variable).
    Checked as live by hand on vibex6 (Xvfb :391, ~/tmp/skasm/hov): constraints from a selection, dimension place / edit,
-   drags. Queued on vibex7 (vibe5/vibe3 gone; NOSHAPE_LAND_QUEUE_HOST=vibex7): e038a9ea (the
-   parting-line `r.sketch` fix; woken edge ends' H / V; H / V on two lines about their midpoints; Normal on two lines
-   refused; curve drags as live2's sketch-drags via `Sketch::lives_drag`) and 6857ba59 (drag glyphs, an arc end's
-   level drop, the spline rows: snaps matrix 67 / 67). Gaps left: the ellipse's minor-axis rim (live ×2.07 for a
-   10.8 mm drag), a free chain's L2 dragged by its middle (live slides the shared end). Show constraints memory is already live's.
+   drags. Landed today after that: 4a8381fc (curve drags, woken edge ends, H / V on two lines), 3621f719 (drag
+   glyphs, arc-end level drop, spline rows: matrix 67 / 67), 5245720f (every constraint button on two lines).
+   Pair 1117b (my stack vs main): +5 features (parting-line 5 -> 10/17), no other document changed.
+   In the tree, testing (vibex7): a chain's L2 dragged by its middle and the ellipse's minor rim (live2 run4);
+   Fix on a line holds the line, not its ends (live2 sketch-state: badge stays, ends blue); an unsolved sketch has
+   no badge and says "Sketch could not be solved." (was "Sketch has conflicting constraints"); one constraint
+   glyph selected at a time (live2 glyph-select). FIX documents traced: bezier 4/6 and cf-parameter-pattern 9/9,
+   as on main. Show constraints memory is already live's.
 1. config-parts: linear-rail 26/26, links 35/35 (live fetched Derived 1's source), standoffs 32/32, sprockets 24/24
    (live's volume band carried while its volume stays: carry_volume_bands); pulleys 12/22 (Circular pattern 1, a face
    pattern ADD, fails in our op on main too: core's since 11:45); nuts 14/17 (Sweep 1, bool's). Standoffs regenerates

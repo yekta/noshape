@@ -34,7 +34,9 @@ fn dof_per_entity_type_and_fix() {
         assert_eq!(r.state(id), Some(ConstraintState::UnderConstrained));
         let f = sk.add_constraint(ConstraintKind::Fix { entity: id }).unwrap();
         let r = solved(&mut sk);
-        assert_eq!(r.dof, Some(0), "{:?}", sk.kind(id));
+        // Live (live2 sketch-state 11-17): Fix on a line holds the line, its two ends free to slide along it.
+        let left = if sk.kind(id) == Some(EntityKind::Line) { 2 } else { 0 };
+        assert_eq!(r.dof, Some(left), "{:?}", sk.kind(id));
         assert_eq!(r.state(id), Some(ConstraintState::FullyConstrained));
         assert!(r.redundant.is_empty(), "{:?} {:?}", sk.kind(id), r.redundant);
         let _ = f;
