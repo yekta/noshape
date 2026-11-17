@@ -1726,23 +1726,6 @@ fn a_part_pattern_of_one_merges_its_seed_as_live() {
     assert!(near(noshape_kernel::volume_properties(&res.context.bodies[0].shape).unwrap().mass, 0.005 * 0.01 * 0.01, 1e-9));
 }
 
-/// A Mirror with Add joins a surface's mirror to the surface it meets (std processPatternBooleansIfNeeded; live
-/// c2-surf-workshop-singularities' Mirror 3: a sheet and its mirror across its edge, one sheet of 2 faces).
-#[test]
-fn a_mirrored_surface_added_joins_the_surface_it_meets() {
-    let mut t = T::new();
-    let mut sk = noshape_sketch::Sketch::new();
-    // Front: sketch x = X, y = Z; from the Right plane out.
-    let l = sk.add_line(DVec2::ZERO, DVec2::new(0.02, 0.01)).0;
-    let s1 = t.sketch(Reference::Plane(DatumPlane::Front), sk);
-    let x = t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![Reference::SketchEntity { sketch: s1, entity: l }])), ("depth", e("40 mm"))]);
-    let id = BodyId { feature: x, index: 0 };
-    t.add("mirror", &[("entities", q(vec![body_ref(&id)])), ("mirrorPlane", q(vec![Reference::Plane(DatumPlane::Right)])), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
-    let res = t.ok();
-    assert_eq!(res.context.bodies.len(), 1, "one sheet");
-    assert_eq!(res.context.bodies[0].faces.len(), 2);
-}
-
 /// A sheet split by a sheet across it comes apart in two (OCCT keeps the halves in one shell, joined along the cut:
 /// c2-surf-workshop-manualblend's Split 1 reported "does not split"; live 2 pieces of each).
 #[test]
