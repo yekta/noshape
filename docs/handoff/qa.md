@@ -70,8 +70,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    (suites/<run>/worse.txt from bin/suites-diff.py: models, scenarios, `failure`, `speed`, `newdiff`; assemblies.log
    `^asm-…: … BOM rows` and `^assemblies:`; exchange.log `exchange score` and times over live). Regressions -> owners as P0
    (paused agents: to the lead), tickets the run confirms fixed -> mark verified.
-4. Open P0s to re-check on the green that claims each fix: IMPELLER-DELETE-FACE-2-SLOW (core; impeller Delete face 2 ~10 s,
-   live 2.8 s for the whole document), SCISSOR-LIFT-BOM-ROWS (bool bisects, asm owns the BOM). blend's impeller Fillet 3
+4. Open P0s to re-check on the green that claims each fix: SCISSOR-LIFT-BOM-ROWS (bool bisects, asm owns the BOM).
+   IMPELLER-DELETE-FACE-2-SLOW reclassified 10:55: slower than live (~19 s vs 2.8 s), not a regression (v0.4.48 built other
+   parts); core told. The knife Chamfer 2 / Fillet 5 / Fillet 3 "regressions" (v0.4.48 -> v0.4.53) were the same: blend's Mac
+   A/B 10:40, v0.4.48 matched 20/52 knife features. Closed; they stay on blend's slower-than-live list. blend's impeller Fillet 3
    is WIP in blend10 (not landed): when it lands, re-time c2-impeller-loft v0.4.56 vs green on vibe6
    (bin/abn-feat.py 3 <cli,cli> ~/agents/qa-keep/abc/m <work> c2-impeller-loft; full paths, `~` after a comma isn't expanded).
 5. Nightly (02:00, qa-w7-nightly): after it, check suites/window-0200-<mmdd>.log ends NIGHTLY-DONE and the SCORE row is valid
@@ -101,6 +103,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   (APP, XD, DOC env; NOSHAPE_FRAME_LOG + NOSHAPE_PERF=1); lat-open.py <dir>; ../lat-steps.py <scenario> <frames log>.
   quitv.sh <runs> <scenario> <app>... (XD, SD env) for crash loops; quit scenarios qa-asm-a / qa-tabs / qa-edit.
 - A/B: bin/ab-feat.py (2 CLIs), bin/abn-feat.py <runs> <cli,cli,..> (n CLIs; full paths, no ~), bin/ab-sum.py <jsonl> [live-regen.json].
+  Since 11-17 10:50 both write "parts_same" (each CLI's final parts on a fresh copy, outside the timed runs; scp sig.py + nscli.py
+  beside them, else None). parts_same False = the builds model different geometry: no regression claim from such an A/B.
 - Speed: mac/opentime.py, mac/modeltime.py (vibe7 copies in ~/agents/qa-keep), bin/nightly-sum.py, mac/live-regen.json.
 - Private documents (hat8, hat15, hat15b, dock in vibe5 / vibe7 ~/lead-private) only as mode-700 copies in ~/tmp/qa on a
   host, deleted after; never in the repo or tickets.
