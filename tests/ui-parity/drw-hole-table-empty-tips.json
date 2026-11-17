@@ -1,0 +1,45 @@
+{
+  "name": "drw-hole-table-empty-tips",
+  "about": "Hole table tool opened with no view: its title is invalid (red); hovering the title and the Views list shows their tooltips; cancelled",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (live2 11-17: the drawing matrix's Hole table gaps 'All views in a hole table must be of a common singular part' / 'Select views of a common singular part')",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Hole table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          112,
+          90
+        ]
+      },
+      "ms": 1500
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          140,
+          177
+        ]
+      },
+      "ms": 1500
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
