@@ -323,6 +323,8 @@ struct FeatureRow {
     /// Mate indicator hidden (None: no eye icon).
     hidden: Option<bool>,
     tooltip: Option<String>,
+    /// A mate's flyout (its head and read-only parameter rows), shown as its row's tooltip.
+    flyout: Option<(String, Vec<crate::assembly_flyout::FlyRow>)>,
     /// Implicit mate connectors listed under the mate (label, connector).
     implicit: Vec<(String, MateConnectorRef)>,
 }
@@ -4370,7 +4372,7 @@ impl AssemblyView {
 
     fn feature_row(&self, f: FeatureRow, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let FeatureRow { id, icon, name, ok, inactive, message, has_limits, hidden, tooltip, implicit } = f;
+        let FeatureRow { id, icon, name, ok, inactive, message, has_limits, hidden, tooltip, flyout, implicit } = f;
         // The added mates only count beside a selected one (clicks that
         // clear `selected_mate` leave them).
         // (And the mate whose dialog is open, live asm-mate-menu-edit.)
@@ -4441,7 +4443,12 @@ impl AssemblyView {
                 )
             })
             // No row tooltip while a context menu is open (it would cover the menu).
-            .when_some(tip.filter(|_| !crate::os_menu::is_open(cx)), |d, m| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)).tooltip_show_delay(crate::ui::ROW_TIP_DELAY))
+            // A mate's: its flyout (live2 asm-feel (1)); an error's or another row's: the plain tooltip.
+            .map(|d| match (tip.filter(|_| !crate::os_menu::is_open(cx)), flyout.filter(|_| message.is_none())) {
+                (Some(m), Some((head, rows))) => crate::assembly_flyout::with_mate_flyout(d, head, rows, m),
+                (Some(m), None) => d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)).tooltip_show_delay(crate::ui::ROW_TIP_DELAY),
+                (None, _) => d,
+            })
             // Drag a row onto another of the same kind to reorder (Onshape).
             .on_drag(behaviors::MateDrag { id, label: name.clone().into() }, |d, _, _, cx| cx.new(|_| d.clone()))
             .drag_over::<behaviors::MateDrag>(move |st, _, _, _| st.border_t_2().border_color(accent))
@@ -4663,6 +4670,36 @@ impl AssemblyView {
         lines.join("\n")
     }
 
+    /// A mate's flyout (live2 asm-feel (1)): its tooltip's head, then its parameters read-only, only the type while they
+    /// are all at their defaults (Revolute: "Revolute"; with Limits ticked: the type, Offset, Limits, each limit or "No
+    /// minimum" / "No maximum", Simulation connection).
+    fn mate_flyout(&self, m: &Mate) -> (String, Vec<crate::assembly_flyout::FlyRow>) {
+        use crate::assembly_flyout::FlyRow;
+        let head = self.mate_tooltip(m).lines().next().unwrap_or_default().to_string();
+        let t = m.mate_type;
+        let mut rows = vec![FlyRow::Text(t.name().to_string())];
+        let set = |e: &Option<ExprValue>| e.as_ref().is_some_and(|e| !e.text.trim().is_empty());
+        let offset = set(&m.offset_x) || set(&m.offset_y) || set(&m.offset_z) || set(&m.rotation);
+        if !(offset || !m.limits.is_empty() || m.simulation_connection) {
+            return (head, rows);
+        }
+        let (ox, oy, oz, orot) = noshape_model::assembly::eval::offset_axes(t);
+        if ox || oy || oz || orot {
+            rows.push(FlyRow::Check("Offset".into(), offset));
+        }
+        if !noshape_model::assembly::eval::limit_keys(t).is_empty() {
+            rows.push(FlyRow::Check("Limits".into(), !m.limits.is_empty()));
+            for (_, l) in &m.limits {
+                rows.push(FlyRow::Text(l.min.as_ref().map(|e| e.text.clone()).unwrap_or_else(|| "No minimum".into())));
+                rows.push(FlyRow::Text(l.max.as_ref().map(|e| e.text.clone()).unwrap_or_else(|| "No maximum".into())));
+            }
+        }
+        if t.has_simulation_connection() {
+            rows.push(FlyRow::Check("Simulation connection".into(), m.simulation_connection));
+        }
+        (head, rows)
+    }
+
     /// A mate's row in Mate features (None when the filter hides it).
     /// A mate's list row, a ui-parity target (`mate:<name>`).
     fn mate_list_row(&self, m: &Mate, result: &AssemblyResult, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -4681,7 +4718,7 @@ impl AssemblyView {
         // Live (asm-root-menu-expand-all): the children read "Mate connector".
         let implicit: Vec<(String, MateConnectorRef)> = m.connectors().filter(|c| c.connector.is_none() && !c.is_origin()).map(|c| ("Mate connector".to_string(), c.clone())).collect();
         Some(self.feature_row(
-            FeatureRow { id: m.id, icon: mate_icon(m.mate_type), name: m.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: !m.limits.is_empty(), hidden: Some(hidden), tooltip: Some(self.mate_tooltip(m)), implicit },
+            FeatureRow { id: m.id, icon: mate_icon(m.mate_type), name: m.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: !m.limits.is_empty(), hidden: Some(hidden), tooltip: Some(self.mate_tooltip(m)), flyout: Some(self.mate_flyout(m)), implicit },
             cx,
         ))
     }
@@ -5008,7 +5045,7 @@ impl AssemblyView {
                 continue;
             }
             let icon = icon_path(relation_icon(r.relation_type));
-            let row = self.feature_row(FeatureRow { id: r.id, icon, name: r.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
+            let row = self.feature_row(FeatureRow { id: r.id, icon, name: r.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
             items.push((r.id, crate::ui_script::wrap(row, || format!("mate:{}", r.name))));
         }
         // Live (behaviours "qa (2026-10-28, P3) assembly E2 follow-up"; GROUP-ROW-ERROR):
@@ -5030,7 +5067,7 @@ impl AssemblyView {
             let hidden = (g.hidden || !self.show_mates) && !editing;
             let tail = if hidden { " (Hidden)" } else { "" };
             let tooltip = Some(if err { format!("{} has error: {SAME_GROUP}{tail}", g.name) } else { format!("{}{tail}", g.name) });
-            let row = self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: !err, inactive: g.suppressed, message: err.then(|| SAME_GROUP.to_string()), has_limits: false, hidden: Some(hidden), tooltip, implicit: vec![] }, cx);
+            let row = self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: !err, inactive: g.suppressed, message: err.then(|| SAME_GROUP.to_string()), has_limits: false, hidden: Some(hidden), tooltip, flyout: None, implicit: vec![] }, cx);
             let row = if editing { div().bg(pal.accent_soft).font_weight(FontWeight::BOLD).child(row).into_any_element() } else { row };
             items.push((g.id, crate::ui_script::wrap(row, || format!("mate:{}", g.name))));
         }
@@ -5055,7 +5092,7 @@ impl AssemblyView {
         let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id)).map(|d| (d.id, d.mate_type, d.name.clone(), d.a.is_some() && d.b.is_some() && !d.same_instance(), d.a.is_some() || d.b.is_some(), d.same_instance()));
         if let Some((id, mate_type, name, complete, _, same)) = new_mate.clone() {
             let message = if same { Some(crate::assembly_mate_dialog::SAME_INSTANCE.to_string()) } else { (!complete).then(|| "Mate cannot resolve mate connectors.".to_string()) };
-            let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete, inactive: false, message, has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
+            let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete, inactive: false, message, has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
             mate_ids.push(id);
         }
@@ -5063,7 +5100,7 @@ impl AssemblyView {
         // origin is picked) is in the list while its dialog is open (not one opened from a mate's chip).
         let new_mc = self.mc.as_ref().filter(|s| !s.editing && s.for_mate.is_none() && !asm.connectors.iter().any(|c| c.id == s.id)).map(|s| (s.id, s.name.clone(), s.on.is_some()));
         if let Some((id, name, ok)) = new_mc.clone() {
-            let row = self.feature_row(FeatureRow { id, icon: icon_path("mate-connector-assembly"), name, ok, inactive: false, message: None, has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
+            let row = self.feature_row(FeatureRow { id, icon: icon_path("mate-connector-assembly"), name, ok, inactive: false, message: None, has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
             mate_ids.push(id);
         }
