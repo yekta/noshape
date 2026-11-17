@@ -1,0 +1,83 @@
+{
+  "name": "drw-view-properties-synchronize-breaks",
+  "about": "A break on Front, then Right's View properties: the projected view shows Suppress alignment with parent and Synchronize breaks from parent; cancelled",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (live2 11-17: the drawing matrix's View properties gap 'Synchronize breaks from parent')",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Break view"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            10,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            30,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Right"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "View properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
