@@ -28,7 +28,7 @@ pub use jog::{CentermarkArms, seg_dist};
 pub use annotation_edit::LeaderHit;
 pub use opts::*;
 pub use pending::ToolValues;
-pub use pick::{SheetPick, closed_circle};
+pub use pick::{SheetPick, VIEW_REACH_MM, closed_circle};
 pub use smart::{Refs, same, view_of};
 pub use sketch::{SkCon, SkTool};
 pub use types::*;
