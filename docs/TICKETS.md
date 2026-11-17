@@ -567,7 +567,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   with the wrong part (fa6f90cc: 13/33/25 faces/edges/vertices, 5269155 mm³; live 27/67/47, 6325199 mm³). qa-lp-verify runs
   that document alone on the first green with core's revert (vibex6) -> qa-alerts and here.
 - Green 592b0fc9 vs v0.4.57: hat8, hat15, hat15b, the dock, ticket and authored documents ALL-SAME.
-- **v0.4.57 macOS app on the user's Mac (qa 22:05, release .app.zip SHA OK, ~/noshape-host, slot, nice 19)**: a new mm
+- **v0.4.57 macOS app on the user's Mac (qa 21:59, release .app.zip SHA OK, ~/noshape-host, slot, nice 19)**: a new mm
   document's Fillet opens empty (Entities to fillet empty and active, Radius 5 mm, no red value) with fresh settings, with an
   old build's "9 mm + #wall_thickness" memory, and with an old-format "3 mm" memory (5 mm: REMEMBERED-VALUES-OLD-FORMAT, fixed
   by 40a994a16 for 05:00). Evidence: the runner's dialog state, qa-scratch/mac/out57/out-fillet/*/state.jsonl. **Not checked
