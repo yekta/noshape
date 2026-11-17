@@ -6182,7 +6182,10 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   (23/25) and train-joe's Sketch 2 (11/12, a COINCIDENT and a MIDPOINT). Our sketch warns for an external_refs entry
   that resolves to nothing (model-core sketch.rs), but sketch_use projects only what exists: the translator needs a
   way to add a dangling reference (a projected point keeping its solved place, its reference to nothing).
-- [ ] P1 PARITY-CUSTOM-RUN-FAILURES (dx, from core 11-03 22:30; dx's parity suite run 42, 11-03 19:33) the corpus's community features
+- [x] P1 PARITY-CUSTOM-RUN-FAILURES (dx 11-17 15:4x: closed. qa's 06:27 models run: 0 documents with custom features
+  failing to compile / run, custom features 105/121; the 16 left are geometry: c2-config-parts-* (live's retake),
+  cf-setback-fillet (SETBACK-FILL-PATCH), cf-surface-pattern (core's loft). isaac 8f5622's GearLab runs since bc58c02b.)
+  (dx, from core 11-03 22:30; dx's parity suite run 42, 11-03 19:33) the corpus's community features
   whose inputs translate whole but fail in our host, with the Monitor's first error (featurestudio_monitor on the
   translated documents: `NOSHAPE_PARITY_SAVE=<dir>` keeps them, NOSHAPE_PARITY_ONLY=<name>; copies of all in
   /root/dx-scratch/pmsave/<name>.noshape), each with live building it:

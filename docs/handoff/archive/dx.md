@@ -3405,3 +3405,66 @@ B-splines); extension-spring same. ui-parity drawing exports 84/84 still match (
 a38f0629 (landed 11-17 03:24): on_conic also takes a 2-point piece (the shorter way) and HLR points within 10 µm
 (ends 1 µm apart close it): housing-draft's drafted rims Right 2 LINE / Front 2 SPLINE / Iso 1 SPLINE -> ELLIPSE;
 sm-louver ARC 68 / CIRCLE 2 as live. ops e2e 222/222 (Mac), ui-parity drawing exports 84/84 (vibe6 exp-tol).
+
+## 11-17 14:3x (moved from the handoff)
+3. Landed 11-17: 4ddf9f2d curve pattern along a helix (frames from the helix's axis; kernel fit's fallback pair, old
+   pair kept when it works): driven-pattern 7/11 -> 11/11, the other 7 helix docs unchanged (vibe6 A/B). 2089f117
+   Parasolid import heals a bodies-only file once (the assembly check stopped healing): rings-loft x_t suite import
+   on the Mac 7.9 -> 6.6 s (live 8.6); qa's `documents import` on vibe6 not re-timed. SM-BOOLEAN-SPEED closed (Mac
+   Up to Part 66 ms / live 160). Studios 06:27: 1dc32b 27/349 (was 17), Boolean 4 hub 232/632/400 vs 216/600/384,
+   2666 ms vs 135: sent to bool 7fa8ceab 08:10 (repro vibe7 ~/agents/dx-keep/repro/1dc32b-b4); 74d3d6 9/180 (core's).
+5. P1 (lead 11-17) asm-robot-relations studio 0c3466 Import 1 (STEP studios/foreign/0fc7dd7c….step, SolidWorks): the
+   file's one MANIFOLD_SOLID_BREP is ONE closed connected shell (174 faces, every edge on 2 faces; python check on the
+   text). Live imports it as 6 SHEET bodies "REV-21-1650": 28/44/22 (box -31..30, -30..31, -58..35 mm), three 4/4/0
+   (~-37..-17, 21..43, -148..-3: tubes), 106/278/184, 1/10/7: 147 faces, no volume; Thicken 1 thickens a face of the
+   28-face one (Part 1 solid 60 faces 223.99 mm³). Ours: one solid, 147 faces (merge_same_surface_faces 174 -> 147),
+   valid closed solid (11-17 12:0x: BRepCheck valid, no self-intersection, every one of 325 edges on 2 faces; the
+   28 'one-face' edges were seams), 171986.6 mm³; live's sheets are its own import failing. Thicken 1 fails in ours
+   (reference to a face of live's sheet JFD). Lead 11-17 12:1x: keep our solid (live's import failing); suite leaves
+   both out from Import 1 on (tests/parity.rs LIVE_IMPORT_FAILURES, PARITY-SUITES); asm maps Thicken 1's JFD face to
+   ours by geometry (sent 12:2x).
+   an imported solid whose healed shell is open -> sheet bodies, one per connected piece (ours would be 1 piece of 147
+   faces; live's 6 split where Parasolid didn't sew: find those edges, e.g. gaps over tolerance). Uncommitted in
+   dx-land: kernel connected_pieces / split_connected_pieces (a part of several solids or of a solid of disconnected
+   pieces -> a part per piece; T1 export::a_solid_of_disconnected_pieces_imports_as_a_part_each), ops import.rs
+   calls it; no live evidence that live splits real multi-piece solids: hold. Also uncommitted: the ACIS seam guard
+   (xt.cpp smooth_seam, ACIS only, <1 mrad, pole move <= 1 um; T1 export::a_tube_wall_with_a_slightly_kinked_seam_
+   goes_round_as_one_acis_face): hose SAT read-back not yet proven (vibe6 run cancelled 11:51, slot queue 5 behind qa).
+
+## 11-17 16:1x (moved from the handoff: exchange history)
+Largest gaps first, one line per landing. Data /root/parity/exchange/<doc>/ (live.*, live-self.json, live-times.json,
+live-drawing.dxf); suite parity::exchange_round_trip (dx-keep/bin/exch.sh). live2's 18:50 fetch of the
+rest of set 2 failed (HTTP 401 on every doc; only variable-fillet's STEP / IGES came): REQUESTS line 3328 (21:04) asks
+for a rerun after re-authenticating (live2 paused until ~11-17 10:15). Full suite rerun x1116n (vibe6, main 57885ecc
+binary incl. 4dd88057, all 17 docs, snapshot ~/tmp/dx/exs, log ~/tmp/dx/exch-x1116n.log, started 21:28): rank from it.
+Landed 11-16 / early 11-17 (exchange suite, x_t / ACIS / DXF fixes): see the archive, 11-17 05:52 block.
+59c0be35 (landed 04:37): SAT writes a face going round its B-surface in ACIS's periodic form (clamped knots,
+"periodic", no seam: live's own SAT) and reads that form back periodic (shared bsurface_as_periodic, xt_read);
+RoundSplines {Split, Parasolid, Acis} replaces the periodic_splines bool, prepared() takes `offsets` apart and converts
+extrusions for ACIS. Ours reads ours.sat: motor-mount-jack 16/24/0 and rings-loft Part 1 273/762/508 as the model
+(Mac exs-all). T1 export::a_loft_wall_goes_round_as_one_acis_face.
+9a19e358 (landed 05:00; lead: split from it, checked alone): a vertex where only seams cross isn't shown (live
+behaviours.md "kern (10-25) seam counts": no seam vertices; free-form one-face bodies 1/0/0) and a free-form face's
+box holds the highest point its climb finds (OCCT's was 1.9 µm short): o-ring generator's elliptic rings read back
+1/0/0 as live. Model suite A/B vibe7 (~/tmp/dx/abK-*): identical but c2-loft-paths-guides Loft 3 vertices 27 -> 26
+(live 23, edges same); hats/dock SAME on every tab (vibe5); psui 206/206, scene, kernel 480/480 on the Mac.
+Left in SAT: cf-hose-routing 22/44/24 for 12/12/0 (sections split, as in x_t); rings-loft Part 2 (x_t's parked piece).
+Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live imports ours 46/48, ours reads ours
+112/119, times 49/50, drawings' DXF 0/4.
+
+## Moved from the handoff 11-17 17:05
+   housing-draft findings (11-17 03:00):
+   - Placement: live centres each suggested view on the projection of the part's loose Parasolid box (live.jsonl
+     final bbox z -3.685..5.0 mm, x +-16.44, from Rotieren 1's torus; the geometry is z -1.37..5.0, x +-15.3), ours on
+     the exact box: Front / Right 1.158 mm (0.0456 in) and Iso 0.946 mm lower, Top exact. Matching it needs
+     Parasolid's loose box of a torus face: left (counts unaffected).
+   - Lug bottoms (torus x plane B-spline edges): live writes chords of a 3D tessellation (LINEs up to 0.13 mm off the
+     curve; one chord where 1.8 mm shows) in Front and Right, cubic SPLINEs in Iso; ours SPLINE everywhere. No rule.
+   - Right-view radial hole rim: live one CIRCLE (a B-spline rim on the hole's cylinder, seen along its axis); ours a
+     70-point free SPLINE + an 8-point piece + three 2-point bits (our model has 8 LINE edges between cylinders, live
+     none). Idea, unproven on other docs: a curve on a cylinder seen end-on is that circle's arc.
+   - Model: our Rotieren 1 face is a surface of revolution (STEP SURFACE_OF_REVOLUTION + 8 extra plane / SoR LINEs)
+     where live's is a degenerate torus; Iso lug-end LINE vs live ARC x2 follow from that.
+- Intermittent segfault (vibe6, binary ops-ex2 22:47 and 22:52, both right after rings-loft's imports, before its STEP
+  export); not again in 8 runs (vibe5 gdb, vibe5/vibe6 plain, x1116j). gdb on vibe5: `handle SIG37 nostop noprint
+  pass` (the checkpoint thread's signal). Watch for it.

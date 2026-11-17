@@ -1,58 +1,26 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 08:19 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 17:05 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
 visuals, the parity translator (crates/ops/src/parity.rs) for my studios. The drawing UI is studios' (11-12).
 Studio split with asm (lead 11-15): infento 1dc32b / 74d3d6 and bjr-config 5d8bc1 are mine; isaac-ball (3c5c58,
 1e81ca, 90f78b) and config-assembly 20e932 are asm's. asm gates parity.rs changes before they land.
-Reduced mode until ~11-17 10:15: asm, skasm, bool2, studios, live, live2 paused: never message them; requests go to
-/root/onshape-research/live/REQUESTS.md or their handoff.
 Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e2e::` (the queue may skip ops).
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.
-Largest gaps first, one line per landing. Data /root/parity/exchange/<doc>/ (live.*, live-self.json, live-times.json,
-live-drawing.dxf); suite parity::exchange_round_trip (dx-keep/bin/exch.sh). live2's 18:50 fetch of the
-rest of set 2 failed (HTTP 401 on every doc; only variable-fillet's STEP / IGES came): REQUESTS line 3328 (21:04) asks
-for a rerun after re-authenticating (live2 paused until ~11-17 10:15). Full suite rerun x1116n (vibe6, main 57885ecc
-binary incl. 4dd88057, all 17 docs, snapshot ~/tmp/dx/exs, log ~/tmp/dx/exch-x1116n.log, started 21:28): rank from it.
-Landed 11-16 / early 11-17 (exchange suite, x_t / ACIS / DXF fixes): see the archive, 11-17 05:52 block.
-59c0be35 (landed 04:37): SAT writes a face going round its B-surface in ACIS's periodic form (clamped knots,
-"periodic", no seam: live's own SAT) and reads that form back periodic (shared bsurface_as_periodic, xt_read);
-RoundSplines {Split, Parasolid, Acis} replaces the periodic_splines bool, prepared() takes `offsets` apart and converts
-extrusions for ACIS. Ours reads ours.sat: motor-mount-jack 16/24/0 and rings-loft Part 1 273/762/508 as the model
-(Mac exs-all). T1 export::a_loft_wall_goes_round_as_one_acis_face.
-9a19e358 (landed 05:00; lead: split from it, checked alone): a vertex where only seams cross isn't shown (live
-behaviours.md "kern (10-25) seam counts": no seam vertices; free-form one-face bodies 1/0/0) and a free-form face's
-box holds the highest point its climb finds (OCCT's was 1.9 µm short): o-ring generator's elliptic rings read back
-1/0/0 as live. Model suite A/B vibe7 (~/tmp/dx/abK-*): identical but c2-loft-paths-guides Loft 3 vertices 27 -> 26
-(live 23, edges same); hats/dock SAME on every tab (vibe5); psui 206/206, scene, kernel 480/480 on the Mac.
-Left in SAT: cf-hose-routing 22/44/24 for 12/12/0 (sections split, as in x_t); rings-loft Part 2 (x_t's parked piece).
-Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live imports ours 46/48, ours reads ours
-112/119, times 49/50, drawings' DXF 0/4.
+Data /root/parity/exchange/<doc>/ (live.*, live-self.json, live-times.json, live-drawing.dxf); suite
+parity::exchange_round_trip (dx-keep/bin/exch.sh). Landed history: archive (11-17 05:52 and 16:1x blocks).
 Open, ranked:
 1. Drawings DXF 0/4 (Mac exs-d, 4 docs, with the queued conic-tolerance commit): sm-louver ARC 68 / CIRCLE 2 as live,
-   ELLIPSE 96/86, LINE 2539/2472, MTEXT 52/54 (scale 1:40 for live's 1:50: whole-studio bounds 2678 x 841 x 978 mm fit
-   1:40 by every rule matching 1898's data; lead: no special case, REQUESTS 11-17 01:47 asks live for blocks across
-   the boundary). housing-draft ARC 0/3, CIRCLE 5/6, ELLIPSE 16/15, LINE 159/154, SPLINE 11/7. extension-spring SPLINE
+   ELLIPSE 96/86, LINE 2539/2472, MTEXT 52/54 (suggested scale now 1:50 as live: af6b564d). housing-draft ARC 0/3, CIRCLE 5/6, ELLIPSE 16/15, LINE 159/154, SPLINE 11/7. extension-spring SPLINE
    37/47 (live splits more), LINE 120/117. rings-loft ARC 37/91, ELLIPSE 135/95, SPLINE 189/211: model (item 4; our
    true circles where live's model has B-splines get conics, live writes SPLINE).
    Tools: /root/dx-scratch/bin/dxfdiff.py ours live drawing.json (per view, bbox-aligned; live's -Z extrusion
    ELLIPSE / ARC handled), dxfplot2.py (a view side by side by type), dxfboxes.py / dxflayers.py (per-view boxes).
-   housing-draft findings (11-17 03:00):
-   - Placement: live centres each suggested view on the projection of the part's loose Parasolid box (live.jsonl
-     final bbox z -3.685..5.0 mm, x +-16.44, from Rotieren 1's torus; the geometry is z -1.37..5.0, x +-15.3), ours on
-     the exact box: Front / Right 1.158 mm (0.0456 in) and Iso 0.946 mm lower, Top exact. Matching it needs
-     Parasolid's loose box of a torus face: left (counts unaffected).
-   - Lug bottoms (torus x plane B-spline edges): live writes chords of a 3D tessellation (LINEs up to 0.13 mm off the
-     curve; one chord where 1.8 mm shows) in Front and Right, cubic SPLINEs in Iso; ours SPLINE everywhere. No rule.
-   - Right-view radial hole rim: live one CIRCLE (a B-spline rim on the hole's cylinder, seen along its axis); ours a
-     70-point free SPLINE + an 8-point piece + three 2-point bits (our model has 8 LINE edges between cylinders, live
-     none). Idea, unproven on other docs: a curve on a cylinder seen end-on is that circle's arc.
-   - Model: our Rotieren 1 face is a surface of revolution (STEP SURFACE_OF_REVOLUTION + 8 extra plane / SoR LINEs)
-     where live's is a degenerate torus; Iso lug-end LINE vs live ARC x2 follow from that.
+   housing-draft placement / lug / rim findings (11-17 03:00): archive.
    rings-loft own x_t Part 2 133/338/208 for 132/335/206: a 0.007 mm² cylinder piece shares part of the big face's seam
    edge (three uses), so UnifySameDomain leaves it: parked.
    SAT: live's own SAT splits periodic faces (rings-loft live.sat 445 faces for the model's 439), so the SAT rows wait
@@ -70,9 +38,6 @@ Open, ranked:
 - Not bugs: sheet-metal-plus ours.3mf read back 554665 for 626770 mm³ (the suite's fallback expectation: Part 2 inside
   Part 1 is its hollow, as live's import of ours.obj does; wait for live's 3MF import of ours). ours.obj "3 parts, live
   2": ours reads the zip by groups (live refuses zips), live was given the bare .obj.
-- Intermittent segfault (vibe6, binary ops-ex2 22:47 and 22:52, both right after rings-loft's imports, before its STEP
-  export); not again in 8 runs (vibe5 gdb, vibe5/vibe6 plain, x1116j). gdb on vibe5: `handle SIG37 nostop noprint
-  pass` (the checkpoint thread's signal). Watch for it.
 - c2-config-parts-screws: hang fixed (b777cbd1), still in tests/parity-models/unscored.json: Sweep 1's 14.8 GB
   Boolean is bool's P0 (lead 11-16). Score it once fixed. Remove vibe5 ~/agents/dx/target-g13 when no longer needed.
 - Exchange suite x1116n running (above); set 2 again when live2 refetches.
@@ -198,39 +163,72 @@ Open, ranked:
    - cf-setback-fillet: parked (lead 11-05, skasm's RABC fill patch; TICKETS SETBACK-FILL-PATCH).
 2. After ~10:17: live's answers to REQUESTS 01:47 (sm-louver scale, live's own SAT import) and 05:46; set 2 after
    live2's refetch.
-3. Landed 11-17: 4ddf9f2d curve pattern along a helix (frames from the helix's axis; kernel fit's fallback pair, old
-   pair kept when it works): driven-pattern 7/11 -> 11/11, the other 7 helix docs unchanged (vibe6 A/B). 2089f117
-   Parasolid import heals a bodies-only file once (the assembly check stopped healing): rings-loft x_t suite import
-   on the Mac 7.9 -> 6.6 s (live 8.6); qa's `documents import` on vibe6 not re-timed. SM-BOOLEAN-SPEED closed (Mac
-   Up to Part 66 ms / live 160). Studios 06:27: 1dc32b 27/349 (was 17), Boolean 4 hub 232/632/400 vs 216/600/384,
-   2666 ms vs 135: sent to bool 7fa8ceab 08:10 (repro vibe7 ~/agents/dx-keep/repro/1dc32b-b4); 74d3d6 9/180 (core's).
-4. Writer guard for kinked closed seams (lead 11-17: under 1 mrad, no pole over 1 um = a tenth of live's 1e-5 m
-   band, export only; uncommitted in dx-land xt.cpp periodic_bsurface smooth_seam + kernel test export::a_tube_wall_
-   with_a_slightly_kinked_seam_goes_round_as_one_acis_face): prove hose x_t / sat read back 12/12/0 (were 12/14/4,
-   22/44/24; seam 0.41 mrad, poles moved 0.21-0.52 um), no other exchange row changes. Core's SWEEP-SEAM-KINK filed.
-   Then rings-loft "ours reads ours" x_t / sat Part 2 133/338/208 for 132/335/206.
-5. P1 (lead 11-17) asm-robot-relations studio 0c3466 Import 1 (STEP studios/foreign/0fc7dd7c….step, SolidWorks): the
-   file's one MANIFOLD_SOLID_BREP is ONE closed connected shell (174 faces, every edge on 2 faces; python check on the
-   text). Live imports it as 6 SHEET bodies "REV-21-1650": 28/44/22 (box -31..30, -30..31, -58..35 mm), three 4/4/0
-   (~-37..-17, 21..43, -148..-3: tubes), 106/278/184, 1/10/7: 147 faces, no volume; Thicken 1 thickens a face of the
-   28-face one (Part 1 solid 60 faces 223.99 mm³). Ours: one solid, 147 faces (merge_same_surface_faces 174 -> 147),
-   valid closed solid (11-17 12:0x: BRepCheck valid, no self-intersection, every one of 325 edges on 2 faces; the
-   28 'one-face' edges were seams), 171986.6 mm³; live's sheets are its own import failing. Thicken 1 fails in ours
-   (reference to a face of live's sheet JFD). Lead 11-17 12:1x: keep our solid (live's import failing); suite leaves
-   both out from Import 1 on (tests/parity.rs LIVE_IMPORT_FAILURES, PARITY-SUITES); asm maps Thicken 1's JFD face to
-   ours by geometry (sent 12:2x).
-   an imported solid whose healed shell is open -> sheet bodies, one per connected piece (ours would be 1 piece of 147
-   faces; live's 6 split where Parasolid didn't sew: find those edges, e.g. gaps over tolerance). Uncommitted in
-   dx-land: kernel connected_pieces / split_connected_pieces (a part of several solids or of a solid of disconnected
-   pieces -> a part per piece; T1 export::a_solid_of_disconnected_pieces_imports_as_a_part_each), ops import.rs
-   calls it; no live evidence that live splits real multi-piece solids: hold. Also uncommitted: the ACIS seam guard
-   (xt.cpp smooth_seam, ACIS only, <1 mrad, pole move <= 1 um; T1 export::a_tube_wall_with_a_slightly_kinked_seam_
-   goes_round_as_one_acis_face): hose SAT read-back not yet proven (vibe6 run cancelled 11:51, slot queue 5 behind qa).
+4. Writer guard for kinked closed seams (lead 11-17: under 1 mrad, poles moved under 1 um, ACIS only; uncommitted in
+   dx-land xt.cpp periodic_bsurface smooth_seam, T1 export::a_tube_wall_with_a_slightly_kinked_seam_goes_round_as_one_
+   acis_face). Mac hose run 14:1x: the guard applies (straight walls 0.41 mrad, poles 0.21-0.52 um) and 0.451m's SAT
+   reads back 12/12/0; 0.417m, 0.487m, 0.524m stay 22/44/24: each has one wall kinked 1.0 / 1.58 / 1.98 mrad, and one
+   failing face makes prepared() split every closed face of the body (ShapeDivideClosed on the whole shape). Decision
+   asked of the lead: limit 2 mrad? Core's SWEEP-SEAM-KINK is the real fix.
+   rings-loft Part 2 133 faces for 132: the cylinder r 10.25 mm (axis -X at x 88.40) is a 510.1585 mm² face plus a
+   0.0073 mm² piece across a seam segment (86.57-86.73 mm) the big face uses on one side only; UnifySameDomain leaves
+   them. Uncommitted fix: xt.cpp across_seam (the big face takes the piece's other edges in that edge's place, their
+   pcurves moved by the period; on a BRepBuilderAPI_Copy without geometry), run first in seam_pieces_joined; write_acis
+   joins too, before scaling (the scaled copy keeps one pcurve of a seam edge: shape_seam_pieces_joined FFI), and
+   sat.cpp seam_direction writes a cylinder face reaching past one period with its reference at the widest angle no
+   edge crosses (our reader's seam went through the cuts and split it again). Mac: rings-loft's x_t reads back as the
+   model; fixture: x_t and SAT read back 1 face. T1 export::a_seam_piece_across_a_seam_segment_is_written_with_its_face
+   (fixture tests/data/seam/rings-loft-seam-piece.brep, 67 KB). Kernel 55/55 export + seam (vibe6), full kernel 499/499
+   before the SAT direction (rerun 15:2x), g++-13 /opt/occt build OK (vibe5, before io.cpp's solid names: redo).
+   Proof run: vibe7 slot (~/tmp/dx/exg.sh -> ~/agents/dx-keep/bin/ops-seam, log ~/agents/dx-keep/exch-seam.log,
+   snapshot ~/tmp/dx/exs-guard; binary md5 e28401fc = the three commits), first in the queue behind qa's ui-parity
+   (15:3x). Baseline x1117c: /root/dx-scratch/exch-x1117c.log (and vibe6 ~/agents/dx-keep). Committed in dx-land, not
+   landed: cfe5b5425 seam join, 19bfb2f58 ACIS guard, 690d4b0f1 import split (live2's q-step-twopiece: live
+   splits a two-piece solid into 2 parts "Part 2__Two pieces"; uncommitted: io.cpp read_step maps each
+   MANIFOLD_SOLID_BREP's name and entity to its solids (StepImport solid_part/index/names/body, ImportedShape
+   solid_names), split_connected_pieces names a split solid's pieces "<part>__<solid>" (only a split: live's control
+   with the solid named as its product, and robot-relations' Combine1 in REV-21-1650, keep the product's name); test
+   expects "Combine1__Two pieces", ops import 32/32). Tell asm when the split lands.
+5. asm-robot-relations 0c3466 Import 1: landed 58c29811 (live's six sheets = its failed import of a valid solid;
+   LIVE_IMPORT_FAILURES leaves both out from Import 1 on; lead 11-17). asm mapped Thicken 1's JFD face to ours by
+   geometry on asm-partorigin (Thicken then makes 11 tiny parts: sent to core).
+5c. Exchange rows from live's newer data (set 2 imports of STL / OBJ / 3MF), committed in dx-land, not landed:
+   18239623a 3MF reads Zip64 (live's 3MF: every live.3mf was 0 parts); 63fb61533 mesh pieces touching along edges
+   (more than two triangles on an edge: each joins the next one turning into its inside, opposite direction; equal
+   angle last): bottle-split STL 1 -> 2 solids (the model's 2; live 148 SHEETs), duct-multipart 1 -> 2 (model 4,
+   parts overlap; live 9 SHEETs), the other 20 docs' STLs unchanged. Decision asked: record live's mesh sheets as its
+   failure (as LIVE_IMPORT_FAILURES).
+   de2e0fac2 (committed, not landed): hex-bookcase's mesh part "imported". live's x_t comes zipped with a .xmm_txt
+   (Parasolid's mesh file, the same node format: PSM_MESH, position / index combs of teeth, indices 1-based); our
+   reader failed on the MESH node's 'b' box field (stoll) and a zip without a native assembly was NO_ROOT. Now
+   xt_read reads the .xmm beside the .x_t (mesh_body -> mesh_compound), import.rs reads a zip of x_t files
+   (native_assembly XT_IN_ZIP). STEP: OCCT reads the TESSELLATED_SHELL as an open shell of one mesh face, wound
+   inward; solids_from_closed_shells -> mesh_rebodied (turned out when its signed volume is negative). T1:
+   export::an_onshape_parasolid_with_a_mesh_part_reads_the_mesh_beside_it, an_onshape_step_tessellated_part_reads_as_a_
+   mesh_solid (trimmed fixture), ops import::tests::a_parasolid_zip_imports_its_parts_and_meshes; g++-13 OK (vibe6).
+   vibe8 exchange (ops-mesh): hex-bookcase live.step / x_t / 3mf match (imports 5/7, was 2/7). Open there: live.igs /
+   live.sat 1 part for live's 2 (mesh part); ours.x_t / ours.sat write the mesh as 948 facets (live 1/0/0: Parasolid
+   writes a MESH + .xmm in a zip). Rest-run (16 docs, ops-seam) done 17:05: 0 panics; vs x1117c only the hose
+   improvement and new-data rows. Suite follow-up: sm-louver's live SAT import merges below its model (Part 2 22/60/40,
+   model and ours 38/76/40) yet counts against ours.
+   The full run 15:3x aborted after rings-loft's imports: bool's par_map_by short result (boolean.rs:5058), fix
+   0b17fee66 on bool's branch (bool 17:0x: the mesh/mod.rs:323 garbage-index panic in the same run is fallout of that
+   panic; send bool the log if it shows without a Boolean panic before it). Remaining 16 docs: vibe7 slot
+   ~/agents/dx-keep/exr.sh -> exch-rest.log, running 16:4x (binary md5 e28401fc: no Zip64 / mesh commits); hose as
+   expected (0.451m SAT 12/12/0, the other three over 1 mrad), no panics so far. rings-loft alone with it: x_t reads back as live, SAT 132/336/207
+   for 132/335/206, imports 4/7 (main's), no part count / name change.
+5b. asm-isaac-ball 8f5622 GearLab (P2, studios / asm 11-17): landed bc58c02b (qLoopEdges of a sketch region = its edges;
+   Fill of the tooth profile found none). Gear builds 363/842/480 for live 283/762/480: the 40 teeth's end faces at
+   z=0 / z=10 stay apart from the blank's cap (our opSweep cap tilted 5e-9 rad, offset 1.8e-12 m: unify won't merge):
+   sent to core 15:0x (repro vibe6 ~/agents/dx-keep/gearlab). Time (14.8 s vs live 1.15 s, vibe6 under load): two
+   OCCT fuses (blank + 40 teeth 3.8 s; herringbone halves 9.2 s), recorded in ~/agents/dx-keep/gearlab/booleans, sent to
+   bool 15:2x; bool took it (mirror fuse with glue=shift 959 -> 304 ms on the Mac, same 404/885; 1dc32b Boolean 4
+   751 -> 189 ms, live 135, gating). asm told.
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## How to run
-- Builds and crate tests on the Mac: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo test -p <crate> …` (one slot).
-  Linux ops binaries for vibe runs: `NOSHAPE_RB_HOST=vibe7 tools/tiers/rb.sh cargo test -p noshape-ops --test all
+- Builds, crate tests and exchange runs on vibe8 (lead 11-17 17:00; ~/parity/exchange + its 22 models copied there);
+  vibe7 only for ~/lead-private; land with `NOSHAPE_LAND_QUEUE_HOST=vibe7 tools/tiers/land.sh`.
+  Linux ops binaries for vibe runs: `NOSHAPE_RB_HOST=vibe8 tools/tiers/rb.sh cargo test -p noshape-ops --test all
   --no-run`, then copy ~/agents/dx/target/debug/deps/all-<hash> to ~/agents/dx-keep/ops-exch (studio scripts' binary)
   or ~/tmp/dx/ops-A / ops-B for an A/B. rb.sh keeps mtimes: `touch` an edited file before the A rebuild, check md5.
   An A/B baseline is rebuilt from the same base (land.sh rebases).
@@ -258,7 +256,7 @@ Open, ranked:
 - Agent ids (message_agent needs them full; 11-17 09:25 restarts): core 6692ae35-758a-4442-81c8-29f67be2e21a,
   asm d8d597e0-675c-497b-a804-544ceab99bbd, blend 0e6e9942-0713-46c1-ae55-132fbbb4a14b, bool
   7fa8ceab-4549-499f-9b01-3a289c2c95b4, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, live
-  e8549719-ef9a-42de-960c-e24b29f142a6, live2 3b9b1e66-33a0-4dfe-9e0a-eee216e354b2, studios
+  e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7, studios
   58e9bca8-346c-4847-8012-e15006ae61ef, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b,
   psui 4973e295-9e92-463f-a13f-2ec5258bc5f9.
 - The archive's "Parity translator changes by asm" section lists asm's translator fixes one line each (lead 11-07).
