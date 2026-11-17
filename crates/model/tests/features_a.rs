@@ -2306,6 +2306,29 @@ fn rib_of_an_l_normal_to_its_plane_as_live() {
     assert!((thick[0].0 - 3552.0).abs() < 1e-6, "{thick:?}");
 }
 
+/// Crossing ribs as rib.fs builds them: each against the part as it was, all merged at once (one Boolean): two ribs
+/// across the open box's pocket in a +, 2 mm, down to its floor: 576 + 256 - 32 mm³ more.
+#[test]
+fn crossing_ribs_merge_as_one() {
+    let mut t = T::new();
+    let (_, x) = t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let top = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let ps = t.sketch(Reference::FeaturePlane(top), rect(0.002, 0.002, 0.038, 0.018));
+    let r = t.regions(ps)[0].clone();
+    let cut = t.extrude(r, "8 mm", "REMOVE");
+    t.set(cut, "oppositeDirection", b(true));
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = sk.add_line(DVec2::new(0.002, 0.01), DVec2::new(0.038, 0.01));
+    let c = sk.add_line(DVec2::new(0.02, 0.002), DVec2::new(0.02, 0.018));
+    let s = t.sketch(Reference::FeaturePlane(top), sk);
+    let profiles = q(vec![Reference::SketchEntity { sketch: s, entity: a.0 }, Reference::SketchEntity { sketch: s, entity: c.0 }]);
+    t.add("rib", &[("profiles", profiles), ("parts", q(vec![Reference::Body(BodyId { feature: x, index: 0 })])), ("thickness", e("2 mm")), ("ribExtrusionDirection", en("NORMAL_TO_SKETCH_PLANE")), ("oppositeDirection", b(true))]);
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1);
+    let v = total_volume(&res.context) * 1e9;
+    assert!((v - (3392.0 + 576.0 + 256.0 - 32.0)).abs() < 1e-6, "{v}");
+}
+
 /// qa RIB-CLOSED-PROFILE-MSG: a closed profile parallel to the sketch plane
 /// fails with rib.fs's RIB_ONLY_OPEN_PROFILES, before anything else.
 #[test]
