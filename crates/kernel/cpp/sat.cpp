@@ -12,8 +12,8 @@
 // everything else as exact B-splines (exactsur / exactcur, "nubs"/"nurbs";
 // ACIS knot vectors leave out the outermost knot at each end, so end
 // multiplicities are the degree). Faces get no seams on periodic analytic
-// surfaces, like Parasolid's (shared preparation: xt.cpp). Lengths are
-// written in millimetres.
+// surfaces nor on B-surfaces they go round (the "periodic" form), like
+// Parasolid's (shared preparation: xt.cpp). Lengths are written in millimetres.
 
 #include "internal.hpp"
 
@@ -212,7 +212,10 @@ struct Sat
                 return gp_Vec(gp_Pnt(o.XYZ() + rad.XYZ() * R), q);
               }};
     }
-    occ::handle<Geom_BSplineSurface> b = occ::down_cast<Geom_BSplineSurface>(s);
+    // A face going round its B-surface: ACIS's periodic form over the clamped knots, no seam (live's own SAT).
+    bool                             up = false, vp = false;
+    occ::handle<Geom_BSplineSurface> eval = exchange_periodic_bsurface(f, RoundSplines::Acis, up, vp);
+    occ::handle<Geom_BSplineSurface> b    = occ::down_cast<Geom_BSplineSurface>(s);
     if (b.IsNull() || b->IsUPeriodic() || b->IsVPeriodic())
     {
       double u0, u1, v0, v1;
@@ -227,9 +230,18 @@ struct Sat
         b->Segment(u0, u1, v0, v1);
       }
     }
+    // Its closing rows made the same as its first (weights 6e-12 apart on c2-rings-loft's loft walls).
+    if (up || vp)
+    {
+      b = occ::down_cast<Geom_BSplineSurface>(b->Copy());
+      for (int i = 1; up && i <= b->NbVPoles(); ++i)
+        b->SetPole(b->NbUPoles(), i, b->Pole(1, i), b->Weight(1, i));
+      for (int i = 1; vp && i <= b->NbUPoles(); ++i)
+        b->SetPole(i, b->NbVPoles(), b->Pole(i, 1), b->Weight(i, 1));
+    }
     const bool  rat = b->IsURational() || b->IsVRational();
     std::string d   = std::string("forward { exactsur full ") + (rat ? "nurbs " : "nubs ") + std::to_string(b->UDegree()) + " " + std::to_string(b->VDegree()) +
-                    (rat ? " both" : "") + " open open none none " + std::to_string(b->NbUKnots()) + " " + std::to_string(b->NbVKnots()) + " " +
+                    (rat ? " both" : "") + (up ? " periodic" : " open") + (vp ? " periodic" : " open") + " none none " + std::to_string(b->NbUKnots()) + " " + std::to_string(b->NbVKnots()) + " " +
                     acis_knots(b->UKnots(), b->UMultiplicities(), b->UDegree()) + acis_knots(b->VKnots(), b->VMultiplicities(), b->VDegree());
     for (int j = 1; j <= b->NbVPoles(); ++j) // u varies fastest
       for (int i = 1; i <= b->NbUPoles(); ++i)
@@ -240,10 +252,12 @@ struct Sat
       }
     d += "0 " + discontinuities(b->UKnots(), b->UMultiplicities(), b->UDegree()) + discontinuities(b->VKnots(), b->VMultiplicities(), b->VDegree()) +
          "F 1 F 0 F 1 F 0 } I I I I ";
-    return {add("spline-surface", d), [b](const gp_Pnt&, double u, double v) {
+    if (eval.IsNull())
+      eval = b;
+    return {add("spline-surface", d), [eval](const gp_Pnt&, double u, double v) {
               gp_Pnt q;
               gp_Vec du, dv;
-              b->D1(u, v, q, du, dv);
+              eval->D1(u, v, q, du, dv);
               return du.Crossed(dv);
             }};
   }
@@ -358,7 +372,7 @@ struct Sat
             fail_op("acis: no surface normal on a face");
           // Loops of coedges.
           std::vector<int> loop_recs;
-          for (const auto& cycle : exchange_loops(F))
+          for (const auto& cycle : exchange_loops(F, RoundSplines::Acis))
           {
             const int        loop = reserve();
             std::vector<int> co;
@@ -460,7 +474,7 @@ void write_acis(const OcShapeList& shapes, rust::Str path)
   for (size_t i = 0; i < shapes.items.size(); ++i)
   {
     require_non_null(shapes.items[i], "shape");
-    sat.body(exchange_prepared(shapes.items[i], false), bodies[i]);
+    sat.body(exchange_prepared(shapes.items[i], false, RoundSplines::Acis), bodies[i]);
   }
   const std::string product = "Noshape", version = "ACIS 7.0 NT", date = ctime_now();
   std::string       out = "700 0 " + std::to_string(bodies.size()) + " 0\n";

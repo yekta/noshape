@@ -2098,6 +2098,23 @@ fn a_loft_wall_closed_but_for_its_weights_last_digits_stays_one_face() {
     assert!((a - want).abs() < 1e-6 * want, "{a} vs {want}");
 }
 
+/// A loft's wall going round (c2-rings-loft's): one face over ACIS's periodic B-surface (clamped knots, the "periodic"
+/// form, no seam), as live's own SAT writes it, read back as one face (it was split at its seam, two faces).
+#[test]
+fn a_loft_wall_goes_round_as_one_acis_face() {
+    let wall = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts/rings-loft-wall.brep")).unwrap();
+    let want = surface_properties(&wall).unwrap().mass;
+    let path = std::env::temp_dir().join(format!("noshape-sat-loft-wall-{}.sat", std::process::id()));
+    write_acis(&path, std::slice::from_ref(&wall), LengthUnit::Meter).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let back = read_acis_parts(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert!(text.contains(" periodic open ") || text.contains(" open periodic "), "no periodic B-surface");
+    assert_eq!(back.iter().map(|p| p.shape.count(ShapeType::Face)).sum::<usize>(), 1);
+    let a: f64 = back.iter().map(|p| surface_properties(&p.shape).unwrap().mass).sum();
+    assert!((a - want).abs() < 1e-6 * want, "{a} vs {want}");
+}
+
 /// A sketch ellipse of equal radii is a circle (as Parasolid's): revolved, a torus, one face through ACIS
 /// (cf-o-ring-generator's rings: a surface of revolution of an ellipse, written as a B-surface split in four).
 #[test]

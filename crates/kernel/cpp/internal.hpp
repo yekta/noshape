@@ -16,6 +16,7 @@
 #include <memory>
 #include <vector>
 #include <GProp_GProps.hxx>
+#include <Geom_BSplineSurface.hxx>
 #include <Geom_Surface.hxx>
 #include <TopExp.hxx>
 #include <gp_Trsf.hxx>
@@ -499,13 +500,26 @@ GProp_GProps surface_props(const TopoDS_Shape& s);
 
 // B-rep exchange writers (xt.cpp): a shape with elementary surfaces where it
 // can, B-splines for swept/offset ones (revolved ones too unless `keep_spun`)
-// and closed B-spline faces split; whether a face lies on a cylinder/cone/
-// sphere/torus (or a kept surface of revolution); a face's
-// boundary as oriented edge cycles without seams of such surfaces and
-// without degenerate edges.
-TopoDS_Shape                          exchange_prepared(const TopoDS_Shape& s, bool keep_spun);
+// and closed B-spline faces split (unless `round` writes them round);
+// whether a face lies on a cylinder/cone/sphere/torus (or a kept
+// surface of revolution); a face's B-surface made periodic where the face goes
+// round it (null if it doesn't); a face's boundary as oriented edge cycles
+// without seams of such surfaces and without degenerate edges.
+// How a face going round a closed B-surface is written: split at its seam, periodic as Parasolid's (the seam knot
+// removed, so only where that is exact) or as ACIS's (its clamped knots and the "periodic" form; a tangent seam).
+enum class RoundSplines
+{
+  Split,
+  Parasolid,
+  Acis,
+};
+TopoDS_Shape                          exchange_prepared(const TopoDS_Shape& s, bool keep_spun, RoundSplines round = RoundSplines::Split);
 bool                                  exchange_periodic_analytic(const TopoDS_Face& f);
-std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& f, bool periodic_splines = false);
+occ::handle<Geom_BSplineSurface>      exchange_periodic_bsurface(const TopoDS_Face& f, RoundSplines round, bool& up, bool& vp);
+// Exchange readers (xt_read.cpp): a B-surface the file calls periodic in u and / or v made a periodic OCCT surface where
+// it closes there and evaluates the same (its faces get their seams in the healing); s otherwise.
+occ::handle<Geom_Surface>             bsurface_as_periodic(const occ::handle<Geom_BSplineSurface>& s, bool up, bool vp);
+std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& f, RoundSplines round = RoundSplines::Split);
 
 // Mesh import (mesh_io.cpp): a shell (solid when closed) of planar triangle
 // faces; nodes closer than `weld` are one vertex and T-junctions are split

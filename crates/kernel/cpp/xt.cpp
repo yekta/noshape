@@ -724,7 +724,7 @@ constexpr double kPrecision = 1e-8; // Parasolid linear precision (metres)
 // round it (Parasolid's periodic B-surface: one face, no seam, like live's
 // smooth loft): a periodic direction, or a closed one whose seam is tangent.
 // Null when it has none, or a periodic direction the face doesn't go round.
-occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surface>& s, const TopoDS_Face& F, bool& up, bool& vp)
+occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surface>& s, const TopoDS_Face& F, bool& up, bool& vp, RoundSplines round = RoundSplines::Parasolid)
 {
   up = vp = false;
   occ::handle<Geom_BSplineSurface> b = occ::down_cast<Geom_BSplineSurface>(s);
@@ -775,6 +775,9 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
     ps->SetWeight(ps->NbUPoles(), i, ps->Weight(1, i));
   for (int i = 1; vp && !b->IsVPeriodic() && i <= ps->NbUPoles(); ++i)
     ps->SetWeight(i, ps->NbVPoles(), ps->Weight(i, 1));
+  // ACIS keeps the clamped knots (its periodic form over them, as live's own SAT).
+  if (round == RoundSplines::Acis)
+    return up || vp ? ps : nullptr;
   // Periodic only when the seam knot comes down (a smooth seam): one left at full multiplicity is no smooth
   // periodic surface and Parasolid drops the body (exchange suite, cf-hose-routing's swept hoses: degree-12
   // single-span sections); such a face is split instead.
@@ -811,18 +814,18 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
   return ps;
 }
 
-// Whether face `F` on `fs` goes round without a seam in XT: an analytic periodic surface, or (`periodic_splines`) a
-// B-surface made periodic, or an offset of one (a Shell's wall restored as its offset: offsets_restored).
-bool periodic_face(const occ::handle<Geom_Surface>& fs, const TopoDS_Face& F, bool periodic_splines)
+// Whether face `F` on `fs` goes round without a seam: an analytic periodic surface, or (`round`) a B-surface written
+// round, or an offset of one (a Shell's wall restored as its offset: offsets_restored).
+bool periodic_face(const occ::handle<Geom_Surface>& fs, const TopoDS_Face& F, RoundSplines round)
 {
   bool up, vp;
   if (periodic_analytic(fs))
     return true;
-  if (!periodic_splines)
+  if (round == RoundSplines::Split)
     return false;
   if (auto off = occ::down_cast<Geom_OffsetSurface>(fs))
-    return !periodic_bsurface(basis_surface(off->BasisSurface()), F, up, vp).IsNull();
-  return !periodic_bsurface(fs, F, up, vp).IsNull();
+    return !periodic_bsurface(basis_surface(off->BasisSurface()), F, up, vp, round).IsNull();
+  return !periodic_bsurface(fs, F, up, vp, round).IsNull();
 }
 
 // A closed edge's B-spline as a ring edge's curve (Parasolid writes a closed
@@ -975,7 +978,7 @@ struct BodyWriter
     for (const TopoDS_Shape& g : edge_faces.FindFromKey(cycle[0]))
     {
       bool whole = false;
-      for (const auto& other : exchange_loops(TopoDS::Face(g), true))
+      for (const auto& other : exchange_loops(TopoDS::Face(g), RoundSplines::Parasolid))
       {
         std::vector<const void*> k;
         for (const TopoDS_Edge& e : other)
@@ -1726,7 +1729,7 @@ struct BodyWriter
     // Fins (seams of periodic surfaces and degenerate edges dropped), in loops.
     face_loops.resize(nf);
     for (int fi = 0; fi < nf; ++fi)
-      for (const auto& cycle : exchange_loops(TopoDS::Face(faces(fi + 1)), true))
+      for (const auto& cycle : exchange_loops(TopoDS::Face(faces(fi + 1)), RoundSplines::Parasolid))
         for (const TopoDS_Edge& e : cycle)
           for (const TopoDS_Vertex& v : {TopExp::FirstVertex(e), TopExp::LastVertex(e)})
           {
@@ -1740,7 +1743,7 @@ struct BodyWriter
               l.Append(e);
           }
     for (int fi = 0; fi < nf; ++fi)
-      for (auto cycle : exchange_loops(TopoDS::Face(faces(fi + 1)), true))
+      for (auto cycle : exchange_loops(TopoDS::Face(faces(fi + 1)), RoundSplines::Parasolid))
       {
         whole_ring(cycle);
         fused_arcs(cycle);
@@ -2165,7 +2168,7 @@ TopoDS_Shape swept_to_elementary(const TopoDS_Shape& s)
 // B-splines for the other swept and offset surfaces (same parameterisation),
 // revolved ones too unless `keep_spun` (and all of them when one has a profile
 // the writer can't keep), and faces closed on a surface that isn't periodic
-// split (B-surfaces made periodic are kept with `periodic_splines`).
+// split (B-surfaces going round are kept as `round` writes them; offset surfaces with `offsets`).
 // Faces given new surfaces (`surfaces`, by the forward face), their edges' curves on them kept as they are.
 class FaceSurfaces : public BRepTools_Modification
 {
@@ -2291,7 +2294,7 @@ TopoDS_Shape offsets_restored(const TopoDS_Shape& s)
   return m.IsDone() ? m.ModifiedShape(s) : s;
 }
 
-TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splines)
+TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, RoundSplines round, bool offsets)
 {
   TopoDS_Shape r = swept_to_elementary(s);
   for (TopExp_Explorer ef(r, TopAbs_FACE); ef.More() && keep_spun; ef.Next())
@@ -2304,18 +2307,20 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splin
       keep_spun = !BRep_Tool::Degenerated(TopoDS::Edge(ee.Current()));
   }
   // (Extrusions of ellipses and splines stay: XT swept surfaces, exact. The others are written as B-surfaces. For XT
-  // (`periodic_splines`) offset surfaces stay too, written as Parasolid's OFFSET_SURF over their basis's B-surface:
+  // (`offsets`) offset surfaces stay too, written as Parasolid's OFFSET_SURF over their basis's B-surface:
   // approximated, the edges along them came out tolerant with curves on them that no longer fit; c2-rings-loft's Shell
-  // walls read back 303 mm³ for 441. ACIS and JT, which share this, take them as B-surfaces: rings-loft's SAT failed.)
-  r = ShapeCustom::ConvertToBSpline(r, false, !keep_spun, !periodic_splines, false);
-  if (periodic_splines)
+  // walls read back 303 mm³ for 441. ACIS and JT, which share this, take them as B-surfaces: rings-loft's SAT failed.
+  // ACIS writes extrusions as B-surfaces too, converted here so that one going round is one face: motor-mount-jack's
+  // extruded slots read back split at their seams, 24 faces for 16.)
+  r = ShapeCustom::ConvertToBSpline(r, round == RoundSplines::Acis, !keep_spun, !offsets, false);
+  if (offsets)
     r = offsets_restored(r);
   bool split = false;
   for (TopExp_Explorer ef(r, TopAbs_FACE); ef.More() && !split; ef.Next())
   {
     const TopoDS_Face& F = TopoDS::Face(ef.Current());
     TopLoc_Location    loc;
-    if (periodic_face(basis_surface(BRep_Tool::Surface(F, loc)), F, periodic_splines))
+    if (periodic_face(basis_surface(BRep_Tool::Surface(F, loc)), F, round))
       continue;
     for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More() && !split; ee.Next())
       split = BRep_Tool::IsClosed(TopoDS::Edge(ee.Current()), F);
@@ -2377,9 +2382,18 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splin
 
 // ---------------------------------------------------------------- shared with other B-rep writers
 
-TopoDS_Shape exchange_prepared(const TopoDS_Shape& s, bool keep_spun)
+TopoDS_Shape exchange_prepared(const TopoDS_Shape& s, bool keep_spun, RoundSplines round)
 {
-  return prepared(s, keep_spun, false);
+  return prepared(s, keep_spun, round, false);
+}
+
+occ::handle<Geom_BSplineSurface> exchange_periodic_bsurface(const TopoDS_Face& F, RoundSplines round, bool& up, bool& vp)
+{
+  TopLoc_Location                  loc;
+  occ::handle<Geom_BSplineSurface> b = periodic_bsurface(basis_surface(BRep_Tool::Surface(F, loc)), F, up, vp, round);
+  if (!b.IsNull() && !loc.IsIdentity())
+    b = occ::down_cast<Geom_BSplineSurface>(b->Transformed(loc.Transformation()));
+  return b;
 }
 
 bool exchange_periodic_analytic(const TopoDS_Face& f)
@@ -2388,11 +2402,11 @@ bool exchange_periodic_analytic(const TopoDS_Face& f)
   return periodic_analytic(basis_surface(BRep_Tool::Surface(f, loc)));
 }
 
-std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& F, bool periodic_splines)
+std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& F, RoundSplines round)
 {
   TopLoc_Location                 loc;
   const occ::handle<Geom_Surface> fs = basis_surface(BRep_Tool::Surface(F, loc));
-  const bool periodic = periodic_face(fs, F, periodic_splines);
+  const bool periodic = periodic_face(fs, F, round);
   std::vector<TopoDS_Edge> mine;
   // A seam is used twice by the face (once each way); an edge on the seam line used once bounds the face (live
   // exchange suite: c2-housing-draft's drafted cone face starting at its seam).
@@ -2635,7 +2649,7 @@ TopoDS_Shape seam_pieces_joined(const TopoDS_Shape& s)
 int write_body(Writer& w, const TopoDS_Shape& s)
 {
   require_non_null(s, "shape");
-  const TopoDS_Shape p = prepared(seam_pieces_joined(s), true, true);
+  const TopoDS_Shape p = prepared(seam_pieces_joined(s), true, RoundSplines::Parasolid, true);
   bool               solid = false;
   for (TopExp_Explorer ex(p, TopAbs_SOLID); ex.More(); ex.Next())
     solid = true;

@@ -625,7 +625,12 @@ private:
     const int         du = (int)c.num(), dv = (int)c.num();
     if (rat)
       c.skip(); // rational in: both / u / v
-    c.skip(2); // forms
+    // Forms: open / closed / periodic (live's own SAT: a loft wall periodic in u over clamped knots, no seam).
+    auto periodic = [&c] {
+      const Tok& t = c.next();
+      return (t.k == Tok::Word && t.s == "periodic") || (t.k == Tok::Num && t.x == 2);
+    };
+    const bool up = periodic(), vp = periodic();
     if (file.version >= 4.0)
       c.skip(2); // singularities
     const int   nu = (int)c.num(), nv = (int)c.num();
@@ -654,8 +659,9 @@ private:
         a((int)i + 1) = v[i];
       return a;
     };
-    return rat ? new Geom_BSplineSurface(poles, w, arr(ku.k), arr(kv.k), arri(ku.m), arri(kv.m), du, dv)
-               : new Geom_BSplineSurface(poles, arr(ku.k), arr(kv.k), arri(ku.m), arri(kv.m), du, dv);
+    const occ::handle<Geom_BSplineSurface> b = rat ? new Geom_BSplineSurface(poles, w, arr(ku.k), arr(kv.k), arri(ku.m), arri(kv.m), du, dv)
+                                                   : new Geom_BSplineSurface(poles, arr(ku.k), arr(kv.k), arri(ku.m), arri(kv.m), du, dv);
+    return occ::down_cast<Geom_BSplineSurface>(bsurface_as_periodic(b, up, vp));
   }
 
   // Subtype blocks ("{ exactsur … }"), numbered in file order for "{ ref n }".
