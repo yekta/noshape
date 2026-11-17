@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-17 00:20 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-17 01:50 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -16,15 +16,16 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   sliver check by 1% areas). Mac x3: knife Fillet 2 95 -> 85, Chamfer 1 117 -> 112, Fillet 3 63 -> 47, Fillet 5 23 ->
   21, Fillet 6 20 -> 7 (live 7); knife ~1020 ms (live 622). Lead split the knife's non-blend time: bool (Split 4,
   Mirror 1, Chamfer 1 / Fillet 2 Booleans, Revolve 1, Extrudes 2/3/8/9), core (Extrude 10, Lofts 1/3); both told.
-- QUEUED 0aad993d (11-17 ~00:05): conic contact edges checked by the faces around them (Fillet 3 47 -> 45 Mac;
-  corpus check: full vs part agreed on its 2 cases).
-- In suites on vibe6 (units blend-seq-nk then blend-seq-gv; logs suite-r-nk*.log / suite-r-gv*.log, .cmp):
+- Landed 11-17 00:42: 0aad993d (367cf3ae) conic contact edges checked by the faces around them (Fillet 3 47 -> 45).
+- cf-spur-gear (11-17, Mac release, main 5b23c028f): every Spur Gear is under live (117/56/34/98/77 vs 955/95/75/283/
+  343); its opFillet is 0.3-0.4 ms, the time is the Rust op_boolean (112/46/26/78/53 ms). Sent to bool. Nothing for blend.
+- In suites (units blend-seq-nk then blend-seq-gv on vibe6; logs suite-r-nk*.log / suite-r-gv*.log, .cmp):
   - `blend-necks` 736f4c2df (blend4, on main 11fbe0901): isaac-ball 3c5c58 9 -> 32/33 (Mac; first diff now Extrude 8,
     52/129/71 vs live 51/128/71). Necks cut at every face (own scale where needed), plane pieces' pcurves stored,
     sewn strip ends dropped, full rounds 5e-5 R apart merged, fillet joins edges after merged_blends too, and core's
     join_loop_pieces joins two arcs of one ellipse (rebuilt as one ellipse, SameParameter tolerance; !legacy).
-    CORE REVIEWS the boolean.cpp part first (sent 11-17 00:20: /root/blend-scratch/necks-boolean.diff); land after
-    its OK + strict suite + userdocs (bin/ud-st.sh pattern) + g13-nk.log.
+    Now c47d0c2a7 with core's two suggestions (9-point surface check, keep the arcs if SameParameter's tolerance >
+    hair); core OK'd. Strict suite 127/127 same, g13 builds; userdocs on vibe5 (unit blend-ud-nk, ud-nk.log). Land.
   - `blend-gearvar` (blend3, on main): variable fillet edge by name + ends (GearLab 90f78b's shared tooth-root name);
     T1 unit test detail::tests::a_variable_fillets_edge_of_a_shared_name_is_found_by_its_ends; base blend8.
 - Knife blends left (Mac): Fillet 8 65 (live 12: OCCT's working-scale round 45 after the as-is fails 7; split-line
@@ -91,10 +92,21 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   knife's ~21 um tolerances (a disjointness test proves 4 of 96; parked hulls-wip.patch).
 - cf-snap-hook (dx): Mac release Fillet 6 26 ms (live 8), Fillet 3 14 (7); the document 243 vs live 274. Low.
 
+- Knife Fillet 8 parity (blend10 `blend-f8split` 90deb589a WIP with debug; parked/f8-spring-split-wip.patch):
+  - Split rule found: split a round's edge on a B-spline support where the support's normal curvature ACROSS the
+    round jumps > 20 % over a C1 knot line (live's 6 splits jump 39-72 %, its 2 non-splits 3-7 %; the along-edge
+    curvature jumps at all 8). split_at_support_joints after join_split_lines, pieces marked kept_ends (else
+    join_loop_pieces rejoins them), marks carried back through Scaled::unscaled. 2.3 ms (2.0 the face check).
+  - Alone it moves Fillet 8 16/34/20 -> 16/40/26 (live 15/37/25): not landable alone. Ours has two round faces
+    because the ring is two OCCT edges (sphere seam; shown as one) and OCCT rounds each edge as a face. Live's one
+    face needs the halves joined as one B-spline closed on its own seam + side pieces joined across y 0 (~1 day);
+    then 15/37/24, the last vertex being Revolve 1's closed-edge vertex (core's). Only knife Fillet 8 in the suite
+    has this (knifehandle Fillet 3's +1 face is a planar round face, other cause). Decision asked of the lead.
+
 ## Next, in order
 
-1. cf-spur-gear's opFillet blend (65-120 ms, dx's note): Mac profile, take the lever (lead 11-17).
-2. Knife Fillet 8's spring-line split at the support's G2 knot lines (live 3093).
+1. Land blend-necks (userdocs) and blend-gearvar (suite); then the lead's call on Fillet 8 (above).
+2. Knife Fillet 8 speed (67 vs live 12: as-is 7 ms fails, working-scale round 47).
 3. Land blend-necks (after core's OK) and blend-gearvar when their suites hold; GearLab then needs OCCT to round the
    tooth root (core checks the loft face: dump vibe6 ~/tmp/blend/gd/fillet-variable-15).
 4. Impeller Fillet 3 (parked WIP), Chamfer 3 when the lead decides.
@@ -103,7 +115,7 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 - Known sections API: /root/blend-scratch/parked/knownsec-wip.patch (bool agreed to park; tangent support pairs aren't
   the cost).
-- Debug patches: parked/zz-ahead-dbg.patch (per-pair occt_ahead time), knot-report-dbg.patch (round-edge crossings),
+- Debug patches: parked/f8-spring-split-wip.patch (split + ZZ_KNOTS report), parked/zz-ahead-dbg.patch (per-pair occt_ahead time), knot-report-dbg.patch (round-edge crossings),
   hulls-wip.patch (pole-hull disjointness + true distances), chordfoot-wip.patch (superseded by chordnear),
   impf3-wip.patch (impeller Fillet 3: 1.8 mm-loose vertices; the conic loft builds, the cut is invalid).
 - L-joint Fillet 2 (asm, no mate impact): live's corners sphere + torus + B-spline where OCCT fills one B-spline;
