@@ -49,6 +49,8 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-15 Edges live adds only inside a sub-micron near-tangent sliver (Parasolid's tolerance choices, e.g. impeller f15)
   are a known live difference when ours is the exact intersection and no later feature references them; chase
   them only if a later feature or a selection depends on them.
+  11-17: hulls_apart's face / face margin may be 2 x the two faces' own tolerances (it stands for their face / face
+  section only; edge / face and vertex / face checks keep their own): faces 21.6 um apart are not a tangent contact.
 - 11-15 OCCT loops must poll the break hook and have a deterministic work bound (patch 0030); never a wall clock.
 - 11-15 OCCT patches (0030, 0031, …) land when results are identical end to end, the patch is in patches/occt/ and builds
   with g++-13 and Apple clang; the owner stages built libs (x86-64 on vibe5, arm64 on the Mac) and the lead installs
