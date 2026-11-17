@@ -372,11 +372,26 @@ impl DrawingEditor {
         let lower = side_rows(false);
         let flip_ok = !s.symmetric;
         crate::ui_script::note_dialog(|| {
+            // A side with a joint reads its rows' captions where they show (live2 drw-weld-panel-lists: V groove below
+            // the line adds Contour, Finishing, Root opening, Groove after All around).
+            let captions = |other: bool| -> Vec<&str> {
+                let joint = if s.spacer == JointSpacer::None { if other { s.other.joint } else { s.arrow.joint } } else { s.spacer.joint() };
+                if joint == WeldJoint::None || (!other && s.symmetric) {
+                    return vec![];
+                }
+                let mut c: Vec<&str> = ["Contour", "Finishing", "Root opening", "Groove"].into_iter().filter(|c| !iso || *c != "Finishing").collect();
+                if other {
+                    c.reverse();
+                }
+                c
+            };
             let mut text = vec!["Weld symbol", "Flip symbol", if iso { "Flip identification line" } else { "Joint spacer" }, "Stagger", "Symmetric"];
             if s.stagger {
                 text.extend(["Left", "Right"]);
             }
+            text.extend(captions(true));
             text.extend(["Reference", "All around"]);
+            text.extend(captions(false));
             serde_json::json!({ "kind": "drawing-panel", "title": "Weld symbol", "text": text })
         });
         Some(

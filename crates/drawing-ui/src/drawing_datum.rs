@@ -230,7 +230,10 @@ impl DrawingEditor {
         }
         let opts = row.ann.target.as_deref().cloned().unwrap_or_default();
         if let AnnotationKind::DatumTarget { label: l, anchor, .. } = &mut row.ann.kind {
-            *l = label;
+            // An emptied Label keeps the last one (live2 drw-datum-target-panel-tips s22: the row still reads A1).
+            if !label.is_empty() {
+                *l = label;
+            }
             if let (Some(o), true) = (opts.origin, opts.angular) {
                 // On the circle of that diameter round the origin, at that
                 // angle from the reference (live 1699).
@@ -454,14 +457,15 @@ impl DrawingEditor {
                 }))
                 .into_any_element()
         }));
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(36.)).px(px(8.)).gap(px(6.)).child(div().w(px(72.)).text_size(px(12.)).child(label)).child(body).into_any_element();
+        let row = |label: &'static str, body: AnyElement| h_flex().h(px(40.)).px(px(8.)).gap(px(6.)).child(div().w(px(72.)).text_size(px(12.)).child(label)).child(body).into_any_element();
         type Act = std::rc::Rc<dyn Fn(&mut DatumDlg)>;
+        type OnToggle = Box<dyn Fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>)>;
         let icon_menu = |id: &'static str, glyph: String, items: Vec<(String, String, bool, Act)>| -> AnyElement {
             let ed = ed.clone();
             Button::new(id).ghost().w(px(50.)).h(px(30.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).dropdown_caret(true).child(div().text_size(px(16.)).child(glyph)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (g, l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
-                    m = m.item(crate::os_menu::OsMenuItem::new(format!("{g}  {l}")).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_datum(|d| f(d), cx))));
+                    m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).glyph(g).checked(*on).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit_datum(|d| f(d), cx))));
                 }
                 m
             })
@@ -485,16 +489,19 @@ impl DrawingEditor {
             );
         } else {
             let areas: Vec<(String, String, bool, Act)> = AREAS.iter().enumerate().map(|(i, (n, g))| (g.to_string(), n.to_string(), d.area == i, std::rc::Rc::new(move |d: &mut DatumDlg| d.area = i) as Act)).collect();
-            let styles: Vec<(String, String, bool, Act)> = TargetStyle::ALL
-                .iter()
-                .map(|&s| (style_glyph(s).to_string(), s.name().to_string(), d.style == s, std::rc::Rc::new(move |d: &mut DatumDlg| d.style = s) as Act))
-                .collect();
             // Live request 1735: Circle's "Area size: Ø [25 mm]" has no
             // checkbox (always on); Point's and Rectangle's do.
             let area_size = d.area_size || d.area == 2;
+            // The outside styles put the size outside the bubble: listed only with an area size (live2
+            // drw-datum-target-panel-lists: Point with no size lists the three inside ones).
+            let styles: Vec<(String, String, bool, Act)> = TargetStyle::ALL
+                .iter()
+                .filter(|s| area_size || !s.outside())
+                .map(|&s| (style_glyph(s).to_string(), s.name().to_string(), d.style == s, std::rc::Rc::new(move |d: &mut DatumDlg| d.style = s) as Act))
+                .collect();
             let sized = matches!(d.area, 2 | 3);
             body = body
-                .child(row("Target area:", icon_menu("dt-area", AREAS[d.area].1.to_string(), areas)))
+                .child(row("Target area:", div().id("dt-area-tip").tooltip(crate::ui::tooltip("Datum target area")).child(icon_menu("dt-area", AREAS[d.area].1.to_string(), areas)).into_any_element()))
                 .child(row("Style:", div().id("dt-style-tip").tooltip(crate::ui::tooltip("Datum style")).child(icon_menu("dt-style", style_glyph(d.style).into(), styles)).into_any_element()))
                 .child(
                     h_flex()
@@ -508,7 +515,7 @@ impl DrawingEditor {
                                 this.edit_datum(|d| d.area_size = v, cx)
                             })))
                         })
-                        .when(area_size && sized, |e| e.child(div().text_size(px(13.)).child(if d.area == 2 { "Ø" } else { "" })).child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_a).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
+                        .when(area_size && sized, |e| e.child(div().text_size(px(13.)).child(if d.area == 2 { "∅" } else { "" })).child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_a).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
                         .when(area_size && d.area == 3, |e| e.child(div().w(px(80.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&d.size_b).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
                         .when(area_size && sized, |e| {
                             // Its precision ▾ (help datum: "Area size … with precision").
@@ -531,7 +538,7 @@ impl DrawingEditor {
                 .id("dt-targets")
                 .when(d.rows.is_empty(), |e| e.tooltip(crate::ui::tooltip("Click in space to add a target")))
                 .mx(px(4.))
-                .my(px(3.))
+                .mb(px(3.))
                 .px(px(6.))
                 .py(px(4.))
                 .rounded(px(2.))
@@ -551,7 +558,8 @@ impl DrawingEditor {
                 list = list.child(
                     h_flex()
                         .id(("dt-row", k))
-                        .h(px(22.))
+                        .mt(px(3.))
+                        .h(px(26.))
                         .gap(px(4.))
                         .cursor_pointer()
                         .child(crate::ui::caret(open))
@@ -576,6 +584,7 @@ impl DrawingEditor {
                 );
                 if open {
                     let opts = r.ann.target.as_deref().cloned().unwrap_or_default();
+                    let mode_name = if opts.angular { "Angle" } else { "Length" };
                     let picking = d.picking_origin == Some(k);
                     let modes: Vec<(String, bool, bool)> = vec![("Length".into(), !opts.angular, false), ("Angle".into(), opts.angular, true)];
                     let mode_btn = {
@@ -621,7 +630,7 @@ impl DrawingEditor {
                             .children(value.map(|v| div().text_size(px(13.)).child(v)))
                     };
                     let flip = |id: (&'static str, usize), label: &'static str, on: bool, x: bool, cx: &mut Context<Self>| {
-                        v_flex().items_center().child(div().text_size(px(10.)).child(label)).child(
+                        v_flex().w(px(25.)).items_center().child(div().text_size(px(10.)).whitespace_nowrap().child(label)).child(
                             div().id(id).size(px(20.)).flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).when(on, |e| e.bg(gpui_kit::rgb(0xdfe7ee))).cursor_pointer().child(div().text_size(px(11.)).child("⤢")).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.datum_dlg
                                     && let Some(r) = d.rows.get_mut(k)
@@ -637,7 +646,9 @@ impl DrawingEditor {
                             })),
                         )
                     };
-                    let label_row = h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Label")).child(div().flex_1().border_b_1().border_color(blue).child(Input::new(&r.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()));
+                    // An emptied Label is red; the header's tooltip says why (live2 drw-datum-target-panel-tips s24-25).
+                    let empty = r.label.read(cx).value().trim().is_empty();
+                    let label_row = h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Label")).child(div().flex_1().border_b_1().border_color(if empty { gpui_kit::rgb(0xd9534f) } else { blue }).child(Input::new(&r.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()));
                     // A Custom area's row is its Label only: no origin, no
                     // positions (live 1699 (e)).
                     if matches!(r.ann.kind, AnnotationKind::DatumTarget { area: DatumTargetArea::Custom, .. }) {
@@ -648,7 +659,7 @@ impl DrawingEditor {
                         v_flex()
                             .pl(px(10.))
                             .child(label_row)
-                            .child(div().border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(mode_btn))
+                            .child(crate::ui_script::mark(div().mt(px(4.)).mb(px(5.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)), move || format!("dropdown:{}", mode_name)).child(mode_btn))
                             .child(
                                 field_box(("dt-origin", k), "Origin", opts.origin.map(|_| "Point".to_string()), picking)
                                     .relative()
@@ -677,7 +688,7 @@ impl DrawingEditor {
                             // Flip and Rotate (live 1699).
                             .when(!opts.angular, |e| {
                                 e
-                                .child(h_flex().gap(px(4.)).child(crate::ui::caret(true)).child(div().text_size(px(12.)).child("X position")))
+                                .child(h_flex().pt(px(3.)).pb(px(1.)).gap(px(4.)).child(crate::ui::caret(true)).child(div().text_size(px(12.)).child("X position")))
                                 .when(opts.x_dir.is_none() || !r.dir_y, |e| {
                                     e.child(field_box(("dt-xdir", k), "X direction", opts.x_dir.filter(|_| !r.dir_y).map(|_| "Edge".to_string()), d.picking_dir == Some((k, false))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         if let Some(d) = &mut this.datum_dlg {
@@ -687,8 +698,8 @@ impl DrawingEditor {
                                         cx.notify();
                                     })))
                                 })
-                                .child(h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.x).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
-                                .child(h_flex().gap(px(4.)).child(crate::ui::caret(true)).child(div().text_size(px(12.)).child("Y position")))
+                                .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.x).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
+                                .child(h_flex().pt(px(2.)).pb(px(1.)).gap(px(4.)).child(crate::ui::caret(true)).child(div().text_size(px(12.)).child("Y position")))
                                 // Setting one direction hides the other (live 1699, as
                                 // the hole table's).
                                 .when(opts.x_dir.is_none() || r.dir_y, |e| {
@@ -700,16 +711,22 @@ impl DrawingEditor {
                                         cx.notify();
                                     })))
                                 })
-                                .child(h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.y).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
-                                .child(h_flex().gap(px(8.)).pt(px(2.)).child(flip(("dt-flipx", k), "X", opts.flip_x, true, cx)).child(flip(("dt-flipy", k), "Y", opts.flip_y, false, cx)))
+                                .child(h_flex().mt(px(2.)).h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child("Distance:")).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(&r.y).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall())))
+                                .child(h_flex().pt(px(2.)).child(flip(("dt-flipx", k), "X", opts.flip_x, true, cx)).child(flip(("dt-flipy", k), "Y", opts.flip_y, false, cx)))
                             })
                             .when(opts.angular, |e| {
                                 let invalid = opts.origin.is_some() && !matches!(opts.origin_ref, Some(noshape_model::drawing::PointRef::Center { .. }));
                                 let input_row = |label: &'static str, st: &Entity<InputState>| h_flex().h(px(26.)).gap(px(6.)).child(div().text_size(px(12.)).child(label)).child(div().flex_1().border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(2.)).px(px(4.)).child(Input::new(st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).xsmall()));
-                                let toggle = |id: (&'static str, usize), label: &'static str, on: bool| div().id(id).tooltip(crate::ui::tooltip(if label == "Flip" { "Flip measurement from reference line" } else { "Rotate angle measurement" })).px(px(6.)).h(px(22.)).flex().items_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).when(on, |e| e.bg(gpui_kit::rgb(0xdfe7ee))).cursor_pointer().text_size(px(12.)).child(label);
+                                // Live (px-datum-dt-angle): a caption over a 20 px icon button, as the X / Y flips.
+                                let toggle = |id: (&'static str, usize), label: &'static str, on: bool, cx: &mut Context<Self>, f: OnToggle| {
+                                    let tip = if label == "Flip" { "Flip measurement from reference line" } else { "Rotate angle measurement" };
+                                    v_flex().w(px(25.)).items_center().child(div().text_size(px(10.)).whitespace_nowrap().child(label)).child(
+                                        div().id(id).tooltip(crate::ui::tooltip(tip)).size(px(20.)).flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).when(on, |e| e.bg(gpui_kit::rgb(0xdfe7ee))).cursor_pointer().child(div().text_size(px(11.)).child(if label == "Flip" { "⤢" } else { "↻" })).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| f(this, window, cx))),
+                                    )
+                                };
                                 e.when(invalid, |e| e.child(div().text_size(px(11.)).text_color(gpui_kit::rgb(0xd0021b)).child("Invalid origin selected. Angle datum target origin must be an arc or circle center.")))
-                                    .child(input_row("Diameter distance:", &r.x))
-                                    .child(h_flex().h(px(26.)).child(crate::drawing_chrome::DrCheckbox::new(("dt-radial", k)).label("Radial lines").checked(opts.radial_lines).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                                    .child(input_row("Diameter distance:", &r.x).mt(px(5.)))
+                                    .child(h_flex().mt(px(2.)).h(px(26.)).child(crate::drawing_chrome::DrCheckbox::new(("dt-radial", k)).label("Radial lines").checked(opts.radial_lines).on_click(cx.listener(move |this, v: &bool, _, cx| {
                                         let v = *v;
                                         if let Some(r) = this.datum_dlg.as_mut().and_then(|d| d.rows.get_mut(k)) {
                                             r.ann.target.get_or_insert_with(Default::default).radial_lines = v;
@@ -723,20 +740,19 @@ impl DrawingEditor {
                                         }
                                         cx.notify();
                                     })))
-                                    .child(input_row("Angle:", &r.y))
-                                    .child(input_row("Instance count:", &r.count))
+                                    .child(input_row("Angle:", &r.y).mt(px(2.)))
+                                    .child(input_row("Instance count:", &r.count).mt(px(2.)))
                                     .child(
                                         h_flex()
-                                            .gap(px(6.))
                                             .pt(px(2.))
-                                            .child(toggle(("dt-aflip", k), "Flip", opts.angle_flip).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                            .child(toggle(("dt-aflip", k), "Flip", opts.angle_flip, cx, Box::new(move |this, _, cx| {
                                                 if let Some(r) = this.datum_dlg.as_mut().and_then(|d| d.rows.get_mut(k)) {
                                                     let o = r.ann.target.get_or_insert_with(Default::default);
                                                     o.angle_flip = !o.angle_flip;
                                                 }
                                                 this.datum_row_from_inputs(k, cx);
                                             })))
-                                            .child(toggle(("dt-arot", k), "Rotate", opts.angle_rotate).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                            .child(toggle(("dt-arot", k), "Rotate", opts.angle_rotate, cx, Box::new(move |this, window, cx| {
                                                 if let Some(r) = this.datum_dlg.as_mut().and_then(|d| d.rows.get_mut(k)) {
                                                     let o = r.ann.target.get_or_insert_with(Default::default);
                                                     o.angle_rotate = !o.angle_rotate;
@@ -751,9 +767,20 @@ impl DrawingEditor {
             body = body.child(list);
         }
         let can_accept = tab == 1 && !d.rows.is_empty();
+        let invalid_title = (tab == 1)
+            .then(|| d.rows.iter().find(|r| r.label.read(cx).value().trim().is_empty()))
+            .flatten()
+            .and_then(|r| if let AnnotationKind::DatumTarget { label, .. } = &r.ann.kind { Some(format!("{label}: This field cannot be empty")) } else { None });
         Some(
             v_flex()
                 .id("dr-datum-dlg")
+                // Esc in one of its fields closes it as Esc elsewhere does, the targets dropped (live2
+                // drw-datum-target-panel-lists s26: focus in Diameter distance).
+                .capture_action(cx.listener(|this, _: &gpui_kit::component::input::Escape, window, cx| {
+                    this.close_datum_dlg(false, cx);
+                    window.focus(&this.focus, cx);
+                    cx.stop_propagation();
+                }))
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
@@ -768,7 +795,9 @@ impl DrawingEditor {
                     h_flex()
                         .h(px(30.))
                         .pl(px(11.))
-                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Datum"))
+                        // A target with an emptied Label: the title says which (live2 explore: "A1: This field cannot be
+                        // empty" on the header).
+                        .child(div().id("dt-title").flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).when_some(invalid_title, |e, t| e.tooltip(crate::ui::tooltip(t))).child("Datum"))
                         .child(div().id("dt-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(if can_accept { pal.accept } else { gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED) }).cursor_pointer().child(crate::drawing_chrome::ok_check(18.)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if can_accept {
                                 this.close_datum_dlg(true, cx)
@@ -930,7 +959,12 @@ fn datum_dlg_texts(d: &DatumDlg) -> Vec<(String, bool)> {
         out.push(("Label".into(), false));
         return out;
     }
-    out.extend(["Target area:", "Style:", "Area size:", "Targets"].map(|t| (t.to_string(), false)));
+    out.extend(["Target area:", "Style:", "Area size:"].map(|t| (t.to_string(), false)));
+    // Circle's size is a diameter: "∅" before its field (live2 drw-datum-target-panel-tips s28).
+    if d.area == 2 {
+        out.push(("∅".into(), false));
+    }
+    out.push(("Targets".into(), false));
     for (k, r) in d.rows.iter().enumerate() {
         let AnnotationKind::DatumTarget { label, area, .. } = &r.ann.kind else { continue };
         let opts = r.ann.target.as_deref().cloned().unwrap_or_default();

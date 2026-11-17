@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 20:19 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45 and ~18:15.
+Updated 2026-11-17 21:03 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45 and ~18:15.
 
 ## In flight
 
@@ -27,11 +27,22 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
     scenarios; the Styles panel's full reading (drw-styles-dimension 29/31); the inspection table's 8 columns.
 - Full drawing run on vibex8, outside its slot (lead 20:18; 2 apps, 334 takes, binary 20:08 relayed from vibex6):
   ~/agents/studios-keep/drw1117c (log drw1117c.log); memguard.sh pauses its process group under 6 GB available
-  (drw1117c-mem.log). Then the matrix refresh (`drawing_matrix.py --run`) and the differences.
-- Asked live2 (20:0x): drw-styles-dimension s29 (does Escape after Enter in Text gap deselect? ours does, the take's
-  panel keeps the fields); whether "Synchronize breaks from parent" shows without a parent break (ours: always).
-- live2's 868bbb6c (simplification Absolute, synchronize breaks, inspection ISO scrolled) and the 8 drw-revision-*
-  retakes: run when they land.
+  (drw1117c-mem.log). It survived the 21:00 local kill (lead incident); the local score waiter was restarted.
+  Then the matrix refresh (`drawing_matrix.py --run`).
+- Fixed in the worktree after the run's first half (not queued yet; checked on vibex6 with 1 app, binary
+  ~/tmp/studios/noshape there): 0d9b8552 Drawing properties footer (7 dprops takes: 25/23 lines); db5357fd Styles
+  gap fields keep the focus on Enter, Esc keeps the selection (behaviours "qa5 ADV4"; feel test; live2 records
+  s27-29 to confirm); 810413b3 `{"px": [x, y]}` targets (20 live2 list takes failed at their first list click) and
+  the Datum Label select's options flagged; uncommitted: weld side captions, menu `MenuIcon::Glyph` (the datum
+  Target area rows read "Point", no ✓), datum Style list without outside styles when no area size, Target area
+  tooltip, datum target rows at live's heights (px-datum-dt-target / -angle), Flip / Rotate as captioned icon
+  buttons, Esc in a datum field closes the panel (targets dropped, live2 s26).
+- live2 answered "Synchronize breaks from parent": shown unchecked with or without a parent break (ours as live).
+- live2's new takes staged on vibex8 (~/agents/studios-keep/new4.txt): simplification-absolute,
+  synchronize-breaks, inspection-table-iso-scrolled (queued branches, not on main yet), dprops-sketch-points-sharps-
+  chamfer. The 8 drw-revision-* retakes: not landed yet (the run has the old takes).
+- Next feature found: weld's upper joint list adds "Seam centered joint" and "Spot centered joint" (live2
+  drw-weld-panel-lists s7; joints drawn on the line): new `WeldJoint` kinds, glyphs, export.
 - Side-by-side crops for the lead: /root/studios-scratch/mate-glyphs-live-vs-ours.png, centermark-live-vs-ours.png,
   dimhover-sbs.png, view-sbs.png.
 

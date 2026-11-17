@@ -66,6 +66,8 @@ pub enum MenuIcon {
     Swatch(Hsla),
     /// A custom feature's initials box ("uF"; live's custom features menus).
     Initials(SharedString),
+    /// A text glyph standing for an icon (a drawing panel's ✕ / ◍ choices); not part of the row's name.
+    Glyph(SharedString),
 }
 
 /// One row of an [`OsMenu`].
@@ -146,6 +148,14 @@ impl OsMenuItem {
     pub fn initials(mut self, name: &str) -> Self {
         if let Self::Item { icon: i, .. } | Self::Submenu { icon: i, .. } = &mut self {
             *i = Some(MenuIcon::Initials(SharedString::from(name.to_string())));
+        }
+        self
+    }
+
+    /// A text glyph at the icon position ([`MenuIcon::Glyph`]).
+    pub fn glyph(mut self, text: &str) -> Self {
+        if let Self::Item { icon: i, .. } | Self::Submenu { icon: i, .. } = &mut self {
+            *i = Some(MenuIcon::Glyph(SharedString::from(text.to_string())));
         }
         self
     }
@@ -678,6 +688,7 @@ impl Render for OsMenu {
                         MenuIcon::Kit(k) => div().size(px(icon_sz)).flex().items_center().justify_center().child((**k).clone().with_size(px(12.)).text_color(pal.text)).into_any_element(),
                         MenuIcon::Swatch(c) => div().size(px(icon_sz)).flex().items_center().justify_center().child(div().flex_none().size(px(17.)).rounded(px(3.)).bg(*c)).into_any_element(),
                         MenuIcon::Initials(n) => div().size(px(icon_sz)).flex().items_center().justify_center().child(crate::ui::initials_icon(n)).into_any_element(),
+                        MenuIcon::Glyph(g) => div().size(px(icon_sz)).flex().items_center().justify_center().text_size(px(14.)).text_color(pal.text).child(g.clone()).into_any_element(),
                     })
                 };
                 // "Label\tbeta": the label and a blue badge (live drawing/447:
