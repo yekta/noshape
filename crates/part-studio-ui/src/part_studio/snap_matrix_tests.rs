@@ -24,6 +24,10 @@ enum Pt {
     /// probe then moves along the hypotenuse, `dir.0`'s sign the way).
     SlantMid,
     SlantPerp(f64),
+    /// This many px from the start along the hypotenuse (the probe then moves across it).
+    SlantAlong(f64),
+    /// This many px straight up the screen from the hypotenuse's right end (the probe then moves sideways).
+    SlantEndUp(f64),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -186,6 +190,10 @@ fn rows() -> Vec<Row> {
         // Not rested on: asleep, no perpendicular.
         Row { rest_lit: Lit::Slant, not: &["PERPENDICULAR"], ..row("wake/model-edge/asleep", Tool::Line, &[], Some(S), (Pt::SlantPerp(150.), (1., 0.)), (0., None), &[]) },
         Row { rest: &[Pt::SlantMid], rest_lit: Lit::Slant, ..row("wake/model-edge/perpendicular/other-side", Tool::Line, &[], Some(S), (Pt::SlantPerp(150.), (-1., 0.)), (6.5, Some(8.5)), &["PERPENDICULAR"]) },
+        // A woken model edge gives no parallel (live2 wake-parallel: 0.2–3° off, woken or not), but its ends' alignments:
+        // a line from the start ending level with or plumb below an end takes HORIZONTAL / VERTICAL with it.
+        Row { rest: &[Pt::SlantMid], rest_lit: Lit::Slant, not: &["PARALLEL"], ..row("wake/model-edge/no-parallel", Tool::Line, &[], Some(S), (Pt::SlantAlong(150.), (1., 0.)), (2., None), &[]) },
+        Row { rest: &[Pt::SlantMid], rest_lit: Lit::Slant, ..row("wake/model-edge/end-alignment", Tool::Line, &[], Some(S), (Pt::SlantEndUp(90.), (1., 0.)), (6.5, Some(8.5)), &["VERTICAL"]) },
         // A circle snapped onto gives the two tangent lines from the start (here 120 px along one, 2 px off it).
         Row { rest: &[C(130., 0.)], ..row("wake/circle/tangent-line", Tool::Line, CIRCLE, Some(C(-60., -120.)), (C(-60. + 120. * 0.5548, -120. + 120. * 0.8320), (0.8320, -0.5548)), (2., Some(6.)), &["TANGENT"]) },
         // Per tool: a circle's radius point takes coincident points and tangent points only: no midpoint, no curve.
@@ -380,6 +388,8 @@ impl Bench {
             Pt::PinCentre => self.centre,
             Pt::SlantMid => self.slant_ends.map_or(self.centre, |(a, z)| (a + z) * 0.5),
             Pt::SlantPerp(d) => self.at(S) + self.slant_dir().perp() * d * if self.slant_dir().perp().dot(self.centre - self.at(S)) < 0.0 { -1.0 } else { 1.0 },
+            Pt::SlantAlong(d) => self.at(S) + self.slant_dir() * d * if self.slant_dir().dot(self.centre - self.at(S)) < 0.0 { -1.0 } else { 1.0 },
+            Pt::SlantEndUp(d) => self.slant_ends.map_or(self.centre, |(a, z)| if a.x > z.x { a } else { z }) + DVec2::new(0., -d),
         }
     }
 
@@ -530,6 +540,7 @@ fn probe(cx: &mut TestAppContext, studios: &Studios, r: &Row, scale: f32, off: f
     let target = b.at(r.at);
     let way = match r.at {
         Pt::SlantPerp(_) => b.slant_dir() * r.dir.0.signum(),
+        Pt::SlantAlong(_) => b.slant_dir().perp() * r.dir.0.signum(),
         _ => b.along(r.dir),
     };
     let at = target + way * off;

@@ -1075,9 +1075,10 @@ impl PartStudioView {
                 // A perpendicular to a woken model edge uses the edge (live sketch-gaps 1c).
                 if let Some(r) = self.sketch.as_ref().filter(|s| s.tool.draws()).and_then(|s| s.needs_woken_edge().cloned())
                     && let Some(id) = self.external_entity(&r, false, true, cx)
+                    && let Some(data) = self.sketch_data(cx)
                     && let Some(ed) = &mut self.sketch
                 {
-                    ed.link_woken_edge(id);
+                    ed.link_woken_edge(&data.sketch, id);
                 }
                 let (shift, dbl) = (modifiers.shift || modifiers.control, *click_count >= 2);
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_down(data, p, hovered, shift, dbl)) {
@@ -5495,7 +5496,7 @@ fn model_straight_edges(display: &noshape_model::display::StudioDisplay, frame: 
             let (a, z) = (q[0], q[q.len() - 1]);
             let Some(dir) = (z - a).try_normalize() else { continue };
             if q.iter().all(|p| (*p - a).perp_dot(dir).abs() <= (z - a).length() * 1e-6) {
-                out.push((r.clone(), a, dir));
+                out.push((r.clone(), a, z));
             }
         }
     }

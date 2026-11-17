@@ -35,8 +35,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
    Dimension 8.5 px straight out from the pointer; a point beats the GPU's line; the region past every reach; no plane /
    face / region hover while drawing; the second-picked line moves as live2's 2b; range errors from a variable).
    Checked as live by hand on vibe6 (Xvfb :391, ~/tmp/skasm/hov): constraints from a selection, dimension place / edit,
-   drags. Next: live2's sweep groups (inference / snapping, drags) as they come; Show constraints memory is already
-   live's (sketch-options.json, saved on accept when changed).
+   drags. Landing now: a woken model edge's ends give H / V alignment (live2 wake-parallel; matrix 65 / 67); H / V on
+   two lines turn both about their midpoints; Normal on two lines refused; curve drags as live2's sketch-drags
+   (`Sketch::lives_drag`: arc end / centre, LENGTH line end, ellipse rim). Gaps left: the ellipse's minor-axis rim,
+   a free chain's L2 dragged by its middle, the HORIZONTAL an arc end makes released level. Show constraints memory is already live's.
 1. config-parts: linear-rail 26/26, links 35/35 (live fetched Derived 1's source), standoffs 32/32, sprockets 24/24
    (live's volume band carried while its volume stays: carry_volume_bands); pulleys 12/22 (Circular pattern 1, a face
    pattern ADD, fails in our op on main too: core's since 11:45); nuts 14/17 (Sweep 1, bool's). Standoffs regenerates

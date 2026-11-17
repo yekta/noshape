@@ -414,6 +414,8 @@ const EDGE_WAKE_REST: std::time::Duration = std::time::Duration::from_millis(60)
 /// Stands for the woken model edge in an inference's constraints until the click uses the edge
 /// ([`SketchEditor::link_woken_edge`]).
 pub const WOKEN_EDGE: EntityId = EntityId(u32::MAX - 1);
+/// Stand for the woken model edge's ends in an inference's alignments until the click uses the edge.
+const WOKEN_EDGE_ENDS: [EntityId; 2] = [EntityId(u32::MAX - 2), EntityId(u32::MAX - 3)];
 /// How far the pointer moves from a press, on screen, before the press is a drag (live2 "feel (sketch)" (5): a drag
 /// starts at about 5 px on an end point or a line, whatever the time; less is a click).
 const DRAG_START_PX: f64 = 5.0;
@@ -568,8 +570,8 @@ pub struct SketchEditor {
     pub external_snap: Option<ExternalSnap>,
     /// The centres of the model's circular edges in the sketch's plane (the view fills it once a sketch is open).
     pub model_centres: std::sync::OnceLock<Vec<(DVec2, noshape_model::reference::Reference)>>,
-    /// The model's straight edges in the sketch's plane: each one's reference, a point on it and its direction (the
-    /// view fills it once a sketch is open; a woken one gives a perpendicular).
+    /// The model's straight edges in the sketch's plane: each one's reference and ends (the view fills it once a
+    /// sketch is open; a woken one gives a perpendicular and its ends' alignments).
     pub model_lines: std::sync::OnceLock<Vec<(noshape_model::reference::Reference, DVec2, DVec2)>>,
     pub selection: Vec<EntityId>,
     pub selected_constraints: Vec<ConstraintId>,
@@ -721,8 +723,8 @@ pub struct SketchEditor {
     /// since the last move.
     edge_acquiring: Option<(noshape_model::reference::Reference, std::time::Instant)>,
     edge_seen: Option<noshape_model::reference::Reference>,
-    /// The model edge woken last: a point on it and its direction in the sketch (live sketch-gaps 1c: a line from a
-    /// start then offers PERPENDICULAR to it).
+    /// The model edge woken last and its ends in the sketch (live sketch-gaps 1c: a line from a start then offers
+    /// PERPENDICULAR to it; live2 wake-parallel: its ends give horizontal / vertical alignment, never a parallel).
     pub woken_edge: Option<(noshape_model::reference::Reference, DVec2, DVec2)>,
     /// Press position of a drawing tool (press-drag-release placement).
     press: Option<DVec2>,
@@ -1676,6 +1678,7 @@ impl SketchEditor {
             exclude: Vec::new(),
             origin: true,
             woken: self.woken.clone(),
+            woken_at: self.woken_edge.as_ref().map_or(Vec::new(), |(_, a, z)| vec![(WOKEN_EDGE_ENDS[0], *a), (WOKEN_EDGE_ENDS[1], *z)]),
             screen: self.screen_metric(),
         };
         let mut all = noshape_sketch::infer(sk, p, &ctx);
@@ -1902,9 +1905,9 @@ impl SketchEditor {
             match self.edge_acquiring.take() {
                 Some((r, since)) if seen.as_ref() == Some(&r) => {
                     if now.duration_since(since) >= EDGE_WAKE_REST
-                        && let Some(Some((a, dir))) = self.model_lines.get().map(|l| l.iter().find(|l| l.0 == r).map(|l| (l.1, l.2)))
+                        && let Some(Some((a, z))) = self.model_lines.get().map(|l| l.iter().find(|l| l.0 == r).map(|l| (l.1, l.2)))
                     {
-                        self.woken_edge = Some((r.clone(), a, dir));
+                        self.woken_edge = Some((r.clone(), a, z));
                     }
                     self.edge_acquiring = Some((r, since));
                 }
@@ -2249,7 +2252,8 @@ impl SketchEditor {
     /// horizontal's (7–9 px either side 60 mm out), not an angle; nothing for a level or plumb edge (the horizontal and
     /// vertical give it).
     fn woken_edge_perpendicular(&self, p: DVec2, anchor: Option<DVec2>) -> Option<Inference> {
-        let (a, (_, _, dir)) = (anchor?, self.woken_edge.as_ref()?);
+        let (a, (_, s, e)) = (anchor?, self.woken_edge.as_ref()?);
+        let dir = (*e - *s).try_normalize()?;
         if dir.x.abs() < 1e-9 || dir.y.abs() < 1e-9 || !matches!(self.tool, Tool::Line) {
             return None;
         }
@@ -2268,11 +2272,17 @@ impl SketchEditor {
         })
     }
 
-    /// The click takes the woken model edge's perpendicular: the edge is used in the sketch as `id`.
-    pub fn link_woken_edge(&mut self, id: EntityId) {
-        if let Some(inf) = &mut self.inference {
-            for c in &mut inf.constraints {
-                *c = retarget_auto(*c, WOKEN_EDGE, id);
+    /// The click takes the woken model edge's perpendicular or an end's alignment: the edge is used in `sk` as `id`.
+    pub fn link_woken_edge(&mut self, sk: &Sketch, id: EntityId) {
+        let ends = self.woken_edge.as_ref().map(|w| [w.1, w.2]);
+        let used = sk.endpoints(id).and_then(|(a, b)| Some((a, sk.point(a)?, b, sk.point(b)?)));
+        let Some(inf) = &mut self.inference else { return };
+        for c in &mut inf.constraints {
+            *c = retarget_auto(*c, WOKEN_EDGE, id);
+            for (k, end) in WOKEN_EDGE_ENDS.into_iter().zip(ends.into_iter().flatten()) {
+                if let Some((a, pa, b, pb)) = used {
+                    *c = retarget_auto(*c, k, if (pa - end).length() <= (pb - end).length() { a } else { b });
+                }
             }
         }
     }
@@ -2280,7 +2290,8 @@ impl SketchEditor {
     /// The inference about to be clicked needs the woken model edge used.
     pub fn needs_woken_edge(&self) -> Option<&noshape_model::reference::Reference> {
         let i = self.inference.as_ref()?;
-        i.constraints.contains(&AutoConstraint::PerpendicularTo(WOKEN_EDGE)).then(|| self.woken_edge.as_ref().map(|w| &w.0))?
+        let woken = |e: EntityId| e == WOKEN_EDGE || WOKEN_EDGE_ENDS.contains(&e);
+        i.constraints.iter().any(|c| auto_target(c).is_some_and(woken)).then(|| self.woken_edge.as_ref().map(|w| &w.0))?
     }
 
     /// Link an external snap (model vertex) to a fixed sketch point before a
@@ -6558,6 +6569,9 @@ impl SketchEditor {
                 .iter()
                 .filter_map(|c| match c {
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == noshape_sketch::ORIGIN => Some(DVec2::ZERO),
+                    AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if WOKEN_EDGE_ENDS.contains(p) => {
+                        self.woken_edge.as_ref().map(|w| if *p == WOKEN_EDGE_ENDS[0] { w.1 } else { w.2 })
+                    }
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) => data.sketch.point(*p),
                     _ => None,
                 })
@@ -8184,7 +8198,7 @@ pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -
         ConstraintTool::Perpendicular => n == 2 && all(&line),
         ConstraintTool::Equal => n >= 2 && (all(&line) || all(&|k| k.is_circular())),
         ConstraintTool::Midpoint => (n == 2 && count(&point) == 1 && kinds.iter().any(|k| matches!(k, EntityKind::Line | EntityKind::Arc))) || (n == 3 && all(&point)),
-        ConstraintTool::Normal => n == 2 && count(&line) >= 1 && all(&curve),
+        ConstraintTool::Normal => n == 2 && count(&line) == 1 && all(&curve),
         ConstraintTool::Pierce => n == 2 && ids.iter().filter(|e| sk.entity(**e).is_some_and(|x| x.external)).count() == 1,
         ConstraintTool::Symmetric => n == 3 && count(&line) >= 1,
         ConstraintTool::Fix => true,
@@ -8209,6 +8223,7 @@ pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityI
     let before = sk.clone();
     // Live (live2 11-17 part 2b): the first-picked entity stays, the second-picked moves (placed as live places it).
     place_second_line(sk, c, ids);
+    level_lines(sk, c, ids);
     let light = if centers.is_empty() { what_moves(sk, c, ids) } else { centers };
     let report = sk.solve_with(&noshape_sketch::SolveOptions { light, ..Default::default() });
     if !report.is_solved() {
@@ -8223,6 +8238,9 @@ pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityI
 /// the curve's centre, so it shifts the shortest way with its radii kept.
 fn what_moves(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> Vec<EntityId> {
     let [first, second] = ids else { return Vec::new() };
+    if matches!(c, ConstraintTool::Horizontal | ConstraintTool::Vertical) && ids.iter().all(|e| sk.kind(*e) == Some(EntityKind::Line)) {
+        return ids.to_vec();
+    }
     let pinned = |p: EntityId| sk.entity(p).is_some_and(|e| e.external) || sk.constraints().any(|k| k.kind == ConstraintKind::Fix { entity: p });
     if matches!(c, ConstraintTool::Coincident | ConstraintTool::Pierce) {
         let (point, curve) = if is_point(sk, *first) { (*first, *second) } else { (*second, *first) };
@@ -8279,6 +8297,30 @@ fn place_second_line(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
     };
     let _ = sk.set_point(s, na);
     let _ = sk.set_point(e, nb);
+}
+
+/// Horizontal or Vertical on lines (live2 11-17 part 2b: one constraint each): each line free of anything else turns
+/// level or plumb about its midpoint, its length kept.
+fn level_lines(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
+    let want = match c {
+        ConstraintTool::Horizontal => DVec2::X,
+        ConstraintTool::Vertical => DVec2::Y,
+        _ => return,
+    };
+    for &l in ids {
+        let (Some(Curve2::Line { a, b }), Some((s, e))) = (sk.curve(l), sk.endpoints(l)) else { continue };
+        let own = |k: &ConstraintKind| matches!(k, ConstraintKind::Horizontal { .. } | ConstraintKind::Vertical { .. }) && k.entities().as_slice() == [l];
+        let held = sk.constraints().any(|k| !own(&k.kind) && k.kind.entities().iter().any(|x| [l, s, e].contains(x)))
+            || sk.entities().any(|x| x.id != l && x.point_refs().iter().any(|p| *p == s || *p == e));
+        let d = b - a;
+        if held || d.length() < 1e-12 {
+            continue;
+        }
+        let half = if want.dot(d) >= 0.0 { want } else { -want } * d.length() * 0.5;
+        let mid = (a + b) * 0.5;
+        let _ = sk.set_point(s, mid - half);
+        let _ = sk.set_point(e, mid + half);
+    }
 }
 
 /// Whether constraint tool `c` takes `e` after `picks` (live: it doesn't
@@ -10125,6 +10167,90 @@ mod tests {
         }
     }
 
+    /// Live2 sketch-drags (11-17, drags.json; 40 px = 10.795 mm): a circle's rim resizes it and its centre moves it;
+    /// an arc's end keeps its radius and other end until the chord passes the diameter (then a semicircle on it), its
+    /// middle keeps the centre, its centre keeps the end; a shared end takes both lines; a LENGTH line's end
+    /// translates it, with the other end fixed it swings; a fixed point stays; an ellipse's rim scales it about its
+    /// centre. Within a pixel (0.27 mm) of live's.
+    #[test]
+    fn curves_drag_as_lives() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let d = 10.795;
+        let near = |got: Option<DVec2>, want: (f64, f64)| got.is_some_and(|g| (g - mm(want.0, want.1)).length() < 0.27e-3);
+        let run = |setup: &dyn Fn(&mut Sketch) -> EntityId, from: (f64, f64), by: (f64, f64)| {
+            let (mut ed, mut data) = editor(Tool::Select);
+            let e = setup(&mut data.sketch);
+            drag(&mut ed, &mut data, mm(from.0, from.1), mm(from.0 + by.0, from.1 + by.1));
+            (data.sketch, e)
+        };
+        // (a) The circle.
+        let circle = |sk: &mut Sketch| sk.add_circle(mm(-150.0, 0.0), 20e-3);
+        for (from, want_c, want_r) in [((-130.0, 0.0), (-150.0, 0.0), 30.795), ((-150.0, 0.0), (-139.054, 0.0), 20.0)] {
+            let (sk, c) = run(&circle, from, (d, 0.0));
+            let Some(Curve2::Circle { center, radius }) = sk.curve(c) else { panic!() };
+            assert!(near(Some(center), want_c) && (radius * 1e3 - want_r).abs() < 0.27, "circle from {from:?}: {center:?} {radius}");
+        }
+        // (b) The arc: centre (-80, -15), r 25, from (-60, 0) to (-100, 0).
+        let arc = |sk: &mut Sketch| sk.add_arc(mm(-80.0, -15.0), mm(-60.0, 0.0), mm(-100.0, 0.0));
+        let cases = [
+            ((-60.0, 0.0), (0.0, d), (-76.349, -8.102), 25.0, (-59.981, 10.795), (-100.0, 0.0)),
+            ((-60.0, 0.0), (d, 0.0), (-74.593, 0.0), 25.407, (-49.186, 0.0), (-100.0, 0.0)),
+            ((-60.0, 0.0), (d, -6.7469), (-74.593, -3.373), 25.630, (-49.186, -6.747), (-100.0, 0.0)),
+            ((-80.0, 10.0), (0.0, d), (-80.0, -15.0), 35.795, (-51.364, 6.477), (-108.636, 6.477)),
+            ((-80.0, -15.0), (d, 0.0), (-69.157, -14.843), 34.229, (-51.185, 14.288), (-100.0, 0.0)),
+        ];
+        for (from, by, c, r, s0, e0) in cases {
+            let (sk, a) = run(&arc, from, by);
+            let Some(noshape_sketch::Geometry::Arc { center, start, end }) = sk.entity(a).map(|e| e.geometry.clone()) else { panic!() };
+            let radius = (sk.point(start).unwrap() - sk.point(center).unwrap()).length() * 1e3;
+            assert!(near(sk.point(center), c) && (radius - r).abs() < 0.27 && near(sk.point(start), s0) && near(sk.point(end), e0), "arc from {from:?} by {by:?}: {:?} r {radius} {:?} {:?}", sk.point(center).map(|p| p * 1e3), sk.point(start).map(|p| p * 1e3), sk.point(end).map(|p| p * 1e3));
+        }
+        // (c) The shared end of two chained lines: both follow, their far ends kept.
+        let chain = |sk: &mut Sketch| {
+            let (a, o, c) = (sk.add_point(mm(-29.755, -51.816)), sk.add_point(mm(0.0, -59.912)), sk.add_point(mm(20.172, -39.941)));
+            sk.add_line_between(a, o).unwrap();
+            sk.add_line_between(o, c).unwrap();
+            o
+        };
+        let (sk, o) = run(&chain, (0.0, -59.912), (0.0, -d));
+        assert!(near(sk.point(o), (0.0, -70.707)) && sk.entities().filter(|e| e.kind() == EntityKind::Point).filter(|e| e.id != o).count() == 2, "shared end");
+        // (d) A LENGTH 40 line: an end along or across translates it; with its start fixed it swings (along: stays).
+        let sized = |fixed: bool| {
+            move |sk: &mut Sketch| {
+                let l = sk.add_line(mm(60.0, 0.0), mm(100.0, 0.0));
+                sk.add_constraint(ConstraintKind::Length { curve: l, value: 40e-3 }).unwrap();
+                if fixed {
+                    let (s, _) = sk.endpoints(l).unwrap();
+                    sk.add_constraint(ConstraintKind::Fix { entity: s }).unwrap();
+                }
+                l
+            }
+        };
+        for (fixed, by, s0, e0) in [
+            (false, (d, 0.0), (70.849, 0.0), (110.849, 0.0)),
+            (false, (0.0, d), (60.054, 10.795), (100.054, 10.795)),
+            (true, (0.0, d), (60.0, 0.0), (98.601, 10.488)),
+            (true, (d, 0.0), (60.0, 0.0), (100.0, 0.0)),
+        ] {
+            let (sk, l) = run(&sized(fixed), (100.0, 0.0), by);
+            let Some(Curve2::Line { a, b }) = sk.curve(l) else { panic!() };
+            assert!(near(Some(a), s0) && near(Some(b), e0), "length line, fixed {fixed}, by {by:?}: {:?} {:?}", a * 1e3, b * 1e3);
+        }
+        // (e) A fixed point doesn't move.
+        let fixed = |sk: &mut Sketch| {
+            let p = sk.add_point(mm(150.0, 0.0));
+            sk.add_constraint(ConstraintKind::Fix { entity: p }).unwrap();
+            p
+        };
+        let (sk, p) = run(&fixed, (150.0, 0.0), (d, 0.0));
+        assert!(near(sk.point(p), (150.0, 0.0)), "fixed point");
+        // (f) The ellipse's rim on its major axis: both axes scale, the centre kept.
+        let ellipse = |sk: &mut Sketch| sk.add_ellipse(mm(230.0, 0.0), mm(30.0, 0.0), 15e-3);
+        let (sk, e) = run(&ellipse, (260.0, 0.0), (d, 0.0));
+        let Some(noshape_sketch::Geometry::Ellipse { center, major, minor }) = sk.entity(e).map(|x| x.geometry.clone()) else { panic!() };
+        assert!(near(sk.point(center), (230.0, 0.0)) && (major.length() * 1e3 - 40.525).abs() < 0.3 && (minor * 1e3 - 20.263).abs() < 0.15, "ellipse: {major:?} {minor}");
+    }
+
     /// Live (feel/sketch.json "boxA": A selected, then a right-to-left box over B): a box adds to the selection.
     #[test]
     fn a_box_adds_to_the_selection() {
@@ -10840,6 +10966,29 @@ mod tests {
         }
     }
 
+    /// Live2 11-17 part 2b: Horizontal / Vertical on two lines, one each; both turn about their midpoints.
+    #[test]
+    fn horizontal_and_vertical_turn_both_lines_about_their_midpoints() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        // live2 p2b2.json "apply": L1, L2 as picked; the ends after.
+        let cases = [
+            (ConstraintTool::Horizontal, [[44.6972, -6.7073, 85.1054, -6.7073], [47.5463, 20.6754, 97.2065, 20.6754]]),
+            (ConstraintTool::Vertical, [[64.9013, -26.9114, 64.9013, 13.4968], [72.3764, -4.1547, 72.3764, 45.5055]]),
+        ];
+        for (c, want) in cases {
+            let mut sk = Sketch::new();
+            let l1 = sk.add_line(mm(44.92, -9.72), mm(84.88, -3.70));
+            let l2 = sk.add_line(mm(49.85, 10.23), mm(94.90, 31.12));
+            assert!(apply_constraint(&mut sk, c, &[l1, l2]).is_ok_and(|n| n == 2), "{c:?}");
+            assert!(solve_after_constraint(&mut sk, c, &[l1, l2]), "{c:?}");
+            for (l, w) in [l1, l2].into_iter().zip(want) {
+                let Some(Curve2::Line { a, b }) = sk.curve(l) else { panic!() };
+                let off = (a - mm(w[0], w[1])).length().max((b - mm(w[2], w[3])).length());
+                assert!(off < 0.02e-3, "{c:?} {l:?}: {a:?} {b:?}");
+            }
+        }
+    }
+
     /// Live sketch-tool-conic: a conic from the Origin to a point level with it, then its shoulder: Coincident at the
     /// Origin and Horizontal between the ends, as a line's would be.
     #[test]
@@ -10944,6 +11093,10 @@ mod tests {
         let refused = [
             (ConstraintTool::Concentric, vec![a, c], "A concentric constraint can only be added to circles, arcs, ellipses and points."),
             (ConstraintTool::Concentric, vec![arm, c], "A concentric constraint can only be added to circles, arcs, ellipses and points."),
+            // (live2 11-17 part 2b: two lines picked.)
+            (ConstraintTool::Concentric, vec![a, b], "A concentric constraint can only be added to circles, arcs, ellipses and points."),
+            (ConstraintTool::Midpoint, vec![a, b], "Midpoint constraint requires a point and a line or arc."),
+            (ConstraintTool::Normal, vec![a, b], "A normal constraint requires a line and a curve."),
             (ConstraintTool::Parallel, vec![a, c], "A parallel constraint requires two lines."),
             (ConstraintTool::Perpendicular, vec![a, b, c], "Could not add constraint."),
             (ConstraintTool::Tangent, vec![a, b], "A tangent constraint requires two curves, one of which must not be a line."),

@@ -61,6 +61,10 @@ pub struct InferenceContext {
     /// behaviours "skb (10-25) sketch inference").
     #[serde(default)]
     pub woken: Vec<EntityId>,
+    /// Woken points outside the sketch (a woken model edge's ends, live2 wake-parallel): horizontal / vertical
+    /// alignment as a woken point's, under a placeholder id the caller replaces when the click is placed.
+    #[serde(default)]
+    pub woken_at: Vec<(EntityId, DVec2)>,
     /// The view's projection of the plane: reach measured on screen (live's), not in the sketch. None: in the sketch
     /// (the agent API's headless editor, tests).
     #[serde(default)]
@@ -82,6 +86,7 @@ impl Default for InferenceContext {
             exclude: Vec::new(),
             origin: false,
             woken: Vec::new(),
+            woken_at: Vec::new(),
             screen: None,
         }
     }
@@ -340,6 +345,15 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                     push(&mut out, InferenceKind::OnCurve, q, Some(e.id), None, vec![AutoConstraint::OnCurve(e.id)], 3);
                 }
             }
+        }
+    }
+    for &(id, pos) in &ctx.woken_at {
+        let (dx, dy) = (off_x(cursor - pos), off_y(cursor - pos));
+        if dx <= ra_v && best_v.is_none_or(|b| dx < b.0) {
+            best_v = Some((dx, id, pos));
+        }
+        if dy <= ra_h && best_h.is_none_or(|b| dy < b.0) {
+            best_h = Some((dy, id, pos));
         }
     }
     // the sketch origin (unless a point already sits on it)
@@ -650,6 +664,21 @@ mod tests {
         assert!((r[0].position - v(2.0, 6.0)).length() < 1e-12);
         let r = infer(&sk, v(2.03, 6.03), &InferenceContext { woken: vec![], ..ctx });
         assert_eq!(r[0].constraints, vec![AutoConstraint::HorizontalLine]);
+    }
+
+    /// Live2 wake-parallel: a woken model edge's end aligns as a woken point does (its placeholder id), with sketch
+    /// points too.
+    #[test]
+    fn a_woken_point_outside_the_sketch_aligns() {
+        let mut sk = Sketch::new();
+        let p = sk.add_point(v(-5.0, 3.0));
+        let end = EntityId(u32::MAX - 2);
+        let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(-8.0, -4.0)), snap_radius: 0.1, woken: vec![p], woken_at: vec![(end, v(2.0, 1.0))], ..Default::default() };
+        let r = infer(&sk, v(2.04, 7.0), &ctx);
+        assert_eq!(r[0].constraints, vec![AutoConstraint::VerticalWith(end)]);
+        assert!((r[0].position - v(2.0, 7.0)).length() < 1e-12);
+        let r = infer(&sk, v(2.04, 3.03), &ctx);
+        assert_eq!(r[0].constraints, vec![AutoConstraint::HorizontalWith(p), AutoConstraint::VerticalWith(end)]);
     }
 
     /// Live (feel/sketch.json, interaction-feel.md "Two at once"): a line's end both horizontal and on a line gets

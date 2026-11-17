@@ -1629,6 +1629,8 @@ impl Sketch {
     /// Constraint states come from the last analysis if the sketch structure
     /// has not changed since.
     pub fn drag(&mut self, handles: &[(DragHandle, DVec2)]) -> SolveReport {
+        let lives = self.lives_drag(handles);
+        let handles = lives.as_deref().unwrap_or(handles);
         // Well-posed drag steps converge in a few iterations; a step that
         // doesn't converge soon sits at a limit of the constraints.
         let mut opts = SolveOptions { analyze: false, max_iterations: 8, ..SolveOptions::default() };
@@ -1708,11 +1710,67 @@ impl Sketch {
         }
     }
 
+    /// A point drag as live places the curve it belongs to (live2 sketch-drags 11-17), as more handles: an arc's end
+    /// keeps its radius and other end, the centre moving, until the chord passes the diameter (then a semicircle on
+    /// the chord); an arc's centre keeps the end, the start sliding onto the new circle; a LENGTH line's end
+    /// translates the line. Only where nothing else holds the curve; `None`: the solver's own drag.
+    fn lives_drag(&self, handles: &[(DragHandle, DVec2)]) -> Option<Vec<(DragHandle, DVec2)>> {
+        let [(DragHandle::Point(p), t)] = handles else { return None };
+        let (p, t) = (*p, *t);
+        // Nothing but `ok` constraints on `ids`, and their points used by `curve` alone.
+        let loose = |curve: EntityId, ids: &[EntityId], ok: &dyn Fn(&ConstraintKind) -> bool| {
+            !self.constraints().any(|c| !ok(&c.kind) && c.kind.entities().iter().any(|e| ids.contains(e)))
+                && !self.entities().any(|e| e.id != curve && e.point_refs().iter().any(|q| ids.contains(q)))
+        };
+        let none = |_: &ConstraintKind| false;
+        for e in self.entities().filter(|e| !e.external) {
+            match e.geometry {
+                Geometry::Arc { center, start, end } if p == start || p == end => {
+                    let other = if p == start { end } else { start };
+                    if !loose(e.id, &[e.id, center, other], &none) {
+                        continue;
+                    }
+                    let (c, q, r) = (self.point(center)?, self.point(other)?, (self.point(p)? - self.point(center)?).length());
+                    let (mid, half) = ((t + q) * 0.5, (t - q) * 0.5);
+                    // The centre on the side of the chord it was on.
+                    let side = (self.point(p)? - q).perp_dot(c - q).signum();
+                    let n = (t - q).perp().normalize_or_zero() * side;
+                    let h = (r * r - half.length_squared()).max(0.0).sqrt();
+                    return Some(vec![(DragHandle::Point(p), t), (DragHandle::Point(other), q), (DragHandle::Point(center), mid + n * h)]);
+                }
+                Geometry::Arc { center, start, end } if p == center => {
+                    if !loose(e.id, &[e.id, start, end], &none) {
+                        continue;
+                    }
+                    let (s0, q) = (self.point(start)?, self.point(end)?);
+                    let r = (q - t).length();
+                    return Some(vec![(DragHandle::Point(center), t), (DragHandle::Point(end), q), (DragHandle::Point(start), t + (s0 - t).normalize_or(DVec2::X) * r)]);
+                }
+                Geometry::Line { start, end } if p == start || p == end => {
+                    let other = if p == start { end } else { start };
+                    let own = |k: &ConstraintKind| match *k {
+                        ConstraintKind::Length { curve, .. } => curve == e.id,
+                        ConstraintKind::Horizontal { a, b: None } | ConstraintKind::Vertical { a, b: None } => a == e.id,
+                        _ => false,
+                    };
+                    let sized = self.constraints().any(|c| c.driving && matches!(c.kind, ConstraintKind::Length { curve, .. } if curve == e.id));
+                    if !sized || !loose(e.id, &[e.id, other], &own) {
+                        continue;
+                    }
+                    let d = t - self.point(p)?;
+                    return Some(vec![(DragHandle::Point(p), t), (DragHandle::Point(other), self.point(other)? + d)]);
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
     /// Whether a body drag of curve `id` (not a circle or an arc: those resize) can't translate it: one of its points is
     /// fixed, external, or coincident with a fixed or external point.
     fn body_drag_held(&self, id: EntityId) -> bool {
         let Some(e) = self.entity(id) else { return false };
-        if matches!(e.geometry, Geometry::Point { .. } | Geometry::Circle { .. } | Geometry::Arc { .. }) {
+        if matches!(e.geometry, Geometry::Point { .. } | Geometry::Circle { .. } | Geometry::Arc { .. } | Geometry::Ellipse { .. }) {
             return false;
         }
         let fixed = |p: EntityId| self.entity(p).is_some_and(|x| x.external) || self.constraints().any(|c| matches!(c.kind, ConstraintKind::Fix { entity } if entity == p || entity == id));
@@ -1781,6 +1839,17 @@ impl Sketch {
                         Geometry::Circle { center, .. } => {
                             if let Some(c) = self.point(*center) {
                                 out.push(DragTarget::Own { entity: id, slot: 0, value: (*target - c).length() });
+                            }
+                        }
+                        // Live2 sketch-drags (f): the rim scales the ellipse about its centre, its ratio kept, through the pointer.
+                        Geometry::Ellipse { center, major, minor } => {
+                            if let (Some(c), Some(u)) = (self.point(*center), major.try_normalize()) {
+                                let v = *target - c;
+                                let k = ((v.dot(u) / major.length()).powi(2) + (v.dot(u.perp()) / minor).powi(2)).sqrt();
+                                push_pt(&mut out, *center, c);
+                                for (slot, value) in [major.x * k, major.y * k, minor * k].into_iter().enumerate() {
+                                    out.push(DragTarget::Own { entity: id, slot: slot as u8, value });
+                                }
                             }
                         }
                         Geometry::Arc { center, start, end } => {
