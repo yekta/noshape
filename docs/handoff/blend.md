@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-17 08:10 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-17 12:34 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -41,22 +41,27 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   (vibe6, asm-sf-base.log / asm-sf.log, unit blend-seq-sf3) running; land when identical.
 - Live's knife times (11-16): Fillet 1-8 8/9/10/6/9/27/7/12 ms, studio 622; 11-17 (live/blend/knife-regen-1117.json):
   Chamfer 1 19, Chamfer 2 7, Fillet 2 10, Fillet 3 10, Fillet 8 12, studio 597-693. Lead: Fillet 5 at or below live is P0.
-- impeller Fillet 3 (P0, blend10 `blend-impf3`, WIP uncommitted on 8e269426d): builds as one solid 71,097.14 mm3 (live
-  71,096.12), 34 faces as live, edges/vertices 93/60 vs 95/62 (the front circle's 3 arcs joined by the unify: a fix
-  run in flight), Fillet 3 13 s (live 0.1 s: speed next). Pieces: closed_run_on takes all conic tools at once; an end
-  whose first met face doesn't cut the tool is a corner: walls = that face + its neighbours bordering a support
-  (7, 17, 4 = the chamfers and the x 5 face), tool less the cells behind every wall (one Boolean, so the round face
-  stays whole); new kernel op merge_on_surfaces (boolean.cpp): pieces on copies of an extended face's surface put on
-  one and merged (core's unify refuses: its 1e-9 volume check vs 1e-7 integral noise; ours checks 1e-6 by
-  volume_props), vertices left between pieces of one curve kept (KeepEndsMark, live keeps them). Debug left: ZZ_*
-  prints (blend_section.rs, boolean.cpp ZZ_USD, closed_run_on), probes in kernel tests/blend.rs zz_*. Then
-  Stevenrohr zum Halter ("Adjoining edge not filleted.", 2 ms), then tell core. Live's chamfer extension reaches
-  x 0.097 at the deep contact, ours 1.5 (OCCT's B-spline extension vs Parasolid's): areas 1.6 mm2 apart, counts same.
+- impeller Fillet 3: 4efe95564 landed (be6f0ca8, 34/93/60). 3df3608b1 landed 13:58 as f6274d94 (core told):
+  kept edges along faces the convex rounds end on (the front circle's 3 arcs, 34/95/62 as live; impeller 29/48, first
+  difference Halter), merge_on_surfaces without the volume integrals (3.4 s; adaptive 15 % off), mark_kept_edges takes
+  `ends` (imprint_kept false: fan-blade's Derived 1 Poti2 went 48 -> 0/53 with ends). Gate: strict suite only the
+  impeller differs (27 -> 29/48), userdocs/tickets/qa docs/f197 SAME, g13 OK (bin/seq-imp3.sh, ud5-imp3.sh). Fillet 3 Mac ~4-5 s (live 0.1): speed P0 after Halter (hotspots op_boolean, props_surface x24,
+  reface_on x4 whole-shape BRepCheck, min_distance x268 = closed_run_on's touches()).
+- Halter (P0, impeller f29, R2 on edges 55/56/59/60 of 35 faces, tangentPropagation off, overflow off):
+  live/blend/q-imp-halter (11-17): the round on Jfp runs past the tip along JfV and ends against the wall; tip moves to
+  x 0.704; JfV -> 2.4405, chamfer 7.9946 mm2; the x 5 rounds run to x 7; rounds meet in convex edges. Ours: refused by
+  curved_edge_left_open; skipping concave edges there (/root/blend-scratch/halter-convex.patch) it fails in frame_at:
+  every probe at the tip classifies OnBoundary. Cause upstream: Chamfer Stevenrohr Halterung (f26, OFFSET_ANGLE 3.5 mm
+  20 deg FACE_OFFSET) leaves its bevel foot on the wall (x 1.5) at 0.21 mm tolerance, bevel faces 6.097 mm2 vs live
+  6.18; Fillet 3's Cut then makes chamfer-extension x wall edge (x 1.5 to the tip) at 2.33 mm tolerance; our tip
+  x 1.502 vs live 0.097 (live JfR curves to -x). GeomLib C2 extension changes nothing. Dumps Mac
+  ~/noshape-host/agents/blend10/zzdump/sections-{31,34,35}.brep (+.txt edges); probes kernel blend.rs zz_halter /
+  zz_extdev; ZZ_TOL / ZZ_DUMP / ZZ_FRAME prints in blend_section.rs (blend10, uncommitted). Next: f26's bevel.
 - Agent ids (11-17 09:25, fresh threads): asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm
   18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
   58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2
-  3b9b1e66-33a0-4dfe-9e0a-eee216e354b2, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core 6692ae35-758a-4442-81c8-29f67be2e21a, qa
-  132756b3-e48d-4b9f-8a0e-3d4f23629c8b.
+  79ae5cdb-42a4-4025-b43a-da61a4f92ad7, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core 6692ae35-758a-4442-81c8-29f67be2e21a, qa
+  132756b3-e48d-4b9f-8a0e-3d4f23629c8b, psui 4973e295-9e92-463f-a13f-2ec5258bc5f9.
 - Queued from asm (after the current items): asm-gearbox-std 6a912b / a470167 Fillet 2 (EDGE fillet of 2 faces' edges,
   tangent, 0.125 in: ours 38/92/56, live 38/88/52, -12.1 mm3; repro vibe6/7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/mgb
   NOSHAPE_PARITY_ONLY=m6a912b); asm-scissor-lift fed22d Fillet 3 (Top - Side 2 45/110/64 vs 48/116/64; Motor Mount Live (q-gearbox-f2/corner.json): each corner a torus (27.55 mm2, its edge on the vertical round the
@@ -105,10 +110,14 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## Next, in order
 
-1. P0 (lead 11-17): impeller Fillet 3 (counts, speed, strip debug, suite/userdocs/g13, land) and "Fillet Stevenrohr
-   zum Halter"; tell core when either builds (core told 08:10 of the WIP state).
-2. qa's P0 speed A/B (knife Chamfer 2 / Fillet 3 / Fillet 5).
-3. Unpark the knife Fillet 8 join, then its speed.
+1. P0 Halter (live's rule from live's capture, never guessed); tell core when it builds (core's Extrude impellerraum
+   input 35 faces vs live 39 waits on it).
+2. P0 speed: impeller Fillet 3 (Mac ~4-5 s vs live 0.1 s), profile with bin/sample-mac.sh.
+3. P2 asm: GearLab 1e81ca opFillet FILLET_FAILED (repro vibe7 NOSHAPE_FS_TRACE=1 NOSHAPE_PARITY_MODELS=
+   ~/agents/asm-keep/m1e ~/agents/asm-keep/bin/ops-c03 parity::parity_models); isaac-ball a2e4a2 f23 Chamfer 2
+   (TWO_OFFSETS 5.5/6, ours 51/124/68 40986.25 vs live 53/126/68 41594.02; repro NOSHAPE_PARITY_MODELS=
+   ~/agents/asm-keep/ma2v7 ~/agents/asm-keep/bin/ops-c04, DIFFERING; tell asm if the edge as sent looks wrong).
+4. qa's speed A/B (knife Chamfer 2 / Fillet 3 / Fillet 5), then the parked knife Fillet 8 join.
 
 ## Parked (with where)
 
