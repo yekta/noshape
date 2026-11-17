@@ -4,12 +4,16 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 14:15 UTC.
+Updated 11-17 17:55 UTC. Hosts (lead 11-17): builds, gates, A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8, cold since
+17:05); land `NOSHAPE_LAND_QUEUE_HOST=vibex7 tools/tiers/land.sh`; private docs on vibex7 ~/lead-private (hat8, hat15,
+hat15b, AppleWatchDock); bool2 gates on vibex6; Mac for crate tests. vibe3/vibe5 gone (never name a build host vibeN).
 
 ## In flight
-- Gate unit bool-gate-shared3 -> /root/bool-hat-scratch/chain-a1d7ca0b4.out (14:15, queued behind bool2's on vibe5),
-  run by /root/bool-scratch/gate-chain-own.sh (gate.sh / gate-host.py from the branch itself: its replay statuses).
-  Branch bool-shared2 (bool-hat), three commits on main f6274d94e:
+- Gate unit bool-gate-x8b -> /root/bool-hat-scratch/chain-26ce2dffa.out (17:51, vibex8, cold build), by
+  /root/bool-scratch/gate-chain-own.sh (gate.sh / gate-host.py from the branch: its new replay statuses). Then unit
+  bool-udoc8c runs /root/bool-hat-scratch/udoc-ab8.sh 26ce2dffa (CLIs built on vibex8, the 4 docs compared on vibex7)
+  -> udoc-26ce2dffa.out. Then knurls ours-only, land, tell dx (f93a1292).
+  Branch bool-shared2 (bool-hat), seven commits on main f6274d94e:
   1. e61278b1d usd: op_unify keeps USD's merge whose volume change fits in the merged faces' tolerant edges (sum of
      tol^2 x length, capped at 1e-8 of the volume, only where every face USD made of two or more is on an elementary
      surface). infento 1dc32b Boolean 4 Part 4 232/632/400 -> 216/600/384 as live. Grooves cd1c58431ab4a62c 9 -> 8.
@@ -18,17 +22,30 @@ Updated 11-17 14:15 UTC.
      end to end, (b) hats/dock SAME, (c) replay differs only in those labels, listed by case ("shared shapes
      relabelled"; also "seam placement only": a unify's closed-face seam elsewhere, lead-approved, e.g. impeller
      7cb79697), (d) T1 split_names::a_shared_edge_of_split_pieces_keeps_its_name_through_a_boolean (declined on main).
-     Sheets keep the decline (corpus 1230858b: their faces turned otherwise). Mac shared74: 62/68 taken, 41 relabelled,
-     0 differ. Boolean 4: 751 -> 392 ms (parts unchanged).
-  3. a1d7ca0b4 split_params boxes a NURBS section piece by its curve's cached piece boxes (grown GREY x tol_far), not
-     16 samples a span: Boolean 4's real inputs (Mac rec1 3b82079bd90565b5, exact recording) ours 137 -> 84 ms.
-  After the gate: knurl corpora ours-only with the gate's base/new binaries, hats/dock (udoc-ab.sh) + hat15b by hand,
-  land, tell dx (f93a1292). Note: the old infb4 recording (3af1878c, 85 KB) is not Boolean 4's real input.
-- SCISSOR-LIFT-BOM-ROWS: culprit core's 41f62884a (pattern/Mirror Add joins surface copies): bad vs its parent
-  5e976a640 good, same debug build on vibe6 (5b2807501 innocent: core's revert on 7c76 still bad). core (P0), asm, qa,
-  lead told 14:1x. Bisect done; logs /root/bool-scratch/sl-*.out, steps now run on vibe6 (bisect-sl.sh).
+     Sheets keep the decline (corpus 1230858b). Mac shared74: 62/68 taken, 41 relabelled, 0 differ.
+  3. a1d7ca0b4 + 65befe285: a NURBS section piece's vertex search, intervals_on's vertices and an input edge's split
+     test box the curve by its cached piece boxes (Ctx::nurbs_box), not 16 samples a span (ours 137 -> 70 ms).
+  4. 51ee7c1cb unify room summed most tolerant edge first, stopping once it covers the change (check 76-106 -> 35 ms).
+     infento Boolean 4 with 1-4: 751 -> 189 ms in the CLI on the Mac (live 135), parts unchanged. Exact recording of
+     its inputs: Mac rec1 3b82079bd90565b5 (the old infb4 3af1878c, 85 KB, is not Boolean 4's input).
+  5. 0b17fee66 par_map_by: a worker stopped by its own stop state (memory budget: per-thread RSS sampling) where the
+     caller wasn't declines "cancelled" instead of returning short (dx: boolean.rs:5058 index out of bounds, abort).
+  6. 26ce2dffa fuse_glued: a mirrored plane's normal is against its axis (T1
+     a_cylinder_and_its_mirror_image_fuse_glued, fails without it).
+- GearLab herringbone (dx, asm-isaac-ball 8f5622, 14.8 s vs live 1.15): fuses 726897a5 (teeth on blank, ours "two
+  edges leave a vertex in one direction"; glue changes history: no) and 68f32ae1 (half + mirror, ours "a piece's point
+  on another solid's face"; OCCT 949 ms, glue shift 294 identical history). fuse_glued now sees the mirror (6.) but
+  the half's z=5 cap is 41 faces (core's 5e-9 rad tilted sweep caps leave teeth end faces unmerged): with core's fix
+  it should go glued. ShiftChecked's volumes_add_up (1e-7) rejects B-spline solids (integration noise ~1e-5).
+  Cases Mac ~/noshape-host/agents/bool-hat/gear, vibex6 ~/agents/dx-keep/gearlab/booleans.
+- asm pattern-std 36b90f Extrude 12 (17/43/28 vs live 14/36/24, 3 faces left split): unit bool-mps8 runs the
+  branch's ops binary (vibex8 ~/agents/bool-keep/ops-51ee, model ~/agents/bool-keep/mps) -> /root/bool-scratch/mps-51ee.log.
+- blend: c2-impeller-loft Fillet 3's OCCT cut 9602f671f8528c1a (~650-800 ms, PerformEF 481): vibex7
+  ~/agents/blend-keep/rec-f3, Mac ~/noshape-host/agents/blend10/rec-f3.
+- SCISSOR-LIFT-BOM-ROWS: culprit core's 41f62884a; core's revert ddfea0eb restores 59/87. Done on my side.
 - impeller 02f2f58d (bool2's): Linux "unified differently" only; on the Mac history differs with or without my change
   (platform). 7cb79697: seam placement only.
+- vibe3's ~/agents/bool-cases copy went to vibe5 (gone): lost.
 - Not mine (11-17): impeller 38073a30 (bool2: live wins, OCCT's the outlier), impeller Extrude impellerraum (core),
   c2-fan-blade-sweep Boolean 2 (qa: core's Subtract with Offset range; main 1d77cd633 back to 56/139/84).
 - Landed 11-17: bool-knife (ecf8c33a), OCCT 0033 (9ece8f66), bool-knife2 (cf5a9aff), bool-march (d3f24a83), nuts
