@@ -29,15 +29,22 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   ~/agents/skasm/trace-<doc>.log.
 
 ## Next, in order
-1. Mac tests green -> commit the uncommitted fixes, land the stack (lead 11-17: land now; the pair checks after).
-2. config-parts' rest: pulleys Circular pattern 1 (face pattern of one groove, "Failed to create pattern" on main
-   too: core's once the translation is whole); sprockets 16/24 (from Circular pattern 1 on one volume, 3302.3612 vs
-   live 3302.3558 mm³, 1.6e-6 relative: live's band asked in REQUESTS.md 11:28); standoffs Hole 2 message (diameter
-   expression 0: ours "A parameter value is not valid.", live "Error regenerating: a parameter is out of range.":
-   rule asked in REQUESTS.md 11:28); nuts Sweep 1 non-manifold (bool's per core's handoff); links Derived 1 NOT BUILT.
-3. Surface workshop: pipe Loft profile 3 Pierce taken back (2.69 mm off our guide), knifehandle P4, britatap,
-   manualblend; core has mutualtrim Sweep 1. Live's Pierce answer: a circle stays on the spline as a curve (shifted
-   2 mm, radius kept); a centre point moves onto the spline.
+0. USER P0 (lead 11-17 12:30): sketch interaction parity, ahead of config-parts. psui owns the viewport pick / hover
+   emit (planes under the open sketch in the GPU pick); mine is the sketch side. Done, in test: hover re-resolved on
+   each PointerMove (`sketch_hover`, `ui.sketch_gpu_hover`; GUI test a_line_lights_over_the_plane_the_gpu_pick_keeps;
+   the user's frames lead-scratch/vid/hover/t01..t05). Then, with live2's capture (coming) and behaviours.md: constraint
+   creation by selection (two lines -> the toolbar's options), inference and snapping while drawing, drags of points,
+   lines and dimensions, dimension placement and edit, constraint-icon hover. Each fix with an interaction-feel test
+   (docs/parity/interaction-feel.md "Sketch").
+1. Stack 9d4a1a74 queued 12:2x (landing: tell bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, standoffs Revolve 1 fixed by
+   ca5c2d9f0, 13 -> 31/32).
+2. config-parts' rest: pulleys Circular pattern 1 handed to core 11:45 (face pattern ADD fails in our op, main too);
+   sprockets 16/24 (one volume, 1.6e-6: live's band asked, REQUESTS 11:28 (a)); standoffs Hole 2 message (rule asked
+   (b)); links Derived 1 (source studio not in the corpus, asked (c)); nuts Sweep 1 (bool's).
+3. Surface workshop: pipe now stops at core's Loft (guides with more than two profiles); knifehandle P4 Pierce taken
+   back (its edge doesn't end on the plane), first difference Sweep 2 area (core); britatap Split topology (core);
+   manualblend Sketch 5 Concentric 128 mm (upstream JNE), Sketch 6 / 7 INTERSECTED geometry not found. Pierce of a
+   circle grows its radius, live keeps it (asked REQUESTS (d)).
 4. core's sketch cases below. 5. tablet-stand Flange 2. 6. Remaining dropped constraints (see archive).
 
 ## core's sketch cases (2026-11-16), queue item 3

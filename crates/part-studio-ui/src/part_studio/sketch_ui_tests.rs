@@ -1427,6 +1427,67 @@ fn a_line_in_reach_lights_and_is_clicked_when_the_gpu_pick_misses_it(cx: &mut Te
     assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().selection.clone()), vec![line], "the click selects it");
 }
 
+/// The user's recording (11-17, lead-scratch/vid/hover): in a sketch on Top, the pointer coming onto the sketch's line
+/// in front of the Front plane lit the plane, and the light went stale. The GPU's pick stayed the plane, so no new
+/// hover came and what is in reach under the pointer wasn't asked again. Each move asks again: the line lights, and
+/// the plane once the pointer is off the line.
+#[gpui::test]
+fn a_line_lights_over_the_plane_the_gpu_pick_keeps(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "line-over-plane", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (700., 400.));
+    keys(cx, window, &["escape", "escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    draw(cx, window);
+    let (line, on, off, plane) = cx.update(|cx| {
+        let v = view.read(cx);
+        let data = v.sketch_data(cx).unwrap();
+        let ed = v.sketch.as_ref().unwrap();
+        let line = data.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+        let Some(noshape_sketch::Curve2::Line { a, b }) = data.sketch.curve(line) else { panic!("a line") };
+        let vp = v.viewport.read(cx);
+        let (sa, sb) = (vp.project(ed.frame.to_world(a)).unwrap(), vp.project(ed.frame.to_world(b)).unwrap());
+        let n = (sb - sa).perp().normalize();
+        let plane = v.built.as_ref().unwrap().picks.ids_for(&Reference::Plane(DatumPlane::Front)).first().copied().expect("the Front plane's pick");
+        (line, (sa + sb) * 0.5 + n * 3.0, (sa + sb) * 0.5 + n * 60.0, plane)
+    });
+    let (end, by_end, line_pick) = cx.update(|cx| {
+        let v = view.read(cx);
+        let data = v.sketch_data(cx).unwrap();
+        let ed = v.sketch.as_ref().unwrap();
+        let Some(noshape_sketch::Curve2::Line { b, .. }) = data.sketch.curve(line) else { panic!("a line") };
+        let end = data.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Point && data.sketch.point(e.id).is_some_and(|q| (q - b).length() < 1e-9)).unwrap().id;
+        let vp = v.viewport.read(cx);
+        let at = vp.project(ed.frame.to_world(data.sketch.point(end).unwrap())).unwrap();
+        let picks = &v.built.as_ref().unwrap().picks;
+        (end, at + DVec2::new(-2.0, 4.0), picks.ids_for(&Reference::SketchEntity { sketch: ed.feature, entity: line.0 }).first().copied().unwrap())
+    });
+    let move_to = |cx: &mut TestAppContext, at: DVec2, gpu: Option<Option<u32>>| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                vp.update(cx, |vp, _| vp.place_pointer(at));
+                v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
+                if let Some(id) = gpu {
+                    v.on_viewport_event(&vp, &ViewportEvent::Hover(id), w, cx);
+                }
+            });
+        })
+        .unwrap();
+        draw(cx, window);
+    };
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| (view.read(cx).sketch.as_ref().unwrap().hover, view.read(cx).hover.clone()));
+    move_to(cx, off, Some(Some(plane)));
+    assert_eq!(lit(cx), (None, Some(Reference::Plane(DatumPlane::Front))), "off the line: the plane");
+    move_to(cx, on, None);
+    assert_eq!(lit(cx).0, Some(line), "onto the line, the GPU's pick still the plane: the line lights");
+    move_to(cx, off, None);
+    assert_eq!(lit(cx), (None, Some(Reference::Plane(DatumPlane::Front))), "off it again: the plane, not a stale line");
+    // Beside the line's end, the GPU's pick the line: the end point in its reach wins (live: a point beats its lines).
+    move_to(cx, by_end, Some(Some(line_pick)));
+    assert_eq!(lit(cx).0, Some(end), "by the end: the point");
+}
+
 /// ui-parity sketch-constraint-refusals step 58 (qa 11-12): a click on a small circle's rim, its centre 11 px away. Our
 /// pick pass reaches a point from about 12 px and points win, so the GPU's hover was the centre; held to live's reach
 /// (a point 10 px) the circle under the pointer is what lights and what the click selects, as live.

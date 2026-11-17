@@ -612,7 +612,8 @@ impl PartStudioView {
         let Some(ed) = self.sketch.as_ref() else { return false };
         let Some(d) = self.sketch_data(cx) else { return false };
         let r = ed.world_per_px * 10.0;
-        let curve_r = ed.world_per_px * if ed.tool == Tool::Dimension { 8.0 } else { 6.0 };
+        // Live (live2 11-17 hover-p0): a line lights to 7 px in sketch mode (8 gives the region or plane), a point to 10.
+        let curve_r = ed.world_per_px * if ed.tool == Tool::Dimension { 8.0 } else { 7.0 };
         let screen = ed.screen_metric();
         match (d.sketch.point(e), screen) {
             (Some(q), Some(m)) => m.len(q - p) <= r,
@@ -659,10 +660,13 @@ impl PartStudioView {
         let pick_of = |e: noshape_sketch::EntityId| built.picks.ids_for(&Reference::SketchEntity { sketch: ed.feature, entity: e.0 }).first().copied();
         // Nothing of the sketch under the GPU's pick (a plane, a region, the background): what a click there takes.
         let Some(e) = id.and_then(own) else { return self.sketch_pick_at(p, cx).and_then(pick_of).or(id) };
+        // A point in its reach beats the line the GPU picked (live2 11-17 hover-p0: 8 px off a corner, the corner).
+        let near = self.sketch_pick_at(p, cx);
         if self.in_sketch_reach(e, p, cx) {
-            return id;
+            let point = near.filter(|q| *q != e && self.sketch_data(cx).is_some_and(|d| d.sketch.point(*q).is_some() && d.sketch.point(e).is_none()));
+            return point.and_then(pick_of).or(id);
         }
-        self.sketch_pick_at(p, cx).and_then(pick_of)
+        near.and_then(pick_of)
     }
 
     fn snap_to_hover(&mut self, hover: Option<&Reference>, cx: &mut Context<Self>) {
@@ -737,6 +741,69 @@ impl PartStudioView {
             ed.place_frame(center, size.y);
             ed.screen_map = sketch_screen_map(vp, ed);
         }
+    }
+
+    /// The GPU's hover pick in sketch mode (and again on each move while it stands: `sketch_gpu_hover`), resolved by
+    /// [`Self::sketch_hover_id`] and applied.
+    fn sketch_hover(&mut self, gpu_id: Option<u32>, vp: &Entity<Viewport>, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let id = &self.sketch_hover_id(gpu_id, cx);
+        self.ui.sketch_gpu_hover = Some((gpu_id, *id));
+        // While a glyph/label is hovered, the geometry under it isn't.
+        if self.sketch.as_ref().is_some_and(|s| s.hover_constraint.is_some()) {
+            if self.hover.take().is_some() {
+                self.refresh_scene(false, cx);
+            }
+            return true;
+        }
+        let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
+        // Live Onshape: the sketch's own plane (or face) is never
+        // pre-highlighted while sketching on it, except a face for
+        // Use, which projects its edges (qa5 CTX-USE).
+        let use_face = self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Use) && matches!(r, Some(Reference::Face(_)));
+        if !use_face && r.as_ref().is_some_and(|r| self.is_own_sketch_plane(r, cx)) {
+            if self.hover.take().is_some() {
+                self.refresh_scene(false, cx);
+            }
+            if let Some(ed) = &mut self.sketch {
+                ed.hover_region = None;
+                ed.hover = None;
+            }
+            self.snap_to_hover(None, cx);
+            return true;
+        }
+        if let Some(ed) = &mut self.sketch {
+            ed.hover_region = match &r {
+                Some(Reference::SketchRegion { sketch, key }) if *sketch == ed.feature => Some(key.clone()),
+                _ => None,
+            };
+            let ent = match &r {
+                Some(Reference::SketchEntity { sketch, entity }) if *sketch == ed.feature && noshape_sketch::text::glyph_text_id(noshape_sketch::EntityId(*entity)).is_none() => Some(noshape_sketch::EntityId(*entity)),
+                _ => None,
+            };
+            if ed.hover != ent {
+                if let Some(old) = ed.hover {
+                    ed.glyph_entity = Some((old, std::time::Instant::now()));
+                }
+                ed.hover = ent;
+                cx.notify();
+            }
+        }
+        // A drawing tool snaps to what is now drawn hovered (the pick arrives after the move).
+        self.snap_to_hover(r.as_ref(), cx);
+        // The GPU hover result arrives after PointerMove. Refresh Use
+        // here as well, so stopping on an edge still previews it.
+        if self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Use) {
+            self.hover = r;
+            self.update_use_preview();
+            self.refresh_scene(false, cx);
+            cx.notify();
+            return true;
+        }
+        // (Picking under the pointer is off while Select other is open.)
+        if self.ui.select_other.is_none() {
+            self.apply_hover_pick(*id, vp, window, cx);
+        }
+        true
     }
 
     /// Handle viewport input in sketch mode. Returns true when consumed.
@@ -817,65 +884,7 @@ impl PartStudioView {
                 }
                 true
             }
-            ViewportEvent::Hover(gpu_id) => {
-                let id = &self.sketch_hover_id(*gpu_id, cx);
-                // While a glyph/label is hovered, the geometry under it isn't.
-                if self.sketch.as_ref().is_some_and(|s| s.hover_constraint.is_some()) {
-                    if self.hover.take().is_some() {
-                        self.refresh_scene(false, cx);
-                    }
-                    return true;
-                }
-                let r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
-                // Live Onshape: the sketch's own plane (or face) is never
-                // pre-highlighted while sketching on it, except a face for
-                // Use, which projects its edges (qa5 CTX-USE).
-                let use_face = self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Use) && matches!(r, Some(Reference::Face(_)));
-                if !use_face && r.as_ref().is_some_and(|r| self.is_own_sketch_plane(r, cx)) {
-                    if self.hover.take().is_some() {
-                        self.refresh_scene(false, cx);
-                    }
-                    if let Some(ed) = &mut self.sketch {
-                        ed.hover_region = None;
-                        ed.hover = None;
-                    }
-                    self.snap_to_hover(None, cx);
-                    return true;
-                }
-                if let Some(ed) = &mut self.sketch {
-                    ed.hover_region = match &r {
-                        Some(Reference::SketchRegion { sketch, key }) if *sketch == ed.feature => Some(key.clone()),
-                        _ => None,
-                    };
-                    let ent = match &r {
-                        Some(Reference::SketchEntity { sketch, entity }) if *sketch == ed.feature && noshape_sketch::text::glyph_text_id(noshape_sketch::EntityId(*entity)).is_none() => Some(noshape_sketch::EntityId(*entity)),
-                        _ => None,
-                    };
-                    if ed.hover != ent {
-                        if let Some(old) = ed.hover {
-                            ed.glyph_entity = Some((old, std::time::Instant::now()));
-                        }
-                        ed.hover = ent;
-                        cx.notify();
-                    }
-                }
-                // A drawing tool snaps to what is now drawn hovered (the pick arrives after the move).
-                self.snap_to_hover(r.as_ref(), cx);
-                // The GPU hover result arrives after PointerMove. Refresh Use
-                // here as well, so stopping on an edge still previews it.
-                if self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Use) {
-                    self.hover = r;
-                    self.update_use_preview();
-                    self.refresh_scene(false, cx);
-                    cx.notify();
-                    return true;
-                }
-                // (Picking under the pointer is off while Select other is open.)
-                if self.ui.select_other.is_none() {
-                    self.apply_hover_pick(*id, vp, window, cx);
-                }
-                true
-            }
+            ViewportEvent::Hover(gpu_id) => self.sketch_hover(*gpu_id, vp, window, cx),
             ViewportEvent::PointerMove { position, modifiers } => {
                 let Some(p) = to_plane(self, *position, cx) else { return false };
                 let shift = modifiers.shift;
@@ -897,6 +906,13 @@ impl PartStudioView {
                 }
                 if was_shift != shift {
                     cx.notify();
+                }
+                // The GPU's pick stands until it changes (the plane behind a line it still reports as the pointer
+                // comes onto the line): resolved again here, so what lights is what is under the pointer now.
+                if let Some((gpu, resolved)) = self.ui.sketch_gpu_hover
+                    && self.sketch_hover_id(gpu, cx) != resolved
+                {
+                    self.sketch_hover(gpu, vp, window, cx);
                 }
                 // Let hover highlighting run too.
                 false

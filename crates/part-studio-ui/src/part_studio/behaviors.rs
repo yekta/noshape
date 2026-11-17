@@ -237,6 +237,9 @@ pub struct UiState {
     /// The pick under the pointer as the pick buffer has it (before Alt and
     /// the active field's filter), so Alt going down or up re-hovers.
     pub hover_raw: Option<PickTarget>,
+    /// In sketch mode: the GPU's last hover pick and the id it was resolved to (`sketch_hover_id`), so a move that
+    /// keeps the GPU's pick (the plane behind a line) still re-resolves to what is in reach under the pointer.
+    pub sketch_gpu_hover: Option<(Option<u32>, Option<u32>)>,
     /// Alt is down: hover and clicks go through see-through parts.
     pub alt_held: bool,
     /// The pick under the pointer before midpoint snapping
@@ -780,6 +783,7 @@ impl UiState {
             cam_history: Vec::new(),
             pointer: None,
             hover_raw: None,
+            sketch_gpu_hover: None,
             alt_held: false,
             hover_pick: None,
             midpoint_armed: None,
