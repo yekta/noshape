@@ -22,7 +22,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   Restarted 11-17 03:33 with the fixed script: the clean A/B step (nightly/ab-<mmdd>.args) and the latency step now
   `cd … || exit 1;` (the A/B's `cd … && ( load loop ) &` backgrounded the cd, ab-feat.py ran in ~ and the loop held the ssh).
 - **qa-suites**: bin/qa-suites-loop.sh, every 4 h: interaction suite, model suite (speed, debug) and assembly / exchange
-  suites of the newest green, all on **vibe7** (lead 11-15: vibe5 is the land queue), each through `~/bin/slot` there.
+  suites of the newest green, each through `~/bin/slot`: ui + models on **vibe7**, assemblies / exchange (suites-rest) on
+  **vibe6** beside them since 11-17 04:51 (vibe7's slot was held 4 h by dx). 1117-0227-ecf8c33a's stage re-run as unit
+  qa-suites-redo-0227 (QA_REDO).
   Results suites/<mmdd-hhmm-sha>/; host overrides QA_UI_HOST / QA_SPEED_HOST / QA_SUITES_HOST.
 - **qa-cut-0415 / qa-cut-1615** timers: bin/cut-verdict.sh (cut-check.sh: newest green's compat vs the baseline) -> one GO /
   NO-GO line in /tmp/lead/qa-alerts and compat/cut-<mmdd-hhmm>.txt. Add the verdict as a "Release blockers" section in TICKETS.md.
