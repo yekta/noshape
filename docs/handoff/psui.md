@@ -89,7 +89,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 - ab8a2a43 (leak fixes + NOSHAPE_SOAK) FAILED 11-16 20:59 on ops `spawn_guard` (soak.rs runs `ps` without
   CREATE_NO_WINDOW). Fix: soak.rs added to spawn_guard.rs ALLOWED (a measuring aid, off unless set), committed with
-  this handoff and queued again 11-17 ~09:30 (the Mac run of `spawn_guard::` hadn't finished): check
+  this handoff and queued again 11-17 09:34 as e794a9dd (the Mac run of `spawn_guard::` hadn't finished): check
   `tools/tiers/land.sh --status`; if it fails again, fix forward.
 
 ## Current task (lead 11-17 09:25)
