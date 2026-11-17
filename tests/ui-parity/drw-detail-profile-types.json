@@ -1,0 +1,21 @@
+{
+ "name": "drw-detail-profile-types",
+ "about": "Detail view tool: the profile type buttons Rectangle, Polygon and Spline clicked in turn (the prompt field reads Create rectangle, Create closed polygon, Create closed profile), the prompt field hovered (tooltip: Create closed profile for detail view boundary), back to Circle (Create circle); Escape",
+ "area": "drawing",
+ "source": "studios 11-16 matrix (Detail view: Create rectangle, Create closed polygon, Create closed profile for detail view boundary unseen); live2 11-17 exploration; the unlabelled profile buttons by pixel (drawing panel at the left, screen = iframe DOM + 40)",
+ "start": "block-drawing",
+ "steps": [
+  {"do": "click", "on": {"tool": "Detail view"}},
+  {"do": "wait", "until": "ms", "ms": 1500},
+  {"do": "click", "on": {"px": [91, 121]}},
+  {"do": "wait", "until": "ms", "ms": 800},
+  {"do": "hover", "on": {"px": [100, 153]}},
+  {"do": "click", "on": {"px": [158, 121]}},
+  {"do": "wait", "until": "ms", "ms": 800},
+  {"do": "click", "on": {"px": [124, 121]}},
+  {"do": "wait", "until": "ms", "ms": 800},
+  {"do": "click", "on": {"px": [57, 121]}},
+  {"do": "wait", "until": "ms", "ms": 800},
+  {"do": "key", "key": "Escape"}
+ ]
+}
