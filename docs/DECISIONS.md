@@ -102,3 +102,6 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   drag, dimensions) as live, within a frame, ahead of geometry tails. In sketch mode the active sketch's entities win the
   hover over planes and faces. Every fix comes with an interaction-feel scenario; a suite that passes while the user hits
   a broken hover is missing coverage, which is part of the bug. live2's lanes serve these captures first.
+- 11-17 A Boolean's history may call a shared edge or vertex Modified (same place) where OCCT says Kept (OCCT's choice
+  follows its rounding) when the model suite is identical end to end over every feature, hats/dock are SAME, the
+  corpus replay differs only in those labels, and a T1 test shows references keep their names through it.
