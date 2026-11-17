@@ -4,42 +4,50 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 17:55 UTC. Hosts (lead 11-17): builds, gates, A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8, cold since
-17:05); land `NOSHAPE_LAND_QUEUE_HOST=vibex7 tools/tiers/land.sh`; private docs on vibex7 ~/lead-private (hat8, hat15,
-hat15b, AppleWatchDock); bool2 gates on vibex6; Mac for crate tests. vibe3/vibe5 gone (never name a build host vibeN).
+Updated 11-17 22:00 UTC. Hosts (lead 11-17): builds, gates, A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8); Mac for crate
+tests and `sample` profiles (NOSHAPE_RB_HOST=mac); land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh` (lead
+21:23: queue moved to vibe2); private docs on vibex7 ~/lead-private (hat8, hat15, hat15b, AppleWatchDock); bool2 gates
+on vibex6. Never kill a process tree from a computed pid (lead 21:06): `systemctl stop <unit>`; kill only own pids > 1.
 
 ## In flight
-- Gate unit bool-gate-x8b -> /root/bool-hat-scratch/chain-26ce2dffa.out (17:51, vibex8, cold build), by
-  /root/bool-scratch/gate-chain-own.sh (gate.sh / gate-host.py from the branch: its new replay statuses). Then unit
-  bool-udoc8c runs /root/bool-hat-scratch/udoc-ab8.sh 26ce2dffa (CLIs built on vibex8, the 4 docs compared on vibex7)
-  -> udoc-26ce2dffa.out. Then knurls ours-only, land, tell dx (f93a1292).
-  Branch bool-shared2 (bool-hat), seven commits on main f6274d94e:
+- Gate unit bool-gate-x8b -> /root/bool-hat-scratch/chain-26ce2dffa.out: built 18:55 on vibex8, waiting for the
+  host's slot (asm's parity_assemblies holds it since 19:27, 4 h limit). Then unit bool-udoc8c runs
+  /root/bool-hat-scratch/udoc-ab8.sh 26ce2dffa (4 private docs on vibex7) -> udoc-26ce2dffa.out. Then knurls
+  ours-only, land, tell dx (now 2108c2b7-2f48-43a7-87a0-3f652e3cda6d) and core.
+  Branch bool-shared2 (bool-hat) on main f6274d94e: the gated seven, then two more that need the next gate:
   1. e61278b1d usd: op_unify keeps USD's merge whose volume change fits in the merged faces' tolerant edges (sum of
      tol^2 x length, capped at 1e-8 of the volume, only where every face USD made of two or more is on an elementary
      surface). infento 1dc32b Boolean 4 Part 4 232/632/400 -> 216/600/384 as live. Grooves cd1c58431ab4a62c 9 -> 8.
-  2. 8a9351e4b shared: solids' Booleans no longer decline "a shared shape OCCT may keep or remake": ours remakes those
-     shapes in place (Modified where OCCT, by rounding, says Kept). Lead 11-17 conditions: (a) model suite identical
-     end to end, (b) hats/dock SAME, (c) replay differs only in those labels, listed by case ("shared shapes
-     relabelled"; also "seam placement only": a unify's closed-face seam elsewhere, lead-approved, e.g. impeller
-     7cb79697), (d) T1 split_names::a_shared_edge_of_split_pieces_keeps_its_name_through_a_boolean (declined on main).
-     Sheets keep the decline (corpus 1230858b). Mac shared74: 62/68 taken, 41 relabelled, 0 differ.
-  3. a1d7ca0b4 + 65befe285: a NURBS section piece's vertex search, intervals_on's vertices and an input edge's split
-     test box the curve by its cached piece boxes (Ctx::nurbs_box), not 16 samples a span (ours 137 -> 70 ms).
-  4. 51ee7c1cb unify room summed most tolerant edge first, stopping once it covers the change (check 76-106 -> 35 ms).
-     infento Boolean 4 with 1-4: 751 -> 189 ms in the CLI on the Mac (live 135), parts unchanged. Exact recording of
-     its inputs: Mac rec1 3b82079bd90565b5 (the old infb4 3af1878c, 85 KB, is not Boolean 4's input).
-  5. 0b17fee66 par_map_by: a worker stopped by its own stop state (memory budget: per-thread RSS sampling) where the
-     caller wasn't declines "cancelled" instead of returning short (dx: boolean.rs:5058 index out of bounds, abort).
-  6. 26ce2dffa fuse_glued: a mirrored plane's normal is against its axis (T1
-     a_cylinder_and_its_mirror_image_fuse_glued, fails without it).
+  2. 8a9351e4b shared: solids' Booleans no longer decline "a shared shape OCCT may keep or remake" (Modified where
+     OCCT, by rounding, says Kept). Lead 11-17 conditions: (a) model suite identical end to end, (b) hats/dock SAME,
+     (c) replay differs only in those labels, listed by case ("shared shapes relabelled"; "seam placement only"),
+     (d) T1 split_names::a_shared_edge_of_split_pieces_keeps_its_name_through_a_boolean. Sheets keep the decline.
+  3. a1d7ca0b4 + 65befe285: NURBS piece boxes (Ctx::nurbs_box) for vertex search / intervals_on / split test.
+  4. 51ee7c1cb unify room summed most tolerant edge first. infento Boolean 4 with 1-4: 751 -> 189 ms (live 135).
+  5. 0b17fee66 par_map_by: a worker stopped by its own stop state declines "cancelled" (dx's boolean.rs:5058 abort).
+  6. 26ce2dffa fuse_glued: a mirrored plane's normal is against its axis.
+  7. b11d72be6 gap(): arcs meeting end to start, rounded a little past (4e-15 rad), leave no gap (it read a 186 deg
+     gap on c2-config-parts-pulleys' rim; its 23-groove Circular pattern 1 cut declined "an arc across a cylinder's
+     seam" to OCCT, 254 ms). T1 tests::arcs_meeting_end_to_start_leave_no_gap_between_them; case bf1b3ffd3777f210 in
+     tests/data/brep.
+  8. 29bcd92a8 pattern copies check their source curves' clearance once per (face, canonical pair) (Ctx::from_clear);
+     seam_cuts samples only spans whose hull may reach the seam (a 131-pole section: 4096 samples x 46). Pulleys' 23-tool
+     cut on the Mac 44 -> 28 ms (OCCT 32, live 23 for the feature).
+- DECISION ASKED (lead, 22:00): every Boolean's check as made_valid (made / changed faces + shells) instead of
+  BRepCheck of the whole result: pulleys' 5-tool cut 13.1 -> 6.2 ms (OCCT 8.2), 4-tool 7.1 -> 3.7. Untouched input
+  faces then aren't re-checked. Experiment: DBG_MADE switch at rust_boolean.cpp `const bool valid` (reverted).
+- Validity in the gate: tools/bool/gate-host.py (landed 3b8bfba0) reads blend's NOSHAPE_PARITY_VALIDITY CHECK lines
+  (cfd943d5) and fails on a part valid on main and invalid on the branch. My own invalid_solids was withdrawn (lead).
+- asm pattern-std 36b90f Extrude 12 (17/43/28 vs live 14/36/24): not the Boolean (same with NOSHAPE_BOOL_RUST=0):
+  the up-to-surface extrude's caps; told asm 11-17. Logs /root/bool-scratch/mps-51ee{,-off}.log.
+- Pulleys recordings: vibex8 ~/tmp/bool/pul (6 cases), Mac ~/noshape-host/bool-keep/pul; Mac scripts in bool-hat
+  .samp.sh / .t6.sh / .t7.sh (untracked).
 - GearLab herringbone (dx, asm-isaac-ball 8f5622, 14.8 s vs live 1.15): fuses 726897a5 (teeth on blank, ours "two
   edges leave a vertex in one direction"; glue changes history: no) and 68f32ae1 (half + mirror, ours "a piece's point
   on another solid's face"; OCCT 949 ms, glue shift 294 identical history). fuse_glued now sees the mirror (6.) but
   the half's z=5 cap is 41 faces (core's 5e-9 rad tilted sweep caps leave teeth end faces unmerged): with core's fix
   it should go glued. ShiftChecked's volumes_add_up (1e-7) rejects B-spline solids (integration noise ~1e-5).
   Cases Mac ~/noshape-host/agents/bool-hat/gear, vibex6 ~/agents/dx-keep/gearlab/booleans.
-- asm pattern-std 36b90f Extrude 12 (17/43/28 vs live 14/36/24, 3 faces left split): unit bool-mps8 runs the
-  branch's ops binary (vibex8 ~/agents/bool-keep/ops-51ee, model ~/agents/bool-keep/mps) -> /root/bool-scratch/mps-51ee.log.
 - blend: c2-impeller-loft Fillet 3's OCCT cut 9602f671f8528c1a (~650-800 ms, PerformEF 481): vibex7
   ~/agents/blend-keep/rec-f3, Mac ~/noshape-host/agents/blend10/rec-f3.
 - SCISSOR-LIFT-BOM-ROWS: culprit core's 41f62884a; core's revert ddfea0eb restores 59/87. Done on my side.
@@ -125,10 +133,10 @@ cf-snap-hook 866 / 274 (suite run 18:5x); c2-bottle-split Split 1 ~12 ms in rele
   /root/bool-scratch/probes/all-rs.patch`; undo before a commit. Mac binaries: ~/noshape-host/agents/bool-hat/oc33.
 - Gate: `systemd-run --unit=bool-gate-<sha> --collect /root/bool-scratch/gate-chain.sh <sha>` (gate-chain-own.sh: the
   branch's own gate.sh / gate-host.py, for changes to them; the branch's gate only;
-  NOSHAPE_GATE_HOST to change host, default vibe5). Output /root/bool-hat-scratch/chain-<sha>.out (VERDICT,
+  NOSHAPE_GATE_HOST to change host, default vibex8). Output /root/bool-hat-scratch/chain-<sha>.out (VERDICT,
   "CHAIN DONE rc N") and gate-<sha>.log; read with grep. gate.sh runs its replays through the host's ~/bin/slot
   (bool2's ff43a8c95). A crates/brep or Boolean change needs a clean gate and identical results end to end.
-- Land: `NOSHAPE_LAND_QUEUE_HOST=vibe5 NOSHAPE_LAND_HOSTS="vibe5 vibe3" tools/tiers/land.sh` after
+- Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh` after
   `git diff --stat $(git merge-base HEAD origin/main) HEAD`; `tools/tiers/land.sh --status`.
 - g++-13: /root/bool-scratch/gcc13-split.sh / gcc13-hat.sh <file.cpp> (name only, e.g. rust_boolean.cpp).
 - A/B binaries: /root/bool-scratch/kb5.sh <worktree> <name> (kernel release test binary to vibe5 ~/tmp/bool/<name>).
