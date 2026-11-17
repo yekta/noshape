@@ -9,6 +9,7 @@ use noshape_app_core::*;
 // The Drawing studio UI (Create drawing from an assembly or a part).
 use noshape_drawing_ui::drawing_create;
 
+pub mod assembly_flyout;
 pub mod assembly_hooks;
 pub mod assembly_mate_dialog;
 pub mod assembly_scene;

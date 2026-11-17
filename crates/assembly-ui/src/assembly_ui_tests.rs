@@ -1193,3 +1193,24 @@ fn closing_the_insert_dialog_after_esc_leaves_no_redo(cx: &mut TestAppContext) {
     });
     draw(cx, window);
 }
+
+/// Live2 asm-feel (1): a mate row's flyout heads with the mate's name and state, then shows its parameters read-only:
+/// only the type while they are at their defaults, every one with Limits ticked ("No minimum" / "No maximum" for a
+/// limit left open).
+#[gpui::test]
+fn a_mate_rows_flyout_shows_the_type_alone_until_a_parameter_is_set(cx: &mut TestAppContext) {
+    use crate::assembly_flyout::FlyRow;
+    use noshape_model::assembly::{Limits, Mate, MateId};
+    let (_window, view) = pattern_assembly(cx, "mate-flyout");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let (a, b) = (face_connector(v, "Part 1 <1>", true, cx), face_connector(v, "Part 2 <1>", false, cx));
+        let mut m = Mate::new(MateId(900), "Revolute 1".into(), MateType::Revolute, a, b);
+        let (head, rows) = v.mate_flyout(&m);
+        assert!(head.starts_with("Revolute 1"), "{head}");
+        assert_eq!(rows, vec![FlyRow::Text("Revolute".into())], "defaults: the type alone");
+        m.limits = vec![("rz".into(), Limits { min: None, max: None })];
+        let (_, rows) = v.mate_flyout(&m);
+        assert_eq!(rows, vec![FlyRow::Text("Revolute".into()), FlyRow::Check("Offset".into(), false), FlyRow::Check("Limits".into(), true), FlyRow::Text("No minimum".into()), FlyRow::Text("No maximum".into()), FlyRow::Check("Simulation connection".into(), false)], "Limits ticked: every parameter");
+    });
+}
