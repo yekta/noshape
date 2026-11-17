@@ -214,6 +214,12 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             // How far its edges may lie off their faces, and their total length: what an exchange round trip may
             // move its volume and area by (docs/PARITY-SUITES.md §3).
             v["edge_tolerance"] = json!(b.shape.max_edge_tolerance() * k);
+            // NOSHAPE_PARITY_VALIDITY: its BRepCheck validity and raw counts, for suite pairs (a part valid on one side
+            // and not the other, or topology the shown counts hide, is a difference: DECISIONS 11-17).
+            if std::env::var_os("NOSHAPE_PARITY_VALIDITY").is_some() {
+                use noshape_kernel::ShapeType;
+                v["check"] = json!(format!("valid {} raw {}/{}/{}", b.shape.is_valid(), b.shape.count(ShapeType::Face), b.shape.count(ShapeType::Edge), b.shape.count(ShapeType::Vertex)));
+            }
             if let Ok(l) = noshape_kernel::linear_properties(&b.shape) {
                 v["edge_length"] = json!(r6(l.mass * k));
             }

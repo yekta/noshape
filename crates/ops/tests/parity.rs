@@ -451,6 +451,11 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         diff.extend(step.frame.clone());
         match our_parts(&mut t) {
             Ok(parts) => {
+                // NOSHAPE_PARITY_VALIDITY: every feature's parts' validity and raw counts (suite pairs compare them).
+                if std::env::var_os("NOSHAPE_PARITY_VALIDITY").is_some() {
+                    let checks: Vec<String> = parts.iter().map(|p| format!("{} {}", p.name, p.check.as_deref().unwrap_or("-"))).collect();
+                    println!("CHECK {name} feature {k}: {}", checks.join("; "));
+                }
                 let reached: Vec<&str> = reached.iter().map(String::as_str).collect();
                 let (live, parts) = drop_live_import_failures(name, &reached, carry_volume_bands(&mut banded, live_parts(line)), parts);
                 diff.extend(differences(&allow_live_readings(name, &reached, live), &parts))

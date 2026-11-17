@@ -7284,6 +7284,8 @@ pub struct PartState {
     /// Ours: the largest edge tolerance (m) and the edges' total length (m) (`query_parts`).
     pub edge_tolerance: Option<f64>,
     pub edge_length: Option<f64>,
+    /// Ours under NOSHAPE_PARITY_VALIDITY: BRepCheck validity and raw face / edge / vertex counts.
+    pub check: Option<String>,
 }
 
 /// Our parts as an exchange round trip may give them back (docs/PARITY-SUITES.md §3, "Reading our own files back"):
@@ -7511,6 +7513,7 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             freeform_area: None,
             edge_tolerance: None,
             edge_length: None,
+            check: None,
             line_or_other: false,
         })
         .collect()
@@ -7592,6 +7595,7 @@ pub fn parts_from_query(r: &Value) -> Vec<PartState> {
             freeform_area: None,
             edge_tolerance: p["edge_tolerance"].as_f64().map(|t| t * k),
             edge_length: p["edge_length"].as_f64().map(|l| l * k),
+            check: p["check"].as_str().map(str::to_string),
             line_or_other: false,
         })
         .collect()
@@ -7627,6 +7631,7 @@ pub fn parts_from_live_import(v: &Value, mesh: bool) -> Vec<PartState> {
             freeform_area: None,
             edge_tolerance: None,
             edge_length: None,
+            check: None,
             line_or_other: false,
         })
         .collect()
