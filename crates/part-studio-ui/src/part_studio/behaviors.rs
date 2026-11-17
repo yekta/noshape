@@ -4313,8 +4313,6 @@ impl PartStudioView {
     // ------------------------------------------------------------ remembered values
 
     /// Store the REMEMBER_PREVIOUS_VALUE parameters of a committed feature (live 1987: per feature type, for the
-    /// user, in every document; lengths and angles per the document's units, the rest everywhere).
-    /// Store the REMEMBER_PREVIOUS_VALUE parameters of a committed feature (live 1987: per feature type, for the
     /// user, in every document; lengths one memory for metric documents and one for inch ones). A value with a
     /// #variable is never remembered: that parameter keeps its earlier memory (live, user P0 11-17).
     pub(super) fn remember_values(&mut self, f: &noshape_model::partstudio::Feature, units: &noshape_units::UnitPrefs) {
