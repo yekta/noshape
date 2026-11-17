@@ -10,6 +10,13 @@
 use super::*;
 use noshape_model::assembly::eval::PartOccurrence;
 use noshape_model::assembly::standard::{self, Shape, StandardSpec};
+use noshape_ops::prefs::StdMemory;
+
+/// The remembered picks, one for every assembly tab (loaded once; saved in the background on each change).
+fn std_memory() -> std::sync::MutexGuard<'static, StdMemory> {
+    static MEMORY: std::sync::OnceLock<std::sync::Mutex<StdMemory>> = std::sync::OnceLock::new();
+    MEMORY.get_or_init(|| std::sync::Mutex::new(StdMemory::load())).lock().unwrap_or_else(|e| e.into_inner())
+}
 
 /// A face or edge selected before Insert opened (live: pre-select hole
 /// edges or faces, or planar faces with holes, then Insert).
@@ -59,14 +66,30 @@ pub struct StdUi {
 use noshape_ops::assembly::Stack;
 
 impl AssemblyView {
-    /// Spec of the tab, starting with the first of every picker (live:
-    /// ANSI inch › Bolts & screws › Countersunk bolts › Countersunk bolt).
+    /// Spec of the tab: the user's last one, else the first of every picker
+    /// (live: ANSI inch › Bolts & screws › Countersunk bolts › Countersunk bolt).
     fn std_spec(&mut self) -> StandardSpec {
-        self.ui.std.spec.get_or_insert_with(|| StandardSpec::new(standard::default_component())).clone()
+        self.ui.std
+            .spec
+            .get_or_insert_with(|| std_memory().last.clone().filter(|s| standard::component(s).is_some()).unwrap_or_else(|| StandardSpec::new(standard::default_component())))
+            .clone()
+    }
+
+    /// Live remembers a picker's change at once, inserted or not (not while
+    /// editing an instance).
+    fn std_remember(&self, spec: &StandardSpec, cx: &mut Context<Self>) {
+        if self.ui.std.editing.is_some() {
+            return;
+        }
+        let mut memory = std_memory();
+        memory.remember(spec);
+        let copy = memory.clone();
+        cx.background_spawn(async move { copy.save() }).detach();
     }
 
     /// Choose a level (0 standard, 1 category, 2 class, 3 component): the
-    /// levels below fall back to their first entry, as in Onshape.
+    /// levels below take the user's last pick there, else stay when offered,
+    /// else their first entry, as in Onshape; a component its last spec.
     fn std_choose(&mut self, level: usize, value: &str, cx: &mut Context<Self>) {
         self.ui.std.failed_size = None;
         self.ui.std.length_edit = None;
@@ -80,11 +103,18 @@ impl AssemblyView {
                 2 => standard::classes(&path[0], &path[1]),
                 _ => standard::components(&path[0], &path[1], &path[2]).iter().map(|c| c.name.as_str()).collect(),
             };
-            if !options.contains(&path[l].as_str()) {
+            let above: Vec<&str> = path[..l].iter().map(String::as_str).collect();
+            if let Some(last) = std_memory().child(&above).filter(|c| options.contains(c)) {
+                path[l] = last.to_string();
+            } else if !options.contains(&path[l].as_str()) {
                 path[l] = options.first().map(|s| s.to_string()).unwrap_or_default();
             }
         }
-        if let Some(c) = standard::components(&path[0], &path[1], &path[2]).into_iter().find(|c| c.name == path[3]) {
+        let remembered = std_memory().spec(&[path[0].as_str(), path[1].as_str(), path[2].as_str(), path[3].as_str()]).cloned().filter(|s| standard::component(s).is_some());
+        if let Some(spec) = remembered {
+            self.std_remember(&spec, cx);
+            self.ui.std.spec = Some(spec);
+        } else if let Some(c) = standard::components(&path[0], &path[1], &path[2]).into_iter().find(|c| c.name == path[3]) {
             let mut spec = StandardSpec::new(c);
             // Keep the size when the new component has it, and the material.
             if c.size(&cur.size).is_some() {
@@ -92,6 +122,7 @@ impl AssemblyView {
             }
             spec.material = cur.material;
             spec.finish = cur.finish;
+            self.std_remember(&spec, cx);
             self.ui.std.spec = Some(spec);
         }
         cx.notify();
@@ -115,6 +146,7 @@ impl AssemblyView {
         let mut spec = self.std_spec();
         f(&mut spec);
         spec.keep_thread_length();
+        self.std_remember(&spec, cx);
         self.ui.std.spec = Some(spec);
         cx.notify();
     }

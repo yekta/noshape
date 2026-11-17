@@ -365,3 +365,55 @@ impl LibraryFolders {
         LIBRARIES.iter().find(|(k, l)| *k == key_or_label || *l == key_or_label).map(|(k, _)| *k)
     }
 }
+
+/// Insert › Standard content's remembered picks (standard_content.json; live keeps them per account, behaviours "psui
+/// (2422 / 13:40)"): the last spec, each level's last child (a Standard its Category, a Category its Class, a Class its
+/// Component) and each component's last spec, kept as soon as a picker changes.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct StdMemory {
+    #[serde(default)]
+    pub last: Option<noshape_model::assembly::standard::StandardSpec>,
+    /// "standard", "standard/category", "standard/category/class" → its last child.
+    #[serde(default)]
+    pub children: std::collections::BTreeMap<String, String>,
+    /// "standard/category/class/component" → its last spec.
+    #[serde(default)]
+    pub specs: std::collections::BTreeMap<String, noshape_model::assembly::standard::StandardSpec>,
+}
+
+impl StdMemory {
+    fn path() -> std::path::PathBuf {
+        noshape_scene::config_dir().join("standard_content.json")
+    }
+
+    pub fn load() -> Self {
+        std::fs::read(Self::path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+    }
+
+    pub fn save(&self) {
+        let p = Self::path();
+        if let Some(dir) = p.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let _ = std::fs::write(p, serde_json::to_vec_pretty(self).unwrap_or_default());
+    }
+
+    pub fn remember(&mut self, spec: &noshape_model::assembly::standard::StandardSpec) {
+        let levels = [&spec.standard, &spec.category, &spec.class, &spec.component];
+        for l in 1..4 {
+            self.children.insert(levels[..l].iter().map(|s| s.as_str()).collect::<Vec<_>>().join("/"), levels[l].clone());
+        }
+        self.specs.insert(levels.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("/"), spec.clone());
+        self.last = Some(spec.clone());
+    }
+
+    /// The last child picked under `path` (its levels from the Standard down).
+    pub fn child(&self, path: &[&str]) -> Option<&str> {
+        self.children.get(&path.join("/")).map(String::as_str)
+    }
+
+    /// A component's last spec.
+    pub fn spec(&self, path: &[&str; 4]) -> Option<&noshape_model::assembly::standard::StandardSpec> {
+        self.specs.get(&path.join("/"))
+    }
+}

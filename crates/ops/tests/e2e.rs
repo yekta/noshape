@@ -5043,6 +5043,28 @@ fn standard_content_part_number_and_description() {
     assert_eq!(e.param.as_deref(), Some("instance"), "{e:?}");
 }
 
+/// Insert › Standard content remembers the user's picks (live, behaviours "psui (2422 / 13:40)"): each Standard its
+/// last Category / Class / Component, each component its last Size and Length, the last spec of all.
+#[test]
+fn standard_content_remembers_each_levels_last_pick() {
+    use noshape_model::assembly::standard::{self, StandardSpec};
+    let mut memory = noshape_ops::prefs::StdMemory::default();
+    let mut bolt = StandardSpec::new(standard::default_component());
+    let size = standard::component(&bolt).unwrap().size_names().last().unwrap().to_string();
+    bolt.set_size(&size);
+    memory.remember(&bolt);
+    let (s, c, k, n) = (bolt.standard.as_str(), bolt.category.as_str(), bolt.class.as_str(), bolt.component.as_str());
+    assert_eq!((memory.child(&[s]), memory.child(&[s, c]), memory.child(&[s, c, k])), (Some(c), Some(k), Some(n)));
+    assert_eq!(memory.spec(&[s, c, k, n]).map(|m| m.size.as_str()), Some(size.as_str()));
+    let iso = *standard::standards().iter().find(|t| **t != s).unwrap();
+    let other = standard::components(iso, standard::categories(iso)[0], standard::classes(iso, standard::categories(iso)[0])[0])[0];
+    memory.remember(&StandardSpec::new(other));
+    assert_eq!(memory.last.as_ref().map(|l| l.component.as_str()), Some(other.name.as_str()));
+    assert_eq!(memory.spec(&[s, c, k, n]).map(|m| m.size.as_str()), Some(size.as_str()), "another standard's pick keeps this one's");
+    let kept: noshape_ops::prefs::StdMemory = serde_json::from_str(&serde_json::to_string(&memory).unwrap()).unwrap();
+    assert_eq!(kept.child(&[s, c]), Some(k));
+}
+
 /// Assembly configurations: a List input suppressing an instance in one
 /// configuration (Configure suppression), the active configuration.
 #[test]

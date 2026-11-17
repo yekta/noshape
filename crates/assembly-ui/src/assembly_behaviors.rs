@@ -3247,6 +3247,10 @@ impl AssemblyView {
             self.insert_open = true;
             self.ui.insert_inserted.clear();
             self.ui.insert_redo = None;
+            // Standard content opens on the user's last picks (another tab may have changed them).
+            if self.ui.std.editing.is_none() {
+                self.ui.std.spec = None;
+            }
             self.std_take_selection(cx);
             cx.notify();
         }
