@@ -20,7 +20,7 @@ pub fn ops() -> Vec<Op> {
             verb: "parts",
             summary: "The parts, surfaces and curves of a Part Studio",
             description: "Each body with its id (`body:…`), name, kind, volume and centroid (solids), surface area, bounding box and face/edge/vertex counts. Lengths in the workspace units (see `units`).",
-            fields: vec![doc_field(), tab_field(), opt("configuration", json!({ "type": "object" }), "In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown.")],
+            fields: vec![doc_field(), tab_field(), opt("configuration", json!({ "type": "object" }), "In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown."), opt("check", json!({ "type": "boolean", "default": false }), "Also each solid's `valid`: whether it passes OCCT's shape check (closed shells, faces and edges that agree); slower.")],
             mutates: false,
             destructive: false,
             run: parts,
@@ -133,6 +133,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
     let k = len_scale(&units);
+    let check = a.bool_or("check", false)?;
     let r = regenerate_configured(od, tab, a)?;
     let ps = crate::doc::studio(od.doc(), tab)?;
     // Each part's volume, area and box at once (each a whole-body
@@ -210,6 +211,9 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
             if let Some(bb) = bbox {
                 v["bounding_box"] = json!({ "min": pt(bb.min, k), "max": pt(bb.max, k) });
+            }
+            if check && matches!(b.kind, noshape_model::display::BodyKind::Solid) {
+                v["valid"] = json!(b.shape.is_valid());
             }
             // How far its edges may lie off their faces, and their total length: what an exchange round trip may
             // move its volume and area by (docs/PARITY-SUITES.md §3).

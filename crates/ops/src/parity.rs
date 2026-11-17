@@ -7461,6 +7461,8 @@ pub struct PartState {
     /// Live's lines and others counted as one where its fetch read straight edges as OTHER (docs/PARITY-SUITES.md,
     /// "Straight edges of offset faces").
     pub line_or_other: bool,
+    /// Ours: whether the solid passes OCCT's shape check (`query_parts` with `check`); live's are valid.
+    pub valid: Option<bool>,
     /// Ours: the area of the part's faces on other surfaces (blends' procedural surfaces, B-splines), m², whose area
     /// live measures up to 0.22 % low (docs/PARITY-SUITES.md, "Area of procedural blend faces").
     pub freeform_area: Option<f64>,
@@ -7698,13 +7700,14 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             edge_length: None,
             check: None,
             line_or_other: false,
+            valid: None,
         })
         .collect()
 }
 
 /// Our parts now, SI.
 pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
-    let r = t.call("query_parts", json!({}))?;
+    let r = t.call("query_parts", json!({ "check": true }))?;
     // Faces and edges by geometry, per part.
     let mut types = |list: &str, field: &str| -> HashMap<String, std::collections::BTreeMap<String, usize>> {
         let mut out: HashMap<String, std::collections::BTreeMap<String, usize>> = HashMap::new();
@@ -7780,6 +7783,7 @@ pub fn parts_from_query(r: &Value) -> Vec<PartState> {
             edge_length: p["edge_length"].as_f64().map(|l| l * k),
             check: p["check"].as_str().map(str::to_string),
             line_or_other: false,
+            valid: p["valid"].as_bool(),
         })
         .collect()
 }
@@ -7816,6 +7820,7 @@ pub fn parts_from_live_import(v: &Value, mesh: bool) -> Vec<PartState> {
             edge_length: None,
             check: None,
             line_or_other: false,
+            valid: None,
         })
         .collect()
 }
@@ -7878,6 +7883,10 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
         let who = if l.name.is_empty() { "a part".to_string() } else { format!("\"{}\"", l.name) };
         if !l.body_type.is_empty() && o.body_type != l.body_type {
             out.push(format!("{who}: a {} body, live {}", o.body_type, l.body_type));
+        }
+        // (Live's solids are valid: an invalid one of ours is a difference even where its counts are live's.)
+        if o.valid == Some(false) {
+            out.push(format!("{who}: not a valid solid (OCCT's shape check)"));
         }
         if (o.faces, o.edges, o.vertices) != (l.faces, l.edges, l.vertices) {
             out.push(format!("{who}: {}/{}/{} faces/edges/vertices, live {}/{}/{}", o.faces, o.edges, o.vertices, l.faces, l.edges, l.vertices));

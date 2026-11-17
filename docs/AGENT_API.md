@@ -6610,6 +6610,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `configuration` | object |  | In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown. |
+| `check` | boolean |  | Also each solid's `valid`: whether it passes OCCT's shape check (closed shells, faces and edges that agree); slower. |
 
 #### query_entities
 

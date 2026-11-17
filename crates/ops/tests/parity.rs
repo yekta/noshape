@@ -2494,6 +2494,16 @@ fn a_zero_centroid_is_unknown() {
     assert_eq!(live_parts(&solid)[0].volume, Some(1e-6));
 }
 
+/// A solid of ours that fails OCCT's shape check differs from live's (live's are valid) even with live's counts and
+/// volume (lead 11-17: gates compare validity).
+#[test]
+fn an_invalid_solid_of_ours_is_a_difference() {
+    let live = PartState { name: "Part 1".into(), body_type: "solid".into(), faces: 6, edges: 12, vertices: 8, volume: Some(1.0e-6), ..Default::default() };
+    let ours = |valid: bool| parts_from_query(&json!({ "units": { "length": "mm" }, "parts": [{ "name": "Part 1", "kind": "Solid", "faces": 6, "edges": 12, "vertices": 8, "volume": 1000.0, "valid": valid }] }));
+    assert!(differences(&[live.clone()], &ours(true)).is_empty());
+    assert_eq!(differences(&[live], &ours(false)), ["\"Part 1\": not a valid solid (OCCT's shape check)"]);
+}
+
 /// The comparison: counts exact; volume, area and centroid within live's
 /// band (REST's low-accuracy values) or 1e-6; anything else is named.
 #[test]

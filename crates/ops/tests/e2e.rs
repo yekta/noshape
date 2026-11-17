@@ -191,6 +191,9 @@ fn sketch_extrude_fillet_pattern_export_render() {
     let expect0 = 50.0 * 30.0 * 10.0 - std::f64::consts::PI * 25.0 * 10.0;
     assert!((v0 - expect0).abs() < 1.0, "volume {v0} vs {expect0}");
     assert_eq!(parts["parts"][0]["faces"], 7);
+    // Its validity only when asked (OCCT's shape check, slower).
+    assert!(parts["parts"][0].get("valid").is_none(), "{parts}");
+    assert_eq!(call(&mut ctx, "query_parts", json!({ "check": true }))["parts"][0]["valid"], true);
 
     // Fillet the four vertical outer edges 3 mm.
     let edges = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }));
