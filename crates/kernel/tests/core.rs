@@ -240,6 +240,28 @@ fn mass_properties_of_tubes_and_a_torus_are_exact() {
     }
 }
 
+/// The quick centre (a split piece's place) is within a hair of the exact one: a box and a tube cut through by a
+/// tilted B-spline sheet, both pieces.
+#[test]
+fn a_solids_quick_centre_is_the_exact_ones() {
+    let tube = make_cylinder(&Plane::xy(), 20.0, 30.0, 2.0 * PI).unwrap();
+    let bore = make_cylinder(&Plane::new(DVec3::new(0.0, 0.0, -1.0), DVec3::Z, DVec3::X), 10.0, 32.0, 2.0 * PI).unwrap();
+    let tube = boolean(BooleanOp::Cut, &[tube], &[bore], &BooleanOptions::default()).unwrap().shape;
+    let bx = make_box(&Plane::new(DVec3::new(5.0, -3.0, 2.0), DVec3::Z, DVec3::X), 2.0, 4.0, 6.0).unwrap();
+    let wave = |y: f64, lift: f64| {
+        let pts: Vec<DVec3> = (0..4).map(|i| DVec3::new(-30.0 + 20.0 * i as f64, y, 12.0 + lift * (i % 2) as f64)).collect();
+        make_wire(&[make_bspline(&pts, None, &[0.0, 1.0], &[4, 4], 3, false).unwrap()]).unwrap()
+    };
+    let wavy = loft(&[wave(-30.0, 2.0), wave(30.0, -3.0)], &LoftOptions::default()).unwrap().shape;
+    let pieces = split(std::slice::from_ref(&tube), &[wavy], &BooleanOptions::default()).unwrap().shape.solids();
+    assert_eq!(pieces.len(), 2);
+    for (what, s) in [("box", &bx), ("tube", &tube), ("piece 1", &pieces[0]), ("piece 2", &pieces[1])] {
+        let exact = volume_properties(s).unwrap().center;
+        let quick = volume_centre_estimate(s).unwrap();
+        assert!((quick - exact).length() < 1e-6, "{what}: {quick} vs {exact}");
+    }
+}
+
 #[test]
 fn mass_properties_box() {
     let b = make_box(&Plane::xy(), 2.0, 4.0, 6.0).unwrap();
