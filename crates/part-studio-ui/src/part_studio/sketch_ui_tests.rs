@@ -4557,6 +4557,8 @@ mod latency;
 mod fields;
 #[path = "feedback_feel_tests.rs"]
 mod feedback;
+#[path = "sketch_hover_feel_tests.rs"]
+mod sketch_hover;
 
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.

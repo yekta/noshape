@@ -759,6 +759,8 @@ pub struct UiState {
     pub thickness: Option<super::thickness::ThicknessState>,
     /// Pick kinds last given to the viewport (`None` in it: all).
     pub pick_filter: Option<Option<Vec<PickKind>>>,
+    /// The plane left out of the picks with them (the open sketch's own).
+    pub pick_unhovered: Option<Reference>,
     /// The open Flatten surfaces dialog.
     pub flatten: Option<super::flatten_tool::FlattenState>,
     /// Interference detection: the hovered row of its Interferences list.
@@ -1024,6 +1026,7 @@ impl UiState {
             env_picker: None,
             thickness: None,
             pick_filter: None,
+            pick_unhovered: None,
             flatten: None,
             interference_hover: None,
             interference_picked: None,
@@ -1495,7 +1498,10 @@ impl PartStudioView {
     /// when it changes).
     pub(super) fn sync_pick_filter(&mut self, cx: &mut Context<Self>) {
         let key = self.pick_kinds(cx);
-        if self.ui.pick_filter.as_ref() == Some(&key) {
+        // Live (behaviours "USER P0 11-17: sketch hover vs planes"): the open sketch's own plane never hovers.
+        let own_plane = self.sketch.as_ref().and(self.edit.as_ref()).and_then(|e| e.dialog.read(cx).feature.params.query("sketchPlane").first().cloned())
+            .filter(|r| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }));
+        if self.ui.pick_filter.as_ref() == Some(&key) && self.ui.pick_unhovered == own_plane {
             return;
         }
         let Some(built) = &self.built else { return };
@@ -1506,7 +1512,12 @@ impl PartStudioView {
             }
             None => built.picks.priority_fn(),
         };
+        let prio = match own_plane.as_ref().map(|r| built.picks.ids_for(r).to_vec()).filter(|ids| !ids.is_empty()) {
+            Some(ids) => std::sync::Arc::new(move |id: u32| if ids.contains(&id) { i32::MIN } else { prio(id) }) as std::sync::Arc<dyn Fn(u32) -> i32 + Send + Sync>,
+            None => prio,
+        };
         self.ui.pick_filter = Some(key);
+        self.ui.pick_unhovered = own_plane;
         self.viewport.update(cx, |vp, _| vp.pick_priority = prio);
     }
 
@@ -4300,6 +4311,9 @@ impl PartStudioView {
 
     /// Store the REMEMBER_PREVIOUS_VALUE parameters of a committed feature (live 1987: per feature type, for the
     /// user, in every document; lengths and angles per the document's units, the rest everywhere).
+    /// Store the REMEMBER_PREVIOUS_VALUE parameters of a committed feature (live 1987: per feature type, for the
+    /// user, in every document; lengths one memory for metric documents and one for inch ones). A value with a
+    /// #variable is never remembered: that parameter keeps its earlier memory (live, user P0 11-17).
     pub(super) fn remember_values(&mut self, f: &noshape_model::partstudio::Feature, units: &noshape_units::UnitPrefs) {
         let Some(ty) = f.feature_type() else { return };
         let mut groups = crate::feature_settings::Groups::new();
@@ -4311,9 +4325,6 @@ impl PartStudioView {
         let mine = self.ui.remembered.entry(f.type_id.clone()).or_insert_with(|| crate::feature_settings::get(&f.type_id));
         for (g, values) in &groups {
             mine.entry(g.clone()).or_default().extend(values.clone());
-    /// Store the REMEMBER_PREVIOUS_VALUE parameters of a committed feature (live 1987: per feature type, for the
-    /// user, in every document; lengths one memory for metric documents and one for inch ones). A value with a
-    /// #variable is never remembered: that parameter keeps its earlier memory (live, user P0 11-17).
         }
         crate::feature_settings::put(&f.type_id, &groups);
     }

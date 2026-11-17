@@ -115,6 +115,30 @@ docs/DECISIONS.md (read first; it wins over anything here).
    tooldd-fillet-page.png / tooldd-sheetmetal-page.png, then land.
 3. Sketch selection readouts: done, landed e1ce5e41.
 
+## USER P0s (lead 11-17 ~12:20), ahead of everything
+
+1. Sketch hover (user's recording /root/lead-scratch/vid/hover): a plane lit instead of the line under the pointer, and
+   stale / missing line hover. Cause: the viewport emits Hover only when the GPU's id changes; with Front behind the line
+   the GPU's pick stays the plane (line beyond its 5 px square, or a tie), so `sketch_hover_id` never ran again.
+   skasm owns the sketch side (re-resolve on every PointerMove: sketch.rs `sketch_hover`, ui.sketch_gpu_hover; also
+   in_sketch_reach curve 6 → 7 px). Mine (uncommitted): behaviors.rs sync_pick_filter gives the open sketch's own
+   plane i32::MIN (live: never hovers in sketch mode); mod.rs set_built resets ui.pick_filter on every rebuild
+   (rebuild_scene kept a stale priority table: new ids ranked as planes). Test file sketch_hover_feel_tests.rs (real
+   pointer + GPU pick, user's setup): lines on / 160 px off; live2's rows (line ±6 in / ±9 out, corner 8 px = point,
+   centre = region, Top never). Live2's data: behaviours.md "USER P0, 11-17 12:2x" (+ Part 2), live/psui/hover-p0/:
+   sketch mode line 7 px, point 10; outside line 6-7, point 9; plane interior + 6 px; region over planes; no midpoint
+   hover without a tool; glyph hover = secondary preselection only; dimension hover tan, click orange, dbl-click box;
+   box select L→R window / R→L crossing (lines only); fast-move rule min(5 × avg pick, 250 ms).
+   studios takes assembly / drawing hover: told to share Pointer / pick_priority / PickKind::priority, stay out of
+   viewport.rs hover path + sync_pick_filter until I land.
+2. Remembered expression P0 (Fillet "9 mm + #wall_thickness" red in a new document): behaviors.rs remember_values
+   caches each expression's value (dialog variables), apply_remembered keeps an expression only if it evaluates with
+   scope_variables(at the insertion index), else its value, else the default; generic for every remembered param
+   (arrays too). T1 sketch_ui_tests a_remembered_expression_never_opens_red_where_its_variable_is_missing. live
+   (e8549719) is capturing what live remembers across documents: match it when it lands.
+Both tested together on the Mac (filter: `ui_tests::sketch_hover:: remembered`); drop gpui-pre-macos warnings from
+the output (a `head` filled with them once).
+
 ## In progress (11-17, new thread)
 
 - Full ui-parity run, split (lead 11-17 11:55: a run deep in one host's queue moves): green 082bd57e staged as

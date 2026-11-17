@@ -1182,6 +1182,9 @@ impl PartStudioView {
     fn set_built(&mut self, built: BuiltScene, base: Option<BuiltScene>, cx: &mut Context<Self>) {
         self.built_seq += 1;
         drop_off_thread((self.built.replace(built), std::mem::replace(&mut self.built_base, base)), cx);
+        // Its pick ids are new: their priorities go to the viewport with the next `sync_pick_filter` (a rebuild for
+        // view options kept the old table, so new ids picked as planes).
+        self.ui.pick_filter = None;
     }
 
     /// What [`Self::apply_display`] does once the scene is built (`None`: a newer build replaced it meanwhile).

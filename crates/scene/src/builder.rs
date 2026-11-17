@@ -1091,7 +1091,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     let c = theme::lin(theme::pick(theme::viewport::SKETCH_REGION, theme::viewport_dark::SKETCH_REGION));
                     // Flat: lit, the fill came out darker and grayer
                     // ((215,218,221) over the plane).
-                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], theme::pick(0.265, 0.2)]).unlit()
+                    // Picked as solid (live2 USER P0 11-17: the region beats the planes behind it; see-through, the
+                    // planes drawn after it took its pixels in the pick).
+                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], theme::pick(0.265, 0.2)]).unlit().pick_solid(true)
                 } else {
                     Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 0.0]).pick_only()
                 };
