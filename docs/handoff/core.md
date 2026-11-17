@@ -4,11 +4,7 @@ Updated 11-16 18:15 UTC. History (dated notes up to 11-15 14:48): docs/handoff/a
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
-- **LANDING 8ae595cc (queued 11-17 01:08): the ten core-oc commits** (1357fddb1 split-face attributes, 11f1335b9
-  split by untrimmed cylinder, 8deb8156c + bd8b5f74f periodic classify, 3ce19f704 / 3ace68b3f / bcaf5ffdb lofts,
-  97b778e7d captured configuration, b173dc5bb sweep path lines, d2605e45d pattern surface join). Pairs clean: vibe7
-  1206 -> 1216 (knife 46 -> 32 there is 8deb8156c's projection, reverted by bd8b5f74f: 46/52 on HEAD), vibe5 1247 -> 1250.
-  Details in the archive. core-oc's uncommitted probe re-applied (probe-wip.patch).
+- **LANDED 5b280750 (11-17 01:23): the ten core-oc commits** (pairs clean; details in the archive).
 - Impeller Extrude 4 model side: closed, nothing to fix. The 12 mm² sliver alone never meets the offset wall: even its
   surface over all of its own bounds only grazes the prism at the sketch plane (replayed dump vibe5
   ~/agents/core-keep/e4dump/prism_until-10, experiment patch /root/core-scratch/uptowiden-exp.patch). Live's Extrude 4
@@ -101,6 +97,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
        live 6; impeller still 27/48). PAIR p3 (vibe5 ~/agents/core-keep/p3pair.sh, p3res/done.txt; started
        23:21): 4c463c807 vs 68371308e, both binaries from the synced core-trace src (uncommitted parity probe in
        both). Landing core-offset: git checkout crates/ops/tests/parity.rs first (probe), diff --stat vs main.
+       p3 (4c463c807 vs 68371308e) CLEAN 02:00: 1237 = 1237, fan-blade volume/area now live's (57/142/86), impeller
+       volume 0.06 mm3 at its failing Fillet 3 only. Next: hats/dock A/B (core-keep/udoc-cmp.sh, CLIs base 68371308e vs
+       b281fe0d6 building 02:1x), then rebase core-offset and land 3 + Move face + knife commits (p4 running).
        Needs a release pair (model-core) before landing; land 1+2+2b once bool's gate passes (bool gating since
        22:40), then 3 after its pair. Next: the +1 face / -1 edge / -2 vertex difference vs live.
     4. bool's Shell may call it for its inner walls (bool decides).
@@ -142,9 +141,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Saved documents' part names are Part N, not live's.
 
 ## Waiting on others
-- **c2-config-parts-nuts Sweep 1 (14/17): sent to bool 11-17 01:2x.** The thread Cut leaves 8 edges with 3-4 faces (helices
-  on the bore cylinder r 1.62111 mm where the swept flank meets it: bore strips both sides + flank). Dumps vibe5
-  ~/agents/core-keep/nm-nuts/{target,tool0,result}.brep. Bool's if it's the Boolean.
+- **c2-config-parts-nuts Sweep 1 (14/17): mine (bool 11-17 01:3x: the sweep's geometry).** The tool's crest strip is a
+  B-spline (1 x 11) exactly on the bore's cylinder (r 1.621113885844308 mm), so OCCT intersects instead of seeing one
+  surface and misclassifies the bore (its Cut removes more than the tool). Rust Boolean declines. WIP PARKED:
+  /root/core-scratch/sweep-cylinders-wip.patch (op_pipe_shell: faces_on_cylinders, cylinder_of fits the strip exactly,
+  pcurves by unwrapped sampling) -> the reshaped solid fails BRepCheck with no sub-shape status printed; next: write
+  the reshaped tool to brep and check it in a probe (orientation of the new face? wires order?). Dumps vibe5
+  ~/agents/core-keep/nm-nuts/{target,tool0,result}.brep.
 - c2-config-parts-standoffs Revolve 1 (13/32): Sketch 3 solved 4 x 22 mm, chamfers on the axis side; live 3 x 24 (Length),
   outer corners chamfered (sketches.json). Already in skasm's handoff (translator takes Sketch 3 back). Variables OK.
 - **c2-sm-rocker-enclosure-body 15/28 (stable now):** Extrude 6's pocket is ~2 mm off live's and differently shaped
