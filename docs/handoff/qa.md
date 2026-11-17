@@ -6,6 +6,8 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
 ## Running units
+**Start every unit with `systemd-run --setenv=HOME=/root …`** (no HOME = gh fails; 11-17 the published check polled 25 min
+after v0.4.57 was out). Scripts that call gh also `export HOME=${HOME:-/root}` themselves since 20:45.
 Local units are transient (`systemctl list-units 'qa-*'`); restart one with the `systemd-run` line in its description if it's gone.
 - **qa-compat-loop**: bin/compat-loop.sh <baseline>, now **0.4.56** (moved by qa-pub-0456 11-17 06:43). On every watcher green, bin/compat-check.sh runs userdocs.py
   on vibe5 (hats, dock, 47 ticket docs, 16 authored docs from compat-docs/v0443) with the baseline's CLI against the green.
