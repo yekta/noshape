@@ -34,6 +34,8 @@ GPU `feel::presses_orbit_box_and_open_the_menu_as_live`).
 | Vertex | 7 px across, 9 diagonally; stays lit to 7–8 | 7 / 9; 7 (a point picks at most 5 px wide) | matrix | = |
 | Sketch line / point, not editing | 5–6, lit to 9 / 7, lit to 8 | 6, 9 / 7, 7 | matrix | = |
 | A part in iso with the planes behind and through it (user P0 11-17) | the part lights, never a plane behind it: each face's middle (a face, or a seen edge by it), a top corner 5 px out its vertex; beside it a plane | the same | GPU `feel::part_faces_and_vertices_light_over_the_planes_behind` | = |
+| A block wholly behind the Front plane (live psui/hover-pick-1120, 11-17) | a transparent plane never wins over geometry behind it: every face's middle lights the block; an edge with only the plane beyond lights at 5–6 and holds to 9 from the plane side, 4 / 8 from its face; the plane lights only where nothing is behind it | the same (planes see-through in the pick, priority 0) | GPU `feel::a_block_behind_the_front_plane_lights_through_it` | = |
+| A sketch point vs its line, not editing (live hover-pick-1120 row 2) | moving along the line inward the point takes over 8 px before the end, the line back at 9; beyond the end / across 6–7 | the point's square: 7 along, 7 across | – | ≈ (1 px along the line) |
 | Plane border | 7–8, no hold | 7, no hold (`LineSegment::WIDE_PICK`, `NO_HOLD`) | matrix | = |
 | Assembly instance edge / vertex | 6 / 7, no hold | 6, no hold (`NO_HOLD`) / 7 | matrix | = |
 | Silhouette edge | lights at 6, stays lit to 9–10 | as an edge | – | ≈ |

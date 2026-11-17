@@ -377,3 +377,69 @@ fn part_faces_and_vertices_light_over_the_planes_behind(cx: &mut TestAppContext)
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// live psui/hover-pick-1120 (lead 20:28, P0): a block wholly behind the Front plane in the default iso view. Through
+/// the transparent plane the block lights under the real pointer, never the plane: every face's middle; its left
+/// vertical edge (a silhouette with only the plane beyond) 4 px out and 3 px in (live 5–6 / 4); 14 px out the plane,
+/// which lights only where nothing is behind it, and 14 px in the face.
+#[gpui::test]
+fn a_block_behind_the_front_plane_lights_through_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let doc = serde_json::json!({"units": "mm", "features": [
+        {"type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{"corner_rectangle": [[10, 10], [50, 40]]}]},
+        {"type": "extrude", "name": "Extrude 1", "params": {"entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW"}}
+    ]});
+    let (window, view) = part_studio_from(cx, "behind-front-plane", Some(doc));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.iter().any(|b| b.kind == noshape_model::display::BodyKind::Solid));
+    draw(cx, window);
+    let (faces, edge) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let vp = v.viewport.read(cx);
+        let p = |q: &[f32; 3]| glam::DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64);
+        let faces: Vec<DVec2> = b
+            .mesh
+            .face_ranges
+            .iter()
+            .map(|(first, count)| &b.mesh.indices[*first as usize..(*first + *count) as usize])
+            .filter_map(|idx| vp.project(idx.iter().map(|&k| p(&b.mesh.positions[k as usize])).sum::<glam::DVec3>() / idx.len() as f64))
+            .collect();
+        // The vertical edge at x 10, y 10 mm: its middle on screen and the screen direction away from the block.
+        let (r, pl) = b.edge_refs.iter().zip(&b.mesh.edges).find(|(_, pl)| pl.iter().all(|q| (q[0] - 0.01).abs() < 1e-6 && (q[1] - 0.01).abs() < 1e-6)).expect("the edge at x 10, y 10");
+        let (a, z) = (vp.project(p(&pl[0])).unwrap(), vp.project(p(pl.last().unwrap())).unwrap());
+        let mid = (a + z) * 0.5;
+        let centre = vp.project(glam::DVec3::new(0.03, 0.025, 0.005)).unwrap();
+        let mut out = (z - a).perp().normalize();
+        if out.dot(mid - centre) < 0.0 {
+            out = -out;
+        }
+        (faces, (r.clone(), mid, out))
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).hover.clone());
+    let mut wrong = Vec::new();
+    for at in &faces {
+        pointer.move_to(cx, &view, *at);
+        let got = lit(cx);
+        if !matches!(got, Some(Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_))) {
+            wrong.push(format!("a face's middle ({:.0}, {:.0}): lit {got:?}, not the block", at.x, at.y));
+        }
+    }
+    let (edge_ref, mid, out) = edge;
+    for (d, want) in [(14.0, "plane"), (4.0, "edge"), (-3.0, "edge"), (-14.0, "face")] {
+        // (Each from afar, as a fresh approach: a lit edge holds further.)
+        pointer.move_to(cx, &view, mid + out * 60.0);
+        pointer.move_to(cx, &view, mid + out * d);
+        let got = lit(cx);
+        let ok = match want {
+            "plane" => matches!(got, Some(Reference::Plane(_))),
+            "edge" => got.as_ref() == Some(&edge_ref),
+            _ => matches!(got, Some(Reference::Face(_))),
+        };
+        if !ok {
+            wrong.push(format!("{d:+} px off the left edge: lit {got:?}, want the {want}"));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
