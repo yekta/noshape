@@ -314,12 +314,7 @@ pub fn select_related(ctx: &Context, seed: &Reference, criterion: Criterion) -> 
             };
             faces(grow_faces(&edge_faces, i, |_, _, other| round(other)))
         }
-        (Criterion::Fillets, ShapeType::Face) => {
-            // Tangent-connected curved faces with the seed's radius.
-            let Some((_, _, r)) = face_axis(b, i) else { return Vec::new() };
-            let same = |f: usize| face_axis(b, f).is_some_and(|(_, _, q)| (q - r).abs() <= 1e-7_f64.max(r * 1e-6));
-            faces(grow_faces(&edge_faces, i, |e, f, o| same(o) && smooth_edge(b, e, f, o)))
-        }
+        (Criterion::Fillets, ShapeType::Face) => select_fillets(ctx, seed, std::cmp::Ordering::Equal),
         (Criterion::EdgeLoop, ShapeType::Edge) => {
             // Edges of the seed's first face chained to the seed through shared vertices.
             let Some(face) = edge_faces.get(i).and_then(|fs| fs.first()).copied() else { return vec![seed.clone()] };
@@ -500,6 +495,88 @@ pub fn select_adjacent(ctx: &Context, seeds: &[Reference], by_vertex: bool, want
         }
     }
     out
+}
+
+/// std's `qFilletFaces` (Query variable's Fillets, Select ▸ Fillet faces): the fillet faces of the seed's body (a
+/// cylinder or torus meeting a neighbour smoothly) whose radius is equal to the seed's, at most it (`Less`) or at
+/// least it (`Greater`). Live (psui 11-17 12:21): r3 seed on a block with r2 / r3 / r5 fillets: Equal r3 alone, Less or
+/// equal r3 and every r2 face, Greater or equal r3 and r5; another part's fillets never.
+pub fn select_fillets(ctx: &Context, seed: &Reference, compare: std::cmp::Ordering) -> Vec<Reference> {
+    let Some((b, ShapeType::Face, i)) = body_of(ctx, seed) else { return Vec::new() };
+    let Some(r) = fillet_radius(b, i) else { return Vec::new() };
+    let tol = 1e-7_f64.max(r * 1e-6);
+    (0..b.faces.len())
+        .filter(|&f| {
+            fillet_radius(b, f).is_some_and(|q| match compare {
+                std::cmp::Ordering::Equal => (q - r).abs() <= tol,
+                std::cmp::Ordering::Less => q <= r + tol,
+                std::cmp::Ordering::Greater => q >= r - tol,
+            })
+        })
+        .filter_map(|f| face_ref(b, f))
+        .collect()
+}
+
+/// A face's fillet radius: a cylinder's or torus' (its tube) when it meets a neighbour smoothly.
+fn fillet_radius(b: &Body, f: usize) -> Option<f64> {
+    let r = match b.shape.sub_shape(ShapeType::Face, f).ok()?.face_surface().ok()? {
+        Surface::Cylinder { radius, .. } => radius,
+        Surface::Torus { minor_radius, .. } => minor_radius,
+        _ => return None,
+    };
+    let edge_faces = b.shape.edge_faces().ok()?;
+    let smooth = edge_faces.iter().enumerate().any(|(e, fs)| {
+        fs.len() == 2 && fs.contains(&(f as u32)) && fs[0] != fs[1] && {
+            let other = if fs[0] as usize == f { fs[1] } else { fs[0] } as usize;
+            smooth_edge(b, e, f, other)
+        }
+    });
+    smooth.then_some(r)
+}
+
+/// std's `qMatching` (Query variable's Matching): the faces or edges of the seed's body with its size and shape, in
+/// any place or direction (live psui 11-17 12:21): the same surface or curve kind and radii, area or length, and
+/// number of edges.
+pub fn select_matching(ctx: &Context, seed: &Reference) -> Vec<Reference> {
+    let Some((b, kind, i)) = body_of(ctx, seed) else { return Vec::new() };
+    let edge_faces = b.shape.edge_faces().unwrap_or_default();
+    let signature = |k: ShapeType, x: usize| -> Option<(String, Vec<f64>)> {
+        let s = b.shape.sub_shape(k, x).ok()?;
+        if k == ShapeType::Face {
+            let (name, mut v) = match s.face_surface().ok()? {
+                Surface::Plane { .. } => ("plane", vec![]),
+                Surface::Cylinder { radius, .. } => ("cylinder", vec![radius]),
+                Surface::Cone { ref_radius, half_angle, .. } => ("cone", vec![ref_radius, half_angle]),
+                Surface::Sphere { radius, .. } => ("sphere", vec![radius]),
+                Surface::Torus { major_radius, minor_radius, .. } => ("torus", vec![major_radius, minor_radius]),
+                other => return Some((kind_name(&format!("{other:?}")), vec![s.area().ok()?, edge_faces.iter().filter(|fs| fs.contains(&(x as u32))).count() as f64])),
+            };
+            v.push(s.area().ok()?);
+            v.push(edge_faces.iter().filter(|fs| fs.contains(&(x as u32))).count() as f64);
+            Some((name.to_string(), v))
+        } else {
+            let (name, mut v) = match s.edge_curve().ok()? {
+                Curve::Line { .. } => ("line", vec![]),
+                Curve::Circle { radius, .. } => ("circle", vec![radius]),
+                Curve::Ellipse { major_radius, minor_radius, .. } => ("ellipse", vec![major_radius, minor_radius]),
+                other => return Some((kind_name(&format!("{other:?}")), vec![s.length().ok()?])),
+            };
+            v.push(s.length().ok()?);
+            Some((name.to_string(), v))
+        }
+    };
+    let Some(want) = signature(kind, i) else { return Vec::new() };
+    let close = |a: &[f64], c: &[f64]| a.len() == c.len() && a.iter().zip(c).all(|(x, y)| (x - y).abs() <= 1e-9_f64.max(x.abs().max(y.abs()) * 1e-6));
+    let n = if kind == ShapeType::Face { b.faces.len() } else { b.edges.len() };
+    (0..n)
+        .filter(|&x| signature(kind, x).is_some_and(|(name, v)| name == want.0 && close(&v, &want.1)))
+        .filter_map(|x| if kind == ShapeType::Face { face_ref(b, x) } else { edge_ref(b, x) })
+        .collect()
+}
+
+/// A geometry enum's variant name from its Debug text ("BSpline { … }" → "BSpline").
+fn kind_name(debug: &str) -> String {
+    debug.split([' ', '{', '(']).next().unwrap_or_default().to_string()
 }
 
 /// A face or edge name with pattern copies traced back to the patterned

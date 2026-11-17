@@ -628,21 +628,45 @@ fn query_selection(ev: &mut EvalCtx, p: &crate::params::ParamValues, st: &str, p
         }
         "ALL_SOLID_BODIES" => ev.ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect(),
         // std queryVariable.fs: the Create selection queries, from their seeds.
-        "PROTRUSION" | "POCKET" | "HOLE" | "FILLETS" | "TANGENT_CONNECTED" | "PARALLEL" => {
+        "FILLETS" => {
+            let compare = match p.enum_(&qid(prefix, "filletCompareType")) {
+                "LESS_EQUAL" => std::cmp::Ordering::Less,
+                "GREATER_EQUAL" => std::cmp::Ordering::Greater,
+                _ => std::cmp::Ordering::Equal,
+            };
+            let mut out: Vec<Reference> = Vec::new();
+            for seed in p.query(&qid(prefix, "seedFaces")).to_vec() {
+                for r in crate::select::select_fillets(&ev.ctx, &seed, compare) {
+                    if !out.contains(&r) {
+                        out.push(r);
+                    }
+                }
+            }
+            out
+        }
+        "MATCHING" => {
+            let seeds = if p.is(&qid(prefix, "seedType"), "EDGE") { qid(prefix, "seedEdges") } else { qid(prefix, "seedFaces") };
+            let mut out: Vec<Reference> = Vec::new();
+            for seed in p.query(&seeds).to_vec() {
+                for r in crate::select::select_matching(&ev.ctx, &seed) {
+                    if !out.contains(&r) {
+                        out.push(r);
+                    }
+                }
+            }
+            out
+        }
+        "PROTRUSION" | "POCKET" | "HOLE" | "TANGENT_CONNECTED" | "PARALLEL" => {
             use crate::select::Criterion;
             let seed_type = p.enum_(&qid(prefix, "seedType")).to_string();
             let (seeds, criterion) = match st {
                 "PROTRUSION" => (qid(prefix, "seedFaces"), Criterion::Protrusion),
                 "POCKET" => (qid(prefix, "seedFaces"), Criterion::Pocket),
                 "HOLE" => (qid(prefix, "seedFaces"), Criterion::Hole),
-                "FILLETS" => (qid(prefix, "seedFaces"), Criterion::Fillets),
                 "PARALLEL" => (qid(prefix, "seedEdges"), Criterion::ParallelEdges),
                 _ if seed_type == "EDGE" => (qid(prefix, "seedEdges"), Criterion::TangentEdges),
                 _ => (qid(prefix, "seedFaces"), Criterion::TangentFaces),
             };
-            if st == "FILLETS" && !p.is(&qid(prefix, "filletCompareType"), "EQUAL") {
-                ev.warnings.push("Query variable: only Equal fillet compare is supported yet".into());
-            }
             let mut out: Vec<Reference> = Vec::new();
             for seed in p.query(&seeds).to_vec() {
                 for r in crate::select::select_related(&ev.ctx, &seed, criterion) {

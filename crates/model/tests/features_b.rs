@@ -1055,6 +1055,45 @@ fn query_variable_adjacent_as_std() {
     assert!(r.context.query_variables["topFaces"].iter().all(|q| matches!(q, Reference::Face(_))));
 }
 
+/// Query variable › Fillets and Matching as live (psui 11-17 12:21): the seed's body only; a fillet's radius compared
+/// with every fillet of the body, not only the tangent-connected ones; Matching the faces of the seed's size and
+/// shape. The block's four vertical edges rounded r 3, r 3, r 5 and r 2.
+#[test]
+fn query_variable_fillets_and_matching_as_live() {
+    let mut s = block();
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let vertical: Vec<Reference> = b.shape.edges().iter().enumerate().filter(|(_, e)| e.endpoints().is_ok_and(|(a, c)| (a.x - c.x).abs() < 1e-9 && (a.y - c.y).abs() < 1e-9)).map(|(i, _)| Reference::Edge((*b.edges[i]).clone())).collect();
+    assert_eq!(vertical.len(), 4);
+    for (edge, radius) in vertical.into_iter().zip(["3 mm", "3 mm", "5 mm", "2 mm"]) {
+        s.add("fillet", move |p| {
+            p.set("entities", ParamValue::Query(vec![edge]));
+            p.set("radius", expr(radius));
+        });
+    }
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let r3 = b.shape.faces().iter().position(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if near(radius, 0.003, 1e-9))).expect("an r 3 face");
+    let seed = Reference::Face((*b.faces[r3]).clone());
+    let cases: [(&str, &str, &str, usize); 4] = [("eq", "FILLETS", "EQUAL", 2), ("le", "FILLETS", "LESS_EQUAL", 3), ("ge", "FILLETS", "GREATER_EQUAL", 3), ("same", "MATCHING", "", 2)];
+    for (name, kind, compare, _) in cases {
+        let seed = seed.clone();
+        s.add("queryVariable", move |p| {
+            p.set("name", ParamValue::Text(name.into()));
+            p.set("selectionType", ParamValue::Enum(kind.into()));
+            p.set("seedType", ParamValue::Enum("FACE".into()));
+            p.set("seedFaces", ParamValue::Query(vec![seed]));
+            if !compare.is_empty() {
+                p.set("filletCompareType", ParamValue::Enum(compare.into()));
+            }
+        });
+    }
+    let r = s.ok();
+    for (name, _, _, n) in cases {
+        assert_eq!(r.context.query_variables.get(name).map(|v| v.len()), Some(n), "{name}");
+    }
+}
+
 #[test]
 fn reference_misc_point_composite_query() {
     let mut s = block();
