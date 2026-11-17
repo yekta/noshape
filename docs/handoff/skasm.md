@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-17 11:38 UTC (restarted 09:20). Read docs/DECISIONS.md
+Updated 2026-11-17 14:49 UTC (restarted 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed today
@@ -30,23 +30,23 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 
 ## Next, in order
 0. USER P0 (lead 11-17 12:30): sketch interaction parity, ahead of config-parts. psui owns the viewport pick / hover
-   emit and the dimension label drag + feel rows; mine: what the sketch tools do (constraints from a selection, tool
-   first, inference / snapping, drags). Landed b87dd3dc (hover re-resolved on each move). In test (uncommitted on
-   452838df): reach measured straight out from the pointer (7.5 / Dimension 8.5 px; live2: 7 lit, 8 not), a point in
-   reach beats the GPU's line, the region under the pointer past every reach, no plane / face / region hover while a
-   drawing tool is active, psui's sketch_hover_reach_and_priority_as_live appended (green on the Mac), the second-picked
-   line moves as live's (place_second_line + `still`; scene the_second_picked_line_moves_as_lives), range errors from a
-   variable say "Error regenerating: a parameter is out of range." (features_c a_variables_value_out_of_range…;
-   standoffs Hole 2). Next: live2's sweep groups (inference / snapping, drags) as they come.
-1. (Landed 13:04 febd5a37: the stack; bool2 told.)
-2. config-parts' rest: pulleys Circular pattern 1 handed to core 11:45 (face pattern ADD fails in our op, main too);
-   sprockets 16/24 (one volume, 1.6e-6: live's band asked, REQUESTS 11:28 (a)); standoffs Hole 2 message (rule asked
-   (b)); links Derived 1 (source studio not in the corpus, asked (c)); nuts Sweep 1 (bool's).
-3. Surface workshop: pipe now stops at core's Loft (guides with more than two profiles); knifehandle P4 Pierce taken
-   back (its edge doesn't end on the plane), first difference Sweep 2 area (core); britatap Split topology (core);
-   manualblend Sketch 5 Concentric 128 mm (upstream JNE), Sketch 6 / 7 INTERSECTED geometry not found. Pierce of a
-   circle grows its radius, live keeps it (asked REQUESTS (d)).
-4. core's sketch cases below. 5. tablet-stand Flange 2. 6. Remaining dropped constraints (see archive).
+   emit, the dimension label drag and the feel rows; mine: what the sketch tools do (constraints from a selection,
+   tool first, inference / snapping, drags). Landed b87dd3dc and 24441238 (hover re-resolved on each move; reach 7.5 /
+   Dimension 8.5 px straight out from the pointer; a point beats the GPU's line; the region past every reach; no plane /
+   face / region hover while drawing; the second-picked line moves as live2's 2b; range errors from a variable).
+   Checked as live by hand on vibe6 (Xvfb :391, ~/tmp/skasm/hov): constraints from a selection, dimension place / edit,
+   drags. Next: live2's sweep groups (inference / snapping, drags) as they come; Show constraints memory is already
+   live's (sketch-options.json, saved on accept when changed).
+1. config-parts: linear-rail 26/26, links 35/35 (live fetched Derived 1's source), standoffs 32/32, sprockets 24/24
+   (live's volume band carried while its volume stays: carry_volume_bands); pulleys 12/22 (Circular pattern 1, a face
+   pattern ADD, fails in our op on main too: core's since 11:45); nuts 14/17 (Sweep 1, bool's). Standoffs regenerates
+   in 12.4 s against live's 0.2 s: bool2's thread Booleans.
+2. Surface workshop: pipe stops at core's Loft (guides with more than two profiles); knifehandle P4 Pierce taken back
+   (its edge doesn't end on the plane), first difference Sweep 2 area (core); britatap Split topology (core);
+   manualblend Sketch 5 Concentric 128 mm (upstream JNE), Sketch 6 / 7 INTERSECTED geometry not found. A circle or
+   ellipse Coincident / Pierce with something fixed shifts with its radii kept (live 11-17, REQUESTS (d)): ours splits
+   the move with the radius, a solver item.
+3. core's sketch cases below. 4. tablet-stand Flange 2. 5. Remaining dropped constraints (see archive).
 
 ## core's sketch cases (2026-11-16), queue item 3
 - c2-sm-rocker-enclosure-sm Extrude 2 (now its first difference once core's split-face attributes fix lands, 8/14):

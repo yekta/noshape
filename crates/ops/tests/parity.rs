@@ -4,6 +4,7 @@
 use noshape_ops::Ctx;
 use noshape_ops::parity::{LiveRef, PartState, live_refs, Translator, add_sketch_refs, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, model_topology, refs_from_bodies, refs_from_sketches, standard_spec_by_part_name, within_edge_tolerance};
 use serde_json::{Value, json};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 fn scratch(name: &str) -> PathBuf {
@@ -305,6 +306,42 @@ fn live_scatter_widens_every_part_both_ways() {
     assert!(!differences(&allow_live_readings("c2-impeller-loft", &["Loft Gehäuse"], vec![part("Part 2", 5427.707922765784)]), &[part("Part 2", 5427.637657)]).is_empty(), "not before the Shell");
 }
 
+/// Live's mass-property band of a part (its `volume_band`) holds on later features while live's volume of that part is
+/// the same (c2-config-parts-sprockets: banded after Circular pattern 1, the same 3302.355823 mm³ through Part Number 1).
+fn carry_volume_bands(banded: &mut HashMap<String, (f64, [f64; 2])>, mut parts: Vec<PartState>) -> Vec<PartState> {
+    for p in &mut parts {
+        let Some(v) = p.volume else { continue };
+        match p.volume_band {
+            Some(b) => {
+                banded.insert(p.name.clone(), (v, b));
+            }
+            None => {
+                // (The same to its last digits; under a new name, the one banded part of that volume: Part Number 1.)
+                let same = |was: &f64| (was - v).abs() <= 1e-12 * v.abs();
+                let renamed = || {
+                    let mut it = banded.values().filter(|(was, _)| same(was));
+                    it.next().filter(|_| it.next().is_none())
+                };
+                p.volume_band = banded.get(&p.name).filter(|(was, _)| same(was)).or_else(renamed).map(|(_, b)| *b);
+            }
+        }
+    }
+    parts
+}
+
+#[test]
+fn a_volume_band_holds_while_lives_volume_stays() {
+    let part = |v: f64, band: Option<[f64; 2]>| PartState { name: "Part 1".into(), volume: Some(v), volume_band: band, ..Default::default() };
+    let mut banded = HashMap::new();
+    let b = [3.2990986e-6, 3.305568e-6];
+    carry_volume_bands(&mut banded, vec![part(3.302355823e-6, Some(b))]);
+    assert_eq!(carry_volume_bands(&mut banded, vec![part(3.302355823e-6, None)])[0].volume_band, Some(b), "the same volume: banded");
+    assert_eq!(carry_volume_bands(&mut banded, vec![part(3.302355823000001e-6, None)])[0].volume_band, Some(b), "to its last digits");
+    let renamed = PartState { name: "16T 05B Sprocket".into(), ..part(3.302355823e-6, None) };
+    assert_eq!(carry_volume_bands(&mut banded, vec![renamed])[0].volume_band, Some(b), "renamed (Part Number 1)");
+    assert_eq!(carry_volume_bands(&mut banded, vec![part(3.1e-6, None)])[0].volume_band, None, "changed: not");
+}
+
 #[test]
 fn live_volume_allowances_widen_from_their_feature_on_upward() {
     let live = |v: f64| PartState { name: "Part 1".into(), faces: 40, edges: 90, vertices: 52, volume: Some(v * 1e-9), ..Default::default() };
@@ -369,6 +406,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     res.custom.extend(t.custom_failures.iter().cloned());
     res.std_pins.extend(t.std_pins.iter().filter(|(_, pin, served)| pin != served).map(|(n, pin, served)| format!("{n} pins std {pin}, served {served}")));
     let mut reached: Vec<String> = Vec::new();
+    let mut banded: HashMap<String, (f64, [f64; 2])> = HashMap::new();
     for k in 0..t.len() {
         let step = t.step(k);
         noshape_ops::parity::trace_live_pattern(&step.name, &step.feature_type, live, k);
@@ -414,7 +452,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         match our_parts(&mut t) {
             Ok(parts) => {
                 let reached: Vec<&str> = reached.iter().map(String::as_str).collect();
-                let (live, parts) = drop_live_import_failures(name, &reached, live_parts(line), parts);
+                let (live, parts) = drop_live_import_failures(name, &reached, carry_volume_bands(&mut banded, live_parts(line)), parts);
                 diff.extend(differences(&allow_live_readings(name, &reached, live), &parts))
             }
             Err(e) => diff.push(format!("parts: {e}")),
