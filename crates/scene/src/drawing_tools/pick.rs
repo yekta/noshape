@@ -24,6 +24,8 @@ pub const VIEW_REACH_MM: f64 = 3.6;
 /// Select's hover reach (screen px) for an annotation's lines and from a text's box (live2 feel/drawing.json D1).
 pub const SELECT_LINE_REACH_PX: f64 = 7.0;
 pub const SELECT_TEXT_REACH_PX: f64 = 9.0;
+/// Select's hover reach (screen px) from a note's leader: it lights the note from 10 px, not 12 (D1).
+pub const SELECT_LEADER_REACH_PX: f64 = 11.0;
 
 /// The editor state picking reads.
 #[derive(Clone, Copy)]
@@ -71,12 +73,21 @@ impl<'a> SheetPick<'a> {
     }
 
     /// The pick the active tool highlights under the cursor.
+    /// Select: the note (or callout) whose leader runs within [`SELECT_LEADER_REACH_PX`] of the pointer.
+    fn leader_reach(&self) -> Option<u32> {
+        let r = self.tol_mm(SELECT_LEADER_REACH_PX);
+        let id = match super::annotation_edit::leader_hit(self.built, &self.current_sheet().annotations, self.cursor, r, r)? {
+            super::LeaderHit::Stroke { id, .. } | super::LeaderHit::Node { id, .. } | super::LeaderHit::Bend { id, .. } => id,
+        };
+        self.built?.picks.iter().position(|t| matches!(t, PickTarget::Annotation(a) if *a == id)).map(|i| i as u32)
+    }
+
     pub fn hover_at(&self) -> Option<u32> {
         let tol = self.tol_mm(5.0);
         // Select (live2 feel/drawing.json D1): an annotation's lines light within 6 px (not at 8), its text within 8 px
         // of its box (not at 10); the tools keep their own reach.
         let hover = match self.tool {
-            Tool::Select => self.built.and_then(|b| b.hit_reach(self.cursor, self.tol_mm(SELECT_LINE_REACH_PX), self.tol_mm(SELECT_TEXT_REACH_PX))).map(|h| self.centerline_on_edge(h).unwrap_or(h)),
+            Tool::Select => self.built.and_then(|b| b.hit_reach(self.cursor, self.tol_mm(SELECT_LINE_REACH_PX), self.tol_mm(SELECT_TEXT_REACH_PX))).map(|h| self.centerline_on_edge(h).unwrap_or(h)).or_else(|| self.leader_reach()),
             _ => self.built.and_then(|b| b.hit(self.cursor, tol)),
         };
         // Tools that take only view edges (or sketch geometry) look for those
