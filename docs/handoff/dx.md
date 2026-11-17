@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 21:26 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 22:51 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -174,46 +174,27 @@ Open, ranked:
    detail in the archive.
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
-## Since 19:50 (this thread; dx-land on main a2edca4b4)
-- Mesher crash (P0 item 1), found and fixed: ASan (vibex8 ~/agents/dx-keep/asan.507953 / .511180) stack-buffer-overflow
-  in work_step() under noshape_should_break under mesh_prepare on a rayon worker. The crash guard's siglongjmp skipped
-  a ScopedWork's destructor (Draft / defeature / HLR bounds), leaving t_work on the dead frame; every later stop check
-  on that thread did ++used there (the garbage indices at mesh_rust.cpp:669). Not bool's Boolean panic. Fix:
-  run_guarded / trycatch_timed restore t_work with t_deadline (POSIX and SEH). T1 kernel
-  core::a_fault_inside_a_work_bound_leaves_no_bound_behind (crash kind 15): fails without the fix ("a work bound left
-  behind"), passes with it. QUEUED 331e37ac from dx-main (branch dx-main-land, the fix alone).
-- dx-land, committed, not queued (waits on the suite run below, lead's 2 mrad condition): bbe892984 suite (IGES/ACIS
-  drop mesh parts), 87aa2196a ACIS guard 2 mrad (kAcisSeamKink, poles <= 1 um kAcisSeamMove), 7581f3a22 suite
-  LIVE_MESH_SHEETS, 4ce6c052a x_t mesh export (38.1), 3f85e56b9 suite renames default-named parts as live's by volume,
-  27a2fe690 (= 331e37ac), dac9d1713 x_t MESH from 28.1 on + "minimum version 2801000" + 28.0 and older refuse in live's
-  words, 36e76ac0b PARITY-SUITES (mesh sheets = live's failure), 706b2c23b 28.1-30.0 PART_XMT_BLOCK without
-  index_map_offset + INTERSECTION_DATA from 30.0 (live's 28.1 / 30.0 files of hex-bookcase now read as live's own
-  import: 60/168/108 9366.248, mesh 1/0/0 10364.977). Kernel export/import 81/81, ops e2e export 5/5 (vibex8).
-- 21:00 incident (lead): queue state lost; re-queued 21:0x from dx-main branch dx-land2 = t_work fix + x_t mesh export
-  (4ce6c052a / dac9d1713 / 706b2c23b cherry-picked) + 25.0 confirmed comment (live2 21:0x: ours-duct at 25.0 / 28.1 /
-  30.0 / 38.1 all import as live's own). Lead 21:0x: keep the disjoint-piece split.
-- d49566497 (dx-land, not queued): Parasolid import takes a B-surface that is a plane / cylinder / cone / sphere / torus
-  within 1e-7 m as that surface (not one an SP-curve lies on), as live: hex-bookcase "shrunk"'s B-surface is a cone
-  80.943666 mm² (live 80.943); our re-export now writes its ring as one circle (was two: live read 60/169/110). T1
-  export::a_parasolid_bspline_cone_reads_as_a_cone; kernel export/import 82/82, ops e2e export/import 12/12. Lands
-  with the suite proof below (it can move x_t import rows).
-- config-parts at live's 18:0x retake (ops-fix, vibex8 ~/agents/dx-keep/cfgp-fix.log): linear-rail 26/26, links 35/35,
-  sprockets 24/24, standoffs 32/32, nuts 14/17 (Sweep 1 "non-manifold" ERROR, live OK: core/bool), pulleys 12/22
-  (Circular pattern 1: refs = live's; faces_tool's cap fails, core's 06ecaff5a fixes it, 22/22).
-  Speed: standoffs Threads=true Revolve 2 5.6 s / Boolean 1 3.2 s / Boolean 2 4.2 s (live 26-29 ms): OCCT Edge-Face
-  intersections (366 calls, 3.2 s in Revolve 2), profile ~/agents/dx-keep/stoff-prof.log: lead gave it to bool2.
-- Suite proof run: vibex8 slot ~/agents/dx-keep/exfix.sh ops-fix fix (binary md5 88ef6080 = dx-land d49566497): full suite -> ~/agents/dx-keep/exch-fix.log, then first6 x3; lines in ~/agents/dx-keep/f6.out. Compare
-  with /root/dx-scratch/exch-x1117c.log (59/75, 46/48, 114/119, DXF 0/4, times 49/50) and vibex7 exch-rest.log; land
-  dx-land (land.sh) if only the hose / mesh rows changed and no crash.
-- Asked live2 20:28: import ours-duct-{25.0,28.1,30.0,38.1}.x_t and ours-hexmesh-{28.1,30.0}.zip
-  (/root/onshape-research/live/dx/ours-xt-versions): 25.0's part list without index_map_offset is a guess.
-- Decision asked (lead): the split landed 19:30 with live evidence (live2 12:53); keep unless told to revert.
+## Since 19:50 (this thread)
+- Landed (vibex7 queue, before its move): 41f2a2da9 t_work after a recovered fault (the mesher crash: ASan
+  stack-buffer-overflow in work_step under mesh_prepare; the crash guard's longjmp skipped ScopedWork's destructor),
+  5015b2e95 / 40a03567d / 8cf411708 x_t mesh export 28.1+ (MESH + .xmm_txt, "minimum version 2801000", <28.1 refused),
+  PART_XMT_BLOCK per version (live2: ours at 25.0 / 28.1 / 30.0 / 38.1 import as live's own).
+- Queued now via vibe2 (branch dx-land-stack): 6151d88cd suite (IGES/ACIS drop mesh parts), 2 mrad ACIS guard,
+  LIVE_MESH_SHEETS + PARITY-SUITES note, suite part renames, Parasolid import B-surface -> analytic (cone as live;
+  only surfaces just faces / intersections use). Proof: exchange suite A/B on vibex6 (A = main + t_work/x_t, B = the
+  stack; logs vibex6 ~/agents/dx-keep/exch-{mainA,fix2}.log, /root/dx-scratch/bin/exdiff.py): ours imports live's
+  109 -> 114/130, ours reads ours 148/154 both; only bottle-split / duct-multipart mesh rows, hex-bookcase IGES/SAT
+  and hose 0.524m SAT (12/12/0 as live) differ; 0 crashes in 4 full-suite runs and 3 first-six reruns. A first B
+  had cf-snap-hook x_t reading back as no parts (offset surface over a converted base): fixed (cbe833343).
+- config-parts at live's 18:0x retake: 4/6 to the end (143/156); nuts Sweep 1: core; pulleys Circular pattern 1:
+  core's 06ecaff5a (refs are live's); standoffs Threads=true time: bool2 (profile vibex8
+  ~/agents/dx-keep/stoff-prof.log).
 - Tools: /root/dx-scratch/bin/xtdump.py dumps a text x_t / xmm with an embedded schema (live's), not native ones (ours).
   vibex8 ~/agents/dx-land/target/debug/noshape-cli (current dx-land) + ~/tmp/dx/xmmv/*.jsonl batches.
 
 ## How to run
 - Builds, crate tests and exchange runs on vibex8 (lead 11-17 17:00; ~/parity/exchange + its 22 models copied there);
-  vibex7 only for ~/lead-private; land with `NOSHAPE_LAND_QUEUE_HOST=vibex7 tools/tiers/land.sh`.
+  vibex7 only for ~/lead-private; land with `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh` (lead 21:23).
   Linux ops binaries for vibe runs: `NOSHAPE_RB_HOST=vibex8 tools/tiers/rb.sh cargo test -p noshape-ops --test all
   --no-run`, then copy ~/agents/dx/target/debug/deps/all-<hash> to ~/agents/dx-keep/ops-exch (studio scripts' binary)
   or ~/tmp/dx/ops-A / ops-B for an A/B. rb.sh keeps mtimes: `touch` an edited file before the A rebuild, check md5.
