@@ -567,6 +567,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   with the wrong part (fa6f90cc: 13/33/25 faces/edges/vertices, 5269155 mm³; live 27/67/47, 6325199 mm³). qa-lp-verify runs
   that document alone on the first green with core's revert (vibex6) -> qa-alerts and here.
 - Green 592b0fc9 vs v0.4.57: hat8, hat15, hat15b, the dock, ticket and authored documents ALL-SAME.
+- **v0.4.57 macOS app on the user's Mac (qa 22:05, release .app.zip SHA OK, ~/noshape-host, slot, nice 19)**: a new mm
+  document's Fillet opens empty (Entities to fillet empty and active, Radius 5 mm, no red value) with fresh settings, with an
+  old build's "9 mm + #wall_thickness" memory, and with an old-format "3 mm" memory (5 mm: REMEMBERED-VALUES-OLD-FORMAT, fixed
+  by 40a994a16 for 05:00). Evidence: the runner's dialog state, qa-scratch/mac/out57/out-fillet/*/state.jsonl. **Not checked
+  on the Mac: the sketch-line hover over the planes and "Highlight tool in toolbar"**: an ssh session may not capture the
+  screen or move the pointer there (TCC: no Screen Recording / Accessibility for sshd), and the runner's state has neither
+  the hovered item nor toolbar positions.
 - Main RED at a71c2f11b (21:32, psui's sketch_glyph linger test): the candidate must be a green.
 - Speed: the 21:03 suite run on vibex7 (load ~60) is LOADED, not counted (suites-diff now skips speed and marks timing states
   above load 16); absolute numbers from the 02:00-04:00 nightly only.
