@@ -106,8 +106,10 @@ bkey_s=$(key "$base_sk" "$sfp"); nkey_s=$(key "$new_sk" "$sfp")
 bkey_o=$(key "$base_ok" "$rfp"); nkey_o=$(key "$new_ok" "$rfp")
 cached() { ssh -o BatchMode=yes "$host" "test -s ~/agents/bool-gate/cache/$1-$2.tsv"; }
 
-# One gate per host at a time: its worktrees, target dirs and cores.
-lock=/root/projects/noshape-wt/.bool-gate-$host.lock
+# One gate per host at a time: its worktrees, target dirs and cores. (By the host's own name: two ssh names for one
+# host (vibe6, vibex6) are one lock.)
+hname=$(ssh -o BatchMode=yes -o ConnectTimeout=20 "$host" hostname -s) || { say "$host doesn't answer"; exit 1; }
+lock=/root/projects/noshape-wt/.bool-gate-$hname.lock
 exec 9> "$lock"
 flock -n 9 || { say "waiting for another gate on $host"; flock 9; }
 
