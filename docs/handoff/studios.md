@@ -9,16 +9,18 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-16 11:50 UTC. PAUSED by the lead (~24 h; restart ~11-17 10:15 UTC). Nothing running on any host.
+Updated 2026-11-17 09:50 UTC. Restarted 11-17 09:20 after the lead's pause.
 
-## State at the pause
+## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
-- Landed today: 547a769e, 79a35df0, c2d47005, db04b19b (08:12: panel fixes, Styles on a dimension, Create Drawing
-  names, runner rules), 9c9366b1 (09:23: view drag + `drawing_view_move`, centermark reading + `expect` centermarks,
-  Esc in Align centermark, the 4 flow scenarios, Add Items rows named, coverage "manual capture").
-- Committed, NOT landed: bdab0ef9 (ui_script: a documents-page step that opens a document is timed until its active
-  tab is built and drawn; clippy clean on the Mac). Land it first (tools/tiers/land.sh).
+- Queued 09:25: b2dc27d5 (bdab0ef9 document-open timing + the paused handoff, rebased).
+- Box select (queue item 4), uncommitted: `select_in_box` per live2's rule, `BOX_VIEW_FRAME_PX` 7, GPUI tests
+  `a_box_takes_a_view_by_a_whole_edge_or_by_crossing_its_frame`, `a_box_takes_a_dimension_by_…`; row 106 updated.
+  The press rule (a press within a view's reach drags it) was already ours (VIEW_REACH_MM 3.6 mm = live D1's 14 px).
+- vibe6: app build (systemd studios-build6-0925) for the doc-open speed runs and the drawing run (315 names:
+  ~/agents/studios-keep/drwall-1117.txt). New speed fixture fs-large (std query.fs in a Feature Studio) in mkperf.py,
+  scenario perf/perf-fs-large.json.
 
 ## Lead's queue (11-16 ~09:00), in order
 
@@ -55,6 +57,12 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
    15533efc (6 Move to sheet / Replicate retakes); Datum target / Weld / GTOL takes + 12 retakes after 18:50 UTC.
    Then drawing_matrix.py --run on the fresh run.
 
+## Agents (full thread ids, 11-17)
+core 6692ae35-758a-4442-81c8-29f67be2e21a, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, blend
+0e6e9942-0713-46c1-ae55-132fbbb4a14b, dx f93a1292-5bb7-406f-9a25-59767e01878e, psui 4d0a82b2-8fc7-43e6-b45d-bd8cb225741e,
+qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b (since 11-17 ~10:00). asm, skasm, bool2, live, live2: new ids from the lead;
+paused agents are not messaged (DECISIONS 11-17).
+
 ## Waiting on others
 - live2 (paused to ~11-17 10:15): the 4 flow takes (09:06), the 4 manual captures (08:47), Datum target / Weld / GTOL
   panel takes and 12 retakes (after the translation quota, 18:50 UTC).
@@ -70,9 +78,10 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
   explode mode, a Revolute-constrained drag's grab point.
 - Interaction-feel row 97 ≠: a centerline over a view edge, live's click takes the view, ours the centerline (GPU pick
   bias); P3.
-- Release: the gap list in the archive (11-12 07:33 entry) is partly stale. Submit already makes the version, and
-  approvals and the release_* ops (approve, reject, comment, drafts, obsolete, settings) exist. Re-audit it against
-  the code before taking an item from it.
+- Release gap list (archive 11-12 07:33), re-audited 11-17: done 1 (approvals), 2 (drafts, approve / reject, comment,
+  obsolete, settings, require_note), 8 (Go back), 9 (revision table Copy), 10 (unreleased suffix), 11 (part number in
+  another pending candidate). Still absent: "Release all configurations", the outdated associated drawing warning.
+  Neither is in the versions universe (167/167): only with a live capture.
 
 ## Next, in order
 See "Lead's queue" above: land bdab0ef9, then 1-5 there.

@@ -266,32 +266,83 @@ fn a_zoom_remakes_the_lines_off_the_ui_thread(cx: &mut TestAppContext) {
     assert!(!remaking && after == zoom && zoom > before * 1.4, "the lines made for the new zoom: {before} -> {after} ({zoom})");
 }
 
-/// Live2 feel/drawing.json F3: a box takes a view it reaches in either direction (half of it covered), and it adds to
-/// what was selected.
+/// Live2 box-select-rule (11-16) on a block's view: left to right a box takes the view only with a whole edge of it
+/// inside (part of its bottom edge or a box past its corner: nothing), right to left when it meets the view's frame
+/// (~7 px out); a box adds to what was selected (F3).
 #[gpui::test]
-fn a_box_takes_the_views_it_reaches_and_adds_them(cx: &mut TestAppContext) {
+fn a_box_takes_a_view_by_a_whole_edge_or_by_crossing_its_frame(cx: &mut TestAppContext) {
     use noshape_scene::drawing_tools::Sel;
     SUGGESTED.set(true);
     let (window, editor) = drawing(cx, "box-views");
-    for _ in 0..1500 {
-        if cx.update(|cx| editor.read(cx).real_sheet_in()) {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        cx.executor().advance_clock(std::time::Duration::from_millis(50));
-        draw(cx, window);
-    }
-    let pls = cx.update(|cx| editor.read(cx).built.as_ref().map(|b| b.placements.clone()).unwrap_or_default());
+    real_sheet(cx, window, &editor);
+    let (pls, zoom) = cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.built.as_ref().map(|b| b.placements.clone()).unwrap_or_default(), e.zoom)
+    });
     let (pl, other) = (pls[0], pls[1]);
-    let corner = [pl.min[0] - 3.0, pl.min[1] - 3.0];
-    let middle = [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0];
-    for (from, to) in [(corner, middle), (middle, corner)] {
-        let taken = cx.update(|cx| editor.update(cx, |e, cx| {
-            e.selection = vec![Sel::View(other.id)];
-            e.select_in_box(from, to, true, cx);
-            (e.selection.contains(&Sel::View(pl.id)), e.selection.contains(&Sel::View(other.id)))
-        }));
-        assert_eq!(taken, (true, true), "half covered: taken, and the other view still selected ({from:?} -> {to:?})");
+    let px = |n: f64| n / zoom;
+    let w = pl.max[0] - pl.min[0];
+    // (a) the middle third of the bottom edge, (b) the whole right edge, (d) past the corner, 4 to 20 px off.
+    let part_of_bottom = ([pl.min[0] + w / 3.0, pl.min[1] - px(8.0)], [pl.max[0] - w / 3.0, pl.min[1] + px(3.0)]);
+    let right_edge = ([pl.max[0] - px(3.0), pl.min[1] - px(5.0)], [pl.max[0] + px(10.0), pl.max[1] + px(5.0)]);
+    let past_corner = ([pl.max[0] + px(4.0), pl.max[1] + px(4.0)], [pl.max[0] + px(20.0), pl.max[1] + px(20.0)]);
+    for (name, (lo, hi), window_takes, crossing_takes) in [("part of the bottom edge", part_of_bottom, false, true), ("the whole right edge", right_edge, true, true), ("past the corner", past_corner, false, true)] {
+        for (from, to, want) in [([lo[0], lo[1]], [hi[0], hi[1]], window_takes), ([hi[0], hi[1]], [lo[0], lo[1]], crossing_takes)] {
+            let taken = cx.update(|cx| editor.update(cx, |e, cx| {
+                e.selection = vec![Sel::View(other.id)];
+                e.select_in_box(from, to, true, cx);
+                (e.selection.contains(&Sel::View(pl.id)), e.selection.contains(&Sel::View(other.id)))
+            }));
+            assert_eq!(taken, (want, true), "{name}, {}: the view taken {want}, the other still selected", if from[0] < to[0] { "left to right" } else { "right to left" });
+        }
+    }
+}
+
+/// Live2 box-select-rule (11-16): left to right a box takes a dimension holding its whole text, an arrowhead or an
+/// attachment point, not an extension line's foot alone; right to left it takes it when it touches it.
+#[gpui::test]
+fn a_box_takes_a_dimension_by_its_text_an_arrowhead_or_an_attachment_point(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "box-dimension");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| a.kind.is_dimension()).map(|a| a.id)).expect("a dimension");
+    let grow = |pts: &[[f64; 2]], m: f64| {
+        let lo = pts.iter().fold([f64::MAX; 2], |a, p| [a[0].min(p[0]), a[1].min(p[1])]);
+        let hi = pts.iter().fold([f64::MIN; 2], |a, p| [a[0].max(p[0]), a[1].max(p[1])]);
+        ([lo[0] - m, lo[1] - m], [hi[0] + m, hi[1] + m])
+    };
+    let (text, arrow, attach, foot) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let (b, picks) = (e.built.clone().expect("built"), e.picks_of(Sel::Annotation(id)));
+        let t = b.geometry.texts.iter().find(|t| picks.contains(&t.pick)).expect("the dimension's text");
+        let text = grow(&noshape_model::drawing::font::text_box(t), 0.5);
+        let fills = b.geometry.annotation_fills.iter().find(|(a, _)| *a == id).map(|(_, r)| r.clone()).expect("its arrowheads");
+        let arrow = grow(&b.geometry.fills[fills.start].points, 0.3);
+        let a = e.pk().resolved_annotation(id).expect("resolved");
+        let p = e.pk().attach_points(&a)[0].1;
+        let attach = grow(&[p], 0.5);
+        // The extension line from that attachment point: a stretch of it from 5 % to 45 % of its length.
+        let ext = b.geometry.lines.iter().filter(|l| picks.contains(&l.pick) && l.points.len() == 2).min_by(|l, m| {
+            let d = |l: &&noshape_model::drawing::sheet::Polyline2| (l.points[0][0] - p[0]).hypot(l.points[0][1] - p[1]).min((l.points[1][0] - p[0]).hypot(l.points[1][1] - p[1]));
+            d(l).total_cmp(&d(m))
+        }).expect("an extension line");
+        let (near, far) = if (ext.points[0][0] - p[0]).hypot(ext.points[0][1] - p[1]) < (ext.points[1][0] - p[0]).hypot(ext.points[1][1] - p[1]) { (ext.points[0], ext.points[1]) } else { (ext.points[1], ext.points[0]) };
+        let at = |t: f64| [near[0] + (far[0] - near[0]) * t, near[1] + (far[1] - near[1]) * t];
+        let foot = grow(&[at(0.05), at(0.45)], 0.5);
+        (text, arrow, attach, foot)
+    });
+    for (name, (lo, hi), window_takes) in [("its whole text", text, true), ("an arrowhead", arrow, true), ("an attachment point", attach, true), ("an extension line's foot", foot, false)] {
+        for (from, to, want) in [([lo[0], lo[1]], [hi[0], hi[1]], window_takes), ([hi[0], hi[1]], [lo[0], lo[1]], true)] {
+            let taken = cx.update(|cx| editor.update(cx, |e, cx| {
+                e.selection.clear();
+                e.select_in_box(from, to, true, cx);
+                e.selection.contains(&Sel::Annotation(id))
+            }));
+            assert_eq!(taken, want, "{name}, {}", if from[0] < to[0] { "left to right" } else { "right to left" });
+        }
     }
 }
 

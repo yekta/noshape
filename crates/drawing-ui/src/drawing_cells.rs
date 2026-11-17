@@ -77,9 +77,12 @@ impl DrawingEditor {
 
     /// End of a box select (left-drag from empty sheet, live navigation/44) from `a` to `b`: left to right (window)
     /// the annotations, tables, images and sketch entities wholly inside the box are selected, right to left
-    /// (crossing) those it touches, and views it reaches either way; `add` keeps what was selected (live2 F3: a box
-    /// adds).
+    /// (crossing) those it touches; `add` keeps what was selected (live2 F3: a box adds). Live2 box-select-rule
+    /// (11-16): a window takes a view only with a whole model edge of it inside, and a dimension with its whole text,
+    /// an arrowhead or an attachment point inside (a crossing box with that point too); a crossing box takes a view when it
+    /// meets its frame.
     pub fn select_in_box(&mut self, a: [f64; 2], b: [f64; 2], add: bool, cx: &mut Context<Self>) {
+        use noshape_model::drawing::font::text_box;
         let (lo, hi) = ([a[0].min(b[0]), a[1].min(b[1])], [a[0].max(b[0]), a[1].max(b[1])]);
         let crossing = b[0] < a[0];
         let inside = |p: [f64; 2]| p[0] >= lo[0] && p[0] <= hi[0] && p[1] >= lo[1] && p[1] <= hi[1];
@@ -88,12 +91,20 @@ impl DrawingEditor {
             false => pts.iter().all(|p| inside(*p)),
             true => pts.iter().any(|p| inside(*p)) || pts.windows(2).any(|w| segment_meets_box(w[0], w[1], lo, hi)),
         };
+        let frame = self.tol_mm(BOX_VIEW_FRAME_PX);
         let picked: Vec<Sel> = {
             let Some(built) = &self.built else { return };
-            // Each item's drawn parts: window, all of them taken; crossing, any.
+            let pk = self.pk();
+            let sheet = self.current_sheet();
+            let dimension = |sel: &Sel| match sel {
+                Sel::Annotation(id) => sheet.annotations.iter().find(|x| x.id == *id).filter(|x| x.kind.is_dimension()).map(|x| x.id),
+                _ => None,
+            };
+            // Each item's drawn parts: window, all of them taken; crossing, any. A dimension in a window: any of its
+            // texts, arrowheads or attachment points.
             let mut all_in: Vec<(Sel, bool)> = Vec::new();
-            let mut note = |sel: Sel, ok: bool| match all_in.iter_mut().find(|x| x.0 == sel) {
-                Some(x) if crossing => x.1 |= ok,
+            let mut note = |sel: Sel, ok: bool, any: bool| match all_in.iter_mut().find(|x| x.0 == sel) {
+                Some(x) if crossing || any => x.1 |= ok,
                 Some(x) => x.1 &= ok,
                 None => all_in.push((sel, ok)),
             };
@@ -103,19 +114,38 @@ impl DrawingEditor {
                     if l.closed && let Some(first) = pts.first().copied() {
                         pts.push(first);
                     }
-                    note(sel, takes(&pts));
+                    let dim = !crossing && dimension(&sel).is_some();
+                    note(sel, !dim && takes(&pts), dim);
                 }
             }
             for t in built.geometry.texts.iter().filter(|t| t.pick != 0) {
                 if let Some(sel) = self.sel_of_pick(t.pick).filter(|s| !matches!(s, Sel::View(_) | Sel::Edge(..))) {
-                    note(sel, inside(t.pos));
+                    let mut quad = text_box(t).to_vec();
+                    quad.push(quad[0]);
+                    let ok = takes(&quad) || (crossing && point_in_polygon(lo, &quad));
+                    note(sel, ok, !crossing && dimension(&sel).is_some());
                 }
             }
-            // A view the box reaches is taken either way (live2 feel/drawing.json F3: half of the Right view
-            // covered, left to right or right to left).
+            if !crossing {
+                for (id, fills) in &built.geometry.annotation_fills {
+                    let sel = Sel::Annotation(*id);
+                    if dimension(&sel).is_some() {
+                        let ok = built.geometry.fills.get(fills.clone()).is_some_and(|f| f.iter().any(|f| f.points.iter().all(|p| inside(*p))));
+                        note(sel, ok, true);
+                    }
+                }
+            }
+            // (Either way: live2's case (b) held only the attachment point and took the dimension both ways.)
+            for x in sheet.annotations.iter().filter(|x| x.kind.is_dimension()) {
+                let ok = pk.resolved_annotation(x.id).is_some_and(|r| pk.attach_points(&r).iter().any(|(_, p)| inside(*p)));
+                note(Sel::Annotation(x.id), ok, true);
+            }
             for pl in &built.placements {
-                let meets = pl.min[0] <= hi[0] && pl.max[0] >= lo[0] && pl.min[1] <= hi[1] && pl.max[1] >= lo[1];
-                note(Sel::View(pl.id), meets);
+                let ok = match crossing {
+                    true => pl.min[0] - frame <= hi[0] && pl.max[0] + frame >= lo[0] && pl.min[1] - frame <= hi[1] && pl.max[1] + frame >= lo[1],
+                    false => self.geoms.get(&pl.id).is_some_and(|g| whole_edge_inside(g, pl, &inside)),
+                };
+                note(Sel::View(pl.id), ok, false);
             }
             all_in.into_iter().filter(|x| x.1).map(|x| x.0).collect()
         };
@@ -357,6 +387,27 @@ impl DrawingEditor {
         self.status = None;
         true
     }
+}
+
+/// How far outside its geometry a view's frame lies (screen px): a right to left box meeting it takes the view (live2
+/// box-select-rule: boxes 4 and 5 px off the geometry took it, the frame drawn ~7 px out).
+const BOX_VIEW_FRAME_PX: f64 = 7.0;
+
+/// Whether a whole model edge of view `g` (all its drawn pieces) lies inside, on the sheet.
+fn whole_edge_inside(g: &noshape_model::drawing::views::ViewGeometry, pl: &noshape_model::drawing::build::ViewPlacement, inside: &impl Fn([f64; 2]) -> bool) -> bool {
+    let all_in = |e: &noshape_model::drawing::views::ViewEdge| e.points.iter().all(|p| inside(pl.to_sheet(*p)));
+    g.edges.iter().enumerate().any(|(i, e)| match e.model {
+        Some(m) => g.edges.iter().position(|o| o.model == Some(m)) == Some(i) && g.edges.iter().filter(|o| o.model == Some(m)).all(all_in),
+        None => all_in(e),
+    })
+}
+
+/// Whether `p` lies inside closed polygon `poly` (its first point repeated last).
+fn point_in_polygon(p: [f64; 2], poly: &[[f64; 2]]) -> bool {
+    poly.windows(2).fold(false, |odd, w| {
+        let (a, b) = (w[0], w[1]);
+        if (a[1] > p[1]) != (b[1] > p[1]) && p[0] < a[0] + (p[1] - a[1]) * (b[0] - a[0]) / (b[1] - a[1]) { !odd } else { odd }
+    })
 }
 
 /// Whether segment `a`–`b` meets the box `lo`–`hi` (Liang–Barsky).
