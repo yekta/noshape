@@ -1956,6 +1956,33 @@ fn an_edge_on_circle_projects_to_an_exact_line() {
     }
 }
 
+/// A B-spline edge projects exactly: its poles projected, its knots on 0..1, as live's Use stores it (a fit through
+/// samples missed c2-parting-line-draft-parting-line's parting edge by 0.13 mm; Split 3 by its extrusion failed).
+#[test]
+fn a_bspline_edge_projects_to_its_exact_bspline() {
+    use noshape_model::regen::features::sketch::{project_edge_any, SectionCurve};
+    let frame = noshape_model::display::PlaneFrame { origin: DVec3::new(0.0, 0.0, 0.002), x: DVec3::X, y: DVec3::Z, normal: -DVec3::Y };
+    let poles = [(-75.0, 23.67), (-64.36, 33.08), (-34.25, 47.55), (-4.16, 20.46), (37.40, 13.42), (63.22, 28.80), (75.0, 40.36)];
+    let data = noshape_kernel::BSplineCurveData {
+        poles: poles.iter().enumerate().map(|(i, (x, z))| DVec3::new(*x, -25.0 + i as f64, *z) * 1e-3).collect(),
+        weights: None,
+        knots: vec![0.0, 0.2548, 0.4919, 0.7368, 1.0],
+        mults: vec![4, 1, 1, 1, 4],
+        degree: 3,
+        periodic: false,
+    };
+    let edge = noshape_kernel::make_bspline_edge(&data).unwrap();
+    let Some(SectionCurve::Exact(noshape_sketch::Curve2::Nurbs(n))) = project_edge_any(&edge, &frame) else { panic!("not an exact B-spline") };
+    assert_eq!((n.degree, n.ctrl.len(), n.knots.len()), (3, 7, 11));
+    let info = edge.edge_info().unwrap();
+    for i in 0..=40 {
+        let t = i as f64 / 40.0;
+        let p = edge.point_at(info.first_param + (info.last_param - info.first_param) * t).unwrap();
+        let q = frame.to_local(p);
+        assert!((n.point(t) - q).length() < 1e-12, "at {t}: {:?} vs {q:?}", n.point(t));
+    }
+}
+
 /// An ellipse that projects onto a circle (a cylinder cut obliquely, seen along its axis): a circle, or an arc between
 /// the edge's projected ends (live offsets such an edge as a circle: c2-hunting-knife's Sketch 16).
 #[test]

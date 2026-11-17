@@ -116,7 +116,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             }
             continue;
         }
-        match project_edge_any(&edge, &frame) {
+        match project_edge_with(&edge, &frame, sk.kind(id) != Some(noshape_sketch::EntityKind::FitSpline)) {
             Some(SectionCurve::Exact(c)) => update_external(&mut sk, id, &c),
             Some(sampled) => {
                 update_intersection(&mut sk, &[*eid], &[sampled]);
@@ -484,6 +484,12 @@ pub fn project_edge(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneF
 /// in planes parallel to the sketch and circles seen obliquely (ellipses),
 /// sampled (fit spline) otherwise.
 pub fn project_edge_any(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneFrame) -> Option<SectionCurve> {
+    project_edge_with(edge, frame, true)
+}
+
+/// [`project_edge_any`]; with `exact_splines` off a B-spline edge is sampled (a Use made before it was exact: a fit
+/// spline through its samples, which keeps following the model).
+fn project_edge_with(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneFrame, exact_splines: bool) -> Option<SectionCurve> {
     use glam::{DVec2, DVec3};
     use noshape_kernel as k;
     if let Some(c) = project_edge(edge, frame) {
@@ -540,7 +546,28 @@ pub fn project_edge_any(edge: &noshape_kernel::Shape, frame: &crate::display::Pl
         let (lo, hi) = (snap(lo), snap(hi));
         return Some(SectionCurve::Exact(noshape_sketch::Curve2::Line { a: foot(lo), b: foot(hi) }));
     }
+    // A B-spline or Bézier edge projects exactly: its poles projected, its knots (on 0..1) and weights kept, as live's
+    // Use stores it (c2-parting-line-draft-parting-line's Sketch 3: a fit through samples missed the part's parting edge
+    // by 0.13 mm, and the Split by its extrusion left slivers).
+    if exact_splines
+        && matches!(info.curve, k::Curve::BSpline { periodic: false, .. } | k::Curve::Bezier { .. })
+        && let Some(n) = projected_nurbs(edge, frame)
+    {
+        return Some(SectionCurve::Exact(noshape_sketch::Curve2::Nurbs(n)));
+    }
     resample(&pl, SECTION_SAMPLES).map(SectionCurve::Sampled)
+}
+
+/// A non-periodic B-spline edge's orthogonal projection onto the sketch plane, exact (the projection is affine).
+fn projected_nurbs(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneFrame) -> Option<noshape_sketch::Nurbs> {
+    let b = edge.edge_bspline().ok()?;
+    let (k0, k1) = (*b.knots.first()?, *b.knots.last()?);
+    if b.periodic || k1 <= k0 {
+        return None;
+    }
+    let knots = b.knots.iter().zip(&b.mults).flat_map(|(k, m)| std::iter::repeat_n((k - k0) / (k1 - k0), *m as usize)).collect();
+    let n = noshape_sketch::Nurbs { degree: b.degree as usize, knots, ctrl: b.poles.iter().map(|p| frame.to_local(*p)).collect(), weights: b.weights };
+    n.is_valid().then_some(n)
 }
 
 /// Where an edge crosses the sketch plane (Pierce): bracketed on samples along the curve, then halved down on the curve
@@ -721,6 +748,11 @@ pub fn update_external(sk: &mut noshape_sketch::Sketch, id: noshape_sketch::Enti
             {
                 for (p, q) in points.iter().zip(&n.ctrl) {
                     let _ = sk.set_point(*p, *q);
+                }
+                if let Some(ent) = sk.entity_mut(id)
+                    && let Geometry::BSpline { degree, knots, weights, .. } = &mut ent.geometry
+                {
+                    (*degree, *knots, *weights) = (n.degree, n.knots.clone(), n.weights.clone());
                 }
             }
         }
