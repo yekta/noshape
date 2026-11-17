@@ -472,6 +472,24 @@ fn delete_and_offset_faces() {
 
 /// Two chamfers on opposite edges of a block, deleted at once: OCCT removes each on its own (two features apart, each
 /// under its work bound), the block whole again.
+/// A free-form face pinched to a point where its normal has no one direction (a ruled loft from a bent profile to a
+/// point: the rulings leave the point at different angles): Thicken fails, as Parasolid's (c2-surf-workshop-
+/// singularities' Thicken failure), where OCCT's offset crashed. A plane fan to a point thickens.
+#[test]
+fn thicken_fails_a_face_pinched_where_its_normal_has_no_one_direction() {
+    let v = |x: f64, y: f64, z: f64| DVec3::new(x, y, z);
+    let (a0, a1, apex) = (v(-10., 0., 0.), v(10., 0., 0.), v(0., 20., 0.));
+    let ruled = LoftOptions { ruled: true, ..Default::default() };
+    let bent = make_bspline(&[a0, v(0., 0., 8.), a1], None, &[0.0, 1.0], &[3, 3], 2, false).unwrap();
+    let r = loft(&[make_wire(&[bent]).unwrap(), make_vertex(apex).unwrap()], &ruled).unwrap().shape;
+    assert!(r.faces().len() == 1 && r.faces()[0].is_valid());
+    let e = thicken(&r, 1.0, 0.0).map(|_| ()).unwrap_err().to_string();
+    assert!(e.contains("pinched"), "{e}");
+    let flat = make_bspline(&[a0, v(0., -2., 0.), a1], None, &[0.0, 1.0], &[3, 3], 2, false).unwrap();
+    let f = loft(&[make_wire(&[flat]).unwrap(), make_vertex(apex).unwrap()], &ruled).unwrap().shape;
+    assert!(thicken(&f, 1.0, 0.0).is_ok());
+}
+
 #[test]
 fn chamfers_apart_deleted_at_once_each_go() {
     let b = box10();
