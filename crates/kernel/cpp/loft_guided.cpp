@@ -76,12 +76,30 @@ struct Loop
   TopoDS_Wire                            wire;
   std::unique_ptr<BRepAdaptor_CompCurve> c;
   double                                 t0 = 0, t1 = 0, len = 0;
+  // Arc length at evenly spaced parameters (each step integrated once): param and abscissa look up their step and
+  // integrate only within it (GCPnts_AbscissaPoint from the start each time was most of c2-hunting-knife's Loft 1).
+  std::vector<double> ts, ss;
 
   explicit Loop(const TopoDS_Wire& w) : wire(w), c(new BRepAdaptor_CompCurve(w))
   {
-    t0  = c->FirstParameter();
-    t1  = c->LastParameter();
-    len = GCPnts_AbscissaPoint::Length(*c, t0, t1);
+    t0             = c->FirstParameter();
+    t1             = c->LastParameter();
+    const int    n = 256;
+    ts.push_back(t0);
+    ss.push_back(0);
+    for (int i = 1; i <= n; ++i)
+    {
+      ts.push_back(t0 + (t1 - t0) * i / n);
+      ss.push_back(ss.back() + GCPnts_AbscissaPoint::Length(*c, ts[(size_t)i - 1], ts[(size_t)i]));
+    }
+    len = ss.back();
+  }
+  // Arc length from the start to parameter t.
+  double length_to(double t) const
+  {
+    t              = std::clamp(t, t0, t1);
+    const size_t i = std::min(ts.size() - 2, (size_t)(std::upper_bound(ts.begin(), ts.end(), t) - ts.begin()) - 1);
+    return ss[i] + (t > ts[i] ? GCPnts_AbscissaPoint::Length(*c, ts[i], t) : 0.0);
   }
   // Parameter at arc length s (wrapped into [0, len)).
   double param(double s) const
@@ -91,7 +109,8 @@ struct Loop
       s += len;
     if (s < 1e-15)
       return t0;
-    GCPnts_AbscissaPoint ap(*c, s, t0);
+    const size_t i = std::min(ts.size() - 2, (size_t)(std::upper_bound(ss.begin(), ss.end(), s) - ss.begin()) - 1);
+    GCPnts_AbscissaPoint ap(*c, s - ss[i], ts[i]);
     if (!ap.IsDone())
       fail_op("loft: arc length on a profile failed");
     return ap.Parameter();
@@ -118,7 +137,7 @@ struct Loop
         t    = e;
       }
     dist = std::sqrt(dist);
-    const double s = GCPnts_AbscissaPoint::Length(*c, t0, t);
+    const double s = length_to(t);
     return s >= len - 1e-12 ? 0.0 : s;
   }
   // Arc lengths of the corners (tangent breaks between edges).
@@ -217,6 +236,34 @@ double meet(const Adaptor3d_Curve& g, const Adaptor3d_Curve& p, double& tg, gp_P
         take(x.SquareDistance(i), x.Point(i).Parameter(), q);
   }
   return std::sqrt(best);
+}
+
+// meet() for a guide that ends on the profile (as guides do): the end within `tol` of the profile's wire, checked
+// edge by edge; else meet() with the whole profile (OCCT's curve-curve extrema against a composite profile were 9 ms a
+// guide, c2-hunting-knife's Loft 1).
+double meet(const Adaptor3d_Curve& g, const Adaptor3d_Curve& p, const TopoDS_Wire& w, double tol, double& tg, gp_Pnt& at)
+{
+  double best = 1e300;
+  for (const double e : {g.FirstParameter(), g.LastParameter()})
+  {
+    const gp_Pnt q = g.Value(e);
+    for (TopExp_Explorer x(w, TopAbs_EDGE); x.More(); x.Next())
+    {
+      if (BRep_Tool::Degenerated(TopoDS::Edge(x.Current())))
+        continue;
+      BRepAdaptor_Curve c(TopoDS::Edge(x.Current()));
+      double            d2 = std::min(q.SquareDistance(c.Value(c.FirstParameter())), q.SquareDistance(c.Value(c.LastParameter())));
+      Extrema_ExtPC     ext(q, c);
+      if (ext.IsDone())
+        for (int i = 1; i <= ext.NbExt(); ++i)
+          d2 = std::min(d2, ext.SquareDistance(i));
+      if (d2 < best)
+        best = d2, tg = e, at = q;
+    }
+  }
+  if (std::sqrt(best) <= tol)
+    return std::sqrt(best);
+  return meet(g, p, tg, at);
 }
 
 // A guide as a curve from its start on profile A to its end on profile B,
@@ -563,6 +610,7 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
 {
   require_non_null(profile_a.shape, "first profile");
   require_non_null(profile_b.shape, "second profile");
+  std::optional<KernelTimer> t_setup(std::in_place, "loft_guided.setup");
   Loop A(outer_wire(profile_a.shape)), B(outer_wire(profile_b.shape));
   const double size = std::max(A.len, B.len);
   const double tol  = 1e-7 * (1 + size);
@@ -598,7 +646,7 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
     // Trimmed to its stretch between the profiles.
     double ta, tb;
     gp_Pnt pa, pb;
-    if (meet(*g.c, *A.c, ta, pa) > tol || meet(*g.c, *B.c, tb, pb) > tol || std::abs(ta - tb) < 1e-12)
+    if (meet(*g.c, *A.c, A.wire, tol, ta, pa) > tol || meet(*g.c, *B.c, B.wire, tol, tb, pb) > tol || std::abs(ta - tb) < 1e-12)
       fail_op("All guides should intersect each profile boundary.");
     g.reversed = ta > tb;
     g.t0       = std::min(ta, tb);
@@ -752,6 +800,8 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
   std::vector<TopoDS_Shape> caps;
   BRepBuilderAPI_Sewing     sew(1e-6 * (1 + size));
   const int             NU = 48, NV = 24;
+  t_setup.reset();
+  std::optional<KernelTimer> t_faces(std::in_place, "loft_guided.faces");
   for (size_t k = 0; k < seams.size(); ++k)
   {
     const size_t i0 = seams[k], i1 = seams[(k + 1) % seams.size()];
@@ -933,6 +983,7 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
       // them within half the sewing tolerance (an arc of B paired to a short line or spline of A: c2-hunting-knife's
       // handle didn't sew there; to `tol` it took 988 rows of poles, live 66, and every later cut on it slowed).
       occ::handle<Geom_BSplineSurface> piece;
+      const KernelTimer                t_rows("loft_guided.faces.rows");
       for (int m = std::max(3, (int)std::ceil(NU * std::max(at[k2 + 1] - at[k2], b_share(at[k2 + 1]) - b_share(at[k2])))); ; m *= 2)
       {
         std::vector<std::vector<gp_Pnt>> grid;
@@ -962,6 +1013,7 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
       fail_op("loft: guided face failed");
     sew.Add(mf.Face());
   }
+  t_faces.reset();
   // Each guide end a vertex of both profiles.
   std::vector<gp_Pnt> ends_a;
   for (const Guide& g : gs)
@@ -975,8 +1027,10 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
     for (const TopoDS_Shape& c : caps)
       sew.Add(c);
   }
+  std::optional<KernelTimer> t_sew(std::in_place, "loft_guided.sew");
   sew.Perform();
   TopoDS_Shape r = sew.SewedShape();
+  t_sew.reset();
   // One closed shell, or the solid would be open (a piece's end off a profile by more than the tolerance: BRepCheck
   // NotClosed, kept as a solid before): sewn again ten times looser, else refused.
   auto closed = [](const TopoDS_Shape& s) {
@@ -1018,14 +1072,17 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
   }
   if (shells != 1)
     fail_op("Could not create loft with given information. Check profile order, guide/profile intersections or end conditions.");
+  const KernelTimer        t_solid("loft_guided.solid");
   BRepBuilderAPI_MakeSolid ms(shell);
   if (!ms.IsDone())
     fail_op("loft: solid failed");
   TopoDS_Solid sol = ms.Solid();
-  BRepLib::OrientClosedSolid(sol);
-  GProp_GProps gp;
-  BRepGProp::VolumeProperties(sol, gp);
-  if (gp.Mass() <= 0)
+  // (Oriented outward, and not flat: no volume integral over the B-spline sides, 20 ms of c2-hunting-knife's Loft 1.)
+  Bnd_Box box;
+  BRepBndLib::Add(sol, box, false);
+  double x0, y0, z0, x1, y1, z1;
+  box.Get(x0, y0, z0, x1, y1, z1);
+  if (!BRepLib::OrientClosedSolid(sol) || std::min({x1 - x0, y1 - y0, z1 - z0}) <= tol)
     fail_op("Could not create loft with given information. Check profile order, guide/profile intersections or end conditions.");
   return wrap(sol);
 }
@@ -1514,7 +1571,7 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
     g.shape = gx;
     g.tabulate();
     gp_Pnt pa, pb;
-    if (meet(*g.c, *A.c, g.ta, pa) > tol || meet(*g.c, *B.c, g.tb, pb) > tol || std::abs(g.ta - g.tb) < 1e-12)
+    if (meet(*g.c, *A.c, A.wire, tol, g.ta, pa) > tol || meet(*g.c, *B.c, B.wire, tol, g.tb, pb) > tol || std::abs(g.ta - g.tb) < 1e-12)
       fail_op("All guides should intersect each profile boundary.");
     const double lo = g.c->FirstParameter(), hi = g.c->LastParameter();
     g.len    = GCPnts_AbscissaPoint::Length(*g.c, std::min(g.ta, g.tb), std::max(g.ta, g.tb));
