@@ -575,6 +575,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   plane** though the pointer isn't over it (1/3). v0.4.56, same flow and host: the same, plus 5 missed line hovers in 3 runs
   (0.4.57 is better, not fixed). Shots: qa-scratch/uh/h57*, h56-*; sheet tickets/hover57-evidence.png (vibex6
   ~/agents/qa-keep/hover57/): top row top line / off (all lit) / back; bottom row off (all lit) / back (unlit) / off (Right lit).
+  22:40 (lead: pointer drawn, newest green): the "off" rest point is screen (1115, 830), window (873, 740): empty background
+  (white pixels), ~10 px below the Front plane's corner, outside the rectangle, on no plane and not the region; the path from a
+  line to it crosses the region. Lines rest at bottom (1274, 615), right (1378, 635), top (1374, 602), left (1270, 582).
+  **Green 592b0fc9 (has psui's 11-17 hover / glyph commits) does not fix it**, 3 runs: off lights the loop (1/3) or the Right
+  plane (2/3); hg-3 resting on the bottom line lights the **Front plane, not the line**; on the top line lights the whole loop;
+  on the right / left line again lights nothing; one run (hg-2) clean. Sheet tickets/hover-x-sheet.png (red cross = pointer;
+  vibex6 ~/agents/qa-keep/hover57/); shots qa-scratch/uh/hg-*.
 - **v0.4.57 "Highlight tool in toolbar" (qa 22:05, Linux release, vibex6 Xvfb)**: pass. Alt+C, "Fillet": the Fillet button gets the
   orange box; "Linear pattern": the pattern dropdown's button does; unticking removes the box; no toolbar button moves in any
   state (pixel diff of the toolbar row against before the search: only the boxed button's 32 px). Shots
