@@ -30,14 +30,15 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 
 ## Next, in order
 0. USER P0 (lead 11-17 12:30): sketch interaction parity, ahead of config-parts. psui owns the viewport pick / hover
-   emit (planes under the open sketch in the GPU pick); mine is the sketch side. Done, in test: hover re-resolved on
-   each PointerMove (`sketch_hover`, `ui.sketch_gpu_hover`; GUI test a_line_lights_over_the_plane_the_gpu_pick_keeps;
-   the user's frames lead-scratch/vid/hover/t01..t05). Then, with live2's capture (coming) and behaviours.md: constraint
-   creation by selection (two lines -> the toolbar's options), inference and snapping while drawing, drags of points,
-   lines and dimensions, dimension placement and edit, constraint-icon hover. Each fix with an interaction-feel test
-   (docs/parity/interaction-feel.md "Sketch").
-1. Stack 9d4a1a74 queued 12:2x (landing: tell bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, standoffs Revolve 1 fixed by
-   ca5c2d9f0, 13 -> 31/32).
+   emit and the dimension label drag + feel rows; mine: what the sketch tools do (constraints from a selection, tool
+   first, inference / snapping, drags). Landed b87dd3dc (hover re-resolved on each move). In test (uncommitted on
+   452838df): reach measured straight out from the pointer (7.5 / Dimension 8.5 px; live2: 7 lit, 8 not), a point in
+   reach beats the GPU's line, the region under the pointer past every reach, no plane / face / region hover while a
+   drawing tool is active, psui's sketch_hover_reach_and_priority_as_live appended (green on the Mac), the second-picked
+   line moves as live's (place_second_line + `still`; scene the_second_picked_line_moves_as_lives), range errors from a
+   variable say "Error regenerating: a parameter is out of range." (features_c a_variables_value_out_of_range…;
+   standoffs Hole 2). Next: live2's sweep groups (inference / snapping, drags) as they come.
+1. (Landed 13:04 febd5a37: the stack; bool2 told.)
 2. config-parts' rest: pulleys Circular pattern 1 handed to core 11:45 (face pattern ADD fails in our op, main too);
    sprockets 16/24 (one volume, 1.6e-6: live's band asked, REQUESTS 11:28 (a)); standoffs Hole 2 message (rule asked
    (b)); links Derived 1 (source studio not in the corpus, asked (c)); nuts Sweep 1 (bool's).

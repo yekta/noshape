@@ -1395,6 +1395,28 @@ fn full_round_fillet_parting_draft_swept_blend() {
     assert!(near(volume(&r, 0), v, 1e-12), "swept blend volume {}", volume(&r, 0));
 }
 
+/// Live (live2 11-17 range-error): a value a variable gives that is out of its parameter's range is
+/// PARAMETER_OUT_OF_RANGE at regeneration ("Error regenerating: a parameter is out of range."; c2-config-parts-standoffs'
+/// Hole 2), while a typed one is the dialog's "A parameter value is not valid." (an Extrude's depth past 500 m).
+#[test]
+fn a_variables_value_out_of_range_is_out_of_range() {
+    for (depth, words) in [("#h * 200000", "Error regenerating: a parameter is out of range."), ("1000 m", "A parameter value is not valid.")] {
+        let mut s = Studio::new();
+        s.add("assignVariable", |p| {
+            p.set("name", ParamValue::Text("h".into()));
+            p.set("variableType", en("LENGTH"));
+            p.set("lengthValue", expr("5 mm"));
+        });
+        let c = circle_sketch(&mut s, 4.0);
+        let rc = s.region(c);
+        s.add("extrude", move |p| {
+            p.set("entities", q(rc));
+            p.set("depth", expr(depth));
+        });
+        assert_eq!(s.last_status(), (FeatureStatus::Error, words.to_string()), "{depth}");
+    }
+}
+
 #[test]
 fn flat_spiral_planes_and_ruled_overrides() {
     // Height 0 (a flat spiral) is out of Onshape's range (live L32).

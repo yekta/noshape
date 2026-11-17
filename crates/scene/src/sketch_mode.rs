@@ -8207,12 +8207,63 @@ pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityI
         Vec::new()
     };
     let before = sk.clone();
-    let report = if centers.is_empty() { sk.solve() } else { sk.solve_with(&noshape_sketch::SolveOptions { light: centers, ..Default::default() }) };
+    // Live (live2 11-17 part 2b): the first-picked entity stays, the second-picked moves (placed as live places it).
+    place_second_line(sk, c, ids);
+    let still = if ids.len() == 2 { vec![ids[0]] } else { Vec::new() };
+    let report = sk.solve_with(&noshape_sketch::SolveOptions { light: centers, still, ..Default::default() });
     if !report.is_solved() {
         *sk = before;
         return false;
     }
     true
+}
+
+/// Two lines constrained, the second free of everything else: it moves as live moves it before the solve (live2
+/// 11-17 part 2b, L2 picked second): Parallel turns it about its midpoint, Perpendicular about where the two lines
+/// cross, Coincident lays it on the first's line (turned about its midpoint, then across), lengths kept; Equal keeps
+/// its start and direction.
+fn place_second_line(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
+    let [first, second] = ids else { return };
+    let (Some(Curve2::Line { a: a1, b: b1 }), Some(Curve2::Line { a, b })) = (sk.curve(*first), sk.curve(*second)) else { return };
+    let Some((s, e)) = sk.endpoints(*second) else { return };
+    // Nothing else holds it: no other constraint on it or its ends, no other curve through its ends.
+    let held = sk.constraints().any(|k| {
+        let on = k.kind.entities();
+        on.iter().any(|x| [*second, s, e].contains(x)) && !on.contains(first)
+    }) || sk.entities().any(|x| x.id != *second && x.point_refs().iter().any(|p| *p == s || *p == e));
+    if held {
+        return;
+    }
+    let (d1, d) = ((b1 - a1).normalize_or_zero(), b - a);
+    if d1 == DVec2::ZERO || d.length() < 1e-12 {
+        return;
+    }
+    // The direction along `want` (either way) nearest the line's own.
+    let toward = |want: DVec2| if want.dot(d) >= 0.0 { want } else { -want };
+    let turned = |pivot: DVec2, dir: DVec2| {
+        let (from, to) = (d.normalize(), dir);
+        let rot = DVec2::new(from.dot(to), from.perp_dot(to));
+        (pivot + (a - pivot).rotate(rot), pivot + (b - pivot).rotate(rot))
+    };
+    let mid = (a + b) * 0.5;
+    let (na, nb) = match c {
+        ConstraintTool::Parallel => turned(mid, toward(d1)),
+        ConstraintTool::Perpendicular => {
+            let dir = toward(d1.perp());
+            let den = d1.perp_dot(d);
+            let pivot = if den.abs() > 1e-12 { a1 + d1 * ((a - a1).perp_dot(d) / den) } else { mid };
+            turned(pivot, dir)
+        }
+        ConstraintTool::Coincident => {
+            let (ta, tb) = turned(mid, toward(d1));
+            let across = d1.perp() * d1.perp().dot(a1 - mid);
+            (ta + across, tb + across)
+        }
+        ConstraintTool::Equal => (a, a + d.normalize() * (b1 - a1).length()),
+        _ => return,
+    };
+    let _ = sk.set_point(s, na);
+    let _ = sk.set_point(e, nb);
 }
 
 /// Whether constraint tool `c` takes `e` after `picks` (live: it doesn't
@@ -10690,6 +10741,35 @@ mod tests {
         ed.commit_otf(&mut d, "0.3", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
         let conic = d.sketch.entities().find(|e| e.kind() == EntityKind::Conic).unwrap();
         assert!(matches!(conic.geometry, noshape_sketch::Geometry::Conic { rho, .. } if (rho - 0.3).abs() < 1e-12));
+    }
+
+    /// Live2 11-17 part 2b: two free lines, L1 picked first, then a constraint from the selection. L1 never moves; L2
+    /// moves as live's (mm): Parallel about its midpoint, Perpendicular about where the lines cross, Coincident onto
+    /// L1's line, lengths kept; Equal keeps its start and direction.
+    #[test]
+    fn the_second_picked_line_moves_as_lives() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let cases: [(ConstraintTool, [f64; 4]); 4] = [
+            (ConstraintTool::Parallel, [47.82, 16.98, 96.93, 24.37]),
+            (ConstraintTool::Perpendicular, [-21.48, 48.60, -28.88, 97.70]),
+            (ConstraintTool::Coincident, [51.69, -8.70, 100.80, -1.30]),
+            (ConstraintTool::Equal, [49.85, 10.23, 86.51, 27.23]),
+        ];
+        for (c, want) in cases {
+            let mut sk = Sketch::new();
+            let l1 = sk.add_line(mm(44.92, -9.72), mm(84.88, -3.70));
+            let l2 = sk.add_line(mm(49.85, 10.23), mm(94.90, 31.12));
+            assert!(apply_constraint(&mut sk, c, &[l1, l2]).is_ok_and(|n| n > 0), "{c:?}");
+            assert!(solve_after_constraint(&mut sk, c, &[l1, l2]), "{c:?}");
+            let Some(Curve2::Line { a: a1, b: b1 }) = sk.curve(l1) else { panic!() };
+            assert!((a1 - mm(44.92, -9.72)).length() < 1e-9 && (b1 - mm(84.88, -3.70)).length() < 1e-9, "{c:?}: L1 stays");
+            let Some(Curve2::Line { a, b }) = sk.curve(l2) else { panic!() };
+            let off = (a - mm(want[0], want[1])).length().max((b - mm(want[2], want[3])).length());
+            // (Perpendicular turns about a point ~70 mm off: live's 0.01 mm rounding of the lines grows there.)
+            let tol = if c == ConstraintTool::Perpendicular { 0.15e-3 } else { 0.02e-3 };
+            assert!(((b - a).length() - mm(45.05, 20.89).length()).abs() < 1e-9 || c == ConstraintTool::Equal, "{c:?}: length kept");
+            assert!(off < tol, "{c:?}: L2 {:?} → {:?}, live ({}, {}) → ({}, {}): {:.4} mm off", a * 1e3, b * 1e3, want[0], want[1], want[2], want[3], off * 1e3);
+        }
     }
 
     /// Live sketch-tool-conic: a conic from the Origin to a point level with it, then its shoulder: Coincident at the

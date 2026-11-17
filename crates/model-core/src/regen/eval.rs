@@ -501,9 +501,13 @@ impl<'a> EvalCtx<'a> {
                 ParamKind::Num(n) => {
                     let Ok(v) = self.eval_num_in(vals, s.id, n.kind) else { continue };
                     // Live (L32, L45, L55): Onshape's text for a value out of
-                    // its range, with the field marked.
+                    // its range, with the field marked: the dialog's refusal of
+                    // a typed value. One a variable gives is out of range at
+                    // regeneration (live2 11-17 range-error: a Hole's diameter
+                    // #v = 0, PARAMETER_OUT_OF_RANGE).
                     if bounds_violation(v, n, self.units).is_some() {
-                        return err_at(&[s.id], "A parameter value is not valid.");
+                        let variable = vals.expr(s.id).is_some_and(|e| e.text.contains('#'));
+                        return err_at(&[s.id], if variable { "Error regenerating: a parameter is out of range." } else { "A parameter value is not valid." });
                     }
                 }
                 ParamKind::Array { item, .. } => {

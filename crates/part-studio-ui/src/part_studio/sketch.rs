@@ -613,13 +613,16 @@ impl PartStudioView {
         let Some(d) = self.sketch_data(cx) else { return false };
         let r = ed.world_per_px * 10.0;
         // Live (live2 11-17 hover-p0): a line lights to 7 px in sketch mode (8 gives the region or plane), a point to 10.
-        let curve_r = ed.world_per_px * if ed.tool == Tool::Dimension { 8.0 } else { 7.0 };
+        // (Between the last offset that lights and the first that doesn't: 7 / 8 px, the Dimension tool's 8 / 9.)
+        let curve_r = ed.world_per_px * if ed.tool == Tool::Dimension { 8.5 } else { 7.5 };
         let screen = ed.screen_metric();
         match (d.sketch.point(e), screen) {
             (Some(q), Some(m)) => m.len(q - p) <= r,
             (Some(q), None) => (q - p).length() <= r,
             // Text box lines stand for their glyphs; keep them.
-            (None, Some(m)) => d.text_of_entity(e).is_some() || d.sketch.screen_box_distance_to(e, p, &m).is_some_and(|x| x <= curve_r),
+            // Straight out from the curve, not a square round the pointer: live2 11-17's slanted iso lines light to 7 px
+            // across them, 8 gives the region (a square's reach is ~9.6 px across a 30° line).
+            (None, Some(m)) => d.text_of_entity(e).is_some() || d.sketch.screen_distance_to(e, p, &m).is_some_and(|x| x <= curve_r),
             (None, None) => d.text_of_entity(e).is_some() || d.sketch.curve(e).is_some_and(|c| c.closest(p).2 <= r),
         }
     }
@@ -653,9 +656,10 @@ impl PartStudioView {
             Some(Reference::SketchEntity { sketch, entity }) if *sketch == ed.feature => Some(noshape_sketch::EntityId(*entity)),
             _ => None,
         };
-        // (Where the viewport's pick was made: the pointer as it knows it, also after a press without a move.)
+        // (Where the viewport's pick was made: the pointer as it knows it, also after a press without a move. Reach is
+        // measured from the pointer itself, not its pixel's centre: half a pixel across a slanted line made 7.5 px 8.1.)
         let vp = self.viewport.read(cx);
-        let (o, d) = vp.ray(vp.pointer_position() + DVec2::splat(0.5));
+        let (o, d) = vp.ray(vp.pointer_position());
         let Some(p) = ed.plane_point(o, d) else { return id };
         let pick_of = |e: noshape_sketch::EntityId| built.picks.ids_for(&Reference::SketchEntity { sketch: ed.feature, entity: e.0 }).first().copied();
         // Nothing of the sketch under the GPU's pick (a plane, a region, the background): what a click there takes.
@@ -666,7 +670,28 @@ impl PartStudioView {
             let point = near.filter(|q| *q != e && self.sketch_data(cx).is_some_and(|d| d.sketch.point(*q).is_some() && d.sketch.point(e).is_none()));
             return point.and_then(pick_of).or(id);
         }
-        near.and_then(pick_of)
+        // Past every reach (the GPU's pick holds a line to 9 px): the region under the pointer, as live (8 px off a line
+        // inside the rectangle hovers the region).
+        near.and_then(pick_of).or_else(|| self.sketch_region_pick_at(p))
+    }
+
+    /// The pick id of the open sketch's smallest region under plane point `p` (its displayed triangles).
+    fn sketch_region_pick_at(&self, p: DVec2) -> Option<u32> {
+        let ed = self.sketch.as_ref()?;
+        let shown = self.display.sketches.iter().find(|s| s.feature == ed.feature)?;
+        let local = |q: &[f32; 3]| ed.frame.to_local(DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64));
+        let inside = |a: DVec2, b: DVec2, c: DVec2| {
+            let s = |u: DVec2, v: DVec2| (v - u).perp_dot(p - u);
+            let (x, y, z) = (s(a, b), s(b, c), s(c, a));
+            (x >= 0.0 && y >= 0.0 && z >= 0.0) || (x <= 0.0 && y <= 0.0 && z <= 0.0)
+        };
+        let region = shown
+            .regions
+            .iter()
+            .filter(|r| !r.imprinted)
+            .filter(|r| r.indices.as_chunks::<3>().0.iter().any(|t| inside(local(&r.positions[t[0] as usize]), local(&r.positions[t[1] as usize]), local(&r.positions[t[2] as usize]))))
+            .min_by(|a, b| a.area.total_cmp(&b.area))?;
+        self.built.as_ref()?.picks.ids_for(&Reference::SketchRegion { sketch: ed.feature, key: region.key.clone() }).first().copied()
     }
 
     fn snap_to_hover(&mut self, hover: Option<&Reference>, cx: &mut Context<Self>) {
@@ -956,7 +981,12 @@ impl PartStudioView {
                 let Some(p) = to_plane(self, *position, cx) else { return true };
                 // What is lit is within live's reach (the hover checks it too); the GPU hover pick may lag behind a
                 // quick click: checked again here, else the geometric pick for tools that act on existing entities.
-                let hovered = self.hovered_sketch_entity(cx).filter(|e| self.in_sketch_reach(*e, p, cx)).or_else(|| self.sketch_pick_at(p, cx));
+                // (Reach from the pointer itself, as the hover's.)
+                let hit = {
+                    let (o, d) = vp.read(cx).ray(*position);
+                    self.sketch.as_ref().and_then(|s| s.plane_point(o, d)).unwrap_or(p)
+                };
+                let hovered = self.hovered_sketch_entity(cx).filter(|e| self.in_sketch_reach(*e, hit, cx)).or_else(|| self.sketch_pick_at(hit, cx));
                 // Dimensions and constraints to planes, model edges / vertices and
                 // other sketches: a linked external reference entity stands in.
                 let tool_now = self.sketch.as_ref().map(|s| s.tool);

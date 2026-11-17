@@ -232,8 +232,11 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     fill_defaults(specs, &mut values, ev.units);
     // Live (FS probe at Size 0.5 mm): "A parameter value is not valid.",
     // the field marked.
+    // One a variable gives is out of range at regeneration (live2 11-17 range-error, PARAMETER_OUT_OF_RANGE).
     if let Some(id) = out_of_bounds(ev, specs, &values) {
-        return Err(FeatureError { faulty: vec![id], ..FeatureError::new("A parameter value is not valid.") });
+        let variable = values.expr(id).is_some_and(|e| e.text.contains('#'));
+        let words = if variable { "Error regenerating: a parameter is out of range." } else { "A parameter value is not valid." };
+        return Err(FeatureError { faulty: vec![id], ..FeatureError::new(words) });
     }
 
     // Printed object numbers restart per feature run (the Context is "BuiltIn: 0").
