@@ -39,7 +39,8 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   SAME). Core told.
 - Scale-first blend6 4b2f94289 (base 3178c98b5): release suite strict-identical 127/127, userdocs ALL-SAME; assemblies
   (vibe6, asm-sf-base.log / asm-sf.log, unit blend-seq-sf3) running; land when identical.
-- Live's knife times (11-16): Fillet 1-8 8/9/10/6/9/27/7/12 ms, studio 622. Lead: Fillet 5 at or below live is P0.
+- Live's knife times (11-16): Fillet 1-8 8/9/10/6/9/27/7/12 ms, studio 622; 11-17 (live/blend/knife-regen-1117.json):
+  Chamfer 1 19, Chamfer 2 7, Fillet 2 10, Fillet 3 10, Fillet 8 12, studio 597-693. Lead: Fillet 5 at or below live is P0.
 - impeller Fillet 3 (P0, blend10 `blend-impf3`, WIP uncommitted on 8e269426d): builds as one solid 71,097.14 mm3 (live
   71,096.12), 34 faces as live, edges/vertices 93/60 vs 95/62 (the front circle's 3 arcs joined by the unify: a fix
   run in flight), Fillet 3 13 s (live 0.1 s: speed next). Pieces: closed_run_on takes all conic tools at once; an end
@@ -54,10 +55,13 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - Agent ids (11-17 09:25, fresh threads): asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm
   18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
   58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2
-  3b9b1e66-33a0-4dfe-9e0a-eee216e354b2, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core 6692ae35-758a-4442-81c8-29f67be2e21a.
+  3b9b1e66-33a0-4dfe-9e0a-eee216e354b2, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core 6692ae35-758a-4442-81c8-29f67be2e21a, qa
+  132756b3-e48d-4b9f-8a0e-3d4f23629c8b.
 - Queued from asm (after the current items): asm-gearbox-std 6a912b / a470167 Fillet 2 (EDGE fillet of 2 faces' edges,
   tangent, 0.125 in: ours 38/92/56, live 38/88/52, -12.1 mm3; repro vibe6/7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/mgb
-  NOSHAPE_PARITY_ONLY=m6a912b); asm-scissor-lift fed22d Fillet 3 (Top - Side 2 45/110/64 vs 48/116/64; Motor Mount
+  NOSHAPE_PARITY_ONLY=m6a912b); asm-scissor-lift fed22d Fillet 3 (Top - Side 2 45/110/64 vs 48/116/64; Motor Mount Live (q-gearbox-f2/corner.json): each corner a torus (27.55 mm2, its edge on the vertical round the
+  whole r 6.35 quarter) + one 3-sided blend face (29.11 mm2); no 2.158 arc, no vertex along that edge (ours 61.4 mm2 vs
+  56.66).
   69/128/50 vs 66/121/46), then Fillets 4, 5, 15 fail (repro vibe7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/ms
   ~/agents/dx-keep/ops-gB3; on main + cf49196a it differs at feature 6 Mirror 1 already: parked until dx's translator
   work lands). Gearbox: live's corner topology asked (REQUESTS 14:02); ours at each of 4 corners an OCCT 48.7 mm2
