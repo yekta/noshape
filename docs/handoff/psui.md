@@ -128,6 +128,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
   ui_tests::feel:: ui_tests::snaps:: ui_tests::list:: ui_tests::measure:: ui_tests::nav:: ui_tests::chrome::
   ui_tests::toolbar_highlight:: ui_tests::sm:: ui_tests::sketchtools:: ui_tests::editing:: ui_tests::dialogs::
   ui_tests::fields:: ui_tests::feedback::` (module path part_studio::sketch::ui_tests::<m>; one test per matrix).
+- 11-17 12:25: interim vibe5 half 142/144 (asm-cylindrical-limits: asm; bend-relief-new-edit-reedit related row
+  Flange 2 vs live's Flange 1: skasm's vertex label item).
+- Landed 01fb280e: toolbar box model. Queued: Query variable Adjacent (std qAdjacent; T1
+  features_b::query_variable_adjacent_as_std; audit A3). Asked live2 (REQUESTS 12:21) for Fillets Less / Greater and
+  Matching: std says all fillets of the body, ours Equal is tangent-connected only; no change until live answers.
+- Checked, nothing to do: flat view colours after 0bb94eede (ours 126,165,189 vs live 124,164,187; our ui-parity
+  window's right 242 px are off-screen, so the flat looks cut); tab-new-edit-reedit 22/22 (live's ray 0.3 mm = 1.1 px
+  off the edge: sub-pixel camera, `ours_on` stays); S-TOOLBAR-OVER-TABS already fixed; audit D134 (Frame profile) is
+  only the oracle's type, the picker is there.
 - 11-17 12:00: sketch-linear- / -circular-pattern-click-commit match (28/28 states, build e1ce5e41 + toolbar).
 - Queued 22349e4f (toolbar box model, chips y 11-29 vs live 11-30).
 - Landed e1ce5e41 (11:12): sketch pair readouts as live's (arcs as arcs, Center to the infinite line, order by kinds,
