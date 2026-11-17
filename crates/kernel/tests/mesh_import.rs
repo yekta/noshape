@@ -285,3 +285,45 @@ fn stl_with_a_fold_is_a_solid() {
     let v = volume_properties(&s).unwrap().mass;
     assert!((v - 1e-6).abs() < 1e-10, "volume {v}");
 }
+
+/// Two closed meshes touching along edges (c2-bottle-split: its two solid halves as STL, every edge where they touch on
+/// four triangles) are two solids, each triangle joined to the next one turning into its inside about the edge
+/// (ours read one piece; live's import makes 148 sheets of it: its edges on more than two triangles split it).
+#[test]
+fn closed_meshes_touching_along_edges_stay_two_solids() {
+    // Two unit cubes side by side sharing the face x = 1: written without that face, each cube's other faces meet on
+    // the shared square's four edges (four triangles each).
+    let v = |x: f64, y: f64, z: f64| [x, y, z];
+    let cube = |x0: f64, skip_x: Option<f64>| {
+        let mut t = Vec::new();
+        let c = [v(x0, 0.0, 0.0), v(x0 + 1.0, 0.0, 0.0), v(x0 + 1.0, 1.0, 0.0), v(x0, 1.0, 0.0), v(x0, 0.0, 1.0), v(x0 + 1.0, 0.0, 1.0), v(x0 + 1.0, 1.0, 1.0), v(x0, 1.0, 1.0)];
+        let quads = [([0, 3, 2, 1], None), ([4, 5, 6, 7], None), ([0, 1, 5, 4], None), ([2, 3, 7, 6], None), ([1, 2, 6, 5], Some(x0 + 1.0)), ([3, 0, 4, 7], Some(x0))];
+        for (q, at) in quads {
+            if at.is_some() && at == skip_x {
+                continue;
+            }
+            t.push([c[q[0]], c[q[1]], c[q[2]]]);
+            t.push([c[q[0]], c[q[2]], c[q[3]]]);
+        }
+        t
+    };
+    // Each cube closed with its own face on x = 1 as well (two coincident squares, opposite ways).
+    let mut tris = cube(0.0, None);
+    tris.extend(cube(1.0, None));
+    let mut stl = String::from("solid two\n");
+    for t in &tris {
+        stl += "facet normal 0 0 0\nouter loop\n";
+        for p in t {
+            stl += &format!("vertex {} {} {}\n", p[0], p[1], p[2]);
+        }
+        stl += "endloop\nendfacet\n";
+    }
+    stl += "endsolid two\n";
+    let path = std::env::temp_dir().join(format!("noshape-two-cubes-{}.stl", std::process::id()));
+    std::fs::write(&path, stl).unwrap();
+    let s = read_mesh_bodies(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(s.count(ShapeType::Solid), 2);
+    let vol = volume_properties(&s).unwrap().mass;
+    assert!((vol - 2.0).abs() < 1e-9, "{vol}");
+}
