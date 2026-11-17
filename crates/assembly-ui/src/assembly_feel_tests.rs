@@ -151,7 +151,7 @@ fn settle(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<Assemb
     while cx.update(|cx| {
         let vp = view.read(cx).viewport.read(cx);
         vp.pick_pending() || vp.hover_pending() || !vp.hover_settled()
-    }) && t.elapsed() < std::time::Duration::from_secs(15)
+    }) && t.elapsed() < std::time::Duration::from_secs(60)
     {
         frames(cx, window, view);
     }
@@ -225,8 +225,14 @@ fn a_mate_glyph_wins_the_hover_within_its_reach_and_its_click_selects_the_mate(c
     assert_eq!((ov, hover), (None, Some(crate::scene_builder::PickKind::Face)), "24 px from the glyph's centre: the face");
 
     move_to(cx, window, &view, centre + DVec2::new(3.0, 0.0));
+    // The press goes to what is hovered: wait for the glyph's hover pick to come back (on a loaded host the face's
+    // from 24 px can still be the hover, and the press takes its instance).
+    wait_until(cx, window, &view, |v, _| v.hover_overlay == Some(OverlayPick::Mate(0)));
     let w = at_window(cx, &view, centre + DVec2::new(3.0, 0.0));
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());
+    // The click's pick comes back on its own time (a loaded host): wait for its result, not for what is pending
+    // right after the click (nothing yet, before its pick starts).
+    wait_until(cx, window, &view, |v, _| v.selected_mate.is_some() || !v.selected.is_empty());
     settle(cx, window, &view);
     cx.update(|cx| {
         let v = view.read(cx);

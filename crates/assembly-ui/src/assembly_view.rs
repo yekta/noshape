@@ -2894,6 +2894,29 @@ impl AssemblyView {
         self.viewport.read(cx).selection_count
     }
 
+    /// A click on a mate glyph selects the mate (highlighted in the list), or fills the relation dialog's next mate
+    /// field; on a mate connector it selects the connector.
+    fn click_mate_overlay(&mut self, o: OverlayPick, window: &mut Window, cx: &mut Context<Self>) {
+        match o {
+            OverlayPick::Mate(i) => {
+                let id = self.ui.overlay_mates.get(i).copied();
+                if let (Some(id), true) = (id, self.relation.is_some()) {
+                    self.pick_relation_mate(id, cx);
+                } else if let (Some(id), true) = (id, self.ui.cfg_mode.is_some()) {
+                    self.configure_pick_mate(id, window, cx);
+                } else {
+                    self.selected_mate = id;
+                    self.selected.clear();
+                }
+            }
+            OverlayPick::Connector(i) => {
+                self.selected_mate = self.overlay_connectors.get(i).copied();
+                self.selected.clear();
+            }
+            _ => {}
+        }
+    }
+
     fn on_viewport_event(&mut self, _: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
         match ev {
             ViewportEvent::Hover(id) => {
@@ -3038,22 +3061,8 @@ impl AssemblyView {
                     if let Some(c) = self.chosen_connector(*pick, cx) {
                         self.deliver_connector(c, window, cx);
                     }
-                } else if let Some(OverlayPick::Mate(i)) = self.overlay(*pick) {
-                    // Clicking a mate indicator selects the mate (highlighted in the
-                    // list), or fills the relation dialog's next mate field.
-                    let id = self.ui.overlay_mates.get(i).copied();
-                    if let (Some(id), true) = (id, self.relation.is_some()) {
-                        self.pick_relation_mate(id, cx);
-                    } else if let (Some(id), true) = (id, self.ui.cfg_mode.is_some()) {
-                        self.configure_pick_mate(id, window, cx);
-                    } else {
-                        self.selected_mate = id;
-                        self.selected.clear();
-                    }
-                } else if let Some(OverlayPick::Connector(i)) = self.overlay(*pick) {
-                    // Select an assembly mate connector (highlights it in the list).
-                    self.selected_mate = self.overlay_connectors.get(i).copied();
-                    self.selected.clear();
+                } else if let Some(o @ (OverlayPick::Mate(_) | OverlayPick::Connector(_))) = self.overlay(*pick) {
+                    self.click_mate_overlay(o, window, cx);
                 } else {
                     let target = self.pick(*pick);
                     self.click_select(target, *position, modifiers.shift || modifiers.secondary(), cx);
@@ -3065,6 +3074,18 @@ impl AssemblyView {
                 self.focus_from_viewport(window, cx);
                 self.ui.ctx_menu = None;
                 self.ui.mini_toolbar = None;
+                // A press on a hovered mate glyph or connector is its click, never the face behind it (the viewport
+                // sends tool events when the last hover was geometry: a press right after the glyph took the hover).
+                if let Some(o @ (OverlayPick::Mate(_) | OverlayPick::Connector(_))) = self.hover_overlay
+                    && self.placing.is_none()
+                    && self.snap.is_none()
+                    && self.pick_mode(cx).is_none()
+                {
+                    self.click_mate_overlay(o, window, cx);
+                    self.refresh_scene(false, cx);
+                    cx.notify();
+                    return;
+                }
                 if self.start_section_drag(*position, cx) {
                     return;
                 }
