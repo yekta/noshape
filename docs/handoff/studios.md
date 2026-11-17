@@ -9,44 +9,38 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 09:50 UTC. Restarted 11-17 09:20 after the lead's pause.
+Updated 2026-11-17 13:10 UTC. Restarted 11-17 09:20 after the lead's pause.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
-- Landed 11-17: 7abd9bdf (doc-open timing), b5d11ad7 (box select by live2's rule; row 106 =).
-- Committed f16defe3, not landed: drawing panels report every text with the selects' options' indices (`options`,
-  `drawing_panels::panel_text`); run.py `panel_text_form`: recorder < live2 2026-11-17.3: first 30 with options; from
-  .3: no options, 120 (live's decision 11-17; live re-records the 52 takes whose panel text hit 30). Check: panel12 run
-  on vibe6 (~/tmp/studios/panel12). Once live's .3 takes land: fill each panel's texts past line 30 (Drawing properties
-  tabs, Note, Styles, Revision table, View properties) from them.
-- Uncommitted: Add Items to Release tree opens expanded (`collapsed`, live2 rel-flow-two-parts); manual-4: FS Ctrl-hover
-  link (`CtrlLink`, `link_at`, `render_ctrl_link`, vendor `offset_for_point`, icon ui-arrow-up-right), quick tab
-  switcher look + mouse-up off the card closes (backdrop), Print in a drawing without the export banner; tests:
-  feature-studio-ui `ctrl_over_a_defined_identifier_shows_a_link_that_goes_to_it`, app workspace_tests.rs
-  (`the_tab_switcher_takes_a_hovered_thumbnail_…`, `a_shortcut_works_with_the_focus_on_the_top_bar`), drawing-ui
-  `print_in_a_drawing_opens_its_pdf_without_a_banner`. Then set `manual.test` in universe documents.json (3) and
-  feature-studio.json (1).
-- vibe6 slot queue (behind qa's suites-rest since 08:40): speed1117.sh (mkperf + perf-open-30 / perf-open-hist /
-  perf-fs-large x5, ~/agents/studios-keep/speed1117.log), then the drawing run (drwall-1117.txt, out
-  ~/tmp/studios/drw1117, drw1117.log) -> `drawing_matrix.py --run`, copy the run to ~/agents/studios-keep.
-- live2's 4 flow takes landed (793cb58e): run them after the next vibe6 build (B1's name wins a same-feature merge,
-  revision B offered after A, Add Items expanded with row clicks).
+- Landed 11-17: 7abd9bdf (doc-open timing), b5d11ad7 (box select), 01fb280e (panel text form gated on live2
+  2026-11-17.3, versions flows, manual-4).
+- Queued 12:45: 57dc3ed4 (Section panels: Cut angle checkbox, Edit section's depth block + Opposite direction;
+  first angle suggested views (Left, iso projected from Front, sheet-centred); Detail panel reading; drawing context
+  menu reads its submenu only after a pointer move).
+- Committed, not landed: Cut angle ticked row; section/aux/detail VIEW for the 11-15 reader; runner
+  `section_cut_point_read`; drawing feel tests (drawing-ui src/drawing_ui_tests/feel.rs: view reach, dimension line /
+  text reach, click toggles, view and note drag thresholds, centerline on an edge); `centerline_on_edge` (row 97 =).
+  Mac test run studios-mac-feel-*; land after it and 57dc3ed4.
+- vibe6: full drawing run restarted 13:03 (319 takes, ~/tmp/studios/drw1117, log ~/agents/studios-keep/drw1117b.log);
+  no rb.sh to vibe6 while it runs (the 11:58 run died at 12:07, likely during a sync). Then `drawing_matrix.py --run`
+  and the speed run (speed1117.sh, died in the slot queue: rerun).
+- Waiting on live2: the weld take re-recorded after their metric-position fix (ours matches its views at 60.9 mm);
+  REQUESTS 12:52 P0 assembly hover captures (mate-row flyout, graphics -> list, priorities, click, box, the unticked
+  Angular second click). Live re-records the 52 panel takes (.5, ~17:30): then fill panel texts past line 30.
 
-## Lead's queue (11-16 ~09:00), state 11-17
+## Lead's queue (11-17)
 
-1. Versions / branches / merge / release flows vs live: live2's 4 flow takes landed (793cb58e). Fixed in the tree:
-   compare names a modified feature by the base side's name (`compare_features`: a.or(b)); a Merge's feature changed on
-   both sides takes the source's (`merge_from_source`, `merge_part_studio_with`; session rebases keep ours); Add Items
-   rows expanded and never "checked"; runner `late_modal` (a modal live fills after its server's answer when the next
-   step only waits). Verify: verrel run (158 ver-/rel- takes) on vibe6 ~/tmp/studios/verrel. Approve / reject: not
-   capturable with one account.
-2. Speed: table in the archive's / perf-1116.log (none slower than live). Document open + fs-large queued in vibe6's
-   slot (speed1117.sh). Decision asked of the lead: the judged numbers on the Mac (opens app windows there).
-3. Manual-4 (live2 11-17 09:47, behaviours "studios manual-4"): implemented, see In flight; universe tests set.
-4. Box select: landed (b5d11ad7).
-5. Drawing matrix refresh: drawing run queued in vibe6's slot (315 takes); live re-records the 52 panel takes in the
-   .5 form (done ~17:30); then fill the panels' texts past 30 lines.
+P0 (lead 11-17 ~12:45): hover / select parity outside Part Studios, a feel scenario per item.
+- Drawings: 6 GPUI feel tests (above). Still without a test: note leader reach (needs a leader op), snap markers,
+  placement inference, view drag alignment, double-click (has one). Row 97 fixed.
+- Assembly: ours has list -> viewport hover (instance outline, mate row: both parts + glyph); missing: the mate-row
+  flyout (live opens one), graphics -> list (unknown in live). GPU pick through psui's code: `Viewport::pick_priority`
+  from `AsmPickMap::priority_fn`, `PickKind::priority`, PickBuffer::pick; psui is in viewport.rs hover path,
+  behaviors.rs sync_pick_filter, mod.rs set_built/rebuild_scene until they land (today) - stay out. Assembly feel rows
+  in a sibling file in assembly-ui in feel_tests.rs' style (its `Pointer` is pub(super) in part-studio-ui).
+Then the earlier queue: speed (Mac judged numbers: decision asked of the lead), drawing matrix refresh.
 
 ## Agents (lead's roster 11-17 10:30; only these ids)
 psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, core 6692ae35-758a-4442-81c8-29f67be2e21a,
@@ -58,8 +52,8 @@ live e8549719-ef9a-42de-960c-e24b29f142a6, live2 3b9b1e66-33a0-4dfe-9e0a-eee216e
 Paused agents are not messaged (DECISIONS 11-17).
 
 ## Waiting on others
-- live2 (3b9b1e66, restarted 11-17; asks in REQUESTS): the 4 flow takes (09:06), the 4 manual captures (08:47), Datum target / Weld / GTOL
-  panel takes and 12 retakes (after the translation quota, 18:50 UTC).
+- live2 (3b9b1e66): REQUESTS 12:52 (P0 assembly hover), the weld retake (metric positions). live (e8549719): the 52
+  panel takes in the .5 form, Hole/thread callout palette takes (drw-hcallout-palette-tips / -dual / -fit-tips).
 
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;
@@ -70,15 +64,13 @@ Paused agents are not messaged (DECISIONS 11-17).
   (250 px) and 20-25° (400 px), and top at 20-25° from vertical. Left as is until a finer sweep.
 - Assembly "?" rows: a list row's tooltip (live2 ~70 ms), a selected instance's outline through other parts in
   explode mode, a Revolute-constrained drag's grab point.
-- Interaction-feel row 97 ≠: a centerline over a view edge, live's click takes the view, ours the centerline (GPU pick
-  bias); P3.
 - Release gap list (archive 11-12 07:33), re-audited 11-17: done 1 (approvals), 2 (drafts, approve / reject, comment,
   obsolete, settings, require_note), 8 (Go back), 9 (revision table Copy), 10 (unreleased suffix), 11 (part number in
   another pending candidate). Still absent: "Release all configurations", the outdated associated drawing warning.
   Neither is in the versions universe (167/167): only with a live capture.
 
 ## Next, in order
-See "Lead's queue" above: land bdab0ef9, then 1-5 there.
+See "In flight" and "Lead's queue (11-17)".
 
 ## How to run
 
