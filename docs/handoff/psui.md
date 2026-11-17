@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-17 22:18 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-17 23:22 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -119,7 +119,7 @@ nothing.
   the GPU gave them, so a stale plane pick is the viewport's. The glyph rows' linger is mine.
 - Measured (vibex6, load 26–37): every 3 s shot is right; a frame takes 350–450 ms to the screen, a hover pick
   250–390 ms. The 0.7 s shots show hovers from along the path.
-- Done (queued 22:4x): viewport `pick_layout_epoch` (a hover's own redraw doesn't void a hover pick asked before it;
+- Done (landed 5e498ffb 23:13): viewport `pick_layout_epoch` (a hover's own redraw doesn't void a hover pick asked before it;
   the camera, size, geometry or filter do), a hover result applied where the pointer is now, and a new pick asked as
   soon as the pointer leaves the in-flight pick's rectangle (the render thread batches them). GPU test
   sketch_hover::the_first_pick_at_rest_lights_what_is_under_the_pointer (the GPU answers only at rest).
@@ -130,10 +130,17 @@ nothing.
   Part 2 row → click, real GPUI events) passes on main: Part 2 lit and selected, Part 1 not. qa's state had Part 2
   selected while the shot showed Part 1's outline: the frame on screen trails the state at load ~24 (350–450 ms per
   frame). Re-check on a release build in a quiet window before changing anything.
-- Then: re-run qa's flow (~/agents/psui-keep/hover/uh2.sh, 0.7 s and 3 s shots) on the green with this.
-- Queue after: live's feature-dialog selection boxes (behaviours "feature dialog selection boxes",
-  live/psui/feature-dialogs-1117/: first box active, filtered hover, list row hover 121–181 ms, Radius focused keeps
-  the box active) against docs/parity/interaction-feel.md "Dialogs".
+- Then: re-run qa's flow (~/agents/psui-keep/hover/uh2.sh, 0.7 s and 3 s shots) on the first green with 5e498ffb
+  (qa asked to do the same with 1.5 s / 3 s shots).
+- Also landed 23:20 (f03552c2): feel::a_part_row_clicked_after_passing_another_leaves_no_stale_hover,
+  feel::a_dialogs_active_box_filters_what_lights (live feature-dialogs-1117: Extrude edge → face, Fillet / Chamfer
+  vertex → edge, Boolean face → part, plane spot nothing), dialogs matrix 23 / 23 (empty click, Radius focused + edge
+  click, Boolean Subtract no auto-advance).
+- Queued 23:2x (6f9f391f): below 20 fps a view change jumps (`navigation::view_change_duration`, live nav-1117);
+  wheel / Ctrl+wheel / pinch already live's (matrix rows).
+- Red main at 22:06 (sketch_glyph tests, also CI on 592b0fc9 21:22) predates f2348fa9 (22:12: linger on the app's
+  clock, tests on the test clock); 3 / 3 green on vibex6 with 2 threads.
+- Left from live's feature-dialogs-1117: list-row hover timing (121–181 ms, ours not measured).
 
 ## Current order (lead 11-17 ~14:05)
 
