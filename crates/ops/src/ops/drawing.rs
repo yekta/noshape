@@ -392,6 +392,19 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                     j["label_text"] = json!(lines);
                 }
             }
+            // Its automatic centermarks: centre and arm reach (sheet mm; drawing_centermark_resize).
+            if let Some(b) = &m.built {
+                use noshape_model::drawing::{build::PickTarget, sheet::GripKind};
+                let marks: Vec<Value> = b.picks.iter().enumerate().filter(|(_, t)| matches!(t, PickTarget::AutoCentermark { view, .. } if *view == v.id)).filter_map(|(i, _)| {
+                    let grips: Vec<_> = b.geometry.grips.iter().filter(|g| g.pick == i as u32).collect();
+                    let c = grips.iter().find(|g| g.kind == GripKind::Origin)?.pos;
+                    let reach = grips.iter().filter(|g| g.kind == GripKind::Jog).map(|g| (g.pos[0] - c[0]).hypot(g.pos[1] - c[1])).fold(0.0, f64::max);
+                    Some(json!({ "center": [r3(c[0]), r3(c[1])], "reach": r3(reach) }))
+                }).collect();
+                if !marks.is_empty() {
+                    j["centermarks"] = json!(marks);
+                }
+            }
             // The view menu's state, when not the defaults.
             if let Some(n) = &v.name {
                 j["name"] = json!(n);

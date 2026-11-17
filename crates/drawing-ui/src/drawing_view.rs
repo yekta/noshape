@@ -1396,6 +1396,23 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// The canvas resized (live2 drw-window-resize): a sheet at its Zoom to fit is fitted again; otherwise it keeps
+    /// its width across the canvas (the zoom scales with the canvas width) about the same centre.
+    pub fn resize_canvas(&mut self, bounds: Bounds<Pixels>, cx: &mut Context<Self>) {
+        let old = self.size_px();
+        let laid_out = self.fitted && old[0] >= 10.0 && old[1] >= 10.0;
+        let at_fit = laid_out && (self.zoom, self.center) == noshape_scene::camera_ops::drawing_fit_sheet(old, self.current_sheet());
+        self.bounds = bounds;
+        let new = self.size_px();
+        if at_fit {
+            self.zoom_to_fit(cx);
+        } else if laid_out && new[0] >= 10.0 {
+            self.zoom = (self.zoom * new[0] / old[0]).clamp(0.05, 200.0);
+        }
+        self.frame_dirty = true;
+        cx.notify();
+    }
+
     /// Ctrl+Shift+arrow: move the sheet a tenth of the canvas width toward
     /// the arrow (`dx`, `dy` = ±1).
     pub fn pan_step(&mut self, dx: f64, dy: f64, cx: &mut Context<Self>) {
@@ -1523,6 +1540,17 @@ impl DrawingEditor {
                     overlay.dots.push((p, [0xdd, 0x28, 0x28, 255]));
                 }
             }
+        }
+        // An automatic centermark's arm pulled short of its default: a red ⊘ at the pointer (live2 drw-centermark).
+        if let Drag::AutoCentermarkArm { refused: true, .. } = &self.drag {
+            let (c, r) = (self.cursor, 7.0 / self.zoom.max(1e-6));
+            let ring: Vec<[f64; 2]> = (0..=24).map(|i| {
+                let t = i as f64 / 24.0 * std::f64::consts::TAU;
+                [c[0] + r * t.cos(), c[1] + r * t.sin()]
+            }).collect();
+            let d = r * std::f64::consts::FRAC_1_SQRT_2;
+            overlay.tinted.push((ring, [0xdc, 0x28, 0x28, 255], 2.0));
+            overlay.tinted.push((vec![[c[0] - d, c[1] + d], [c[0] + d, c[1] - d]], [0xdc, 0x28, 0x28, 255], 2.0));
         }
         // A centermark arm snapped onto an edge: a red diamond (live A55).
         if let Drag::CentermarkArm { snap: Some(p), .. } = &self.drag {
@@ -2074,9 +2102,7 @@ impl DrawingEditor {
                     move |bounds, _window, cx| {
                         entity.update(cx, |this, cx| {
                             if this.bounds != bounds {
-                                this.bounds = bounds;
-                                this.frame_dirty = true;
-                                cx.notify();
+                                this.resize_canvas(bounds, cx);
                             }
                         });
                     },

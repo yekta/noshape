@@ -356,6 +356,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("drawing_ordinate", &[r##"{"drawing": "Part 1 Drawing 1", "origin": [180, 140], "side": [180, 130], "points": [[205.5, 160], [220, 140]]}"##, r##"{"drawing": "Part 1 Drawing 1", "group": 9, "points": [[230, 140]]}"##]),
     ("drawing_datum", &[r##"{"drawing": "Part 1 Drawing 1", "anchor": [200, 140], "position": [200, 125], "label": "A"}"##]),
     ("drawing_centermark", &[r##"{"drawing": "Part 1 Drawing 1", "holes": [[205.5, 160]]}"##]),
+    ("drawing_centermark_resize", &[r##"{"drawing": "Part 1 Drawing 1", "center": [200.5, 160], "reach": 12}"##]),
     ("drawing_note", &[r##"{"drawing": "Part 1 Drawing 1", "text": "BREAK ALL SHARP EDGES", "position": [30, 40]}"##]),
     ("drawing_gdt", &[r##"{"drawing": "Part 1 Drawing 1", "position": [240, 120], "rows": [{"symbol": "position", "tolerance": "⌀0.1", "datums": ["A", "B"]}]}"##]),
     ("drawing_surface_finish", &[r##"{"drawing": "Part 1 Drawing 1", "position": [210, 175], "value": "Ra 1.6"}"##]),

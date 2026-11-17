@@ -1447,6 +1447,18 @@ impl DrawingEditor {
                 }
                 self.set_preview(Some(dr), cx);
             }
+            Drag::AutoCentermarkArm { arm, .. } => {
+                let ext = self.pk().dragged_auto_centermark(&arm);
+                self.drag = Drag::AutoCentermarkArm { arm, refused: ext.is_none() };
+                let preview = ext.map(|ext| {
+                    let mut dr = self.drawing.clone();
+                    if let Some(v) = dr.sheets.get_mut(self.sheet).and_then(|s| s.view_mut(arm.view)) {
+                        set_centermark_extension(v, arm.key, ext);
+                    }
+                    dr
+                });
+                self.set_preview(preview, cx);
+            }
             Drag::CentermarkArm { orig, k, .. } => {
                 let snap = if e.modifiers.shift { None } else { self.centermark_edge_snap(&orig, k).map(|s| s.1) };
                 let a = self.dragged_centermark(&orig, k, e.modifiers.shift);
@@ -1660,7 +1672,7 @@ impl DrawingEditor {
                     self.commit("Move annotation", p, cx);
                 }
             }
-            Drag::Jog { .. } | Drag::Reattach { .. } | Drag::CentermarkArm { .. } | Drag::CenterlineEnd { .. } => {
+            Drag::Jog { .. } | Drag::Reattach { .. } | Drag::CentermarkArm { .. } | Drag::AutoCentermarkArm { .. } | Drag::CenterlineEnd { .. } => {
                 if let Some(p) = self.preview.take() {
                     let name = match drag {
                         Drag::Jog { .. } => "Move jog",
@@ -1944,6 +1956,9 @@ impl DrawingEditor {
         }
         if let Some((orig, k)) = self.centermark_grip_at(start) {
             return Drag::CentermarkArm { orig, k, snap: None };
+        }
+        if let Some(arm) = self.pk().auto_centermark_grip_at(start) {
+            return Drag::AutoCentermarkArm { arm, refused: false };
         }
         if let Some((orig, k)) = self.centerline_grip_at(start) {
             return Drag::CenterlineEnd { orig, k };
@@ -2842,6 +2857,14 @@ const INFER_REACH_PX: f64 = 8.0;
 /// A box select shows once the pointer is more than this far from the press (live2 drw-feel-q (a): none at 7 px
 /// along an axis or 5.7 px diagonally, a box at 8 px and at 7.07 px diagonally).
 const BOX_START_PX: f64 = 7.0;
+
+/// An automatic centermark's arms `ext` sheet mm longer than its default (0: as made).
+pub(crate) fn set_centermark_extension(v: &mut DrawingView, key: [i64; 2], ext: f64) {
+    v.centermark_extensions.retain(|(k, _)| *k != key);
+    if ext > 1e-9 {
+        v.centermark_extensions.push((key, ext));
+    }
+}
 
 #[cfg(test)]
 mod note_preview_tests {

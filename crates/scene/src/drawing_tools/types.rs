@@ -268,6 +268,9 @@ pub enum Drag {
     /// An arm end of a centermark (`snap`: the red diamond on the edge it
     /// snapped to).
     CentermarkArm { orig: Annotation, k: usize, snap: Option<[f64; 2]> },
+    /// An arm end of an automatic centermark: all four arms longer, never shorter than the default (`refused`: the
+    /// pointer short of it, a red ⊘).
+    AutoCentermarkArm { arm: super::AutoArm, refused: bool },
     /// An end grip of a centerline (along its line).
     CenterlineEnd { orig: Annotation, k: usize },
     MoveTable { id: u64, start: [f64; 2], orig: [f64; 2] },

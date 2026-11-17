@@ -32,6 +32,18 @@ pub fn seg_dist(c: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
 /// A centermark's center, arm ends (+x, +y, −x, −y) and arm lengths.
 pub type CentermarkArms = ([f64; 2], [[f64; 2]; 4], [f64; 4]);
 
+/// An automatic centermark's arm being dragged: its view and center key, its center (sheet), the arm's direction,
+/// its default reach and its extension now (sheet mm).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AutoArm {
+    pub view: noshape_model::drawing::ViewId,
+    pub key: [i64; 2],
+    pub center: [f64; 2],
+    pub dir: [f64; 2],
+    pub base: f64,
+    pub ext: f64,
+}
+
 impl SheetPick<'_> {
     /// A linear dimension's geometry on the sheet (resolved positions).
     pub fn dimension_frame(&self, a: &Annotation) -> Option<LinearFrame> {
@@ -108,15 +120,66 @@ impl SheetPick<'_> {
         Some((c, dirs, lens))
     }
 
-    /// An arm-end grip of a selected centermark under `start`: (mark, arm).
+    /// An arm-end grip of a centermark under `start`, while its grips show: it hovered or selected (live2
+    /// drw-centermark follow-up: drags start from hover). (mark, arm).
     pub fn centermark_grip_at(&self, start: [f64; 2]) -> Option<(Annotation, usize)> {
         let tol = self.tol_mm(5.0);
-        self.selection.iter().find_map(|s| {
+        let hovered = self.hover.and_then(|h| self.sel_of_pick(h));
+        self.selection.iter().chain(hovered.iter()).find_map(|s| {
             let Sel::Annotation(id) = s else { return None };
             let a = self.resolved_annotation(*id)?;
             let (c, dirs, lens) = self.centermark_arms(&a)?;
             (0..4).find(|k| seg_dist(start, [c[0] + dirs[*k][0] * lens[*k], c[1] + dirs[*k][1] * lens[*k]], [c[0] + dirs[*k][0] * lens[*k], c[1] + dirs[*k][1] * lens[*k]]) < tol).map(|k| (a.clone(), k))
         })
+    }
+
+    /// An automatic centermark's arm-end grip under `start`, while its grips show (it hovered or selected, or its
+    /// view selected; live2 drw-centermark follow-up).
+    pub fn auto_centermark_grip_at(&self, start: [f64; 2]) -> Option<AutoArm> {
+        use noshape_model::drawing::build::{PickTarget, same_centre};
+        use noshape_model::drawing::sheet::GripKind;
+        let b = self.built?;
+        let tol = self.tol_mm(5.0);
+        let hovered = self.hover.and_then(|h| self.sel_of_pick(h));
+        let shows = |view: noshape_model::drawing::ViewId, key: [i64; 2]| {
+            self.selection.iter().chain(hovered.iter()).any(|s| matches!(s, Sel::AutoCentermark(v, k) if *v == view && *k == key) || *s == Sel::View(view))
+        };
+        let (pick, view, key) = b.picks.iter().enumerate().find_map(|(i, t)| match t {
+            PickTarget::AutoCentermark { view, center } if shows(*view, *center) && b.geometry.grips.iter().any(|g| g.pick == i as u32 && g.kind == GripKind::Jog && len(sub(start, g.pos)) < tol) => Some((i as u32, *view, *center)),
+            _ => None,
+        })?;
+        let grips: Vec<_> = b.geometry.grips.iter().filter(|g| g.pick == pick).collect();
+        let center = grips.iter().find(|g| g.kind == GripKind::Origin)?.pos;
+        let end = grips.iter().filter(|g| g.kind == GripKind::Jog).min_by(|a, c| len(sub(start, a.pos)).total_cmp(&len(sub(start, c.pos))))?.pos;
+        let reach = len(sub(end, center));
+        if reach < 1e-9 {
+            return None;
+        }
+        let ext = self.current_sheet().view(view)?.centermark_extensions.iter().find(|(k, _)| same_centre(*k, key)).map_or(0.0, |(_, e)| e.max(0.0));
+        Some(AutoArm { view, key, center, dir: [(end[0] - center[0]) / reach, (end[1] - center[1]) / reach], base: reach - ext, ext })
+    }
+
+    /// The automatic centermark centred at sheet point `c` (within 0.5 mm): its view and key, its default reach and
+    /// its extension (sheet mm).
+    pub fn auto_centermark_at(&self, c: [f64; 2]) -> Option<(noshape_model::drawing::ViewId, [i64; 2], f64, f64)> {
+        use noshape_model::drawing::build::{PickTarget, same_centre};
+        use noshape_model::drawing::sheet::GripKind;
+        let b = self.built?;
+        let (pick, view, key) = b.picks.iter().enumerate().find_map(|(i, t)| match t {
+            PickTarget::AutoCentermark { view, center } if b.geometry.grips.iter().any(|g| g.pick == i as u32 && g.kind == GripKind::Origin && len(sub(g.pos, c)) < 0.5) => Some((i as u32, *view, *center)),
+            _ => None,
+        })?;
+        let center = b.geometry.grips.iter().find(|g| g.pick == pick && g.kind == GripKind::Origin)?.pos;
+        let reach = b.geometry.grips.iter().filter(|g| g.pick == pick && g.kind == GripKind::Jog).map(|g| len(sub(g.pos, center))).fold(0.0, f64::max);
+        let ext = self.current_sheet().view(view)?.centermark_extensions.iter().find(|(k, _)| same_centre(*k, key)).map_or(0.0, |(_, e)| e.max(0.0));
+        Some((view, key, reach - ext, ext))
+    }
+
+    /// The extension an automatic centermark's arm dragged to the cursor gets: the pointer's reach along it past the
+    /// default; `None` short of the default (live: a red ⊘, nothing changes).
+    pub fn dragged_auto_centermark(&self, arm: &AutoArm) -> Option<f64> {
+        let along = (self.cursor[0] - arm.center[0]) * arm.dir[0] + (self.cursor[1] - arm.center[1]) * arm.dir[1];
+        (along >= arm.base).then_some(along - arm.base)
     }
 
     /// Where arm `k` of the centermark `orig`, dragged near the cursor,
@@ -130,7 +193,11 @@ impl SheetPick<'_> {
         let along = dot(sub(self.cursor, c), d);
         let tol = self.tol_mm(8.0);
         let mut best: Option<(f64, [f64; 2])> = None;
-        for e in g.edges.iter().filter(|e| e.visible) {
+        // Not the mark's own hole (live2 drw-centermark follow-up: a Single mark pulled to 2 px inside it stays there).
+        let own = |e: &noshape_model::drawing::views::ViewEdge| {
+            matches!(e.model.and_then(|m| g.model_edges.get(m as usize)).map(|me| &me.geom), Some(noshape_model::drawing::views::EdgeGeom::Circle { center, .. }) if len(sub(pl.to_sheet(*center), c)) < 1e-3)
+        };
+        for e in g.edges.iter().filter(|e| e.visible && !own(e)) {
             for w in e.points.windows(2) {
                 let (p, q) = (pl.to_sheet(w[0]), pl.to_sheet(w[1]));
                 let s = sub(q, p);

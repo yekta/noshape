@@ -597,6 +597,10 @@ pub struct DrawingView {
     /// coordinates, radians).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub centermark_angles: Vec<([i64; 2], f64)>,
+    /// Automatic centermarks whose arms were dragged longer (live2 drw-centermark follow-up: kept on reload, never
+    /// shorter than the default, Drawing properties untouched): (the mark's center key, the extra length, sheet mm).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub centermark_extensions: Vec<([i64; 2], f64)>,
     /// Show/hide edges: model edges left out of the view.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_edges: Vec<(BodyId, TopoName)>,
@@ -876,6 +880,7 @@ impl Default for DrawingView {
             model_annotations: true,
             deleted_centermarks: Vec::new(),
             centermark_angles: Vec::new(),
+            centermark_extensions: Vec::new(),
             editing_edges: false,
             pinned: None,
             detail_profile: None,

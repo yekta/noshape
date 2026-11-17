@@ -638,6 +638,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "centermark_resize",
+            summary: "Lengthen or shorten a centermark's arms (drag of an arm end's grip)",
+            description: "A centermark's arm-end grip dragged along its arm: all four arms end `reach` sheet mm from the center (\"Resize centermark\"). A Single mark takes any length; an automatic one never shorter than its default (live: the drag is refused), and keeps its length on reload without touching Drawing properties.",
+            fields: with(common(), vec![req("center", point(), "The mark's center (sheet mm)."), req("reach", json!({ "type": "number", "exclusiveMinimum": 0 }), "How far the arm ends sit from the center (sheet mm).")]),
+            mutates: true,
+            destructive: false,
+            run: centermark_resize,
+        },
+        Op {
+            group: "drawing",
             verb: "note",
             summary: "Note (text) with an optional leader",
             description: "The Note tool and panel: `text` (several lines with \\n) placed at `position` (sheet mm); with `leader` (a vertex, circle center or edge point, sheet mm) a leader points there. `height` sets the text height (sheet mm; it becomes the drawing's note height default, as typing it in the panel does). One edit (\"Note\").",
@@ -1544,6 +1554,40 @@ fn centermark(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut out = reply(od, tab, sheet, false)?;
     out["annotations"] = json!(ids);
     Ok(out.into())
+}
+
+fn centermark_resize(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let c = pt_arg(a, "center")?;
+    let reach = a.f64("reach")?;
+    if !reach.is_finite() || reach <= 0.0 {
+        return Err(OpError::param("reach", "a length above 0 (sheet mm)"));
+    }
+    let t = target(od, a)?;
+    let (tab, sheet) = (t.tab, t.sheet);
+    let pk = t.m.pick(&Tool::Select, &[], c);
+    let near = |p: [f64; 2]| (p[0] - c[0]).hypot(p[1] - c[1]) < 0.5;
+    let single = t.d.sheets[sheet].annotations.iter().filter_map(|x| pk.resolved_annotation(x.id)).find(|r| pk.centermark_arms(r).is_some_and(|(cc, _, _)| near(cc)));
+    let mut d = t.d.clone();
+    if let Some(r) = single {
+        let AnnotationKind::Centermark { view, size, .. } = r.kind else { unreachable!("centermark_arms is Some for centermarks only") };
+        let per = pk.placement(view).map(|pl| pl.len_to_sheet(1.0)).filter(|k| *k > 1e-12).ok_or_else(|| OpError::param("center", "the mark's view is gone"))?;
+        if let Some(AnnotationKind::Centermark { arms, .. }) = d.sheets[sheet].annotations.iter_mut().find(|x| x.id == r.id).map(|x| &mut x.kind) {
+            *arms = [reach / per - size; 4];
+        }
+    } else {
+        let (view, key, base, _) = pk.auto_centermark_at(c).ok_or_else(|| OpError::param("center", "no centermark centred there"))?;
+        if reach < base - 1e-6 {
+            return Err(OpError::param("reach", &format!("an automatic centermark's arms can't be shorter than its default ({base:.3} mm)")));
+        }
+        let v = d.sheets[sheet].view_mut(view).ok_or_else(|| OpError::param("center", "the mark's view is gone"))?;
+        v.centermark_extensions.retain(|(k, _)| *k != key);
+        if reach - base > 1e-9 {
+            v.centermark_extensions.push((key, reach - base));
+        }
+    }
+    commit(od, tab, sheet, d, "Resize centermark")?;
+    Ok(reply(od, tab, sheet, false)?.into())
 }
 
 fn note(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

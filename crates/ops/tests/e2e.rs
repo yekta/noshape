@@ -8312,6 +8312,53 @@ fn a_radial_hole_gets_its_centermark() {
     assert_eq!(marks, 12, "two marks of six lines");
 }
 
+/// A centermark's arms dragged by a grip (live2 drw-centermark follow-up): an automatic mark lengthens and comes back,
+/// never shorter than its default, and keeps its length on reopening; a Single mark shortens below it too.
+#[test]
+fn centermark_arms_resize_as_their_grips_drag() {
+    let mut ctx = Ctx::new();
+    let sketch = new_sketch(&mut ctx, "centermark-resize.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "shapes": [{ "tool": "corner_rectangle", "points": [[-20, -20], [20, 20]] }, { "tool": "circle", "points": [[0, 0], [5, 0]] }] }));
+    let regions = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }))["regions"].as_array().unwrap().clone();
+    let outer = regions.iter().max_by(|a, b| num(&a["area"]).abs().total_cmp(&num(&b["area"]).abs())).unwrap()["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [outer], "depth": "10 mm" } }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "suggested_views": true }));
+    let tab = d["drawing"].clone();
+    let marks = |ctx: &mut Ctx| -> Vec<Value> { call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"].as_array().unwrap().iter().flat_map(|v| v["centermarks"].as_array().cloned().unwrap_or_default()).collect() };
+    let m = marks(&mut ctx);
+    assert_eq!(m.len(), 1, "the hole's automatic mark: {m:?}");
+    let (c, base) = (m[0]["center"].clone(), num(&m[0]["reach"]));
+    let resize = |ctx: &mut Ctx, reach: f64| try_call(ctx, "drawing_centermark_resize", json!({ "drawing": tab, "center": c, "reach": reach }));
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    resize(&mut ctx, base + 8.0).unwrap();
+    assert!(last(&mut ctx).ends_with(":: Resize centermark"), "{}", last(&mut ctx));
+    assert!((num(&marks(&mut ctx)[0]["reach"]) - (base + 8.0)).abs() < 1e-3, "lengthened");
+    resize(&mut ctx, base + 4.0).unwrap();
+    assert!((num(&marks(&mut ctx)[0]["reach"]) - (base + 4.0)).abs() < 1e-3, "a lengthened mark comes back");
+    let e = resize(&mut ctx, base - 2.0).unwrap_err();
+    assert!(e.param.as_deref() == Some("reach") && e.message.contains("can't be shorter than its default"), "{e:?}");
+    // Reopened: the length kept.
+    let mut ctx = Ctx::new();
+    let path = std::env::temp_dir().join(format!("noshape-ops-e2e-{}", std::process::id())).join("centermark-resize.noshape");
+    call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+    assert!((num(&marks(&mut ctx)[0]["reach"]) - (base + 4.0)).abs() < 1e-3, "kept on reopening");
+    resize(&mut ctx, base).unwrap();
+    assert!((num(&marks(&mut ctx)[0]["reach"]) - base).abs() < 1e-3, "back to the default");
+    let e = resize(&mut ctx, 3.0).err();
+    assert!(e.is_some(), "an automatic mark refuses a reach under its default");
+    let e = try_call(&mut ctx, "drawing_centermark_resize", json!({ "drawing": tab, "center": [1.0, 1.0], "reach": 5.0 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("center"), "{e:?}");
+    // A Single mark on the hole, the automatic ones hidden: it shortens below the default too.
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let (view, circle) = g["views"].as_array().unwrap().iter().find_map(|v| v["edges"].as_array().unwrap().iter().find(|e| e["type"] == "circle").map(|e| (v["id"].clone(), e.clone()))).expect("the hole seen end-on");
+    call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": view, "auto_centermarks": false }));
+    assert!(marks(&mut ctx).is_empty(), "automatic marks hidden");
+    let (cc, r) = ([num(&circle["center"][0]), num(&circle["center"][1])], num(&circle["radius"]));
+    call(&mut ctx, "drawing_centermark", json!({ "drawing": tab, "holes": [[cc[0] + r, cc[1]]] }));
+    try_call(&mut ctx, "drawing_centermark_resize", json!({ "drawing": tab, "center": cc, "reach": base / 2.0 })).unwrap();
+    assert!(last(&mut ctx).ends_with(":: Resize centermark"), "a Single mark shorter than the default: {}", last(&mut ctx));
+}
+
 /// Suggested views of a 50 mm part reopened from its file are 1:1 on ANSI A
 /// (live 1857: pipeflange-steven, 50 × 50 × 28 mm; ours took 1:2 from the
 /// fast box, enlarged by its curved faces' poles).

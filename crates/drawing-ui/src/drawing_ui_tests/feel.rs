@@ -626,3 +626,143 @@ fn a_drawing_opens_fitted_and_zoom_to_fit_puts_it_back(cx: &mut TestAppContext) 
     draw(cx, window);
     assert_eq!(camera(cx), opened, "Zoom to fit: back where it opened");
 }
+
+/// Live2 drw-window-resize: at its Zoom to fit the sheet is fitted again on a window resize; zoomed and panned it
+/// keeps its width across the canvas (1879 -> 1400 px canvas: the sheet 1300 -> 969 px) and its place along it, and a
+/// resize back restores it exactly.
+#[gpui::test]
+fn a_resized_window_refits_a_fitted_sheet_and_scales_a_zoomed_one_with_its_width(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "feel-resize");
+    real_sheet(cx, window, &editor);
+    let resize = |cx: &mut TestAppContext, w: f32, h: f32| {
+        VisualTestContext::from_window(window, cx).simulate_resize(size(px(w), px(h)));
+        draw(cx, window);
+    };
+    let state = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let b = e.built.as_ref().expect("built");
+            let (l, r) = (e.sheet_to_local([0.0, 0.0])[0], e.sheet_to_local([b.geometry.width, 0.0])[0]);
+            let fit = noshape_scene::camera_ops::drawing_fit_sheet(e.size_px(), e.current_sheet());
+            ((e.zoom, e.center), fit, r - l, (l + r) / 2.0 / e.size_px()[0], e.size_px()[0])
+        })
+    };
+    resize(cx, 1919.0, 992.0);
+    let (camera, fit, ..) = state(cx);
+    assert_eq!(camera, fit, "at its fit: fitted again to the new canvas");
+    resize(cx, 1400.0, 760.0);
+    let (camera, fit, ..) = state(cx);
+    assert_eq!(camera, fit, "and again");
+    resize(cx, 1919.0, 992.0);
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.zoom_by(1.7, [500.0, 300.0], cx);
+        e.pan_step(1.0, 0.0, cx);
+    }));
+    draw(cx, window);
+    let (camera, _, wide, place, canvas) = state(cx);
+    resize(cx, 1400.0, 760.0);
+    let (_, fit, wide2, place2, canvas2) = state(cx);
+    assert!(canvas2 < canvas, "a narrower canvas");
+    assert!((wide2 / wide - canvas2 / canvas).abs() < 1e-9, "the sheet scales with the canvas width: {wide} -> {wide2} px over {canvas} -> {canvas2}");
+    assert!((place2 - place).abs() < 1e-9, "its place along the canvas kept: {place} -> {place2}");
+    assert_ne!(state(cx).0, fit, "not refitted");
+    resize(cx, 1919.0, 992.0);
+    let (back, ..) = state(cx);
+    assert!((back.0 - camera.0).abs() < 1e-9 && back.1 == camera.1, "resized back: as it was ({camera:?} vs {back:?})");
+}
+
+/// A press at `p` dragged to `q` (sheet mm), then released.
+fn drag_sheet(cx: &mut TestAppContext, window: AnyWindowHandle, editor: &Entity<DrawingEditor>, p: [f64; 2], q: [f64; 2], mid: impl FnOnce(&mut TestAppContext)) {
+    cx.executor().advance_clock(std::time::Duration::from_millis(600));
+    let (a, b) = (at_window(cx, editor, p), at_window(cx, editor, q));
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(a, None, Modifiers::default());
+    v.simulate_mouse_down(a, MouseButton::Left, Modifiers::default());
+    v.simulate_mouse_move(b, Some(MouseButton::Left), Modifiers::default());
+    draw(cx, window);
+    mid(cx);
+    VisualTestContext::from_window(window, cx).simulate_mouse_up(b, MouseButton::Left, Modifiers::default());
+    draw(cx, window);
+}
+
+/// The automatic centre mark's centre and its +x arm end (sheet mm).
+fn auto_mark(cx: &mut TestAppContext, editor: &Entity<DrawingEditor>) -> ([f64; 2], [f64; 2]) {
+    use noshape_model::drawing::{build::PickTarget, sheet::GripKind};
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        let pick = b.picks.iter().position(|t| matches!(t, PickTarget::AutoCentermark { .. })).expect("an automatic centre mark") as u32;
+        let grips: Vec<_> = b.geometry.grips.iter().filter(|g| g.pick == pick).collect();
+        let c = grips.iter().find(|g| g.kind == GripKind::Origin).expect("its centre").pos;
+        let end = grips.iter().filter(|g| g.kind == GripKind::Jog).max_by(|a, b| a.pos[0].total_cmp(&b.pos[0])).expect("its arms").pos;
+        (c, end)
+    })
+}
+
+/// Live2 drw-centermark follow-up: a grip dragged from hover; an automatic mark's arms all grow, following the pointer,
+/// and never get shorter than the default (a red ⊘, nothing changes); a Single mark's shorten below it too.
+#[gpui::test]
+fn a_centre_marks_grips_drag_from_hover_and_an_automatic_one_never_gets_shorter(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    HOLED.set(true);
+    let (window, editor) = drawing(cx, "feel-cm-drag");
+    HOLED.set(false);
+    real_sheet(cx, window, &editor);
+    let mm_per_px = cx.update(|cx| {
+        let e = editor.read(cx);
+        let (a, b) = (e.sheet_to_local([0.0, 0.0]), e.sheet_to_local([100.0, 0.0]));
+        100.0 / (b[0] - a[0]).abs()
+    });
+    let (c, end) = auto_mark(cx, &editor);
+    let base = end[0] - c[0];
+    lit_at(cx, window, &editor, end);
+    drag_sheet(cx, window, &editor, end, [end[0] + 30.0 * mm_per_px, end[1]], |_| {});
+    let (_, longer) = auto_mark(cx, &editor);
+    assert!((longer[0] - c[0] - (base + 30.0 * mm_per_px)).abs() < 0.5 * mm_per_px, "the arms follow the pointer out: {base} -> {}", longer[0] - c[0]);
+    lit_at(cx, window, &editor, [5.0, 5.0]);
+    let (_, end) = auto_mark(cx, &editor);
+    lit_at(cx, window, &editor, end);
+    let refused = std::cell::Cell::new(false);
+    drag_sheet(cx, window, &editor, end, [c[0] + base - 9.0 * mm_per_px, end[1]], |cx| {
+        refused.set(cx.update(|cx| matches!(editor.read(cx).drag, noshape_scene::drawing_tools::Drag::AutoCentermarkArm { refused: true, .. })));
+    });
+    assert!(refused.get(), "short of the default: refused (the red ⊘)");
+    assert_eq!(auto_mark(cx, &editor).1, end, "nothing changed");
+}
+
+/// Live2 drw-centermark follow-up (3): a Single mark's grip dragged from hover shortens it below its default too.
+#[gpui::test]
+fn a_single_centre_marks_grip_shortens_it_from_hover(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    HOLED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let (view, circle) = g["views"].as_array().unwrap().iter().find_map(|v| v["edges"].as_array().unwrap().iter().find(|e| e["type"] == "circle").map(|e| (v["id"].clone(), e.clone()))).expect("the hole end-on");
+        call(ctx, "drawing_view_display", json!({ "drawing": dw, "view": view, "auto_centermarks": false }));
+        let (c, r) = ([circle["center"][0].as_f64().unwrap(), circle["center"][1].as_f64().unwrap()], circle["radius"].as_f64().unwrap());
+        call(ctx, "drawing_centermark", json!({ "drawing": dw, "holes": [[c[0] + r, c[1]]] }));
+    }));
+    let (window, editor) = drawing(cx, "feel-cm-single");
+    HOLED.set(false);
+    real_sheet(cx, window, &editor);
+    let arm = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let id = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Centermark { .. })).expect("the Single mark").id;
+            let pk = e.pk();
+            let (c, dirs, lens) = pk.centermark_arms(&pk.resolved_annotation(id).expect("resolved")).expect("its arms");
+            (c, [c[0] + dirs[0][0] * lens[0], c[1] + dirs[0][1] * lens[0]], lens[0])
+        })
+    };
+    let mm_per_px = cx.update(|cx| {
+        let e = editor.read(cx);
+        let (a, b) = (e.sheet_to_local([0.0, 0.0]), e.sheet_to_local([100.0, 0.0]));
+        100.0 / (b[0] - a[0]).abs()
+    });
+    let (c, end, before) = arm(cx);
+    lit_at(cx, window, &editor, end);
+    let to = [end[0] - (end[0] - c[0]) / before * 10.0 * mm_per_px, end[1] - (end[1] - c[1]) / before * 10.0 * mm_per_px];
+    drag_sheet(cx, window, &editor, end, to, |_| {});
+    let (_, _, after) = arm(cx);
+    assert!((before - after - 10.0 * mm_per_px).abs() < 0.5 * mm_per_px, "10 px inward from hover: shorter than its default ({before} -> {after})");
+}

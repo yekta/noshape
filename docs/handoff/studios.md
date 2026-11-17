@@ -38,9 +38,12 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
     it drags the view (`hole_press_view`); feel test `a_holes_centre_mark_lights_from_its_circle_and_a_press_there_drags_the_view`;
   - the matrix drops the hole callout palette's hidden dimension controls and «Varies» (live2 11-17).
 - Sheet fit checked 11-17 19:05: on open = Zoom to fit = live (feel `a_drawing_opens_fitted_and_zoom_to_fit_puts_it_back`,
-  queued ccab6c95). Asked live2 (low priority, after the grip drags): refit or keep zoom + centre on a window resize.
-- Asked live2 (18:45): centre mark grip drags (inward outside the circle, an automatic mark's stored length, hover-only
-  drags). Ours: automatic marks don't drag; a Single mark's selected grip moves all four arms. Then implement + test.
+  queued ccab6c95).
+- Centre mark grip drags and window resize done per live2's answers (queued 19:4x; drawing-ui 60, ops e2e 225, coverage, drawing, scene, model-data, clippy green): automatic
+  marks drag from hover (`DrawingView::centermark_extensions`, never below the default, ⊘), Single marks from hover
+  (no snap to their own hole), op `drawing_centermark_resize`, drawing_get views list `centermarks`; `resize_canvas`
+  refits a fitted sheet, else scales the zoom with the canvas width. Versions panel feel scenarios committed (91025dd1);
+  next there: the release Add Items tree (rel-flow-two-parts: opens expanded, a row click selects).
 - Side-by-side crops for the lead: /root/studios-scratch/mate-glyphs-live-vs-ours.png, dimhover-sbs.png,
   view-sbs.png, sel-sbs.png.
 
@@ -63,7 +66,7 @@ live e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-b43a-da61a4f
 Paused agents are not messaged (DECISIONS 11-17).
 
 ## Waiting on others
-- live2 (79ae5cdb): the centre mark drag answers; the weld retake (metric positions). live (e8549719): the 8
+- live2 (79ae5cdb): the weld retake (metric positions). live (e8549719): the 8
   drw-revision-* and drw-styles-dimension retakes (failed: no Revision table tool, .6 dropdowns).
 
 ## Open (no owner action possible yet)

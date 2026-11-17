@@ -2211,17 +2211,20 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     // Turned with Align centermark.
                     let turn = v.centermark_angles.iter().find(|(k, _)| *k == key).map(|(_, a)| *a).unwrap_or(0.0);
                     let (ux, uy) = if turn != 0.0 { (rotate2(ux, turn), rotate2(uy, turn)) } else { (ux, uy) };
+                    // Its arms dragged longer (live2 drw-centermark follow-up).
+                    let ext = v.centermark_extensions.iter().find(|(k, _)| same_centre(*k, key)).map_or(0.0, |(_, e)| e.max(0.0));
+                    let cross = if vt.centermark_extended { a } else { a + ext };
                     for u in [ux, uy] {
-                        g.lines.push(Polyline2 { points: vec![at(u, -a), at(u, a)], style: LineStyle::Thin, closed: false, pick: view_pick });
+                        g.lines.push(Polyline2 { points: vec![at(u, -cross), at(u, cross)], style: LineStyle::Thin, closed: false, pick: view_pick });
                     }
                     if vt.centermark_extended {
                         for u in [ux, uy, [-ux[0], -ux[1]], [-uy[0], -uy[1]]] {
-                            g.lines.push(Polyline2 { points: vec![at(u, a + gap), at(u, r + a + gap)], style: LineStyle::Centerline, closed: false, pick: view_pick });
+                            g.lines.push(Polyline2 { points: vec![at(u, a + gap), at(u, r + a + gap + ext)], style: LineStyle::Centerline, closed: false, pick: view_pick });
                         }
                     }
                     // Shown while it is hovered or selected or its view is (live2 drw-centermark): orange at the
                     // arm ends, blue at the centre.
-                    let reach = if vt.centermark_extended { r + a + gap } else { a };
+                    let reach = if vt.centermark_extended { r + a + gap + ext } else { cross };
                     for u in [ux, uy, [-ux[0], -ux[1]], [-uy[0], -uy[1]]] {
                         g.grips.push(super::sheet::Grip { pick: view_pick, pos: at(u, reach), kind: super::sheet::GripKind::Jog });
                     }
