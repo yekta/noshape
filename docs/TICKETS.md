@@ -557,6 +557,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - **No blocker so far (GO on 7f287e52).** 12:35: greens 551d200b, 6bb61e69 and 7f287e52 (have blend's conic round be6f0ca8c
   and skasm's FeatureScript colours 0bb94eede) ALL-SAME vs v0.4.56: hats, dock, 47 ticket documents, authored documents.
   blend's impeller Fillet 3 (9e40ad95a) is not on main yet; checked on its green when it lands.
+- **Must carry core's fix: SCISSOR-LIFT-BOM-ROWS** (lead 14:15). The culprit core 41f62884a (01:23) is in v0.4.56 (not
+  0.4.55): asm-scissor-lift's BOM rows as live 59 -> 57/87 shipped. The 17:00 candidate must contain core's fix or revert
+  (not on main at 14:15). qa-sl-verify runs asm-scissor-lift alone on the first green with it (vibe6, bool's method):
+  pass = BOM rows 59/87 and no fed22d Fillet 18 error, as 0.4.55; result -> qa-alerts and here.
 - **User P0s verified in the app on green c330a760** (14:05, vibe6 Xvfb; v0.4.56 alongside):
   remembered Fillet radius (psui 452838df): an old build's memory "9 mm + #wall_thickness" (v0.4.56's own file format) opens
   red "9 mm + #wall_t…" in v0.4.56, 5 mm on the green; a plain 7 mm memory opens 7 mm; a #variable memory in the new format
