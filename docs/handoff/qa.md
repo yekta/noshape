@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-17 14:10 on the Ubeyd account)
+# QA handoff (agent qa; current state only, updated 2026-11-17 18:15 on the Ubeyd account)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -58,12 +58,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.56** published check done 11-17 06:58: clean, baseline 0.4.56. Next: the 17:00 cut (qa-cut-1615).
 
 ## Next (in this order)
-00. **v0.4.57: GO given 18:11** (519afe8e2). When published: `systemd-run --unit qa-pub-0457 bash /root/qa-scratch/bin/rel-pub-all.sh
-   0.4.56 0.4.57 /home/ngyekta/agents/qa-bisect/target/release/noshape-cli` (vibex7; candidate CLI there), then spot-check rows 9-16.
-0a. **Validity column (lead 11-17 ruling)**: compat (userdocs.py / sig.py) and suite comparisons (suites-diff.py) also compare
-   each changed feature's solid validity (BRepCheck): valid on the base, invalid on the candidate = a difference. bool told
-   (gate.sh). Do it when next touching those tools (find whether the CLI exposes validity first).
-0. **05:00 checklist (psui via lead)**: REMEMBERED-VALUES-OLD-FORMAT fix 582351aab (uh/uf2.sh on its green: 3 mm, 0.3 cm,
+00. **v0.4.57**: GO 18:11, tagged 519afe8e2. Unit qa-pub-0457 (rel-pub-all.sh 0.4.56 0.4.57 <candidate CLI on vibex7>, started
+   18:13) waits for the release, checks SHA256SUMS / userdocs candidate vs released / quit x5 (vibex6) / released vs 0.4.56,
+   moves the compat baseline to 0.4.57 -> one line in qa-alerts. Then the spot-check rows 9-16 on the released app.
+0. **05:00 checklist (psui via lead)**: REMEMBERED-VALUES-OLD-FORMAT fix 582351aab (uh/wait-uf2.sh waits for its green, runs uf2.sh: 3 mm, 0.3 cm,
    0.2 in, 5 mm; v0.4.57 / a1383a65 gives 5 mm, 0.5 cm, 0.2 in, 5 mm), f6ef6a252 glyph (uh2.sh: no parallel glyph in the
    "off" shots), f74af0d9a. psui sends main shas if the land rebases them.
 1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (12:35: GO on 7f287e52; c101c3c0 has core's
