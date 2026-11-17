@@ -90,10 +90,6 @@
 #include <TopoDS_Shell.hxx>
 #include <TopoDS_Solid.hxx>
 #include <TopoDS_Wire.hxx>
-#include <BRepGProp.hxx>
-#include <GProp_GProps.hxx>
-#include <GCPnts_AbscissaPoint.hxx>
-#include <GeomAdaptor_Curve.hxx>
 #include <ShapeUpgrade_ShapeDivideClosed.hxx>
 #include <ShapeUpgrade_ShapeDivideClosedEdges.hxx>
 #include <TopExp.hxx>
@@ -2415,12 +2411,6 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, RoundSplines round,
       continue;
     for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More() && !split; ee.Next())
       split = BRep_Tool::IsClosed(TopoDS::Edge(ee.Current()), F);
-    if (split && std::getenv("NOSHAPE_XT_TRACE"))
-    {
-      GProp_GProps g;
-      BRepGProp::SurfaceProperties(F, g);
-      fprintf(stderr, "XT_TRACE closed face %s area %g mm2 at (%g %g %g)\n", basis_surface(BRep_Tool::Surface(F, loc))->DynamicType()->Name(), g.Mass() * 1e6, g.CentreOfMass().X() * 1e3, g.CentreOfMass().Y() * 1e3, g.CentreOfMass().Z() * 1e3);
-    }
   }
   if (split)
   {
@@ -2464,19 +2454,6 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, RoundSplines round,
           closed = c3->Value(f + (l - f) * i / 20.0).Distance(sf->Value(uv.X(), uv.Y()).Transformed(loc.Transformation())) > kPrecision;
         }
       }
-  }
-  if (closed && std::getenv("NOSHAPE_XT_TRACE"))
-  {
-    for (TopExp_Explorer ee(r, TopAbs_EDGE); ee.More(); ee.Next())
-    {
-      const TopoDS_Edge& e = TopoDS::Edge(ee.Current());
-      if (BRep_Tool::Degenerated(e) || !TopExp::FirstVertex(e).IsSame(TopExp::LastVertex(e)))
-        continue;
-      double                  f, l;
-      occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
-      const gp_Pnt            p = c.IsNull() ? gp_Pnt() : c->Value(f);
-      fprintf(stderr, "XT_TRACE closed edge %s tol %g at (%g %g %g) len %g\n", c.IsNull() ? "null" : c->DynamicType()->Name(), BRep_Tool::Tolerance(e), p.X() * 1e3, p.Y() * 1e3, p.Z() * 1e3, c.IsNull() ? 0.0 : GCPnts_AbscissaPoint::Length(GeomAdaptor_Curve(c, f, l)) * 1e3);
-    }
   }
   if (closed)
   {

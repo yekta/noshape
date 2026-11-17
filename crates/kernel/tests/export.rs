@@ -248,6 +248,44 @@ fn an_iges_bspline_sphere_reads_as_a_sphere() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A cone written as a B-surface (live's c2-hex-bookcase-derived "shrunk": a u-periodic cubic B-surface live's import
+/// makes a CONE) reads back as a cone from Parasolid, at the cone's area.
+#[test]
+fn a_parasolid_bspline_cone_reads_as_a_cone() {
+    let dir = std::env::temp_dir().join(format!("noshape-xt-cone-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    // The side of a cone from r 6 mm at z 0 to r 2 mm at z 10 mm: an exact rational circle along u, a line along v.
+    let mm = 1e-3;
+    let square = [(1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (-1.0, 1.0), (-1.0, 0.0), (-1.0, -1.0), (0.0, -1.0), (1.0, -1.0), (1.0, 0.0)];
+    let poles = square.iter().flat_map(|&(x, y)| [DVec3::new(6.0 * mm * x, 6.0 * mm * y, 0.0), DVec3::new(2.0 * mm * x, 2.0 * mm * y, 10.0 * mm)]).collect();
+    let weights = (0..9).flat_map(|i| [if i % 2 == 0 { 1.0 } else { std::f64::consts::FRAC_1_SQRT_2 }; 2]).collect();
+    let data = BSplineSurfaceData {
+        poles,
+        nu: 9,
+        nv: 2,
+        weights: Some(weights),
+        u_knots: vec![0.0, 0.0, 0.0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1.0, 1.0, 1.0],
+        v_knots: vec![0.0, 0.0, 1.0, 1.0],
+        u_degree: 2,
+        v_degree: 1,
+        u_periodic: false,
+        v_periodic: false,
+    };
+    let spline = make_bspline_surface(&data, &[], false).unwrap();
+    let want = std::f64::consts::PI * (6.0 + 2.0) * mm * ((10.0 * mm).powi(2) + (4.0 * mm).powi(2)).sqrt();
+    assert!(matches!(spline.faces()[0].face_surface(), Ok(Surface::BSpline { .. })));
+    let path = dir.join("cone.x_t");
+    write_parasolid(&path, std::slice::from_ref(&spline), LengthUnit::Meter, false).unwrap();
+    let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
+    // (Ours writes a closed, non-periodic face in two.)
+    for f in back.faces() {
+        assert!(matches!(f.face_surface(), Ok(Surface::Cone { .. })), "{:?}", f.face_surface());
+    }
+    let a: f64 = back.faces().iter().map(|f| f.area().unwrap()).sum();
+    assert!((a - want).abs() < 1e-6 * want, "{a} vs {want}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// A B-spline sheet in two pieces, each written as its own copy of the surface (an IGES writer's pieces of a face:
 /// live's hose and motor-mount), reads as one face, as Onshape's import.
 #[test]

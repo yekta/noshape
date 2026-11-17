@@ -24,6 +24,9 @@
 #include <GeomAPI_Interpolate.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <GeomConvert_SurfToAnaSurf.hxx>
+#include <GeomLProp_SLProps.hxx>
+#include <Geom_ElementarySurface.hxx>
 #include <Extrema_GenLocateExtPS.hxx>
 #include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom2dAPI_Interpolate.hxx>
@@ -711,6 +714,9 @@ struct Builder
   std::map<long long, TopoDS_Vertex>             verts;
   std::map<long long, TopoDS_Edge>               edges;
   double                                         tol = 1e-7;
+  // Surfaces SP-curves lie on (their B-curves in the surface's parameters).
+  std::set<long long> sp_surfaces;
+  bool                sp_surfaces_indexed = false;
 
   explicit Builder(const Parser& p) : r(p) {}
 
@@ -906,12 +912,58 @@ struct Builder
         occ::handle<Geom_BSplineSurface> bs = rat ? new Geom_BSplineSurface(poles, w, arr(uk), arr(vk), arr(um), arr(vm), du, dv)
                                                   : new Geom_BSplineSurface(poles, arr(uk), arr(vk), arr(um), arr(vm), du, dv);
         s = bsurface_as_periodic(bs, g.chr("u_periodic") == 'T', g.chr("v_periodic") == 'T');
+        if (const occ::handle<Geom_Surface> a = analytic_form(bs, idx); !a.IsNull())
+          s = a;
         break;
       }
       default:
         fail_unsupported("parasolid: surface type " + std::to_string(n.type));
     }
     return surfs[idx] = s;
+  }
+
+  // A B-surface that is a plane, cylinder, cone, sphere or torus to within kAnalyticFit, as that surface, its normal
+  // the same way: live's import makes it one (c2-hex-bookcase-derived "shrunk": a u-periodic cubic B-surface of 130
+  // poles is a CONE in live; read as a B-spline its ring edge with the cylinder next to it came out with two vertices,
+  // and our files of it split the ring). Not one an SP-curve lies on: its B-curve is in the B-surface's parameters.
+  occ::handle<Geom_Surface> analytic_form(const occ::handle<Geom_BSplineSurface>& bs, long long idx)
+  {
+    constexpr double kAnalyticFit = 1e-7;
+    if (!sp_surfaces_indexed)
+    {
+      sp_surfaces_indexed = true;
+      for (const auto& [i, n] : r.nodes)
+        if (n.type == 137)
+          sp_surfaces.insert(n.ptr("surface"));
+    }
+    if (sp_surfaces.count(idx))
+      return nullptr;
+    try
+    {
+      GeomConvert_SurfToAnaSurf       conv(bs);
+      const occ::handle<Geom_Surface> a = conv.ConvertToAnalytical(kAnalyticFit);
+      if (a.IsNull() || conv.Gap() > kAnalyticFit || !a->IsKind(STANDARD_TYPE(Geom_ElementarySurface)))
+        return nullptr;
+      const double u = 0.5 * (bs->UKnot(1) + bs->UKnot(bs->NbUKnots())), v = 0.5 * (bs->VKnot(1) + bs->VKnot(bs->NbVKnots()));
+      gp_Pnt       p;
+      gp_Vec       du, dv;
+      bs->D1(u, v, p, du, dv);
+      GeomAPI_ProjectPointOnSurf pr(p, a);
+      if (pr.NbPoints() == 0)
+        return nullptr;
+      double pu = 0, pv = 0;
+      pr.LowerDistanceParameters(pu, pv);
+      GeomLProp_SLProps lp(a, pu, pv, 1, 1e-9);
+      if (!lp.IsNormalDefined() || du.Crossed(dv).Magnitude() < 1e-12)
+        return nullptr;
+      if (lp.Normal().Dot(du.Crossed(dv)) < 0)
+        a->UReverse();
+      return a;
+    }
+    catch (const Standard_Failure&)
+    {
+      return nullptr;
+    }
   }
 
   // A rolling-ball blend (constant radius): the tube of that radius round
