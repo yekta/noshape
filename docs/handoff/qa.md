@@ -60,9 +60,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.56** published check done 11-17 06:58: clean, baseline 0.4.56. Next: the 17:00 cut (qa-cut-1615).
 
 ## Next (in this order)
-00. **v0.4.57 published, checked clean 21:44** (compat/published-0.4.57.txt, rel-0.4.57.txt); compat baseline 0.4.57. Next:
-   the app spot-check rows 9-16 (interaction-feel rows 41-49: hover timing, midpoint dwell, click, Ctrl+click, Select
-   other, box select, press -> drag, right press) on the released app.
+00. **v0.4.57 published, checked clean 21:44**; compat baseline 0.4.57. Spot-check rows 9-16 done 22:00 (pass; TICKETS). Next
+   release: rows 17-24 (uh/sc.sh start|shot|stop + uh/rows.sh drive the released app on vibex6 :664).
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py

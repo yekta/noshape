@@ -560,6 +560,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-17 17:00 release (qa list 12:35, newest checked green 7f287e52; the latest release is v0.4.56)
+- **v0.4.57 app spot-check, rows 9-16 (qa 22:00, released Linux app, vibex6 :664 Xvfb, real xdotool input, the block)**: pass:
+  click selects a face (Area 1200 mm² readout), again deselects, empty clears, Shift+empty keeps; Ctrl+click opens the
+  context menu, selects nothing; Select other (`) opens at the pointer + (99, 51), ~221 px wide (live + (100, 51), 220);
+  a left drag from empty draws the box; a right drag orbits (no menu), a right click opens the empty-space menu at the
+  pointer; an edge's midpoint target shows only after a rest (none 80 ms after arriving, there at 1.5 s). Not checked by
+  eye: hover timing (row 9) and box select's 18 / 13 counts (row 14: no count readout; feel tests cover them). Shots
+  /root/qa-scratch/uh/sc/. Next rotation: rows 17-24.
 - **v0.4.57 published 20:15, qa check clean 21:44**: 3 Linux assets = SHA256SUMS; released CLI vs the candidate: hat8, hat15, hat15b,
   the dock, f197 SAME; QUIT-ABORT-DOCK guard 5/5 rc 0 (vibex6); released CLI vs v0.4.56: user / ticket / authored documents
   ALL-SAME; compat baseline -> 0.4.57.
