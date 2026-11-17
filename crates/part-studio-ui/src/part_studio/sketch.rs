@@ -760,7 +760,11 @@ impl PartStudioView {
         // pre-highlighted while sketching on it, except a face for
         // Use, which projects its edges (qa5 CTX-USE).
         let use_face = self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Use) && matches!(r, Some(Reference::Face(_)));
-        if !use_face && r.as_ref().is_some_and(|r| self.is_own_sketch_plane(r, cx)) {
+        // Live (live2 11-17 tools-planes): while a drawing tool is active no plane, face or region pre-highlights,
+        // before the first click and mid-shape alike; sketch entities, the origin and model edges / vertices do.
+        let drawing = self.sketch.as_ref().is_some_and(|s| s.tool.draws())
+            && matches!(r, Some(Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_) | Reference::SketchRegion { .. }));
+        if drawing || (!use_face && r.as_ref().is_some_and(|r| self.is_own_sketch_plane(r, cx))) {
             if self.hover.take().is_some() {
                 self.refresh_scene(false, cx);
             }

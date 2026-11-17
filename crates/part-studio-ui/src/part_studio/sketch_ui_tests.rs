@@ -1488,6 +1488,32 @@ fn a_line_lights_over_the_plane_the_gpu_pick_keeps(cx: &mut TestAppContext) {
     assert_eq!(lit(cx).0, Some(end), "by the end: the point");
 }
 
+/// Live (live2 11-17 tools-planes): with a drawing tool active, before the first click and mid-line, no plane
+/// pre-highlights (ours lit the Front plane orange under a line being drawn).
+#[gpui::test]
+fn no_plane_lights_while_a_line_is_drawn(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "no-plane-mid-line", Tool::Line);
+    draw(cx, window);
+    let plane = cx.update(|cx| view.read(cx).built.as_ref().unwrap().picks.ids_for(&Reference::Plane(DatumPlane::Front)).first().copied().expect("the Front plane's pick"));
+    let hover = |cx: &mut TestAppContext, at: (f64, f64)| {
+        let at = DVec2::new(at.0, at.1);
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                vp.update(cx, |vp, _| vp.place_pointer(at));
+                v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
+                v.on_viewport_event(&vp, &ViewportEvent::Hover(Some(plane)), w, cx);
+            });
+        })
+        .unwrap();
+        draw(cx, window);
+        cx.update(|cx| view.read(cx).hover.clone())
+    };
+    assert_eq!(hover(cx, (800., 300.)), None, "before the first click");
+    click(cx, window, &view, (500., 400.));
+    assert_eq!(hover(cx, (800., 300.)), None, "mid-line");
+}
+
 /// ui-parity sketch-constraint-refusals step 58 (qa 11-12): a click on a small circle's rim, its centre 11 px away. Our
 /// pick pass reaches a point from about 12 px and points win, so the GPU's hover was the centre; held to live's reach
 /// (a point 10 px) the circle under the pointer is what lights and what the click selects, as live.
