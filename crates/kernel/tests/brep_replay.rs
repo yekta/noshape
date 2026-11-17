@@ -4,7 +4,9 @@
 //!
 //! `NOSHAPE_BOOL_CORPUS=/root/core-scratch/bool-corpus cargo test -p noshape-kernel --test all
 //! brep_replay::brep_corpus_replay -- --ignored --nocapture` (a result that differs from OCCT's only by OCCT's
-//! arbitrary choices is reported equivalent with its deltas (`equivalent`), NOSHAPE_BREP_EXACT=1: as differing;
+//! arbitrary choices is reported equivalent with its deltas (`equivalent`), one whose history differs only in shapes
+//! the arguments share remade where OCCT keeps them as relabelled (`shared_relabelled`), one whose unified result
+//! differs only in a closed face's seam as seam placement only (`seam_placement_only`); NOSHAPE_BREP_EXACT=1: as differing;
 //! NOSHAPE_BREP_DIFF=1 prints each mismatch's history records that differ; NOSHAPE_BREP_ONLY=<name> runs one case; NOSHAPE_BREP_SHOW_OCCT=<name>,... prints
 //! OCCT's result and history records for those cases, taken or not; NOSHAPE_BREP_VS_OCCT=1 compares with OCCT run
 //! here instead of the recorded result: for a corpus recorded with this Boolean on; NOSHAPE_BREP_ALWAYS=<dir> writes
@@ -70,6 +72,71 @@ fn same_records(a: &[(String, [i64; 3])], b: &[(String, [i64; 3])]) -> bool {
             let hit = b.iter().enumerate().position(|(j, (l, o))| !used[j] && k == l && (0..3).all(|i| (p[i] - o[i]).abs() <= 2));
             hit.map(|j| used[j] = true).is_some()
         })
+}
+
+/// The records of each not matched in the other (places within 2 µm).
+fn apart<'a>(a: &'a [(String, [i64; 3])], b: &'a [(String, [i64; 3])]) -> (Vec<&'a (String, [i64; 3])>, Vec<&'a (String, [i64; 3])>) {
+    let mut used = vec![false; b.len()];
+    let mut only_a = Vec::new();
+    for x in a {
+        match b.iter().enumerate().position(|(j, y)| !used[j] && x.0 == y.0 && (0..3).all(|i| (x.1[i] - y.1[i]).abs() <= 2)) {
+            Some(j) => used[j] = true,
+            None => only_a.push(x),
+        }
+    }
+    (only_a, b.iter().zip(used).filter(|(_, u)| !u).map(|(y, _)| y).collect())
+}
+
+/// Where the histories differ only in input shapes two arguments share, or edges and faces on them, Modified (remade at
+/// the same place) in ours and Kept in OCCT's: OCCT keeps or remakes those as its rounding falls, ours remakes them
+/// (lead 11-17). How many.
+fn shared_relabelled(c: &Case, ours: &[(String, [i64; 3])], occt: &[(String, [i64; 3])]) -> Option<usize> {
+    let (mine, theirs) = apart(ours, occt);
+    if mine.is_empty() || mine.len() != theirs.len() {
+        return None;
+    }
+    let args: Vec<&Shape> = c.objects.iter().chain(&c.tools).collect();
+    let shared = |arg: usize, input: &str| {
+        let at = input.find(|ch: char| ch.is_ascii_digit())?;
+        let kind = match &input[..at] {
+            "Vertex" => ShapeType::Vertex,
+            "Edge" => ShapeType::Edge,
+            "Face" => ShapeType::Face,
+            _ => return None,
+        };
+        let x = args.get(arg)?.sub_shape(kind, input[at..].parse().ok()?).ok()?;
+        let others: Vec<Shape> = args.iter().enumerate().filter(|&(j, _)| j != arg).flat_map(|(_, s)| s.sub_shapes(ShapeType::Vertex)).collect();
+        Some(args.iter().enumerate().any(|(j, s)| j != arg && s.sub_shapes(kind).contains(&x)) || x.sub_shapes(ShapeType::Vertex).iter().any(|v| others.contains(v)))
+    };
+    let mut used = vec![false; theirs.len()];
+    for m in &mine {
+        let w: Vec<&str> = m.0.split(' ').collect();
+        let [arg, input, "Modified", out] = w[..] else { return None };
+        let want = format!("{arg} {input} Kept {out}");
+        let j = theirs.iter().enumerate().position(|(j, t)| !used[j] && t.0 == want && (0..3).all(|i| (m.1[i] - t.1[i]).abs() <= 2))?;
+        used[j] = true;
+        if shared(arg.strip_prefix("arg")?.parse().ok()?, input) != Some(true) {
+            return None;
+        }
+    }
+    Some(mine.len())
+}
+
+/// Unified results apart only where the unify put a closed face's seam (it follows the faces' order): the same faces,
+/// both valid, the volume and area within the model tolerance (as [`equivalent`]), and the same edges and vertices as
+/// shown (Parasolid's: seams, and vertices only they end, aren't).
+fn seam_placement_only(r: &Shape, o: &Shape) -> bool {
+    const TOL: f64 = 1e-7;
+    let (Ok(ur), Ok(uo)) = (unify_same_domain(r), unify_same_domain(o)) else { return false };
+    let (ur, uo) = (ur.shape, uo.shape);
+    if ur.count(ShapeType::Face) != uo.count(ShapeType::Face) || !ur.is_valid() || !uo.is_valid() {
+        return false;
+    }
+    let shown = |s: &Shape| s.shown_topology().ok().map(|t| (t.face_count(), t.edge_count(), t.vertex_count()));
+    let (Some(a), Some(b)) = (shown(&ur), shown(&uo)) else { return false };
+    let (Ok(vr), Ok(vo), Ok(ar), Ok(ao)) = (ur.volume(), uo.volume(), ur.area(), uo.area()) else { return false };
+    let len: f64 = uo.sub_shapes(ShapeType::Edge).iter().map(|e| e.length().unwrap_or(0.0)).sum();
+    a == b && (vr - vo).abs() <= ao * TOL && (ar - ao).abs() <= len * TOL
 }
 
 type Unified = Option<(usize, usize, bool, f64)>;
@@ -307,6 +374,7 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
     let mut times: [Vec<(f64, f64)>; 3] = Default::default();
     let (mut n, mut accepted) = (0, 0);
     let mut equivalents: Vec<String> = Vec::new();
+    let (mut relabelled, mut seams): (Vec<String>, Vec<String>) = (Vec::new(), Vec::new());
     for name in cases(dir) {
         if only.as_ref().is_some_and(|o| *o != name) || unstable.contains(&name) {
             continue;
@@ -385,6 +453,12 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         // The history's hash rounds centroids: compare with OCCT's records within 2 µm.
         if d == ["history differs"] && std::env::var_os("NOSHAPE_BREP_EXACT").is_none() && theirs.as_ref().is_some_and(|t| same_records(ours.records(), t.records())) {
             d.clear();
+        } else if d == ["history differs"]
+            && std::env::var_os("NOSHAPE_BREP_EXACT").is_none()
+            && let Some(n) = theirs.as_ref().and_then(|t| shared_relabelled(&c, ours.records(), t.records()))
+        {
+            relabelled.push(format!("{name} ({:?}, {} tools): {n} shared shapes Modified where OCCT keeps them", c.op, c.tools.len()));
+            d.clear();
         }
         // What the model does next with a result (merging faces left on one surface) must come out the same.
         if d.is_empty()
@@ -400,7 +474,10 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
                 let _ = std::fs::write(Path::new(&dump).join(format!("{name}-occt.brep")), o.shape.to_brep_bytes().unwrap_or_default());
             }
             let (ur, uo) = (ours.unified(), t.unified());
-            if !alike(&ur, &uo) {
+            if alike(&ur, &uo) {
+            } else if std::env::var_os("NOSHAPE_BREP_EXACT").is_none() && seam_placement_only(&r.shape, &o.shape) {
+                seams.push(format!("{name} ({:?}, {} tools): unified {ur:?} vs OCCT {uo:?}", c.op, c.tools.len()));
+            } else {
                 d.push(format!("unified differently: {ur:?} vs OCCT {uo:?}"));
             }
         }
@@ -490,6 +567,12 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
     }
     for x in &as_live {
         report += &format!("  as live, OCCT differs: {x}\n");
+    }
+    for x in &relabelled {
+        report += &format!("  shared shapes relabelled: {x}\n");
+    }
+    for x in &seams {
+        report += &format!("  seam placement only: {x}\n");
     }
     for (why, k) in &declines {
         report += &format!("  declined {k}: {why}\n");

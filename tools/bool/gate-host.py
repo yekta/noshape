@@ -165,9 +165,10 @@ def parse_replay(log):
         if m:
             got.setdefault(m[1], ("same", "", m[3]))
             continue
-        m = re.match(rf"^  (equivalent|as live, OCCT differs): ({NAME})", l)
+        m = re.match(rf"^  (equivalent|as live, OCCT differs|shared shapes relabelled|seam placement only): ({NAME})", l)
         if m:
-            got[m[2]] = ("equivalent" if m[1] == "equivalent" else "as-live", l.split(": ", 2)[-1][:300], got.get(m[2], ("", "", ""))[2])
+            status = {"equivalent": "equivalent", "as live, OCCT differs": "as-live", "shared shapes relabelled": "relabelled"}.get(m[1], "seams")
+            got[m[2]] = (status, l.split(": ", 2)[-1][:300], got.get(m[2], ("", "", ""))[2])
             continue
         if re.match(r"^\d+ of \d+ cases differ:$", l):
             differ = True
@@ -368,7 +369,7 @@ def speed(base_kbin, new_kbin, out, threads, rounds=5):
 
 # ---- the verdict ---------------------------------------------------------------------------------------------------
 
-TAKEN = {"same", "equivalent", "as-live"}
+TAKEN = {"same", "equivalent", "as-live", "relabelled", "seams"}
 
 
 def rounded(text, digits=9):
@@ -429,6 +430,11 @@ def compare(base_r, new_r, base_s, new_s, spd):
         info.append(f"replay: {len(n)} distinct cases; taken {sum(r[3] in TAKEN for r in base_r)} -> {sum(r[3] in TAKEN for r in new_r)} "
                     f"(+{len(gained)} -{len(lost)}), differing {sum(r[3] in BAD for r in base_r)} -> {sum(r[3] in BAD for r in new_r)}, "
                     f"fixed {len(fixed)}, decline reasons changed {reasons}")
+        # (Taken with OCCT's arbitrary labels or seams told apart, by case: lead 11-17.)
+        for what, st in (("shared shapes relabelled", "relabelled"), ("seam placement only", "seams")):
+            xs = [f"{r[1]} {r[4]}" for _, r in sorted(n.items()) if r[3] == st]
+            if xs:
+                info.append(f"  {what} ({len(xs)}): " + "; ".join(xs[:40]))
         # (Our time on the cases both take, both runs in one pool at once: a hint; the timing rounds decide.)
         tb = {k: float(r[5]) for k, r in b.items() if r[3] in TAKEN and r[5]}
         tn = {k: float(r[5]) for k, r in n.items() if r[3] in TAKEN and r[5]}
