@@ -192,7 +192,9 @@ Open, ranked:
      the nearest grid point 0.15 mm inside the face's edge), removed volume 18683.9 mm³ for live's 18681.6. Our
      Thicken 1 is already +24.3 mm³ / +5.5 mm² off (loft surface, in band); our faces: 86 sphere (one dimple in two),
      42 B-spline, 1 other, with knife-edge pieces (a 0.000625 mm² sphere sliver at (65.410, 43.071, 4.933), a
-     0.000741 mm² island). Asked live (REQUESTS 05:46) for Surface 1's area and the small faces after it.
+     0.000741 mm² island). Live 10:10 (dx/q-cfsp/faces.json): Loft 1's Surface 1 20480.0518 mm² (ours 20482.3596:
+     our loft surface +2.31 mm², core's natural_loft); after Surface Pattern 3 85 SPHERE / 45 SPLINE / 1 OTHER (ours
+     86 / 42 / 1), its 13 faces under 1 mm² all SPLINE, no sphere sliver. Follows the loft: core's, parked here.
    - cf-setback-fillet: parked (lead 11-05, skasm's RABC fill patch; TICKETS SETBACK-FILL-PATCH).
 2. After ~10:17: live's answers to REQUESTS 01:47 (sm-louver scale, live's own SAT import) and 05:46; set 2 after
    live2's refetch.
@@ -202,7 +204,17 @@ Open, ranked:
    on the Mac 7.9 -> 6.6 s (live 8.6); qa's `documents import` on vibe6 not re-timed. SM-BOOLEAN-SPEED closed (Mac
    Up to Part 66 ms / live 160). Studios 06:27: 1dc32b 27/349 (was 17), Boolean 4 hub 232/632/400 vs 216/600/384,
    2666 ms vs 135: sent to bool 7fa8ceab 08:10 (repro vibe7 ~/agents/dx-keep/repro/1dc32b-b4); 74d3d6 9/180 (core's).
-4. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
+4. Writer guard for kinked closed seams (lead 11-17: under 1 mrad, no pole over 1 um = a tenth of live's 1e-5 m
+   band, export only; uncommitted in dx-land xt.cpp periodic_bsurface smooth_seam + kernel test export::a_tube_wall_
+   with_a_slightly_kinked_seam_goes_round_as_one_acis_face): prove hose x_t / sat read back 12/12/0 (were 12/14/4,
+   22/44/24; seam 0.41 mrad, poles moved 0.21-0.52 um), no other exchange row changes. Core's SWEEP-SEAM-KINK filed.
+   Then rings-loft "ours reads ours" x_t / sat Part 2 133/338/208 for 132/335/206.
+5. asm (P2, 11-17): asm-robot-relations studio 0c3466 Import 1: the STEP (studios/foreign/0fc7dd7c….step, SolidWorks,
+   one MANIFOLD_SOLID_BREP 'Combine1', one CLOSED_SHELL of 174 faces) is 6 disconnected pieces: live makes 6 parts
+   all "REV-21-1650", ours one (171986.6 mm³), so Thicken 1 fails and the BOM's 6 rows become one. Split an imported
+   solid's shell into its connected pieces (Shape::faces_oriented_consistently gives one shell per piece), each a
+   solid named as the file's. asm's trace: vibe7 ~/agents/asm-keep/one/rr2.log.
+6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## How to run
 - Builds and crate tests on the Mac: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo test -p <crate> …` (one slot).
@@ -231,9 +243,10 @@ Open, ranked:
   temporary backtrace build.
 - vibe7 → vibe6 scp fails: relay through /root/dx-scratch/bin-relay. Host ~/tmp is pruned after 6-12 h: keep scripts
   and binaries in ~/agents/dx-keep.
-- Agent ids (message_agent needs them full): core 6692ae35-758a-4442-81c8-29f67be2e21a,
-  asm 75d6886b-30b5-45c0-b789-a6730354be97, blend 0e6e9942-0713-46c1-ae55-132fbbb4a14b, bool
-  c25aee1d-f0a9-4fab-ac99-acca645c81c7, live b89af730-e8c6-4234-b83e-00a9e1ba6acc, live2
-  c42ce02b-3429-4294-861b-ccbc6cbb41d2, studios 08f83230-1122-4c3c-a185-edf9f225d834, skasm
-  a09d30a7-95db-42d1-8f2d-946c6fb8f232.
+- Agent ids (message_agent needs them full; 11-17 09:25 restarts): core 6692ae35-758a-4442-81c8-29f67be2e21a,
+  asm d8d597e0-675c-497b-a804-544ceab99bbd, blend 0e6e9942-0713-46c1-ae55-132fbbb4a14b, bool
+  7fa8ceab-4549-499f-9b01-3a289c2c95b4, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, live
+  e8549719-ef9a-42de-960c-e24b29f142a6, live2 3b9b1e66-33a0-4dfe-9e0a-eee216e354b2, studios
+  58e9bca8-346c-4847-8012-e15006ae61ef, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b,
+  psui 4973e295-9e92-463f-a13f-2ec5258bc5f9.
 - The archive's "Parity translator changes by asm" section lists asm's translator fixes one line each (lead 11-07).
