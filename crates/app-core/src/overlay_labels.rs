@@ -209,8 +209,8 @@ pub fn row_box(window: &Window, cx: &App, b: &RowBox, anchor: glam::DVec3, hit: 
         // Centered in the row (items_center), from the rounded corner.
         let top = edge + round_half_down((inner_h - f32::from(line_height) * scale) * 0.5);
         let origin = point(px(x / scale), px(top / scale));
-        if !leaf.text.is_empty() {
-            let (mask, at) = raster(window, leaf.text, font, size, line_height, leaf.color, origin)?;
+        // (Text that can't be rasterized still leaves its box to hover and press.)
+        if let Some((mask, at)) = (!leaf.text.is_empty()).then(|| raster(window, leaf.text, font, size, line_height, leaf.color, origin)).flatten() {
             masks.push((mask, at, rgba(leaf.color)));
         }
         x += w + (leaf.margin_right * scale).round();

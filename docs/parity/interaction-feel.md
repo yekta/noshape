@@ -295,7 +295,7 @@ a band 6.5 / 8.5 across (live's own takes vary by a pixel with where its target 
 | Drags: a free end onto a point (straight, diagonally), a midpoint, a circle's rim; no H / V | 7–9 / 6, not 8 / ≤ 6; COINCIDENT / MIDPOINT on release | the squares and bands (`point_drop_target`; points were an 8.5 px circle) | = (fixed) |
 | Line end / a spline's through-point (along); across it; its curve between points | 7 px along, then on the curve; 8–9 px across; the curve 12, not 14 | the square (7.5) and band (7.5): along =, across and the curve stop at 7.5 | = / ≠ / ≠ (live's spline shape isn't recorded: a wider spline zone or its tessellation's chords?) |
 | Woken model edge / a perpendicular through the start (live sketch-gaps 1c) | a straight model edge wakes after a 60 ms rest (not 0 or 30); then PERPENDICULAR through the start, a line zone 7–9 px either side (not an angle), the edge used | woke nothing (model edges never woke); now `SketchEditor::woken_edge` (`EDGE_WAKE_REST` 60 ms, `woken_edge_perpendicular`, the click uses the edge: `link_woken_edge`); the bench's triangle prism (`triangle_part`) | = (fixed) |
-| Not yet in the matrix | a woken model edge's parallel (not measured live) | – | – |
+| Woken model edge / a line 0.2°–3° off parallel (live2 wake-parallel, 11-17) | no PARALLEL, woken or not (0–12 px across at the end); only a VERTICAL alignment to the edge's end vertex | no parallel (`woken_edge_perpendicular` only) | = |
 
 ## Feature list and Parts list (matrix)
 
