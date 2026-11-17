@@ -1,0 +1,108 @@
+{
+  "name": "drw-view-properties-projected-from-section",
+  "about": "A section view of the pin-block assembly, a view projected from it (Right, parent Section), then that view's View properties: it alone has 'Apply parent view section cut'; cancelled",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (live2 11-17: the drawing matrix's View properties gap 'Apply parent view section cut')",
+  "start": "pin-block-asm-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Section view"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Horizontal"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          812,
+          350
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          726,
+          530
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "click",
+      "on": {
+        "tool": "Projected view"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "view": "Section"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          1000,
+          530
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "px": [
+          1000,
+          530
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "View properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
