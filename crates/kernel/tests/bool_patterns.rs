@@ -341,10 +341,10 @@ fn arguments_sharing_sub_shapes_keep_them_as_occt() {
 }
 
 /// Arguments sharing a corner where only faces on one plane of each meet it (a recorded fuse): OCCT keeps or remakes
-/// such a shape as its rounding falls (here keeps; at the mirror image of another such corner it remakes), so
-/// noshape's Boolean declines and OCCT's runs.
+/// such a shape as its rounding falls (here keeps; at the mirror image of another such corner it remakes). noshape's
+/// Boolean takes it: OCCT's result, the shared shapes remade at their places (Modified where OCCT says Kept: lead 11-17).
 #[test]
-fn a_shared_corner_by_coplanar_faces_goes_to_occt() {
+fn a_shared_corner_by_coplanar_faces_is_remade_in_place() {
     let _ = k::set_working_scale(1000.0);
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
     let c = k::bool_corpus::load(&dir, "4006f865627b319d").expect("the recorded fuse");
@@ -352,9 +352,18 @@ fn a_shared_corner_by_coplanar_faces_goes_to_occt() {
     let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
     let why = k::last_rust_decline();
     k::set_rust_boolean_only(false);
-    assert!(r.is_err() && why == "a shared shape OCCT may keep or remake", "{why}");
-    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
-    assert_eq!(k::bool_corpus::Summary::of(&r).differences(&c.summary), Vec::<String>::new());
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let d = k::bool_corpus::Summary::of(&r).differences(&c.summary);
+    assert!(d.iter().all(|x| x == "history differs"), "{d:?}");
+    let args: Vec<&k::Shape> = c.objects.iter().chain(&c.tools).collect();
+    let mut remade = 0;
+    for h in r.history.records.iter().filter(|h| h.relation == k::Relation::Modified && h.input_kind == k::ShapeType::Vertex) {
+        let shared = args.iter().filter(|a| a.sub_shapes(k::ShapeType::Vertex).contains(&args[h.arg as usize].sub_shape(k::ShapeType::Vertex, h.input_index as usize).unwrap())).count() > 1;
+        let at = |s: &k::Shape, i: u32| s.sub_shape(k::ShapeType::Vertex, i as usize).unwrap().vertex_point().unwrap();
+        assert!((at(args[h.arg as usize], h.input_index) - at(&r.shape, h.output_index)).length() < 1e-9, "a vertex moved");
+        remade += shared as usize;
+    }
+    assert!(remade > 0, "no shared vertex remade");
 }
 
 /// A plane containing an extrusion's direction cuts it along rulings: noshape's own section, exact lines, as
