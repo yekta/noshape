@@ -464,6 +464,13 @@ impl FrameTimer {
     }
 }
 
+/// A view change's animation time: live's (500 ms views, 250 ms arrows and keys, 125 ms levelling), but below 20 fps
+/// (an average frame over 50 ms) it jumps, its next frame at the end (live nav-1117: on a software-rendered Chrome every
+/// cube / Shift view landed in one frame).
+pub fn view_change_duration(duration: Duration, timer: &FrameTimer) -> Duration {
+    if timer.below_threshold() { Duration::from_nanos(1) } else { duration }
+}
+
 /// Above this interactive frame rate detail comes back
 /// (`DETAIL_ENHANCEMENT_THRESHOLD_FPS`).
 pub const DETAIL_ENHANCEMENT_THRESHOLD_FPS: f64 = 30.0;
@@ -1336,6 +1343,21 @@ mod tests {
         drag_rotate(&mut c, DVec2::new(37.0, -12.0), vp, pivot, false);
         let after = c.project(pivot, vp, 1.0).unwrap();
         assert!((before - after).length() < 1e-6);
+    }
+
+    #[test]
+    fn a_view_change_jumps_below_20_fps() {
+        let mut slow = FrameTimer::default();
+        for d in [60, 60, 60, 60, 60] {
+            slow.draw_end(Duration::from_millis(d));
+        }
+        assert_eq!(view_change_duration(CAMERA_LONG_ANIMATION, &slow), Duration::from_nanos(1));
+        let mut fast = FrameTimer::default();
+        for d in [5, 5, 5, 5, 5] {
+            fast.draw_end(Duration::from_millis(d));
+        }
+        assert_eq!(view_change_duration(CAMERA_LONG_ANIMATION, &fast), CAMERA_LONG_ANIMATION);
+        assert_eq!(ease(1e9), 1.0, "the jump's first frame is at the end");
     }
 
     #[test]

@@ -1082,6 +1082,7 @@ impl Viewport {
         }
         self.inertia = None;
         self.axis_tag = AxisTag::None;
+        let duration = nav::view_change_duration(duration, &self.frame_timer);
         self.anim = Some(CameraAnimation { from: self.camera, to, start, duration });
         self.dirty = true;
         cx.notify();
