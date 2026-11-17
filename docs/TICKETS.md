@@ -550,12 +550,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
-## Release blockers for the 2026-11-17 17:00 release (qa early list 09:30, newest green fa9f84b8; the latest release is v0.4.56)
-- **No blocker so far (GO on fa9f84b8).** Compat check complete (08:49): user documents (hats, dock), ticket documents (f197
-  SAME with blend's re-landed full round 74d05ad5e) and qa's authored documents ALL-SAME vs v0.4.56.
+## Release blockers for the 2026-11-17 17:00 release (qa list 11:25, newest checked green c101c3c0; the latest release is v0.4.56)
+- **No blocker so far (GO on c101c3c0).** Compat 11:2x on c101c3c0 (has core's Split pieces apart 0d7e2fc2f, Use B-spline
+  0b93cf9d5, Rib a9900df79, Split placing 85010cc40): user documents (hats, dock), 47 ticket documents and qa's authored
+  documents ALL-SAME vs v0.4.56. Earlier: fa9f84b8 (08:49) and dd344ea1 the same.
+- Suites on green 827a23a6 (11:19) vs ecf8c33a: models 85/126 (0 worse, 0 better), scenarios 0 worse; exchange imports
+  57 -> 60/74, reads ours back 143 -> 145; assemblies 5/24, mates 664 -> 668. One change: c2-fan-blade-sweep Boolean 2
+  56/139/84 -> 57/142/86 (live 56/143/88), volume now within live's band, 127 -> 813 ms (document 704 -> 1373 ms, live
+  1418): sent to bool (suspect 4ce48b9a0); not a blocker (closer to live, under live's time).
 - c2-impeller-loft (IMPELLER-MOVE-FACE-2-REF): fixed by core c85e75070, every feature's status as v0.4.56 (vibe6, 3 runs).
   Times were a hint only (vibe6 load 6-15 during the run): total 43.5 s (v0.4.56) -> 25.2 s, Delete face 2 22.2 -> 10.1 s.
-- Open, not blocking the cut (not regressions against v0.4.56): IMPELLER-DELETE-FACE-2-SLOW (core), SCISSOR-LIFT-BOM-ROWS
+- Open, not blocking the cut (not regressions against v0.4.56): IMPELLER-DELETE-FACE-2-SLOW (core; slower than live, not a regression), SCISSOR-LIFT-BOM-ROWS
   (bool bisects; in v0.4.56 already). blend's impeller Fillet 3 has not landed (blend10 WIP).
 - Final verdict: the qa-cut-1615 timer at 16:15 (cut-verdict.sh on the newest green) -> qa-alerts; update this entry then.
 
