@@ -209,7 +209,7 @@ def suite_tasks(role, out, obin, jobs):
         os.makedirs(sd, exist_ok=True)
         os.symlink(MODELS, os.path.join(sd, "models"))
         tasks.append({"role": role, "kind": "suite", "id": f"s{i}", "weight": w,
-                      "env": {"NOSHAPE_PARITY_MODELS": os.path.join(sd, "models"), "NOSHAPE_PARITY_ONLY": ",".join(members)},
+                      "env": {"NOSHAPE_PARITY_MODELS": os.path.join(sd, "models"), "NOSHAPE_PARITY_ONLY": ",".join(members), "NOSHAPE_PARITY_VALIDITY": "1"},
                       "cmd": [obin, "parity::parity_models", "--exact", "--ignored", "--nocapture", "--test-threads=1"],
                       "docs": members})
     return tasks
@@ -217,8 +217,14 @@ def suite_tasks(role, out, obin, jobs):
 
 def parse_suite(log, docs):
     """{document: (outcome text without times, our regeneration ms)}: its line and the indented lines under it."""
-    blocks, cur = {}, None
+    blocks, cur, invalid = {}, None, {}
     for l in read_lines(log):
+        # (NOSHAPE_PARITY_VALIDITY's "CHECK <doc> feature <k>: <part> valid <bool> raw f/e/v; ...": the parts OCCT's
+        # checker finds invalid join the document's outcome, lead 11-17.)
+        m = re.match(r"^CHECK (\S+) feature (\d+): (.*)$", l)
+        if m and m[1] in docs:
+            invalid.setdefault(m[1], []).extend(f"invalid solid: feature {m[2]}: {x[: x.rindex(' valid false')]}" for x in m[3].split("; ") if " valid false raw " in x)
+            continue
         # (The test's own "test ... ... " starts the first document's line; a custom feature's id is the run's.)
         l = re.sub(r"custom:[0-9a-f]{16}:", "custom:-:", re.sub(r"^test \S+ \.\.\. ", "", l))
         m = re.match(r"^(\S+?): (.*)$", l)
@@ -241,7 +247,7 @@ def parse_suite(log, docs):
                 ms = m[2]
                 l = l[: m.start()]
             text.append(l)
-        got[d] = (" | ".join(text), ms)
+        got[d] = (" | ".join(text + invalid.get(d, [])), ms)
     return got
 
 
@@ -460,6 +466,12 @@ def compare(base_r, new_r, base_s, new_s, spd):
                 continue
             fb, fn = frac(tb_[1]), frac(tn_[1])
             line = f"{d}: main '{tb_[1][:200]}' -> '{tn_[1][:200]}'"
+            # (A part valid on main and invalid on the branch: worse.)
+            invalid = lambda t: set(re.findall(r"invalid solid: [^|]+?(?= \| |$)", t))
+            newly = sorted(invalid(tn_[1]) - invalid(tb_[1]))
+            if newly:
+                worse.append(f"{d}: only on the branch: {'; '.join(newly[:5])}")
+                continue
             if tn_[1].startswith("noresult") or (fb and fn and fn[0] < fb[0]) or (fb and not fn):
                 worse.append(line)
             elif fb and fn and fn[0] > fb[0]:
