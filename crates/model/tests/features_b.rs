@@ -1020,6 +1020,41 @@ fn an_edge_point_on_a_sketch_line() {
     assert!(vnear(p, DVec3::new(0.02, 0.0, 0.01)), "{p:?}");
 }
 
+/// Query variable › Adjacent as std's qAdjacent (live's probe, behaviours dx 11-04: a face's edge-adjacent edges are its
+/// own; a vertex's vertex-adjacent edges end there; an edge's edge-adjacent faces are the two it bounds).
+#[test]
+fn query_variable_adjacent_as_std() {
+    let mut s = block();
+    let r = s.ok();
+    let top = top_face(&r);
+    let b = &r.context.bodies[0];
+    let edge = Reference::Edge((*b.edges[0]).clone());
+    let corner = Reference::Vertex((*b.vertices[0]).clone());
+    let cases: [(&str, Reference, &str, &str, usize); 7] = [
+        ("topFaces", top.clone(), "EDGE", "FACE", 4),
+        ("topEdges", top.clone(), "EDGE", "EDGE", 4),
+        ("topAll", top.clone(), "EDGE", "ALL", 8),
+        ("topByVertex", top, "VERTEX", "FACE", 4),
+        ("edgeFaces", edge, "EDGE", "FACE", 2),
+        ("cornerEdges", corner.clone(), "VERTEX", "EDGE", 3),
+        ("cornerFaces", corner, "VERTEX", "FACE", 3),
+    ];
+    for (name, seed, shared, filter, _) in cases.clone() {
+        s.add("queryVariable", move |p| {
+            p.set("name", ParamValue::Text(name.into()));
+            p.set("selectionType", ParamValue::Enum("ADJACENT".into()));
+            p.set("seedQuery", ParamValue::Query(vec![seed]));
+            p.set("adjacencyType", ParamValue::Enum(shared.into()));
+            p.set(if shared == "EDGE" { "edgeAdjacentEntityType" } else { "vertexAdjacentEntityType" }, ParamValue::Enum(filter.into()));
+        });
+    }
+    let r = s.ok();
+    for (name, _, _, _, n) in cases {
+        assert_eq!(r.context.query_variables.get(name).map(|v| v.len()), Some(n), "{name}");
+    }
+    assert!(r.context.query_variables["topFaces"].iter().all(|q| matches!(q, Reference::Face(_))));
+}
+
 #[test]
 fn reference_misc_point_composite_query() {
     let mut s = block();

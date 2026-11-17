@@ -671,6 +671,18 @@ fn query_selection(ev: &mut EvalCtx, p: &crate::params::ParamValues, st: &str, p
             let bodies = ev.resolve_bodies(p.query(&qid(prefix, "seedBodies")));
             bodies.into_iter().flat_map(|bi| crate::select::edges_by_convexity(&ev.ctx.bodies[bi], &kind)).collect()
         }
+        "ADJACENT" => {
+            // std queryVariable.fs adjacent(): the filter for the shared kind, "ALL" any kind it allows.
+            let by_vertex = p.is(&qid(prefix, "adjacencyType"), "VERTEX");
+            let filter = p.enum_(&qid(prefix, if by_vertex { "vertexAdjacentEntityType" } else { "edgeAdjacentEntityType" })).to_string();
+            let want: &[ShapeType] = match filter.as_str() {
+                "EDGE" => &[ShapeType::Edge],
+                "FACE" => &[ShapeType::Face],
+                "VERTEX" => &[ShapeType::Vertex],
+                _ => &[ShapeType::Edge, ShapeType::Face, ShapeType::Vertex],
+            };
+            crate::select::select_adjacent(&ev.ctx, p.query(&qid(prefix, "seedQuery")), by_vertex, want)
+        }
         other => {
             ev.warnings.push(format!("Query variable selection type {other} is not supported yet; it selects nothing"));
             Vec::new()

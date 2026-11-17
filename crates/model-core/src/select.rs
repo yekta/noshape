@@ -446,6 +446,62 @@ pub fn select_loops(ctx: &Context, seeds: &[Reference]) -> Vec<Reference> {
     out
 }
 
+/// std's `qAdjacent` (Query variable's Adjacent): the entities of the seeds' bodies that share an edge (`by_vertex`
+/// false) or a vertex with a seed, of the kinds `want` allows; a seed is never its own neighbour. As live's probe (dx
+/// 11-04): a face's edge-adjacent edges are its own edges, a vertex's vertex-adjacent edges the edges ending there, an
+/// edge's edge-adjacent faces the two it bounds. OCCT seams and the vertices Onshape has no topology for are left out.
+pub fn select_adjacent(ctx: &Context, seeds: &[Reference], by_vertex: bool, want: &[ShapeType]) -> Vec<Reference> {
+    let mut out: Vec<Reference> = Vec::new();
+    for seed in seeds {
+        let found = ctx.bodies.iter().find_map(|b| match seed {
+            Reference::Face(n) => b.find_faces(n).first().map(|i| (&**b, ShapeType::Face, *i)),
+            Reference::Edge(n) => b.find_edges(n).first().map(|i| (&**b, ShapeType::Edge, *i)),
+            Reference::Vertex(n) => b.find_vertices(n).first().map(|i| (&**b, ShapeType::Vertex, *i)),
+            _ => None,
+        });
+        let Some((b, kind, i)) = found else { continue };
+        let (Ok(edge_faces), Ok(vertex_edges), Ok(vertex_faces)) = (b.shape.edge_faces(), b.shape.vertex_edges(), b.shape.vertex_faces()) else { continue };
+        let shown = b.shape.shown_topology().ok();
+        let edge_shown = |e: usize| shown.as_ref().is_none_or(|t| t.edges.get(e).copied().unwrap_or(true));
+        let vertex_shown = |v: usize| shown.as_ref().is_none_or(|t| t.vertices.get(v).copied().unwrap_or(true));
+        let has = |list: &Vec<u32>, x: usize| list.contains(&(x as u32));
+        // The seed's own edges and vertices.
+        let seed_edges: BTreeSet<usize> = match kind {
+            ShapeType::Face => edge_faces.iter().enumerate().filter(|(e, fs)| has(fs, i) && edge_shown(*e)).map(|(e, _)| e).collect(),
+            ShapeType::Edge => BTreeSet::from([i]),
+            _ => BTreeSet::new(),
+        };
+        let seed_vertices: BTreeSet<usize> = match kind {
+            ShapeType::Vertex => BTreeSet::from([i]),
+            // (A cylinder's ring edges have no vertex in Onshape: OCCT's seam ends aren't shared.)
+            _ => vertex_edges.iter().enumerate().filter(|(v, es)| vertex_shown(*v) && seed_edges.iter().any(|e| has(es, *e))).map(|(v, _)| v).collect(),
+        };
+        let not_seed = |k: ShapeType, x: usize| !(k == kind && x == i);
+        let mut found: Vec<Reference> = Vec::new();
+        if want.contains(&ShapeType::Face) {
+            let faces: BTreeSet<usize> = if by_vertex {
+                seed_vertices.iter().flat_map(|v| vertex_faces[*v].iter().map(|f| *f as usize)).collect()
+            } else {
+                seed_edges.iter().flat_map(|e| edge_faces[*e].iter().map(|f| *f as usize)).collect()
+            };
+            found.extend(faces.into_iter().filter(|f| not_seed(ShapeType::Face, *f)).filter_map(|f| face_ref(b, f)));
+        }
+        if want.contains(&ShapeType::Edge) {
+            let edges: BTreeSet<usize> = if by_vertex { seed_vertices.iter().flat_map(|v| vertex_edges[*v].iter().map(|e| *e as usize)).collect() } else { seed_edges.clone() };
+            found.extend(edges.into_iter().filter(|e| edge_shown(*e) && not_seed(ShapeType::Edge, *e)).filter_map(|e| edge_ref(b, e)));
+        }
+        if by_vertex && want.contains(&ShapeType::Vertex) {
+            found.extend(seed_vertices.iter().filter(|v| not_seed(ShapeType::Vertex, **v)).filter_map(|v| b.vertices.get(*v).map(|n| Reference::Vertex((**n).clone()))));
+        }
+        for r in found {
+            if !out.contains(&r) {
+                out.push(r);
+            }
+        }
+    }
+    out
+}
+
 /// A face or edge name with pattern copies traced back to the patterned
 /// original (`Role::Copy`), so all instances share it.
 fn pattern_root(n: &TopoName) -> TopoName {
