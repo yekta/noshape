@@ -1,19 +1,23 @@
 {
  "scenario": "drw-revision-callout-add",
- "recorded": "2026-11-15T02:29:21.349Z",
+ "recorded": "2026-11-17T20:47:26.251Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.7"
  },
  "live": {
-  "document": "9e97e7fa36f0ed452ca0c5c0",
-  "workspace": "ff208b24428de4defbc1b80a",
-  "element": "6c36b26619291f184c980a7b",
+  "document": "c87e514b98c21d3c5a2ef675",
+  "workspace": "c8c40bf7eab64598a23b3efd",
+  "element": "5abd177f842a34c53db080b6",
   "start": "block-drawing",
-  "startElement": "6c36b26619291f184c980a7b",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "5abd177f842a34c53db080b6",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -150,34 +154,10 @@
      "text": [
       "Revision table",
       "Multi-sheet",
-      "See sheet 1",
-      "Linked",
       "Visible rows",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "10",
-      "11",
-      "12",
-      "13",
-      "14",
-      "15",
-      "16",
-      "17",
-      "18",
-      "19",
-      "20",
-      "21",
-      "22",
-      "23",
-      "24",
-      "25"
+      "Order",
+      "Hide revision callouts no longer shown in the table",
+      "Select fixed corner"
      ],
      "fields": [
       {
@@ -306,7 +286,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 204217
+   "t": 205692
   },
   {
    "step": 2,
@@ -327,34 +307,10 @@
      "text": [
       "Revision table",
       "Multi-sheet",
-      "See sheet 1",
-      "Linked",
       "Visible rows",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "10",
-      "11",
-      "12",
-      "13",
-      "14",
-      "15",
-      "16",
-      "17",
-      "18",
-      "19",
-      "20",
-      "21",
-      "22",
-      "23",
-      "24",
-      "25"
+      "Order",
+      "Hide revision callouts no longer shown in the table",
+      "Select fixed corner"
      ],
      "fields": [
       {
@@ -483,7 +439,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 229729
+   "t": 230683
   },
   {
    "step": 3,
@@ -611,7 +567,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 255840
+   "t": 256304
   },
   {
    "step": 4,
@@ -731,7 +687,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 281123
+   "t": 280885
   },
   {
    "step": 5,
@@ -858,7 +814,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 307278
+   "t": 306646
   },
   {
    "step": 6,
@@ -884,7 +840,56 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Revision table properties...",
+      "Hide revision callouts",
+      "Add revision callout",
+      "Paste as table",
+      "Move to",
+      "Bring to front",
+      "Send to back",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -991,7 +996,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 333886
+   "t": 332962
   },
   {
    "step": 7,
@@ -1003,7 +1008,7 @@
    },
    "ok": true,
    "at": [
-    720,
+    766,
     508
    ],
    "state": {
@@ -1085,12 +1090,7 @@
       }
      ],
      "annotations": [],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Top"
-      }
-     ]
+     "selection": []
     },
     "document": {
      "workspace": "Main",
@@ -1121,7 +1121,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 359713
+   "t": 358363
   },
   {
    "step": 8,
@@ -1254,7 +1254,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 385788
+   "t": 384985
   },
   {
    "step": 9,
@@ -1379,7 +1379,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 412357
+   "t": 410175
   },
   {
    "step": 10,
@@ -1511,7 +1511,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 438444
+   "t": 436626
   }
  ]
 }

@@ -1,19 +1,23 @@
 {
  "scenario": "drw-revision-cell-size-columns",
- "recorded": "2026-11-15T02:58:24.743Z",
+ "recorded": "2026-11-17T20:16:03.885Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.7"
  },
  "live": {
-  "document": "0eb6cd9aab5dac8b19cf75c5",
-  "workspace": "2cd35823a10ee756cff2ef4e",
-  "element": "6bc1fecaecdf01911a88049a",
+  "document": "2c5bac261462c765275531a3",
+  "workspace": "694a5bdbcf6b336352c35fd8",
+  "element": "84b904fed8eea02c01382e97",
   "start": "block-drawing",
-  "startElement": "6bc1fecaecdf01911a88049a",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "84b904fed8eea02c01382e97",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -150,34 +154,10 @@
      "text": [
       "Revision table",
       "Multi-sheet",
-      "See sheet 1",
-      "Linked",
       "Visible rows",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "10",
-      "11",
-      "12",
-      "13",
-      "14",
-      "15",
-      "16",
-      "17",
-      "18",
-      "19",
-      "20",
-      "21",
-      "22",
-      "23",
-      "24",
-      "25"
+      "Order",
+      "Hide revision callouts no longer shown in the table",
+      "Select fixed corner"
      ],
      "fields": [
       {
@@ -306,7 +286,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 202863
+   "t": 204279
   },
   {
    "step": 2,
@@ -327,34 +307,10 @@
      "text": [
       "Revision table",
       "Multi-sheet",
-      "See sheet 1",
-      "Linked",
       "Visible rows",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "10",
-      "11",
-      "12",
-      "13",
-      "14",
-      "15",
-      "16",
-      "17",
-      "18",
-      "19",
-      "20",
-      "21",
-      "22",
-      "23",
-      "24",
-      "25"
+      "Order",
+      "Hide revision callouts no longer shown in the table",
+      "Select fixed corner"
      ],
      "fields": [
       {
@@ -483,7 +439,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 229154
+   "t": 230291
   },
   {
    "step": 3,
@@ -611,7 +567,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 255080
+   "t": 255920
   },
   {
    "step": 4,
@@ -731,7 +687,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 279339
+   "t": 280437
   },
   {
    "step": 5,
@@ -858,7 +814,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 304797
+   "t": 306782
   },
   {
    "step": 6,
@@ -882,38 +838,73 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Cell",
-     "text": [
-      "Cell",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      559,
+      307,
+      590,
+      96
      ],
      "fields": [
+      {
+       "label": "Size columns equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Size rows equally",
+       "kind": "button",
+       "enabled": false
+      },
       {
        "label": "Font",
        "kind": "select",
        "value": "Noto Sans"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
       }
      ]
     },
@@ -1021,7 +1012,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 330890
+   "t": 331977
   },
   {
    "step": 7,
@@ -1037,38 +1028,73 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Cell",
-     "text": [
-      "Cell",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      559,
+      307,
+      590,
+      96
      ],
      "fields": [
+      {
+       "label": "Size columns equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Size rows equally",
+       "kind": "button",
+       "enabled": false
+      },
       {
        "label": "Font",
        "kind": "select",
        "value": "Noto Sans"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
       }
      ]
     },
@@ -1176,7 +1202,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 355286
+   "t": 356528
   },
   {
    "step": 8,
@@ -1200,44 +1226,101 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Cell",
-     "text": [
-      "Cell",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      559,
+      307,
+      590,
+      96
      ],
      "fields": [
+      {
+       "label": "Size columns equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Size rows equally",
+       "kind": "button",
+       "enabled": false
+      },
       {
        "label": "Font",
        "kind": "select",
        "value": "Noto Sans"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
       }
      ]
     },
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "NoteContextMenus",
+     "rows": [
+      "Size",
+      "Resize...",
+      "",
+      "Copy"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -1339,7 +1422,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 380537
+   "t": 382627
   },
   {
    "step": 9,
@@ -1360,44 +1443,95 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Cell",
-     "text": [
-      "Cell",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      559,
+      307,
+      590,
+      96
      ],
      "fields": [
+      {
+       "label": "Size columns equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Size rows equally",
+       "kind": "button",
+       "enabled": false
+      },
       {
        "label": "Font",
        "kind": "select",
        "value": "Noto Sans"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
       }
      ]
     },
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": null,
+     "rows": [
+      "Columns Equally",
+      "Rows Equally"
+     ],
+     "checked": [
+      false,
+      false
+     ],
+     "disabled": [
+      true,
+      true
+     ],
+     "highlighted": -1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -1499,7 +1633,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 406359
+   "t": 408719
   },
   {
    "step": 10,
@@ -1511,7 +1645,7 @@
    },
    "ok": true,
    "at": [
-    800,
+    821,
     462
    ],
    "state": {
@@ -1520,44 +1654,95 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Cell",
-     "text": [
-      "Cell",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      559,
+      307,
+      590,
+      96
      ],
      "fields": [
+      {
+       "label": "Size columns equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Size rows equally",
+       "kind": "button",
+       "enabled": false
+      },
       {
        "label": "Font",
        "kind": "select",
        "value": "Noto Sans"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
       }
      ]
     },
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": null,
+     "rows": [
+      "Columns Equally",
+      "Rows Equally"
+     ],
+     "checked": [
+      false,
+      false
+     ],
+     "disabled": [
+      true,
+      true
+     ],
+     "highlighted": 0
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -1659,7 +1844,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 432025
+   "t": 433904
   },
   {
    "step": 11,
@@ -1675,44 +1860,95 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Cell",
-     "text": [
-      "Cell",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      559,
+      307,
+      590,
+      96
      ],
      "fields": [
+      {
+       "label": "Size columns equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Size rows equally",
+       "kind": "button",
+       "enabled": false
+      },
       {
        "label": "Font",
        "kind": "select",
        "value": "Noto Sans"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
       }
      ]
     },
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": null,
+     "rows": [
+      "Columns Equally",
+      "Rows Equally"
+     ],
+     "checked": [
+      false,
+      false
+     ],
+     "disabled": [
+      true,
+      true
+     ],
+     "highlighted": 0
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -1814,7 +2050,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 456841
+   "t": 460038
   }
  ]
 }

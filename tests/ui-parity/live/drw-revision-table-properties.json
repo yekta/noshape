@@ -1,19 +1,23 @@
 {
  "scenario": "drw-revision-table-properties",
- "recorded": "2026-11-15T03:14:51.843Z",
+ "recorded": "2026-11-17T20:01:39.924Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.7"
  },
  "live": {
-  "document": "3cf55221a1fc624d88a5bd80",
-  "workspace": "19cef78049bb5e666128854f",
-  "element": "5937963bf401462ac7ad6128",
+  "document": "eb493f379bff9eda760a7876",
+  "workspace": "e169c56384afc006cff4d7fd",
+  "element": "c153ad428ddb7ba63c0408f3",
   "start": "block-drawing",
-  "startElement": "5937963bf401462ac7ad6128",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "c153ad428ddb7ba63c0408f3",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -150,34 +154,10 @@
      "text": [
       "Revision table",
       "Multi-sheet",
-      "See sheet 1",
-      "Linked",
       "Visible rows",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "10",
-      "11",
-      "12",
-      "13",
-      "14",
-      "15",
-      "16",
-      "17",
-      "18",
-      "19",
-      "20",
-      "21",
-      "22",
-      "23",
-      "24",
-      "25"
+      "Order",
+      "Hide revision callouts no longer shown in the table",
+      "Select fixed corner"
      ],
      "fields": [
       {
@@ -306,7 +286,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 202318
+   "t": 205731
   },
   {
    "step": 2,
@@ -327,34 +307,10 @@
      "text": [
       "Revision table",
       "Multi-sheet",
-      "See sheet 1",
-      "Linked",
       "Visible rows",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "10",
-      "11",
-      "12",
-      "13",
-      "14",
-      "15",
-      "16",
-      "17",
-      "18",
-      "19",
-      "20",
-      "21",
-      "22",
-      "23",
-      "24",
-      "25"
+      "Order",
+      "Hide revision callouts no longer shown in the table",
+      "Select fixed corner"
      ],
      "fields": [
       {
@@ -483,7 +439,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 228786
+   "t": 231884
   },
   {
    "step": 3,
@@ -611,7 +567,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 255733
+   "t": 258634
   },
   {
    "step": 4,
@@ -731,7 +687,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 280708
+   "t": 283964
   },
   {
    "step": 5,
@@ -858,7 +814,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 307596
+   "t": 310017
   },
   {
    "step": 6,
@@ -884,7 +840,50 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Revision table properties...",
+      "Paste as table",
+      "Move to",
+      "Bring to front",
+      "Send to back",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -991,7 +990,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 334135
+   "t": 335852
   },
   {
    "step": 7,
@@ -1003,7 +1002,7 @@
    },
    "ok": true,
    "at": [
-    978,
+    1024,
     392
    ],
    "state": {
@@ -1017,34 +1016,10 @@
      "text": [
       "Revision table",
       "Multi-sheet",
-      "See sheet 1",
-      "Linked",
       "Visible rows",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "10",
-      "11",
-      "12",
-      "13",
-      "14",
-      "15",
-      "16",
-      "17",
-      "18",
-      "19",
-      "20",
-      "21",
-      "22",
-      "23",
-      "24",
-      "25"
+      "Order",
+      "Hide revision callouts no longer shown in the table",
+      "Select fixed corner"
      ],
      "fields": [
       {
@@ -1178,7 +1153,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 360805
+   "t": 361451
   },
   {
    "step": 8,
@@ -1199,34 +1174,10 @@
      "text": [
       "Revision table",
       "Multi-sheet",
-      "See sheet 1",
-      "Linked",
       "Visible rows",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "10",
-      "11",
-      "12",
-      "13",
-      "14",
-      "15",
-      "16",
-      "17",
-      "18",
-      "19",
-      "20",
-      "21",
-      "22",
-      "23",
-      "24",
-      "25"
+      "Order",
+      "Hide revision callouts no longer shown in the table",
+      "Select fixed corner"
      ],
      "fields": [
       {
@@ -1360,7 +1311,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 386461
+   "t": 387978
   },
   {
    "step": 9,
@@ -1487,7 +1438,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 412575
+   "t": 414281
   }
  ]
 }
