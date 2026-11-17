@@ -559,6 +559,30 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Part Studio selection feel vs live2's 11-17 capture (qa 22:50, green 592b0fc9, vibex6 Xvfb, load ~24, real xdotool pointer)
+Start two-blocks (Part Studio), iso + 10 wheel steps; selection / rows from the runner's state, one state per row (sf/mini.sh);
+shots with the pointer as a red cross: qa-scratch/sf/sel-feel-{s1..s4,mismatch}.png (vibex6 ~/agents/qa-keep/sel-feel/).
+Pass: box drag lights nothing while it sweeps; window LTR from empty = faces / edges wholly inside (19: Part 1's 6 + 12, one Part 2
+edge), crossing RTL = touched (8); a press whose first move ends over a plane lights the plane and draws no box until the next
+move (live's quirk); plane click selects it, a second adds, face + plane both, empty clears; double-click edge leaves nothing;
+list hover: Extrude 1 row bg + "Extrude 1 <- Sketch 1" + part outlined light orange, Part 2 row + eye + tooltip, Top row lights
+the plane; Extrude 1 row click selects the feature, part drawn amber, Part 1 related; face picks relate feature + part rows;
+Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctrl+click opens the menu and selects nothing.
+- [ ] **P0 SELFEEL-RELATED-STAYS (psui)**: after a double-click on Part 2's top, an empty click (and every later hover) leaves
+  Sketch 2 + Extrude 2 related (state rows related, 40 s later too). Live row 2/5: an empty click clears both sides.
+- [ ] **P0 SELFEEL-DBLCLICK-FACE-SKETCH (psui)**: double-click on a face doesn't show its feature's sketch (live row 3: Sketch 2's
+  rectangle drawn blue at Part 2's base); the face shows amber 1.2 s after (state: nothing selected, as live).
+- [ ] **P0 SELFEEL-HIDDEN-SKETCH-HOVER (psui)**: hovering the hidden Sketch 1 row shows the tooltip but doesn't draw the sketch
+  light orange in place (live row 4).
+- [ ] **P0 SELFEEL-PART-ROW (psui)**: clicking the Part 2 row selects the body (state) with Extrude 2 related, but Part 2 isn't
+  drawn selected and Part 1 keeps a light-orange hover outline (the pointer crossed the Part 1 row on its way): a stale list hover,
+  as USER-HOVER-STAYS-LIT (live row 5: the part drawn selected).
+- [ ] **P1 SELFEEL-PLANE-DEFAULT-GEOMETRY (psui)**: a default plane picked in the viewport selects its row, but "Default
+  geometry" isn't related (live rows 2 and 5).
+- Not judged: the selected look appeared 0.25-1 s late in some shots (box release, a face, a plane; others at once): Xvfb debug
+  build at load 24, re-check on a release build in the quiet window. Not run: Sketch 3's region (our two-blocks start has no
+  Sketch 3), the view cube click.
+
 ## Release blockers for the 2026-11-18 05:00 release (qa list 21:55, newest checked green 592b0fc9; the latest release is v0.4.57)
 - **Must carry (qa-cut-0415 says HOLD if the candidate lacks one; list in qa-scratch cut-must.txt)**: psui's per-unit remembered
   values 40a994a16 with db4ff933c, 65ceee7f2, ea25d544e (on main; verified 20:40 on green 0cc996f7: 3 mm / 0.3 cm / 0.2 in /
