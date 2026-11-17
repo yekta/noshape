@@ -559,8 +559,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-18 05:00 release (qa list 21:55, newest checked green 592b0fc9; the latest release is v0.4.57)
+- **Must carry (qa-cut-0415 says HOLD if the candidate lacks one; list in qa-scratch cut-must.txt)**: psui's per-unit remembered
+  values 40a994a16 with db4ff933c, 65ceee7f2, ea25d544e (on main; verified 20:40 on green 0cc996f7: 3 mm / 0.3 cm / 0.2 in /
+  5 mm, no lingering glyph); core's revert of c064b550a (lands via vibe2 tonight; not on main at 21:55).
+- **LOFT-PATHS-MIRROR-WRONG-VOLUME (shipped in v0.4.57)**: c064b550a (01:23) is in v0.4.57: c2-loft-paths-guides Mirror 1 is Ok
+  with the wrong part (fa6f90cc: 13/33/25 faces/edges/vertices, 5269155 mm³; live 27/67/47, 6325199 mm³). qa-lp-verify runs
+  that document alone on the first green with core's revert (vibex6) -> qa-alerts and here.
+- Green 592b0fc9 vs v0.4.57: hat8, hat15, hat15b, the dock, ticket and authored documents ALL-SAME.
+- Main RED at a71c2f11b (21:32, psui's sketch_glyph linger test): the candidate must be a green.
+- Speed: the 21:03 suite run on vibex7 (load ~60) is LOADED, not counted (suites-diff now skips speed and marks timing states
+  above load 16); absolute numbers from the 02:00-04:00 nightly only.
+
 ## Release blockers for the 2026-11-17 17:00 release (qa list 12:35, newest checked green 7f287e52; the latest release is v0.4.56)
-- **v0.4.57 app spot-check, rows 9-16 (qa 22:00, released Linux app, vibex6 :664 Xvfb, real xdotool input, the block)**: pass:
+- **v0.4.57 app spot-check, rows 9-16 (qa 21:45, released Linux app, vibex6 :664 Xvfb, real xdotool input, the block)**: pass:
   click selects a face (Area 1200 mm² readout), again deselects, empty clears, Shift+empty keeps; Ctrl+click opens the
   context menu, selects nothing; Select other (`) opens at the pointer + (99, 51), ~221 px wide (live + (100, 51), 220);
   a left drag from empty draws the box; a right drag orbits (no menu), a right click opens the empty-space menu at the

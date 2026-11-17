@@ -9,8 +9,8 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 **Start every unit with `systemd-run --setenv=HOME=/root …`** (no HOME = gh fails; 11-17 the published check polled 25 min
 after v0.4.57 was out). Scripts that call gh also `export HOME=${HOME:-/root}` themselves since 20:45.
 Local units are transient (`systemctl list-units 'qa-*'`); restart one with the `systemd-run` line in its description if it's gone.
-- **qa-compat-loop**: bin/compat-loop.sh <baseline>, now **0.4.56** (moved by qa-pub-0456 11-17 06:43). On every watcher green, bin/compat-check.sh runs userdocs.py
-  on vibe5 (hats, dock, 47 ticket docs, 16 authored docs from compat-docs/v0443) with the baseline's CLI against the green.
+- **qa-compat-loop**: bin/compat-loop.sh <baseline>, now **0.4.57** (moved by qa-pub-0457 11-17 21:44). On every watcher green, bin/compat-check.sh runs userdocs.py
+  on vibex7 (hats, dock, 47 ticket docs, 16 authored docs from ~/agents/qa-keep/compat-v0443) with the baseline's CLI against the green.
   A feature that gets worse writes compat/ALERT-<sha> and one line per feature to /tmp/lead/qa-alerts. Move the baseline by
   restarting the unit with the new version (rel-published.sh does it).
 - **qa-w7-nightly**: bin/w7-nightly.sh. Sleeps to 02:00 UTC, then on vibex7 with the newest release (downloaded to vibex7
@@ -60,7 +60,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.56** published check done 11-17 06:58: clean, baseline 0.4.56. Next: the 17:00 cut (qa-cut-1615).
 
 ## Next (in this order)
-00. **v0.4.57 published, checked clean 21:44**; compat baseline 0.4.57. Spot-check rows 9-16 done 22:00 (pass; TICKETS). Next
+00. **v0.4.57 published, checked clean 21:44**; compat baseline 0.4.57. Spot-check rows 9-16 done 21:45 (pass; TICKETS). Next
    release: rows 17-24 (uh/sc.sh start|shot|stop + uh/rows.sh drive the released app on vibex6 :664).
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
@@ -69,8 +69,14 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    (only when both logs have CHECK lines); qa-suites.sh copies those to qa-alerts. bool's gate 2d5bf386 does the same.
    Compat: v0.4.56's CLI query parts has no "check"; once cfd943d5 is in a release CLI, add it to sig.py's part tuple.
    (suites-models.sh was moved to bin/retired by mistake at 16:35 and restored 18:28; the hosts kept their copy meanwhile.)
-0. **05:00 checklist**: psui's batch verified 20:40 on green 0cc996f7 (memory 3 mm / 0.3 cm / 0.2 in / 5 mm; no lingering glyph).
-   Include in the 05:00 cut's checks: those commits must be in the candidate (40a994a16, db4ff933c, 65ceee7f2, ea25d544e).
+0. **05:00 cut**: TICKETS "Release blockers for the 2026-11-18 05:00 release". cut-verdict.sh reads /root/qa-scratch/cut-must.txt
+   (commit or grep:<pattern> per line) and says HOLD if the green lacks one: psui 40a994a16 / db4ff933c / 65ceee7f2 / ea25d544e
+   (verified 20:40 on 0cc996f7) and core's revert of c064b550a (c2-loft-paths-guides Mirror 1 wrong-volume Ok, shipped in
+   v0.4.57). **qa-lp-verify** (lp/lp-verify.sh) waits for that revert on a green, runs the document alone on vibex6 -> lp/run.txt +
+   qa-alerts. Rewrite cut-must.txt after each cut.
+0b. **LOADED runs (lead 21:50)**: speed / timing at load > 16 (2 x 8 cores) don't count. suites-diff.py prints "LOADED: …" first,
+   skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
+   the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.
 1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (12:35: GO on 7f287e52; c101c3c0 has core's
    four Split / Use / Rib lands; suites 827a23a6 clean; fan-blade-sweep Boolean 2 is now live's volume, 8x slower: core's Offset, sent to core). Still to come:
    blend's impeller Fillet 3 (when it lands: compat on its green + the impeller re-time below).
