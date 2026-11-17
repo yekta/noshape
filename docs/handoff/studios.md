@@ -9,40 +9,33 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 21:03 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45 and ~18:15.
+Updated 2026-11-17 22:09 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45 and ~18:15.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
 - Landed 11-17: 7abd9bdf, b5d11ad7, 01fb280e, 1db5e57e's fix; 19:31 as 539aeb9b: 09af37a6 (+358ab7a3, 66eee5f9,
   a457a82b): mate glyphs per type, part silhouette, instance row tooltips, drawing view frames, leader reach.
-- Queued on vibex7 (`NOSHAPE_LAND_QUEUE_HOST=vibex7 tools/tiers/land.sh --no-precheck`, clippy run on vibex6 first):
-  - ccab6c95 (+c8d30fce): run.py skips a live step whose page crashed (asm + section 224/224); drawing highlights
-    3 px (`Style::lit_line_px`, `LIT_LINE_PX`), a tool's hovered edge orange, centre mark looks (grips, blue dot and
-    circle; the hole circle lights / takes its mark, a press drags the view), no second frame on a selected view;
-    the sheet fit scenario.
-  - b6c54cdd (+bc2eda52 / fdfd19ae, 0bf67e29, 91025dd1): centre mark grip drags from hover (automatic marks never below
-    their default, `DrawingView::centermark_extensions`, op `drawing_centermark_resize`, drawing_get `centermarks`),
-    `resize_canvas` (refit at fit, else zoom with the canvas width); Versions panel / Compare / Add to Release feel
-    scenarios; the Styles panel's full reading (drw-styles-dimension 29/31); the inspection table's 8 columns.
-- Full drawing run on vibex8, outside its slot (lead 20:18; 2 apps, 334 takes, binary 20:08 relayed from vibex6):
-  ~/agents/studios-keep/drw1117c (log drw1117c.log); memguard.sh pauses its process group under 6 GB available
-  (drw1117c-mem.log). It survived the 21:00 local kill (lead incident); the local score waiter was restarted.
-  Then the matrix refresh (`drawing_matrix.py --run`).
-- Fixed in the worktree after the run's first half (not queued yet; checked on vibex6 with 1 app, binary
-  ~/tmp/studios/noshape there): 0d9b8552 Drawing properties footer (7 dprops takes: 25/23 lines); db5357fd Styles
-  gap fields keep the focus on Enter, Esc keeps the selection (behaviours "qa5 ADV4"; feel test; live2 records
-  s27-29 to confirm); 810413b3 `{"px": [x, y]}` targets (20 live2 list takes failed at their first list click) and
-  the Datum Label select's options flagged; uncommitted: weld side captions, menu `MenuIcon::Glyph` (the datum
-  Target area rows read "Point", no ✓), datum Style list without outside styles when no area size, Target area
-  tooltip, datum target rows at live's heights (px-datum-dt-target / -angle), Flip / Rotate as captioned icon
-  buttons, Esc in a datum field closes the panel (targets dropped, live2 s26).
-- live2 answered "Synchronize breaks from parent": shown unchecked with or without a parent break (ours as live).
-- live2's new takes staged on vibex8 (~/agents/studios-keep/new4.txt): simplification-absolute,
-  synchronize-breaks, inspection-table-iso-scrolled (queued branches, not on main yet), dprops-sketch-points-sharps-
-  chamfer. The 8 drw-revision-* retakes: not landed yet (the run has the old takes).
-- Next feature found: weld's upper joint list adds "Seam centered joint" and "Spot centered joint" (live2
-  drw-weld-panel-lists s7; joints drawn on the line): new `WeldJoint` kinds, glyphs, export.
+- Queued: on vibex7 b6c54cdd (carries ccab6c95 / c8d30fce, whose 20:42 failure was psui's real-pointer sketch test
+  under load: it and the whole part-studio-ui suite pass on vibex6, 221/221); on vibe2 (`NOSHAPE_LAND_QUEUE_HOST=vibe2
+  tools/tiers/land.sh --no-precheck`, lead 21:23) ec42bd22 = everything since, rebased on main 21:2x: Drawing
+  properties footer / tab headers / hatch values, Styles gap fields (live2 confirmed s27-29), `{"px": [x, y]}` targets,
+  Datum target panel (rows at live's heights, lists, Esc), weld captions, `MenuIcon::Glyph`, View properties' last
+  lines, hole callout palette names / tooltips / count default, gtol type rows, inspection Lower limit, hatch tooltips,
+  the runner's Drawing properties header rule, the matrix refresh.
+- Full drawing run 11-17 (vibex8, outside the slot, 2 apps, memguard): 276/334 on the 20:08 build; the 58 differing +
+  live2's 4 new takes rerun on the 21:17 build: 41 still differing then, many fixed since (checked on vibex6 with 1 app:
+  datum x3, canvas, view properties, dprops, inspection, hcallout fit-tips). Results ~/agents/studios-keep/drw1117c and
+  drwredo on vibex8; local copy /root/studios-scratch/m1117. Matrix: docs/parity/drawing-matrix.md (1046/1875 =).
+- Still differing (next): weld Seam / Spot centered joints (new `WeldJoint`s, glyphs, export); Annotations tab's Edge
+  condition symbols section (a new `AnnType`: shifts `wt_fields` indices); hcallout palette dual Units "(mm)", hatch
+  Esc with a tooltip up, gtol pending annotation (asked live2 22:1x); table cell-format panel (drw-table-cells-*),
+  table menus' disabled rows, leader add / remove node selection, ordinate add-to-group / Reset ordinate, note
+  copy-paste menu, note editor closing, sheet properties zones, view adjust linestyle rows, replicate region panel,
+  detail-id label position, section exclude-from-cut, synchronize-breaks Gap distance, simplification-absolute BOM row
+  name, toolbar Undo tip take.
+- live2's new takes queued on vibe2: drw-hole-table-empty-tips, drw-view-properties-projected-from-section,
+  drw-view-replicate-region-place, the 8 drw-revision-* retakes: run when landed.
 - Side-by-side crops for the lead: /root/studios-scratch/mate-glyphs-live-vs-ours.png, centermark-live-vs-ours.png,
   dimhover-sbs.png, view-sbs.png.
 
