@@ -230,7 +230,16 @@ pub fn surface_result(ev: &mut EvalCtx, tool: NamedShape) -> FResult<()> {
 
 /// `tool` sewn to the surfaces of `scope` it touches (a closed result a solid part), else a new surface.
 pub fn join_surface(ev: &mut EvalCtx, tool: NamedShape, scope: Vec<usize>) -> FResult<()> {
-    let targets: Vec<usize> = scope.into_iter().filter(|&i| k::distance(&ev.ctx.bodies[i].shape, &tool.shape).map(|d| d.distance < 1e-6).unwrap_or(false)).collect();
+    // (Boxes apart: not touching; a vertex of the tool on it: touching (c2-hunting-knife's Loft 3 onto its other half,
+    // 18 ms of distance between their B-spline faces); else measured.)
+    let tool_box = tool.shape.bounding_box(false).ok();
+    let apart = |b: &Shape| match (b.bounding_box(false).ok(), &tool_box) {
+        (Some(a), Some(t)) => (a.min - DVec3::splat(1e-6)).cmpgt(t.max).any() || (t.min - DVec3::splat(1e-6)).cmpgt(a.max).any(),
+        _ => false,
+    };
+    let tool_vertices = tool.shape.vertices();
+    let touches = |b: &Shape| tool_vertices.iter().any(|v| k::distance(v, b).is_ok_and(|d| d.distance < 1e-6)) || k::distance(b, &tool.shape).is_ok_and(|d| d.distance < 1e-6);
+    let targets: Vec<usize> = scope.into_iter().filter(|&i| !apart(&ev.ctx.bodies[i].shape) && touches(&ev.ctx.bodies[i].shape)).collect();
     if targets.is_empty() {
         return ev.apply_operation(vec![tool], "NEW", None, BodyKind::Surface);
     }
@@ -239,7 +248,15 @@ pub fn join_surface(ev: &mut EvalCtx, tool: NamedShape, scope: Vec<usize>) -> FR
     // edges of a plane surface leaves that surface alone, with the Boolean's note).
     let target_faces: Vec<Shape> = shapes.iter().flat_map(|s| s.faces()).collect();
     let tool_faces = tool.shape.faces();
-    if !tool_faces.is_empty() && tool_faces.iter().all(|f| target_faces.iter().any(|g| face_duplicates(f, g))) {
+    // (Only faces whose box holds all of the tool face's vertices are measured: their areas were most of c2-hunting-knife's
+    // Loft 3.)
+    let target_boxes: Vec<Option<k::BoundingBox>> = target_faces.iter().map(|g| g.bounding_box(false).ok()).collect();
+    let holds = |b: &Option<k::BoundingBox>, pts: &[DVec3]| b.as_ref().is_none_or(|b| pts.iter().all(|p| p.cmpge(b.min - DVec3::splat(1e-6)).all() && p.cmple(b.max + DVec3::splat(1e-6)).all()));
+    let duplicated = |f: &Shape| {
+        let pts: Vec<DVec3> = f.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect();
+        target_faces.iter().zip(&target_boxes).any(|(g, b)| holds(b, &pts) && face_duplicates(f, g))
+    };
+    if !tool_faces.is_empty() && tool_faces.iter().all(duplicated) {
         ev.infos.push(crate::regen::eval::NO_GEOMETRY_CHANGE.into());
         return Ok(());
     }
