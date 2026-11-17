@@ -1,19 +1,39 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-16 11:33 UTC (paused by the lead for ~24 h; restart ~2026-11-17 10:15 UTC). Read docs/DECISIONS.md
+Updated 2026-11-17 09:30 UTC (restarted). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## From qa, 2026-11-16 13:50 (you were paused; lead: regressions go here)
-- Interaction-suite regressions on green c2d470050 (both matched on f8cbf3c6): bend-new-edit-reedit and jog-new-edit-reedit,
-  "step 9 differs at .dialog.fields[2].items[0]: live "Face of Sheet metal model 1" / ours "Face of Bend 1"" (and "Face of
-  Jog 1"), 13/22 states each. In range: your 8e1f5c430 (a sheet metal entity labelled after the feature that made its
-  definition entity as it is now) over c546fada2. Results: /root/qa-scratch/suites/1116-0633-c2d47005/uip/{bend,jog}-new-edit-reedit.json.
+## Unlanded (worktree /root/projects/noshape-wt/skasm, rebased on 143f22c12 2026-11-17 09:2x)
+- d3e6bcef5 (commit A of 11-16, squashed): held-direction zero lines, edge-on circle Use, orphans, bodies-line sketch
+  ids, use_entity, solved_circles, refs-sk.jsonl, sm-box colour (psui waits on it: tell psui
+  4d0a82b2-8fc7-43e6-b45d-bd8cb225741e when it lands), take-back TRACE. Core landed the same curved-wall flat
+  (198c2b6d3) and sheet metal Move face (b0e98fa3c) meanwhile: main's code kept, my two tests kept.
+- b0bee2b62: while a feature is edited, sheet metal chips take label_owners from before_context (qa's bend/jog
+  re-edit regression, "Face of Bend 1" vs live "Face of Sheet metal model 1"; still red in qa's 1117-0627 run).
+  Verify with tools/ui-parity/run.py bend-new-edit-reedit jog-new-edit-reedit on vibe6 (app build) before landing.
+- Uncommitted: surface-workshop translator: a Bezier's `<id>.<n>.internal` = its poles, BEZIER_DEGREE checked
+  against our degree, EQUAL_CURVATURE -> curvature, EQUAL_CURVATURE_G3 -> flow; parity
+  a_beziers_control_points_take_its_constraints.
 
-Updated 2026-11-16 01:57 UTC. Read docs/DECISIONS.md first; history is in docs/handoff/archive/skasm.md (read it
-only when a line here points there).
+## Running
+- skasm-pair-1117a (systemd here): smab.sh (ops-a = main 143f22c12 in skasm-base, ops-b = skasm tree) then vibe6
+  `~/bin/slot pairrun.sh 1117a` (both on one cp -al snapshot, NOSHAPE_PARITY_DIFFERING) -> vibe6
+  ~/agents/skasm-keep/pair-1117a-{a,b}.log. Gate for landing A (no document worse, every differing feature read).
+- skasm-mac-1117a: sketch / parity:: / e2e / sheetmetal_std on the Mac (tree of A) -> /root/skasm-scratch/mac-1117a.log.
+- skasm-check-1117a: cargo check ops tests + part-studio-ui on vibe6 -> /root/skasm-scratch/check-1117a.log.
 
+## Next, in order
+1. Pair green -> land A + chip fix (+ Bezier mapping if in ops-b). Tell psui.
+2. Surface workshop (lead's order 11-17): mutualtrim Sweep 1: live's path JHR is the Bezier (P0 (-53.7, -28.8) ->
+   P3 (-27.21, 55.05) mm sketch), Plane 1 at vertex JHE = P0; ours ends at (-10.38, 60.56) = the construction line
+   ZYv9J4xUoBps's other end: check which edge our Sweep path / Plane 1 resolve (ut3t.sh trace). Then the remaining
+   surface-workshop drops: INTERSECTED (Onshape's sketch Intersect tool, SECTION: manualblend Sketch 6/7; we have no
+   such tool), PIERCE rejected (same sketches), britatap Blend curves taken back (14 mm), cpcurves Sketch 4.
+3. core's sketch cases below. 4. tablet-stand Flange 2 (core landed Move face; re-check first). 5. Remaining dropped
+   constraints (valve-config text centre, hex-bookcase, knife 12, duct, impeller, clamp-guillem MIDPOINT, rings-loft /
+   rib-wrap, bottle-split, spur-gear, fan-blade 14).
 
-## From core, 2026-11-16 (you were paused)
+## core's sketch cases (2026-11-16), queue item 3
 - c2-sm-rocker-enclosure-sm Extrude 2 (now its first difference once core's split-face attributes fix lands, 8/14):
   Sketch 4's four circles are PROJECTED (Use) constraints whose live external edges (refs.jsonl
   AjhQtHt4MbMf.{0..3}.project: x 45–60 mm, y ±78, z −91 / −21) aren't on our part. Our sketch comes out with two
@@ -54,58 +74,6 @@ only when a line here points there).
   copies of the seeds"), so our hexagon-and-lines stays as stored: one region of 107.106 mm² where live has two
   (84.163 + 22.943, refs.jsonl) at the solved place; the cut removes 115 mm³ more than live's and has one face more.
 
-
-## Unlanded (worktree /root/projects/noshape-wt/skasm, branch base efb202e80, not rebased onto e37bfc9c yet)
-- Commit A 5469a2eea (gated by a model suite: see Running): the whole stack of 2026-11-16 (each test fails without its change):
-  (1) a line a sketch fillet consumes stays at zero length keeping its direction (lead ruling 06:5x; Entity::
-  held_direction, Sketch::keep_direction / held_line; solver: per held line a direction unknown d, |d| = 1, weight 1e-10
-  (Owner::Held), a fixed 0 param for direction pairs; Parallel / Perpendicular / Horizontal / Angle / Normal /
-  contact Tangent read d, point-on-line and distances Term::PLDistDir; Equal / length / Symmetric keep the points);
-  our fillet keeps it; sketch_draw `direction` on a line of two clicks at one point; the translator draws live's zero
-  lines so, after the other curves. Tests tools::a_side_two_fillets_consume_keeps_its_direction, e2e
-  a_zero_length_line_keeps_its_direction. fan-blade 13 -> 0.
-  (2) edge-on circle Use (valve-config 6): e2e use_of_a_circle_seen_edge_on_spans_its_diameter.
-  (3) orphans: constraints / dimensions naming only their sketch's own points or a deleted feature's DUMMY query
-  (names_only_own, names_gone: bracket03, chino, extension-spring, knife Sketch 10): parity an_orphaned_use_…,
-  a_dimension_naming_its_own_point_is_an_orphan, a_dimension_to_a_deleted_features_point_is_an_orphan.
-  (4) sketch ids from live's bodies lines (Translator::new carry; live_refs keeps `sketch` on a same-key refs line):
-  chino JFV, extension-spring JFN; parity a_sketch_edge_stays_…, a_refs_line_keeps_its_bodies_lines_sketch.
-  (5) use_entity (hex clip 9): parity a_coincident_to_a_used_vertex_is_on_the_use. (6) solved_circles (knob-kraut):
-  parity a_cap_edge_follows_its_circles_solved_size. (7) the harness reads refs-sk.jsonl under refs.jsonl (knife's
-  Sketch 6 Ic / Id). (8) psui's sm-box colour: Context::reuse_colours_from after a FeatureScript feature
-  (sheetmetal_std::a_sheet_metal_part_takes_the_first_colour; psui told). (9) sheet metal curved walls (TANGENT
-  joints, Definition.tangents / k_rolled, curved_walls) developed in the flat: tablet-stand no false collision, 3 -> 6
-  of 16 (sheetmetal_std::a_rolled_wall_tangent_to_its_walls_flattens_in_a_row). (10) over-defined take-back TRACE.
-  Mac: sketch, parity::, sheetmetal (89 incl. T2), engine, features_a, custom all pass; clippy clean on sketch, ops,
-  model-core, custom, model.
-- Commit B 642bd8ab3 (on top of A): Move face of an active sheet metal part runs std's moveFace (std_route sm_move_face /
-  moves_active_sheet_metal): tablet-stand 6 -> 9 of 16; sheetmetal_std::move_face_offsets_a_sheet_metal_wall (fails
-  without: Flange 1 "Selected edges should be from active sheet metal models."). Then a docs commit
-  (this handoff).
-- Untracked scratch to delete before land.sh: .ut3p.sh, .suite.sh, .suite-only.
-
-## Running
-- Nothing. suite-0913 (vibe7, binary of commit A) was stopped by the lead before it ran, to free vibe7's slot for the
-  P0 hang-fix gate; its log /root/skasm-scratch/suite-0913.log has no results. The vibe5 CLI build was stopped too.
-
-## Next, in order
-1. Rebase the stack (A, B, this handoff) onto fresh origin/main, then rerun the whole model suite on HEAD
-   (fullsuite.sh through ~/bin/slot on the host the lead names; .suite-only skips c2-config-parts-screws unless dx's
-   hang fix has landed). Compare with suite-2354.log on common documents (no document worse), dropped.py for the
-   count. Green -> delete the untracked scratch -> land.sh. A worse document -> fix forward first.
-2. tablet-stand Flange 2: ours 2 parts (16533 + 9769 mm³, 26302 < 26554 before it), live 1 (28434): the rebuilt
-   pieces don't touch / material lost; flange on edge SXB5B (tab end, x 54.01, z 38.2, y -48..-23), Corner break 1
-   (R15) before it. Repro: save the translated doc (.ut3s-style NOSHAPE_PARITY_SAVE on vibe5), a CLI from this tree
-   (buildcli.sh on vibe5), delete features after Flange 2, query parts / faces.
-3. Remaining dropped constraints: valve-config text centre (COINCIDENT origin–text centre: needs our font's advances
-   to match live's to 1e-4 mm, ours 0.0125 mm off: not mapped), hex-bookcase 8 mesh Uses (dx) + 3 text, knife Sketch
-   12's 5 Uses (upstream geometry), duct 6 (core), impeller 5 (parked), clamp-guillem MIDPOINT rejected, rings-loft /
-   rib-wrap SILHOUETTED / text ascent, bottle-split 1 PROJECTED, spur-gear 1, fan-blade Sketch 14's 1.
-4. The surface-workshop documents' drops (BEZIER_DEGREE 92, spline control-polygon COINCIDENTs ~294): mine, not in
-   the lead's 74; ask the lead's order before starting. core's case (2026-11-17 05:16): c2-surf-workshop-mutualtrim
-   Sketch 2 path spline LuJu8R5X5pXx (Bézier degree 3, HORIZONTAL on internal point 1 vs IB, internal point 0
-   COINCIDENT with construction line ZYv9J4xUoBps's end) ends at (0, -10.38, 60.56) mm in ours vs live's
-   (0, -27.21, 55.05); start agrees. Sweep 1's profile sits there (area 3476.7 vs 8896.9 mm²). core leaves it to me.
 
 ## Waiting on others
 - psui (4d0a82b2-8fc7-43e6-b45d-bd8cb225741e): told 20:3x the tab row is a pick difference (live hit Flange 1's wall).

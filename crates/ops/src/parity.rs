@@ -1842,6 +1842,12 @@ impl<'a> Translator<'a> {
                 }
             }
         }
+        // A Bezier's control points: live's `<id>.<n>.internal`, pole by pole.
+        if let (true, Some(pts)) = (c["type"] == "bspline", c["point_ids"].as_array()) {
+            for (n, pid) in pts.iter().enumerate().filter_map(|(n, p)| Some((n, p.as_str()?))) {
+                self.sketch_entities.insert((oid.clone(), format!("{eid}.{n}.internal")), pid.to_string());
+            }
+        }
         // A Bezier's control polygon: live's `<id>.cppolygon.<n>` lines, pole to pole.
         if let (Some(arms), Some(pts)) = (c["handle_arms"].as_array().filter(|_| c["type"] == "bspline"), c["point_ids"].as_array()) {
             for (n, arm) in arms.iter().enumerate() {
@@ -5302,6 +5308,20 @@ impl<'a> Translator<'a> {
         Ok(())
     }
 
+    /// A BEZIER_DEGREE: our curve of that degree (a stored Bezier keeps its poles, so its degree is live's).
+    fn bezier_degree(&mut self, oid: &str, id: &str, c: &Value) -> Result<(), String> {
+        let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned().unwrap_or(Value::Null);
+        let curve = par("localFirst")["value"].as_str().and_then(|v| self.sketch_entities.get(&(oid.to_string(), v.to_string()))).cloned().ok_or("its curve not translated")?;
+        let degree = par("bezierDegree");
+        let want = degree["expression"].as_str().and_then(|e| e.trim().parse::<f64>().ok()).or_else(|| degree["value"].as_f64()).ok_or("no degree")?;
+        let ours = self.call("sketch_get", json!({ "sketch": id }))?;
+        let have = ours["entities"].as_array().into_iter().flatten().find(|e| e["id"] == curve.as_str()).and_then(|e| e["degree"].as_f64()).ok_or("its curve isn't a Bezier")?;
+        if have != want {
+            return Err(format!("ours is of degree {have}, live's {want}"));
+        }
+        Ok(())
+    }
+
     /// A conic's RHO: our conic's Rho dimension (made with it) set to live's value.
     fn conic_rho(&mut self, oid: &str, id: &str, c: &Value) -> Result<(), String> {
         let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned().unwrap_or(Value::Null);
@@ -5336,7 +5356,9 @@ impl<'a> Translator<'a> {
                 "SYMMETRIC" | "MIRROR" => "symmetric",
                 "FIX" => "fix",
                 "NORMAL" => "normal",
-                "CURVATURE" => "curvature",
+                // Live's Bezier joints: equal curvature (G2) and its G3 (our Flow).
+                "CURVATURE" | "EQUAL_CURVATURE" => "curvature",
+                "EQUAL_CURVATURE_G3" => "flow",
                 // A point at an ellipse's axis end: inferred when ours was drawn there (kept), else on the ellipse.
                 "QUADRANT" => "quadrant",
                 // A point where model geometry or another sketch's curve crosses the sketch plane.
@@ -5367,6 +5389,13 @@ impl<'a> Translator<'a> {
                     let made = local.is_some_and(|l| used(l) || l.strip_suffix(".start").or_else(|| l.strip_suffix(".end")).is_some_and(used));
                     if !made && !orphan {
                         *missed.entry(format!("{ty} (not used: its model geometry not found)")).or_default() += 1;
+                    }
+                    continue;
+                }
+                // A Bezier's degree: ours has its poles' count less one, as live's.
+                "BEZIER_DEGREE" => {
+                    if let Err(e) = self.bezier_degree(oid, id, c) {
+                        *missed.entry(format!("{ty} ({e})")).or_default() += 1;
                     }
                     continue;
                 }

@@ -2677,6 +2677,43 @@ fn a_used_spline_is_used() {
     assert!(curves.len() == 1 && curves[0]["external"] == true, "{g}");
 }
 
+/// A Bezier's live constraints (c2-surf-workshop-mutualtrim's Sketch 2): its ends' snaps to its control points, its
+/// BEZIER_DEGREE, a Horizontal on a control point and an EQUAL_CURVATURE joint, all ours, none left to the solved
+/// geometry.
+#[test]
+fn a_beziers_control_points_take_its_constraints() {
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }]);
+    let local = |id: &str, v: &str| json!({ "btType": "BTMParameterString-149", "parameterId": id, "value": v });
+    let con = |ty: &str, a: &str, b: &str| json!({ "btType": "BTMSketchConstraint-2", "constraintType": ty, "entityId": format!("{ty}{a}"), "parameters": [local("localFirst", a), local("localSecond", b)] });
+    let bezier = |id: &str, poles: [f64; 8]| json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": 1.0,
+        "geometry": { "btType": "BTCurveGeometryControlPointSpline-2197", "controlPointCount": 4, "dimension": 2, "isPeriodic": false, "isRational": false, "isBezier": true, "degree": 3, "controlPoints": poles, "knots": [0, 0, 0, 0, 1, 1, 1, 1] } });
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1", "parameters": top,
+          "entities": [{ "btType": "BTMSketchCurveSegment-155", "entityId": "bz", "startPointId": "bz.start", "endPointId": "bz.end", "startParam": 0.0, "endParam": 1.0,
+              "geometry": { "btType": "BTCurveGeometryControlPointSpline-2197", "controlPointCount": 4, "dimension": 2, "isPeriodic": false, "isRational": false, "isBezier": true, "degree": 3,
+                  "controlPoints": [-0.0537, -0.0288, -0.0227, 0.0, -0.0157, 0.0, -0.0272, 0.0551], "knots": [0, 0, 0, 0, 1, 1, 1, 1] } },
+              bezier("b2", [0.0, 0.01, 0.01, 0.0, 0.02, 0.0, 0.03, 0.0]), bezier("b3", [0.03, 0.0, 0.04, 0.0, 0.05, 0.0, 0.06, 0.01])],
+          "constraints": [
+              con("COINCIDENT", "bz.start", "bz.0.internal"),
+              con("COINCIDENT", "bz.end", "bz.3.internal"),
+              con("HORIZONTAL", "bz.1.internal", "bz.2.internal"),
+              con("COINCIDENT", "b2.end", "b3.start"),
+              // A joint of equal curvature (both straight there).
+              { "btType": "BTMSketchConstraint-2", "constraintType": "EQUAL_CURVATURE", "entityId": "g2", "parameters": [local("localFirst", "b2"), local("localSecond", "b3"),
+                  local("fP0", "FIXED_AT_END"), local("fP1", "FIXED_AT_START"), local("alignment", "ALIGNED")] },
+              { "btType": "BTMSketchConstraint-2", "constraintType": "BEZIER_DEGREE", "entityId": "bz.bezierDegree", "parameters": [local("localFirst", "bz"),
+                  { "btType": "BTMParameterQuantity-147", "isInteger": true, "units": "", "parameterId": "bezierDegree", "value": 0, "expression": "3.0" }] }
+          ] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("bezier-constraints.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    let kinds: Vec<&str> = g["constraints"].as_array().unwrap().iter().filter_map(|c| c["type"].as_str()).collect();
+    assert!(kinds.contains(&"Horizontal") && kinds.contains(&"Curvature"), "{g}");
+}
+
 /// An orphaned Use whose ids name only what the sketch made itself (bracket03-mattie's Sketch 2: live's refs resolve
 /// them only after the sketch): drawn where it is stored, as live keeps it, not counted as a Use ours missed.
 #[test]
