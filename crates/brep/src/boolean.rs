@@ -2211,14 +2211,28 @@ impl Ctx<'_> {
 
     /// Edge `e`'s stretches over free-form face `f`'s surface from `t0` (end `e0`) to `t1` (`e1`), its point at `t`
     /// from `point`: each from where it comes onto the surface to where it leaves, a vertex where it crosses the
-    /// face's own edge there ([`Self::edge_crossing`]). None where it never leaves, or leaves without crossing an edge.
+    /// face's own edge there ([`Self::edge_crossing`]); the whole of it where it never leaves. None where it leaves
+    /// without crossing an edge.
     fn stretches_over(&mut self, e: usize, f: usize, point: &dyn Fn(f64) -> DVec3, (t0, e0): (f64, End), (t1, e1): (f64, End)) -> R<Option<Vec<EdgePart>>> {
         let gap = GREY * self.pool.pair(self.edges[e].t, self.faces[f].t);
         const N: usize = 256;
         let ts: Vec<f64> = (0..=N).map(|k| t0 + (t1 - t0) * k as f64 / N as f64).collect();
-        let on: Vec<bool> = ts.iter().map(|&t| free::surface_distance(&self.faces[f], point(t)) <= gap).collect();
+        // (A point's distance from the surface changes by no more than the point moves: off by more than `gap`
+        // from there on until it has moved that much farther, unasked.)
+        let (mut on, mut least, mut last) = (Vec::with_capacity(N + 1), 0.0f64, None);
+        for &t in &ts {
+            let p = point(t);
+            least -= last.map_or(0.0, |q: DVec3| (p - q).length());
+            last = Some(p);
+            if least > gap {
+                on.push(false);
+                continue;
+            }
+            least = free::surface_distance(&self.faces[f], p);
+            on.push(least <= gap);
+        }
         if on.iter().all(|&x| x) {
-            return Ok(None);
+            return Ok(Some(vec![(t0, e0, t1, e1)]));
         }
         let mut parts = Vec::new();
         let mut k = 0;
@@ -2231,28 +2245,21 @@ impl Ctx<'_> {
             while k <= N && on[k] {
                 k += 1;
             }
-            let a = if start == 0 { Some((t0, e0)) } else { self.edge_crossing(e, f, point, ts[start - 1], ts[start], gap)? };
-            let b = if k > N { Some((t1, e1)) } else { self.edge_crossing(e, f, point, ts[k], ts[k - 1], gap)? };
+            let a = if start == 0 { Some((t0, e0)) } else { self.edge_crossing(e, f, point, ts[start - 1], ts[start])? };
+            let b = if k > N { Some((t1, e1)) } else { self.edge_crossing(e, f, point, ts[k], ts[k - 1])? };
             let (Some(a), Some(b)) = (a, b) else { return Ok(None) };
             parts.push((a.0, a.1, b.0, b.1));
         }
         Ok(Some(parts))
     }
 
-    /// Where edge `e` (its point at `t` from `point`) comes onto free-form face `f`'s surface between `off` (off it by
-    /// more than `gap`) and `onto` (on it): where it comes nearest the face's edge nearest there, a vertex between the
+    /// Where edge `e` (its point at `t` from `point`) comes onto free-form face `f`'s surface between `off` (off it) and
+    /// `onto` (on it): where it comes nearest the face's edge nearest there, a vertex between the
     /// two; none where that's beyond the two edges' tolerances (OCCT's edge-edge crossing: a circle grazing a thread's
     /// run-out edge stays within 0.8 um of it for 44 degrees and crosses it at one point).
-    fn edge_crossing(&mut self, e: usize, f: usize, point: &dyn Fn(f64) -> DVec3, off: f64, onto: f64, gap: f64) -> R<Option<(f64, End)>> {
-        let (mut a, mut b) = (off, onto);
-        for _ in 0..60 {
-            let m = 0.5 * (a + b);
-            if free::surface_distance(&self.faces[f], point(m)) <= gap {
-                b = m;
-            } else {
-                a = m;
-            }
-        }
+    fn edge_crossing(&mut self, e: usize, f: usize, point: &dyn Fn(f64) -> DVec3, off: f64, onto: f64) -> R<Option<(f64, End)>> {
+        // (Two samples' spacing either way of their middle.)
+        let b = 0.5 * (off + onto);
         let p = point(b);
         let Some(x) = self.faces[f].edges.iter().map(|&(x, _)| x).min_by(|&x, &y| self.edge_point_near(x, p).0.total_cmp(&self.edge_point_near(y, p).0)) else {
             return Ok(None);
@@ -2273,25 +2280,76 @@ impl Ctx<'_> {
     }
 
     /// Where a curve (its point at `t` from `point`, `lo` to `hi`) comes nearest edge `x`: its parameter, the distance
-    /// and the edge's point there (the nearest of 65 points along it, then golden sections about that).
+    /// and the edge's point there (the nearest of 17 points along it, then golden sections about that).
     fn nearest_to_edge(&self, x: usize, point: &dyn Fn(f64) -> DVec3, lo: f64, hi: f64) -> (f64, f64, DVec3) {
         let dist = |t: f64| self.edge_point_near(x, point(t)).0;
-        const M: usize = 64;
+        const M: usize = 16;
         let at = |i: usize| lo + (hi - lo) * i as f64 / M as f64;
         let k = (0..=M).min_by(|&i, &j| dist(at(i)).total_cmp(&dist(at(j)))).unwrap_or(0);
         let (mut a, mut c) = (at(k.saturating_sub(1)), at((k + 1).min(M)));
         const G: f64 = 0.381_966_011_250_105_1;
-        for _ in 0..80 {
-            let (m1, m2) = (a + G * (c - a), c - G * (c - a));
-            if dist(m1) <= dist(m2) {
-                c = m2;
+        let (mut m1, mut m2) = (a + G * (c - a), c - G * (c - a));
+        let (mut d1, mut d2) = (dist(m1), dist(m2));
+        for _ in 0..50 {
+            if d1 <= d2 {
+                (c, m2, d2) = (m2, m1, d1);
+                m1 = a + G * (c - a);
+                d1 = dist(m1);
             } else {
-                a = m1;
+                (a, m1, d1) = (m1, m2, d2);
+                m2 = c - G * (c - a);
+                d2 = dist(m2);
             }
         }
         let t = 0.5 * (a + c);
         let (d, q) = self.edge_point_near(x, point(t));
         (t, d, q)
+    }
+
+    /// Edge `e` of an analytic face, free-form face `f` lying on that face's surface: its stretches over `f`, each from
+    /// where it comes onto `f` to where it crosses `f`'s edge there, each projected onto `f` (c2-config-parts-standoffs:
+    /// the bore cylinder's seam and end circles across the thread's root strip, at each of its turns).
+    fn edge_over_free_face(&mut self, e: usize, f: usize) -> R<()> {
+        if self.in_face_done.contains(&(e, f)) {
+            return Ok(());
+        }
+        let s = self.edge_seg(e);
+        let (path, t0, t1) = match s.g {
+            Geo::Line => {
+                let (a, b) = (self.p(s.v[0]), self.p(s.v[1]));
+                let l = (b - a).length();
+                (Path::Line { p: a, d: (b - a) / l }, 0.0, l)
+            }
+            Geo::Arc { k, a0, sweep } => (Path::Circle(k), a0, a0 + sweep),
+            _ => return Ok(()),
+        };
+        let at = |t: f64| match &path {
+            Path::Line { p, d } => (*p + *d * t, *d),
+            Path::Circle(k) => (k.at(t), (k.y * t.cos() - k.x * t.sin()) * k.r),
+            _ => unreachable!(),
+        };
+        let whole = (t0, End::Vertex(s.v[0]), t1, End::Vertex(s.v[1]));
+        let Some(parts) = self.stretches_over(e, f, &|t| at(t).0, (t0, whole.1), (t1, whole.3))? else {
+            return Err(Decline("an edge on another argument's free-form face"));
+        };
+        // (On it all along: as any edge on a face's surface.)
+        if parts == [whole] {
+            return self.edge_in_face(e, f);
+        }
+        self.in_face_done.insert((e, f));
+        let parts: Vec<EdgePart> = parts.into_iter().filter(|&(a0, _, a1, _)| path.length(a0.min(a1), a0.max(a1)) > self.tol).collect();
+        if parts.is_empty() {
+            return Ok(());
+        }
+        let mut on_free = Vec::with_capacity(parts.len());
+        for &(a0, _, a1, _) in &parts {
+            let Some(c) = free::projected(&self.faces[f], &at, a0, a1, GREY * self.tol) else {
+                return Err(Decline("an edge on another argument's free-form face"));
+            };
+            on_free.push(Some((f, c)));
+        }
+        self.pending.push(Pending::InFace(f, path, parts, on_free, e));
+        Ok(())
     }
 
     /// Edge `e` lies on face `f`'s surface: its pieces inside `f` go into `f`.
@@ -2851,6 +2909,17 @@ impl Ctx<'_> {
         // (One surface (a cone and a B-spline of it, two copies of a patch): coincident, like coplanar faces.)
         if self.same_surface(fs, ft) {
             self.coplanar.push((fs, ft));
+            // (A free-form face on an analytic one's surface: the analytic face's edges lie on it where they cross it,
+            // its seam too (a thread's root strip on the bore's cylinder, split at the seam each turn as OCCT's
+            // same-domain faces are).)
+            for (f, g) in [(fs, ft), (ft, fs)] {
+                if matches!(self.faces[f].s, Surf::Nurbs { .. }) && !matches!(self.faces[g].s, Surf::Nurbs { .. }) {
+                    let edges: Vec<usize> = self.faces[g].edges.iter().map(|x| x.0).collect();
+                    for e in edges {
+                        self.edge_over_free_face(e, f)?;
+                    }
+                }
+            }
             return Ok(());
         }
         if self.edge_only.contains(&(fs, ft)) || self.edge_only.contains(&(ft, fs)) {
@@ -6444,7 +6513,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                         sedges[sg].origins.iter().find_map(|&e| {
                             let &(_, rg) = cx.faces[g].edges.iter().find(|x| x.0 == e)?;
                             let es = cx.edge_seg(e);
-                            let (ta, tb) = (cx.seg_param(&es, cx.p(sedges[sg].seg.v[0])).0, cx.seg_param(&es, cx.p(sedges[sg].seg.v[1])).0);
+                            // (By points inside it, not its ends: an end at a closed edge's own vertex is at either end of it
+                            // (a sliver of a thread's root strip ending on the bore's end circle's vertex).)
+                            let (ta, tb) = (cx.seg_param(&es, cx.seg_at(&sedges[sg].seg, 0.25)).0, cx.seg_param(&es, cx.seg_at(&sedges[sg].seg, 0.75)).0);
                             ((ta - tb).abs() > 1e-9 && sedges[sg].seg.v[0] != sedges[sg].seg.v[1]).then_some(((tb > ta) != r) == !rg)
                         })
                     });

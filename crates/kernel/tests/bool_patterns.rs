@@ -2969,12 +2969,12 @@ fn a_lofts_side_cut_by_planes_as_occt() {
     }
 }
 
-/// A recorded cut taken by noshape's Boolean with OCCT's faces, edges, vertices and volume (within 1e-8 of it: its
+/// A recorded Boolean taken by noshape's Boolean with OCCT's faces, edges, vertices and volume (within `rel` of it: its
 /// curves on free-form faces projected, OCCT's its own).
-fn recorded_cut_as_occt(hash: &str) {
+fn recorded_as_occt(hash: &str, rel: f64) {
     let _ = k::set_working_scale(1000.0);
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
-    let c = k::bool_corpus::load(&dir, hash).expect("the recorded cut");
+    let c = k::bool_corpus::load(&dir, hash).expect("the recorded Boolean");
     k::set_rust_boolean_only(true);
     let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
     let why = k::last_rust_decline();
@@ -2984,7 +2984,7 @@ fn recorded_cut_as_occt(hash: &str) {
     assert_eq!((counts(k::ShapeType::Face), counts(k::ShapeType::Edge), counts(k::ShapeType::Vertex)), (c.summary.faces, c.summary.edges, c.summary.vertices));
     assert!(r.shape.is_valid());
     let v = r.shape.volume().unwrap();
-    assert!((v - c.summary.volume).abs() <= 1e-8 * c.summary.volume, "volume {v} vs OCCT's {}", c.summary.volume);
+    assert!((v - c.summary.volume).abs() <= rel * c.summary.volume, "volume {v} vs OCCT's {}", c.summary.volume);
 }
 
 /// A thread's root strip (a B-spline 12 turns round a 4 mm bore, 5 samples a turn, 0.5 mm apart) cut where the bore's
@@ -2993,12 +2993,20 @@ fn recorded_cut_as_occt(hash: &str) {
 /// edges.
 #[test]
 fn a_thread_root_strip_cut_where_a_circle_crosses_its_run_out() {
-    recorded_cut_as_occt("dd85b48f7488742a");
+    recorded_as_occt("dd85b48f7488742a", 1e-9);
 }
 
 /// The same thread's top end: the end face's circle grazes the run-out edge (within 0.8 um of it for 44 degrees) and
 /// crosses it once, where OCCT's vertex is; no second vertex where it leaves the strip's surface beside it.
 #[test]
 fn a_circle_grazing_a_thread_run_out_edge_is_cut_where_it_crosses_it() {
-    recorded_cut_as_occt("5608f6620712c5c8");
+    recorded_as_occt("5608f6620712c5c8", 1e-9);
+}
+
+/// The thread's common with the part: its root strip lies on the bore, which OCCT's result keeps split at the bore's
+/// seam on each turn (13 pieces); the bore's seam and end circles go into the strip stretch by stretch, between their
+/// crossings with its edges (the volume within 2e-6: the stretches' curves on the strip are projected).
+#[test]
+fn a_thread_root_strip_on_a_bore_split_at_its_seam_each_turn() {
+    recorded_as_occt("2a11cb1bac0e81cd", 2e-6);
 }
