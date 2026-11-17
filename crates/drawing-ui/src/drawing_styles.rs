@@ -475,6 +475,15 @@ impl DrawingEditor {
                 if radii {
                     fields.push(check("Show dimension line", dim_line));
                 }
+                // Then the checkboxes' labels and the revert row (live recorder 2026-11-17.5 on: every line).
+                if linear {
+                    text.texts(["Show first extension line", "Show second extension line"]);
+                }
+                text.text("Break dimension");
+                if radii {
+                    text.text("Show dimension line");
+                }
+                text.text("Revert to drawing properties");
                 crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Styles", "fields": fields }), text.0)
             });
             body = body

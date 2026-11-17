@@ -158,8 +158,9 @@ def strip_hidden(raw):
 # Reorder items or Collapse tags row in its dialog, no insert / remove / merge rows in its Cell popup).
 HIDDEN_IS_ABSENT = {"Hole table"}
 # Texts live never lets a user reach (live2 11-17): display:none in every drawing panel dump (Reorder items, Cut from
-# section), or options of the note editor's Flag notes lists, which are disabled in every note and table cell.
-NEVER_SHOWN = {"Reorder items", "Cut from section", "Double circle", "Square circle", "Tight fit"}
+# section), or options of the note editor's Flag notes lists, which are disabled in every note and table cell; the
+# inspection table's 9th column of the 10-18 dumps (live 11-17: 8 columns).
+NEVER_SHOWN = {"Reorder items", "Cut from section", "Double circle", "Square circle", "Tight fit", "Nominal & Tolerance"}
 # Per surface (live2 11-17): the general dimension palette's controls, display:none in every hole callout palette
 # dump; «Varies» only as the read-only Hole class value with Fit type User defined, which no recorder reads.
 NEVER_SHOWN_IN = {"Hole/thread callout": {"Precision:", "Tolerance: None", "Shaft class", "Reset text position", "Parentheses", "Toggle radius/diameter dimension", "Varies", "«Varies»"}}

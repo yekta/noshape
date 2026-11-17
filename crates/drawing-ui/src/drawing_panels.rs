@@ -132,8 +132,8 @@ impl DrawingEditor {
     /// The Inspection table (live drawing/95, 98, dom/drawing-panel-inspection-table.txt): "View:" with a
     /// bordered select (All sheets / Current sheet) and ⋯ (Export to CSV); the collapsible Datums section
     /// (its info box while there are none) and Characteristics: Item, Sheet, Type, Units, Nominal value,
-    /// Tolerance, Upper limit, Lower limit, Nominal & Tolerance (the item bold, "--" when unnumbered, the
-    /// other cells read-only grey), scrolling sideways.
+    /// Tolerance, Upper limit, Lower limit (live2 11-17 drw-inspection-table-iso-scrolled: no "Nominal & Tolerance"
+    /// since; the item bold, "--" when unnumbered, the other cells read-only grey), scrolling sideways.
     fn render_inspection_table(&mut self, cx: &mut Context<Self>) -> AnyElement {
         // Live's empty sections (live2 drw-inspection-table-export-csv).
         const DATUMS_EMPTY: (&str, &str) = ("Add datums or datum targets to build an inspection table", "An inspection table reveals all the datums and datum targets within the drawing. Add datums or datum targets to see the table by the datums name.");
@@ -186,7 +186,7 @@ impl DrawingEditor {
                     cx.notify();
                 }))
         };
-        const COLS: [(&str, f32); 9] = [("Item", 87.), ("Sheet", 147.), ("Type", 147.), ("Units", 147.), ("Nominal value", 147.), ("Tolerance", 147.), ("Upper limit", 147.), ("Lower limit", 147.), ("Nominal & Tolerance", 147.)];
+        const COLS: [(&str, f32); 8] = [("Item", 87.), ("Sheet", 147.), ("Type", 147.), ("Units", 147.), ("Nominal value", 147.), ("Tolerance", 147.), ("Upper limit", 147.), ("Lower limit", 147.)];
         let cell = |text: SharedString, w: f32, grey: bool| div().w(px(w)).h(px(34.)).flex_none().px(px(3.)).flex().items_center().overflow_hidden().whitespace_nowrap().text_ellipsis().border_r_1().border_color(rule).when(grey, |d| d.bg(gpui_kit::rgb(0xf6f6f6))).child(text);
         let sheet_name = |n: usize| format!("{} ({n})", self.drawing.sheets.get(n - 1).map(|s| s.name.as_str()).unwrap_or(""));
         let table = |rows: &[noshape_model::drawing::inspection::InspectionRow], key: &'static str, cx: &mut Context<Self>| -> AnyElement {
@@ -238,7 +238,6 @@ impl DrawingEditor {
                             .into_any_element()
                     }
                 };
-                let both = if r.tolerance.is_empty() { r.nominal.clone() } else { format!("{} {}", r.nominal, r.tolerance) };
                 // Live (live2 drw-inspection-table-assign-number): an empty value shows "--".
                 let dash = |v: &str| if v.is_empty() { "--".to_string() } else { v.to_string() };
                 list = list.child(
@@ -262,8 +261,7 @@ impl DrawingEditor {
                         .child(cell(r.nominal.clone().into(), COLS[4].1, true))
                         .child(cell(dash(&r.tolerance).into(), COLS[5].1, true))
                         .child(cell(dash(&r.upper).into(), COLS[6].1, true))
-                        .child(cell(dash(&r.lower).into(), COLS[7].1, true))
-                        .child(cell(both.into(), COLS[8].1, true)),
+                        .child(cell(dash(&r.lower).into(), COLS[7].1, true)),
                 );
             }
             let width: f32 = COLS.iter().map(|c| c.1).sum();
