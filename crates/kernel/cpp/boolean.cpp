@@ -1542,12 +1542,43 @@ struct ChangeKey
   bool operator==(const ChangeKey& o) const { return old == o.old && made == o.made; }
 };
 
+// Whether the changed faces' edges' tolerances leave room for a volume change `need`: a merged face's new curves on its
+// surface within an edge's tolerance of its neighbour's, a sliver of at most the tolerance squared along the edge. The
+// most tolerant edges first, stopping once there is room (their lengths' integrals were most of the check: asm-infento's
+// 1dc32b Boolean 4, 40-70 ms).
+static bool tolerant_room(const std::vector<TopoDS_Shape>& changed, double need)
+{
+  std::vector<std::pair<double, TopoDS_Edge>> edges;
+  ShapeIMap                                   seen;
+  for (const TopoDS_Shape& f : changed)
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge& x = TopoDS::Edge(e.Current());
+      const double       t = BRep_Tool::Tolerance(x);
+      if (t <= Precision::Confusion() || BRep_Tool::Degenerated(x) || seen.Contains(x))
+        continue;
+      seen.Add(x);
+      edges.emplace_back(t, x);
+    }
+  std::stable_sort(edges.begin(), edges.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+  double room = 0;
+  for (const auto& [t, x] : edges)
+  {
+    GProp_GProps g;
+    BRepGProp::LinearProperties(x, g);
+    room += t * t * g.Mass();
+    if (room >= need)
+      return true;
+  }
+  return false;
+}
+
 // The surfaces share_mirrored_extrusions made this thread's last call for pieces of one spline.
 thread_local std::vector<occ::handle<Geom_Surface>> t_joined_pieces;
 
 std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, const std::vector<TopoDS_Shape>& image,
                                         const std::vector<FaceShare>& share, const TopoDS_Shape& out, double diag,
-                                        std::optional<std::pair<ChangeKey, double>>* memo = nullptr, double* slack = nullptr)
+                                        std::optional<std::pair<ChangeKey, double>>* memo = nullptr, std::vector<TopoDS_Shape>* changed = nullptr)
 {
   ShapeIMap outf;
   for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
@@ -1567,25 +1598,8 @@ std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, con
   for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
     if (!kept.Contains(x.Current()))
       after.push_back(x.Current());
-  // What the changed faces' edges' tolerances leave room for: a merged face's new curves on its surface within an
-  // edge's tolerance of its neighbour's, a sliver of at most the tolerance squared along the edge.
-  if (slack != nullptr)
-  {
-    *slack = 0;
-    ShapeIMap seen;
-    for (const TopoDS_Shape& f : after)
-      for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
-      {
-        const TopoDS_Edge& x = TopoDS::Edge(e.Current());
-        const double       t = BRep_Tool::Tolerance(x);
-        if (t <= Precision::Confusion() || BRep_Tool::Degenerated(x) || seen.Contains(x))
-          continue;
-        seen.Add(x);
-        GProp_GProps g;
-        BRepGProp::LinearProperties(x, g);
-        *slack += t * t * g.Mass();
-      }
-  }
+  if (changed != nullptr)
+    *changed = after;
   ChangeKey key;
   if (memo != nullptr)
   {
@@ -2122,16 +2136,16 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     u.Build();
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
-    double                      slack  = 0;
-    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag, &memo, &slack);
-    // (The room only where every face USD made of two or more is on an elementary surface: the merged face on its
-    // pieces' own surface exactly, only its edges' curves new.)
-    if (slack > 0 && !merges_elementary(in, u))
-      slack = 0;
+    std::vector<TopoDS_Shape>   changed;
+    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag, &memo, &changed);
     // (Within its tolerant edges' room and 1e-8 of the volume: asm-infento's 1dc32b Boolean 4, 16 pairs of quarter
     // cylinders bounded by 5 um B-spline edges, 1.5e-13 m³ (3.1e-9 of its volume) where they allow 1.6e-11; live
-    // merges them. A Shell's walls' merges 1b121fc3, 5e-5 of theirs: rejected.)
-    if (!keeps_volume(change, u.Shape()) && !(change && std::abs(*change) <= std::min(slack, 1e-8 * std::abs(volume0()))))
+    // merges them. A Shell's walls' merges 1b121fc3, 5e-5 of theirs: rejected. The room only where every face USD made
+    // of two or more is on an elementary surface: the merged face on its pieces' own surface exactly, only its edges'
+    // curves new.)
+    const double need  = change ? std::abs(*change) : 0;
+    const auto   roomy = [&] { return change && need <= 1e-8 * std::abs(volume0()) && (need == 0 || (merges_elementary(in, u) && tolerant_room(changed, need))); };
+    if (!keeps_volume(change, u.Shape()) && !roomy())
     {
       // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
       // rest: cf-spur-gear's Boolean 2 tried eight, 86 ms each. A notched cylinder fused with its mirror is kept at
