@@ -591,6 +591,9 @@ pub struct SketchEditor {
     pub hover_pattern: Option<u32>,
     /// Entity whose glyphs stay visible briefly after hover ends.
     pub glyph_entity: Option<(EntityId, std::time::Instant)>,
+    /// The hovered line and the pointer's spot on the plane: with Show constraints off its glyph row sits there, not
+    /// at the line's middle (live2 feel-1417), and stays after the hover ends.
+    pub glyph_row_at: Option<(EntityId, DVec2)>,
     drag: Option<DragState>,
     /// The sketch as a geometry drag found it: each step solves from it.
     drag_origin: Option<Sketch>,
@@ -1352,6 +1355,7 @@ impl SketchEditor {
             hover_constraint: None,
             hover_pattern: None,
             glyph_entity: None,
+            glyph_row_at: None,
             drag: None,
             drag_origin: None,
             box_end: None,
