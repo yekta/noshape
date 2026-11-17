@@ -3468,3 +3468,30 @@ Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live i
 - Intermittent segfault (vibe6, binary ops-ex2 22:47 and 22:52, both right after rings-loft's imports, before its STEP
   export); not again in 8 runs (vibe5 gdb, vibe5/vibe6 plain, x1116j). gdb on vibe5: `handle SIG37 nostop noprint
   pass` (the checkpoint thread's signal). Watch for it.
+
+## Moved from the handoff 11-17 18:3x
+4. Writer guard for kinked closed seams (lead 11-17: under 1 mrad, poles moved under 1 um, ACIS only; uncommitted in
+   dx-land xt.cpp periodic_bsurface smooth_seam, T1 export::a_tube_wall_with_a_slightly_kinked_seam_goes_round_as_one_
+   acis_face). Mac hose run 14:1x: the guard applies (straight walls 0.41 mrad, poles 0.21-0.52 um) and 0.451m's SAT
+   reads back 12/12/0; 0.417m, 0.487m, 0.524m stay 22/44/24: each has one wall kinked 1.0 / 1.58 / 1.98 mrad, and one
+   failing face makes prepared() split every closed face of the body (ShapeDivideClosed on the whole shape). Decision
+   asked of the lead: limit 2 mrad? Core's SWEEP-SEAM-KINK is the real fix.
+   rings-loft Part 2 133 faces for 132: the cylinder r 10.25 mm (axis -X at x 88.40) is a 510.1585 mm² face plus a
+   0.0073 mm² piece across a seam segment (86.57-86.73 mm) the big face uses on one side only; UnifySameDomain leaves
+   them. Uncommitted fix: xt.cpp across_seam (the big face takes the piece's other edges in that edge's place, their
+   pcurves moved by the period; on a BRepBuilderAPI_Copy without geometry), run first in seam_pieces_joined; write_acis
+   joins too, before scaling (the scaled copy keeps one pcurve of a seam edge: shape_seam_pieces_joined FFI), and
+   sat.cpp seam_direction writes a cylinder face reaching past one period with its reference at the widest angle no
+   edge crosses (our reader's seam went through the cuts and split it again). Mac: rings-loft's x_t reads back as the
+   model; fixture: x_t and SAT read back 1 face. T1 export::a_seam_piece_across_a_seam_segment_is_written_with_its_face
+   (fixture tests/data/seam/rings-loft-seam-piece.brep, 67 KB). Kernel 55/55 export + seam (vibex6), full kernel 499/499
+   before the SAT direction (rerun 15:2x), g++-13 /opt/occt build OK (vibe5, before io.cpp's solid names: redo).
+   Proof run: vibex7 slot (~/tmp/dx/exg.sh -> ~/agents/dx-keep/bin/ops-seam, log ~/agents/dx-keep/exch-seam.log,
+   snapshot ~/tmp/dx/exs-guard; binary md5 e28401fc = the three commits), first in the queue behind qa's ui-parity
+   (15:3x). Baseline x1117c: /root/dx-scratch/exch-x1117c.log (and vibex6 ~/agents/dx-keep). Committed in dx-land, not
+   landed: cfe5b5425 seam join, 19bfb2f58 ACIS guard, 690d4b0f1 import split (live2's q-step-twopiece: live
+   splits a two-piece solid into 2 parts "Part 2__Two pieces"; uncommitted: io.cpp read_step maps each
+   MANIFOLD_SOLID_BREP's name and entity to its solids (StepImport solid_part/index/names/body, ImportedShape
+   solid_names), split_connected_pieces names a split solid's pieces "<part>__<solid>" (only a split: live's control
+   with the solid named as its product, and robot-relations' Combine1 in REV-21-1650, keep the product's name); test
+   expects "Combine1__Two pieces", ops import 32/32). Tell asm when the split lands.

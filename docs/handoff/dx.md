@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 17:05 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 20:28 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -69,7 +69,7 @@ Open, ranked:
   start_line_1 (cbore floor vs csink cone).
 - Plane feature planes before refs (committed, not landed): a `….planeOp` query (plain or packed DUMMY) maps to our
   plane before any refs geometry (live's all-feature refs read it as the plane body's face, which by_geometry can't
-  find: c2-loft-guide-curves-wave-washer 2 -> 6/7). Gate: vibe6 corpus3.sh A/B (A build L, B build P md5 5e1d31c239eb)
+  find: c2-loft-guide-curves-wave-washer 2 -> 6/7). Gate: vibex6 corpus3.sh A/B (A build L, B build P md5 5e1d31c239eb)
   over corpus3 + live's newer corpora (~/tmp/dx/corpus3-{A,B}.{log,sum,untr}, out corpus3.out), queued in the slot
   since before 01:41 behind blend; land if SUM-SAME but for the planeOp documents improving. Then sort corpus3's first
   differences to owners.
@@ -85,7 +85,7 @@ Open, ranked:
   "Only planar profiles…": core; save vibe5 ~/tmp/dx/savelf); driven-pattern refetch pending. 7 config-parts to come
   (gears / bevels dropped: private studios).
 
-## Open: my studios (studio-alone runs, vibe7)
+## Open: my studios (studio-alone runs, vibex7)
 - bjr-config 5d8bc1: 107/124 at Manufacture=false (23:42, live's retaken lines). First difference Extrude 55 "vanity
   plate front" 369/955/601, live 365/943/593 (bool / core, parked). Kerf Compensation 1 is suppressed at false (as live);
   Kerf compiles (live's 19:19 fetch); core's e138d597 redoes OCCT's empty metre offset in mm (their check: the true
@@ -138,7 +138,7 @@ Open, ranked:
   a configured part). Run them alone once in, sort first differences to owners.
 
 ## Next, in order
-1. x1117c (vibe6 04:46, main + 59c0be35 + 9a19e358): ours imports live's 59/75, live imports ours 46/48, ours reads
+1. x1117c (vibex6 04:46, main + 59c0be35 + 9a19e358): ours imports live's 59/75, live imports ours 46/48, ours reads
    ours 114/119, DXF 0/4, times 49/50. Queued abb5303e (lead 11-17 decision 1): an import row passes when ours splits
    no more than live's own import of the file (counts between the model's and live's, volume / area as live's import
    is held; PARITY-SUITES.md): rings-loft live.igs now passes (ours 275, live's own 279/787/524 with its ring 565.6 mm³
@@ -163,95 +163,74 @@ Open, ranked:
    - cf-setback-fillet: parked (lead 11-05, skasm's RABC fill patch; TICKETS SETBACK-FILL-PATCH).
 2. After ~10:17: live's answers to REQUESTS 01:47 (sm-louver scale, live's own SAT import) and 05:46; set 2 after
    live2's refetch.
-4. Writer guard for kinked closed seams (lead 11-17: under 1 mrad, poles moved under 1 um, ACIS only; uncommitted in
-   dx-land xt.cpp periodic_bsurface smooth_seam, T1 export::a_tube_wall_with_a_slightly_kinked_seam_goes_round_as_one_
-   acis_face). Mac hose run 14:1x: the guard applies (straight walls 0.41 mrad, poles 0.21-0.52 um) and 0.451m's SAT
-   reads back 12/12/0; 0.417m, 0.487m, 0.524m stay 22/44/24: each has one wall kinked 1.0 / 1.58 / 1.98 mrad, and one
-   failing face makes prepared() split every closed face of the body (ShapeDivideClosed on the whole shape). Decision
-   asked of the lead: limit 2 mrad? Core's SWEEP-SEAM-KINK is the real fix.
-   rings-loft Part 2 133 faces for 132: the cylinder r 10.25 mm (axis -X at x 88.40) is a 510.1585 mm² face plus a
-   0.0073 mm² piece across a seam segment (86.57-86.73 mm) the big face uses on one side only; UnifySameDomain leaves
-   them. Uncommitted fix: xt.cpp across_seam (the big face takes the piece's other edges in that edge's place, their
-   pcurves moved by the period; on a BRepBuilderAPI_Copy without geometry), run first in seam_pieces_joined; write_acis
-   joins too, before scaling (the scaled copy keeps one pcurve of a seam edge: shape_seam_pieces_joined FFI), and
-   sat.cpp seam_direction writes a cylinder face reaching past one period with its reference at the widest angle no
-   edge crosses (our reader's seam went through the cuts and split it again). Mac: rings-loft's x_t reads back as the
-   model; fixture: x_t and SAT read back 1 face. T1 export::a_seam_piece_across_a_seam_segment_is_written_with_its_face
-   (fixture tests/data/seam/rings-loft-seam-piece.brep, 67 KB). Kernel 55/55 export + seam (vibe6), full kernel 499/499
-   before the SAT direction (rerun 15:2x), g++-13 /opt/occt build OK (vibe5, before io.cpp's solid names: redo).
-   Proof run: vibe7 slot (~/tmp/dx/exg.sh -> ~/agents/dx-keep/bin/ops-seam, log ~/agents/dx-keep/exch-seam.log,
-   snapshot ~/tmp/dx/exs-guard; binary md5 e28401fc = the three commits), first in the queue behind qa's ui-parity
-   (15:3x). Baseline x1117c: /root/dx-scratch/exch-x1117c.log (and vibe6 ~/agents/dx-keep). Committed in dx-land, not
-   landed: cfe5b5425 seam join, 19bfb2f58 ACIS guard, 690d4b0f1 import split (live2's q-step-twopiece: live
-   splits a two-piece solid into 2 parts "Part 2__Two pieces"; uncommitted: io.cpp read_step maps each
-   MANIFOLD_SOLID_BREP's name and entity to its solids (StepImport solid_part/index/names/body, ImportedShape
-   solid_names), split_connected_pieces names a split solid's pieces "<part>__<solid>" (only a split: live's control
-   with the solid named as its product, and robot-relations' Combine1 in REV-21-1650, keep the product's name); test
-   expects "Combine1__Two pieces", ops import 32/32). Tell asm when the split lands.
+4. Landed 19:30 as 3621f719 (batch with 1471d405): seam join, ACIS guard 1 mrad, the import split of a solid's
+   disjoint pieces ("<part>__<solid>", live2 q-step-twopiece 12:53: live splits them too), 3MF Zip64, mesh pieces
+   touching along edges, Parasolid / STEP mesh-part import. Decision asked of the lead 20:0x: the 19:50 order said land
+   without the split; it was in already and matches live2's capture, kept unless the lead rules a revert.
 5. asm-robot-relations 0c3466 Import 1: landed 58c29811 (live's six sheets = its failed import of a valid solid;
    LIVE_IMPORT_FAILURES leaves both out from Import 1 on; lead 11-17). asm mapped Thicken 1's JFD face to ours by
    geometry on asm-partorigin (Thicken then makes 11 tiny parts: sent to core).
-5c. Exchange rows from live's newer data (set 2 imports of STL / OBJ / 3MF), committed in dx-land, not landed:
-   18239623a 3MF reads Zip64 (live's 3MF: every live.3mf was 0 parts); 63fb61533 mesh pieces touching along edges
-   (more than two triangles on an edge: each joins the next one turning into its inside, opposite direction; equal
-   angle last): bottle-split STL 1 -> 2 solids (the model's 2; live 148 SHEETs), duct-multipart 1 -> 2 (model 4,
-   parts overlap; live 9 SHEETs), the other 20 docs' STLs unchanged. Decision asked: record live's mesh sheets as its
-   failure (as LIVE_IMPORT_FAILURES).
-   de2e0fac2 (committed, not landed): hex-bookcase's mesh part "imported". live's x_t comes zipped with a .xmm_txt
-   (Parasolid's mesh file, the same node format: PSM_MESH, position / index combs of teeth, indices 1-based); our
-   reader failed on the MESH node's 'b' box field (stoll) and a zip without a native assembly was NO_ROOT. Now
-   xt_read reads the .xmm beside the .x_t (mesh_body -> mesh_compound), import.rs reads a zip of x_t files
-   (native_assembly XT_IN_ZIP). STEP: OCCT reads the TESSELLATED_SHELL as an open shell of one mesh face, wound
-   inward; solids_from_closed_shells -> mesh_rebodied (turned out when its signed volume is negative). T1:
-   export::an_onshape_parasolid_with_a_mesh_part_reads_the_mesh_beside_it, an_onshape_step_tessellated_part_reads_as_a_
-   mesh_solid (trimmed fixture), ops import::tests::a_parasolid_zip_imports_its_parts_and_meshes; g++-13 OK (vibe6).
-   vibe8 exchange (ops-mesh): hex-bookcase live.step / x_t / 3mf match (imports 5/7, was 2/7). Open there: live.igs /
-   live.sat 1 part for live's 2 (mesh part); ours.x_t / ours.sat write the mesh as 948 facets (live 1/0/0: Parasolid
-   writes a MESH + .xmm in a zip). Rest-run (16 docs, ops-seam) done 17:05: 0 panics; vs x1117c only the hose
-   improvement and new-data rows. Suite follow-up: sm-louver's live SAT import merges below its model (Part 2 22/60/40,
-   model and ours 38/76/40) yet counts against ours.
-   The full run 15:3x aborted after rings-loft's imports: bool's par_map_by short result (boolean.rs:5058), fix
-   0b17fee66 on bool's branch (bool 17:0x: the mesh/mod.rs:323 garbage-index panic in the same run is fallout of that
-   panic; send bool the log if it shows without a Boolean panic before it). Remaining 16 docs: vibe7 slot
-   ~/agents/dx-keep/exr.sh -> exch-rest.log, running 16:4x (binary md5 e28401fc: no Zip64 / mesh commits); hose as
-   expected (0.451m SAT 12/12/0, the other three over 1 mrad), no panics so far. rings-loft alone with it: x_t reads back as live, SAT 132/336/207
-   for 132/335/206, imports 4/7 (main's), no part count / name change.
 5b. asm-isaac-ball 8f5622 GearLab (P2, studios / asm 11-17): landed bc58c02b (qLoopEdges of a sketch region = its edges;
    Fill of the tooth profile found none). Gear builds 363/842/480 for live 283/762/480: the 40 teeth's end faces at
    z=0 / z=10 stay apart from the blank's cap (our opSweep cap tilted 5e-9 rad, offset 1.8e-12 m: unify won't merge):
-   sent to core 15:0x (repro vibe6 ~/agents/dx-keep/gearlab). Time (14.8 s vs live 1.15 s, vibe6 under load): two
+   sent to core 15:0x (repro vibex6 ~/agents/dx-keep/gearlab). Time (14.8 s vs live 1.15 s, vibex6 under load): two
    OCCT fuses (blank + 40 teeth 3.8 s; herringbone halves 9.2 s), recorded in ~/agents/dx-keep/gearlab/booleans, sent to
    bool 15:2x; bool took it (mirror fuse with glue=shift 959 -> 304 ms on the Mac, same 404/885; 1dc32b Boolean 4
    751 -> 189 ms, live 135, gating). asm told.
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
+## Since 19:50 (this thread; dx-land on main a2edca4b4)
+- Mesher crash (P0 item 1), found and fixed: ASan (vibex8 ~/agents/dx-keep/asan.507953 / .511180) stack-buffer-overflow
+  in work_step() under noshape_should_break under mesh_prepare on a rayon worker. The crash guard's siglongjmp skipped
+  a ScopedWork's destructor (Draft / defeature / HLR bounds), leaving t_work on the dead frame; every later stop check
+  on that thread did ++used there (the garbage indices at mesh_rust.cpp:669). Not bool's Boolean panic. Fix:
+  run_guarded / trycatch_timed restore t_work with t_deadline (POSIX and SEH). T1 kernel
+  core::a_fault_inside_a_work_bound_leaves_no_bound_behind (crash kind 15): fails without the fix ("a work bound left
+  behind"), passes with it. QUEUED 331e37ac from dx-main (branch dx-main-land, the fix alone).
+- dx-land, committed, not queued (waits on the suite run below, lead's 2 mrad condition): bbe892984 suite (IGES/ACIS
+  drop mesh parts), 87aa2196a ACIS guard 2 mrad (kAcisSeamKink, poles <= 1 um kAcisSeamMove), 7581f3a22 suite
+  LIVE_MESH_SHEETS, 4ce6c052a x_t mesh export (38.1), 3f85e56b9 suite renames default-named parts as live's by volume,
+  27a2fe690 (= 331e37ac), dac9d1713 x_t MESH from 28.1 on + "minimum version 2801000" + 28.0 and older refuse in live's
+  words, 36e76ac0b PARITY-SUITES (mesh sheets = live's failure), 706b2c23b 28.1-30.0 PART_XMT_BLOCK without
+  index_map_offset + INTERSECTION_DATA from 30.0 (live's 28.1 / 30.0 files of hex-bookcase now read as live's own
+  import: 60/168/108 9366.248, mesh 1/0/0 10364.977). Kernel export/import 81/81, ops e2e export 5/5 (vibex8).
+- Suite proof run: vibex8 slot ~/agents/dx-keep/exfix.sh ops-fix fix (binary md5 3ce71350, all of the above but
+  706b2c23b): full suite -> ~/agents/dx-keep/exch-fix.log, then first6 x3; lines in ~/agents/dx-keep/f6.out. Compare
+  with /root/dx-scratch/exch-x1117c.log (59/75, 46/48, 114/119, DXF 0/4, times 49/50) and vibex7 exch-rest.log; land
+  dx-land (land.sh) if only the hose / mesh rows changed and no crash.
+- Asked live2 20:28: import ours-duct-{25.0,28.1,30.0,38.1}.x_t and ours-hexmesh-{28.1,30.0}.zip
+  (/root/onshape-research/live/dx/ours-xt-versions): 25.0's part list without index_map_offset is a guess.
+- Decision asked (lead): the split landed 19:30 with live evidence (live2 12:53); keep unless told to revert.
+- Tools: /root/dx-scratch/bin/xtdump.py dumps a text x_t / xmm with an embedded schema (live's), not native ones (ours).
+  vibex8 ~/agents/dx-land/target/debug/noshape-cli (current dx-land) + ~/tmp/dx/xmmv/*.jsonl batches.
+
 ## How to run
-- Builds, crate tests and exchange runs on vibe8 (lead 11-17 17:00; ~/parity/exchange + its 22 models copied there);
-  vibe7 only for ~/lead-private; land with `NOSHAPE_LAND_QUEUE_HOST=vibe7 tools/tiers/land.sh`.
-  Linux ops binaries for vibe runs: `NOSHAPE_RB_HOST=vibe8 tools/tiers/rb.sh cargo test -p noshape-ops --test all
+- Builds, crate tests and exchange runs on vibex8 (lead 11-17 17:00; ~/parity/exchange + its 22 models copied there);
+  vibex7 only for ~/lead-private; land with `NOSHAPE_LAND_QUEUE_HOST=vibex7 tools/tiers/land.sh`.
+  Linux ops binaries for vibe runs: `NOSHAPE_RB_HOST=vibex8 tools/tiers/rb.sh cargo test -p noshape-ops --test all
   --no-run`, then copy ~/agents/dx/target/debug/deps/all-<hash> to ~/agents/dx-keep/ops-exch (studio scripts' binary)
   or ~/tmp/dx/ops-A / ops-B for an A/B. rb.sh keeps mtimes: `touch` an edited file before the A rebuild, check md5.
   An A/B baseline is rebuilt from the same base (land.sh rebases).
 - Heavy runs on vibe hosts through `~/bin/slot <cmd>` (one per host, waits for free memory; DECISIONS 11-15).
-- Studio-alone runs (vibe7, scripts in ~/agents/dx-keep/bin, model dirs ~/agents/dx-keep/m*/st-*): st5d8.sh,
+- Studio-alone runs (vibex7, scripts in ~/agents/dx-keep/bin, model dirs ~/agents/dx-keep/m*/st-*): st5d8.sh,
   st74.sh, st1dc14.sh copy the corpus studio into a model dir, run loosen.py, save to ~/tmp/dx/save*; one line of
   result in ~/tmp/dx/st*.log (grep "features match").
 - Parity models: NOSHAPE_PARITY_ONLY=<docs,…> NOSHAPE_PARITY_MODELS=~/parity/models <ops binary> parity::parity_models
   --ignored --nocapture; NOSHAPE_PARITY_SAVE=<dir> saves the translated document; NOSHAPE_PARITY_TRACE=1;
   NOSHAPE_KERNEL_PROFILE=1 (kernel calls per feature), NOSHAPE_FS_PROFILE=fn (FeatureScript lines). A saved document:
   `~/agents/dx-keep/cli-main call feature_get '{"doc":…,"feature":…}'` on a copy (CLI batches save in place).
-  cli-main is a release build of main 21:45 (rb.sh `cargo build --release -p noshape-cli` on vibe7, 20 min); a stale
+  cli-main is a release build of main 21:45 (rb.sh `cargo build --release -p noshape-cli` on vibex7, 20 min); a stale
   one regenerates without newer fixes. Tools: feature_list, feature_get, feature_edit, feature_rollback,
   query_parts, query_entities, sketch_get, export_parts; `batch` file of {"tool","args"} lines.
 - Gates for custom-host changes: dx-keep/bin/gate-rf.sh (all 47 cf models, A then B, scores diffed).
-- Exchange suite (vibe6): `cp -a ~/parity/exchange ~/tmp/dx/exs` (the suite writes ours.* there), then
+- Exchange suite (vibex6): `cp -a ~/parity/exchange ~/tmp/dx/exs` (the suite writes ours.* there), then
   `~/bin/slot timeout 6000 ~/agents/dx-keep/bin/exch.sh x <tag> ~/tmp/dx/exs` (log ~/tmp/dx/exch-<tag>.log).
   /root/dx-scratch/bin/stlinfo.py <stl>: triangles, box.
-- Drawing exports: /root/dx-scratch/exprun.sh <out> <scenario…> (EXPHOST=vibe7; builds the app on the host, runs
+- Drawing exports: /root/dx-scratch/exprun.sh <out> <scenario…> (EXPHOST=vibex7; builds the app on the host, runs
   ui-parity, compares with tools/drawing-export/compare.py against /root/parity/ui/live).
-- perf gives no callers on these binaries and vibe7 has no gdb: attribute by NOSHAPE_KERNEL_PROFILE counts, or a
+- perf gives no callers on these binaries and vibex7 has no gdb: attribute by NOSHAPE_KERNEL_PROFILE counts, or a
   temporary backtrace build.
-- vibe7 → vibe6 scp fails: relay through /root/dx-scratch/bin-relay. Host ~/tmp is pruned after 6-12 h: keep scripts
+- vibex7 → vibex6 scp fails: relay through /root/dx-scratch/bin-relay. Host ~/tmp is pruned after 6-12 h: keep scripts
   and binaries in ~/agents/dx-keep.
 - Agent ids (message_agent needs them full; 11-17 09:25 restarts): core 6692ae35-758a-4442-81c8-29f67be2e21a,
   asm d8d597e0-675c-497b-a804-544ceab99bbd, blend 0e6e9942-0713-46c1-ae55-132fbbb4a14b, bool
