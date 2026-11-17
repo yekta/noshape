@@ -138,18 +138,17 @@ impl DrawingEditor {
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(30.)).px(px(10.)).child(div().w(px(80.)).text_size(px(12.)).child(label)).child(body).into_any_element();
         let solid = d.pattern == LinePattern::Solid;
         crate::ui_script::note_dialog(|| {
-            let mut text: Vec<String> = vec!["Adjust linestyle".into(), "Edges".into()];
+            let mut text = crate::drawing_panels::PanelText::default();
+            text.texts(["Adjust linestyle", "Edges"]);
             if empty {
-                text.push("Select edges in a view to change linestyle".into());
+                text.text("Select edges in a view to change linestyle");
             }
             for _ in &d.edges {
-                text.extend([format!("{view_name} : entity"), "×".into()]);
+                text.texts([format!("{view_name} : entity"), "×".into()]);
             }
-            text.push("Linestyle".into());
-            text.extend(LinePattern::ALL.iter().map(|p| p.name().to_string()));
-            text.extend(["Dashes".into(), "Thickness".into()]);
-            text.extend(LINE_THICKNESSES.iter().map(|t| format!("{t:.2} mm")));
-            serde_json::json!({ "kind": "drawing-panel", "title": "Adjust linestyle", "text": text })
+            text.text("Linestyle").options(LinePattern::ALL.iter().map(|p| p.name().to_string()));
+            text.texts(["Dashes", "Thickness"]).options(LINE_THICKNESSES.iter().map(|t| format!("{t:.2} mm")));
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Adjust linestyle" }), text.0)
         });
         Some(
             v_flex()

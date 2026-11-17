@@ -345,19 +345,18 @@ impl DrawingEditor {
                 m
             })
         };
-        // What live's recorder reads (drw-revision-table): the labels and each list's options, at most 30.
+        // What live's recorder reads (drw-revision-table): the labels and each list's options.
         let (see1, newest, hide_on) = (d.see_sheet1, d.newest_top, d.hide_callouts);
         crate::ui_script::note_dialog(|| {
-            let mut text: Vec<String> = ["Revision table", "Multi-sheet", "See sheet 1", "Linked", "Visible rows"].map(String::from).to_vec();
-            text.extend((1..=100).map(|n: u32| n.to_string()));
-            text.truncate(30);
+            let mut text = crate::drawing_panels::PanelText::default();
+            text.texts(["Revision table", "Multi-sheet"]).options(["See sheet 1", "Linked"]).text("Visible rows").options((1..=100).map(|n: u32| n.to_string()));
             let fields = serde_json::json!([
                 { "label": "Multi-sheet", "kind": "select", "value": if see1 { "See sheet 1" } else { "Linked" } },
                 { "label": "Visible rows", "kind": "select", "value": rows_now.to_string() },
                 { "label": "Order", "kind": "select", "value": if newest { "Bottom to top" } else { "Top to bottom" } },
                 { "label": "Hide revision callouts no longer shown in the table", "kind": "checkbox", "value": hide_on },
             ]);
-            serde_json::json!({ "kind": "drawing-panel", "title": "Revision table", "text": text, "fields": fields })
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Revision table", "fields": fields }), text.0)
         });
         let order = select("rev-order", [("Top to bottom", !d.newest_top), ("Bottom to top", d.newest_top)], |d, i| d.newest_top = i == 1);
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(30.)).px(px(6.)).child(div().w(px(90.)).text_size(px(12.)).child(label)).child(body).into_any_element();

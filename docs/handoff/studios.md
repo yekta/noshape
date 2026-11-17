@@ -14,13 +14,16 @@ Updated 2026-11-17 09:50 UTC. Restarted 11-17 09:20 after the lead's pause.
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
-- Queued 09:25: b2dc27d5 (bdab0ef9 document-open timing + the paused handoff, rebased).
-- Box select (queue item 4), uncommitted: `select_in_box` per live2's rule, `BOX_VIEW_FRAME_PX` 7, GPUI tests
-  `a_box_takes_a_view_by_a_whole_edge_or_by_crossing_its_frame`, `a_box_takes_a_dimension_by_…`; row 106 updated.
-  The press rule (a press within a view's reach drags it) was already ours (VIEW_REACH_MM 3.6 mm = live D1's 14 px).
-- vibe6: app build (systemd studios-build6-0925) for the doc-open speed runs and the drawing run (315 names:
-  ~/agents/studios-keep/drwall-1117.txt). New speed fixture fs-large (std query.fs in a Feature Studio) in mkperf.py,
-  scenario perf/perf-fs-large.json.
+- Landed 11-17: 7abd9bdf (document-open timing + paused handoff).
+- Queued 10:10: 8abe1654 box select (queue item 4): `select_in_box` per live2's rule, `BOX_VIEW_FRAME_PX` 7, GPUI
+  tests `a_box_takes_a_view_by_a_whole_edge_or_by_crossing_its_frame`, `a_box_takes_a_dimension_by_…` (drawing-ui 40/40);
+  drw-notes-box-select-delete, -copy-annotation-drag, -view-drag-undo match on vibe6. Row 106 =. The press rule was
+  already ours (VIEW_REACH_MM 3.6 mm = live D1's 14 px).
+- vibe6 slot queue (behind qa's suites-rest since 08:40), binary ~/tmp/studios/noshape (10:04, with box select):
+  speed1117.sh (mkperf + perf-open-30 / perf-open-hist / perf-fs-large x5, log ~/agents/studios-keep/speed1117.log),
+  then the drawing run (315 names drwall-1117.txt, out ~/tmp/studios/drw1117, log drw1117.log); then
+  `drawing_matrix.py --run` on it and copy the run to ~/agents/studios-keep.
+- New speed fixture fs-large (std query.fs in a Feature Studio) in mkperf.py, scenario perf/perf-fs-large.json.
 
 ## Lead's queue (11-16 ~09:00), in order
 
@@ -57,14 +60,17 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
    15533efc (6 Move to sheet / Replicate retakes); Datum target / Weld / GTOL takes + 12 retakes after 18:50 UTC.
    Then drawing_matrix.py --run on the fresh run.
 
-## Agents (full thread ids, 11-17)
-core 6692ae35-758a-4442-81c8-29f67be2e21a, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, blend
-0e6e9942-0713-46c1-ae55-132fbbb4a14b, dx f93a1292-5bb7-406f-9a25-59767e01878e, psui 4d0a82b2-8fc7-43e6-b45d-bd8cb225741e,
-qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b (since 11-17 ~10:00). asm, skasm, bool2, live, live2: new ids from the lead;
-paused agents are not messaged (DECISIONS 11-17).
+## Agents (lead's roster 11-17 10:30; only these ids)
+psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, core 6692ae35-758a-4442-81c8-29f67be2e21a,
+blend 0e6e9942-0713-46c1-ae55-132fbbb4a14b, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4,
+dx f93a1292-5bb7-406f-9a25-59767e01878e, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b,
+asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6,
+bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios 58e9bca8-346c-4847-8012-e15006ae61ef,
+live e8549719-ef9a-42de-960c-e24b29f142a6, live2 3b9b1e66-33a0-4dfe-9e0a-eee216e354b2.
+Paused agents are not messaged (DECISIONS 11-17).
 
 ## Waiting on others
-- live2 (paused to ~11-17 10:15): the 4 flow takes (09:06), the 4 manual captures (08:47), Datum target / Weld / GTOL
+- live2 (3b9b1e66, restarted 11-17; asks in REQUESTS): the 4 flow takes (09:06), the 4 manual captures (08:47), Datum target / Weld / GTOL
   panel takes and 12 retakes (after the translation quota, 18:50 UTC).
 
 ## Open (no owner action possible yet)

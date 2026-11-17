@@ -1124,29 +1124,31 @@ impl DrawingEditor {
             rows.push(row("Threshold", div().id("vp-simp-threshold").tooltip(crate::ui::tooltip("Simplification threshold: Features below this value will be simplified")).child(field(&props.simp_value)).into_any_element()));
         }
         // The panel's texts as live's recorder reads them (dom asbv-view-properties-right-projected: labels and each
-        // list's options, at most 30).
+        // list's options).
+        let several_sheets = self.drawing.sheets.len() > 1;
         if multi.is_none() {
             crate::ui_script::note_dialog(|| {
-                let mut t: Vec<String> = ["View properties", "Document", doc_name.as_str(), "Workspace", workspace, "Type", if is_asm { "Assembly" } else { "Part" }, "Reference", source_name.as_str(), badge_text.as_str()].map(String::from).to_vec();
+                let mut t = crate::drawing_panels::PanelText::default();
+                t.texts(["View properties", "Document", doc_name.as_str(), "Workspace", workspace, "Type", if is_asm { "Assembly" } else { "Part" }, "Reference", source_name.as_str(), badge_text.as_str()]);
                 if let Some(n) = &v.named_view {
-                    t.extend(["Named view".to_string(), n.clone()]);
+                    t.texts(["Named view".to_string(), n.clone()]);
                 }
-                t.push("View orientation".into());
+                t.text("View orientation");
                 match props.orientation {
-                    Some(_) => t.extend(ORIENTATIONS.iter().map(|(_, n)| n.to_string())),
-                    None => t.push(default_view_name(&self.drawing, sheet, &v)),
-                }
-                t.push("Scale".into());
+                    Some(_) => t.options(ORIENTATIONS.iter().map(|(_, n)| n.to_string())),
+                    None => t.text(default_view_name(&self.drawing, sheet, &v)),
+                };
+                t.text("Scale");
                 if has_parent {
-                    t.extend(["Suppress alignment with parent", "Synchronize breaks from parent"].map(String::from));
+                    t.texts(["Suppress alignment with parent", "Synchronize breaks from parent"]);
                 }
-                t.extend(["Rotation angle", "Tangent edges", "Hidden", "Solid", "Phantom", "View render mode", "Best performance", "Best quality", "View simplification"].map(String::from));
-                t.extend(crate::drawing_insert::simplification_choices(eff).into_iter().map(|c| c.name().to_string()));
-                t.push("Sheet".into());
-                t.extend(self.drawing.sheets.iter().map(|s| s.name.clone()));
-                t.push("Name".into());
-                t.truncate(30);
-                serde_json::json!({ "kind": "drawing-panel", "title": "View properties", "text": t })
+                t.texts(["Rotation angle", "Tangent edges"]).options(["Hidden", "Solid", "Phantom"]).text("View render mode").options(["Best performance", "Best quality"]).text("View simplification");
+                t.options(crate::drawing_insert::simplification_choices(eff).into_iter().map(|c| c.name().to_string()));
+                t.text("Sheet");
+                let sheets = self.drawing.sheets.iter().map(|s| s.name.clone());
+                if several_sheets { t.options(sheets) } else { t.texts(sheets) };
+                t.text("Name");
+                crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "View properties" }), t.0)
             });
         }
         // Sheet: the sheet's name; with several sheets a list that moves the view.
@@ -1212,16 +1214,17 @@ impl DrawingEditor {
         if multi.is_some() {
             let (bom_text, cut_text) = (bom.clone(), cut.clone());
             crate::ui_script::note_dialog(|| {
-                let mut t: Vec<String> = ["View properties", "Multiple views selected.", "Scale", "Rotation angle", "Tangent edges", "Hidden", "Solid", "Phantom", "View render mode", "Best performance", "Best quality", "View simplification"].map(String::from).to_vec();
-                t.extend(crate::drawing_insert::simplification_choices(eff).into_iter().map(|c| c.name().to_string()));
-                t.push("Sheet".into());
-                t.extend(self.drawing.sheets.iter().map(|s| s.name.clone()));
-                t.extend(["View label", "Scale label", "Show sketch appearances", "Show annotations from model", "BOM table reference"].map(String::from));
-                t.push(bom_text);
+                let mut t = crate::drawing_panels::PanelText::default();
+                t.texts(["View properties", "Multiple views selected.", "Scale", "Rotation angle", "Tangent edges"]).options(["Hidden", "Solid", "Phantom"]).text("View render mode").options(["Best performance", "Best quality"]).text("View simplification");
+                t.options(crate::drawing_insert::simplification_choices(eff).into_iter().map(|c| c.name().to_string()));
+                t.text("Sheet");
+                let sheets = self.drawing.sheets.iter().map(|s| s.name.clone());
+                if several_sheets { t.options(sheets) } else { t.texts(sheets) };
+                t.texts(["View label", "Scale label", "Show sketch appearances", "Show annotations from model", "BOM table reference"]).options([bom_text]);
                 if !is_asm {
-                    t.extend(["Cut list table reference".to_string(), cut_text]);
+                    t.text("Cut list table reference").options([cut_text]);
                 }
-                serde_json::json!({ "kind": "drawing-panel", "title": "View properties", "text": t })
+                crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "View properties" }), t.0)
             });
         }
         rows.push(check("vp-sketch-app", "Show sketch appearances", props.sketch_appearances, |p, on| p.sketch_appearances = on, cx));

@@ -439,17 +439,14 @@ impl DrawingEditor {
         let shape_name = |k: FlagShape| if k == default_shape { format!("{} (Drawing)", k.name()) } else { k.name().to_string() };
         let shapes: Vec<Entry> = FlagShape::ALL.iter().map(|&k| entry(&shape_name(k), None, st.flag_shape == k, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_shape = k))).collect();
         crate::ui_script::note_dialog(|| {
-            // Every text shown, in reading order, at most 30 (README "### Drawings"; live 2063).
-            let mut text: Vec<String> = vec!["Note".into()];
-            text.extend(font_names);
+            // Every text shown, in reading order (README "### Drawings"; live 2063).
+            let mut text = crate::drawing_panels::PanelText::default();
+            text.text("Note").options(font_names);
             // A table cell's panel has no Flag notes row (live 743–750).
             if !cell {
-                text.push("Flag notes".into());
-                text.extend(shapes.iter().flatten().map(|e| e.0.clone()));
-                text.extend(sizes_names(4));
+                text.text("Flag notes").options(shapes.iter().flatten().map(|e| e.0.clone())).options(sizes_names(4));
             }
-            text.truncate(30);
-            let old = serde_json::json!({ "kind": "drawing-panel", "title": "Note", "text": text });
+            let old = crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Note" }), text.0);
             if cell {
                 return old;
             }

@@ -535,3 +535,38 @@ impl DrawingEditor {
         )
     }
 }
+
+/// A drawing panel's texts in reading order for the ui-parity runner, each with whether it is a select's option.
+#[derive(Default)]
+pub struct PanelText(pub Vec<(String, bool)>);
+
+impl PanelText {
+    pub fn text(&mut self, t: impl Into<String>) -> &mut Self {
+        self.0.push((t.into(), false));
+        self
+    }
+
+    pub fn texts<S: Into<String>>(&mut self, ts: impl IntoIterator<Item = S>) -> &mut Self {
+        self.0.extend(ts.into_iter().map(|t| (t.into(), false)));
+        self
+    }
+
+    pub fn options<S: Into<String>>(&mut self, ts: impl IntoIterator<Item = S>) -> &mut Self {
+        self.0.extend(ts.into_iter().map(|t| (t.into(), true)));
+        self
+    }
+}
+
+/// `dialog` with its `text` (every text, empty ones left out) and `options` (the indices of the selects' options in
+/// it): the runner keeps them and the first 30 for live's recorders before 2026-11-17.3, and leaves them out (the
+/// fields hold the values) and keeps 120 for later ones (live drw-dprops-chamfer: the Font list's 22 options filled
+/// the 30).
+pub fn panel_text(mut dialog: serde_json::Value, lines: Vec<(String, bool)>) -> serde_json::Value {
+    let lines: Vec<(String, bool)> = lines.into_iter().filter(|(t, _)| !t.is_empty()).collect();
+    let options: Vec<usize> = lines.iter().enumerate().filter(|(_, (_, o))| *o).map(|(i, _)| i).collect();
+    dialog["text"] = serde_json::json!(lines.into_iter().map(|(t, _)| t).collect::<Vec<_>>());
+    if !options.is_empty() {
+        dialog["options"] = serde_json::json!(options);
+    }
+    dialog
+}

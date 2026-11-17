@@ -462,8 +462,9 @@ impl DrawingEditor {
             let (font, just, align, hidden, unbroken) = (font_label.clone(), jl.clone(), al.clone(), own.hide_ext, first.unbroken);
             crate::ui_script::note_dialog(|| {
                 let sym = u.symbol().to_string();
-                let mut text: Vec<String> = ["Styles", "Font"].iter().chain(FONT_FAMILIES.iter()).map(|t| t.to_string()).collect();
-                text.extend(["Text height", &sym, "Color", "Arrowhead", &sym, "Text justification", "Text alignment", "Text gap", &sym, "Geometry gap", &sym, "Extension past line", &sym].map(String::from));
+                let mut text = crate::drawing_panels::PanelText::default();
+                text.texts(["Styles", "Font"]).options(FONT_FAMILIES.iter().copied());
+                text.texts(["Text height", &sym, "Color", "Arrowhead", &sym, "Text justification", "Text alignment", "Text gap", &sym, "Geometry gap", &sym, "Extension past line", &sym]);
                 let select = |v: &str| serde_json::json!({ "label": "", "kind": "select", "value": v });
                 let check = |l: &str, v: bool| serde_json::json!({ "label": l, "kind": "checkbox", "value": v });
                 let mut fields = vec![select(&font), select(&just), select(&align)];
@@ -474,7 +475,7 @@ impl DrawingEditor {
                 if radii {
                     fields.push(check("Show dimension line", dim_line));
                 }
-                serde_json::json!({ "kind": "drawing-panel", "title": "Styles", "text": text, "fields": fields })
+                crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Styles", "fields": fields }), text.0)
             });
             body = body
                 .child(row("Text justification", select("st-just", jl, 220., justs)))

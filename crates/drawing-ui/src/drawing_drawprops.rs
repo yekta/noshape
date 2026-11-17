@@ -69,7 +69,7 @@ pub struct DrawingPropsUi {
     pub arrow_menu: Option<&'static str>,
     /// While a UI script records: texts drawn before the row label they follow (a select's options, a field's
     /// unit), until that label is recorded.
-    pub rec_pending: std::cell::RefCell<Vec<String>>,
+    pub rec_pending: std::cell::RefCell<Vec<(String, bool)>>,
 }
 
 impl Default for DrawingPropsUi {
@@ -657,7 +657,7 @@ impl DrawingEditor {
         // The unit beside it follows the row's label in live's reading (live2 drw-properties-dimensions: "Text
         // height", "in").
         if !unitless && !matches!(f.kind, FieldKind::Text) && crate::ui_script::active() {
-            self.drawing_props.rec_pending.borrow_mut().push(if self.drawing.units_mm { "mm" } else { "in" }.into());
+            self.drawing_props.rec_pending.borrow_mut().push((if self.drawing.units_mm { "mm" } else { "in" }.into(), false));
         }
         let unit = (!unitless).then(|| div().w(px(24.)).flex_none().text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).opacity(0.65).flex().justify_center().child(if self.drawing.units_mm { "mm" } else { "in" }));
         let k = unit_k(f.kind, !self.drawing.units_mm);
@@ -815,7 +815,8 @@ impl DrawingEditor {
         // The tab's texts in reading order for the ui-parity runner (live2 drw-drawprops-*: a label, then its select's
         // options): a select's options wait for the label of the row they are in.
         let recording = crate::ui_script::active();
-        let rec: std::cell::RefCell<Vec<String>> = Default::default();
+        // (Each text with whether it is a select's option: live's recorder from 2026-11-17.3 leaves those out.)
+        let rec: std::cell::RefCell<Vec<(String, bool)>> = Default::default();
         let pending = &self.drawing_props.rec_pending;
         pending.borrow_mut().clear();
         let rec_label = |label: &str| {
@@ -823,7 +824,7 @@ impl DrawingEditor {
                 let mut r = rec.borrow_mut();
                 // (A row without a label has no text: live2 drw-properties-construction.)
                 if !label.is_empty() {
-                    r.push(label.to_string());
+                    r.push((label.to_string(), false));
                 }
                 r.append(&mut pending.borrow_mut());
             }
@@ -831,12 +832,12 @@ impl DrawingEditor {
         // A group header or checkbox: its text alone (the options waiting are the next row's).
         let rec_text = |label: &str| {
             if recording {
-                rec.borrow_mut().push(label.to_string());
+                rec.borrow_mut().push((label.to_string(), false));
             }
         };
         let sel = |id: &'static str, current: String, items: Vec<(String, bool, Act)>, w: f32| {
             if recording {
-                pending.borrow_mut().extend(items.iter().map(|i| i.0.clone()));
+                pending.borrow_mut().extend(items.iter().map(|i| (i.0.clone(), true)));
             }
             let ed = ed.clone();
             select_field(id, current, w)
@@ -1230,7 +1231,7 @@ impl DrawingEditor {
             let proj = self.drawing.projection;
             let ed2 = ed.clone();
             if recording {
-                pending.borrow_mut().extend(["First angle", "Third angle"].map(String::from));
+                pending.borrow_mut().extend(["First angle", "Third angle"].map(|t| (t.to_string(), true)));
             }
             // Live 1710: 223 px from the group's column (121 px).
             let proj_btn = select_field("dp-proj", if proj == Projection::ThirdAngle { "Third angle".into() } else { "First angle".into() }, 223.)
@@ -1686,11 +1687,11 @@ impl DrawingEditor {
             // Under the panel's title and the tab's own, but Annotations, Views and Tables under their own alone
             // (live2 drw-drawprops-*, drw-properties-*).
             let tab = TABS.get(self.drawing_props.tab).map(|t| t.0).unwrap_or_default();
-            let mut text: Vec<String> = if matches!(tab, "Annotations" | "Views" | "Tables") { vec![tab.into()] } else { vec!["Drawing properties".into(), tab.into()] };
-            text.append(&mut rec.borrow_mut());
-            text.append(&mut pending.borrow_mut());
-            let title = text[0].clone();
-            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": title, "text": text }));
+            let mut lines: Vec<(String, bool)> = if matches!(tab, "Annotations" | "Views" | "Tables") { vec![(tab.into(), false)] } else { vec![("Drawing properties".into(), false), (tab.into(), false)] };
+            lines.append(&mut rec.borrow_mut());
+            lines.append(&mut pending.borrow_mut());
+            let title = lines[0].0.clone();
+            crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": title }), lines));
         }
         // Live drawing/341: 38 px cells flush left, `#adadad` rules, `#f4f5f6`;
         // the active one white and open to the white section below.

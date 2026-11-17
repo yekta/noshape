@@ -274,7 +274,9 @@ Its state adds `"drawing"` (`null` outside a drawing tab):
   recorder 2026-11-13.1 a field also carries `"placeholder"` (shown only while it is empty: "Multiple values"),
   `"disabled": true` and `"indeterminate": true` when they hold, and the modal `"disabledButtons"` (live 2962); a drawing panel
   (Insert view, Note, Section view) is `{"kind": "drawing-panel", "title", "text": [...]}`, every text it shows in
-  reading order (a list's options too, at most 30).
+  reading order: before live's recorder 2026-11-17.3 a list's options too, at most 30; from it without the options
+  (the fields hold the values), at most 120. Ours lists every text with the options' indices in `"options"`; the runner
+  cuts it to the take's form (`panel_text_form`).
 - `selection` is what is drawn in selection colours: `VIEW` for a framed view (selected or hovered), `EDGE` for a view
   whose edges are drawn picked (a dimension tool's picked circle, or a line once it is the second pick; the edge a
   datum is being placed on, or the last surface finish symbol was placed on; a closed broken-out profile; the

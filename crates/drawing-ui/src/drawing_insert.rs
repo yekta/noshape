@@ -390,22 +390,19 @@ impl DrawingEditor {
         let source_label = self.insert_source_label(source, part.as_ref(), cx);
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings": a list's options too, not the scale combo's).
-            let mut text: Vec<String> = vec!["Insert view".into(), "Insert".into(), source_label.clone()];
-            text.push("View orientation".into());
-            text.extend(orient_items.iter().map(|i| i.0.clone()));
-            text.push("View scale".into());
-            text.push("View simplification".into());
-            text.extend(simp_items.iter().map(|i| i.0.clone()));
+            let mut text = crate::drawing_panels::PanelText::default();
+            text.texts(["Insert view".to_string(), "Insert".into(), source_label.clone(), "View orientation".into()]);
+            text.options(orient_items.iter().map(|i| i.0.clone()));
+            text.texts(["View scale", "View simplification"]);
+            text.options(simp_items.iter().map(|i| i.0.clone()));
             if let Some((_, unit)) = simplification_text(simp, mm).split_once(' ').filter(|_| self.insert.simp_value.is_some()) {
-                text.extend(["Threshold".to_string(), unit.to_string()]);
+                text.texts(["Threshold".to_string(), unit.to_string()]);
             }
-            text.push("Show sketch appearances".into());
+            text.text("Show sketch appearances");
             if !is_asm && part.is_some() {
-                text.push("Show annotations from model".into());
+                text.text("Show annotations from model");
             }
-            text.retain(|t| !t.is_empty());
-            text.truncate(30);
-            serde_json::json!({ "kind": "drawing-panel", "title": "Insert view", "text": text })
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Insert view" }), text.0)
         });
         Some(
             v_flex()

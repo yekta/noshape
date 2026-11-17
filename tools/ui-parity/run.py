@@ -746,11 +746,29 @@ def recorder_form(b, live):
             return not (n and not new) and not (o and new)
         sel[:] = [x for x in sel if kept(x)]
     d = (b or {}).get("dialog")
-    if not (isinstance(d, dict) and "old" in d):
+    if not isinstance(d, dict):
+        return
+    full = m is not None and (m.group(1), int(m.group(2))) >= ("2026-11-17", 3)
+    panel_text_form(d, full)
+    if "old" not in d:
         return
     old = d.pop("old")
     if not new:
+        panel_text_form(old, full)
         b["dialog"] = old
+
+
+def panel_text_form(d, full):
+    """A drawing panel's `text` as live's recorder reads it: before 2026-11-17.3 the first 30 lines with each select's
+    options (ours lists their indices in `options`), from it without the options (the fields hold the values) and at
+    most 120 (live 11-17: the Font list's 22 options filled the 30, drw-dprops-chamfer)."""
+    if not isinstance(d, dict) or d.get("kind") != "drawing-panel" or not isinstance(d.get("text"), list):
+        return
+    opts = set(d.pop("options", None) or [])
+    if full:
+        d["text"] = [t for i, t in enumerate(d["text"]) if i not in opts][:120]
+    else:
+        d["text"] = d["text"][:30]
 
 
 def hole_callout_export_text(a, b):
@@ -1355,7 +1373,7 @@ def compare(live, ours, whole_document=True):
                 d["text"] = [t.replace("\u00a0", " ") if isinstance(t, str) else t for t in d.get("text") or []]
                 d["text"] = [re.sub(r"\bstart \S+ asm( Copy \d+)?\b", "start asm", t) if isinstance(t, str) else t for t in d["text"]]
                 # Live's start studio is named after its start document ("start block Copy 1", live2 drw-custom-table-*).
-                d["text"] = [re.sub(r"^start [\w-]+( Copy \d+)?$", "Part Studio 1", t) if isinstance(t, str) else t for t in d["text"]][:30]
+                d["text"] = [re.sub(r"^start [\w-]+( Copy \d+)?$", "Part Studio 1", t) if isinstance(t, str) else t for t in d["text"]]
                 if d.get("title") in ("View properties", "BOM table properties", "Cut list table properties", "Custom table properties", "Image properties") and len(d["text"]) > 2 and d["text"][1] in ("Document", "Document:"):
                     d["text"][2] = "<document>"
             dr = side.get("drawing")
