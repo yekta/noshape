@@ -4,46 +4,42 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 07:35 UTC.
+Updated 11-17 10:20 UTC.
 
 ## In flight
-- P0 MSVC (lead 07:3x): main's rust_boolean.cpp `fitted` failed on Windows (C2131 `double left[p + 1]` with p a local
-  constexpr captured by the lambdas; C2440 / C3536 the `check` lambda that follows). Fix: `static constexpr int p = 5;`
-  on branch bool-msvc 0dd58bd21 (bool-hat; pushed to origin bool-msvc), g++-13 clean; CI dispatch run 44039545068
-  (all three OSes, T1). Land when its Windows jobs are past the kernel, then delete the origin branch.
-- P0 SCISSOR-LIFT-BOM-ROWS (lead 07:30: bool bisects): fed22d alone as a model (asm's mfe, and a complete copy mfe2 with
-  sketches.json + metadata.json, vibe6 ~/agents/bool-keep/ms) gives the same at both ends (28/60, no Fillet 18 error):
-  the change only shows in the assembly run. Unit bool-bisect-sl (/root/bool-scratch/bisect-sl-run.sh): debug ops
-  tests in worktree 776dfea9 (vibe6 target ~/agents/776dfea9), asm-scissor-lift alone (snapshot vibe6
-  ~/agents/bool-keep/sl) through ~/bin/slot, judged by "Studio fed22d › Fillet 18: Error"; both ends first, then git
-  bisect run. Log /root/bool-scratch/sl-bisect.log, outputs sl-<sha>.out. ~16 min a step. Culprit -> owner as P0.
-- bool-nuts 787b7e70b (bool-hat branch bool-nuts-main, on main 1d77cd633): c2-config-parts-nuts' thread turn cut + T1
-  bool_patterns::a_nuts_thread_turns_cut_its_bore_between_them (tests/data/thread; fails on main, passes here). Gate
-  b6466ab04 (same change on the older stack): replay 0 differences vs bool-march's gate; 2 documents changed only in the
-  order of an untranslated note's sketch-region areas (sprockets, rocker-enclosure). hats/dock 12/12 SAME; hat15b
-  pending (vibe5 ~/tmp/bool/udoc, cli-br / cli-base). Then land.
-- bool-march's (landed d3f24a83) replay flags: 4 cases (inputs 74acee2ff54886eb, e001fa8eb5dbfe24: a common with a
-  z-prism, plane x B-spline caps) "equivalent", 5.4e-6 relative volume, history differs. Ours is the exact one: both
-  caps 8.029909 mm² and volume = cap x 20 mm exactly (160.598185); OCCT's caps differ (8.030027 / 8.030052) and don't
-  match its own volume. Accepted per DECISIONS 11-15 (end to end identical at its land).
-- bool-offedge (bool-hat, WIP commit on branch bool-offedge): off_shared_edges skips a shared edge whose box lies past
-  the limit (the 129-sample scan and the bisection compare only with the 10 um reach; the argmin and tolerance uses take
-  every edge): the same decisions by construction. Mac kernel binaries oc33/kern-main, kern-offedge for the A/B on the
-  knife's Fillet 2 fuse (knrec c1d9f750d291ba85: off_shared_edges 212 of occt_ahead's 905 samples). Then gate.
-- Knife Fillet 2 (Mac, loaded 5-7, hint): 74-81 ms vs live 9: op_boolean 22 (sections ahead 16: OCCT FaceFace
-  ParamParam 200 / ImpPrm 116 samples, MakeCurve 60, off_shared_edges 212), op_split 18.5, min_distance x31 10.6,
-  props_surface x11 6. Its four plane x grind pairs are the marcher's now (< 1 ms each). Knife 595-663 ms vs live 622.
-- GATE GAP: the knurl corpora need a 48 GB host (none); gate-host.py skips them. Ours-only replay instead (lead 11-17 ok):
+- P0 SCISSOR-LIFT-BOM-ROWS (lead 07:30; asm d8d597e0 owns the BOM, waits for my culprit): fed22d alone as a model gives
+  the same at both ends; only the assembly run shows it. Unit bool-bisect-sl2 (/root/bool-scratch/bisect-sl-run2.sh, git
+  bisect run in worktree 776dfea9; step script bisect-sl.sh: debug ops tests built on vibe6 (target ~/agents/776dfea9),
+  the binary copied to vibe7 ~/agents/bool-keep/ops-sl, asm-scissor-lift alone (vibe7 snapshot ~/agents/bool-keep/sl)
+  through vibe7's ~/bin/slot; judged by "Studio fed22d › Fillet 18: Error"). Log /root/bool-scratch/sl-bisect.log.
+  Ends: 684e77e2e good (59/87), ecf8c33ab bad (57/87). 06a56de82 good, 6c18ffe92 bad; 41f62884a and 14727ed62 skipped
+  (slot timeouts behind qa's suite on vibe6). Left: 3b5b8af3b, 5b9064e1b, bdd418e2c, 905a789b4 (my knife stack),
+  9ece8f66d (OCCT 0033), 5b2807501 / 41f62884a (core). Culprit -> its owner as P0 (mine: fix), tell asm.
+- bool-usd-precise 2755135e7 (bool-hat): op_unify keeps USD's merge whose volume change fits in the merged faces'
+  tolerant edges (sum of tol^2 x length): asm-infento 1dc32b Boolean 4 (dx's report): Part 4 232/632/400 -> 216/600/384
+  as live, same volume; Mac Boolean 4 904 -> 789 ms (unify ~266 -> small). T1
+  bool_patterns::quarter_cylinders_bounded_by_tolerant_edges_are_merged (tests/data/unify, fails on main 16/40/26).
+  g++-13 clean. Gate unit bool-gate-usd -> /root/bool-hat-scratch/chain-2755135e7.out (started 10:06), then hats/dock
+  + hat15b (udoc-ab.sh 2755135e7; hat15b by hand: ~/lead-private/hat15b.noshape with the same udoc-cmp.sh), land, tell dx.
+- infento Boolean 4's remaining time (OCCT tree fuse ~650 ms of 789, live 135; 259 ms OCCT "Preparing history"): ours
+  declines "a shared shape OCCT may keep or remake": a vertex shared by copy 14 and hub body 15 at (11.75, 0, 31) mm,
+  only non-plane faces at it (quiet -1). Taking it needs the decision after sections (does any section reach it: OCCT
+  remakes, else keeps) and corpus evidence. Debug print /root/bool-scratch/zz-shared-debug.diff (ZZ_SHARED). Case Mac
+  ~/noshape-host/agents/bool-hat/infb4 (3af1878cfff10d75), vibe7 ~/tmp/bool/infb4 (doc copy, rec), CLI batch b.jsonl.
+- Landed 11-17: bool-knife (ecf8c33a), OCCT 0033 (9ece8f66), bool-knife2 (cf5a9aff), bool-march (d3f24a83), nuts
+  (43335ce3: thread turn helix gap; gate clean, hats/dock/hat15b SAME), MSVC fix (01c5c13e: fitted's p static
+  constexpr; CI 44039545068 green on all three OSes).
+- bool-march's 4 replay cases "equivalent" (74acee2ff54886eb, e001fa8eb5dbfe24): ours the exact one (cap area x height =
+  our volume exactly; OCCT's caps disagree): accepted per DECISIONS 11-15; told the lead.
+- Mac 11-17 (loaded, hints): every qa-list document of mine under live (louver 1195/4987, rings 1387/1557, snap-hook
+  206/274, housing 46/105, lighten 61/114, bottle 29/40, shaped-flange 455/1026); over live only features: rings Extrude 5
+  71/39 (boolean.rust.brep 33: mapped-curve chords), knife Fillet 2 74-81/9 (op_split 18 OCCT EF on the grind B-spline;
+  sections ahead 16), michael Fillet 2, tpd Fillet 1 (blend's). Parked: /root/bool-scratch/parked-offedge-boxes.diff
+  (off_shared_edges box pre-check, identical, no gain).
+- GATE GAP: the knurl corpora need a 48 GB host (none); ours-only replay instead (lead 11-17 ok):
   NOSHAPE_BOOL_CORPUS=~/agents/bool-corpora/<k> NOSHAPE_BREP_OURS_ONLY=1 <kernel tests> brep_replay::brep_corpus_replay.
-- Landed 11-17: bool-knife (ecf8c33a), OCCT 0033 (9ece8f66), bool-knife2 (cf5a9aff), bool-march (d3f24a83).
-- core-sing 4254e715e gate: replay clean, 2 documents changed; core handled it (core-sing2 without the point loft).
-- Rings-loft Extrude 5 (Mac 68 ms, live 39): boolean.rust.brep 31 (cut c40a49c401d38878), prism_until.split 14,
-  unify 11; parked /root/bool-scratch/parked-points-along.diff. Circular pattern 1: decision asked.
-- qa's knife Mirror 1 +12 ms vs v0.4.53: real, from its different input (upstream Fillet 2 / Chamfer 1), not Boolean code.
-- learning-center-michael (Mac 88 ms vs live 96), cf-spur-gear Boolean 1 (~48 vs 34, diffuse): cases vibe5
-  ~/agents/bool-keep/lcmrec, sgrec.
 - Knife cases: vibe5 ~/tmp/bool/knrec, Mac ~/noshape-host/agents/bool-hat/knrec (17b8 c1d9 Fillet 2, a3f9 Chamfer 1, 682a
-  Mirror 1, then the cuts). Revolve 1 = 54f29c1fecb98afe, Extrude 8 = 5d62643e95aabaa7, Extrude 9 = b58272a7dbba8cc5.
+  Mirror 1); knife Fillet 2's split dump Mac ~/noshape-host/agents/bool-hat/kdump2/split-11.
 
 ## Parked (branches / diffs, not landing as they are)
 - Plane x B-spline marcher: un-parked 11-17, now bool-march (In flight above); its knife regression found and fixed.
