@@ -2016,7 +2016,19 @@ impl Ctx<'_> {
                 let reach = 10.0 * cx.tol.max(stol);
                 let of = |f: usize| cx.faces[f].edges.iter().flat_map(|&(e, _)| cx.edges[e].v).collect::<Vec<u32>>();
                 let (a, b) = (of(fs), of(ft));
-                a.into_iter().filter(|w| b.contains(w)).map(|w| (w, (cx.p(w) - p).length())).filter(|x| x.1 <= reach).min_by(|x, y| x.1.total_cmp(&y.1)).map(|x| x.0)
+                a.into_iter().filter(|w| b.contains(w)).map(|w| (w, (cx.p(w) - p).length())).filter(|x| x.1 <= reach).min_by(|x, y| x.1.total_cmp(&y.1)).map(|x| x.0).or_else(|| {
+                    // (Or a vertex where an edge of each crosses the other's (c2-config-parts-sprockets' rim torus and
+                    // a tooth gap's cylinder: their section meets the top plane at a grazing angle, each face's end of
+                    // it 0.28 um along from that crossing).)
+                    let on = |f: usize, w: u32| {
+                        let q = cx.p(w);
+                        cx.faces[f].edges.iter().any(|&(e, _)| {
+                            let (u, d) = cx.seg_param(&cx.edge_seg(e), q);
+                            d <= cx.pool.pair(cx.edges[e].t, cx.pool.t[w as usize]) && (0.0..=1.0).contains(&u)
+                        })
+                    };
+                    cx.pool.near_tol(p, reach).into_iter().filter(|x| x.1 <= reach && on(fs, x.0) && on(ft, x.0)).min_by(|x, y| x.1.total_cmp(&y.1)).map(|x| x.0)
+                })
             };
             // (OCCT's curve ending inside both faces: a new vertex at its end of the curve's tolerance, OCCT's bound
             // pave.)
@@ -2027,11 +2039,24 @@ impl Ctx<'_> {
             {
                 return Ok(Some(cx.pool.add_tol(path.at(x.0), stol)?));
             }
+            // (Else one of the two faces' ends lying on an edge of each, within ten tolerances: the two edges'
+            // crossing, there before or after (the same sprockets' tooth gaps patterned, their crossings found later).)
+            let crossing = |cx: &Ctx, p: DVec3| {
+                let reach = 10.0 * cx.tol.max(stol);
+                let on = |f: usize, q: DVec3| {
+                    cx.faces[f].edges.iter().any(|&(e, _)| {
+                        let (u, d) = cx.seg_param(&cx.edge_seg(e), q);
+                        d <= cx.pool.pair(cx.edges[e].t, 0.0) && (0.0..=1.0).contains(&u)
+                    })
+                };
+                [x.1, y.1].into_iter().find_map(|o| if let End::Point(q) = o && (q - p).length() <= reach && on(fs, q) && on(ft, q) { Some(q) } else { None })
+            };
             let v = match end {
                 End::Open => return Ok(None),
                 End::Vertex(v) => v,
                 End::Point(p) => match corner(cx, p) {
                     Some(w) => w,
+                    None if let Some(q) = crossing(cx, p) => cx.pool.add(q)?,
                     None => {
                         // (On an edge of one face lying on the other, only within the section's own tolerance (the
                         // impeller's flange wall leaving the shell's edge it was drawn from, OCCT's curve 2 um off it
@@ -7099,7 +7124,10 @@ fn gap(covered: &[(f64, f64)]) -> Option<(f64, f64)> {
     let mut best: Option<(f64, f64)> = None;
     for i in 0..ends.len() {
         let end = ends[i].0 + ends[i].1;
-        let next = ends.iter().map(|e| (e.0 - end).rem_euclid(TAU)).fold(TAU, f64::min);
+        // (An arc starting where this one ends, a rounding before it, follows on: not a turn away (c2-config-parts-
+        // sprockets' rim cylinder, two arcs meeting at its old seam took the whole rest of the turn for its gap, not
+        // the tooth's).)
+        let next = ends.iter().map(|e| (e.0 - end).rem_euclid(TAU)).map(|d| if d > TAU - 1e-9 { 0.0 } else { d }).fold(TAU, f64::min);
         let covered_inside = ends.iter().any(|e| {
             let d = (end - e.0).rem_euclid(TAU);
             d > 1e-12 && d < e.1 - 1e-12
