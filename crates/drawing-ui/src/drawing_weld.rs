@@ -81,6 +81,8 @@ fn joint_icon(j: WeldJoint, below: bool) -> Option<String> {
         WeldJoint::PlugSlot => "plug-slot",
         WeldJoint::Seam => "seam",
         WeldJoint::Spot => "spot",
+        WeldJoint::SeamCentered => return Some("weld-seam-centered".into()),
+        WeldJoint::SpotCentered => return Some("weld-spot-centered".into()),
     };
     Some(format!("weld-{slug}{}", if below { "-below" } else { "" }))
 }
@@ -289,7 +291,8 @@ impl DrawingEditor {
                 JointSpacer::None => (side.joint, true),
                 sp => (sp.joint(), false),
             };
-            let joints: Vec<(Option<String>, String, bool, SetSpec)> = WeldJoint::ALL
+            let choices: &[WeldJoint] = if other { &WeldJoint::OTHER_SIDE } else { &WeldJoint::ALL };
+            let joints: Vec<(Option<String>, String, bool, SetSpec)> = choices
                 .iter()
                 .map(|&j| (menu_icon(joint_icon(j, false)), j.name().to_string(), j == side.joint, std::rc::Rc::new(move |s: &mut WeldSpec| if other { s.other.joint = j } else { s.arrow.joint = j }) as SetSpec))
                 .collect();

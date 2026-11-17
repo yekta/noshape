@@ -725,7 +725,7 @@ pub fn ops() -> Vec<Op> {
             summary: "Weld symbol",
             description: Box::leak(
                 format!(
-                    "The Weld symbol tool and dialog: the arrow points at `target` (a vertex, edge or point of a view, sheet mm), the reference line starts at `position`. `spec` is the dialog: `arrow` and `other` sides ({{joint, size, depth, length, pitch, contour, finish, root, groove}}; joints: {}; contours: None, Flat, Convex, Concave; finishes: \"\", C, G, H, M, R, U), `spacer` ({}), `stagger`, `stagger_right`, `symmetric`, `flip`, `flip_id_line`, `all_around`, `flag` (None, Up, Down), `reference` (tail text). One edit (\"Weld symbol\").",
+                    "The Weld symbol tool and dialog: the arrow points at `target` (a vertex, edge or point of a view, sheet mm), the reference line starts at `position`. `spec` is the dialog: `arrow` and `other` sides ({{joint, size, depth, length, pitch, contour, finish, root, groove}}; joints: {}, SeamCentered and SpotCentered on the other side only; contours: None, Flat, Convex, Concave; finishes: \"\", C, G, H, M, R, U), `spacer` ({}), `stagger`, `stagger_right`, `symmetric`, `flip`, `flip_id_line`, `all_around`, `flag` (None, Up, Down), `reference` (tail text). One edit (\"Weld symbol\").",
                     noshape_model::drawing::weld::WeldJoint::ALL.iter().map(|j| format!("{j:?}")).collect::<Vec<_>>().join(", "),
                     noshape_model::drawing::weld::JointSpacer::ALL.iter().map(|j| format!("{j:?}")).collect::<Vec<_>>().join(", ")
                 )
@@ -1921,6 +1921,9 @@ fn weld(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None | Some(Value::Null) => Default::default(),
         Some(v) => serde_json::from_value(v.clone()).map_err(|e| OpError::param("spec", &e.to_string()))?,
     };
+    if spec.arrow.joint.centered() {
+        return Err(OpError::param("spec", &format!("arrow.joint: {} is in the other side's list only", spec.arrow.joint.name())));
+    }
     let c = pt_arg(a, "target")?;
     let (view, target) = t.m.pick(&Tool::Weld, &[], c).weld_target(c);
     let sheet = t.sheet;

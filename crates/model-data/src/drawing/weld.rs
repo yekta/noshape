@@ -27,6 +27,9 @@ pub enum WeldJoint {
     PlugSlot,
     Seam,
     Spot,
+    /// Centered on the reference line, from the other side's list only (live2 drw-weld-panel-lists).
+    SeamCentered,
+    SpotCentered,
 }
 
 impl WeldJoint {
@@ -48,6 +51,31 @@ impl WeldJoint {
         WeldJoint::Spot,
     ];
 
+    /// The other side's dropdown: [`Self::ALL`] and the joints centered on the line.
+    pub const OTHER_SIDE: [WeldJoint; 16] = [
+        WeldJoint::None,
+        WeldJoint::SquareGroove,
+        WeldJoint::VGroove,
+        WeldJoint::UGroove,
+        WeldJoint::JGroove,
+        WeldJoint::BevelGroove,
+        WeldJoint::BevelButtBroadRoot,
+        WeldJoint::VFlareGroove,
+        WeldJoint::BevelFlareGroove,
+        WeldJoint::Bead,
+        WeldJoint::Fillet,
+        WeldJoint::PlugSlot,
+        WeldJoint::Seam,
+        WeldJoint::Spot,
+        WeldJoint::SeamCentered,
+        WeldJoint::SpotCentered,
+    ];
+
+    /// Drawn on the reference line rather than on a side of it.
+    pub fn centered(self) -> bool {
+        matches!(self, WeldJoint::SeamCentered | WeldJoint::SpotCentered)
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             WeldJoint::None => "None",
@@ -64,6 +92,8 @@ impl WeldJoint {
             WeldJoint::PlugSlot => "Plug or Slot joint",
             WeldJoint::Seam => "Seam joint",
             WeldJoint::Spot => "Spot joint",
+            WeldJoint::SeamCentered => "Seam centered joint",
+            WeldJoint::SpotCentered => "Spot centered joint",
         }
     }
 }
@@ -240,10 +270,10 @@ fn glyph(g: &mut SheetGeometry, j: WeldJoint, x: f64, y: f64, dir: f64, pick: u3
         }
         WeldJoint::Fillet => line(g, vec![[x, y], [x, y + h], [x + S, y]], false),
         WeldJoint::PlugSlot => line(g, vec![[x, y], [x, y + h * 0.8], [x + 3.0, y + h * 0.8], [x + 3.0, y]], false),
-        WeldJoint::Seam | WeldJoint::Spot => {
-            let cy = y + h * 0.5;
+        WeldJoint::Seam | WeldJoint::Spot | WeldJoint::SeamCentered | WeldJoint::SpotCentered => {
+            let cy = if j.centered() { y } else { y + h * 0.5 };
             line(g, arc([x + 1.5, cy], 1.4, 0.0, std::f64::consts::TAU), true);
-            if j == WeldJoint::Seam {
+            if matches!(j, WeldJoint::Seam | WeldJoint::SeamCentered) {
                 line(g, vec![[x - 0.4, cy + 0.5], [x + 3.4, cy + 0.5]], false);
                 line(g, vec![[x - 0.4, cy - 0.5], [x + 3.4, cy - 0.5]], false);
             }
@@ -412,5 +442,22 @@ mod tests {
         render(&mut g2, &WeldSpec { flip: true, ..spec.clone() }, &[[100.0, 100.0]], [110.0, 110.0], 2.5, true, 1);
         assert!(g2.lines.iter().any(|l| l.style == LineStyle::Hidden));
         assert!(g2.texts[0].pos[1] > 110.0);
+    }
+
+    /// Seam / Spot centered joint (live2 drw-weld-panel-lists): the circle sits on the reference line, where the other
+    /// side's Seam joint stands above it.
+    #[test]
+    fn a_centered_joints_circle_sits_on_the_reference_line() {
+        let circle_mid = |joint: WeldJoint| {
+            let mut g = SheetGeometry::new(420.0, 297.0);
+            render(&mut g, &WeldSpec { other: WeldSide { joint, ..Default::default() }, ..Default::default() }, &[[100.0, 100.0]], [110.0, 110.0], 2.5, false, 1);
+            let c = g.lines.iter().find(|l| l.closed).expect("the circle");
+            let (lo, hi) = c.points.iter().fold((f64::MAX, f64::MIN), |(a, b), p| (a.min(p[1]), b.max(p[1])));
+            (lo + hi) / 2.0
+        };
+        assert!((circle_mid(WeldJoint::SeamCentered) - 110.0).abs() < 1e-9);
+        assert!((circle_mid(WeldJoint::SpotCentered) - 110.0).abs() < 1e-9);
+        assert!(circle_mid(WeldJoint::Seam) > 111.0);
+        assert!(WeldJoint::OTHER_SIDE.ends_with(&[WeldJoint::SeamCentered, WeldJoint::SpotCentered]) && !WeldJoint::ALL.iter().any(|j| j.centered()));
     }
 }

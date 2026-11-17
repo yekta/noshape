@@ -5072,7 +5072,7 @@ Examples:
 
 Weld symbol (edits the document (one undoable history entry)).
 
-The Weld symbol tool and dialog: the arrow points at `target` (a vertex, edge or point of a view, sheet mm), the reference line starts at `position`. `spec` is the dialog: `arrow` and `other` sides ({joint, size, depth, length, pitch, contour, finish, root, groove}; joints: None, SquareGroove, VGroove, UGroove, JGroove, BevelGroove, BevelButtBroadRoot, VFlareGroove, BevelFlareGroove, Bead, Fillet, PlugSlot, Seam, Spot; contours: None, Flat, Convex, Concave; finishes: "", C, G, H, M, R, U), `spacer` (None, DoubleV, DoubleBevel, DoubleU, DoubleJ, DoubleFlareV, DoubleFlareBevel), `stagger`, `stagger_right`, `symmetric`, `flip`, `flip_id_line`, `all_around`, `flag` (None, Up, Down), `reference` (tail text). One edit ("Weld symbol").
+The Weld symbol tool and dialog: the arrow points at `target` (a vertex, edge or point of a view, sheet mm), the reference line starts at `position`. `spec` is the dialog: `arrow` and `other` sides ({joint, size, depth, length, pitch, contour, finish, root, groove}; joints: None, SquareGroove, VGroove, UGroove, JGroove, BevelGroove, BevelButtBroadRoot, VFlareGroove, BevelFlareGroove, Bead, Fillet, PlugSlot, Seam, Spot, SeamCentered and SpotCentered on the other side only; contours: None, Flat, Convex, Concave; finishes: "", C, G, H, M, R, U), `spacer` (None, DoubleV, DoubleBevel, DoubleU, DoubleJ, DoubleFlareV, DoubleFlareBevel), `stagger`, `stagger_right`, `symmetric`, `flip`, `flip_id_line`, `all_around`, `flag` (None, Up, Down), `reference` (tail text). One edit ("Weld symbol").
 
 Examples:
 

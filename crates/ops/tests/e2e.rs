@@ -3705,6 +3705,10 @@ fn drawing_callouts_ordinates_and_datums() {
     assert!(last(&mut ctx).ends_with(":: Weld symbol"));
     let e = try_call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [10, 10], "spec": { "arrow": { "joint": "Glue" } } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("spec"), "{e:?}");
+    // The joints centered on the line come from the other side's list only (live2 drw-weld-panel-lists).
+    call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [a0[0] - 30.0, a0[1] + 30.0], "spec": { "other": { "joint": "SeamCentered" } } }));
+    let e = try_call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [10, 10], "spec": { "arrow": { "joint": "SpotCentered" } } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("spec"), "{e:?}");
     // Edge condition symbol (live 1955): on an edge, a row's sign and value, All around, ( ).
     let ec = call(&mut ctx, "drawing_edge_condition", json!({ "drawing": tab, "target": a0, "position": [a0[0] + 15.0, a0[1] + 15.0], "rows": [{ "sign": "+", "value": "0.3 mm" }], "all_around": true, "parens": true }));
     let ecid = ec["annotation"].clone();
