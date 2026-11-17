@@ -95,6 +95,42 @@ pub struct Step {
     pub suppressed: bool,
 }
 
+/// Whether a feature's parameter is shown under its translated choices (an Extrude's up-to face isn't under Through
+/// all: one live can't resolve there either names nothing, c2-config-parts-pulleys' Extrude 2).
+fn shown(ty: &str, params: &Map<String, Value>, id: &str) -> bool {
+    use noshape_model::params::{ParamKind, ParamValue};
+    let Some(ft) = noshape_model::features::get(ty) else { return true };
+    let Some(spec) = ft.params.iter().find(|s| s.id == id) else { return true };
+    let mut values = noshape_model::partstudio::PartStudio::new().new_feature(ty, &Default::default()).map(|f| f.params).unwrap_or_default();
+    for s in &ft.params {
+        match (&s.kind, params.get(s.id)) {
+            (ParamKind::Enum { .. }, Some(Value::String(v))) => values.set(s.id, ParamValue::Enum(v.clone())),
+            (ParamKind::Bool { .. }, Some(Value::Bool(b))) => values.set(s.id, ParamValue::Bool(*b)),
+            _ => {}
+        }
+    }
+    spec.is_visible(&values)
+}
+
+/// How far a sketch_get point, circle, arc or ellipse (`e`) is from `at` (its units), None for other kinds.
+fn off_curve(e: &Value, at: [f64; 2]) -> Option<f64> {
+    let pt = |v: &Value| Some([v[0].as_f64()?, v[1].as_f64()?]);
+    let dist = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+    match e["type"].as_str()? {
+        "point" => Some(dist(pt(&e["at"])?, at)),
+        "circle" => Some((dist(pt(&e["center"])?, at) - e["radius"].as_f64()?).abs()),
+        "arc" => Some((dist(pt(&e["center"])?, at) - dist(pt(&e["center"])?, pt(&e["start"])?)).abs()),
+        "ellipse" | "elliptical_arc" => {
+            let (c, m, b) = (pt(&e["center"])?, pt(&e["major"])?, e["minor_radius"].as_f64()?);
+            let a = m[0].hypot(m[1]);
+            let (dx, dy) = (at[0] - c[0], at[1] - c[1]);
+            let (s, t) = ((dx * m[0] + dy * m[1]) / a, (dy * m[0] - dx * m[1]) / a);
+            Some(((s / a).hypot(t / b) - 1.0).abs() * a.min(b))
+        }
+        _ => None,
+    }
+}
+
 /// The default planes' and the Origin's deterministic ids in every Part Studio, and ours.
 const DEFAULT_IDS: [(&str, &str); 4] = [("JDC", "plane:top"), ("JCC", "plane:front"), ("JEC", "plane:right"), ("IB", "origin")];
 
@@ -679,6 +715,11 @@ impl<'a> Translator<'a> {
             if !self.config_inputs.contains(input) {
                 continue;
             }
+            // A Variable's configured value: ours by its type (c2-config-parts-sprockets' #Teeth, a number).
+            let param = match (f["featureType"].as_str(), param) {
+                (Some("assignVariable"), "value") => variable_value_key(f),
+                _ => param,
+            };
             if let Err(e) = self.configure_values(k, json!({ "feature": id, "param": param }), input, p) {
                 problems.push(format!("{param}: not configured ({e})"));
             }
@@ -1162,6 +1203,7 @@ impl<'a> Translator<'a> {
         let known: Vec<String> = schema["params"]["properties"].as_object().map(|m| m.keys().cloned().collect()).unwrap_or_default();
         let mut params = Map::new();
         let mut unknown = Vec::new();
+        let mut failed: Vec<(String, String)> = Vec::new();
         let given: Vec<&str> = f["parameters"].as_array().into_iter().flatten().filter_map(|p| p["parameterId"].as_str()).collect();
         let mut tolerances = 0;
         // A Hole before V2: its standard is today's table for its units and
@@ -1245,9 +1287,10 @@ impl<'a> Translator<'a> {
                     }
                     Err(e) => problems.push(format!("{id}: {e}")),
                 },
-                Err(e) => problems.push(format!("{id}: {e}")),
+                Err(e) => failed.push((id.to_string(), e)),
             }
         }
+        problems.extend(failed.into_iter().filter(|(id, _)| shown(ty, &params, id)).map(|(id, e)| format!("{id}: {e}")));
         problems.append(&mut self.partial);
         // A pre-V2 Hole without units: its standard's, for its table to count.
         if legacy_table.is_some() && !given.contains(&"unitsSystem") && known.iter().any(|n| n == "unitsSystem") {
@@ -2402,7 +2445,8 @@ impl<'a> Translator<'a> {
             // A table from another element (Variable's lookup mode): none chosen is nothing to set.
             "BTMParameterReferenceTable" if p["elementLibraryData"]["elementLibraryId"].as_str().is_none_or(str::is_empty) => None,
             "BTMParameterFeatureList" => {
-                let ids: Vec<String> = p["featureIds"].as_array().into_iter().flatten().filter_map(Value::as_str).map(|id| self.feature_ids.get(id).map(|o| format!("feature:{o}")).ok_or_else(|| format!("feature {id} was not built"))).collect::<Result<_, _>>()?;
+                // An id no feature of the document has (deleted in live) names nothing, as in live.
+                let ids: Vec<String> = p["featureIds"].as_array().into_iter().flatten().filter_map(Value::as_str).filter(|id| self.feature_ids.contains_key(*id) || self.features.iter().any(|f| f["featureId"] == *id)).map(|id| self.feature_ids.get(id).map(|o| format!("feature:{o}")).ok_or_else(|| format!("feature {id} was not built"))).collect::<Result<_, _>>()?;
                 Some(json!(ids))
             }
             // A Frame's profile sketch in another Part Studio of the document: ours `<tab id>#<sketch>.4294967295`
@@ -2506,11 +2550,19 @@ impl<'a> Translator<'a> {
             return Ok(found);
         }
         // A sketch entity named in the text is that entity, before anything lying where live's id is (c2-rings-loft's
-        // Revolve 1 axis: the Axis sketch's line, not a construction point of the profile's sketch on it).
-        if let Some(e) = q["queryString"].as_str().and_then(|t| self.sketch_entity_from_query(t)) {
+        // Revolve 1 axis: the Axis sketch's line, not a construction point of the profile's sketch on it); a Mate
+        // connector feature's connector too, not the vertex at its origin (c2-config-parts-linear-rail's Linear pattern
+        // 1 along Mate connector 1).
+        if let Some(e) = q["queryString"].as_str().and_then(|t| self.sketch_entity_from_query(t).or_else(|| self.mate_connector_from_query(t))) {
             return Ok(vec![e]);
         }
         self.query_with(k, q, true)
+    }
+
+    /// A Mate connector feature's connector (`dummyQuery(id+"F….mateConnectorOp", …)`, written or packed): ours.
+    fn mate_connector_from_query(&self, text: &str) -> Option<String> {
+        let fid = text.split("id+\"").nth(1).and_then(|r| r.split(".mateConnectorOp\"").next()).filter(|f| !f.contains('"')).map(str::to_string).or_else(|| packed_strings_of(text).iter().find_map(|s| s.strip_suffix(".mateConnectorOp").map(str::to_string)))?;
+        self.feature_ids.get(&fid).map(|ours| format!("mc:{ours}.0"))
     }
 
     /// Our sketch `id`'s sketch_get (cached until an edit can change it, [`Self::call`]: asm-infento-subs' studio
@@ -2751,11 +2803,8 @@ impl<'a> Translator<'a> {
         {
             return Ok(vec![format!("body:{ours}.0")]);
         }
-        // A Mate connector feature's connector (`dummyQuery(id+"F….mateConnectorOp", …)`), written or packed.
-        if let Some(fid) = text.split("id+\"").nth(1).and_then(|r| r.split(".mateConnectorOp\"").next()).filter(|f| !f.contains('"')).map(str::to_string).or_else(|| packed_strings_of(text).iter().find_map(|s| s.strip_suffix(".mateConnectorOp").map(str::to_string)))
-            && let Some(ours) = self.feature_ids.get(&fid)
-        {
-            return Ok(vec![format!("mc:{ours}.0")]);
+        if let Some(mc) = self.mate_connector_from_query(text) {
+            return Ok(vec![mc]);
         }
         if let Some(r) = self.blended_face_from_query(text) {
             return r.map(|e| vec![e]);
@@ -5175,6 +5224,29 @@ impl<'a> Translator<'a> {
             let d = (0..3).map(|i| (p[i] - live[i]).powi(2)).sum::<f64>().sqrt();
             worst = Some(worst.map_or(d, |w| w.max(d)));
         }
+        // A PIERCE whose external edge (live's) ends on the sketch plane: that end is where it pierces, so how far our
+        // local point or curve is from it (c2-surf-workshop-pipe's Loft profile 3: stored 2.69 mm off its guides, which
+        // are live's; live re-solves it onto them).
+        let normal = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+        let entities = g["entities"].as_array()?;
+        for c in f["constraints"].as_array()?.iter().filter(|c| c["constraintType"] == "PIERCE") {
+            let params = c["parameters"].as_array().map(Vec::as_slice).unwrap_or_default();
+            let local = params.iter().find(|p| p["parameterId"] == "localEntity").and_then(|p| p["value"].as_str());
+            let query = params.iter().find(|p| p["parameterId"] == "externalEdge").and_then(|p| p["queries"].as_array()).map(Vec::as_slice);
+            let (Some(local), Some([q])) = (local, query) else { continue };
+            let Some([id]) = q["deterministicIds"].as_array().map(Vec::as_slice) else { continue };
+            let Some(ends) = id.as_str().and_then(|id| self.refs.get(&(k, id.to_string()))).filter(|r| r.kind == "EDGE").and_then(|r| r.ends) else { continue };
+            let Some(e) = self.sketch_entities.get(&(oid.to_string(), local.to_string())).and_then(|e| entities.iter().find(|x| x["id"] == e.as_str())) else { continue };
+            for end in ends {
+                let rel = [0, 1, 2].map(|i| end[i] / u - o[i]);
+                if (0..3).map(|i| rel[i] * normal[i]).sum::<f64>().abs() * u > 1e-6 {
+                    continue;
+                }
+                let at = [(0..3).map(|i| rel[i] * x[i]).sum::<f64>(), (0..3).map(|i| rel[i] * y[i]).sum::<f64>()];
+                let Some(d) = off_curve(e, at) else { continue };
+                worst = Some(worst.map_or(d * u, |w| w.max(d * u)));
+            }
+        }
         worst
     }
 
@@ -7143,13 +7215,7 @@ fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>)
         }
         "assignVariable" => {
             if let Some(v) = done("value", params) {
-                let key = match params.get("variableType").and_then(Value::as_str) {
-                    Some("ANGLE") => "angleValue",
-                    Some("NUMBER") => "numberValue",
-                    Some("ANY") => "anyValue",
-                    _ => "lengthValue",
-                };
-                params.entry(key).or_insert(v);
+                params.entry(variable_value_key_of(params.get("variableType").and_then(Value::as_str))).or_insert(v);
             }
         }
         _ => {}
@@ -7157,6 +7223,22 @@ fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>)
     for u in unknown.iter() {
         params.remove(u);
     }
+}
+
+/// Our Variable feature's value parameter for live's `variableType`.
+fn variable_value_key_of(variable_type: Option<&str>) -> &'static str {
+    match variable_type {
+        Some("ANGLE") => "angleValue",
+        Some("NUMBER") => "numberValue",
+        Some("ANY") => "anyValue",
+        _ => "lengthValue",
+    }
+}
+
+/// [`variable_value_key_of`] for a live Variable feature `f`.
+fn variable_value_key(f: &Value) -> &'static str {
+    let ty = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "variableType").and_then(|p| p["value"].as_str());
+    variable_value_key_of(ty)
 }
 
 /// Onshape's default planes in a query string (`dummyQuery(id + "Top.planeOp"…)`,

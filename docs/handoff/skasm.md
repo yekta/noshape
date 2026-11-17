@@ -1,45 +1,44 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-17 10:16 UTC (restarted 09:20). Read docs/DECISIONS.md
+Updated 2026-11-17 11:38 UTC (restarted 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## Unlanded (worktree /root/projects/noshape-wt/skasm, rebased on 143f22c12 2026-11-17 09:2x)
-- d3e6bcef5 (commit A of 11-16, squashed): held-direction zero lines, edge-on circle Use, orphans, bodies-line sketch
-  ids, use_entity, solved_circles, refs-sk.jsonl, sm-box colour (psui 4973e295-9e92-463f-a13f-2ec5258bc5f9 waits on it: tell psui when it lands), take-back
-  TRACE. Core landed the same curved-wall flat (198c2b6d3) and sheet metal Move face (b0e98fa3c): main's code kept,
-  my two tests kept.
-- b0bee2b62: while a feature is edited, sheet metal chips take label_owners from before_context (qa's bend/jog
-  re-edit regression "Face of Bend 1" vs live "Face of Sheet metal model 1"). Verify: skasm-uip-1117a (vibe6 app build
-  + run.py bend-new-edit-reedit jog-new-edit-reedit, starts when the pair starts) -> /root/skasm-scratch/uip-1117a.log.
-- a26f18913 Bezier `<id>.<n>.internal` = poles, BEZIER_DEGREE checked, EQUAL_CURVATURE(_G3) -> Curvature / Flow.
-- 036070cc4 INTERSECTED via sketch_intersection; ids-only edge that is a sketch spline -> that spline by its ends.
-- (Committed since:) Pierce takes a curve (scene constraint_applicable; live's
-  pipe Loft profiles / knifehandle P2-P6 pierce ellipses and circles; live capture asked in REQUESTS.md 10:12);
-  CONCENTRIC of a model point and `X.center` takes the circle (manualblend Sketch 5); a sketch solve that lands
-  live's COINCIDENT model vertices (refs points) is kept, not taken back (cpcurves Sketch 4); AGENT_API.md regenerated
-  on the Mac (copy it back: mac ~/agents/skasm/src/docs/AGENT_API.md).
-- 52447d4eb Pierce takes a curve (live confirmed 10:12 capture), Concentric model point + `X.center`, anchored solves
-  kept, AGENT_API.md; e5f43fb96 Pierce 3-pick refusal text; ca5c2d9f0 configured docs drawn at sketches.json's
-  captured solve.
-- Single-doc effects (ops-b 10:41 vs ops-a main): config-parts 86 -> 131/156 features (links 10 -> 34, standoffs
-  13 -> 31, linear-rail 22 -> 24, pulleys 11 -> 12; nuts, sprockets same); manualblend 9 -> 11/19; cpcurves 7 -> 8/24;
-  tablet-stand 16/16; BEZIER / internal-point drops gone in the surface workshop documents.
+## Landed today
+- 0bb94eede (11:23) flat-view colour fix (a FeatureScript feature's colours go to the bodies it leaves); psui told.
+
+## Unlanded (worktree /root/projects/noshape-wt/skasm, branch agent/skasm)
+- Committed: d3e6bcef5 (commit A of 11-16), b0bee2b62 (sheet metal chips on re-edit), a26f18913 (Bezier poles,
+  BEZIER_DEGREE, EQUAL_CURVATURE), 036070cc4 (INTERSECTED, ids-only spline edges), 52447d4eb (Pierce takes a curve,
+  Concentric model point, anchored solves kept), e5f43fb96 (Pierce 3-pick refusal), ca5c2d9f0 (configured documents
+  drawn at sketches.json's captured solve), handoff commits.
+- Uncommitted (parity.rs + tests): a pattern direction naming a mate connector takes the connector (linear-rail
+  24 -> 26/26); a configured Variable's value goes to its typed key (sprockets); a feature list drops ids of features
+  deleted from the document, and a hidden parameter's failed query isn't a problem (pulleys' Circular pattern 1 and
+  Extrude 2); a solve onto where live's edge (ending on the plane) pierces the sketch is kept (pipe's Loft profile 3);
+  tests stale_references_live_ignores_name_nothing, a_configured_variable_value_is_configured,
+  a_solve_onto_lives_pierce_point_is_kept. Our Pierce of a circle grows its radius (5 -> 6.5 mm in that test); live
+  keeps the radius and shifts the circle: a solver item.
+- Single-doc effects vs main: config-parts 86 -> 131/156 (+2 linear-rail now); manualblend 9 -> 11/19; cpcurves
+  7 -> 8/24; tablet-stand 16/16.
 
 ## Running
-- skasm-pair-1117a: vibe6 `~/bin/slot pairrun.sh 1117a` (ops-a = main 143f22c12, ops-b = skasm; rebuild ops-b with
-  .smb.sh before the slot frees) -> vibe6 ~/agents/skasm-keep/pair-1117a-{a,b}.log; waits behind qa's suite (08:40).
+- skasm-pair-1117a: vibe6 slot pairrun.sh (ops-a = main 143f22c12, ops-b 09:48) -> ~/agents/skasm-keep/pair-1117a-
+  {a,b}.log; a started 11:17.
+- skasm-mac-1117p: Mac parity:: tests -> /root/skasm-scratch/mac-1117p.log (needs a rerun with the hidden-parameter rule).
+- skasm-pu-1117c, then skasm-tr-1117a (pulleys, pipe traces) -> /root/skasm-scratch/tr-<doc>.log, vibe6
+  ~/agents/skasm/trace-<doc>.log.
 
 ## Next, in order
-1. Pair green -> land A + chip fix (+ Bezier mapping if in ops-b). Tell psui.
-2. Surface workshop (lead's order 11-17): mutualtrim Sweep 1 handed back to core 09:5x (our sketch and Plane 1 are
-   live's; our sweep's rails are 36.5 mm, live 94.15: trimEnds cuts the path at world z 0). pipe (core's return):
-   PIERCE to Side profile's Beziers by id alone mapped to a body edge; fix uncommitted (LiveRef.ends,
-   sketch_curve_at matches splines by ends; parity a_pierce_to_a_sketch_bezier_by_its_id_takes_that_curve). Then
-   surface-workshop drops: INTERSECTED (Onshape's sketch Intersect tool, SECTION: manualblend Sketch 6/7; we have no
-   such tool), PIERCE rejected (same sketches), britatap Blend curves taken back (14 mm), cpcurves Sketch 4.
-3. core's sketch cases below. 4. tablet-stand Flange 2 (core landed Move face; re-check first). 5. Remaining dropped
-   constraints (valve-config text centre, hex-bookcase, knife 12, duct, impeller, clamp-guillem MIDPOINT, rings-loft /
-   rib-wrap, bottle-split, spur-gear, fan-blade 14).
+1. Mac tests green -> commit the uncommitted fixes, land the stack (lead 11-17: land now; the pair checks after).
+2. config-parts' rest: pulleys Circular pattern 1 (face pattern of one groove, "Failed to create pattern" on main
+   too: core's once the translation is whole); sprockets 16/24 (from Circular pattern 1 on one volume, 3302.3612 vs
+   live 3302.3558 mm³, 1.6e-6 relative: live's band asked in REQUESTS.md 11:28); standoffs Hole 2 message (diameter
+   expression 0: ours "A parameter value is not valid.", live "Error regenerating: a parameter is out of range.":
+   rule asked in REQUESTS.md 11:28); nuts Sweep 1 non-manifold (bool's per core's handoff); links Derived 1 NOT BUILT.
+3. Surface workshop: pipe Loft profile 3 Pierce taken back (2.69 mm off our guide), knifehandle P4, britatap,
+   manualblend; core has mutualtrim Sweep 1. Live's Pierce answer: a circle stays on the spline as a curve (shifted
+   2 mm, radius kept); a centre point moves onto the spline.
+4. core's sketch cases below. 5. tablet-stand Flange 2. 6. Remaining dropped constraints (see archive).
 
 ## core's sketch cases (2026-11-16), queue item 3
 - c2-sm-rocker-enclosure-sm Extrude 2 (now its first difference once core's split-face attributes fix lands, 8/14):

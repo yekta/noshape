@@ -1721,6 +1721,73 @@ fn a_sketch_on_an_in_context_face_is_built_on_live_frame() {
     assert!(faces["faces"].as_array().unwrap().iter().any(|f| near(&f["centroid"])), "no cap at {cap:?}: {faces}");
 }
 
+/// A Variable whose value a List configures (c2-config-parts-sprockets' #dr, #r, #g by pitch): ours configured on its
+/// typed value parameter, each configuration's value set (was refused: "Variable 3 has no parameter `value`").
+#[test]
+fn a_configured_variable_value_is_configured() {
+    let configured = json!({ "btType": "BTMParameterConfigured-2222", "parameterId": "value", "configurationParameterId": "List_abc",
+        "values": ([("Default", "10 mm"), ("Long", "30 mm")].iter().map(|(o, v)| json!({ "btType": "BTMConfiguredValueByEnum-1923", "enumName": "List_abc_conf", "enumValue": o,
+            "value": { "btType": "BTMParameterQuantity-147", "parameterId": "", "expression": v } })).collect::<Vec<_>>()) });
+    let doc = json!({ "features": [
+        { "btType": "BTMFeature-134", "featureType": "assignVariable", "featureId": "FV", "name": "###name = #value", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "variableType", "value": "LENGTH" },
+            { "btType": "BTMParameterString-149", "parameterId": "name", "value": "d" }, configured] },
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"], "queryString": "query=qCompressed(1.0,\"%B5$QueryM4S…TopplaneOp…\",id);" }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.005, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "#d" }] }
+    ], "configuration": { "configurationParameters": [{ "btType": "BTMConfigurationParameterEnum-105", "parameterId": "List_abc", "parameterName": "Size", "defaultValue": "Default",
+        "options": [{ "option": "Default", "optionName": "Default" }, { "option": "Long", "optionName": "Long one" }] }] } });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("configured-variable.noshape"), &doc, Default::default()).unwrap();
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok") && s.problems.is_empty(), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+    }
+    let volume = |t: &mut Translator| t.call("query_parts", json!({})).unwrap()["parts"][0]["volume"].as_f64().unwrap();
+    let pi = std::f64::consts::PI;
+    assert!((volume(&mut t) - pi * 25.0 * 10.0).abs() < 1e-3, "Default: 10 mm");
+    t.call("config_activate", json!({ "values": { "List_abc": "Long" } })).unwrap();
+    assert!((volume(&mut t) - pi * 25.0 * 30.0).abs() < 1e-3, "Long: 30 mm");
+}
+
+/// Stale references live ignores name nothing (c2-config-parts-pulleys): a feature list's id of a feature deleted from
+/// the document (the feature beside it is still mirrored), and a hidden parameter's query no entity answers (a Blind
+/// Extrude's up-to face).
+#[test]
+fn stale_references_live_ignores_name_nothing() {
+    let doc = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JCC"], "queryString": "query=qCompressed(1.0,\"%B5$QueryM4S…FrontplaneOp…\",id);" }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.005, "xCenter": 0.0, "yCenter": 0.02, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "10 mm" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "endBoundEntityFace", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JZZ"], "queryString": "query=qCompressed(1.0,\"%B5$QueryM4S…gone…\",id);" }] }] },
+        { "btType": "BTMFeature-134", "featureType": "mirror", "featureId": "FM1", "name": "Mirror 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "patternType", "value": "FEATURE" },
+            { "btType": "BTMParameterFeatureList-1749", "parameterId": "instanceFunction", "featureIds": ["FE1", "Fgone"] },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "mirrorPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"], "queryString": "query=qCompressed(1.0,\"%B5$QueryM4S…TopplaneOp…\",id);" }] }] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("deleted-feature-list.noshape"), &doc, Default::default()).unwrap();
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok") && s.problems.is_empty(), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+    }
+    let parts = t.call("query_parts", json!({})).unwrap();
+    let volume: f64 = parts["parts"].as_array().unwrap().iter().filter_map(|p| p["volume"].as_f64()).sum();
+    assert!((volume - 2.0 * std::f64::consts::PI * 25.0 * 10.0).abs() < 1e-3, "the cylinder and its mirror: {parts}");
+}
+
 /// A List configuration input with its configured values (an Extrude's depth, a sketch's diameter): built under
 /// live's ids, the default as live's, each configuration's values set (asm-welding-config's Part 8 instances at
 /// Circle1in…: their mates' connectors are on the configured circle).
@@ -2811,6 +2878,34 @@ fn a_pierce_to_a_sketch_bezier_by_its_id_takes_that_curve() {
     assert!(step.problems.is_empty(), "{:?}", step.problems);
     let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
     assert_eq!(g["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == "Pierce").count(), 2, "{g}");
+}
+
+/// A sketch whose stored curve lags where live's edge, ending on its plane, pierces it (c2-surf-workshop-pipe's Loft
+/// profile 3: its half-ellipse 2.69 mm off the guides, which are live's): the solve onto the edge's end is kept.
+#[test]
+fn a_solve_onto_lives_pierce_point_is_kept() {
+    let plane = |name: &str| json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": format!("query=dummyQuery(id+\"{name}.planeOp\",EntityType.FACE);") }] }]);
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1", "parameters": plane("Top"),
+          "entities": [{ "btType": "BTMSketchCurveSegment-155", "entityId": "bz", "startPointId": "bz.start", "endPointId": "bz.end", "startParam": 0.0, "endParam": 1.0,
+              "geometry": { "btType": "BTCurveGeometryControlPointSpline-2197", "controlPointCount": 4, "dimension": 2, "isPeriodic": false, "isRational": false, "isBezier": true, "degree": 3,
+                  "controlPoints": [-0.02, 0.01, -0.01, 0.015, -0.005, 0.005, 0.0, 0.01], "knots": [0, 0, 0, 0, 1, 1, 1, 1] } }], "constraints": [] },
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2", "parameters": plane("Right"),
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "ci", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.005, "xCenter": 0.01, "yCenter": 0.008, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "PIERCE", "entityId": "pc", "parameters": [
+              { "btType": "BTMParameterQueryList-148", "parameterId": "externalEdge", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "", "deterministicIds": ["JE"] }] },
+              { "btType": "BTMParameterString-149", "parameterId": "localEntity", "value": "ci" }] }] }
+    ] });
+    let refs = json!({ "index": 1, "id": "JE", "kind": "EDGE", "curveType": "SPLINE", "body": "JX", "point": [-0.009, 0.0105, 0.0], "start": [-0.02, 0.01, 0.0], "end": [0.0, 0.01, 0.0], "length": 0.0215 }).to_string();
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("pierce-point-kept.noshape"), &features, parse_refs(&refs)).unwrap();
+    assert!(t.step(0).problems.is_empty());
+    let step = t.step(1);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    let circle = g["entities"].as_array().unwrap().iter().find(|e| e["type"] == "circle").cloned().unwrap_or_default();
+    let c = [circle["center"][0].as_f64().unwrap(), circle["center"][1].as_f64().unwrap()];
+    assert!(((c[0] - 10.0).hypot(c[1]) - circle["radius"].as_f64().unwrap()).abs() < 1e-6, "the circle through (10, 0) mm: {g}");
 }
 
 /// A Concentric between a model point and a circle's centre (c2-surf-workshop-manualblend's Sketch 5: vertex JNE and
