@@ -1,6 +1,6 @@
 {
  "scenario": "drw-weld-flip-identification-line",
- "recorded": "2026-11-17T10:18:03.996Z",
+ "recorded": "2026-11-17T12:22:55.187Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
@@ -9,12 +9,12 @@
    1919,
    1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.2"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "5d7789f0ffc80aef5d5b3f8c",
+  "element": "cf3b258594650e272f82dff0",
   "start": "block-drawing-iso",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -56,8 +56,8 @@
      "name": "Front",
      "kind": "base",
      "position": [
-      1546.9,
-      5618.6
+      60.9,
+      221.2
      ],
      "parent": null,
      "scale": "1:1",
@@ -67,8 +67,8 @@
      "name": "Isometric",
      "kind": "isometric",
      "position": [
-      3787.1,
-      2830.4
+      149.1,
+      111.4
      ],
      "parent": "Front",
      "scale": "1:1",
@@ -78,8 +78,8 @@
      "name": "Left",
      "kind": "projected",
      "position": [
-      3787.1,
-      5618.6
+      149.1,
+      221.2
      ],
      "parent": "Front",
      "scale": "1:1",
@@ -89,8 +89,8 @@
      "name": "Top",
      "kind": "projected",
      "position": [
-      1546.9,
-      2830.4
+      60.9,
+      111.4
      ],
      "parent": "Front",
      "scale": "1:1",
@@ -196,8 +196,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -207,8 +207,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -218,8 +218,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -229,8 +229,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -241,7 +241,7 @@
      "selection": []
     }
    },
-   "t": 232001
+   "t": 226901
   },
   {
    "step": 2,
@@ -332,8 +332,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -343,8 +343,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -354,8 +354,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -365,8 +365,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -377,7 +377,7 @@
      "selection": []
     }
    },
-   "t": 258428
+   "t": 252975
   },
   {
    "step": 3,
@@ -473,8 +473,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -484,8 +484,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -495,8 +495,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -506,8 +506,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -518,7 +518,7 @@
      "selection": []
     }
    },
-   "t": 284136
+   "t": 277782
   },
   {
    "step": 4,
@@ -609,8 +609,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -620,8 +620,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -631,8 +631,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -642,8 +642,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -654,7 +654,7 @@
      "selection": []
     }
    },
-   "t": 310978
+   "t": 304206
   },
   {
    "step": 5,
@@ -750,8 +750,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -761,8 +761,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -772,8 +772,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -783,8 +783,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -795,7 +795,7 @@
      "selection": []
     }
    },
-   "t": 337116
+   "t": 329626
   },
   {
    "step": 6,
@@ -886,8 +886,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -897,8 +897,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -908,8 +908,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -919,8 +919,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -931,7 +931,7 @@
      "selection": []
     }
    },
-   "t": 363139
+   "t": 354897
   },
   {
    "step": 7,
@@ -1027,8 +1027,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -1038,8 +1038,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1049,8 +1049,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1060,8 +1060,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1072,7 +1072,7 @@
      "selection": []
     }
    },
-   "t": 389265
+   "t": 379357
   },
   {
    "step": 8,
@@ -1163,8 +1163,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -1174,8 +1174,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1185,8 +1185,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1196,8 +1196,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1208,7 +1208,7 @@
      "selection": []
     }
    },
-   "t": 416346
+   "t": 410168
   },
   {
    "step": 9,
@@ -1228,7 +1228,7 @@
    "ok": true,
    "at": [
     825,
-    324
+    295
    ],
    "state": {
     "focus": {
@@ -1311,8 +1311,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -1322,8 +1322,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1333,8 +1333,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1344,8 +1344,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1356,7 +1356,7 @@
      "selection": []
     }
    },
-   "t": 443669
+   "t": 436112
   },
   {
    "step": 10,
@@ -1376,7 +1376,7 @@
    "ok": true,
    "at": [
     859,
-    283
+    253
    ],
    "state": {
     "focus": {
@@ -1459,8 +1459,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -1470,8 +1470,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1481,8 +1481,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1492,8 +1492,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1504,7 +1504,7 @@
      "selection": []
     }
    },
-   "t": 471497
+   "t": 462302
   },
   {
    "step": 11,
@@ -1595,8 +1595,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -1606,8 +1606,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1617,8 +1617,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1628,8 +1628,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1640,7 +1640,7 @@
      "selection": []
     }
    },
-   "t": 498970
+   "t": 488445
   },
   {
    "step": 12,
@@ -1694,8 +1694,8 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        1546.9,
-        5618.6
+        60.9,
+        221.2
        ],
        "parent": null,
        "scale": "1:1",
@@ -1705,8 +1705,8 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        3787.1,
-        2830.4
+        149.1,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1716,8 +1716,8 @@
        "name": "Left",
        "kind": "projected",
        "position": [
-        3787.1,
-        5618.6
+        149.1,
+        221.2
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1727,8 +1727,8 @@
        "name": "Top",
        "kind": "projected",
        "position": [
-        1546.9,
-        2830.4
+        60.9,
+        111.4
        ],
        "parent": "Front",
        "scale": "1:1",
@@ -1739,7 +1739,7 @@
      "selection": []
     }
    },
-   "t": 525178
+   "t": 514152
   }
  ]
 }
