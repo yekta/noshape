@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-17 04:15 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-17 08:10 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -19,9 +19,15 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - Landed 11-17 00:42: 0aad993d (367cf3ae) conic contact edges checked by the faces around them (Fillet 3 47 -> 45).
 - cf-spur-gear (11-17, Mac release, main 5b23c028f): every Spur Gear is under live (117/56/34/98/77 vs 955/95/75/283/
   343); its opFillet is 0.3-0.4 ms, the time is the Rust op_boolean (112/46/26/78/53 ms). Sent to bool. Nothing for blend.
-- Landed 11-17: blend-necks ba7a8d755 (isaac-ball 9 -> 32/33; the ellipse join only in op_join_edges, t_join_ellipses,
-  after the land queue's bool_patterns unify volume test failed once). blend-gearvar (GearLab name + ends) queued
-  (strict 127/127 same, userdocs SAME, g13 ok).
+- Landed 11-17: blend-necks ba7a8d755 (isaac-ball 9 -> 32/33) broke rust-zero-solid-f197's Mirror 3 (4 slivers: the
+  retry's necks cut on a result already valid changed Chamfer 3); reverted (b596da51b), re-landed 07:05 as 74d05ad5e:
+  a valid retry keeps its necks unless cutting them lets a full round merge. T1 blend::a_valid_chamfers_necks_stay_and_
+  its_mirror_adds_whole (data blend/f197-chamfer3-input.brep). Before landing: userdocs + f197 + Hole docs + every
+  ~/qa/tickets doc + qa's compat v0443 docs SAME (bin/ud-nk3.sh, the release-candidate set), g13 OK. GearLab
+  (b2e0cbd71) landed.
+- qa P0 speed (11-17, vibe7 A/B v0.4.48 -> v0.4.53): knife Chamfer 2 10.7 -> 67.9, Fillet 5 18.8 -> 95, Fillet 3 136
+  -> 188 ms; impeller Stevenrohr zum Halter 0.6 -> 2610 ms (fixed by 29c1841df, after .53; Mac main 2 ms). v0.4.53
+  predates the 11-16 speed lands; to do: Mac A/B v0.4.48 vs main on those three (bin/ab-mac.sh; commit WIP first).
 - Knife blends left (Mac): Fillet 8 65 (live 12: OCCT's working-scale round 45 after the as-is fails 7; split-line
   join 5.8 needed), Fillet 3 45 (direct build 26: classify.tool 7 = ray intersectors on lofted tools; lofts; conic
   rebuild), Chamfer 2 35, Fillet 5 21. Probes: parked/zz-*.patch; Mac A/B: bin/ab-mac.sh <base> <cand> <doc> <regex>.
@@ -34,22 +40,17 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - Scale-first blend6 4b2f94289 (base 3178c98b5): release suite strict-identical 127/127, userdocs ALL-SAME; assemblies
   (vibe6, asm-sf-base.log / asm-sf.log, unit blend-seq-sf3) running; land when identical.
 - Live's knife times (11-16): Fillet 1-8 8/9/10/6/9/27/7/12 ms, studio 622. Lead: Fillet 5 at or below live is P0.
-- impeller Fillet 3: PARKED by the lead (behind speed and the gearbox fillet). WIP only in parked/imp-f3-conic-balls-wip.patch
-  (blend10 is now the speed branch), which also holds the ZZ
-  timers, ZZ_NO_BALLS and the zz_probe_lens probe: strip those before landing): the rib under the bore is 5.2 mm wide,
-  its lips ~30 deg; live's round is a true R3 rolling ball on the curved faces (contacts y -1.524 on the bore,
-  (0.957, -46.774) on the side: ours now matches), the conic between, the two rounds meeting in a ridge. Done so far:
-  section_blend retries a conic constant-radius round as rolling balls (ball_section takes the Section: conic apex
-  where the contact tangents meet, weight rho/(1-rho)); into_face accepts a curved side by its sag (< step/5);
-  Support::Extruded (feet on a swept face moved along its direction, past where it is trimmed); a swept face's
-  section side interpolated through 9 feet (an arc was 0.04 mm / 17 deg off at the lip); lies_on classifies with
-  periodic recadre. Both tools' sides recognised; the ridge comes out at z -43.902 (live -43.9), the side trimmed at
-  x 54.68 (live 54.7). What's left is the ends. Far end: the blends cross the rib's old footprint on the channel's
-  offset face (interior, not a face), so the direct build (pieces of existing faces only) can't close there. Near end:
-  the tools run on past the lips' start (x 1.5) to -1.5 and cut through the rib's join with the collar at x 0..5 (plane
-  x 0, r 6.25 hole, cone, plane x 5): the Boolean fallback (tried) leaves that collar as a 676 mm3 second solid; live
-  ends the rounds on the chamfer faces (6.18 -> 12.68 mm2). Needs end trimming by those faces (a capped tool or the
-  direct build growing a face into an interior region): a larger build. Impeller corpus runs again on main (55552e704).
+- impeller Fillet 3 (P0, blend10 `blend-impf3`, WIP uncommitted on 8e269426d): builds as one solid 71,097.14 mm3 (live
+  71,096.12), 34 faces as live, edges/vertices 93/60 vs 95/62 (the front circle's 3 arcs joined by the unify: a fix
+  run in flight), Fillet 3 13 s (live 0.1 s: speed next). Pieces: closed_run_on takes all conic tools at once; an end
+  whose first met face doesn't cut the tool is a corner: walls = that face + its neighbours bordering a support
+  (7, 17, 4 = the chamfers and the x 5 face), tool less the cells behind every wall (one Boolean, so the round face
+  stays whole); new kernel op merge_on_surfaces (boolean.cpp): pieces on copies of an extended face's surface put on
+  one and merged (core's unify refuses: its 1e-9 volume check vs 1e-7 integral noise; ours checks 1e-6 by
+  volume_props), vertices left between pieces of one curve kept (KeepEndsMark, live keeps them). Debug left: ZZ_*
+  prints (blend_section.rs, boolean.cpp ZZ_USD, closed_run_on), probes in kernel tests/blend.rs zz_*. Then
+  Stevenrohr zum Halter ("Adjoining edge not filleted.", 2 ms), then tell core. Live's chamfer extension reaches
+  x 0.097 at the deep contact, ours 1.5 (OCCT's B-spline extension vs Parasolid's): areas 1.6 mm2 apart, counts same.
 - asm, skasm, bool2, studios, live, live2 paused until ~11-17 10:15 UTC: no messages to them, write into their
   handoffs or live/REQUESTS.md (lead 11-16).
 - Queued from asm (after the current items): asm-gearbox-std 6a912b / a470167 Fillet 2 (EDGE fillet of 2 faces' edges,
@@ -98,9 +99,10 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## Next, in order
 
-1. P0 (lead 11-17): impeller Fillet 3 and "Fillet Stevenrohr zum Halter" (they fail; core's Move face 1 fails after
-   them; Delete face 2 takes 10.9 s; part 34/87/54 vs live 39/107/69). Tell core when either builds.
-2. Land blend-gearvar (queued); unpark the knife Fillet 8 join, then its speed.
+1. P0 (lead 11-17): impeller Fillet 3 (counts, speed, strip debug, suite/userdocs/g13, land) and "Fillet Stevenrohr
+   zum Halter"; tell core when either builds (core told 08:10 of the WIP state).
+2. qa's P0 speed A/B (knife Chamfer 2 / Fillet 3 / Fillet 5).
+3. Unpark the knife Fillet 8 join, then its speed.
 
 ## Parked (with where)
 
