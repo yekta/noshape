@@ -1051,7 +1051,23 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(held, face, f, l);
         while (const auto t = occ::down_cast<Geom2d_TrimmedCurve>(pc))
           pc = t->BasisCurve();
-        return occ::down_cast<Geom2d_Line>(pc);
+        // (A B-spline whose poles all share one u or v is that iso line: a projection's, c2-fan-blade-sweep's thread
+        // hole on the offset bolt's cylinder.)
+        const auto bs = occ::down_cast<Geom2d_BSplineCurve>(pc);
+        if (bs.IsNull())
+          return occ::down_cast<Geom2d_Line>(pc);
+        const gp_Pnt2d p = bs->Pole(1), q = bs->Pole(bs->NbPoles());
+        auto           level = [&](bool u) {
+          for (int k = 2; k <= bs->NbPoles(); ++k)
+            if (std::abs(u ? bs->Pole(k).X() - p.X() : bs->Pole(k).Y() - p.Y()) > 1e-9)
+              return false;
+          return true;
+        };
+        if (q.Y() != p.Y() && level(true))
+          return occ::handle<Geom2d_Line>(new Geom2d_Line(p, gp_Dir2d(0, q.Y() > p.Y() ? 1 : -1)));
+        if (q.X() != p.X() && level(false))
+          return occ::handle<Geom2d_Line>(new Geom2d_Line(p, gp_Dir2d(q.X() > p.X() ? 1 : -1, 0)));
+        return occ::handle<Geom2d_Line>();
       };
       const auto line = iso(fa), other = iso(fb);
       if (line.IsNull())

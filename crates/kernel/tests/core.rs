@@ -990,6 +990,36 @@ fn a_mirrored_copy_shows_its_originals_faces() {
     assert_eq!(shown(&m), original, "raw faces {raw}, shown in the original {original}");
 }
 
+/// Faces split at a seam whose curves on them are straight B-splines (a projection's, not lines) show as one face, as
+/// with lines (c2-fan-blade-sweep's Boolean 2: the right bolt's offset hole wall showed a face more than the left's).
+#[test]
+fn faces_split_at_a_seam_whose_curves_are_straight_bsplines_show_as_one() {
+    let shown = |s: &Shape| s.shown_topology().unwrap().faces_joined.iter().enumerate().filter(|(i, j)| *i == **j).count();
+    let cyl = make_cylinder(&Plane::xy(), 10.0, 20.0, 2.0 * PI).unwrap();
+    let cutter = make_box_corners(DVec3::new(-20.0, -20.0, -1.0), DVec3::new(-5.0, 20.0, 21.0)).unwrap();
+    let part = boolean(BooleanOp::Cut, &[cyl], &[cutter], &BooleanOptions::default()).unwrap().shape;
+    // Each curve on a face along v at u = 0 or 2π written as the same line, a degree 1 B-spline.
+    let text = String::from_utf8(part.to_brep_bytes().unwrap()).unwrap();
+    let (mut in_2d, mut swapped) = (false, 0);
+    let mut out = String::new();
+    for l in text.lines() {
+        in_2d = (in_2d || l.starts_with("Curve2ds")) && !l.starts_with("Curves");
+        let w: Vec<f64> = l.split_whitespace().filter_map(|x| x.parse().ok()).collect();
+        if in_2d && w.len() == 5 && w[0] == 1.0 && w[3] == 0.0 && w[4].abs() == 1.0 && (w[1].abs() < 1e-12 || (w[1] - 2.0 * PI).abs() < 1e-12) {
+            let (u, v, s) = (w[1], w[2], w[4]);
+            out += &format!("7 0 0  1 2 2  {u:e} {:e}  {u:e} {:e} \n-100 2 100 2 \n", v - 100.0 * s, v + 100.0 * s);
+            swapped += 1;
+            continue;
+        }
+        out += l;
+        out.push('\n');
+    }
+    let respun = Shape::from_brep_bytes(out.as_bytes()).unwrap();
+    assert!(swapped >= 2 && respun.faces().len() == part.faces().len(), "{swapped} curves swapped");
+    assert!(shown(&part) < part.faces().len());
+    assert_eq!(shown(&respun), shown(&part), "{} raw faces", part.faces().len());
+}
+
 /// A ring revolved from half a turn round its profile above its axis (its cylinders' parameters running from π: the seam at −z) with two
 /// grooves cut either side of −z: the tread between them, split at that seam, is one face as live shows it (infento's
 /// tyre, Boolean 2: 392 faces for live's 391).
