@@ -129,6 +129,10 @@ impl Body {
         Body { name, ..self.clone_shallow() }
     }
 
+    pub fn recoloured(&self, color: usize) -> Body {
+        Body { color, ..self.clone_shallow() }
+    }
+
     fn clone_shallow(&self) -> Body {
         Body {
             id: self.id.clone(),
@@ -1129,6 +1133,23 @@ impl Context {
         let c = self.next_color;
         self.next_color += 1;
         c
+    }
+
+    /// The colours taken from `start` on given again, in their order, to the bodies left: a feature's tools and the
+    /// bodies it deleted spend none (live: a sheet metal part is the studio's first colour, std's thickened plate and
+    /// definition surface gone).
+    pub fn reuse_colours_from(&mut self, start: usize) {
+        let mut taken: Vec<usize> = self.bodies.iter().map(|b| b.color).filter(|c| *c >= start).collect();
+        taken.sort_unstable();
+        taken.dedup();
+        for b in self.bodies.iter_mut() {
+            if let Some(i) = taken.iter().position(|c| *c == b.color)
+                && start + i != b.color
+            {
+                *b = Arc::new(b.recoloured(start + i));
+            }
+        }
+        self.next_color = start + taken.len();
     }
 
     /// World bounds of all bodies.

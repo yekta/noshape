@@ -893,6 +893,29 @@ fn flanges_keep_the_part_name_and_colour() {
     assert_eq!(look(&after), look(&before));
 }
 
+/// Live (psui, ui-parity sm-box): a sheet metal part is the studio's first colour, light blue, after its flanges too.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_sheet_metal_part_takes_the_first_colour() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let colours = |r: &RegenResult| r.context.bodies.iter().map(|b| (b.name.clone(), b.kind, b.color)).collect::<Vec<_>>();
+    let r = s.ok();
+    assert_eq!(colours(&r), [("Part 1".to_string(), BodyKind::Solid, 0)]);
+    for at in [DVec3::new(20.0, 0.0, 2.0), DVec3::new(60.0, 25.0, 2.0)] {
+        let r = s.ok();
+        let e = edge_at(&r, at);
+        s.add("sheetMetalFlange", |p| p.set("edges", ParamValue::Query(vec![e])));
+    }
+    assert_eq!(colours(&s.ok()), [("Part 1".to_string(), BodyKind::Solid, 0)]);
+}
+
 /// A studio whose sheet metal was saved while it ran natively keeps running
 /// it natively (P1: by std its Flange and Hem lost their edges, "Select edges
 /// to flange.", and the part was the bare plate again).

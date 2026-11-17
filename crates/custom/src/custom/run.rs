@@ -238,6 +238,7 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
 
     // Printed object numbers restart per feature run (the Context is "BuiltIn: 0").
     noshape_featurescript::value::reset_shown_numbers();
+    let first_colour = ev.ctx.next_color;
     let cx = FsContext::new(std::mem::take(&mut ev.ctx), ev.feature, ev.name.to_string(), *ev.units, ev.outer_vars.clone(), ev.xform);
     let definition = match definition(&cx, params, &values, ev, provider) {
         Ok(d) => d,
@@ -318,6 +319,7 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     OUTPUTS.lock().insert(ev.feature, FeatureOutput { type_id: type_id.clone(), feature_name: ev.name.to_string(), notices, output, line_times });
 
     ev.ctx = cx.take_context();
+    ev.ctx.reuse_colours_from(first_colour);
     let mut st = cx.state.lock();
     let top = vec![Arc::<str>::from(ev.feature.to_string())];
     let status = st.status.get(&top).cloned();
