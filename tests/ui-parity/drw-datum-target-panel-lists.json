@@ -1,0 +1,192 @@
+{
+ "name": "drw-datum-target-panel-lists",
+ "about": "block-drawing: Datum tool, Datum target tab; the Target area and Style lists opened and closed again (a second click); a target placed (point on Front, then its location); hover the target row's x (Delete A1) and the Origin field; its Length list opened, Angle picked (diameter distance, radial lines, reference line, angle, instance count, flip, rotate); the Diameter distance list opened and closed; Escape",
+ "area": "drawing",
+ "source": "studios 11-16 matrix (Datum / Datum target, Weld symbol, Geometric tolerance): live2 exploration px-datum (live/feel shots in /root/live2-scratch/px/datum); unlabelled dropdown arrows by pixel (drawing panel at the left, screen = iframe DOM + 40)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Datum"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Datum target"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     145,
+     159
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     145,
+     159
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     145,
+     197
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     145,
+     197
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      40,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      60,
+      0,
+      30
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     285,
+     286
+    ]
+   },
+   "ms": 1200
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     177,
+     368
+    ]
+   },
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Length"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Angle"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     285,
+     447
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     285,
+     447
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

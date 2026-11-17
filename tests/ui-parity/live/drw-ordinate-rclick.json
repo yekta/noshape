@@ -1,19 +1,23 @@
 {
  "scenario": "drw-ordinate-rclick",
- "recorded": "2026-11-15T06:26:54.011Z",
+ "recorded": "2026-11-17T11:31:20.939Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.12"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.5"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "22a710cd2d4b08c4bf964553",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "c4b6251ff2a76558f220fb23",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -193,7 +197,7 @@
      "selection": []
     }
    },
-   "t": 226027
+   "t": 225024
   },
   {
    "step": 2,
@@ -302,7 +306,7 @@
      ]
     }
    },
-   "t": 251097
+   "t": 251397
   },
   {
    "step": 3,
@@ -411,7 +415,7 @@
      ]
     }
    },
-   "t": 276558
+   "t": 277574
   },
   {
    "step": 4,
@@ -520,7 +524,7 @@
      ]
     }
    },
-   "t": 302616
+   "t": 303502
   },
   {
    "step": 5,
@@ -625,7 +629,7 @@
      "selection": []
     }
    },
-   "t": 330066
+   "t": 329480
   },
   {
    "step": 6,
@@ -723,7 +727,7 @@
      "selection": []
     }
    },
-   "t": 356772
+   "t": 355265
   },
   {
    "step": 7,
@@ -753,7 +757,47 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Add to ordinate dimension group",
+      "Edit...",
+      "Paste as table",
+      "Unbreak dimension",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -833,7 +877,7 @@
      "selection": []
     }
    },
-   "t": 382349
+   "t": 380663
   },
   {
    "step": 8,
@@ -851,7 +895,47 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Add to ordinate dimension group",
+      "Edit...",
+      "Paste as table",
+      "Unbreak dimension",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -931,7 +1015,7 @@
      "selection": []
     }
    },
-   "t": 408007
+   "t": 406762
   },
   {
    "step": 9,
@@ -1036,7 +1120,7 @@
      "selection": []
     }
    },
-   "t": 433200
+   "t": 433199
   }
  ]
 }

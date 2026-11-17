@@ -1,19 +1,23 @@
 {
  "scenario": "drw-table-cells-remove",
- "recorded": "2026-11-07T12:25:03.417Z",
+ "recorded": "2026-11-17T10:23:17.242Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0 + live2 2026-11-07.5"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.2"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "e6a532349748f7efc4234dbe",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "9b6bd71b303ff0196f1dc7f2",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -51,6 +55,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -58,6 +66,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -65,6 +77,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -72,6 +88,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -110,6 +130,18 @@
       "Title row",
       "Header row",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Title row",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Header row",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -142,6 +174,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -149,6 +185,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -156,6 +196,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -163,6 +207,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -172,7 +220,7 @@
      "selection": []
     }
    },
-   "t": 215170
+   "t": 229927
   },
   {
    "step": 2,
@@ -197,6 +245,18 @@
       "Title row",
       "Header row",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Title row",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Header row",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -229,6 +289,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -236,6 +300,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -243,6 +311,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -250,6 +322,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -259,7 +335,7 @@
      "selection": []
     }
    },
-   "t": 229429
+   "t": 256587
   },
   {
    "step": 3,
@@ -274,8 +350,8 @@
    },
    "ok": true,
    "at": [
-    1019,
-    368
+    1023,
+    397
    ],
    "state": {
     "focus": {
@@ -292,6 +368,18 @@
       "Title row",
       "Header row",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Title row",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Header row",
+       "kind": "checkbox",
+       "value": false
+      }
      ]
     },
     "dialogs": [],
@@ -324,6 +412,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -331,6 +423,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -338,6 +434,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -345,6 +445,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -354,7 +458,7 @@
      "selection": []
     }
    },
-   "t": 243757
+   "t": 282226
   },
   {
    "step": 4,
@@ -375,32 +479,94 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Note",
-     "text": [
-      "Note",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans ( Note )",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      851,
+      259,
+      347,
+      129
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      }
      ]
     },
     "dialogs": [],
@@ -433,6 +599,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -440,6 +610,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -447,6 +621,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -454,6 +632,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -463,7 +645,7 @@
      "selection": []
     }
    },
-   "t": 257776
+   "t": 307262
   },
   {
    "step": 5,
@@ -479,32 +661,94 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Note",
-     "text": [
-      "Note",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans ( Note )",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      851,
+      259,
+      347,
+      129
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      }
      ]
     },
     "dialogs": [],
@@ -537,6 +781,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -544,6 +792,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -551,6 +803,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -558,6 +814,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -567,7 +827,7 @@
      "selection": []
     }
    },
-   "t": 272884
+   "t": 332143
   },
   {
    "step": 6,
@@ -576,6 +836,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     952,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -612,6 +880,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -619,6 +891,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -626,6 +902,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -633,6 +913,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -641,13 +925,17 @@
      "annotations": [
       {
        "kind": "table",
-       "text": ""
+       "text": "",
+       "position": [
+        129.8,
+        143.1
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 288767
+   "t": 359045
   },
   {
    "step": 7,
@@ -656,6 +944,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     952,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -692,6 +988,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -699,6 +999,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -706,6 +1010,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -713,6 +1021,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -721,13 +1033,17 @@
      "annotations": [
       {
        "kind": "table",
-       "text": ""
+       "text": "",
+       "position": [
+        129.8,
+        143.1
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 303896
+   "t": 384856
   },
   {
    "step": 8,
@@ -742,8 +1058,8 @@
    },
    "ok": true,
    "at": [
-    1011,
-    376
+    1015,
+    405
    ],
    "state": {
     "focus": {
@@ -751,32 +1067,119 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Cell",
-     "text": [
-      "Cell",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      927,
+      240,
+      590,
+      96
+     ],
+     "fields": [
+      {
+       "label": "Insert row above",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert row below",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert column left",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert column right",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Remove rows",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Remove columns",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Duplicate cells",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Size columns equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Size rows equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Merge cells",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Unmerge cells",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      }
      ]
     },
     "dialogs": [],
@@ -809,6 +1212,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -816,6 +1223,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -823,6 +1234,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -830,6 +1245,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -838,13 +1257,17 @@
      "annotations": [
       {
        "kind": "table",
-       "text": ""
+       "text": "",
+       "position": [
+        129.8,
+        143.1
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 318992
+   "t": 411605
   },
   {
    "step": 9,
@@ -859,8 +1282,8 @@
    },
    "ok": true,
    "at": [
-    1011,
-    376
+    1015,
+    405
    ],
    "state": {
     "focus": {
@@ -868,37 +1291,167 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Cell",
-     "text": [
-      "Cell",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      927,
+      240,
+      590,
+      96
+     ],
+     "fields": [
+      {
+       "label": "Insert row above",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert row below",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert column left",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert column right",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Remove rows",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Remove columns",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Duplicate cells",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Size columns equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Size rows equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Merge cells",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Unmerge cells",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      }
      ]
     },
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": "NoteContextMenus",
+     "rows": [
+      "Insert",
+      "Remove",
+      "Duplicate",
+      "",
+      "Size",
+      "",
+      "Merge",
+      "Unmerge",
+      "Resize...",
+      "",
+      "Copy"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false
+     ],
+     "highlighted": 1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -926,6 +1479,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -933,6 +1490,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -940,6 +1501,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -947,6 +1512,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -955,13 +1524,17 @@
      "annotations": [
       {
        "kind": "table",
-       "text": ""
+       "text": "",
+       "position": [
+        129.8,
+        143.1
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 333308
+   "t": 438195
   },
   {
    "step": 10,
@@ -974,8 +1547,8 @@
    },
    "ok": true,
    "at": [
-    1052,
-    377
+    1058,
+    407
    ],
    "state": {
     "focus": {
@@ -983,37 +1556,140 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Cell",
-     "text": [
-      "Cell",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      927,
+      240,
+      590,
+      96
+     ],
+     "fields": [
+      {
+       "label": "Insert row above",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert row below",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert column left",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert column right",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Remove rows",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Remove columns",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Duplicate cells",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Size columns equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Size rows equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Merge cells",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Unmerge cells",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      }
      ]
     },
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": null,
+     "rows": [
+      "Columns",
+      "Rows"
+     ],
+     "checked": [
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -1041,6 +1717,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -1048,6 +1728,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1055,6 +1739,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1062,6 +1750,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1070,13 +1762,17 @@
      "annotations": [
       {
        "kind": "table",
-       "text": ""
+       "text": "",
+       "position": [
+        129.8,
+        143.1
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 347331
+   "t": 462575
   },
   {
    "step": 11,
@@ -1088,8 +1784,8 @@
    },
    "ok": true,
    "at": [
-    1139,
-    378
+    1142,
+    408
    ],
    "state": {
     "focus": {
@@ -1097,32 +1793,119 @@
      "tag": "iframe"
     },
     "dialog": {
-     "kind": "drawing-panel",
+     "kind": "cell-format",
      "title": "Cell",
-     "text": [
-      "Cell",
-      "APMONO",
-      "ARComp",
-      "ARIsoP1",
-      "ARItal",
-      "ARMono",
-      "ARSimp",
-      "ARTxt",
-      "Arimo",
-      "DejaVu Sans",
-      "DejaVu Sans Mono",
-      "DejaVu Serif",
-      "Noto Sans",
-      "Noto Sans Chinese Simplified",
-      "Noto Sans Chinese Simplified Light",
-      "Noto Sans Chinese Traditional",
-      "Noto Sans Chinese Traditional Light",
-      "Noto Sans Japanese",
-      "Noto Sans Korean",
-      "Noto Sans UI",
-      "Noto Serif",
-      "Open Sans",
-      "Tinos"
+     "rect": [
+      927,
+      240,
+      590,
+      96
+     ],
+     "fields": [
+      {
+       "label": "Insert row above",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert row below",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert column left",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Insert column right",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Remove rows",
+       "kind": "button",
+       "enabled": true
+      },
+      {
+       "label": "Remove columns",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Duplicate cells",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Size columns equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Size rows equally",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Merge cells",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Unmerge cells",
+       "kind": "button",
+       "enabled": false
+      },
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      }
      ]
     },
     "dialogs": [],
@@ -1155,6 +1938,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -1162,6 +1949,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1169,6 +1960,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1176,6 +1971,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1184,13 +1983,17 @@
      "annotations": [
       {
        "kind": "table",
-       "text": ""
+       "text": "",
+       "position": [
+        139.8,
+        143.1
+       ]
       }
      ],
      "selection": []
     }
    },
-   "t": 361959
+   "t": 488404
   }
  ]
 }

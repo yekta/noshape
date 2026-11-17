@@ -1,0 +1,105 @@
+{
+ "name": "drw-weld-panel-lists",
+ "about": "block-drawing: Weld symbol tool; the arrow side's symbol list opened and V groove picked (groove, root opening, finishing, contour fields appear); the other side's list opened and closed again; the Joint spacer list opened and closed again; Escape",
+ "area": "drawing",
+ "source": "studios 11-16 matrix (Datum / Datum target, Weld symbol, Geometric tolerance): live2 exploration px-datum (live/feel shots in /root/live2-scratch/px/datum); unlabelled dropdown arrows by pixel (drawing panel at the left, screen = iframe DOM + 40)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Weld symbol"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     320,
+     293
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "V groove"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     320,
+     179
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     320,
+     179
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     286,
+     119
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     286,
+     119
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 700
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

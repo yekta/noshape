@@ -1,0 +1,2485 @@
+{
+ "scenario": "drw-weld-panel-lists",
+ "recorded": "2026-11-17T12:07:52.602Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 303901ce5388bd1d8370",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.5"
+ },
+ "live": {
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "cb9266ec74e803e86bf33d11",
+  "start": "block-drawing",
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "other",
+   "tag": "iframe"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": {
+   "tab": "Part 1 Drawing 1",
+   "sheet": "Sheet1",
+   "sheets": [
+    "Sheet1"
+   ],
+   "tool": null,
+   "views": [
+    {
+     "name": "Front",
+     "kind": "base",
+     "position": [
+      81,
+      81
+     ],
+     "parent": null,
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Isometric",
+     "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Right",
+     "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Top",
+     "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    }
+   ],
+   "annotations": [],
+   "selection": []
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Weld symbol"
+    }
+   },
+   "ok": true,
+   "at": [
+    714,
+    59
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 228984
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 255588
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      320,
+      293
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    320,
+    293
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "None",
+      "Square groove",
+      "V groove",
+      "U groove",
+      "J groove",
+      "Bevel groove",
+      "Single bevel butt broad root",
+      "V flare groove",
+      "Bevel flare groove",
+      "Bead joint",
+      "Fillet joint",
+      "Plug or Slot joint",
+      "Seam joint",
+      "Spot joint"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "cbWeldTypeOS_Menu",
+     "rows": [
+      "None",
+      "Square groove",
+      "V groove",
+      "U groove",
+      "J groove",
+      "Bevel groove",
+      "Single bevel butt broad root",
+      "V flare groove",
+      "Bevel flare groove",
+      "Bead joint",
+      "Fillet joint",
+      "Plug or Slot joint",
+      "Seam joint",
+      "Spot joint"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 280338
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "None",
+      "Square groove",
+      "V groove",
+      "U groove",
+      "J groove",
+      "Bevel groove",
+      "Single bevel butt broad root",
+      "V flare groove",
+      "Bevel flare groove",
+      "Bead joint",
+      "Fillet joint",
+      "Plug or Slot joint",
+      "Seam joint",
+      "Spot joint"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "cbWeldTypeOS_Menu",
+     "rows": [
+      "None",
+      "Square groove",
+      "V groove",
+      "U groove",
+      "J groove",
+      "Bevel groove",
+      "Single bevel butt broad root",
+      "V flare groove",
+      "Bevel flare groove",
+      "Bead joint",
+      "Fillet joint",
+      "Plug or Slot joint",
+      "Seam joint",
+      "Spot joint"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 307055
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "V groove"
+    }
+   },
+   "ok": true,
+   "at": [
+    410,
+    387
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "Contour",
+      "Finishing",
+      "Root opening",
+      "Groove"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 357626
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "Contour",
+      "Finishing",
+      "Root opening",
+      "Groove"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 388635
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      320,
+      179
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    320,
+    179
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "Contour",
+      "Finishing",
+      "Root opening",
+      "Groove",
+      "None",
+      "Square groove",
+      "V groove",
+      "U groove",
+      "J groove",
+      "Bevel groove",
+      "Single bevel butt broad root",
+      "V flare groove",
+      "Bevel flare groove",
+      "Bead joint",
+      "Fillet joint",
+      "Plug or Slot joint",
+      "Seam joint",
+      "Spot joint",
+      "Seam centered joint",
+      "Spot centered joint"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "cbWeldTypeAS_Menu",
+     "rows": [
+      "None",
+      "Square groove",
+      "V groove",
+      "U groove",
+      "J groove",
+      "Bevel groove",
+      "Single bevel butt broad root",
+      "V flare groove",
+      "Bevel flare groove",
+      "Bead joint",
+      "Fillet joint",
+      "Plug or Slot joint",
+      "Seam joint",
+      "Spot joint",
+      "Seam centered joint",
+      "Spot centered joint"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 438811
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "Contour",
+      "Finishing",
+      "Root opening",
+      "Groove",
+      "None",
+      "Square groove",
+      "V groove",
+      "U groove",
+      "J groove",
+      "Bevel groove",
+      "Single bevel butt broad root",
+      "V flare groove",
+      "Bevel flare groove",
+      "Bead joint",
+      "Fillet joint",
+      "Plug or Slot joint",
+      "Seam joint",
+      "Spot joint",
+      "Seam centered joint",
+      "Spot centered joint"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "cbWeldTypeAS_Menu",
+     "rows": [
+      "None",
+      "Square groove",
+      "V groove",
+      "U groove",
+      "J groove",
+      "Bevel groove",
+      "Single bevel butt broad root",
+      "V flare groove",
+      "Bevel flare groove",
+      "Bead joint",
+      "Fillet joint",
+      "Plug or Slot joint",
+      "Seam joint",
+      "Spot joint",
+      "Seam centered joint",
+      "Spot centered joint"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 463797
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      320,
+      179
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    320,
+    179
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "Contour",
+      "Finishing",
+      "Root opening",
+      "Groove"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 513209
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 700
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "Contour",
+      "Finishing",
+      "Root opening",
+      "Groove"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 539657
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      286,
+      119
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    286,
+    119
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "Contour",
+      "Finishing",
+      "Root opening",
+      "Groove",
+      "None",
+      "Double V groove",
+      "Double bevel groove",
+      "Double U groove",
+      "Double J groove",
+      "Double flare V",
+      "Double flare bevel"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "cbJointType_Menu",
+     "rows": [
+      "None",
+      "Double V groove",
+      "Double bevel groove",
+      "Double U groove",
+      "Double J groove",
+      "Double flare V",
+      "Double flare bevel"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 564275
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1000
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "Contour",
+      "Finishing",
+      "Root opening",
+      "Groove",
+      "None",
+      "Double V groove",
+      "Double bevel groove",
+      "Double U groove",
+      "Double J groove",
+      "Double flare V",
+      "Double flare bevel"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "cbJointType_Menu",
+     "rows": [
+      "None",
+      "Double V groove",
+      "Double bevel groove",
+      "Double U groove",
+      "Double J groove",
+      "Double flare V",
+      "Double flare bevel"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 589383
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      286,
+      119
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    286,
+    119
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "Contour",
+      "Finishing",
+      "Root opening",
+      "Groove"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 639696
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 700
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Weld symbol",
+     "text": [
+      "Weld symbol",
+      "Flip symbol",
+      "Joint spacer",
+      "Stagger",
+      "Symmetric",
+      "Reference",
+      "All around",
+      "Contour",
+      "Finishing",
+      "Root opening",
+      "Groove"
+     ],
+     "fields": [
+      {
+       "label": "Flip symbol",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Stagger",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Symmetric",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Reference",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "All around",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Weld symbol",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 665250
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     904,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 691641
+  }
+ ]
+}
