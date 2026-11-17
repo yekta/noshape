@@ -277,7 +277,8 @@ enum DragState {
     /// position isn't solved again).
     Geometry { handle: DragHandle, at: Option<DVec2> },
     /// Pressed on a dimension label: moves it when dragged, selects it on release.
-    Label { constraint: ConstraintId, start: DVec2, moved: bool, additive: bool },
+    /// (`dragging`: past the drag start, so the label follows the pointer wherever it goes after.)
+    Label { constraint: ConstraintId, start: DVec2, moved: bool, additive: bool, dragging: bool },
     /// Pressed on a constraint glyph: moves it when dragged, selects it on release.
     Glyph { constraint: ConstraintId, entity: EntityId, start: DVec2, orig: DVec2, moved: bool, additive: bool },
     /// Dragging an on-canvas pattern / transform manipulator.
@@ -2350,7 +2351,7 @@ impl SketchEditor {
         // Overlay labels and glyphs take the press first, whatever the tool.
         if let Some((cid, additive, select)) = self.pressed_label.take() {
             // `moved: true` up front suppresses the selection toggle (double-click edit).
-            self.drag = Some(DragState::Label { constraint: cid, start: p, moved: !select, additive });
+            self.drag = Some(DragState::Label { constraint: cid, start: p, moved: !select, additive, dragging: false });
             return EditOutcome::none();
         }
         if let Some((cid, entity, additive)) = self.pressed_glyph.take() {
@@ -4265,11 +4266,11 @@ impl SketchEditor {
                 }
                 EditOutcome::changed()
             }
-            Some(DragState::Label { constraint, start, additive, .. }) => {
-                if self.below_drag_start(p - start) {
+            Some(DragState::Label { constraint, start, additive, dragging, .. }) => {
+                if !dragging && self.below_drag_start(p - start) {
                     return EditOutcome::none();
                 }
-                self.drag = Some(DragState::Label { constraint, start, moved: true, additive });
+                self.drag = Some(DragState::Label { constraint, start, moved: true, additive, dragging: true });
                 data.dimension_labels.insert(constraint.0, [p.x, p.y]);
                 EditOutcome::changed()
             }

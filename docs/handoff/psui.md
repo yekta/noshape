@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-17 10:45 UTC (new thread on this account since 10:35). History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-17 14:21 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -98,103 +98,66 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Landed 11-17 09:54: 498b96a8 (leak fixes + NOSHAPE_SOAK + spawn_guard allow).
 - The Mac's one build slot can hold a test 10+ min: for a quick single test use NOSHAPE_RB_HOST=vibe6.
 
-## Current task (lead 11-17 09:25)
+## Current order (lead 11-17 ~14:05)
 
-1. Rerun the full ui-parity suite (`tools/ui-parity/shards.sh`: every scenario with a live take, 2146; the psui list
-   alone is psui-names.txt, 1021) and the interaction-feel suites (the `*_feel_tests` in part-studio-ui) on vibe6
-   (≤4 apps, through ~/bin/slot, under `timeout`) against current green; list the failing scenarios by owner; fix the
-   psui-owned ones, P0/P1 first (look, hover/pick, timing). Report before/after pass counts in ≤5 lines. Not started
-   (the move to Ubeyd came first). Owner mapping: no owner field in scenarios; by area (sketch / part studio / chrome /
-   viewport → psui; sheet metal → skasm; assemblies → asm; drawings → dx/studios; …) as the 11-16 run's notes.
-2. Toolbar dropdown box model (live2 11-17 09:26, live/feel/shadows/README.md "Toolbar dropdown list box model",
-   tooldd-*.json/png): rows 1 px margin + 6 px padding, icon at list.x + 8, name text at + 32 (margin 0 4px), row 32
-   (34.5 with chips), chips min-width 17, padding 0 2px, 1 px #AAA, radius 2, 11 px on 16.5, no gap, no background;
-   chips end at list right − 8. Our edit, unverified, saved as /root/psui-scratch/toolbar-boxmodel.patch (`git apply`
-   it: ui.rs `shortcut_chips` / `menu_tool_item`, `shortcut_chip` removed as unused; popup_menu.rs tool_list item
-   pr 7 → 6). Next: build, screenshot a Fillet ⌄ / Sheet metal ⌄ list (fb5/tb.json), compare with live's
-   tooldd-fillet-page.png / tooldd-sheetmetal-page.png, then land.
-3. Sketch selection readouts: done, landed e1ce5e41.
+1. Interaction-feel P0 (DECISIONS 11-17): hover and select of points, lines, arcs, constraint glyphs, dimensions,
+   planes, faces, edges, vertices; box select both ways; shift / ctrl click. A scenario (feel test) each, fixed to
+   live. live2 (79ae5cdb-42a4-4025-b43a-da61a4f92ad7) sends groups (behaviours "USER P0, 11-17 12:2x", Part 2, 2b,
+   "psui (11-17 14:1x, feel P0)"). skasm (18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6) owns sketch tools, constraints from a
+   selection, sketch_hover / sketch_hover_id / in_sketch_reach; mine: dimension label drag and the feel rows.
+2. Full ui-parity rerun split, failures by owner.
+3. The tab pick (tab-new-edit-reedit).
 
-## USER P0s (lead 11-17 ~12:20), ahead of everything
+## Landed today (11-17)
 
-1. Sketch hover (user's recording /root/lead-scratch/vid/hover): a plane lit instead of the line under the pointer, and
-   stale / missing line hover. Cause: the viewport emits Hover only when the GPU's id changes; with Front behind the line
-   the GPU's pick stays the plane (line beyond its 5 px square, or a tie), so `sketch_hover_id` never ran again.
-   skasm owns the sketch side (re-resolve on every PointerMove: sketch.rs `sketch_hover`, ui.sketch_gpu_hover; also
-   in_sketch_reach curve 6 → 7 px). Mine (uncommitted): behaviors.rs sync_pick_filter gives the open sketch's own
-   plane i32::MIN (live: never hovers in sketch mode); mod.rs set_built resets ui.pick_filter on every rebuild
-   (rebuild_scene kept a stale priority table: new ids ranked as planes). Test file sketch_hover_feel_tests.rs (real
-   pointer + GPU pick, user's setup): lines on / 160 px off; live2's rows (line ±6 in / ±9 out, corner 8 px = point,
-   centre = region, Top never). Live2's data: behaviours.md "USER P0, 11-17 12:2x" (+ Part 2), live/psui/hover-p0/:
-   sketch mode line 7 px, point 10; outside line 6-7, point 9; plane interior + 6 px; region over planes; no midpoint
-   hover without a tool; glyph hover = secondary preselection only; dimension hover tan, click orange, dbl-click box;
-   box select L→R window / R→L crossing (lines only); fast-move rule min(5 × avg pick, 250 ms).
-   studios takes assembly / drawing hover: told to share Pointer / pick_priority / PickKind::priority, stay out of
-   viewport.rs hover path + sync_pick_filter until I land.
-2. Remembered expression P0 (Fillet "9 mm + #wall_thickness" red in a new document): behaviors.rs remember_values
-   caches each expression's value (dialog variables), apply_remembered keeps an expression only if it evaluates with
-   scope_variables(at the insertion index), else its value, else the default; generic for every remembered param
-   (arrays too). T1 sketch_ui_tests a_remembered_expression_never_opens_red_where_its_variable_is_missing. live
-   (e8549719) is capturing what live remembers across documents: match it when it lands.
-Both tested together on the Mac (filter: `ui_tests::sketch_hover:: remembered`); drop gpui-pre-macos warnings from
-the output (a `head` filled with them once).
+452838df (region beats planes, own plane never hovers, pick table resent on rebuild; sketch_hover_feel_tests),
+1313b3c90 + 291285d6 (remembered values never carry a #variable, per metric / inch memory; legacy store ignored),
+19b3b1f2 Adjacent, eb0ab032 Fillets / Matching (queued 14:05 with the handoff a57c59b4), 01fb280e toolbar box model,
+e1ce5e41 readouts. qa verified both user P0s on green c330a760 (14:0x).
 
-## In progress (11-17, new thread)
+## Queued 11-17 ~15:00 (feel P0 batch)
 
-- Full ui-parity run, split (lead 11-17 11:55: a run deep in one host's queue moves): green 082bd57e staged as
-  ~/agents/psui-keep/noshape, scenarios snapshot ~/tmp/psui/src-1117, script ~/agents/psui-keep/full-half.sh
-  (/root/psui-scratch/full-half.sh). Half 0 on vibe7 (4 apps, :386-389) -> ~/agents/psui-keep/full1117-a, half 1 on
-  vibe5 (3 apps, :386-388) -> full1117-b; units psui-full1117 through each host's ~/bin/slot, logs
-  ~/agents/psui-keep/full1117-{a,b}.log. 12:00: vibe7 third in its queue, vibe5 second. When both are done: copy
-  both into one dir and `run.py --compare-only` over all names for the score; split failures by owner (area field).
-  vibe6's run cancelled.
-- Feel matrices (Mac, 11-17 10:50): 18 / 18 pass. Command: `cargo test -p noshape-part-studio-ui --lib --
-  ui_tests::feel:: ui_tests::snaps:: ui_tests::list:: ui_tests::measure:: ui_tests::nav:: ui_tests::chrome::
-  ui_tests::toolbar_highlight:: ui_tests::sm:: ui_tests::sketchtools:: ui_tests::editing:: ui_tests::dialogs::
-  ui_tests::fields:: ui_tests::feedback::` (module path part_studio::sketch::ui_tests::<m>; one test per matrix).
-- 11-17 12:25: interim vibe5 half 142/144 (asm-cylindrical-limits: asm; bend-relief-new-edit-reedit related row
-  Flange 2 vs live's Flange 1: skasm's vertex label item).
-- Landed 01fb280e: toolbar box model. Queued: Query variable Adjacent (std qAdjacent; T1
-  features_b::query_variable_adjacent_as_std; audit A3). Asked live2 (REQUESTS 12:21) for Fillets Less / Greater and
-  Matching: std says all fillets of the body, ours Equal is tangent-connected only; no change until live answers.
-- Checked, nothing to do: flat view colours after 0bb94eede (ours 126,165,189 vs live 124,164,187; our ui-parity
-  window's right 242 px are off-screen, so the flat looks cut); tab-new-edit-reedit 22/22 (live's ray 0.3 mm = 1.1 px
-  off the edge: sub-pixel camera, `ours_on` stays); S-TOOLBAR-OVER-TABS already fixed; audit D134 (Frame profile) is
-  only the oracle's type, the picker is there.
-- 11-17 12:00: sketch-linear- / -circular-pattern-click-commit match (28/28 states, build e1ce5e41 + toolbar).
-- Queued 22349e4f (toolbar box model, chips y 11-29 vs live 11-30).
-- Landed e1ce5e41 (11:12): sketch pair readouts as live's (arcs as arcs, Center to the infinite line, order by kinds,
-  point on line Min only), lone circle / arc icon, values as measure_value; latency TARGETS note live's timings.
-- Toolbar box model: patch applied in the worktree (uncommitted) + chips on the foot of a 22.5 px line
-  (`shortcut_chips` h 22.5 items_end). First screenshot (fb5-tooldd, before the chip fix): Fillet list 180 x 71
-  (live 71.5), icon art x 9-26, text from 33, chips 127-171 all equal to live's; chips were 2 px high (ours y 9-27,
-  live 11-30). Rebuild + rerun: vibe6 unit psui-tooldd (`~/agents/psui-keep/run1.sh tooldd`, log
-  ~/tmp/psui/tooldd.log, shots ~/tmp/psui/fb5-tooldd/shots 02 = Fillet list, 06 = Sheet metal list). Measure
-  script: /root/psui-scratch/tooldd (chip #aaa extents). Then commit + land.
-- qa P2 DOCK-TAB-SWITCH-TRAILING-FRAMES: repro ~/tmp/psui/tabab (vibe6; live-30-features + duplicated tab;
-  ab.sh rounds apps). Same session 0.4.53 and 0.4.55 both ~850 ms at load 36-43; 0.4.55 208 ms at load 29: load /
-  software GL, not a regression. Told qa (11:50). qa agrees (vibe7 load 17: 0.4.53 818 ms too); qa's nightly (vibe7 alone, 3 rounds) -> /root/qa-scratch/nightly/tabab-1118.txt: close if both settle ~100-200 ms there.
+- Dimension label drag (live2 2b + feel-1417: starts 5 px from the press, then the text centred on the pointer, no
+  snap, never selected): overlay_labels.rs `row_box` keeps the box (hit area) when the text can't be rasterized (the
+  GPUI test's text system); sketch_mode.rs `DragState::Label.dragging` (it froze within 5 px of the press).
+- Glyph linger (qa: a ⫽ glyph stayed after the pointer left, /root/qa-scratch/uh/x-c330 02-off / 08-off):
+  GLYPH_LINGER 550 ms (live2 0.4-0.7 s) and `ui.glyph_linger_task` redraws when it ends; a hovered glyph of the
+  lingering row keeps the row.
+- Feel tests (real pointer + GPU pick; Mac green): sketch_label (drag; hover tan / click selects / double-click box),
+  sketch_glyph (linger end redraw), sketch_box (iso box over the planes: window 4 lines, crossing 3; clicks toggle,
+  Shift the same, Ctrl the menu). Live's Esc doesn't clear a sketch selection (behaviours 189): tests clear directly.
+- interaction-feel.md: woken model edge parallel = none (live2 wake-parallel), ours none.
+- Show constraints remembered per user (live2 14:3x): skasm's (sketch dialog), sent to them.
+
+## Full ui-parity rerun (11-17)
+
+Script ~/agents/psui-keep/full-half.sh (/root/psui-scratch/full-half.sh), scenarios ~/tmp/psui/src-1117.
+- Half b (odd names) on vibe5, green 082bd57e (11:38): 1062 / 1074 (~/agents/psui-keep/full1117-b/score.log).
+  psui-area: jog-new-edit-reedit ("Face of Jog 1": fixed by skasm 8a958336 13:04, after this binary),
+  bend-relief-new-edit-reedit (related row, skasm's vertex label), gusset-new-edit-reedit (title error; core's frame
+  part order). studios: drw-* x5, rel-flow-two-parts, ver-flow-merge-same-feature. asm: asm-cylindrical-limits.
+- Half a (even names) on vibe6 (lead 14:17: vibe6 idle), green f6274d94, 4 apps :386-389, unit psui-full1117a via
+  ~/bin/slot -> ~/agents/psui-keep/full1117-a (log full1117-a.log). Then rerun b's failures with f6274d94 and score.
+  Before: 11-16 psui list 1009 / 1021.
 
 ## Waiting on others
 
-- skasm: bend-relief-* "Vertex of Flange 1" (label after the feature that first created the definition entity: theirs,
-  in progress). tab-new-edit-reedit is a pick: live's ray passes ~0.3 mm above Flange 1's top edge and hovers its outer
-  wall; ours the plate's top. Mine: queue after the P1.
-- skasm: gusset-rectangle-aligned step 7, end-cap-profile-internal step 5 (their validation); sketch circular pattern
-  Equal (sketch-circular-pattern-click-commit constraints[2]).
-- live2: analysis-thickness ×3 (our list lacks the Pro rows?), context-create-version-update retake on main.
-- dx: face-rclick-export-dxf. core: boundary-surface (with my 11620bb3).
+- qa's nightly tab A/B /root/qa-scratch/nightly/tabab-1118.txt: close DOCK-TAB-SWITCH-TRAILING-FRAMES if both settle
+  ~100-200 ms.
+- skasm: bend-relief vertex label; gusset-rectangle-aligned step 7, end-cap-profile-internal step 5.
+- dx: face-rclick-export-dxf. core: boundary-surface, gusset frame part order.
 
 ## Known, left as they are
 
-- sketch-mirror-preselected-batch: live's lost first click after a box select is a live defect (`live_defects` from
-  step 20, DECISIONS 11-15); the rest matches.
+- sketch-mirror-preselected-batch: live's lost first click after a box select is a live defect (DECISIONS 11-15).
 
 ## Next, in order
 
-1. Recheck the flat view's colours: skasm's fix landed 0bb94eede (11:23); fb5 sm-click.json. Then the tab pick per the lead's answer.
-2. Older open items (11-06 to 11-08 "Next, in order" in the archive): check against a rerun before picking any up.
+1. Feel rows still to write (live2 Part 2 / 2b): point hover 10 px and point-over-line, dimension hover tan / click
+   orange / double-click box, glyph hover = secondary, box select L→R window / R→L crossing (lines only), shift /
+   ctrl click, 3D faces / edges / vertices with planes behind (iso).
+2. Older "Next" items in the archive: check against the rerun first.
 
 ## Open decisions
 
-- None pending (11-16: free-click tolerance answered and in the runner).
+- None.

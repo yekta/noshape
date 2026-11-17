@@ -148,6 +148,9 @@ const CM_TYPES: [(&str, &str); 22] = [
     ("Projected", "use"),
     ("Dimension", "dimension"),
 ];
+/// How long a left entity's glyphs stay shown after its orange goes, so the pointer can reach them (live2 feel-1417:
+/// 0.4–0.7 s).
+const GLYPH_LINGER: std::time::Duration = std::time::Duration::from_millis(550);
 const CM_MODES: [(&str, &str); 3] = [("Internal", "cm-internal"), ("External", "cm-external"), ("In context", "cm-in-context")];
 const CM_STATUS: [(&str, &str); 3] = [("Driven", "cm-driven"), ("Solved", "cm-solved"), ("Errors", "cm-errors")];
 
@@ -812,6 +815,13 @@ impl PartStudioView {
             if ed.hover != ent {
                 if let Some(old) = ed.hover {
                     ed.glyph_entity = Some((old, std::time::Instant::now()));
+                    self.ui.glyph_linger_task = Some(cx.spawn(async move |this, cx| {
+                        cx.background_executor().timer(GLYPH_LINGER + std::time::Duration::from_millis(5)).await;
+                        let _ = this.update(cx, |this: &mut Self, cx| {
+                            this.ui.glyph_linger_task = None;
+                            cx.notify();
+                        });
+                    }));
                 }
                 ed.hover = ent;
                 cx.notify();
@@ -3925,9 +3935,11 @@ impl PartStudioView {
         // Live (audit 1969): Shift with Show constraints off shows only the
         // hovered entity's glyphs, as hover does anyway.
         let show_all = ed.show_constraints;
-        let recent = ed.glyph_entity.filter(|(_, t)| t.elapsed().as_millis() < 750).map(|(e, _)| e);
-        let glyphs: Vec<_> = ed
-            .constraint_glyphs(&data)
+        let all = ed.constraint_glyphs(&data);
+        // (A glyph of the row hovered keeps the whole row, live2 feel-1417.)
+        let row_hovered = |e: noshape_sketch::EntityId| all.iter().any(|g| g.entity == e && ed.hover_constraint == Some(g.constraint));
+        let recent = ed.glyph_entity.filter(|(e, t)| t.elapsed() < GLYPH_LINGER || row_hovered(*e)).map(|(e, _)| e);
+        let glyphs: Vec<_> = all
             .into_iter()
             .filter(|g| {
                 show_all

@@ -4592,6 +4592,12 @@ mod fields;
 mod feedback;
 #[path = "sketch_hover_feel_tests.rs"]
 mod sketch_hover;
+#[path = "sketch_label_feel_tests.rs"]
+mod sketch_label;
+#[path = "sketch_glyph_feel_tests.rs"]
+mod sketch_glyph;
+#[path = "sketch_box_feel_tests.rs"]
+mod sketch_box;
 
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.
