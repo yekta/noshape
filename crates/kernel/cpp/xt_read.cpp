@@ -714,9 +714,9 @@ struct Builder
   std::map<long long, TopoDS_Vertex>             verts;
   std::map<long long, TopoDS_Edge>               edges;
   double                                         tol = 1e-7;
-  // Surfaces SP-curves lie on (their B-curves in the surface's parameters).
-  std::set<long long> sp_surfaces;
-  bool                sp_surfaces_indexed = false;
+  // Surfaces other geometry is built on (SP-curves, offset surfaces, ...), not only faces and intersections.
+  std::set<long long> based_surfaces;
+  bool                based_surfaces_indexed = false;
 
   explicit Builder(const Parser& p) : r(p) {}
 
@@ -925,18 +925,23 @@ struct Builder
   // A B-surface that is a plane, cylinder, cone, sphere or torus to within kAnalyticFit, as that surface, its normal
   // the same way: live's import makes it one (c2-hex-bookcase-derived "shrunk": a u-periodic cubic B-surface of 130
   // poles is a CONE in live; read as a B-spline its ring edge with the cylinder next to it came out with two vertices,
-  // and our files of it split the ring). Not one an SP-curve lies on: its B-curve is in the B-surface's parameters.
+  // and our files of it split the ring). Only a surface just faces and intersection curves use: an SP-curve's B-curve
+  // is in the B-surface's parameters, an offset surface (cf-snap-hook's) offsets along its normal.
   occ::handle<Geom_Surface> analytic_form(const occ::handle<Geom_BSplineSurface>& bs, long long idx)
   {
     constexpr double kAnalyticFit = 1e-7;
-    if (!sp_surfaces_indexed)
+    if (!based_surfaces_indexed)
     {
-      sp_surfaces_indexed = true;
+      based_surfaces_indexed = true;
       for (const auto& [i, n] : r.nodes)
-        if (n.type == 137)
-          sp_surfaces.insert(n.ptr("surface"));
+        // (A BODY's, ASSEMBLY's or WORLD's "surface" is the head of its list of surfaces.)
+        if (n.type != 14 && n.type != 38 && n.type != 10 && n.type != 12 && n.type != 101)
+          for (const char* f : {"surface", "basis_surface"})
+            if (const std::vector<Val>* v = n.get(f))
+              for (size_t k = 0; k < v->size(); ++k)
+                based_surfaces.insert(n.ptr(f, k));
     }
-    if (sp_surfaces.count(idx))
+    if (based_surfaces.count(idx))
       return nullptr;
     try
     {
