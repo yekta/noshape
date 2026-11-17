@@ -557,6 +557,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - **No blocker so far (GO on 7f287e52).** 12:35: greens 551d200b, 6bb61e69 and 7f287e52 (have blend's conic round be6f0ca8c
   and skasm's FeatureScript colours 0bb94eede) ALL-SAME vs v0.4.56: hats, dock, 47 ticket documents, authored documents.
   blend's impeller Fillet 3 (9e40ad95a) is not on main yet; checked on its green when it lands.
+- 14:37 lands for 17:00 checked (compat ALL-SAME vs v0.4.56: hats, dock, ticket and authored documents): psui 452838df
+  (green c330a760), skasm b87dd3dcf (c7a03f21), bool2's sections / unify ef79fdeca, 7538babf6, 08c32ea79 (on main 12:00;
+  01fb280e and every green since). Waiting: skasm's second hover half 244412385 (14:34; the user flow re-run with a sketch
+  tool active), blend 9e40ad95a (not on main), core's SCISSOR-LIFT fix. psui's lingering-glyph fix may miss 17:00 (P3).
 - **Must carry core's fix: SCISSOR-LIFT-BOM-ROWS** (lead 14:15). The culprit core 41f62884a (01:23) is in v0.4.56 (not
   0.4.55): asm-scissor-lift's BOM rows as live 59 -> 57/87 shipped. The 17:00 candidate must contain core's fix or revert
   (not on main at 14:15). qa-sl-verify runs asm-scissor-lift alone on the first green with it (vibe6, bool's method):
