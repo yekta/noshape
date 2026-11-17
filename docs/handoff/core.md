@@ -4,6 +4,20 @@ Updated 11-16 18:15 UTC. History (dated notes up to 11-15 14:48): docs/handoff/a
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
+- **STATE 11-17 02:2x (for the compaction):**
+  - core-offset (worktree core-trace, pushed) HEAD b281fe0d6 = merge-base 68371308e + offset 1/2/2b (landed as 822f3632,
+    will drop on rebase) + 87c383316 Boolean offset + 661df0163 parallel tools/StopState + 0c328e3b7 NaN removed faces +
+    4c463c807 Move face offset_solid first + 3c320fc0a prism patch + 01df8c3a1 guided loft speed + 4d1a3b93f
+    surface_result speed + b281fe0d6 no per-hit classify. core-trace has the uncommitted parity probe (never land it).
+  - Pairs: p3 (to 4c463c807) CLEAN; p4 (4c463c807 -> 4d1a3b93f, knife commits) running on vibe5 (p34.sh, p4res).
+  - Hats/dock A/B running (background): CLIs base 68371308e (core-bis) vs b281fe0d6 (core-trace) into vibe5
+    ~/tmp/core/udoc, then ~/agents/core-keep/udoc-cmp.sh (prints differences, UDOC-DONE). Delete src copies after.
+  - Then: if p4 clean and udoc SAME: rebase core-offset on main (drop landed offset commits), git checkout parity.rs
+    probe first, diff --stat, g++-13 build, land.sh.
+  - sew_closing (one sew for "solid if it closes", surface Add / surfaces.rs merge): /root/core-scratch/sew-closing.patch,
+    testing on core-oc (applied there, uncommitted; core-oc also has its parity probe). Commit into core-trace after
+    the udoc branch build has synced (don't change core-trace's tree before that).
+  - core-oc: main-based, probe uncommitted (/root/core-scratch/probe-wip.patch). core-bis: docs lands.
 - **LANDED 5b280750 (11-17 01:23): the ten core-oc commits** (pairs clean; details in the archive).
 - Impeller Extrude 4 model side: closed, nothing to fix. The 12 mm² sliver alone never meets the offset wall: even its
   surface over all of its own bounds only grazes the prism at the sketch plane (replayed dump vibe5
