@@ -4277,18 +4277,19 @@ fn a_nested_subassembly_is_placed_where_its_parts_land() {
     let r = rebuild_assembly(&mut ctx, &scratch("nested-flexible.noshape"), &asm, &[("E1".into(), studio.clone(), parts.clone())]);
     assert_eq!(r.occurrences_matching, r.occurrences, "{r:?}");
 
-    // Three levels, the part turned inside the innermost subassembly against its own tab (asm-xdev-subs'
-    // FXAA3-7-F5-SET <2> in linkage in Latch pusher linkage): the middle tab's own place of the part is in, the inner
-    // subassembly stays where its occurrence is.
+    // Three levels, the inner subassembly used twice in the middle one, its part turned in the second use only
+    // (asm-xdev-subs' FXAA3-7-F5-SET <2> in linkage in Latch pusher linkage): the middle tab's own place of that part is
+    // in, so the second inner subassembly stays where its occurrence is (not turned a second time).
     let asm = json!({
         "rootAssembly": {
             "instances": [{ "id": "IT", "name": "Top <1>", "type": "Assembly", "elementId": "SUBT" }],
             "occurrences": [
                 { "path": ["IT"], "fixed": true, "transform": at(0.0) }, { "path": ["IT", "IO"], "fixed": false, "transform": at(0.0) },
-                { "path": ["IT", "IO", "II"], "fixed": false, "transform": at(0.0) }, { "path": ["IT", "IO", "II", "IC"], "fixed": false, "transform": turned }] },
+                { "path": ["IT", "IO", "II"], "fixed": false, "transform": at(0.0) }, { "path": ["IT", "IO", "II", "IC"], "fixed": false, "transform": at(0.0) },
+                { "path": ["IT", "IO", "IJ"], "fixed": false, "transform": at(0.1) }, { "path": ["IT", "IO", "IJ", "IC"], "fixed": false, "transform": turned }] },
         "subAssemblies": [
             { "elementId": "SUBT", "instances": [{ "id": "IO", "name": "Outer <1>", "type": "Assembly", "elementId": "SUBO" }], "features": [] },
-            { "elementId": "SUBO", "instances": [{ "id": "II", "name": "Inner <1>", "type": "Assembly", "elementId": "SUBI" }], "features": [] },
+            { "elementId": "SUBO", "instances": [{ "id": "II", "name": "Inner <1>", "type": "Assembly", "elementId": "SUBI" }, { "id": "IJ", "name": "Inner <2>", "type": "Assembly", "elementId": "SUBI" }], "features": [] },
             { "elementId": "SUBI", "instances": [{ "id": "IC", "name": "Part 1 <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }], "features": [] }],
         "subAssemblyFeatures": { "SUBT": { "features": [] }, "SUBO": { "features": [] }, "SUBI": { "features": [] } },
         "features": { "features": [], "featureStates": {} } });
