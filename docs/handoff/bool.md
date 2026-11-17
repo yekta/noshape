@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 10:20 UTC.
+Updated 11-17 12:05 UTC.
 
 ## In flight
 - P0 SCISSOR-LIFT-BOM-ROWS (lead 07:30; asm d8d597e0 owns the BOM, waits for my culprit): fed22d alone as a model gives
@@ -12,20 +12,24 @@ Updated 11-17 10:20 UTC.
   bisect run in worktree 776dfea9; step script bisect-sl.sh: debug ops tests built on vibe6 (target ~/agents/776dfea9),
   the binary copied to vibe7 ~/agents/bool-keep/ops-sl, asm-scissor-lift alone (vibe7 snapshot ~/agents/bool-keep/sl)
   through vibe7's ~/bin/slot; judged by "Studio fed22d › Fillet 18: Error"). Log /root/bool-scratch/sl-bisect.log.
-  Ends: 684e77e2e good (59/87), ecf8c33ab bad (57/87). 06a56de82 good, 6c18ffe92 bad; 41f62884a and 14727ed62 skipped
-  (slot timeouts behind qa's suite on vibe6). Left: 3b5b8af3b, 5b9064e1b, bdd418e2c, 905a789b4 (my knife stack),
-  9ece8f66d (OCCT 0033), 5b2807501 / 41f62884a (core). Culprit -> its owner as P0 (mine: fix), tell asm.
-- bool-usd-precise 2755135e7 (bool-hat): op_unify keeps USD's merge whose volume change fits in the merged faces'
-  tolerant edges (sum of tol^2 x length): asm-infento 1dc32b Boolean 4 (dx's report): Part 4 232/632/400 -> 216/600/384
-  as live, same volume; Mac Boolean 4 904 -> 789 ms (unify ~266 -> small). T1
-  bool_patterns::quarter_cylinders_bounded_by_tolerant_edges_are_merged (tests/data/unify, fails on main 16/40/26).
-  g++-13 clean. Gate unit bool-gate-usd -> /root/bool-hat-scratch/chain-2755135e7.out (started 10:06), then hats/dock
-  + hat15b (udoc-ab.sh 2755135e7; hat15b by hand: ~/lead-private/hat15b.noshape with the same udoc-cmp.sh), land, tell dx.
-- infento Boolean 4's remaining time (OCCT tree fuse ~650 ms of 789, live 135; 259 ms OCCT "Preparing history"): ours
-  declines "a shared shape OCCT may keep or remake": a vertex shared by copy 14 and hub body 15 at (11.75, 0, 31) mm,
-  only non-plane faces at it (quiet -1). Taking it needs the decision after sections (does any section reach it: OCCT
-  remakes, else keeps) and corpus evidence. Debug print /root/bool-scratch/zz-shared-debug.diff (ZZ_SHARED). Case Mac
-  ~/noshape-host/agents/bool-hat/infb4 (3af1878cfff10d75), vibe7 ~/tmp/bool/infb4 (doc copy, rec), CLI batch b.jsonl.
+  Good: 684e77e2e, 06a56de82, 5e976a640. Bad: ecf8c33ab, 6c18ffe92. Skipped (slot timeouts): 41f62884a, 14727ed62.
+  Left: 41f62884a / 5b2807501 (core), 9ece8f66d (OCCT 0033), 7c76c77f9 (dx DXF, testing now), 905a789b4, bdd418e2c,
+  5b9064e1b, 3b5b8af3b (my knife stack). Each step waits for vibe7's slot (asm's / qa's suites). Culprit -> owner, asm.
+- bool-usd-precise 8e4759462 (bool-hat): op_unify keeps USD's merge whose volume change fits in the merged faces'
+  tolerant edges (sum of tol^2 x length), capped at 1e-8 of the volume, only where every face USD made of two or more
+  is on an elementary surface (trims unwrapped). infento 1dc32b Boolean 4 (dx): Part 4 232/632/400 -> 216/600/384 as
+  live, same volume; Mac 904 -> 789 ms. The knurl grooves test cd1c58431ab4a62c 9 -> 8 faces (the cylinder's two
+  pieces sharing an edge merged; valid, volume in its bound). walls_usd tests unchanged (their merges 5e-5 off:
+  rejected). T1 bool_patterns::quarter_cylinders_bounded_by_tolerant_edges_are_merged (tests/data/unify, 275 KB).
+  All 489 kernel tests pass on the Mac; g++-13 clean. Gate unit bool-gate-usd2 -> chain-8e4759462.out (12:03, queued
+  behind bool2's gates). Then: knurl corpora ours-only with the gate's base/new binaries, hats/dock + hat15b, land, dx.
+- Shared-shape decline ("a shared shape OCCT may keep or remake"): with it off (/root/bool-scratch/shared-decline-off.diff)
+  the 68 recorded cases (Mac ~/noshape-host/agents/bool-hat/shared74) replay ours-only with "0 differ", but
+  NOSHAPE_BREP_OURS_ONLY lets history-only differences pass: corpus2 4006f865 gives "history differs" in its T1. Next:
+  the exact study (OCCT run, NOSHAPE_BREP_EXACT) per case: which shared vertices OCCT keeps vs remakes, then a rule.
+  infento Boolean 4 our way: 32 ms vs OCCT's ~650, same counts/volume (history unchecked). Case Mac infb4.
+- Not mine (11-17): impeller 38073a30 (bool2: live wins, OCCT's the outlier), impeller Extrude impellerraum (core),
+  c2-fan-blade-sweep Boolean 2 (qa: core's Subtract with Offset range; main 1d77cd633 back to 56/139/84).
 - Landed 11-17: bool-knife (ecf8c33a), OCCT 0033 (9ece8f66), bool-knife2 (cf5a9aff), bool-march (d3f24a83), nuts
   (43335ce3: thread turn helix gap; gate clean, hats/dock/hat15b SAME), MSVC fix (01c5c13e: fitted's p static
   constexpr; CI 44039545068 green on all three OSes).
@@ -53,7 +57,7 @@ Updated 11-17 10:20 UTC.
 - blend's known sections entry point: parked (few pairs are tangent contacts).
 - Rings-loft Shell 1: skipping OCCT's global foot search where Newton from a 25 x 25 grid's local minima finds no
   square foot (/root/bool-scratch/parked-own-foot.diff): identical, only ~3 %; evidence (160/160), not a proof.
-- Parallel-axis cone / cylinder disjointness (/root/bool-scratch/parked-cones-apart.diff: circles at each height,
+- (Handed to bool2 11-17.) Parallel-axis cone / cylinder disjointness (/root/bool-scratch/parked-cones-apart.diff: circles at each height,
   angular ranges as cosine bounds, quadratics in z): cf-snap-hook fuse 96de626280206723's 30 cone x cone pairs
   (OCCT ~30 ms each, none found) share one height where the circles are internally tangent (4e-7): only 1 proven.
   Tangent contacts stay OCCT's (lead 11-15); likewise housing's 4 cylinder x revolution pairs (20-27 ms each, none).
