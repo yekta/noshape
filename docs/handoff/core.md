@@ -4,7 +4,7 @@ Updated 11-16 18:15 UTC. History (dated notes up to 11-15 14:48): docs/handoff/a
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
-- **STATE 11-17 02:2x (for the compaction):**
+- **STATE 11-17 02:15 (for the compaction):**
   - core-offset (worktree core-trace, pushed) HEAD b281fe0d6 = merge-base 68371308e + offset 1/2/2b (landed as 822f3632,
     will drop on rebase) + 87c383316 Boolean offset + 661df0163 parallel tools/StopState + 0c328e3b7 NaN removed faces +
     4c463c807 Move face offset_solid first + 3c320fc0a prism patch + 01df8c3a1 guided loft speed + 4d1a3b93f
