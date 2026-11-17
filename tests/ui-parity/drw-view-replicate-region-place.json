@@ -1,0 +1,162 @@
+{
+  "name": "drw-view-replicate-region-place",
+  "about": "A dimension on Front; Front › Select for replication ▸ Region... with a rectangle round Front (one view only), ✓; Top › Replicate annotations opens 'Replicate region / Place rectangle'; placed on Top, ✓: toast 'Successfully replicated 1/1 annotations'",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (live2 11-17: the drawing matrix's Move/Replicate gaps 'Place rectangle' / 'Successfully replicated …')",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Dimension"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            18
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Select for replication"
+      },
+      "ms": 600
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "View"
+      },
+      "ms": 400
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Region..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          610,
+          610
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          850,
+          740
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Top"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Replicate annotations"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2500
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          727,
+          350
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 12000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
