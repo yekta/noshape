@@ -134,7 +134,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   host, deleted after; never in the repo or tickets.
 
 ## Hosts
-**11-17 16:30: vibe5 DOWN, vibe3 gone.** qa's vibe5 work moved: compat-check / rel-* run on vibe7 (H=vibe7; CLIs in vibe7
+**11-17 17:20: vibe5 gone for good (lead), vibe3 gone; no qa script names either (the lock is qa-scratch/qa-host.lock).
+vibe7 ~/lead-private has all four user documents again (hat15b restored 17:17 from the user's upload).** Earlier note: qa's vibe5 work moved: compat-check / rel-* run on vibe7 (H=vibe7; CLIs in vibe7
 ~/qa-rel/<v>/noshape-cli from the release's noshape-cli tarball), the nightly streams private docs from vibe7 and the saved
 corpus from vibe6, land-footer lands through vibe7. vibe7 ~/lead-private: hat15, hat8 and the dock (16:40, under
 another file name: compat-check / w7-nightly / tabab-* use it); hat15b out until vibe5 returns (reports say "hat15b not run
