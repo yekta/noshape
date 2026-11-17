@@ -106,6 +106,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (104.36, 0, -27.20): the sphere seam's end), both hidden by the seam-join rule. Live's ring RvBB (81.385 mm) has its
   arc-length midpoint exactly on the first, so live keeps one vertex, at the sphere seam's end. Rule unknown (a
   Parasolid sphere has no seam); a live capture of a dome revolved onto a swept handle would settle it.
+- **Knife speed (lead 11-17 00:00, blend's Mac list; vibe5 same-session A/B main -> core-offset, hints):** Extrude 10
+  128-182 -> 46-48 ms (3c320fc0a: prism_until splits by the patch of the one target face its footprint meets, rays
+  from the profile outline, the patch only when wholly inside the face; history maps the patch to the face); Loft 1
+  112-125 -> 53-57 (01df8c3a1: guide ends checked edge by edge before OCCT's extrema on the composite profile,
+  arc-length table, orientation without a volume); Loft 3 surface_result 83 -> 19 ms (4d1a3b93f: touching by a shared
+  vertex first, duplicate faces only where boxes hold the vertices). Revolve 1 / Extrude 8 / 9 / 2 / 3 = bool's Rust
+  Boolean (told bool 00:0x). Left: Loft 3's two sews (~9 ms each), Loft 1 rows 20 ms. PAIR p4 (knife commits vs
+  4c463c807) queued after p3 on vibe5 (p34.sh; p3 base binary rebuilt 01:03 after a transient "no binary base").
+  Don't rb.sh core-trace on vibe5 until p4 has copied its src. Offset steps 1+2+2b LANDED 822f3632 (00:00).
 - **IN FLIGHT (lead 11-16 ~22:10): free-form offset, one kernel `offset_solid` that bool's Shell can call too.**
   Design: every face moved by its own distance (0: stays on its surface, trimmed/extended to meet moved neighbours).
   Surfaces = quad::Surf (shell.cpp; already per-surface `d`, 0 allowed; free-form = Geom_OffsetSurface + foot search);
