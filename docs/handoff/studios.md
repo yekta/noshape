@@ -17,7 +17,7 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
 - Landed 11-17: 7abd9bdf (doc-open timing), b5d11ad7 (box select), 01fb280e (panel text form, versions flows,
   manual-4). 57dc3ed4 failed 13:06 (ops e2e: first angle's side view); fixed forward (drawing_get "isometric",
   e2e takes either side view; ops e2e 222/222 on vibe5).
-- Checking since 14:47: 1db5e57e, 11 commits: section / detail / menu readings, first angle, the e2e fix, the
+- Failed twice (14:54, 15:44) on coverage reading the drawing_ui_tests/ folder as a file; fixed. 1db5e57e, 11 commits: section / detail / menu readings, first angle, the e2e fix, the
   drawing feel tests (drawing_ui_tests/feel.rs, 7), centerline_on_edge, Move to sheet / cell Note / Cell panel
   readings, the mate-row flyout (assembly_flyout.rs).
 - Committed 15:36 (landing after 1db5e57e), from live2 asm-feel 13:05 and asm-feel2 15:0x (behaviours "studios
