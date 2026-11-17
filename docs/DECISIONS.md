@@ -108,10 +108,11 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-17 The Mac's one build slot is for speed numbers and Mac-only checks. When a job would queue behind another there,
   build and test on the least-loaded vibe host instead (`uptime` first). Never end a turn to wait for a slot.
 - 11-17 (user) The build hosts the lead runs are named vibexN (vibex6, vibex7, vibex8 today); vibeN names are the user's
-  own servers. vibe3, vibe4 and vibe5 are gone for good. Land queue: vibex7. Main's watcher: vibex6. Private user
+  own servers. vibe3, vibe4 and vibe5 are gone for good. Land queue: vibe2 (since 21:25). Main's watcher: vibex6. Private user
   documents: vibex7 ~/lead-private only.
 - 11-17 21:00 (user) vibe2 (16 cores, 30 GB) is a build host like the others, though it is the user's own server (also
-  running the user's Motile): everything of ours under user ngyekta's home and /opt/occt, never /root. core, blend, bool2.
+  running the user's Motile): everything of ours under user ngyekta's home and /opt/occt, never /root. 21:25 (user: use it
+  as we want): it runs the land queue (land.sh's default); core and blend build on vibex7, bool2 on vibex6.
 - 11-17 21:05 (lead) Never kill a process tree from a computed pid: a `kill_tree` on a parent that was pid 1 SIGTERMed
   every process on the agents' machine at 21:00:08 (4 agents, every unit, Chrome, Xvfb). Stop your own units with
   `systemctl stop <unit>`; kill only pids you started ($! or a pid file), after checking the pid is > 1, not an ancestor

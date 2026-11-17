@@ -1,13 +1,13 @@
 #!/bin/bash
-# land-relay.sh: the land daemon's hands on this machine (vibe4 has no GitHub credentials; tools/tiers/land-daemon.sh).
-# Every 2 s: does the daemon's requests in vibe4:~/<dir>/outbox ("push <branch> <ref there> <sha>": fetches the
-# checked stack from vibe4 and pushes it, answering "ok" or "rejected …"; "delete <branch>…": deletes queue branches),
-# and every 10 s copies the results back: vibe4:~/land/results/<worktree>.log → /tmp/lead/land-results/ (land.sh
+# land-relay.sh: the land daemon's hands on this machine (the land server has no GitHub credentials; tools/tiers/land-daemon.sh).
+# Every 2 s: does the daemon's requests in the land server's ~/<dir>/outbox ("push <branch> <ref there> <sha>": fetches the
+# checked stack from it and pushes it, answering "ok" or "rejected …"; "delete <branch>…": deletes queue branches),
+# and every 10 s copies the results back: ~/land/results/<worktree>.log → /tmp/lead/land-results/ (land.sh
 # --status, the lead's monitor). land.sh copies it from origin/main to /root/lead-scratch (survives a reboot) and starts
 # it when it isn't running; the lead's monitor restarts it from there.
 # Usage: setsid -f bash /root/lead-scratch/land-relay.sh [<dir> (default land)] >> /root/lead-scratch/land-relay.log 2>&1
 set -uo pipefail
-dir=${1:-land}; host=${NOSHAPE_LAND_QUEUE_HOST:-vibe4}; repo=/root/projects/noshape
+dir=${1:-land}; host=${NOSHAPE_LAND_QUEUE_HOST:-vibe2}; repo=/root/projects/noshape
 out=/tmp/lead/land-results; [ "$dir" = land ] || out=/tmp/lead/$dir-results
 mkdir -p "$out" /tmp/lead
 # Pushes to the URL: no remote-tracking ref to update in the agents' shared repo (a lock taken by an agent's fetch

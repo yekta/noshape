@@ -61,7 +61,7 @@ tools/tiers/rb.sh cargo test -p noshape-brep --lib
 tools/tiers/rb.sh --get noshape cargo build -p noshape   # then run $CARGO_TARGET_DIR/debug/noshape here
 ```
 Heavy jobs (replay corpora, long probes, sweeps) run there too, through `~/bin/slot`: vibe2 has 16 cores and 30 GB of
-memory, vibex6, vibex7 and vibex8 8 cores and 29 GB each. vibex6 also runs main's watcher, vibex7 the land queue.
+memory, vibex6, vibex7 and vibex8 8 cores and 29 GB each. vibe2 also runs the land queue, vibex6 main's watcher.
 
 ## CI on GitHub (`ci.yml`, cliapp 11-01)
 

@@ -1,11 +1,11 @@
 #!/bin/bash
-# land-daemon.sh: the land queue on the land server (vibe4; docs/TESTS.md "Landing"). land.sh pushes a change to a
+# land-daemon.sh: the land queue on the land server (vibe2; docs/TESTS.md "Landing"). land.sh pushes a change to a
 # queue/ branch, writes its job file here and returns at once (11-01: agents spent ~25 h a day waiting on their own
 # lands). Whenever a slot frees, this daemon takes every queued change in arrival order, up to LAND_BATCH (4), stacks
 # them on main (one that doesn't apply goes back as a rebase conflict), runs land-checks.sh once on the stack and
 # pushes it if green. A red batch is split in halves that go first in the queue (tested in parallel slots, down to
 # the change at fault, which is reported; the others land). Batches form only from what waits: none waits to fill one.
-# Pushes go through tools/tiers/land-relay.sh on the agents' machine (vibe4 has no GitHub credentials), which also
+# Pushes go through tools/tiers/land-relay.sh on the agents' machine (the land server has no GitHub credentials), which also
 # brings the results back to /tmp/lead/land-results/<worktree>.log.
 # State is on disk (LAND_DIR, default ~/land): jobs/, pending/ (arrival order; ~/land/queue is slots.sh's file),
 # splits/ (halves of red batches and re-tests, first), run/<batch>/ (claimed: jobs, pid, state, check.log), results/<worktree>.log and results.tsv,
