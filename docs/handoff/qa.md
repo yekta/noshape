@@ -19,7 +19,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   hat15 / dock UI-script rounds + cold / reopen + rotate / pan / zoom, block baseline) -> nightly/lat-<mmdd>.txt; (3) the
   QUIT-ABORT-DOCK guard (qa-asm-a x5) -> nightly/quit-<mmdd>.txt. Failures and a crash append to /tmp/lead/qa-alerts. Log:
   suites/window-0200-<mmdd>.log. Skip a night: touch nightly/skip-<mmdd>. Runs alone (no slot: the window must be quiet).
-  Restarted 11-17 03:33 with the fixed script: the clean A/B step (nightly/ab-<mmdd>.args) and the latency step now
+  Restarted 11-17 07:31: the lead's $HOME fix of the CLI pair (11-17's row INVALID: `~` after a comma isn't expanded, 1 of
+  84 timed) and a guard: < 90 % of the docs timed or < 6 opens -> alert, no SCORE row. Earlier, 03:33: the clean A/B step (nightly/ab-<mmdd>.args) and the latency step now
   `cd … || exit 1;` (the A/B's `cd … && ( load loop ) &` backgrounded the cd, ab-feat.py ran in ~ and the loop held the ssh).
 - **qa-suites**: bin/qa-suites-loop.sh, every 4 h: interaction suite, model suite (speed, debug) and assembly / exchange
   suites of the newest green, each through `~/bin/slot`: ui + models on **vibe7**, assemblies / exchange (suites-rest) on
@@ -67,6 +68,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **11-17 05:00 cut**: v0.4.56 from 35baa32fa (published 06:35). Main HOLD (f197 Mirror 3, blend ba7a8d755) cleared 05:57 by
   the revert b596da51b (qa-hold-watch, exited). blend owes a fixed full-round strip with f197 in its T1 case.
 - **v0.4.56 published check** done 06:58 (compat/published-0.4.56.txt, rel-0.4.56.txt): clean; compat baseline 0.4.56.
+- **qa-imp-verify** (bin/imp-verify.sh f99cf571): on the first green with core's revert of 64744410b's Move face routing,
+  impeller statuses v0.4.56 vs green on vibe6 -> ab1117/imp-verify.txt + alert; expect Delete face 2 / Fillet Flansch Ok.
+- Suites: suites-models.sh sets NOSHAPE_PARITY_DIFFERING; suites-diff.py prints `newdiff` (features differing now, not before).
+- f197 Mirror 3: blend re-applied ba7a8d755 (9a46f7d10) with its fix 74d05ad5e; check f197 SAME on 74d05ad5's compat.
 - **Open P0s from qa 11-17**: IMPELLER-MOVE-FACE-2-REF (core, suspect 64744410b), SCISSOR-LIFT-BOM-ROWS (asm),
   IMPELLER-DELETE-FACE-2-SLOW (core). Re-check each on the green that claims the fix. dx: rings-loft x_t import works since
   0.4.56 but 9-10 s vs live 8.6 (queue item, not P0).
