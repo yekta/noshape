@@ -94,7 +94,9 @@
 #include <IntTools_Context.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
+#include <BRepGProp_Domain.hxx>
 #include <BRepGProp_Face.hxx>
+#include <BRepGProp_Vinert.hxx>
 #include <BOPTools_AlgoTools3D.hxx>
 #include <BOPAlgo_Builder.hxx>
 #include <TopAbs.hxx>
@@ -1343,19 +1345,52 @@ TopoDS_Shape faces_reversed(const TopoDS_Shape& s)
 
 // The volume of faces `fs`, each as its solid uses it: a solid's volume is the sum of its faces' shares (one
 // integral per face), so two solids sharing all but a few faces differ by those faces' shares, the ones of one
-// reversed (in one call: OCCT integrates about the shape's rough centre, so separate calls don't add up).
+// reversed. Each integral about one point (OCCT's: the faces' vertices' middle), on all threads, added in order: the
+// same sum as BRepGProp::VolumeProperties of their compound (c2-config-parts-standoffs' thread unify: 37 faces,
+// 360 ms on one thread).
 double faces_volume(const std::vector<TopoDS_Shape>& fs)
 {
   if (fs.empty())
     return 0;
-  TopoDS_Compound c;
-  BRep_Builder    B;
-  B.MakeCompound(c);
+  gp_XYZ xyz(0, 0, 0);
+  int    nv = 0;
   for (const TopoDS_Shape& f : fs)
-    B.Add(c, f);
-  GProp_GProps g;
-  BRepGProp::VolumeProperties(c, g);
-  return g.Mass();
+    for (TopExp_Explorer x(f, TopAbs_VERTEX); x.More(); x.Next(), ++nv)
+      xyz += BRep_Tool::Pnt(TopoDS::Vertex(x.Current())).XYZ();
+  if (nv == 0)
+  {
+    TopoDS_Compound c;
+    BRep_Builder    B;
+    B.MakeCompound(c);
+    for (const TopoDS_Shape& f : fs)
+      B.Add(c, f);
+    GProp_GProps g;
+    BRepGProp::VolumeProperties(c, g);
+    return g.Mass();
+  }
+  const gp_Pnt        at(xyz / nv);
+  std::vector<double> share(fs.size(), 0.0);
+  OSD_Parallel::For(0, static_cast<int>(fs.size()), [&](int i) {
+    const TopoDS_Face& f = TopoDS::Face(fs[i]);
+    TopLoc_Location    l;
+    if (BRep_Tool::Surface(f, l).IsNull() || (f.Orientation() != TopAbs_FORWARD && f.Orientation() != TopAbs_REVERSED))
+      return;
+    BRepGProp_Face   bf(f);
+    BRepGProp_Vinert g;
+    g.SetLocation(at);
+    if (f.NbChildren() == 0)
+      g.Perform(bf);
+    else
+    {
+      BRepGProp_Domain bd(f);
+      g.Perform(bf, bd);
+    }
+    share[i] = g.Mass();
+  });
+  double v = 0;
+  for (const double x : share)
+    v += x;
+  return v;
 }
 
 // What a face's volume share depends on, as a value: its orientation, surface and, for each edge use in order, the
@@ -2151,7 +2186,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     std::vector<FaceShare>    share;
     images(cp, HHist(), in, image, share);
     u.Build();
-    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape(), diag), u.Shape()))
+    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape(), diag, &memo), u.Shape()))
       continue;
     if (hist.IsNull())
       hist = new BRepTools_History();
