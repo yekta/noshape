@@ -156,6 +156,26 @@ fn rounds_of_a_shim_with_tiny_steps_are_built_as_tools_as_live() {
     assert!((vol_mm3(&r) - 473.342275).abs() < 0.01, "{}", vol_mm3(&r));
 }
 
+/// qa's rust-zero-solid-f197: Chamfer 3 (1 mm on two edges; tests/data its input) then Mirror 3, the part mirrored
+/// across Front and added to itself: one part, 32,264.11 mm³ (0.4.55). The chamfer's retry, valid as it is, with its
+/// necks cut anyway came out with another B-rep, and the union with its mirror was four slivers of 56 mm³ (blend's
+/// ba7a8d755).
+#[test]
+fn a_valid_chamfers_necks_stay_and_its_mirror_adds_whole() {
+    setup();
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend/f197-chamfer3-input.brep");
+    let s = read_brep(&path).unwrap();
+    let all = s.edges();
+    let edges = [all[6].clone(), all[13].clone()];
+    let r = chamfer_checked(&s, &edges, ChamferSpec::Equal(1.0 * MM), &[]).unwrap().shape;
+    let front = Plane { origin: DVec3::ZERO, x_dir: DVec3::X, normal: DVec3::Y };
+    let m = transform(&r, &Transform::Mirror(front), true).unwrap().shape;
+    let u = boolean(BooleanOp::Fuse, &[r], &[m], &BooleanOptions::default()).unwrap().shape;
+    let solids: Vec<f64> = u.solids().iter().map(vol_mm3).collect();
+    assert_eq!(solids.len(), 1, "{solids:?} mm³");
+    assert!((solids[0] - 32264.11).abs() < 0.5, "{} mm³ (0.4.55: 32,264.11)", solids[0]);
+}
+
 /// Draft by wedges against OCCT's draft (where it works) and Onshape (D1).
 #[test]
 fn draft_wedges_like_onshape() {

@@ -5083,6 +5083,8 @@ static TopoDS_Shape without_all_necks(const TopoDS_Shape& s, double width, HHist
   return cur;
 }
 
+void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h);
+
 // A hair-smaller blend's result `r` (valid here) with its necks cut out, valid at the part's own scale; null where
 // there is no neck or no such cut. Cut here first, else at the part's own scale and brought back (a plane piece of
 // isaac-ball 3c5c58's Fillet 1, cut here, came out unorientable once scaled back).
@@ -5177,15 +5179,27 @@ std::pair<TopoDS_Shape, HHist> checked_blend(const TopoDS_Shape& input, const Bl
       {
         const double width = std::max(size * eps * 50, 1e-9);
         TopoDS_Shape r3    = without_slivers(r2, width, h2);
-        // A face this retry pinched to a neck: cut out, so the face is its pieces as live's (isaac-ball 3c5c58's
-        // Fillet 1, a full round across a strip of a bigger face, live two faces; c2-fan-blade-sweep's 2e-10 m bridge,
-        // a self-overlapping face once scaled back), where that comes out valid at the part's own scale.
+        // A face this retry pinched to a neck: cut out, so the face is its pieces as live's, where that comes out valid
+        // at the part's own scale (c2-fan-blade-sweep's 2e-10 m bridge, a self-overlapping face once scaled back). A
+        // retry valid at the part's scale too is kept as it is, unless the cut lets a full round's two halves across a
+        // strip merge (isaac-ball 3c5c58's Fillet 1, live two faces): cut anyway, rust-zero-solid-f197's Fillet 3 came
+        // out with another B-rep and its Mirror 3 in four slivers.
         if (valid_shape(r3))
         {
-          const TopoDS_Shape r4 = necks_cut(input, r3, width, h2);
-          if (!r4.IsNull())
-            return {r4, h2};
-          return {r3, h2};
+          const bool         as_is = valid_unscaled(r3);
+          HHist              hc    = h2;
+          const TopoDS_Shape r4    = necks_cut(input, r3, width, hc);
+          if (r4.IsNull())
+            return {r3, h2};
+          if (as_is)
+          {
+            TopoDS_Shape merged = r4;
+            HHist        hm     = hc;
+            merge_full_rounds(input, merged, hm);
+            if (merged.IsSame(r4))
+              return {r3, h2};
+          }
+          return {r4, hc};
         }
         const TopoDS_Shape r4 = without_necks(r3, width, h2);
         if (!r4.IsSame(r3))
