@@ -410,6 +410,18 @@ impl NurbsCurve {
         Some(out)
     }
 
+    /// A copy with its poles moved by `f`, a rigid motion: its spans' lengths the same, kept (its pieces made anew).
+    pub(crate) fn moved(&self, f: impl Fn(DVec3) -> DVec3) -> NurbsCurve {
+        let mut c = self.clone();
+        for p in &mut c.poles {
+            *p = f(*p);
+        }
+        if let Some(t) = self.spans.3.get() {
+            let _ = c.spans.3.set(t.clone());
+        }
+        c
+    }
+
     /// Its length from `t0` to `t1` (Gauss–Legendre, 4 points on each of 4 pieces of a knot span; the whole spans
     /// between the ends' from a table made once). None: no spans, or past the knots.
     pub(crate) fn length(&self, t0: f64, t1: f64) -> Option<f64> {
