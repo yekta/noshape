@@ -1687,9 +1687,14 @@ impl DrawingEditor {
             // Under the panel's title and the tab's own, but Annotations, Views and Tables under their own alone
             // (live2 drw-drawprops-*, drw-properties-*).
             let tab = TABS.get(self.drawing_props.tab).map(|t| t.0).unwrap_or_default();
-            let mut lines: Vec<(String, bool)> = if matches!(tab, "Annotations" | "Views" | "Tables") { vec![(tab.into(), false)] } else { vec![("Drawing properties".into(), false), (tab.into(), false)] };
+            let own = matches!(tab, "Annotations" | "Views" | "Tables");
+            let mut lines: Vec<(String, bool)> = if own { vec![(tab.into(), false)] } else { vec![("Drawing properties".into(), false), (tab.into(), false)] };
             lines.append(&mut rec.borrow_mut());
             lines.append(&mut pending.borrow_mut());
+            if !own {
+                // The footer, read with the panel (live recorder .5: drw-canvas-drawing-properties).
+                lines.extend(["Update properties from a template...", "Lock drawing properties"].map(|t| (t.to_string(), false)));
+            }
             let title = lines[0].0.clone();
             crate::ui_script::note_dialog(|| crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": title }), lines));
         }
@@ -1929,7 +1934,7 @@ impl DrawingEditor {
                             .flex_1()
                             .child(div().ml(px(8.)).w(px(301.)).h(px(27.)).px(px(8.)).flex().items_center().rounded(px(4.)).bg(gpui_kit::rgb(0xeeeeee)).border_1().border_color(gpui_kit::rgb(0xcccccc)).text_size(px(14.)).text_color(gpui_kit::rgb(0x555555)).child(div().truncate().child(name.clone())))
                             .into_any_element(),
-                        None => div().flex_1().h(px(26.)).pl(px(14.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x666666)).child("Update properties from a template…").into_any_element(),
+                        None => div().flex_1().h(px(26.)).pl(px(14.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x666666)).child("Update properties from a template...").into_any_element(),
                     })
                     .child(dwt),
             )
