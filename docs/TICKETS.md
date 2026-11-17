@@ -21,7 +21,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   difference: ours has (1, "Motor Mount", 3.0, "Motor Mount", "", "- None -") under "Drive", live doesn't; the "Gear Frame"
   row under "Gearbox" no longer differs. 106 commits in range (bool, core, dx, blend; no asm). Logs:
   /root/qa-scratch/suites/{1116-1642-684e77e2,1117-0227-ecf8c33a}/assemblies.log.
-- [ ] P0 IMPELLER-MOVE-FACE-2-REF (core; qa 2026-11-17 07:10, vibe6, v0.4.56 CLI vs green c9b3ad6f, same session, 3 runs, load ~2)
+- [x] verified (qa 09:27 on green fa9f84b8 = core c85e75070, which reverts 64744410b's Move face routing: every impeller feature's status as v0.4.56; Delete face 2 / Fillet Flansch zum Stroemungskanal Ok, Move face 2 "Could not transform…" as v0.4.56; ab1117/imp-verify.txt) P0 IMPELLER-MOVE-FACE-2-REF (core; qa 2026-11-17 07:10, vibe6, v0.4.56 CLI vs green c9b3ad6f, same session, 3 runs, load ~2)
   c2-impeller-loft (qa-parity/saved) regenerates worse on main than in v0.4.56: "Move face 2" "Could not transform selected faces
   as requested." -> "Select faces to move." (its saved face no longer resolves), "Delete face 2" Ok -> Error "Could not delete
   selected faces.", "Fillet Flansch zum Stroemungskanal" Ok -> Warning "2 missing selections". The first feature that changes
@@ -530,6 +530,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Fillet / sketch plane / Shell / mate connector / Draft / Extrude up to face on one piece's face change or take
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
+
+## Release blockers for the 2026-11-17 17:00 release (qa early list 09:30, newest green fa9f84b8; the latest release is v0.4.56)
+- **No blocker so far (GO on fa9f84b8).** Compat check complete (08:49): user documents (hats, dock), ticket documents (f197
+  SAME with blend's re-landed full round 74d05ad5e) and qa's authored documents ALL-SAME vs v0.4.56.
+- c2-impeller-loft (IMPELLER-MOVE-FACE-2-REF): fixed by core c85e75070, every feature's status as v0.4.56 (vibe6, 3 runs).
+  Times were a hint only (vibe6 load 6-15 during the run): total 43.5 s (v0.4.56) -> 25.2 s, Delete face 2 22.2 -> 10.1 s.
+- Open, not blocking the cut (not regressions against v0.4.56): IMPELLER-DELETE-FACE-2-SLOW (core), SCISSOR-LIFT-BOM-ROWS
+  (bool bisects; in v0.4.56 already). blend's impeller Fillet 3 has not landed (blend10 WIP).
+- Final verdict: the qa-cut-1615 timer at 16:15 (cut-verdict.sh on the newest green) -> qa-alerts; update this entry then.
 
 ## Release blockers for the 2026-11-17 05:00 release (qa list 04:42, newest green 5875109e; the latest release is v0.4.55)
 - [x] **HOLD cleared 05:57 (qa): blend reverted ba7a8d755 in b596da51b; green b596da51 complete check: user, ticket (f197 SAME) and authored documents ALL-SAME vs 0.4.55, verdict GO; 827a23a6 the same.** Was: **HOLD, P0 MIRROR3-UNION-LOSES-PART (blend ba7a8d755, bisected by core 11-17: a38f06293 good, 44 faces / 32,264.11 mm³;

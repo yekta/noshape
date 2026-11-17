@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, rewritten 2026-11-17 03:45; this thread replaced the one that stalled 11-17 02:30)
+# QA handoff (agent qa; current state only, rewritten 2026-11-17 09:35 for the move to the Ubeyd account at ~10:02)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -7,10 +7,10 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 
 ## Running units
 Local units are transient (`systemctl list-units 'qa-*'`); restart one with the `systemd-run` line in its description if it's gone.
-- **qa-compat-loop**: bin/compat-loop.sh <baseline>, now **0.4.54**. On every watcher green, bin/compat-check.sh runs userdocs.py
+- **qa-compat-loop**: bin/compat-loop.sh <baseline>, now **0.4.56** (moved by qa-pub-0456 11-17 06:43). On every watcher green, bin/compat-check.sh runs userdocs.py
   on vibe5 (hats, dock, 47 ticket docs, 16 authored docs from compat-docs/v0443) with the baseline's CLI against the green.
   A feature that gets worse writes compat/ALERT-<sha> and one line per feature to /tmp/lead/qa-alerts. Move the baseline by
-  restarting the unit with the new version (rel-published.sh does it). Baseline now **0.4.55** (11-16 21:16).
+  restarting the unit with the new version (rel-published.sh does it).
 - **qa-w7-nightly**: bin/w7-nightly.sh. Sleeps to 02:00 UTC, then on vibe7 with the newest release (downloaded to vibe7
   ~/qa-rel/<v>/) runs: (1) opentime.py (hat8, hat15, hat15b, dock) and modeltime.py (84 suite docs), 3 runs, the previous release's CLI
   alternating with the current one (DECISIONS db4db21a0; the row shows the same-session sums and docs > 1.25x slower, details
@@ -53,44 +53,42 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    rotation (next: rows 9-16).
 - **v0.4.56** published check done 11-17 06:58: clean, baseline 0.4.56. Next: the 17:00 cut (qa-cut-1615).
 
+## Next (in this order)
+1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (early list written 09:30: GO on fa9f84b8).
+   The qa-cut-1615 timer runs cut-verdict.sh at 16:15 -> one line in /tmp/lead/qa-alerts + compat/cut-1117-1615.txt. Read
+   the ticket section of that compat file too (a ticket doc's wrong geometry is a HOLD), then update the entry with the
+   verdict and the green it names, commit docs-only. HOLD only for a real P0 (crash, wrong geometry, speed regression, a user
+   document changed). After the cut is published: `systemd-run --unit qa-pub-<v> bash /root/qa-scratch/bin/rel-pub-all.sh
+   0.4.56 <v> <candidate binary on vibe5>` (stage the candidate app at vibe5 ~/tmp/qa/cand/noshape, one fixed path;
+   delete it after); it waits for the release, checks, moves the compat baseline, writes one line to qa-alerts.
+2. **qa-imp-verify is DONE** (09:27): green fa9f84b8 (core c85e75070) gives every c2-impeller-loft feature v0.4.56's status
+   (ab1117/imp-verify.txt); IMPELLER-MOVE-FACE-2-REF marked verified. Nothing left to run for it.
+3. Suites: the qa-suites loop's next run picks the newest green (4-hourly). Compare each finished run with the previous one
+   (suites/<run>/worse.txt from bin/suites-diff.py: models, scenarios, `failure`, `speed`, `newdiff`; assemblies.log
+   `^asm-…: … BOM rows` and `^assemblies:`; exchange.log `exchange score` and times over live). Regressions -> owners as P0
+   (paused agents: to the lead), tickets the run confirms fixed -> mark verified.
+4. Open P0s to re-check on the green that claims each fix: IMPELLER-DELETE-FACE-2-SLOW (core; impeller Delete face 2 ~10 s,
+   live 2.8 s for the whole document), SCISSOR-LIFT-BOM-ROWS (bool bisects, asm owns the BOM). blend's impeller Fillet 3
+   is WIP in blend10 (not landed): when it lands, re-time c2-impeller-loft v0.4.56 vs green on vibe6
+   (bin/abn-feat.py 3 <cli,cli> ~/agents/qa-keep/abc/m <work> c2-impeller-loft; full paths, `~` after a comma isn't expanded).
+5. Nightly (02:00, qa-w7-nightly): after it, check suites/window-0200-<mmdd>.log ends NIGHTLY-DONE and the SCORE row is valid
+   (the guard alerts otherwise); send blend faceblend / tpd / michael and skasm corner-break from the row.
+
 ## Open items
-- **Speed (P0)**: owners got their slower-than-live documents 11-15 (from 11-14's vibe7 window, v0.4.48): blend (faceblend,
-  tpd, michael, motor-mount, bracket03, pipeflange, radijator), core (impeller defeature, louver, housing revolve, lighten's
-  opEnclose / opOffsetFace done 3bfc17b1), bool (knife Split 4, bottle Shell / Split, rings Shell + CP2, housing / louver /
-  snap-hook Booleans, lighten opShell), bool2 (valve CP1, helical Sweep, housing / impeller unify), dx (std cold compile,
-  evEdgeConvexity), skasm (corner-break: 1850 ms vs live 1972 on main, closes unless the window disagrees). After each
-  night: send blend faceblend / tpd / michael and skasm corner-break from the new SCORE row; re-list what is still slower.
-- **Interaction latency**: absolute numbers only from the nightly (DECISIONS 11-15). Candidates from vibe6 11-15 (load
-  3-30): rotate / pan / zoom 2-5 fps on hat / dock vs 11-15 on the block (llvmpipe), hat hover first frame 0.9 s (live 600
-  ms on a block), dock's first switch to B 14.7 s settle. psui owns the hat15 fillet edit (Tab not applying a variable-bound
-  Radius; ✓ leaving the dialog open); my 7.9 / 4.4 s were the caret blink (lat-steps now 450 ms quiet). Send owners only
-  what the nightly confirms slow, or > 3x a PLAN 2.7 target.
-- **11-17 05:00 cut**: v0.4.56 from 35baa32fa (published 06:35). Main HOLD (f197 Mirror 3, blend ba7a8d755) cleared 05:57 by
-  the revert b596da51b (qa-hold-watch, exited). blend owes a fixed full-round strip with f197 in its T1 case.
-- **v0.4.56 published check** done 06:58 (compat/published-0.4.56.txt, rel-0.4.56.txt): clean; compat baseline 0.4.56.
-- **qa-imp-verify** (bin/imp-verify.sh f99cf571): on the first green with core's revert of 64744410b's Move face routing,
-  impeller statuses v0.4.56 vs green on vibe6 -> ab1117/imp-verify.txt + alert; expect Delete face 2 / Fillet Flansch Ok.
-- Suites: suites-models.sh sets NOSHAPE_PARITY_DIFFERING; suites-diff.py prints `newdiff` (features differing now, not before).
-- f197 Mirror 3: blend re-applied ba7a8d755 (9a46f7d10) with its fix 74d05ad5e: f197 SAME on green 74d05ad5 (07:37), all docs SAME vs 0.4.56.
-- **Open P0s from qa 11-17**: IMPELLER-MOVE-FACE-2-REF (core, suspect 64744410b), SCISSOR-LIFT-BOM-ROWS (asm),
-  IMPELLER-DELETE-FACE-2-SLOW (core). Re-check each on the green that claims the fix. dx: rings-loft x_t import works since
-  0.4.56 but 9-10 s vs live 8.6 (queue item, not P0).
-- **Clean A/B 11-17** (lead ran it by hand on vibe7 02:55-03:31; ab1117/ here and in lead-scratch): 0.4.48 -> 0.4.53 -> 0.4.55 ms:
-  helical 159 / 398 | 380 / 96 (Sweep 1 fixed in 0.4.55, no ticket); knife 1700 / 3154 | 2947 / 2207 (0.4.48 had 9 features
-  in error); impeller 15643 / 28592 | 27584 / 25314; live 40 / 408 / 2773. Green 35baa32f: knife 1803 (Mirror 1 128 / 220 /
-  140 ms for 0.4.53 / 0.4.55 / green: sent to bool), impeller 23190 with Delete face 2 still 12.1 s -> P0
-  IMPELLER-DELETE-FACE-2-SLOW (core bisects it; qa doesn't).
-- Old: clean A/B v0.4.48 vs v0.4.53 (impeller, helical, knife incl. Fillet 5): bin/ab-clean.sh as unit qa-ab-clean, after asm's
-  full7 on vibe7, `SLOT_QUIET_OK=1 ~/bin/slot`, load every 30 s, removes ~/.slot-quiet -> nightly/ab-clean-<mmdd>.*; valid if
-  load < ~1.5. Owners so far: impeller Delete face 2 is upstream (core: Move face 1 fails where live builds; blend Fillet 28/29),
-  impeller fillet failure cost (blend 29c1841df), helical Sweep 1 fixed on main (bool2 895c8e3b / e47268f2).
-- v0.4.54 published check done 11-16 (compat/published-0.4.54.txt, rel-0.4.54.txt): clean; baseline 0.4.54.
-- The suites runs of 11-16 00:32 (f14f85a8) and 04:43 (601df0ac) were stopped to keep vibe7 quiet; the loop reruns.
+- **Speed (P0)**: owners got their slower-than-live documents 11-15 (blend, core, bool, bool2, dx, skasm; archive has the
+  list). Re-list what is still slower after each valid nightly row.
+- **Interaction latency**: absolute numbers only from the nightly (DECISIONS 11-15). Send owners only what the nightly
+  confirms slow, or > 3x a PLAN 2.7 target. psui owns the hat15 fillet edit (Tab not applying a variable-bound Radius).
+- dx: c2-rings-loft x_t import works since 0.4.56 but 9-10 s vs live 8.6 (sent to dx, queue item).
+- bool: knife Mirror 1 128 / 220 / 140 ms (0.4.53 / 0.4.55 / 35baa32f): bool's 846aace6a says fixed; check in the next valid nightly.
+- Agent ids changed 11-17 09:25 (asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2
+  e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios 58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6,
+  live2 3b9b1e66-33a0-4dfe-9e0a-eee216e354b2; bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core 6692ae35-758a-4442-81c8-29f67be2e21a,
+  blend 0e6e9942-0713-46c1-ae55-132fbbb4a14b, dx f93a1292-5bb7-406f-9a25-59767e01878e). No qa script holds agent ids.
 - QUIT-ABORT-DOCK: verified fixed (80e16e42d); guarded by the nightly and rel-published.
-- f197 Fillet 1 vs 0.4.51 was core's 1ac08e247 (reverted on v0.4.52's branch); 0.4.52 baseline is clean.
 
 ## Expected userdocs differences (not regressions)
-- none against 0.4.54 (E2 Govde's ee16972d8 topology is in it).
+- none against 0.4.56. hat15 vs 0.4.43 always DIFFs (Fan Riser +5.83 mm³, STEP reference 51188.66 -> .65): known.
 
 ## Tools
 - userdocs.py <cliA> <tagA> <cliB> <tagB> <doc>...: fresh 600 copies in ~/tmp/qa/ud-<pid>, per Part Studio feature status /

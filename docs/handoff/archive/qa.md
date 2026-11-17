@@ -2069,3 +2069,41 @@ Update stays dim after a sketch in an unused Part Studio 2; lights up after the 
 ## Next
 Revolve / patterns / mirror / boolean on the new plate; feature-list reorder/delete/rollback on the 30-feature part;
 selection, measure, section view; then P2 assembly and drawing passes; verify the list above once green moves.
+
+## 2026-11-17 09:35: open items moved out of the handoff
+## Open items
+- **Speed (P0)**: owners got their slower-than-live documents 11-15 (from 11-14's vibe7 window, v0.4.48): blend (faceblend,
+  tpd, michael, motor-mount, bracket03, pipeflange, radijator), core (impeller defeature, louver, housing revolve, lighten's
+  opEnclose / opOffsetFace done 3bfc17b1), bool (knife Split 4, bottle Shell / Split, rings Shell + CP2, housing / louver /
+  snap-hook Booleans, lighten opShell), bool2 (valve CP1, helical Sweep, housing / impeller unify), dx (std cold compile,
+  evEdgeConvexity), skasm (corner-break: 1850 ms vs live 1972 on main, closes unless the window disagrees). After each
+  night: send blend faceblend / tpd / michael and skasm corner-break from the new SCORE row; re-list what is still slower.
+- **Interaction latency**: absolute numbers only from the nightly (DECISIONS 11-15). Candidates from vibe6 11-15 (load
+  3-30): rotate / pan / zoom 2-5 fps on hat / dock vs 11-15 on the block (llvmpipe), hat hover first frame 0.9 s (live 600
+  ms on a block), dock's first switch to B 14.7 s settle. psui owns the hat15 fillet edit (Tab not applying a variable-bound
+  Radius; ✓ leaving the dialog open); my 7.9 / 4.4 s were the caret blink (lat-steps now 450 ms quiet). Send owners only
+  what the nightly confirms slow, or > 3x a PLAN 2.7 target.
+- **11-17 05:00 cut**: v0.4.56 from 35baa32fa (published 06:35). Main HOLD (f197 Mirror 3, blend ba7a8d755) cleared 05:57 by
+  the revert b596da51b (qa-hold-watch, exited). blend owes a fixed full-round strip with f197 in its T1 case.
+- **v0.4.56 published check** done 06:58 (compat/published-0.4.56.txt, rel-0.4.56.txt): clean; compat baseline 0.4.56.
+- **qa-imp-verify** (bin/imp-verify.sh f99cf571): on the first green with core's revert of 64744410b's Move face routing,
+  impeller statuses v0.4.56 vs green on vibe6 -> ab1117/imp-verify.txt + alert; expect Delete face 2 / Fillet Flansch Ok.
+- Suites: suites-models.sh sets NOSHAPE_PARITY_DIFFERING; suites-diff.py prints `newdiff` (features differing now, not before).
+- f197 Mirror 3: blend re-applied ba7a8d755 (9a46f7d10) with its fix 74d05ad5e: f197 SAME on green 74d05ad5 (07:37), all docs SAME vs 0.4.56.
+- **Open P0s from qa 11-17**: IMPELLER-MOVE-FACE-2-REF (core, suspect 64744410b), SCISSOR-LIFT-BOM-ROWS (asm),
+  IMPELLER-DELETE-FACE-2-SLOW (core). Re-check each on the green that claims the fix. dx: rings-loft x_t import works since
+  0.4.56 but 9-10 s vs live 8.6 (queue item, not P0).
+- **Clean A/B 11-17** (lead ran it by hand on vibe7 02:55-03:31; ab1117/ here and in lead-scratch): 0.4.48 -> 0.4.53 -> 0.4.55 ms:
+  helical 159 / 398 | 380 / 96 (Sweep 1 fixed in 0.4.55, no ticket); knife 1700 / 3154 | 2947 / 2207 (0.4.48 had 9 features
+  in error); impeller 15643 / 28592 | 27584 / 25314; live 40 / 408 / 2773. Green 35baa32f: knife 1803 (Mirror 1 128 / 220 /
+  140 ms for 0.4.53 / 0.4.55 / green: sent to bool), impeller 23190 with Delete face 2 still 12.1 s -> P0
+  IMPELLER-DELETE-FACE-2-SLOW (core bisects it; qa doesn't).
+- Old: clean A/B v0.4.48 vs v0.4.53 (impeller, helical, knife incl. Fillet 5): bin/ab-clean.sh as unit qa-ab-clean, after asm's
+  full7 on vibe7, `SLOT_QUIET_OK=1 ~/bin/slot`, load every 30 s, removes ~/.slot-quiet -> nightly/ab-clean-<mmdd>.*; valid if
+  load < ~1.5. Owners so far: impeller Delete face 2 is upstream (core: Move face 1 fails where live builds; blend Fillet 28/29),
+  impeller fillet failure cost (blend 29c1841df), helical Sweep 1 fixed on main (bool2 895c8e3b / e47268f2).
+- v0.4.54 published check done 11-16 (compat/published-0.4.54.txt, rel-0.4.54.txt): clean; baseline 0.4.54.
+- The suites runs of 11-16 00:32 (f14f85a8) and 04:43 (601df0ac) were stopped to keep vibe7 quiet; the loop reruns.
+- QUIT-ABORT-DOCK: verified fixed (80e16e42d); guarded by the nightly and rel-published.
+- f197 Fillet 1 vs 0.4.51 was core's 1ac08e247 (reverted on v0.4.52's branch); 0.4.52 baseline is clean.
+
