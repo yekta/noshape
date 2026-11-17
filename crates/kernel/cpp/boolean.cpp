@@ -97,6 +97,7 @@
 #include <BRepGProp_Domain.hxx>
 #include <BRepGProp_Face.hxx>
 #include <BRepGProp_Vinert.hxx>
+#include <GeomAdaptor_Surface.hxx>
 #include <BOPTools_AlgoTools3D.hxx>
 #include <BOPAlgo_Builder.hxx>
 #include <TopAbs.hxx>
@@ -1580,6 +1581,131 @@ struct ChangeKey
 // The surfaces share_mirrored_extrusions made this thread's last call for pieces of one spline.
 thread_local std::vector<occ::handle<Geom_Surface>> t_joined_pieces;
 
+// Faces of `before` and `after` on one free-form surface neither closed nor periodic (one handle and placement, one
+// orientation), the edges around each side's faces (those not between two of them) the same curves, each point along
+// one lying on one of the other side's: one region of that surface, so one volume share; dropped from both
+// (c2-config-parts-standoffs' thread: 13 pieces of a flank merged into one, and faces whose edges USD only joined,
+// 700 ms of integrals for 1e-17 m³). On a closed surface one boundary can bound the other side too (a notched
+// cylinder's merge, 4/3 its volume): those integrated, and planes' and other analytic faces' (cheaper than this).
+void drop_same_regions(std::vector<TopoDS_Shape>& before, std::vector<TopoDS_Shape>& after)
+{
+  struct Group
+  {
+    occ::handle<Geom_Surface> s;
+    TopLoc_Location           l;
+    TopAbs_Orientation        o = TopAbs_FORWARD;
+    bool                      ok = true;
+    std::vector<size_t>       of[2];
+  };
+  std::vector<Group> groups;
+  for (int side = 0; side < 2; ++side)
+  {
+    const std::vector<TopoDS_Shape>& fs = side == 0 ? before : after;
+    for (size_t i = 0; i < fs.size(); ++i)
+    {
+      TopLoc_Location                 l;
+      const occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(fs[i]), l);
+      if (g.IsNull() || g->IsUClosed() || g->IsVClosed() || g->IsUPeriodic() || g->IsVPeriodic() || GeomAdaptor_Surface(g).GetType() <= GeomAbs_Torus)
+        continue;
+      auto at = std::find_if(groups.begin(), groups.end(), [&](const Group& x) { return x.s == g && x.l.IsEqual(l); });
+      if (at == groups.end())
+      {
+        groups.push_back(Group{g, l, fs[i].Orientation(), true, {}});
+        at = groups.end() - 1;
+      }
+      at->ok = at->ok && at->o == fs[i].Orientation();
+      at->of[side].push_back(i);
+    }
+  }
+  struct Edge
+  {
+    occ::handle<Geom_Curve> c;
+    double                  t0 = 0, t1 = 0, tol = 0;
+    Bnd_Box                 box;
+  };
+  // (The edges around faces `ids` of `fs`: those only one of them uses.)
+  auto around = [](const std::vector<TopoDS_Shape>& fs, const std::vector<size_t>& ids) {
+    NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> uses;
+    std::vector<TopoDS_Edge>                                        order;
+    for (size_t i : ids)
+      for (TopExp_Explorer x(fs[i], TopAbs_EDGE); x.More(); x.Next())
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+        if (BRep_Tool::Degenerated(e))
+          continue;
+        if (int* n = uses.ChangeSeek(e))
+          ++*n;
+        else
+        {
+          uses.Bind(e, 1);
+          order.push_back(e);
+        }
+      }
+    std::vector<Edge> out;
+    for (const TopoDS_Edge& e : order)
+    {
+      if (uses.Find(e) != 1)
+        continue;
+      Edge x;
+      x.c = BRep_Tool::Curve(e, x.t0, x.t1);
+      if (x.c.IsNull())
+        return std::optional<std::vector<Edge>>();
+      x.c = occ::down_cast<Geom_Curve>(x.c->Transformed(e.Location().Transformation()));
+      x.tol = BRep_Tool::Tolerance(e);
+      BRepBndLib::Add(e, x.box, false);
+      out.push_back(x);
+    }
+    return std::optional<std::vector<Edge>>(out);
+  };
+  // (Each of `a`'s edges, at seven points along it, within the two edges' tolerances of one of `b`'s.)
+  auto on = [](const std::vector<Edge>& a, const std::vector<Edge>& b) {
+    for (const Edge& e : a)
+      for (int k = 1; k <= 7; ++k)
+      {
+        const gp_Pnt p     = e.c->Value(e.t0 + (e.t1 - e.t0) * k / 8);
+        bool         found = false;
+        for (const Edge& o : b)
+        {
+          const double reach = std::max(e.tol + o.tol, 1e-7);
+          if (o.box.IsOut(p) && o.box.Distance(Bnd_Box(gp_Pnt(p), gp_Pnt(p))) > reach)
+            continue;
+          GeomAPI_ProjectPointOnCurve pr(p, o.c, o.t0, o.t1);
+          double                      d = pr.NbPoints() > 0 ? pr.LowerDistance() : std::numeric_limits<double>::infinity();
+          d = std::min({d, p.Distance(o.c->Value(o.t0)), p.Distance(o.c->Value(o.t1))});
+          if (d <= reach)
+          {
+            found = true;
+            break;
+          }
+        }
+        if (!found)
+          return false;
+      }
+    return true;
+  };
+  std::vector<bool> drop[2] = {std::vector<bool>(before.size(), false), std::vector<bool>(after.size(), false)};
+  for (const Group& g : groups)
+  {
+    if (!g.ok || g.of[0].empty() || g.of[1].empty())
+      continue;
+    const std::optional<std::vector<Edge>> eb = around(before, g.of[0]), ea = around(after, g.of[1]);
+    if (!eb || !ea || !on(*ea, *eb) || !on(*eb, *ea))
+      continue;
+    for (int side = 0; side < 2; ++side)
+      for (size_t i : g.of[side])
+        drop[side][i] = true;
+  }
+  for (int side = 0; side < 2; ++side)
+  {
+    std::vector<TopoDS_Shape>& fs = side == 0 ? before : after;
+    std::vector<TopoDS_Shape>  kept;
+    for (size_t i = 0; i < fs.size(); ++i)
+      if (!drop[side][i])
+        kept.push_back(fs[i]);
+    fs = std::move(kept);
+  }
+}
+
 std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, const std::vector<TopoDS_Shape>& image,
                                         const std::vector<FaceShare>& share, const TopoDS_Shape& out, double diag,
                                         std::optional<std::pair<ChangeKey, double>>* memo = nullptr)
@@ -1665,6 +1791,7 @@ std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, con
   for (const TopoDS_Shape& f : after)
     if (!one_surface(f, before))
       after_left.push_back(f);
+  drop_same_regions(before_left, after_left);
   after = std::move(after_left);
   for (const TopoDS_Shape& f : before_left)
     after.push_back(f.Reversed());
