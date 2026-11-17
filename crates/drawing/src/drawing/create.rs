@@ -192,10 +192,10 @@ pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>
     d.sheets[0].scale = suggested_scale(d.sheets[0].size, e);
     // Live 1898 (blocks of 20 to 120 mm on ANSI A, and on ISO A3): the four
     // views' centres don't follow the part: two columns 0.42 of the sheet's
-    // width apart about the frame's centre, two rows 0.3696 of its height
+    // width apart about its centre (live2 ISO A4 portrait: 105 mm, not the
+    // frame's 115 past its binding margin), two rows 0.3696 of its height
     // apart about 0.56 of it.
-    let [fx0, _, fx1, _] = d.sheets[0].size.frame_rect();
-    let (xc, yc, dx, dy) = ((fx0 + fx1) * 0.5, 0.56 * h, 0.21 * w, 0.1848 * h);
+    let (xc, yc, dx, dy) = (0.5 * w, 0.56 * h, 0.21 * w, 0.1848 * h);
     let third = d.projection == Projection::ThirdAngle;
     // Third angle: front bottom-left, top above, right to the right.
     // First angle: front top-left, top below, the side view to its right.
@@ -225,16 +225,15 @@ pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>
     let sheet = &mut d.sheets[0];
     sheet.views.push(base(1, ViewOrientation::Front, [front_x, front_y]));
     let v = if third { 1.0 } else { -1.0 };
-    // In live's order (its Sheets panel: Front, Right, Top, Isometric); the ids stay Top 2, Right 3.
-    sheet.views.push(projected(3, [v, 0.0], [other_x, front_y]));
+    // In live's order (its Sheets panel: Front, Right, Top, Isometric); the ids stay Top 2, Right 3. Each folds toward
+    // where it sits (`views::fold` turns first angle's to the far side: the view right of Front shows Left, live2
+    // block-drawing-iso).
+    sheet.views.push(projected(3, [1.0, 0.0], [other_x, front_y]));
     sheet.views.push(projected(2, [0.0, v], [front_x, other_y]));
-    // Third angle: the isometric is projected from Front, up and right (live 2063: its parent is Front; the fold gives
-    // the standard isometric frame). First angle keeps a base isometric (its diagonal fold is another view).
-    if third {
-        sheet.views.push(projected(4, [std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2], [other_x, other_y]));
-    } else {
-        sheet.views.push(base(4, ViewOrientation::Isometric, [other_x, other_y]));
-    }
+    // The isometric is projected from Front (live 2063, live2 block-drawing-iso: its parent is Front), along the
+    // diagonal whose fold gives the standard isometric frame: up and right in third angle, down and left in first.
+    let d45 = std::f64::consts::FRAC_1_SQRT_2 * v;
+    sheet.views.push(projected(4, [d45, d45], [other_x, other_y]));
     d
 }
 
@@ -333,6 +332,14 @@ mod tests {
         assert_eq!(s, 1.0);
         let iso = [[121.8, 221.2056], [298.2, 221.2056], [121.8, 111.4344], [298.2, 111.4344]];
         assert!(p.iter().zip(iso).all(|(a, b)| near(*a, b, 1.0)), "{p:?}");
+        // ISO A4 portrait (live2 block-drawing-iso, a 40 x 30 x 10 block at 1:1): about the sheet's centre, not the
+        // frame's.
+        let t = DrawingTemplate::standard("ISO A4 Portrait", crate::drawing::SheetSize::A4Portrait, crate::drawing::TitleBlockStyle::Iso, false, Projection::FirstAngle);
+        let d = create_drawing(&t, Some(&src), Some((DVec3::ZERO, DVec3::new(0.04, 0.03, 0.01))), true, None);
+        let (s, p) = (d.sheets[0].scale, d.sheets[0].views.iter().map(|v| v.position).collect::<Vec<_>>());
+        assert_eq!(s, 1.0);
+        let a4 = [[60.9, 221.2056], [149.1, 221.2056], [60.9, 111.4344], [149.1, 111.4344]];
+        assert!(p.iter().zip(a4).all(|(a, b)| near(*a, b, 1.0)), "{p:?}");
     }
 
     #[test]

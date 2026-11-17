@@ -680,9 +680,10 @@ def panel_list_over_view(a, b):
 
 def panel_fields_unread(a, b, recorded):
     """A drawing panel's fields: live's recorder read none before 11-10 (drw-inspection-table-export-csv, 11-07:
-    "fields": []), so ours' aren't compared against those takes."""
+    "fields": []) and a panel's checkboxes from 11-14 on (live2's reader; drw-section-vertical 11-12: "fields": []), so
+    ours' aren't compared against a take that read none before 11-15."""
     da, db = (a or {}).get("dialog"), (b or {}).get("dialog")
-    if recorded < "2026-11-10" and isinstance(da, dict) and isinstance(db, dict) and da.get("kind") == "drawing-panel" and da.get("fields") == [] and db.get("fields"):
+    if recorded < "2026-11-15" and isinstance(da, dict) and isinstance(db, dict) and da.get("kind") == "drawing-panel" and da.get("fields") == [] and db.get("fields"):
         db["fields"] = []
 
 

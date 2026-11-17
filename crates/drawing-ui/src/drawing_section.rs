@@ -48,6 +48,9 @@ pub struct SectionDlg {
     /// "Opposite direction".
     pub angle: f64,
     pub angle_input: Option<(Entity<InputState>, Subscription)>,
+    /// Angular's "Cut angle" checkbox (live2 drw-section-tabs-angular: after Show cut geometry only, off at first): its
+    /// field and Opposite direction show while it is on.
+    pub angle_on: bool,
     pub opposite: bool,
     /// Flip: look the other way across the cutting line.
     pub flip: bool,
@@ -73,7 +76,7 @@ pub fn parse_depth(s: &str, mm: bool) -> Option<f64> {
 }
 
 /// An offset: a depth, or 0 ("0 mm").
-fn parse_offset(s: &str, mm: bool) -> Option<f64> {
+pub(crate) fn parse_offset(s: &str, mm: bool) -> Option<f64> {
     parse_depth(s, mm).or_else(|| s.trim().trim_end_matches(char::is_alphabetic).trim().parse::<f64>().ok().filter(|v| *v == 0.0))
 }
 
@@ -87,7 +90,7 @@ impl DrawingEditor {
                 let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
                 // Live drawing/20: the dialog opens with the label selected.
                 label.update(cx, |s, cx| s.focus(window, cx));
-                self.section_dlg = Some(SectionDlg { mode: 0, label, label_focused: true, select_label: true, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, offset: None, offset_value: None, offset_flip: false, exclude: Vec::new(), anchor: None, picking: 0, placed: None, angle: 45.0, angle_input: None, opposite: false, flip: false, cut_from: true });
+                self.section_dlg = Some(SectionDlg { mode: 0, label, label_focused: true, select_label: true, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, offset: None, offset_value: None, offset_flip: false, exclude: Vec::new(), anchor: None, picking: 0, placed: None, angle: 45.0, angle_input: None, angle_on: false, opposite: false, flip: false, cut_from: true });
             }
             (Some(_), false) => self.section_dlg = None,
             _ => {}
@@ -272,7 +275,7 @@ impl DrawingEditor {
         let d = self.section_dlg.as_ref()?;
         let pal = p();
         let mode = d.mode;
-        let (opp, flip) = (d.opposite, d.flip);
+        let (opp, flip, angle_on) = (d.opposite, d.flip, d.angle_on);
         // Exclude from cut is for assembly views.
         let assembly = match &self.tool {
             Tool::Section { parent: Some(p), .. } => noshape_model::drawing::views::view_source(self.current_sheet(), *p).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly),
@@ -306,35 +309,43 @@ impl DrawingEditor {
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_section_mode(m, cx)))
         };
         crate::ui_script::note_dialog(|| {
-            // Every text shown, in reading order (README "### Drawings"; live 2063).
-            let mut text = vec!["Section view"];
+            // Every text shown, in reading order (README "### Drawings"; live 2063), the checkboxes and End type as fields
+            // (live's recorder since 11-14; End type's options left out since 2026-11-17.3).
+            let mut t = crate::drawing_panels::PanelText::default();
+            t.text("Section view");
             if d.placed.is_none() {
-                text.extend(["Vertical", "Horizontal", "Angular"]);
+                t.texts(["Vertical", "Horizontal", "Angular"]);
             }
-            if mode == 2 && d.angle_input.is_some() {
-                text.push("Cut angle");
-            }
+            let mut fields = Vec::new();
+            let check = |t: &mut crate::drawing_panels::PanelText, fields: &mut Vec<serde_json::Value>, label: &'static str, on: bool| {
+                t.text(label);
+                fields.push(serde_json::json!({ "label": label, "kind": "checkbox", "value": on }));
+            };
             // Live (drw-section-view-cut-geometry-only, -section-depth): the two exclude each other.
             if d.depth.is_none() {
-                text.push("Show cut geometry only");
+                check(&mut t, &mut fields, "Show cut geometry only", d.cut_only);
+            }
+            if mode == 2 {
+                check(&mut t, &mut fields, "Cut angle", d.angle_on);
             }
             if of_section {
-                text.push("Cut from section");
+                check(&mut t, &mut fields, "Cut from section", d.cut_from);
             }
             if !jogged && !d.cut_only {
-                text.push("Section depth");
+                check(&mut t, &mut fields, "Section depth", d.depth.is_some());
                 if d.depth.is_some() {
-                    text.extend(["Up to entity", "Blind"]);
-                    text.push(if d.up_to { "Depth of section cut" } else { "Depth" });
+                    t.options(["Up to entity", "Blind"]);
+                    fields.push(serde_json::json!({ "label": "End type", "kind": "select", "value": if d.up_to { "Up to entity" } else { "Blind" } }));
+                    t.text(if d.up_to { "Depth of section cut" } else { "Depth" });
                     if d.up_to {
-                        text.push("Offset");
+                        check(&mut t, &mut fields, "Offset", d.offset.is_some());
                     }
                 }
             }
             if assembly {
-                text.push("Exclude from cut");
+                t.text("Exclude from cut");
             }
-            serde_json::json!({ "kind": "drawing-panel", "title": "Section view", "text": text })
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Section view", "fields": fields }), t.0)
         });
         Some(
             v_flex()
@@ -430,14 +441,38 @@ impl DrawingEditor {
                                         })),
                                 ),
                         )
-                        .when_some(d.angle_input.as_ref().filter(|_| mode == 2).map(|x| x.0.clone()), |e, st| {
+                        .when(d.depth.is_none(), |e| e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-only").label("Show cut geometry only").checked(d.cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
+                            if let Some(d) = &mut this.section_dlg {
+                                d.cut_only = *v;
+                            }
+                            this.update_preview(cx);
+                            cx.notify();
+                        })))))
+                        // Ticked, its field takes the keyboard (live2 drw-section-tabs-angular: Esc then leaves the panel open).
+                        .when(mode == 2, |e| e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-angle").label("Cut angle").checked(angle_on).on_click(cx.listener(|this, v: &bool, window, cx| {
+                            if let Some(d) = &mut this.section_dlg {
+                                d.angle_on = *v;
+                                if let Some((st, _)) = d.angle_input.as_ref().filter(|_| *v) {
+                                    st.update(cx, |s, cx| s.focus(window, cx));
+                                }
+                            }
+                            this.update_preview(cx);
+                            cx.notify();
+                        })))))
+                        .when_some(d.angle_input.as_ref().filter(|_| mode == 2 && angle_on).map(|x| x.0.clone()), |e, st| {
                             e.child(
                                 h_flex()
                                     .h(px(30.))
                                     .px(px(6.))
                                     .gap(px(6.))
                                     .child(div().text_size(px(12.)).text_color(pal.text_muted).child("Cut angle"))
-                                    .child(div().flex_1().child(Input::new(&st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small()))
+                                    // Esc in the field leaves it, not the panel.
+                                    .child(div().flex_1().capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                                        if e.keystroke.key == "escape" {
+                                            cx.stop_propagation();
+                                            window.focus(&this.focus, cx);
+                                        }
+                                    })).child(Input::new(&st).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small()))
                                     .child(
                                         div()
                                             .id("ds-opposite")
@@ -461,13 +496,6 @@ impl DrawingEditor {
                                     ),
                             )
                         })
-                        .when(d.depth.is_none(), |e| e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-only").label("Show cut geometry only").checked(d.cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
-                            if let Some(d) = &mut this.section_dlg {
-                                d.cut_only = *v;
-                            }
-                            this.update_preview(cx);
-                            cx.notify();
-                        })))))
                         .when(of_section, |e| {
                             e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-cut-from").label("Cut from section").checked(d.cut_from).on_click(cx.listener(|this, v: &bool, _, cx| {
                                 if let Some(d) = &mut this.section_dlg {

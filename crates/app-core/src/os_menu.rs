@@ -977,16 +977,24 @@ pub fn ui_state(cx: &App) -> Option<serde_json::Value> {
 
 /// [`ui_state`] of a menu held elsewhere (the graphics area's context menu).
 pub fn menu_state(menu: &Entity<OsMenu>, cx: &App) -> Option<serde_json::Value> {
-    state_of(menu, false, cx)
+    state_of(menu, false, true, cx)
 }
 
-/// `in_camera`: a submenu of the view cube's menu (live's recorder: "camera-submenu", with each row's check).
-fn state_of(menu: &Entity<OsMenu>, in_camera: bool, cx: &App) -> Option<serde_json::Value> {
+/// [`ui_state`] of the open menu itself, an open submenu left out (a drawing's context menu: live's recorder reads
+/// its "RmbMenu", the row under the pointer highlighted, live2 drw-section-edit-depth-direction).
+pub fn root_ui_state(cx: &App) -> Option<serde_json::Value> {
+    let (_, _, _, menu, _) = cx.try_global::<OsMenuHost>()?.0.as_ref()?;
+    state_of(menu, false, false, cx)
+}
+
+/// `in_camera`: a submenu of the view cube's menu (live's recorder: "camera-submenu", with each row's check); `deepest`:
+/// an open submenu stands for its menu.
+fn state_of(menu: &Entity<OsMenu>, in_camera: bool, deepest: bool, cx: &App) -> Option<serde_json::Value> {
     let m = menu.read(cx);
     // An open submenu is the list (live's recorder reads the deepest one: ui-parity folder-menu-collapse-all), but
     // not a page dropdown's (in-context-follow-position: Follow position ▸ open, the list its menu).
-    if let Some(sub) = m.open_submenu().filter(|_| !m.page) {
-        return state_of(sub, in_camera || m.camera, cx);
+    if let Some(sub) = m.open_submenu().filter(|_| !m.page && deepest) {
+        return state_of(sub, in_camera || m.camera, true, cx);
     }
     let mut rows = Vec::new();
     let (mut highlighted, mut disabled, mut flags, mut checks) = (None, Vec::new(), Vec::new(), Vec::new());
