@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 20:28 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 21:09 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -170,13 +170,8 @@ Open, ranked:
 5. asm-robot-relations 0c3466 Import 1: landed 58c29811 (live's six sheets = its failed import of a valid solid;
    LIVE_IMPORT_FAILURES leaves both out from Import 1 on; lead 11-17). asm mapped Thicken 1's JFD face to ours by
    geometry on asm-partorigin (Thicken then makes 11 tiny parts: sent to core).
-5b. asm-isaac-ball 8f5622 GearLab (P2, studios / asm 11-17): landed bc58c02b (qLoopEdges of a sketch region = its edges;
-   Fill of the tooth profile found none). Gear builds 363/842/480 for live 283/762/480: the 40 teeth's end faces at
-   z=0 / z=10 stay apart from the blank's cap (our opSweep cap tilted 5e-9 rad, offset 1.8e-12 m: unify won't merge):
-   sent to core 15:0x (repro vibex6 ~/agents/dx-keep/gearlab). Time (14.8 s vs live 1.15 s, vibex6 under load): two
-   OCCT fuses (blank + 40 teeth 3.8 s; herringbone halves 9.2 s), recorded in ~/agents/dx-keep/gearlab/booleans, sent to
-   bool 15:2x; bool took it (mirror fuse with glue=shift 959 -> 304 ms on the Mac, same 404/885; 1dc32b Boolean 4
-   751 -> 189 ms, live 135, gating). asm told.
+5b. asm-isaac-ball 8f5622 GearLab: landed bc58c02b; gear teeth caps (core, 15:0x) and its fuses' time (bool) sent;
+   detail in the archive.
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## Since 19:50 (this thread; dx-land on main a2edca4b4)
@@ -194,6 +189,21 @@ Open, ranked:
   words, 36e76ac0b PARITY-SUITES (mesh sheets = live's failure), 706b2c23b 28.1-30.0 PART_XMT_BLOCK without
   index_map_offset + INTERSECTION_DATA from 30.0 (live's 28.1 / 30.0 files of hex-bookcase now read as live's own
   import: 60/168/108 9366.248, mesh 1/0/0 10364.977). Kernel export/import 81/81, ops e2e export 5/5 (vibex8).
+- 21:00 incident (lead): queue state lost; re-queued 21:0x from dx-main branch dx-land2 = t_work fix + x_t mesh export
+  (4ce6c052a / dac9d1713 / 706b2c23b cherry-picked) + 25.0 confirmed comment (live2 21:0x: ours-duct at 25.0 / 28.1 /
+  30.0 / 38.1 all import as live's own). Lead 21:0x: keep the disjoint-piece split.
+- In progress: live2 21:1x: our re-export of OUR IMPORT of live's hex-bookcase x_t (38.1 and 28.1 alike) imports in
+  live as shrunk 60/169/110 (live's own 168/108): the r 2 mm ring at (4.871, 155, 4) between a cylinder and live's
+  CONE (80.943 mm²) is written as 2 half circles (two CIRCLE nodes). Our imported model has that cone face as a
+  B-spline surface and the ring edge reports start (6.87,155,4) / end (2.87,155,4) with length 12.566: a reader bug
+  (prepared()'s DivideClosed paths don't fire: uncommitted NOSHAPE_XT_TRACE prints in dx-land xt.cpp, remove before
+  committing). Our own model's export (18:14 ours.x_t.zip) imports as 168/108, so it's import-only. Batches:
+  vibex8 ~/tmp/dx/xmmv/r*.jsonl, live2's diff live/dx/ours-xt-versions/edge-diff-live-vs-ours381.json.
+- config-parts at live's 18:0x retake (ops-fix, vibex8 ~/agents/dx-keep/cfgp-fix.log): linear-rail 26/26, links 35/35,
+  sprockets 24/24, standoffs 32/32, nuts 14/17 (Sweep 1 "non-manifold" ERROR, live OK: core/bool), pulleys 12/22
+  (Circular pattern 1 of 5 tooth faces x #Teeth "Failed to create pattern": check the 5 face refs, mine first).
+  Speed: standoffs Threads=true Revolve 2 5.6 s / Boolean 1 3.2 s / Boolean 2 4.2 s (live 26-29 ms): OCCT Edge-Face
+  intersections (366 calls, 3.2 s in Revolve 2), profile ~/agents/dx-keep/stoff-prof.log: for bool.
 - Suite proof run: vibex8 slot ~/agents/dx-keep/exfix.sh ops-fix fix (binary md5 3ce71350, all of the above but
   706b2c23b): full suite -> ~/agents/dx-keep/exch-fix.log, then first6 x3; lines in ~/agents/dx-keep/f6.out. Compare
   with /root/dx-scratch/exch-x1117c.log (59/75, 46/48, 114/119, DXF 0/4, times 49/50) and vibex7 exch-rest.log; land
