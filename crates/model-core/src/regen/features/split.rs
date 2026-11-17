@@ -86,6 +86,13 @@ fn whole_cylinder(ev: &EvalCtx, face: &Shape, origin: DVec3, axis: DVec3, x_dir:
 
 /// Centroid of a piece (volume, area or length weighted).
 fn piece_center(s: &Shape) -> DVec3 {
+    // (A solid's by the quick estimate: the exact integral took 0.9 s of c2-parting-line-draft-parting-line's Split 3,
+    // a piece cut by a free-form surface; only its side and order are wanted.)
+    if s.count(ShapeType::Solid) > 0
+        && let Ok(c) = k::volume_centre_estimate(s)
+    {
+        return c;
+    }
     let props = if s.count(ShapeType::Solid) > 0 {
         k::volume_properties(s)
     } else if s.count(ShapeType::Face) > 0 {

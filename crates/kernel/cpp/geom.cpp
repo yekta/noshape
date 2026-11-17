@@ -1609,6 +1609,18 @@ double max_edge_tolerance(const OcShape& s)
   return tol;
 }
 
+// A solid's centre by OCCT's plain Gauss integration: within a hair of the exact one, milliseconds where the exact
+// integral takes a second on a free-form face (c2-parting-line-draft-parting-line's Split 3: 0.9 s); for placing a
+// piece (its side of a tool, its order), not for its mass properties.
+P3 props_volume_centre_estimate(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  GProp_GProps out;
+  BRepGProp::VolumeProperties(s.shape, out);
+  const gp_Pnt c = out.CentreOfMass();
+  return P3{c.X(), c.Y(), c.Z()};
+}
+
 PropsF props_volume_precise(const OcShape& s)
 {
   require_non_null(s.shape, "shape");

@@ -34,6 +34,12 @@ pub fn volume_properties(shape: &Shape) -> Result<MassProperties> {
     Ok(conv(ck(ffi::props_volume(shape.raw()))?))
 }
 
+/// A solid's centre by plain Gauss integration: within a hair of [`volume_properties`]' centre and much faster on
+/// free-form faces; for placing a piece (which side of a tool, in what order), never for mass properties shown.
+pub fn volume_centre_estimate(shape: &Shape) -> Result<DVec3> {
+    Ok(v3(ck(ffi::props_volume_centre_estimate(shape.raw()))?))
+}
+
 /// [`volume_properties`] with the centre of mass and inertia integrated
 /// tighter (the mass properties shown; slower, not cached).
 pub fn mass_properties(shape: &Shape) -> Result<MassProperties> {
