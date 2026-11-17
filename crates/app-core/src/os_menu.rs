@@ -254,6 +254,9 @@ pub struct OsMenu {
     truncate: bool,
     /// The checked row is the active one, `#b2ddf6` whatever the pointer is on (live's sort menus, class `active`).
     active_checked: bool,
+    /// The pointer has moved over the menu since it opened (a row merely under the pointer when it opened hasn't
+    /// opened its submenu in live yet: [`root_ui_state`]).
+    moved: bool,
 }
 
 /// An `OsMenu`'s one-shot Esc handler.
@@ -270,7 +273,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, flip: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, sep_margin: 0., text_inset: None, text_px: None, camera: false, on_escape: None, after_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, flip: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, sep_margin: 0., text_inset: None, text_px: None, camera: false, on_escape: None, after_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, moved: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -846,6 +849,7 @@ impl Render for OsMenu {
                     cx.set_global(PressClosedMenu(Some(e.position)));
                 }
             }))
+            .on_mouse_move(cx.listener(|this, _: &MouseMoveEvent, _, _| this.moved = true))
             .on_hover(cx.listener(|this, h: &bool, _, cx| {
                 // Leaving the menu clears the row highlight unless a submenu is open.
                 if !*h && this.open_submenu().is_none() && this.hovered.take().is_some() {
@@ -980,11 +984,12 @@ pub fn menu_state(menu: &Entity<OsMenu>, cx: &App) -> Option<serde_json::Value> 
     state_of(menu, false, true, cx)
 }
 
-/// [`ui_state`] of the open menu itself, an open submenu left out (a drawing's context menu: live's recorder reads
-/// its "RmbMenu", the row under the pointer highlighted, live2 drw-section-edit-depth-direction).
+/// [`ui_state`] of a drawing's context menu: its open submenu only once the pointer has moved over the menu (live2
+/// drw-datum-target-hide-dim: a hovered row's submenu; drw-section-edit-depth-direction: the menu that just opened under
+/// the pointer, its row highlighted, its submenu not open yet).
 pub fn root_ui_state(cx: &App) -> Option<serde_json::Value> {
     let (_, _, _, menu, _) = cx.try_global::<OsMenuHost>()?.0.as_ref()?;
-    state_of(menu, false, false, cx)
+    state_of(menu, false, menu.read(cx).moved, cx)
 }
 
 /// `in_camera`: a submenu of the view cube's menu (live's recorder: "camera-submenu", with each row's check); `deepest`:
