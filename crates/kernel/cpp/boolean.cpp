@@ -7449,7 +7449,9 @@ static bool fuse_glued(const TopoDS_Shape& target, const TopoDS_Shape& tool, Top
         continue;
       const gp_Pln pl = su.Plane();
       gp_Dir       n  = pl.Axis().Direction();
-      if (f.Orientation() == TopAbs_REVERSED)
+      // (A mirrored plane's axes are left-handed: its surface's normal the other way (the mirrored half of
+      // asm-isaac-ball's GearLab herringbone gear).)
+      if ((f.Orientation() == TopAbs_REVERSED) == pl.Position().Direct())
         n.Reverse();
       v.push_back({f, pl, n});
     }
