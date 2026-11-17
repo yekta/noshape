@@ -97,3 +97,60 @@ fn the_parts_row_lists_revision_a(cx: &mut TestAppContext) {
         assert_eq!(v.rows[0].revision.read(cx).value().to_string(), "A");
     });
 }
+
+struct AddRoot(Entity<super::AddItemsDialog>);
+
+impl Render for AddRoot {
+    fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+        div().size_full().child(self.0.clone())
+    }
+}
+
+/// Live2 rel-flow-two-parts: Add to Release… lists the Part Studio's parts at once (its row opens expanded) and a
+/// click on Part 2's row picks it; a second click puts it back.
+#[gpui::test]
+fn add_items_opens_with_the_parts_listed_and_a_row_click_picks_one(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    register_hooks();
+    let dir = std::env::temp_dir().join(format!("noshape-release-ui-add-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("two.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    {
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [20, 20]] }, { "tool": "corner_rectangle", "points": [[40, 0], [60, 20]] }] }));
+        let regions: Vec<serde_json::Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).unwrap().id;
+    let (window, view) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let existing: Vec<_> = tab_items(doc.read(cx), tab).into_iter().filter(|it| it.name == "Part 1").collect();
+        assert_eq!(existing.len(), 1, "Part 1 in the candidate");
+        let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
+        let mut view = None;
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| super::AddItemsDialog::new(doc, false, existing, |_, _, _| {}, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| AddRoot(v))
+        })
+        .unwrap();
+        (w, view.unwrap())
+    });
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let row = vcx.debug_bounds("add-part Part 2").expect("Part 2 listed at once: the Part Studio opens expanded");
+    vcx.simulate_click(row.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    let picked = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).picked.iter().map(|it| it.name.clone()).collect::<Vec<_>>());
+    assert_eq!(picked(cx), ["Part 2"], "a click on its row picks Part 2");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(row.center(), gpui_kit::Modifiers::default());
+    draw(cx, window);
+    assert!(picked(cx).is_empty(), "a second click puts it back");
+}

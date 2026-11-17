@@ -165,7 +165,12 @@ pub fn open_add_obsolete_items(doc: Entity<DocModel>, existing: Vec<ReleaseItem>
 }
 
 fn open_add_dialog(doc: Entity<DocModel>, obsolete: bool, existing: Vec<ReleaseItem>, on_add: impl Fn(Vec<ReleaseItem>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
-    let view = cx.new(|cx| {
+    let view = cx.new(|cx| AddItemsDialog::new(doc, obsolete, existing, on_add, window, cx));
+    window.open_dialog(cx, move |dialog, _, _| release_modal(dialog).w(px(860.)).child(view.clone()));
+}
+
+impl AddItemsDialog {
+    pub(crate) fn new(doc: Entity<DocModel>, obsolete: bool, existing: Vec<ReleaseItem>, on_add: impl Fn(Vec<ReleaseItem>, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).placeholder(ADD_KINDS[0].1));
         let sub = cx.subscribe(&search, |_: &mut AddItemsDialog, _, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change) {
@@ -175,8 +180,7 @@ fn open_add_dialog(doc: Entity<DocModel>, obsolete: bool, existing: Vec<ReleaseI
         let url = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search or paste URL"));
         let browse = add_source::Browse { filter: None, query: None, docs: None, url };
         AddItemsDialog { doc, kind: 0, search, collapsed: Vec::new(), picked: Vec::new(), pending: Default::default(), configs: Default::default(), text_inputs: Default::default(), config_menu: None, obsolete, on_add: std::rc::Rc::new(on_add), thumbs: Default::default(), requested: Default::default(), other: false, existing, source: None, browse, error: None, _sub: sub }
-    });
-    window.open_dialog(cx, move |dialog, _, _| release_modal(dialog).w(px(860.)).child(view.clone()));
+    }
 }
 
 impl AddItemsDialog {
@@ -551,6 +555,10 @@ impl Render for AddItemsDialog {
                                 h_flex()
                                     .map(|d| crate::ui_script::mark(d, move || format!("checkbox:{name}")))
                                     .id(SharedString::from(format!("add-part-{}-{k}", tab.0)))
+                                    .debug_selector({
+                                        let selector = format!("add-part {}", it.name);
+                                        move || selector
+                                    })
                                     .h(px(42.))
                                     .pl(px(34.))
                                     .gap(px(4.))
