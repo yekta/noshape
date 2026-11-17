@@ -254,6 +254,8 @@ pub struct UiState {
     pub midpoint_armed_since: Option<std::time::Instant>,
     /// Re-checks the hover once the dwell is over (nothing else does while the pointer rests).
     pub midpoint_dwell_task: Option<Task<()>>,
+    /// Redraws when a left entity's lingering glyphs are due to go (nothing else may draw then).
+    pub glyph_linger_task: Option<Task<()>>,
     /// Mate connector inference points of the hovered entity (inference.rs) and their computation.
     pub inference: Option<super::inference::InferenceHover>,
     pub inference_task: Option<Task<()>>,
@@ -794,6 +796,7 @@ impl UiState {
             dblclick_related: None,
             dblclick_drawn: false,
             midpoint_dwell_task: None,
+            glyph_linger_task: None,
             inference: None,
             inference_task: None,
             select_other: None,
