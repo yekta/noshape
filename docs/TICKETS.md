@@ -557,6 +557,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - **No blocker so far (GO on 7f287e52).** 12:35: greens 551d200b, 6bb61e69 and 7f287e52 (have blend's conic round be6f0ca8c
   and skasm's FeatureScript colours 0bb94eede) ALL-SAME vs v0.4.56: hats, dock, 47 ticket documents, authored documents.
   blend's impeller Fillet 3 (9e40ad95a) is not on main yet; checked on its green when it lands.
+- **User P0s verified in the app on green c330a760** (14:05, vibe6 Xvfb; v0.4.56 alongside):
+  remembered Fillet radius (psui 452838df): an old build's memory "9 mm + #wall_thickness" (v0.4.56's own file format) opens
+  red "9 mm + #wall_t…" in v0.4.56, 5 mm on the green; a plain 7 mm memory opens 7 mm; a #variable memory in the new format
+  is ignored (5 mm). Sketch hover (psui 452838df + skasm b87dd3dcf): the user's flow (new Part Studio, Sketch 1 on Top, a
+  rectangle, iso; each line hovered, off, back, with real pointer moves): every line lights each time; a hover inside the
+  rectangle lights the region (v0.4.56: the Front plane behind it); Top never lights. Xvfb's software pick does not
+  reproduce the user's stale line in v0.4.56 either, so the GPU timing part is covered only by skasm's tests. Scripts:
+  /root/qa-scratch/uh/{uh2.sh,uf.sh}. c330a760's compat: user documents ALL-SAME, tickets / authored running.
 - c101c3c0 (11:2x): Compat 11:2x on c101c3c0 (has core's Split pieces apart 0d7e2fc2f, Use B-spline
   0b93cf9d5, Rib a9900df79, Split placing 85010cc40): user documents (hats, dock), 47 ticket documents and qa's authored
   documents ALL-SAME vs v0.4.56. Earlier: fa9f84b8 (08:49) and dd344ea1 the same.
