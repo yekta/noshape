@@ -373,7 +373,10 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                         j["projection"] = json!(side);
                     }
                     // What it looks along (Onshape names the view by it: "Top", "Right"...).
-                    if let Some(o) = noshape_model::drawing::views::standard_orientation(&m.drawing, sheet, v.id) {
+                    // (A diagonal one the standard isometric: the suggested views' fourth, in either projection.)
+                    use noshape_model::drawing::views::{orientation_frame, standard_orientation, view_frame};
+                    let iso = || view_frame(&m.drawing, sheet, v.id).is_some_and(|f| f.dir.normalize_or_zero().dot(orientation_frame(ViewOrientation::Isometric).dir.normalize()) > 1.0 - 1e-9);
+                    if let Some(o) = standard_orientation(&m.drawing, sheet, v.id).or_else(|| iso().then_some(ViewOrientation::Isometric)) {
                         j["orientation"] = json!(ORIENTATIONS.iter().find(|x| x.1 == o).map(|x| x.0));
                     }
                 }
