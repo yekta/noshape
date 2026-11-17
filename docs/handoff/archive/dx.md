@@ -3364,3 +3364,44 @@ Live's note creation seems to be two history entries (place, then the text edit)
     the other "query not mapped" ones. Not geometry: curve-level MIRROR (exhaust-clamp), MINOR_DIAMETER on an ellipse
     and QUADRANT (rings-loft), dimensions on spline handles (knife). c2-sm-louver's 46 s is one fuse: bool.md.
   I'll take the sketch / sheet metal / assembly ones again after your refetch; tell me when it's in.
+
+## Moved from the handoff 2026-11-17 05:52 UTC
+Last full run (exch-1116, 08:50 binary): ours imports live's 58/74, live imports ours 46/48, ours reads ours 108/117,
+times at or under live's 48/48.
+Landed 11-16: 503d5a2a6 suite; 4d5ba3177 OBJ zip import; ad4a3517e mesh part -> planar facets (x_t / ACIS / IGES /
+JT / Rhino / PVZ crashed); 81ae5cce0 x_t seam-line + SweptToElementary fixes; b75687eb8 suite file / key fallbacks;
+2ddc1b649 DXF layouts + 2 viewports; f184f26ae tangent edges by geometry; 7c4ea1412 short arcs as conics; 4058e93e
+centermarks not on bends + STEP / IGES offsets as B-surfaces (rings-loft 440.81 mm³); 99d57322 x_t ring edge only
+where every face has the arcs as a loop (cf-snap-hook one solid); 03467fc8 ACIS import keeps the file's edge range
+where projection misses (cf-sheet-metal-model-plus' SAT: Part 1 was inside out -> import failed; now 10148.89 mm³,
+live 10147.18); b777cbd1 the screws Split hang fix (bool's gate clean).
+b3f549eb (landed): import_files reports a failed Import feature in `errors` (was 0 parts, no error).
+Landed 11-16 pm: 5acd8e11 curve pattern along a 3D path in the corrected Frenet frame (driven-pattern Curve pattern 1:
+instances 50 -> 2-4 µm off live, still 7/11: ours are exact screw copies of the seed, live's not quite: helix geometry?);
+de3fb725 live's rings-loft x_t imports (periodic tube both ways, blend SP-curves not p-curves; Extruded ring 273 faces,
+440.79 mm³ / 1193.08 mm² as live; 766/510 edges/vertices for 762/508 = the two ring faces' seams; no T1 test: the only
+reproducer is live's 1 MB file, exchange suite covers it); e3109d3c drawings: B-spline edges on a circle / ellipse to
+1 µm drawn as conics (rings-loft ELLIPSE 15 -> 96, live 95). 46ee2df2: an exact view whose shape loads no edges
+(OCCT Update swallows the failure, at random in one of a sheet's parallel views) retries, then goes polygonal.
+654ffaf5: x_t export writes offset surfaces as OFFSET_SURF over their basis's B-surface and puts each fin's SP-curve in
+the period of the B-surface's range as written (rings-loft Part 1 read back 302.72 -> 440.65 mm³, 440.77; T1
+export::offsets_of_a_periodic_bsurface_round_trip_through_parasolid).
+Landed 11-16 late: 212337b1 x_t import: a blend's tube stations from its spine's curvature, halved until round to
+1 nm (were r/16: 618-1235 stations; live's rings-loft x_t imported 7.1 -> 3.1 s on the Mac, same parts; query_parts' 4.7 s
+is OCCT volume integration, generic). 4a77e41a x_t export joins a periodic face's pieces OCCT cut only at its seam
+(face_joins) into one face and fuses a rim's arcs meeting at a vertex only they use (housing-draft x_t matches).
+5d0813e0 ACIS / JT export: offsets as B-surfaces again (my 4dd88057 had broken rings-loft's SAT; T1
+offset_walls_export_to_acis, area 0.17 % off: the B-surface approximation, open). f6b9adf5 x_t export: a B-surface
+closed but for its end rows' weights' last digits (6e-12) is one periodic face (rings-loft Part 1 x_t matches).
+4620ccea a sketch ellipse of equal radii is a circle (o-ring generator's round rings are tori, 19 as live; psui's
+rust_mesh o-ring test now asserts the torus). 25ca889a suggested views' scale fits Front, Top and Right in 30 % of the
+frame (housing-draft 1:1 as live, was 2:1; T1 suggested_scale_fits_all_three_views). 7c76c77f DXF writes a model edge
+straight in its view as a LINE (sm-louver SPLINE 31 -> 0). 35baa32f: a model edge whose curve is a true circle /
+ellipse is written as its exact conic's piece (ModelEdge.conic -> SheetGeometry.conic_lines -> cad_fit::on_conic;
+B-splines on a conic keep the fitted path: live writes SPLINE where its model has a B-spline). Mac, 4 docs: sm-louver
+ARC 101 -> 66 (live 68), ELLIPSE 50 -> 96 (86); housing-draft ELLIPSE 9 -> 11 (15), SPLINE 16 -> 14 (7); rings-loft
+ARC 40 -> 35 (91), ELLIPSE 96 -> 112 (95), SPLINE 217 -> 200 (211) (our 7 true circles where live's model has
+B-splines); extension-spring same. ui-parity drawing exports 84/84 still match (vibe6 exp-conic).
+a38f0629 (landed 11-17 03:24): on_conic also takes a 2-point piece (the shorter way) and HLR points within 10 µm
+(ends 1 µm apart close it): housing-draft's drafted rims Right 2 LINE / Front 2 SPLINE / Iso 1 SPLINE -> ELLIPSE;
+sm-louver ARC 68 / CIRCLE 2 as live. ops e2e 222/222 (Mac), ui-parity drawing exports 84/84 (vibe6 exp-tol).

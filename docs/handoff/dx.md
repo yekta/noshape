@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 05:01 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 05:52 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -18,45 +18,7 @@ live-drawing.dxf); suite parity::exchange_round_trip (dx-keep/bin/exch.sh). live
 rest of set 2 failed (HTTP 401 on every doc; only variable-fillet's STEP / IGES came): REQUESTS line 3328 (21:04) asks
 for a rerun after re-authenticating (live2 paused until ~11-17 10:15). Full suite rerun x1116n (vibe6, main 57885ecc
 binary incl. 4dd88057, all 17 docs, snapshot ~/tmp/dx/exs, log ~/tmp/dx/exch-x1116n.log, started 21:28): rank from it.
-Last full run (exch-1116, 08:50 binary): ours imports live's 58/74, live imports ours 46/48, ours reads ours 108/117,
-times at or under live's 48/48.
-Landed 11-16: 503d5a2a6 suite; 4d5ba3177 OBJ zip import; ad4a3517e mesh part -> planar facets (x_t / ACIS / IGES /
-JT / Rhino / PVZ crashed); 81ae5cce0 x_t seam-line + SweptToElementary fixes; b75687eb8 suite file / key fallbacks;
-2ddc1b649 DXF layouts + 2 viewports; f184f26ae tangent edges by geometry; 7c4ea1412 short arcs as conics; 4058e93e
-centermarks not on bends + STEP / IGES offsets as B-surfaces (rings-loft 440.81 mm³); 99d57322 x_t ring edge only
-where every face has the arcs as a loop (cf-snap-hook one solid); 03467fc8 ACIS import keeps the file's edge range
-where projection misses (cf-sheet-metal-model-plus' SAT: Part 1 was inside out -> import failed; now 10148.89 mm³,
-live 10147.18); b777cbd1 the screws Split hang fix (bool's gate clean).
-b3f549eb (landed): import_files reports a failed Import feature in `errors` (was 0 parts, no error).
-Landed 11-16 pm: 5acd8e11 curve pattern along a 3D path in the corrected Frenet frame (driven-pattern Curve pattern 1:
-instances 50 -> 2-4 µm off live, still 7/11: ours are exact screw copies of the seed, live's not quite: helix geometry?);
-de3fb725 live's rings-loft x_t imports (periodic tube both ways, blend SP-curves not p-curves; Extruded ring 273 faces,
-440.79 mm³ / 1193.08 mm² as live; 766/510 edges/vertices for 762/508 = the two ring faces' seams; no T1 test: the only
-reproducer is live's 1 MB file, exchange suite covers it); e3109d3c drawings: B-spline edges on a circle / ellipse to
-1 µm drawn as conics (rings-loft ELLIPSE 15 -> 96, live 95). 46ee2df2: an exact view whose shape loads no edges
-(OCCT Update swallows the failure, at random in one of a sheet's parallel views) retries, then goes polygonal.
-654ffaf5: x_t export writes offset surfaces as OFFSET_SURF over their basis's B-surface and puts each fin's SP-curve in
-the period of the B-surface's range as written (rings-loft Part 1 read back 302.72 -> 440.65 mm³, 440.77; T1
-export::offsets_of_a_periodic_bsurface_round_trip_through_parasolid).
-Landed 11-16 late: 212337b1 x_t import: a blend's tube stations from its spine's curvature, halved until round to
-1 nm (were r/16: 618-1235 stations; live's rings-loft x_t imported 7.1 -> 3.1 s on the Mac, same parts; query_parts' 4.7 s
-is OCCT volume integration, generic). 4a77e41a x_t export joins a periodic face's pieces OCCT cut only at its seam
-(face_joins) into one face and fuses a rim's arcs meeting at a vertex only they use (housing-draft x_t matches).
-5d0813e0 ACIS / JT export: offsets as B-surfaces again (my 4dd88057 had broken rings-loft's SAT; T1
-offset_walls_export_to_acis, area 0.17 % off: the B-surface approximation, open). f6b9adf5 x_t export: a B-surface
-closed but for its end rows' weights' last digits (6e-12) is one periodic face (rings-loft Part 1 x_t matches).
-4620ccea a sketch ellipse of equal radii is a circle (o-ring generator's round rings are tori, 19 as live; psui's
-rust_mesh o-ring test now asserts the torus). 25ca889a suggested views' scale fits Front, Top and Right in 30 % of the
-frame (housing-draft 1:1 as live, was 2:1; T1 suggested_scale_fits_all_three_views). 7c76c77f DXF writes a model edge
-straight in its view as a LINE (sm-louver SPLINE 31 -> 0). 35baa32f: a model edge whose curve is a true circle /
-ellipse is written as its exact conic's piece (ModelEdge.conic -> SheetGeometry.conic_lines -> cad_fit::on_conic;
-B-splines on a conic keep the fitted path: live writes SPLINE where its model has a B-spline). Mac, 4 docs: sm-louver
-ARC 101 -> 66 (live 68), ELLIPSE 50 -> 96 (86); housing-draft ELLIPSE 9 -> 11 (15), SPLINE 16 -> 14 (7); rings-loft
-ARC 40 -> 35 (91), ELLIPSE 96 -> 112 (95), SPLINE 217 -> 200 (211) (our 7 true circles where live's model has
-B-splines); extension-spring same. ui-parity drawing exports 84/84 still match (vibe6 exp-conic).
-a38f0629 (landed 11-17 03:24): on_conic also takes a 2-point piece (the shorter way) and HLR points within 10 µm
-(ends 1 µm apart close it): housing-draft's drafted rims Right 2 LINE / Front 2 SPLINE / Iso 1 SPLINE -> ELLIPSE;
-sm-louver ARC 68 / CIRCLE 2 as live. ops e2e 222/222 (Mac), ui-parity drawing exports 84/84 (vibe6 exp-tol).
+Landed 11-16 / early 11-17 (exchange suite, x_t / ACIS / DXF fixes): see the archive, 11-17 05:52 block.
 59c0be35 (landed 04:37): SAT writes a face going round its B-surface in ACIS's periodic form (clamped knots,
 "periodic", no seam: live's own SAT) and reads that form back periodic (shared bsurface_as_periodic, xt_read);
 RoundSplines {Split, Parasolid, Acis} replaces the periodic_splines bool, prepared() takes `offsets` apart and converts
@@ -212,16 +174,34 @@ Open, ranked:
 
 ## Next, in order
 1. x1117c (vibe6 04:46, main + 59c0be35 + 9a19e358): ours imports live's 59/75, live imports ours 46/48, ours reads
-   ours 114/119, DXF 0/4, times 49/50. Left: rings-loft live.igs / live.sat 275/771/514 for the model's 273 (live's
-   files hold two closed faces each as halves split at the seam and mid-period; live's own IGES import 279/787/524:
-   decision asked of the lead 05:1x: an import row passes when ours splits no more than live's own import, as the
-   export rows' splits_no_more; the SAT row waits on live2's own SAT import, REQUESTS 01:47); sm-louver live.sat
-   Part 2 40/82/44 (same wait); extension-spring live.sat area +0.016 % (ACIS procedural approximations); hose SAT.
+   ours 114/119, DXF 0/4, times 49/50. Queued abb5303e (lead 11-17 decision 1): an import row passes when ours splits
+   no more than live's own import of the file (counts between the model's and live's, volume / area as live's import
+   is held; PARITY-SUITES.md): rings-loft live.igs now passes (ours 275, live's own 279/787/524 with its ring 565.6 mm³
+   for 440.8, model 273). Waiting on live2's own SAT imports (REQUESTS 01:47): rings-loft / sm-louver live.sat.
+   Parked (lead 11-17 decision 2, "not now"): rings-loft live.step's revolved ring reads 1450.036 mm² for the model's
+   1449.943 (band +-0.044): live.step has no pcurves and its plane / extrusion edges are B-splines ~3 µm off the true
+   intersection (18 small planes 1.8157 mm² each for 1.8108); live's import gets the model's area, so it re-derives
+   them. Re-deriving such edges from their two faces on import would be a healing feature: wait for more cases.
+   extension-spring live.sat area +0.016 % (ACIS procedural approximations); hose SAT.
    Drawings: all four follow model differences (extension-spring Fillet 1 10/24/16 for live's 11/27/18: blend;
    rings-loft walls) or live rules without evidence (housing-draft lug chords, hole rim: lead, wait for more docs).
    View placement waits (lead).
-2. After ~10:17: live's answers to REQUESTS 01:47 (sm-louver scale, live's own SAT import); set 2 after live2's refetch.
-3. Curve pattern 1 path (driven-pattern, above): translator, mine.
+2. Queued 4dd4d7ef: MCP-QUOTED-VALUE (sketch dimension values sent in quotes). P1 PARITY-CUSTOM-RUN-FAILURES
+   (custom features 105/121), 14 of the 16 in config-parts (wait for live's retake), and:
+   - cf-surface-pattern Surface Pattern 3 129/386/259 for 131/387/258: the same 85 sphere dimples (Part 2, r 14.3 mm;
+     the nearest grid point 0.15 mm inside the face's edge), removed volume 18683.9 mm³ for live's 18681.6. Our
+     Thicken 1 is already +24.3 mm³ / +5.5 mm² off (loft surface, in band); our faces: 86 sphere (one dimple in two),
+     42 B-spline, 1 other, with knife-edge pieces (a 0.000625 mm² sphere sliver at (65.410, 43.071, 4.933), a
+     0.000741 mm² island). Asked live (REQUESTS 05:46) for Surface 1's area and the small faces after it.
+   - cf-setback-fillet: parked (lead 11-05, skasm's RABC fill patch; TICKETS SETBACK-FILL-PATCH).
+2. After ~10:17: live's answers to REQUESTS 01:47 (sm-louver scale, live's own SAT import) and 05:46; set 2 after
+   live2's refetch.
+3. driven-pattern Curve pattern 1 (7/11), parked with evidence: our helix is Parasolid's 120 planar 9° arcs and every
+   instance (18°) sits on an arc joint, where the arcs' curvature directions differ by ~0.57° about the tangent; our
+   frames (1078 samples, slerped) mix the two sides by a drifting share: a roll sawtooth 0-0.57° (period ~30
+   instances). Live's instances are exact at 0° / 180° and tilt up to 0.51° about the radius elsewhere (4.5 µm,
+   repeating each half turn: Parasolid's sweep of curvePattern.fs' 0.1 mm line). Taking the joint's mean curvature
+   would make ours exact screw copies, but only live's 6 exact instances would pass the 1 µm box rule.
 4. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## How to run
