@@ -8849,6 +8849,28 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 part_names.insert((element.clone(), pid.to_string()), ours);
             }
         }
+        // A part only another configuration makes (asm-xdev-subs' "Bearings mount", JlD at v1_1_3_3 of a studio whose
+        // default makes two): ours there of the feature that made it, with its properties at that configuration.
+        for i in levels.iter().flat_map(|l| l.instances.iter()).filter(|i| i["elementId"] == element.as_str() && i["type"] == "Part") {
+            let Some(pid) = i["partId"].as_str() else { continue };
+            if part_bodies.contains_key(&(element.clone(), pid.to_string())) {
+                continue;
+            }
+            let choices: serde_json::Map<String, Value> = instance_config_entries(i).into_iter().filter(|(n, _)| t.config_inputs.contains(n)).map(|(n, v)| (n, json!(v))).collect();
+            if choices.is_empty() {
+                continue;
+            }
+            let Ok(q) = t.call("query_parts", json!({ "tab": t.tab, "configuration": choices })) else { continue };
+            let there: Vec<String> = q["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid" || p["kind"] == "Composite").filter_map(|p| p["id"].as_str().map(str::to_string)).collect();
+            let Some(id) = t.part_by_creator(t.len(), pid, &there) else { continue };
+            trace(&format!("{element}: live part {pid} (configuration {choices:?}) -> ours {id}"));
+            if let Some((item, _)) = metadata_item(&studio["partMetadata"], i["fullConfiguration"].as_str(), pid) {
+                for e in set_metadata(&mut t, &id, item, true) {
+                    res.untranslated.push(format!("{element}: part {pid}'s {e}"));
+                }
+            }
+            part_bodies.insert((element.clone(), pid.to_string()), id);
+        }
         // Each connector found with the studio in its instance's configuration (an entity's id may differ between
         // configurations: asm-welding-config's Part 8 at Circle1in has its cap edge meet another face), grouped by
         // configuration; then back to the default.
