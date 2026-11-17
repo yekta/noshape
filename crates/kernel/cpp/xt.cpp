@@ -772,10 +772,13 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
   const bool round_u = fu1 - fu0 > u1 - u0 - 1e-9, round_v = fv1 - fv0 > v1 - v0 - 1e-9;
   if ((b->IsUPeriodic() && !round_u) || (b->IsVPeriodic() && !round_v))
     return nullptr;
-  // ACIS: a closed seam kinked by under a milliradian (our sweep's single-span sections: cf-hose-routing's hoses 0.41
-  // mrad, core's SWEEP-SEAM-KINK) is made tangent: the pole rows beside it take the mean of their two end derivatives,
-  // moving no pole over 1 um (SAT is written in millimetres), a tenth of live's 1e-5 m linear band. (Not Parasolid:
-  // its knot removal still fails there, and live dropped hoses written with such walls periodic, 2452.)
+  // ACIS: a closed seam kinked by under kAcisSeamKink (our sweep's single-span sections: cf-hose-routing's hose walls
+  // 0.41 to 1.98 mrad, core's SWEEP-SEAM-KINK; lead 11-17) is made tangent: the pole rows beside it take the mean of
+  // their two end derivatives, moving no pole over kAcisSeamMove (SAT is written in millimetres: 1 um, a tenth of
+  // live's 1e-5 m linear band). (Not Parasolid: its knot removal still fails there, and live dropped hoses written
+  // with such walls periodic, 2452.)
+  constexpr double kAcisSeamKink = 2e-3; // rad
+  constexpr double kAcisSeamMove = 1e-3; // mm
   auto smooth_seam = [&](bool in_u) {
     const int deg = in_u ? b->UDegree() : b->VDegree(), np = in_u ? b->NbUPoles() : b->NbVPoles();
     const int nq = in_u ? b->NbVPoles() : b->NbUPoles();
@@ -806,13 +809,13 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
       first[j] = P(2, j), last[j] = P(np - 1, j);
       if (d0.Magnitude() < 1e-12 * size && d1.Magnitude() < 1e-12 * size)
         continue;
-      if (d0.Magnitude() < 1e-12 * size || d1.Magnitude() < 1e-12 * size || d0.Angle(d1) > 1e-3)
+      if (d0.Magnitude() < 1e-12 * size || d1.Magnitude() < 1e-12 * size || d0.Angle(d1) > kAcisSeamKink)
         return;
       const gp_Vec g = (d0 + d1) / 2;
       first[j] = P(1, j).Translated(g * h0), last[j] = P(np, j).Translated(-g * h1);
       moved = std::max({moved, first[j].Distance(P(2, j)), last[j].Distance(P(np - 1, j))});
     }
-    if (moved == 0 || moved > 1e-3)
+    if (moved == 0 || moved > kAcisSeamMove)
       return;
     b = occ::down_cast<Geom_BSplineSurface>(b->Copy());
     for (int j = 1; j <= nq; ++j)
