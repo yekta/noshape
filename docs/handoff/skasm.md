@@ -5,7 +5,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 
 ## Unlanded (worktree /root/projects/noshape-wt/skasm, rebased on 143f22c12 2026-11-17 09:2x)
 - d3e6bcef5 (commit A of 11-16, squashed): held-direction zero lines, edge-on circle Use, orphans, bodies-line sketch
-  ids, use_entity, solved_circles, refs-sk.jsonl, sm-box colour (psui waits on it: tell psui when it lands), take-back
+  ids, use_entity, solved_circles, refs-sk.jsonl, sm-box colour (psui 4973e295-9e92-463f-a13f-2ec5258bc5f9 waits on it: tell psui when it lands), take-back
   TRACE. Core landed the same curved-wall flat (198c2b6d3) and sheet metal Move face (b0e98fa3c): main's code kept,
   my two tests kept.
 - b0bee2b62: while a feature is edited, sheet metal chips take label_owners from before_context (qa's bend/jog
@@ -80,14 +80,14 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 
 
 ## Agents (lead's roster 11-17 10:30; only these ids)
-psui 4d0a82b2-8fc7-43e6-b45d-bd8cb225741e (moving soon), core 6692ae35-758a-4442-81c8-29f67be2e21a, blend
+psui 4973e295-9e92-463f-a13f-2ec5258bc5f9 (since 11-17 ~10:35), core 6692ae35-758a-4442-81c8-29f67be2e21a, blend
 0e6e9942-0713-46c1-ae55-132fbbb4a14b, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, dx f93a1292-5bb7-406f-9a25-59767e01878e,
 qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm (me)
 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
 58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2 3b9b1e66-33a0-4dfe-9e0a-eee216e354b2.
 
 ## Waiting on others
-- psui (4d0a82b2-8fc7-43e6-b45d-bd8cb225741e): told 20:3x the tab row is a pick difference (live hit Flange 1's wall).
+- psui: told 20:3x the tab row is a pick difference (live hit Flange 1's wall).
 - dx: cf-spur-gear's per-host Sketch 2 failure = the near-singular sketch 62893b1ed takes back (told 21:3x).
 - Not mine (handed): knife / impeller geometry (core); fan-blade Boolean 2, gamma / wire-clip Boolean 2, shaped-flange
   Booleans, surface-pattern sphere cuts (bool); setback fillet (blend); hex-bookcase mesh Uses (dx).
