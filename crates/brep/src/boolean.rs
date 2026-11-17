@@ -4617,34 +4617,42 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     helix_round |= acc.abs() >= TAU - 0.05;
                 }
             }
-            // (A gap of a rounding between a helix's ends a whole turn apart: none, it goes round.)
-            let th0 = match gap(&covered).filter(|&(_, w)| w > 1e-9 || !helix_round) {
-                Some((th0, _)) => th0,
-                None => {
-                    // Going round (a thread's helical face): between its rulings at one angle, th0 there; those
-                    // its loop runs up (along its parameters' v) are on the far side.
-                    let Surf::Cyl { a, flip, r, .. } = cx.faces[f].s else { unreachable!() };
-                    let angle = |p: DVec3| (p - o).dot(y).atan2((p - o).dot(x));
-                    let rulings: Vec<(usize, bool)> = cx.faces[f].edges.iter().copied().filter(|&(e, _)| cx.edges[e].g == Geo::Line).collect();
-                    let Some(&(e0, _)) = rulings.first() else { return Err(Decline("a cylinder face without curved edges")) };
-                    let th0 = angle(cx.p(cx.edges[e0].v[0]));
-                    let at = |p: DVec3| ((angle(p) - th0 + PI).rem_euclid(TAU) - PI).abs() * r <= tol;
-                    if rulings.len() < 2 || !rulings.iter().all(|&(e, _)| cx.edges[e].v.iter().all(|&w| at(cx.p(w)))) {
-                        return Err(Decline("a cylinder face without curved edges"));
-                    }
-                    let up = |(e, rev): (usize, bool)| {
-                        let [v0, v1] = cx.edges[e].v;
-                        let d = (cx.p(v1) - cx.p(v0)).dot(a) * if rev { -1.0 } else { 1.0 };
-                        if flip { -d > 0.0 } else { d > 0.0 }
-                    };
-                    let right: Vec<usize> = rulings.iter().copied().filter(|&x| up(x)).map(|x| x.0).collect();
-                    if right.is_empty() || right.len() == rulings.len() {
-                        return Err(Decline("a cylinder face without curved edges"));
-                    }
-                    cx.faces[f].right = right;
-                    cx.faces[f].wrap_eps = tol / r;
-                    th0
+            // Going round (a thread's helical face): between its rulings at one angle, th0 there; those its loop runs
+            // up (along its parameters' v) are on the far side.
+            let Surf::Cyl { a, flip, r, .. } = cx.faces[f].s else { unreachable!() };
+            let round = || -> Option<(f64, Vec<usize>)> {
+                let angle = |p: DVec3| (p - o).dot(y).atan2((p - o).dot(x));
+                let rulings: Vec<(usize, bool)> = cx.faces[f].edges.iter().copied().filter(|&(e, _)| cx.edges[e].g == Geo::Line).collect();
+                let &(e0, _) = rulings.first()?;
+                let th0 = angle(cx.p(cx.edges[e0].v[0]));
+                let at = |p: DVec3| ((angle(p) - th0 + PI).rem_euclid(TAU) - PI).abs() * r <= tol;
+                if rulings.len() < 2 || !rulings.iter().all(|&(e, _)| cx.edges[e].v.iter().all(|&w| at(cx.p(w)))) {
+                    return None;
                 }
+                let up = |(e, rev): (usize, bool)| {
+                    let [v0, v1] = cx.edges[e].v;
+                    let d = (cx.p(v1) - cx.p(v0)).dot(a) * if rev { -1.0 } else { 1.0 };
+                    if flip { -d > 0.0 } else { d > 0.0 }
+                };
+                let right: Vec<usize> = rulings.iter().copied().filter(|&x| up(x)).map(|x| x.0).collect();
+                (!right.is_empty() && right.len() < rulings.len()).then_some((th0, right))
+            };
+            // (A gap of a rounding between a helix's ends a whole turn apart, within the tolerance (2.6e-8 rad on a
+            // nut's thread turn: a gap there left both its rulings on one side): none, it goes round between them.)
+            let gap = gap(&covered);
+            let th0 = match gap {
+                Some((th0, w)) if !helix_round || (w > 1e-9 && w * r > tol) => th0,
+                _ => match round() {
+                    Some((th0, right)) => {
+                        cx.faces[f].right = right;
+                        cx.faces[f].wrap_eps = tol / r;
+                        th0
+                    }
+                    None => match gap {
+                        Some((th0, w)) if w > 1e-9 => th0,
+                        _ => return Err(Decline("a cylinder face without curved edges")),
+                    },
+                },
             };
             if let Surf::Cyl { th0: t, .. } = &mut cx.faces[f].s {
                 *t = th0;

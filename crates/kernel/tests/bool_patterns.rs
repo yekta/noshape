@@ -2497,6 +2497,27 @@ fn a_thread_on_its_shafts_cylinder_fuses_into_one_solid() {
     assert!((v - 4896.29).abs() <= 0.2, "volume {v} mm³ against live's 4896.29");
 }
 
+/// c2-config-parts-nuts' Sweep 1 (tests/data/thread: the nut's blank and core's thread, a cylinder face per turn): one
+/// turn's helices fall 2.6e-8 rad short of a whole turn. That gap was taken for the face's start, both its rulings fell
+/// on one side, and the bore's strip between turns was swallowed (non-manifold). Ours valid, 42 faces (OCCT's invalid).
+#[test]
+fn a_nuts_thread_turns_cut_its_bore_between_them() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/thread");
+    let blank = k::read_brep(&dir.join("nut-blank.brep")).expect("the blank");
+    let thread = k::read_brep(&dir.join("nut-thread-turns.brep")).expect("the thread");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Cut, &[blank], &[thread], &k::BooleanOptions::default());
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let s = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})")).shape;
+    assert!(s.is_valid(), "valid");
+    assert_eq!((s.solids().len(), s.count(k::ShapeType::Face)), (1, 42));
+    assert!(s.edge_faces().unwrap().iter().all(|f| f.len() <= 2), "manifold");
+    let v = s.volume().unwrap() * 1e9;
+    assert!((v - 135.267625).abs() <= 1e-4, "volume {v} mm³");
+}
+
 /// asm-bjr-config st-5d8bc1's Extrude 55 (recorded, two of its 130 up-to letters fused into the vanity plate): a
 /// letter's rim, an ellipse on the plate's round hole, runs across the hole's seam; split there as a circle's is ("an
 /// ellipse across a cylinder's seam" before). OCCT's volume and counts.
