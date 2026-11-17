@@ -360,22 +360,33 @@ impl DrawingEditor {
         crate::ui_script::note_dialog(|| {
             let toggle = |label: &str, on: bool| serde_json::json!({ "label": label, "kind": "toggle", "value": on, "enabled": true });
             let menu = |label: &str, enabled: bool| serde_json::json!({ "label": label, "kind": "menu-button", "enabled": enabled });
+            // A general table's row 1 too (live2 drw-table-cells-insert-row 11-16): its insert, remove and duplicate
+            // buttons, merge greyed for one cell.
+            let button = |label: &str, enabled: bool| serde_json::json!({ "label": label, "kind": "button", "enabled": enabled });
+            let mut fields: Vec<serde_json::Value> = Vec::new();
+            if !hole_table {
+                fields.extend(["Insert row above", "Insert row below", "Insert column left", "Insert column right", "Remove rows", "Remove columns"].map(|l| button(l, true)));
+                fields.push(menu("Duplicate cells", true));
+            }
+            fields.extend([button("Size columns equally", cols_on), button("Size rows equally", rows_on)]);
+            if !hole_table {
+                fields.extend([menu("Merge cells", !single), button("Unmerge cells", merged)]);
+            }
+            fields.extend([
+                serde_json::json!({ "label": "Font", "kind": "select", "value": family }),
+                serde_json::json!({ "label": "Text height", "kind": "combo", "value": height.read(cx).value().to_string() }),
+                toggle("Bold", bold),
+                toggle("Italic", italic),
+                toggle("Underline", underline),
+                toggle("Strikethrough", strike),
+                menu("Line spacing", false),
+                menu("Horizontal alignment", true),
+                menu("Vertical alignment", true),
+            ]);
             serde_json::json!({
                 "kind": "cell-format",
                 "title": "Cell",
-                "fields": [
-                    { "label": "Size columns equally", "kind": "button", "enabled": cols_on },
-                    { "label": "Size rows equally", "kind": "button", "enabled": rows_on },
-                    { "label": "Font", "kind": "select", "value": family },
-                    { "label": "Text height", "kind": "combo", "value": height.read(cx).value().to_string() },
-                    toggle("Bold", bold),
-                    toggle("Italic", italic),
-                    toggle("Underline", underline),
-                    toggle("Strikethrough", strike),
-                    menu("Line spacing", false),
-                    menu("Horizontal alignment", true),
-                    menu("Vertical alignment", true),
-                ],
+                "fields": fields,
                 "old": { "kind": "drawing-panel", "title": "Cell", "text": std::iter::once("Cell").chain(FONT_FAMILIES.iter().copied()).collect::<Vec<_>>() },
             })
         });

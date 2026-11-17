@@ -447,13 +447,36 @@ impl DrawingEditor {
                 text.text("Flag notes").options(shapes.iter().flatten().map(|e| e.0.clone())).options(sizes_names(4));
             }
             let old = crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Note" }), text.0);
-            if cell {
-                return old;
-            }
             // Live's recorder since 2026-11-15.1 reads its controls (live2 drw-note-move-to-title-block 11-15); the
             // runner takes `old`, the panel's texts, for older takes.
             let toggle = |label: &str, on: bool, enabled: bool| serde_json::json!({ "label": label, "kind": "toggle", "value": on, "enabled": enabled });
             let menu = |label: &str, enabled: bool| serde_json::json!({ "label": label, "kind": "menu-button", "enabled": enabled });
+            // A table cell's (live2 drw-table-cells-insert-row 11-16): no Note order or flag rows, Line spacing and List
+            // greyed.
+            if cell {
+                return serde_json::json!({
+                    "kind": "cell-format",
+                    "title": "Note",
+                    "fields": [
+                        { "label": "Font", "kind": "select", "value": font_value },
+                        { "label": "Text height", "kind": "combo", "value": height.read(cx).value().to_string() },
+                        toggle("Bold", bold, !shx),
+                        toggle("Italic", italic, !shx),
+                        toggle("Underline", st.underline, true),
+                        toggle("Strikethrough", st.strikethrough, true),
+                        menu("Line spacing", false),
+                        menu("Horizontal alignment", true),
+                        menu("List", false),
+                        menu("Vertical alignment", true),
+                        menu("Insert symbol", true),
+                        menu("Insert drawing property", true),
+                        menu("Insert sheet reference property", true),
+                        menu("Text format", tf_on),
+                        menu("Date time format", is_date),
+                    ],
+                    "old": old,
+                });
+            }
             serde_json::json!({
                 "kind": "cell-format",
                 "title": "Note",

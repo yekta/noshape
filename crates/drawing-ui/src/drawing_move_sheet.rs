@@ -272,7 +272,7 @@ impl DrawingEditor {
         let names: Vec<String> = self.drawing.sheets.iter().map(|s| s.name.clone()).collect();
         let cur = names.get(d.sheet).cloned().unwrap_or_default();
         let at = d.at;
-        let shown = cur.clone();
+        let (shown, value) = (cur.clone(), cur.clone());
         let sheet = Button::new("ms-sheet").label(cur).ghost().xsmall().w(px(130.)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu("ms-sheet-dd", true, move |mut m, _, _| {
             for (i, n) in names.iter().enumerate() {
                 let e = ed.clone();
@@ -288,6 +288,13 @@ impl DrawingEditor {
             m
         });
         let sheet = crate::ui_script::mark(sheet, move || format!("dropdown:{shown}"));
+        // Live2 drw-view-move-to-sheet (11-16): its title, "Sheet" and the list's options; the list as a field.
+        let all: Vec<String> = self.drawing.sheets.iter().map(|s| s.name.clone()).collect();
+        crate::ui_script::note_dialog(|| {
+            let mut t = crate::drawing_panels::PanelText::default();
+            t.texts(["Move to sheet", "Sheet"]).options(all);
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Move to sheet", "fields": [{ "label": "Sheet", "kind": "select", "value": value }] }), t.0)
+        });
         Some(
             v_flex()
                 .id("dr-move-sheet")
