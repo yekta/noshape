@@ -540,7 +540,7 @@ impl PartStudioView {
             ed.model_lines.get_or_init(|| model_straight_edges(&self.display, &ed.frame));
         }
         let own = matches!(&self.hover, Some(Reference::SketchEntity { sketch, .. }) if Some(*sketch) == self.sketch.as_ref().map(|ed| ed.feature));
-        let lit = self.hover.as_ref().and_then(|r| self.model_snap_of(r, cursor, vp)).or_else(|| (!own).then(|| self.plane_edge_snap(cursor, vp)).flatten());
+        let lit = self.unhovered_snap(self.hover.as_ref().and_then(|r| self.model_snap_of(r, cursor, vp)), own, cursor, vp);
         if matches!(lit, Some(ExternalSnap::Vertex { .. } | ExternalSnap::Edge { midpoint: true, .. })) {
             return lit;
         }
@@ -601,6 +601,40 @@ impl PartStudioView {
             }
             _ => None,
         }
+    }
+
+    /// What the snap is with `hovered` the hover's own (none over the open sketch's own geometry, `own`): a point
+    /// outside the sketch on its plane (another sketch's, live 11-17 sketch-snap-1117: lit at 6–7 px along x, a circle's
+    /// centre at 5–8, its 15 px square, where the GPU's 5 px point pick lit it at 5 / 4) beats an edge; then the
+    /// hovered snap; then an edge on the plane.
+    fn unhovered_snap(&self, hovered: Option<ExternalSnap>, own: bool, cursor: DVec2, vp: &Viewport) -> Option<ExternalSnap> {
+        if own || matches!(hovered, Some(ExternalSnap::Vertex { .. })) {
+            return hovered;
+        }
+        self.plane_point_snap(cursor, vp).or(hovered).or_else(|| self.plane_edge_snap(cursor, vp))
+    }
+
+    /// The nearest point of another shown sketch on this sketch's plane within the 15 px square round the pointer.
+    fn plane_point_snap(&self, cursor: DVec2, vp: &Viewport) -> Option<ExternalSnap> {
+        let ed = self.sketch.as_ref()?;
+        let frame = ed.frame;
+        let cursor_s = vp.project(frame.to_world(cursor))?;
+        let mut best: Option<(f64, ExternalSnap)> = None;
+        for s in self.display.sketches.iter().filter(|s| !s.hidden && s.feature != ed.feature) {
+            for p in &s.points {
+                let w = DVec3::new(p.position[0] as f64, p.position[1] as f64, p.position[2] as f64);
+                if (frame.to_world(frame.to_local(w)) - w).length() >= 1e-6 {
+                    continue;
+                }
+                let Some(at) = vp.project(w) else { continue };
+                let d = (at - cursor_s).abs();
+                let (box_d, dist) = (d.x.max(d.y), d.length());
+                if box_d < 7.5 && best.as_ref().is_none_or(|b| dist < b.0) {
+                    best = Some((dist, ExternalSnap::Vertex { position: frame.to_local(w), reference: Reference::SketchEntity { sketch: s.feature, entity: p.entity } }));
+                }
+            }
+        }
+        best.map(|b| b.1)
     }
 
     /// The model edges on the sketch plane snap without being hovered (live 11-17 sketch-snap-1117: the block's edge on
@@ -727,7 +761,7 @@ impl PartStudioView {
         let own = hover.is_some_and(|r| matches!(r, Reference::SketchEntity { sketch, .. } if Some(*sketch) == self.sketch.as_ref().map(|ed| ed.feature)));
         if !shift
             && let Some(c) = cursor
-            && let Some(snap) = hover.and_then(|r| self.model_snap_of(r, c, self.viewport.read(cx))).or_else(|| (!own).then(|| self.plane_edge_snap(c, self.viewport.read(cx))).flatten())
+            && let Some(snap) = self.unhovered_snap(hover.and_then(|r| self.model_snap_of(r, c, self.viewport.read(cx))), own, c, self.viewport.read(cx))
             && let Some(ed) = &mut self.sketch
         {
             ed.apply_external_snap(snap);

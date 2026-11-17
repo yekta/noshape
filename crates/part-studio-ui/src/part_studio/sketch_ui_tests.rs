@@ -1419,6 +1419,36 @@ fn the_dimension_tool_flow_as_lives(cx: &mut TestAppContext) {
     assert!(gone && after == before - on_it, "Delete: the line and its {on_it} constraints go, the rest stays ({before} -> {after})");
 }
 
+/// qa 11-17 SKSNAP-REACH (live 11-17 sketch-snap-1117 row 1): another sketch's point takes a line's end from 6–7 px
+/// along x (its 15 px square), with no hover of it (the GPU's point pick reaches 5 px).
+#[gpui::test]
+fn another_sketchs_point_snaps_from_its_square(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "other-sketch-point", Tool::Point);
+    click(cx, window, &view, (700., 250.));
+    keys(cx, window, &["escape"]);
+    let q = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).filter_map(|e| d.sketch.point(e.id)).last().unwrap()
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
+    let (window, view) = sketch_in(cx, window, view, Tool::Line);
+    click(cx, window, &view, (450., 400.));
+    let wpp = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
+    let at = |cx: &mut TestAppContext, dx: f64| {
+        let p = on_screen(cx, &view, q + DVec2::new(dx * wpp, 0.0));
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: p, modifiers: Modifiers::default() }, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+        cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().inference.as_ref().is_some_and(|i| (i.position - q).length() < 1e-7))
+    };
+    assert!(!at(cx, 12.0), "12 px off: free");
+    assert!(at(cx, 6.5), "6.5 px along x: on the point");
+}
+
 /// qa 11-17 SKSNAP-MODEL-EDGE (live 11-17 sketch-snap-1117 rows 1, 3): in a new sketch on Top under a block, the
 /// block's edge on the plane takes a line's end 2 px off it (COINCIDENT with the edge used) and offers its midpoint at
 /// its middle, with no hover of it (in a normal view the block's top edge is drawn over it and is the one lit).
