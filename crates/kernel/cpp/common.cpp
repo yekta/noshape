@@ -1295,10 +1295,15 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         shown       = open[j];
         anyEdge     = anyEdge || out[(size_t)j - 1] != 0;
       }
-      if (!shown && !anyEdge)
+      // A B-spline face drawn to a point keeps it (live c2-loft-paths-guides' Loft 1: a dome to a sketch point, 3/2/1): a
+      // pole, on a degenerated edge; not where only seams cross (a ring's B-surface round both ways: cf-o-ring-generator's
+      // elliptic rings, live 1/0/0).
+      bool pole = false;
+      for (uint32_t k = e0; k < e1 && !pole; ++k)
+        pole = BRep_Tool::Degenerated(TopoDS::Edge(em((int)ve.second[k] + 1)));
+      if (!shown && !anyEdge && pole)
         for (uint32_t k = vf.first[(size_t)i - 1]; k < vf.first[(size_t)i] && !shown; ++k)
         {
-          // A B-spline face drawn to a point keeps it (live c2-loft-paths-guides' Loft 1: a dome to a sketch point, 3/2/1).
           const GeomAbs_SurfaceType t = BRepAdaptor_Surface(TopoDS::Face(fm((int)vf.second[k] + 1)), false).GetType();
           shown = t == GeomAbs_Cone || t == GeomAbs_BSplineSurface || t == GeomAbs_BezierSurface;
         }

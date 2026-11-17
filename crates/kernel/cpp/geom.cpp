@@ -1385,7 +1385,9 @@ static void face_box(const TopoDS_Face& f, Bnd_Box& out, NCollection_DataMap<Top
       else
         step *= 0.5;
     }
-    box[side] = sign > 0 ? std::min(b[side], std::max(box[side], top)) : std::max(b[side], std::min(box[side], -top));
+    // (A point of the face found is in the box though OCCT's misses it: a whole ring's rational B-surface, its box
+    // 1.9 µm short of the top, cf-o-ring-generator's elliptic rings read back from ACIS.)
+    box[side] = sign > 0 ? std::max(top, std::min(b[side], std::max(box[side], top))) : std::min(-top, std::max(b[side], std::min(box[side], -top)));
   }
   out.Update(box[0], box[1], box[2], box[3], box[4], box[5]);
 }
