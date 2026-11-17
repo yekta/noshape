@@ -4241,6 +4241,43 @@ fn a_configurations_own_part_id_takes_its_named_body() {
     assert_eq!((r.occurrences_matching, r.occurrences, r.bom_matching, r.bom_rows), (2, 2, 2, 2), "{r:?}");
 }
 
+/// A subassembly used twice whose inner subassembly's part sits turned over in the second use while that inner
+/// subassembly's own occurrence doesn't turn (live's flexible subassemblies: asm-xdev-subs' SFRRGA3-29-P25 in Latch
+/// pusher linkage <1>): the inner one placed where its part lands, every occurrence as live's.
+#[test]
+fn a_nested_subassembly_is_placed_where_its_parts_land() {
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": 0.01, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": "FS1", "entityType": "FACE" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "20 mm" }] }
+    ] });
+    let parts = json!([{ "partId": "JHD", "name": "Part 1" }]);
+    let at = |x: f64| json!([1, 0, 0, x, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+    // Turned 180° about Z at x = 100 mm: the part's axis (10 mm off the origin) lands at x = 90 mm.
+    let turned = json!([-1, 0, 0, 0.1, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+    let asm = json!({
+        "rootAssembly": {
+            "instances": [{ "id": "IO1", "name": "Outer <1>", "type": "Assembly", "elementId": "SUBO" }, { "id": "IO2", "name": "Outer <2>", "type": "Assembly", "elementId": "SUBO" }],
+            "occurrences": [
+                { "path": ["IO1"], "fixed": true, "transform": at(0.0) }, { "path": ["IO2"], "fixed": true, "transform": at(0.1) },
+                { "path": ["IO1", "II"], "fixed": false, "transform": at(0.0) }, { "path": ["IO2", "II"], "fixed": false, "transform": at(0.1) },
+                { "path": ["IO1", "II", "IC"], "fixed": false, "transform": at(0.0) }, { "path": ["IO2", "II", "IC"], "fixed": false, "transform": turned }] },
+        "subAssemblies": [
+            { "elementId": "SUBO", "instances": [{ "id": "II", "name": "Inner <1>", "type": "Assembly", "elementId": "SUBI" }], "features": [] },
+            { "elementId": "SUBI", "instances": [{ "id": "IC", "name": "Part 1 <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }], "features": [] }],
+        "subAssemblyFeatures": { "SUBO": { "features": [] }, "SUBI": { "features": [] } },
+        "features": { "features": [], "featureStates": {} } });
+    let mut ctx = Ctx::new();
+    let r = rebuild_assembly(&mut ctx, &scratch("nested-flexible.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    assert_eq!(r.occurrences_matching, r.occurrences, "{r:?}");
+}
+
 /// A sketch on Top of `entities` (Onshape JSON) and one Extrude of `region`
 /// 10 mm, with live's part after it.
 fn one_extrude(sketch: &str, entities: Value, region: Value, live_part: Value) -> (Value, Vec<Value>) {
