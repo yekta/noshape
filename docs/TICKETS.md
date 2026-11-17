@@ -559,7 +559,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
-## Part Studio selection feel vs live2's 11-17 capture (qa 22:50, green 592b0fc9, vibex6 Xvfb, load ~24, real xdotool pointer)
+## Part Studio selection feel vs live2's 11-17 capture (qa 22:47, green 592b0fc9, vibex6 Xvfb, load ~24, real xdotool pointer)
 Start two-blocks (Part Studio), iso + 10 wheel steps; selection / rows from the runner's state, one state per row (sf/mini.sh);
 shots with the pointer as a red cross: qa-scratch/sf/sel-feel-{s1..s4,mismatch}.png (vibex6 ~/agents/qa-keep/sel-feel/).
 Pass: box drag lights nothing while it sweeps; window LTR from empty = faces / edges wholly inside (19: Part 1's 6 + 12, one Part 2

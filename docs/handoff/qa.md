@@ -80,6 +80,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    only. GUI flows run on the Linux release on vibex6 Xvfb: v0.4.57 Fillet opens empty (Mac state), toolbar search pass,
    P0 USER-HOVER-STAYS-LIT sent to psui + skasm 22:12 (re-run uh/uh2.sh <app> <out> on their fix's green; 3 runs, count lit
    pixels per shot as in TICKETS).
+0d. **Selection feel (lead 22:25)**: live2's sel-feel rows on green 592b0fc9, TICKETS "Part Studio selection feel": 4 P0 + 1 P1 to
+   psui. Tools in qa-scratch/sf (vibex6 ~/tmp/qa/sf): drive.py (actions, real pointer), sfs.sh (held session), mini.sh <tag>
+   <idx,..> (one state per row; feel.sh's timed waits drift ~3 actions), sheet.py (pointer-marked sheets). Re-run on psui's fixes.
 0b. **LOADED runs (lead 21:50)**: speed / timing at load > 16 (2 x 8 cores) don't count. suites-diff.py prints "LOADED: …" first,
    skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
    the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.
