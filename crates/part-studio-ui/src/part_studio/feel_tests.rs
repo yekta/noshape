@@ -311,3 +311,69 @@ fn box_select_takes_what_live_takes(cx: &mut TestAppContext) {
         }
     }
 }
+
+/// User P0 11-17, out of sketch mode: a part in the default iso view with the default planes behind and through it.
+/// Under the real pointer every face's middle lights the part (never a plane behind it), a top corner 5 px
+/// out to the side lights its vertex (live/feel/3d.json: a vertex lights at 7 px level), and beside the part a plane
+/// lights.
+#[gpui::test]
+fn part_faces_and_vertices_light_over_the_planes_behind(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, _top, _) = block_part(cx, "3d-over-planes");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // Each face's middle and the part's corners on screen.
+    let (faces, corners) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let vp = v.viewport.read(cx);
+        let p = |q: &[f32; 3]| glam::DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64);
+        let faces: Vec<(Reference, DVec2)> = b
+            .face_refs
+            .iter()
+            .zip(&b.mesh.face_ranges)
+            .filter_map(|(r, (first, count))| {
+                let idx = &b.mesh.indices[*first as usize..(*first + *count) as usize];
+                let c = idx.iter().map(|&k| p(&b.mesh.positions[k as usize])).sum::<glam::DVec3>() / idx.len() as f64;
+                Some((r.clone(), vp.project(c)?))
+            })
+            .collect();
+        let top_z = b.mesh.positions.iter().map(|q| q[2]).fold(f32::MIN, f32::max);
+        let mut corners: Vec<DVec2> = b.mesh.positions.iter().filter(|q| (q[2] - top_z).abs() < 1e-7).filter_map(|q| vp.project(p(q))).collect();
+        corners.dedup_by(|a, b| (*a - *b).length() < 0.5);
+        (faces, corners)
+    });
+    assert_eq!(faces.len(), 6, "the block's six faces");
+    let pointer = Pointer::new(cx, window, &view);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).hover.clone());
+    let mut wrong = Vec::new();
+    for (face, at) in &faces {
+        pointer.move_to(cx, &view, *at);
+        let got = lit(cx);
+        // (A hidden face's middle may fall by a seen edge, which lights: the part, never a plane behind it.)
+        if !matches!(got, Some(Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_))) {
+            wrong.push(format!("the middle of {face:?} ({:.0}, {:.0}): lit {got:?}, not the part", at.x, at.y));
+        }
+    }
+    // The leftmost and rightmost top corners, 5 px further out.
+    let centre = corners.iter().sum::<DVec2>() / corners.len() as f64;
+    for corner in [corners.iter().min_by(|a, b| a.x.total_cmp(&b.x)), corners.iter().max_by(|a, b| a.x.total_cmp(&b.x))].into_iter().flatten() {
+        let at = *corner + DVec2::new(5.0 * (corner.x - centre.x).signum(), 0.0);
+        pointer.move_to(cx, &view, at);
+        let got = lit(cx);
+        if !matches!(got, Some(Reference::Vertex(_))) {
+            wrong.push(format!("5 px beside the corner ({:.0}, {:.0}): lit {got:?}, not its vertex", corner.x, corner.y));
+        }
+    }
+    // Beside the part: some spot lights a plane.
+    let (lo, hi) = corners.iter().fold((DVec2::splat(f64::MAX), DVec2::splat(f64::MIN)), |(l, h), c| (l.min(*c), h.max(*c)));
+    let spots = [DVec2::new(lo.x - 50.0, hi.y + 60.0), DVec2::new(hi.x + 50.0, hi.y + 60.0), DVec2::new(lo.x - 80.0, lo.y), DVec2::new(hi.x + 80.0, lo.y), DVec2::new((lo.x + hi.x) * 0.5, hi.y + 120.0)];
+    let plane = spots.iter().any(|s| {
+        pointer.move_to(cx, &view, *s);
+        matches!(lit(cx), Some(Reference::Plane(_)))
+    });
+    if !plane {
+        wrong.push("no plane lit beside the part".into());
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
