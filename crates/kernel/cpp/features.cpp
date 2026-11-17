@@ -4996,6 +4996,57 @@ TopoDS_Shape without_necks(const TopoDS_Shape& s, double width, HHist& h)
     return s;
   TopoDS_Solid solid = ms.Solid();
   BRepLib::OrientClosedSolid(solid);
+  // The new edges' curves stored on their plane pieces (computed on the fly otherwise, which a scaled copy lost:
+  // isaac-ball 3c5c58's Fillet 1, a piece without its curves once scaled back).
+  ShapeIMap old_edges;
+  TopExp::MapShapes(s, TopAbs_EDGE, old_edges);
+  for (TopExp_Explorer x(solid, TopAbs_FACE); x.More(); x.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(x.Current());
+    if (BRepAdaptor_Surface(f, false).GetType() != GeomAbs_Plane)
+      continue;
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+      if (!old_edges.Contains(e.Current()))
+      {
+        BRepLib::BuildCurve3d(TopoDS::Edge(e.Current()));
+        BRepLib::BuildPCurveForEdgeOnPlane(TopoDS::Edge(e.Current()), f);
+      }
+  }
+  // (The strip's end edges, its width long, sewn to nothing: dropped. isaac-ball 3c5c58's Fillet 1, a full round across
+  // a 9 mm face 1e-5 R narrower.)
+  HHist dropH;
+  if (!valid_shape(solid))
+  {
+    occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+    bool                           dropped = false;
+    NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef;
+    TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+    for (int i = 1; i <= ef.Extent(); ++i)
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(i));
+      if (!BRep_Tool::Degenerated(e))
+        continue;
+      bool on_planes = true;
+      for (NCollection_List<TopoDS_Shape>::Iterator f(ef(i)); f.More(); f.Next())
+        on_planes = on_planes && BRepAdaptor_Surface(TopoDS::Face(f.Value()), false).GetType() == GeomAbs_Plane;
+      TopoDS_Vertex v0, v1;
+      TopExp::Vertices(e, v0, v1);
+      if (!on_planes || !v0.IsSame(v1))
+        continue;
+      rs->Remove(e);
+      dropped = true;
+    }
+    if (dropped)
+    {
+      const TopoDS_Shape fixed = rs->Apply(solid);
+      for (TopExp_Explorer x(fixed, TopAbs_SOLID); x.More(); x.Next())
+      {
+        solid = TopoDS::Solid(x.Current());
+        dropH = rs->History();
+        break;
+      }
+    }
+  }
   if (!valid_shape(solid))
     return s;
   HHist sewH = new BRepTools_History();
@@ -5014,7 +5065,61 @@ TopoDS_Shape without_necks(const TopoDS_Shape& s, double width, HHist& h)
     }
   merge_into(h, cutH);
   merge_into(h, sewH);
+  if (!dropH.IsNull())
+    merge_into(h, dropH);
   return s.ShapeType() == TopAbs_SOLID ? TopoDS_Shape(solid) : compound_of({solid});
+}
+
+// `s` with every neck cut out (without_necks, again while one is found), its history merged into `h`; `s` itself
+// where there is none.
+static TopoDS_Shape without_all_necks(const TopoDS_Shape& s, double width, HHist& h)
+{
+  TopoDS_Shape cur = s;
+  for (int i = 0; i < 8; ++i)
+  {
+    HHist              step;
+    const TopoDS_Shape next = without_necks(cur, width, step);
+    if (next.IsSame(cur))
+      break;
+    merge_into(h, step);
+    cur = next;
+  }
+  return cur;
+}
+
+// A hair-smaller blend's result `r` (valid here) with its necks cut out, valid at the part's own scale; null where
+// there is no neck or no such cut. Cut here first, else at the part's own scale and brought back (a plane piece of
+// isaac-ball 3c5c58's Fillet 1, cut here, came out unorientable once scaled back).
+static TopoDS_Shape necks_cut(const TopoDS_Shape& input, const TopoDS_Shape& r, double width, HHist& h)
+{
+  HHist              here;
+  const TopoDS_Shape c = without_all_necks(r, width, here);
+  if (c.IsSame(r))
+    return {};
+  if (valid_unscaled(c))
+  {
+    h = compose(input, h, here);
+    return c;
+  }
+  const double k = working_scale();
+  if (k == 1.0)
+    return {};
+  auto by = [](const TopoDS_Shape& x, double f) {
+    gp_Trsf t;
+    t.SetScale(gp_Pnt(0, 0, 0), f);
+    BRepBuilderAPI_Transform tr(x, t, true);
+    return std::make_pair(tr.Shape(), HHist(new BRepTools_History(to_list({x}), tr)));
+  };
+  const auto         down = by(r, 1.0 / k);
+  HHist              own;
+  const TopoDS_Shape u = without_all_necks(down.first, width / k, own);
+  if (u.IsSame(down.first) || !valid_shape(u))
+    return {};
+  const auto up = by(u, k);
+  if (!valid_unscaled(up.first))
+    return {};
+  h = compose(input, compose(input, compose(input, h, down.second), own), up.second);
+  return up.first;
 }
 
 // Remove faces narrower than `width` (slivers left by a blend that almost
@@ -5076,14 +5181,15 @@ std::pair<TopoDS_Shape, HHist> checked_blend(const TopoDS_Shape& input, const Bl
       {
         const double width = std::max(size * eps * 50, 1e-9);
         TopoDS_Shape r3    = without_slivers(r2, width, h2);
-        // A face this retry pinched to a neck valid here but not at the part's own scale (a self-overlapping face
-        // once scaled back: c2-fan-blade-sweep's 2e-10 m bridge), or not even here: the neck cut out.
+        // A face this retry pinched to a neck: cut out, so the face is its pieces as live's (isaac-ball 3c5c58's
+        // Fillet 1, a full round across a strip of a bigger face, live two faces; c2-fan-blade-sweep's 2e-10 m bridge,
+        // a self-overlapping face once scaled back), where that comes out valid at the part's own scale.
         if (valid_shape(r3))
         {
-          if (valid_unscaled(r3))
-            return {r3, h2};
-          const TopoDS_Shape r4 = without_necks(r3, width, h2);
-          return {r4.IsSame(r3) || !valid_unscaled(r4) ? r3 : r4, h2};
+          const TopoDS_Shape r4 = necks_cut(input, r3, width, h2);
+          if (!r4.IsNull())
+            return {r4, h2};
+          return {r3, h2};
         }
         const TopoDS_Shape r4 = without_necks(r3, width, h2);
         if (!r4.IsSame(r3))
@@ -5256,9 +5362,11 @@ void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
   auto same_round = [](const BRepAdaptor_Surface& a, const BRepAdaptor_Surface& b) {
     if (a.GetType() == GeomAbs_Cylinder && b.GetType() == GeomAbs_Cylinder)
     {
+      // (Axes up to 5e-5 R apart: a round made 1e-5 smaller across a strip leaves its two halves 2e-5 R apart,
+      // isaac-ball 3c5c58's Fillet 1.)
       const gp_Cylinder ca = a.Cylinder(), cb = b.Cylinder();
       const double      ra = ca.Radius();
-      return std::abs(ra - cb.Radius()) <= 1e-6 * ra && ca.Axis().IsParallel(cb.Axis(), 1e-9) && gp_Lin(ca.Axis()).Distance(cb.Location()) <= 1e-6 * ra;
+      return std::abs(ra - cb.Radius()) <= 1e-6 * ra && ca.Axis().IsParallel(cb.Axis(), 1e-9) && gp_Lin(ca.Axis()).Distance(cb.Location()) <= 5e-5 * ra;
     }
     if (a.GetType() == GeomAbs_Torus && b.GetType() == GeomAbs_Torus)
     {

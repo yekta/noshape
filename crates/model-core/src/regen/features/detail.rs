@@ -600,7 +600,15 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         let (shape, face_names) = match merged_blends(&res) {
             Some(un) => {
                 let merged = ev.name_result(&[&crate::regen::eval::names_for(&res.shape, face_names)], &un.history, &un.shape, &BTreeMap::new(), None);
-                (un.shape, merged)
+                // (The merged blend's edge pieces joined too: isaac-ball 3c5c58's full rounds across a strip, one half
+                // cylinder whose edge on the tilted plane stayed two arcs.)
+                match joined_edges(&un) {
+                    Some(j) => {
+                        let named = ev.name_result(&[&crate::regen::eval::names_for(&un.shape, merged)], &j.history, &j.shape, &BTreeMap::new(), None);
+                        (j.shape, named)
+                    }
+                    None => (un.shape, merged),
+                }
             }
             None => match joined_edges(&res) {
                 Some(j) => {
