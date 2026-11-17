@@ -809,7 +809,14 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
         // Text transmit file in the chosen version (live G36: the body in that
         // version's layouts; "Use latest version" = 38.1).
         // Named and coloured as Onshape's (TYSA_NAME / TYSA_COLOUR_2).
-        PartFormat::Parasolid => k::write_parasolid_parts(path, &parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), k::LengthUnit::Meter, false, parasolid_version(s))?,
+        PartFormat::Parasolid => {
+            // Meshes came with Parasolid 28.1: live refuses a mesh part in an older version.
+            let first_mesh_version = PARASOLID_VERSIONS.iter().position(|v| *v == "28.1");
+            if PARASOLID_VERSIONS.iter().position(|v| *v == parasolid_version(s)) > first_mesh_version && parts.iter().any(|p| p.1.is_mesh() && p.1.count(k::ShapeType::Solid) > 0) {
+                anyhow::bail!("The selected Parasolid version does not support the current geometry contents.");
+            }
+            k::write_parasolid_parts(path, &parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), k::LengthUnit::Meter, false, parasolid_version(s))?
+        }
         PartFormat::Acis => k::write_acis(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
         PartFormat::Pvz => {
             let shapes: Vec<k::ExportShape> = parts.iter().map(|(n, sh, _)| k::ExportShape { shape: sh.clone(), name: Some(n.clone()), color: None }).collect();

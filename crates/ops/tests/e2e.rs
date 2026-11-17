@@ -4509,8 +4509,6 @@ fn export_store_file_in_a_new_tab() {
     assert_eq!(e.param.as_deref(), Some("file"), "{e:?}");
 }
 
-/// Files that aren't CAD (Markdown, CSV, a picture) import as file tabs,
-/// one edit each, as the app's + › Import… (Onshape: imported for viewing).
 /// A mesh part through Parasolid as live (c2-hex-bookcase-derived: its x_t comes zipped with the .xmm_txt holding the
 /// mesh): live's file imports with the mesh read beside it, the Part Studio exports as a zip of "<name>.x_t" and
 /// "<name>.xmm_txt", and that zip imports as the same parts, the mesh still a mesh at its volume.
@@ -4545,9 +4543,14 @@ fn a_mesh_part_goes_through_parasolid_zipped_with_its_mesh_file() {
     for (m, b) in model.iter().zip(&back) {
         assert!((m.1 - b.1).abs() <= 1e-6 * m.1, "{m:?} {b:?}");
     }
+    // A version before meshes refuses the part, as live's 28.0.
+    let e = try_call(&mut ctx, "export_parts", json!({ "tab": studio, "format": "PARASOLID", "version": "28.0", "file": scratch("xt_mesh_28.x_t").to_str().unwrap() })).unwrap_err().to_string();
+    assert!(e.contains("The selected Parasolid version does not support the current geometry contents."), "{e}");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Files that aren't CAD (Markdown, CSV, a picture) import as file tabs,
+/// one edit each, as the app's + › Import… (Onshape: imported for viewing).
 #[test]
 fn import_files_stores_other_files_as_file_tabs() {
     let mut ctx = Ctx::new();

@@ -161,9 +161,9 @@ fn an_onshape_parasolid_with_a_mesh_part_reads_the_mesh_beside_it() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// A mesh part written to Parasolid as live writes one (c2-hex-bookcase-derived's "imported"): in the latest version a
-/// MESH whose triangles go in the .xmm_txt beside the .x_t, read back as the same mesh solid; in an older one, planar
-/// facets and no mesh file.
+/// A mesh part written to Parasolid as live writes one (c2-hex-bookcase-derived's "imported"): from 28.1 on a MESH
+/// whose triangles go in the .xmm_txt beside the .x_t (the file naming 28.1 its minimum version), read back as the same
+/// mesh solid; 28.0 has no meshes and refuses it, as live's export.
 #[test]
 fn a_mesh_part_goes_to_parasolid_as_a_mesh_beside_the_file() {
     let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts");
@@ -173,18 +173,22 @@ fn a_mesh_part_goes_to_parasolid_as_a_mesh_beside_the_file() {
     let dir = std::env::temp_dir().join(format!("noshape-xt-mesh-out-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("part.x_t");
-    write_parasolid_version(&path, std::slice::from_ref(&mesh), LengthUnit::Millimeter, false, "38.1").unwrap();
-    let text = std::fs::read_to_string(dir.join("part.xmm_txt")).unwrap();
-    assert!(text.contains(": MESH FILE created by modeller version"), "{}", &text[..text.len().min(400)]);
-    let back = read_parasolid_parts(&path, LengthUnit::Millimeter).unwrap();
-    assert_eq!(back.len(), 1);
-    assert!(back[0].shape.is_mesh() && back[0].shape.count(ShapeType::Solid) == 1);
-    let v = volume_properties(&back[0].shape).unwrap().mass;
-    assert!((v - want).abs() <= 1e-9 * want, "{v} vs {want}");
-    write_parasolid_version(&path, std::slice::from_ref(&mesh), LengthUnit::Millimeter, false, "28.0").unwrap();
+    for version in ["38.1", "30.0", "28.1"] {
+        write_parasolid_version(&path, std::slice::from_ref(&mesh), LengthUnit::Millimeter, false, version).unwrap();
+        let text = std::fs::read_to_string(dir.join("part.xmm_txt")).unwrap();
+        assert!(text.contains(": MESH FILE created by modeller version"), "{version}: {}", &text[..text.len().min(400)]);
+        let part = std::fs::read_to_string(&path).unwrap().replace('\n', "");
+        assert!(part.contains(": TRANSMIT FILE created by modeller version 3801231 minimum version 2801000"), "{version}");
+        let back = read_parasolid_parts(&path, LengthUnit::Millimeter).unwrap();
+        assert_eq!(back.len(), 1, "{version}");
+        assert!(back[0].shape.is_mesh() && back[0].shape.count(ShapeType::Solid) == 1, "{version}");
+        let v = volume_properties(&back[0].shape).unwrap().mass;
+        assert!((v - want).abs() <= 1e-9 * want, "{version}: {v} vs {want}");
+    }
+    std::fs::remove_file(dir.join("part.xmm_txt")).unwrap();
+    let e = write_parasolid_version(&path, std::slice::from_ref(&mesh), LengthUnit::Millimeter, false, "28.0").unwrap_err().to_string();
+    assert!(e.contains("The selected Parasolid version does not support the current geometry contents."), "{e}");
     assert!(!dir.join("part.xmm_txt").exists());
-    let back = read_parasolid_parts(&path, LengthUnit::Millimeter).unwrap();
-    assert!(!back[0].shape.is_mesh() && back[0].shape.count(ShapeType::Face) == 948, "{} faces", back[0].shape.count(ShapeType::Face));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

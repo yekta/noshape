@@ -528,6 +528,10 @@ private:
       *L = native->at(type);
     else if (!embedded && type == 176 && bi == base.end())
       *L = part_xmt_block();
+    else if (!embedded && bi == base.end() && version_schemas().rbegin()->second.count(type))
+      // A node type newer than the base schema and laid out alike since (MESH and the mesh file's nodes: live's 28.1
+      // and 30.0 files as its 38.1 ones).
+      *L = version_schemas().rbegin()->second.at(type);
     else if (!embedded)
     {
       if (bi == base.end())

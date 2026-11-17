@@ -226,6 +226,10 @@ struct XtVersion
 // The writing modeller's id (major minor build), the same in every
 // version's file (live G36: "modeller version 3801231", FRU 38.1.231).
 const char* const kModeller = "3801231";
+// MESH (a mesh body's geometry) and the first version that has it: older ones refuse a mesh part (live: 28.0's export
+// "The selected Parasolid version does not support the current geometry contents.", 28.1 and 30.0 write the mesh).
+const int kMeshNode       = 201;
+const int kFirstMeshCode  = 28100;
 const XtVersion kVersions[] = {
   {"38.1", "SCH_3801231_38101"}, {"37.1", "SCH_3701000_37102"}, {"37.0", "SCH_3700000_36001"},
   {"36.0", "SCH_3600000_36001"}, {"35.1", "SCH_3501000_35102"}, {"34.1", "SCH_3401000_34101"},
@@ -364,7 +368,9 @@ std::string num(double v)
 
 std::string text_body(const std::vector<Node>& nodes, const XtVersion& v, const char* kind = "TRANSMIT FILE")
 {
-  const std::string kVersion = std::string(": ") + kind + " created by modeller version " + kModeller;
+  // A part file with a MESH names the first version that reads one (live's 28.1, 30.0 and 38.1 files alike).
+  const bool        mesh     = std::string(kind) == "TRANSMIT FILE" && std::any_of(nodes.begin(), nodes.end(), [](const Node& n) { return n.type == kMeshNode; });
+  const std::string kVersion = std::string(": ") + kind + " created by modeller version " + kModeller + (mesh ? " minimum version 2801000" : "");
   const std::string kSchema  = v.schema;
   std::string       s        = "T";
   auto        put = [&](const std::string& t) {
@@ -2896,18 +2902,24 @@ int write_mesh_body(Writer& w, const TopoDS_Shape& s)
   return body;
 }
 
+// A solid of mesh faces only (an imported STL's part): what Parasolid writes as a MESH.
+bool solid_mesh_body(const TopoDS_Shape& s)
+{
+  if (s.IsNull() || !has_mesh_faces(s) || !TopExp_Explorer(s, TopAbs_SOLID).More())
+    return false;
+  for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
+    if (!is_mesh_face(TopoDS::Face(e.Current())))
+      return false;
+  return true;
+}
+
 // One part's BODY, as write_parasolid writes it.
 int write_body(Writer& w, const TopoDS_Shape& s)
 {
   require_non_null(s, "shape");
   if (has_mesh_faces(s))
   {
-    bool solid = false, all = true;
-    for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next())
-      solid = true;
-    for (TopExp_Explorer e(s, TopAbs_FACE); e.More() && all; e.Next())
-      all = is_mesh_face(TopoDS::Face(e.Current()));
-    if (w.meshes && solid && all)
+    if (w.meshes && solid_mesh_body(s))
       return write_mesh_body(w, s);
     MeshFacets m;
     return write_body(w, facet_mesh(s, m));
@@ -3025,10 +3037,12 @@ static void write_parasolid_as(const OcShapeList& shapes, rust::Slice<const rust
   Writer           w;
   AttrWriter       aw{w};
   std::vector<int> bodies;
-  // Mesh bodies as meshes in a text file of the latest version (live's 38.1 files are where their layouts come from),
-  // as planar facets otherwise.
+  // Solid mesh bodies as meshes in a text file (their MESH and the .xmm's nodes are laid out alike from 28.1 to 38.1:
+  // live's files of each), as planar facets in a binary one; a version without meshes refuses them, as live.
   std::vector<Writer::Mesh> meshes;
-  if (!binary && !bare && std::string(ver.name) == kVersions[0].name)
+  if (schema_code(ver) < kFirstMeshCode && std::any_of(shapes.items.begin(), shapes.items.end(), [](const TopoDS_Shape& s) { return solid_mesh_body(s); }))
+    fail_invalid("The selected Parasolid version does not support the current geometry contents.");
+  if (!binary && !bare)
     w.meshes = &meshes;
   const bool       list = shapes.items.size() != 1;
   const int        root = list ? w.alloc() : 0;
