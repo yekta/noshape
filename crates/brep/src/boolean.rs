@@ -1646,7 +1646,7 @@ impl Ctx<'_> {
         }
         // The face's vertices on it (where it runs along the boundary; a NURBS curve's: those in its box).
         let near = match path {
-            Path::Nurbs { c, .. } => Some(free::piece_box(c, t0, t1)),
+            Path::Nurbs { id, .. } => Some(self.nurbs_box(*id, t0, t1)),
             _ => None,
         };
         for k in 0..self.faces[f].edges.len() {
@@ -3632,6 +3632,19 @@ impl Ctx<'_> {
         Ok(self.split_params(s, sorted_x, te, at_ends)?.0)
     }
 
+    /// A box holding the NURBS curve `id` from `t0` to `t1`: its pieces' boxes over it (made once), else 16 samples a
+    /// span grown by their sag. (Curve samples for every section piece were most of infento's 1dc32b Boolean 4.)
+    fn nurbs_box(&self, id: u32, t0: f64, t1: f64) -> (DVec3, DVec3) {
+        let nc = &self.ncurves[id as usize];
+        let (ta, tb) = (t0.min(t1), t0.max(t1));
+        nc.boxes
+            .get_or_init(|| nc.c.piece_boxes(8))
+            .iter()
+            .filter(|x| x.1 >= ta && x.0 <= tb)
+            .fold(None, |a: Option<(DVec3, DVec3)>, x| Some(a.map_or((x.2, x.3), |(l, h)| (l.min(x.2), h.max(x.3)))))
+            .unwrap_or_else(|| free::piece_box(&nc.c, t0, t1))
+    }
+
     /// [`Self::split_reach`]'s chain and its vertices' parameters on `s` (0 and 1 at its ends).
     fn split_params(&self, s: &Seg, sorted_x: &Sorted3, te: f64, at_ends: bool) -> R<(Vec<u32>, Vec<f64>)> {
         let tol = self.tol;
@@ -3645,16 +3658,10 @@ impl Ctx<'_> {
             }
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
             Geo::Ell { e, t0, sweep, .. } => e.piece_box(t0, sweep),
-            // (Its pieces' boxes over it, grown to the reach their test below keeps: no curve samples (infento's
-            // 1dc32b Boolean 4: 16 a span, every section piece, most of its time).)
+            // (Grown to the reach the pieces' boxes' test below keeps.)
             Geo::Nurbs { id, t0, t1 } => {
-                let nc = &self.ncurves[id as usize];
-                let (ta, tb) = (t0.min(t1), t0.max(t1));
-                let g = DVec3::splat((GREY - 1.0) * tol_far);
-                match nc.boxes.get_or_init(|| nc.c.piece_boxes(8)).iter().filter(|x| x.1 >= ta && x.0 <= tb).fold(None, |a: Option<(DVec3, DVec3)>, x| Some(a.map_or((x.2, x.3), |(l, h)| (l.min(x.2), h.max(x.3))))) {
-                    Some((l, h)) => (l - g, h + g),
-                    None => free::piece_box(&nc.c, t0, t1),
-                }
+                let (l, h) = self.nurbs_box(id, t0, t1);
+                (l - DVec3::splat((GREY - 1.0) * tol_far), h + DVec3::splat((GREY - 1.0) * tol_far))
             }
             Geo::Apex { .. } => return Ok((vec![s.v[0], s.v[1]], vec![0.0, 1.0])),
         };
@@ -5512,7 +5519,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             Geo::Line | Geo::Apex { .. } => (cx.p(s.v[0]).min(cx.p(s.v[1])), cx.p(s.v[0]).max(cx.p(s.v[1]))),
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
             Geo::Ell { e, t0, sweep, .. } => e.piece_box(t0, sweep),
-            Geo::Nurbs { id, t0, t1 } => free::piece_box(&cx.ncurves[id as usize].c, t0, t1),
+            Geo::Nurbs { id, t0, t1 } => cx.nurbs_box(id, t0, t1),
         };
         let near = es != usize::MAX && (0..ns).any(|t| meets[es * ns + t] && boxes_meet(lo, hi, cx.solids[t].lo, cx.solids[t].hi, GREY * tol));
         if near { cx.split_among(&s, &lists, Some(cx.edges[e].arg), cx.edges[e].t) } else { Ok(vec![s.v[0], s.v[1]]) }
