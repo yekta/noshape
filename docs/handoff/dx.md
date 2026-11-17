@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 05:52 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 07:13 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -196,12 +196,13 @@ Open, ranked:
    - cf-setback-fillet: parked (lead 11-05, skasm's RABC fill patch; TICKETS SETBACK-FILL-PATCH).
 2. After ~10:17: live's answers to REQUESTS 01:47 (sm-louver scale, live's own SAT import) and 05:46; set 2 after
    live2's refetch.
-3. driven-pattern Curve pattern 1 (7/11), parked with evidence: our helix is Parasolid's 120 planar 9° arcs and every
-   instance (18°) sits on an arc joint, where the arcs' curvature directions differ by ~0.57° about the tangent; our
-   frames (1078 samples, slerped) mix the two sides by a drifting share: a roll sawtooth 0-0.57° (period ~30
-   instances). Live's instances are exact at 0° / 180° and tilt up to 0.51° about the radius elsewhere (4.5 µm,
-   repeating each half turn: Parasolid's sweep of curvePattern.fs' 0.1 mm line). Taking the joint's mean curvature
-   would make ours exact screw copies, but only live's 6 exact instances would pass the 1 µm box rule.
+3. Landing (dx-land): curve pattern along a helix, frames from the helix's axis, plus the kernel fit's fallback pair
+   when n/3 and 2n/3 fall on whole turns (old pair kept when it works: a new pair moved fan-blade's Boolean 2).
+   driven-pattern 7/11 -> 11/11; 8 helix docs A/B on vibe6 (~/tmp/dx/hab-A/B2.log): nothing else changes. T1
+   features_b::a_curve_pattern_along_a_helix_screws_its_seed (49 -> 0.42 µm), kernel thread::a_helix_of_whole_turns_
+   is_fitted. g++-13 against /opt/occt clean. SM-BOOLEAN-SPEED closed (lead): Mac release median Up to Part 66 ms /
+   live 160, document 92 / 917. Studios 06:27: 1dc32b 27/349 (was 17), first difference Boolean 4 "4" wheel hub"
+   232/632/400 vs 216/600/384 (bool's area, to look at); 74d3d6 9/180, Extrude 4 (core's, parked).
 4. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## How to run
