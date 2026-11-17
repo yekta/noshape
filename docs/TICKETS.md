@@ -559,6 +559,27 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Sketch line snap and inference vs live's 11-17 capture (qa 23:17, green 592b0fc9, vibex6 Xvfb, load ~24, real xdotool pointer)
+live's set-up rebuilt (block 40x30x10, Sketch 2: line, circle, point; Sketch 3 on Top, view normal, 3.53 px/mm), Line tool from
+(70,-30); the pointer in 1 px steps in to each target and back out, a crop per step (qa-scratch/sk/sweep.py, hv.py, glyphs.py;
+crops sk/sw, sk/run2, sk/run3; sheets tickets/sketch-snap-sheet.png, sk/glyph-sheet.png, vibex6 ~/agents/qa-keep/sketch-snap/).
+Reach from the coincident / midpoint glyph by the pointer (lights at -> lets go; live in brackets): point x 5 -> 8 (6-7 -> 9-10),
+y 5 -> 9 (5-6 -> 9-10), diagonal 8.5 -> 11.3 (8-10 -> 11-12); line end 6 -> 9 (6-7 -> 8-10); midpoint 6 -> 10 (6-7 -> 8-10); on
+the line 6 -> 10 (6-7 -> 8-10); circle centre 4 -> 7 (5-8 -> 7-12). The yellow square trails the glyph by 2 steps both ways (a
+frame behind here). Own H / V band: lights at 7 px off the axis, lets go at 8 (H) / 9-10 (V), the same at 40, 80 and 160 px, with
+the dashed preview and "—" / "|" by the pointer (= live). Shift held: no snap, a line 2 px off H stays tilted, an end 1 px from a
+point gets no coincident (= live). Ending on a point / midpoint: COINCIDENT (shared point) / MIDPOINT created (= live).
+- [ ] **P0 SKSNAP-MODEL-EDGE (skasm)**: a model edge on the sketch plane lights (orange) within 4-5 px but shows no coincident glyph
+  by the pointer, offers no midpoint at its middle, and a click 2 px off it leaves the end 0.5 mm off the edge with no constraint
+  (live row 1 / 3: coincident on the edge at 7 px, midpoint at the middle at 6 px; COINCIDENT (end, edge) after the click).
+- [ ] **P0 SKSNAP-ALIGN-WOKEN-POINT (skasm)**: after resting on Sketch 2's point, no vertical alignment to it is offered at 60 or
+  150 px below, 0-14 px off its vertical (no dashed line, no glyph) (live row 2: a ±6-7 px band, yellow dashed line to the point).
+- [ ] **P1 SKSNAP-GLYPHS-AFTER (skasm)**: after the click no constraint glyph is drawn (H, V, coincident, midpoint, edge) (live row
+  3: "—" under the line's middle, "|" beside it, coincident / midpoint glyphs above-left of the end).
+- [ ] **P2 SKSNAP-REACH (skasm)**: a point lights at 5 px along x (live 6-7) and a circle centre at 4 px (live 5-8).
+- [ ] **P2 SKSNAP-SHIFT-ICON (skasm)**: with Shift held near the point a black cube icon shows by the pointer (live: nothing).
+- Not run: a local point beating an external one 1 px apart.
+
 ## Part Studio selection feel vs live2's 11-17 capture (qa 22:47, green 592b0fc9, vibex6 Xvfb, load ~24, real xdotool pointer)
 Start two-blocks (Part Studio), iso + 10 wheel steps; selection / rows from the runner's state, one state per row (sf/mini.sh);
 shots with the pointer as a red cross: qa-scratch/sf/sel-feel-{s1..s4,mismatch}.png (vibex6 ~/agents/qa-keep/sel-feel/).
@@ -568,16 +589,16 @@ move (live's quirk); plane click selects it, a second adds, face + plane both, e
 list hover: Extrude 1 row bg + "Extrude 1 <- Sketch 1" + part outlined light orange, Part 2 row + eye + tooltip, Top row lights
 the plane; Extrude 1 row click selects the feature, part drawn amber, Part 1 related; face picks relate feature + part rows;
 Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctrl+click opens the menu and selects nothing.
-- [ ] **P0 SELFEEL-RELATED-STAYS (psui)**: after a double-click on Part 2's top, an empty click (and every later hover) leaves
+- [ ] **P0 SELFEEL-RELATED-STAYS (skasm, lead 22:48 split)**: after a double-click on Part 2's top, an empty click (and every later hover) leaves
   Sketch 2 + Extrude 2 related (state rows related, 40 s later too). Live row 2/5: an empty click clears both sides.
-- [ ] **P0 SELFEEL-DBLCLICK-FACE-SKETCH (psui)**: double-click on a face doesn't show its feature's sketch (live row 3: Sketch 2's
+- [ ] **P0 SELFEEL-DBLCLICK-FACE-SKETCH (skasm)**: double-click on a face doesn't show its feature's sketch (live row 3: Sketch 2's
   rectangle drawn blue at Part 2's base); the face shows amber 1.2 s after (state: nothing selected, as live).
-- [ ] **P0 SELFEEL-HIDDEN-SKETCH-HOVER (psui)**: hovering the hidden Sketch 1 row shows the tooltip but doesn't draw the sketch
+- [ ] **P0 SELFEEL-HIDDEN-SKETCH-HOVER (skasm)**: hovering the hidden Sketch 1 row shows the tooltip but doesn't draw the sketch
   light orange in place (live row 4).
 - [ ] **P0 SELFEEL-PART-ROW (psui)**: clicking the Part 2 row selects the body (state) with Extrude 2 related, but Part 2 isn't
   drawn selected and Part 1 keeps a light-orange hover outline (the pointer crossed the Part 1 row on its way): a stale list hover,
   as USER-HOVER-STAYS-LIT (live row 5: the part drawn selected).
-- [ ] **P1 SELFEEL-PLANE-DEFAULT-GEOMETRY (psui)**: a default plane picked in the viewport selects its row, but "Default
+- [ ] **P1 SELFEEL-PLANE-DEFAULT-GEOMETRY (skasm)**: a default plane picked in the viewport selects its row, but "Default
   geometry" isn't related (live rows 2 and 5).
 - Not judged: the selected look appeared 0.25-1 s late in some shots (box release, a face, a plane; others at once): Xvfb debug
   build at load 24, re-check on a release build in the quiet window. Not run: Sketch 3's region (our two-blocks start has no
