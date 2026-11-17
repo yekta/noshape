@@ -113,7 +113,7 @@ namespace {
 struct FieldSpec
 {
   std::string name;
-  char        type = 'd'; // d int, p pointer, f double, v vector, h hvec, i interval, c char, l logical, u byte, n short, t tag, w unicode char
+  char        type = 'd'; // d int, p pointer, f double, v vector, h hvec, i interval, c char, l logical, u byte, n short, t tag, w unicode char, b box
   int         n    = 0;   // 0 scalar, 1 variable length, >1 fixed array
 };
 
@@ -435,6 +435,16 @@ private:
             v.x[k] = b64();
           v.null = v.x[0] == -3.14158e13;
           break;
+        case 'b':
+          // A box (a mesh's): its low corner kept, its high one read past.
+          for (int k = 0; k < 6; ++k)
+          {
+            const double x = b64();
+            if (k < 3)
+              v.x[k] = x;
+          }
+          v.null = v.x[0] == -3.14158e13;
+          break;
         default:
           fail_unsupported(std::string("parasolid: field type ") + ty);
       }
@@ -465,6 +475,14 @@ private:
       case 'h':
         for (int k = 0; k < 3; ++k)
           v.x[k] = treal();
+        break;
+      case 'b':
+        for (int k = 0; k < 6; ++k)
+        {
+          const double x = treal();
+          if (k < 3)
+            v.x[k] = x;
+        }
         break;
       default:
         v.i = tint();
@@ -650,9 +668,12 @@ bool on_both(const GeomAdaptor_Surface& a1, const GeomAdaptor_Surface& a2, gp_Pn
   return false;
 }
 
+gp_Trsf transform_of(const XNode& t);
+
 struct Builder
 {
   const Parser&                                  r;
+  const Parser*                                  meshes = nullptr; // the .xmm file written with it (its mesh bodies)
   BRep_Builder                                   B;
   std::map<long long, occ::handle<Geom_Surface>> surfs;
   struct Projector
@@ -1806,12 +1827,99 @@ struct Builder
     return out;
   }
 
+  // A comb's `count` values (times `per`): its teeth's values in turn.
+  std::vector<Val> comb_values(long long idx, const char* count, size_t per) const
+  {
+    const XNode& c = meshes->at_index(idx);
+    if (c.integer("encoding") != 1)
+      fail_unsupported("parasolid: mesh encoding " + std::to_string(c.integer("encoding")));
+    const size_t     n = (size_t)std::max(0LL, c.integer(count)) * per;
+    std::vector<Val> out;
+    const auto*      teeth = c.get("teeth");
+    for (size_t t = 0; teeth && t < teeth->size() && out.size() < n && meshes->has((*teeth)[t].i); ++t)
+      if (const auto* v = meshes->at_index((*teeth)[t].i).get("values"))
+        out.insert(out.end(), v->begin(), v->begin() + (long)std::min(v->size(), n - out.size()));
+    if (out.size() != n)
+      fail_invalid("parasolid: a mesh of the .xmm file is cut short");
+    return out;
+  }
+
+  // A MESH surface's triangles (reversed when `flip`), added to `pts` / `tris`: the PSM mesh its rcv_index names in
+  // the .xmm file's list, positions and 1-based position indices each a comb.
+  void mesh_triangles(const XNode& m, bool flip, std::vector<gp_Pnt>& pts, std::vector<std::array<int, 3>>& tris) const
+  {
+    if (!meshes)
+      fail_invalid("parasolid: the file's mesh bodies are in its .xmm_txt file, which isn't next to it");
+    const XNode&    list = meshes->at_index(1);
+    const auto*     e    = list.get("entries");
+    const long long k    = m.integer("rcv_index");
+    if (list.type != 74 || !e || k < 1 || k > (long long)e->size() || !meshes->has((*e)[(size_t)k - 1].i))
+      fail_invalid("parasolid: a mesh is missing from the .xmm file");
+    const XNode& psm  = meshes->at_index((*e)[(size_t)k - 1].i);
+    const gp_Trsf at  = r.has(m.ptr("transform")) ? transform_of(r.at_index(m.ptr("transform"))) : gp_Trsf();
+    const auto   P    = comb_values(psm.ptr("position_pool"), "n_vectors", 3);
+    const auto   I    = comb_values(psm.ptr("position_indices"), "n_integers", 1);
+    const size_t base = pts.size(), n = P.size() / 3;
+    for (size_t i = 0; i < n; ++i)
+      pts.push_back(gp_Pnt(P[3 * i].x[0], P[3 * i + 1].x[0], P[3 * i + 2].x[0]).Transformed(at));
+    for (size_t i = 0; i + 2 < I.size(); i += 3)
+    {
+      std::array<int, 3> t{};
+      for (int j = 0; j < 3; ++j)
+      {
+        const long long v = I[i + (size_t)j].i;
+        if (v < 1 || v > (long long)n)
+          fail_invalid("parasolid: a mesh's triangle has no such node");
+        t[(size_t)j] = (int)(base + (size_t)v - 1);
+      }
+      if (flip)
+        std::swap(t[1], t[2]);
+      tris.push_back(t);
+    }
+  }
+
+  // A body of mesh faces (Parasolid's facet bodies: Onshape's imported meshes) as the mesh import makes it, a solid
+  // per closed piece; null when it has none.
+  TopoDS_Shape mesh_body(const XNode& b, int type)
+  {
+    std::vector<gp_Pnt>             pts;
+    std::vector<std::array<int, 3>> tris;
+    bool                            mesh = false, exact = false;
+    for (long long reg = b.ptr("region"); reg; reg = r.at_index(reg).ptr("next"))
+    {
+      const XNode& R = r.at_index(reg);
+      if (type == 1 && R.chr("type") != 'S')
+        continue;
+      for (long long sh = R.ptr("shell"); sh; sh = r.at_index(sh).ptr("next"))
+        for (long long fi : shell_faces(r.at_index(sh)))
+        {
+          const XNode& f = r.at_index(fi);
+          if (!r.has(f.ptr("surface")) || r.at_index(f.ptr("surface")).type != 201)
+          {
+            exact = true;
+            continue;
+          }
+          const XNode& m = r.at_index(f.ptr("surface"));
+          mesh           = true;
+          mesh_triangles(m, (f.chr("sense") == '-') != (m.chr("sense") == '-'), pts, tris);
+        }
+    }
+    if (!mesh)
+      return {};
+    if (exact)
+      fail_unsupported("parasolid: a body of both mesh and exact faces");
+    const TopoDS_Shape c = mesh_compound(mesh_bodies(pts, std::move(tris), 0.0));
+    return c.NbChildren() == 1 ? TopoDS_Iterator(c).Value() : c;
+  }
+
   // A body as the file has it, before healing (heal_import; bodies share
   // nothing, so read_xt_data heals several at once).
   TopoDS_Shape body_raw(long long bi)
   {
     const XNode&    b    = r.at_index(bi);
     const int       type = (int)b.integer("body_type"); // 1 solid, 2 wire, 3 sheet, 6 general
+    if (TopoDS_Shape m = mesh_body(b, type); !m.IsNull())
+      return m;
     TopoDS_Compound part;
     B.MakeCompound(part);
     int nsolids = 0;
@@ -2493,41 +2601,61 @@ TopoDS_Shape heal_import(TopoDS_Shape out, double tol)
   }
 }
 
-std::vector<XtPart> read_xt_parts(const std::string& path)
+namespace
+{
+std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree, std::string meshes = {});
+
+std::string file_data(const std::string& path)
 {
   std::ifstream in(path, std::ios::binary);
   if (!in)
     fail_io("cannot read " + path);
-  return read_xt_data(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()));
+  return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 }
 
-namespace
+// The mesh file Parasolid writes next to a part file with mesh bodies ("a.x_t" -> "a.xmm_txt", "a.x_b" -> "a.xmm_bin";
+// Onshape zips them together); empty when there is none.
+std::string mesh_file_data(const std::string& path)
 {
-std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree);
+  const size_t slash = path.find_last_of("/\\");
+  const size_t dot   = path.rfind('.');
+  if (dot == std::string::npos || (slash != std::string::npos && dot < slash))
+    return {};
+  for (const char* ext : {".xmm_txt", ".xmm_bin", ".XMM_TXT", ".XMM_BIN"})
+    if (std::ifstream(path.substr(0, dot) + ext, std::ios::binary))
+      return file_data(path.substr(0, dot) + ext);
+  return {};
 }
+} // namespace
+
+std::vector<XtPart> read_xt_parts(const std::string& path) { return read_xt_impl(file_data(path), nullptr, mesh_file_data(path)); }
 
 std::vector<XtPart> read_xt_data(std::string data) { return read_xt_impl(std::move(data), nullptr); }
 
 XtTree read_xt_tree(const std::string& path)
 {
-  std::ifstream in(path, std::ios::binary);
-  if (!in)
-    fail_io("cannot read " + path);
   XtTree t;
-  read_xt_impl(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()), &t);
+  read_xt_impl(file_data(path), &t, mesh_file_data(path));
   return t;
 }
 
 namespace
 {
-std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree)
+std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree, std::string meshes)
 {
   Parser p(std::move(data));
+  std::unique_ptr<Parser> mp;
   {
     KernelTimer t("xt.parse");
     p.parse();
+    if (!meshes.empty())
+    {
+      mp = std::make_unique<Parser>(std::move(meshes));
+      mp->parse();
+    }
   }
   Builder              b(p);
+  b.meshes = mp.get();
   std::vector<XtPart>  out;
   std::set<long long>  seen;
   // Each part's body and placement, healed and placed after the walk.
@@ -2633,7 +2761,7 @@ std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree)
     const size_t       k   = uniq[j];
     const TopoDS_Shape raw = out[k].shape;
     TopoDS_Shape       h;
-    healed[k] = run_guarded([&] { h = heal_import(raw, tol); }) && !h.IsNull() ? h : raw;
+    healed[k] = !has_mesh_faces(raw) && run_guarded([&] { h = heal_import(raw, tol); }) && !h.IsNull() ? h : raw;
   });
   // The assembly tree: each distinct body once, unplaced, then the placed
   // instances (only when the file has an assembly).
@@ -2661,8 +2789,10 @@ std::vector<XtPart> read_xt_impl(std::string data, XtTree* tree)
   {
     out[k].shape = healed[first[pending[k].body]];
     b.face_colours_of(out[k]);
+    BRepTools_History h;
     if (pending[k].place.Form() != gp_Identity)
-      out[k].shape = BRepBuilderAPI_Transform(out[k].shape, pending[k].place, true).Shape();
+      out[k].shape = has_mesh_faces(out[k].shape) ? transform_mesh(out[k].shape, pending[k].place, h)
+                                                  : BRepBuilderAPI_Transform(out[k].shape, pending[k].place, true).Shape();
   }
   if (out.empty())
     fail_invalid("parasolid: no parts in the file");

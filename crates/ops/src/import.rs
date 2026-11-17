@@ -164,6 +164,27 @@ fn read_obj_zip(zip: &Path, units: &UnitPrefs) -> anyhow::Result<Option<Vec<(Str
     result
 }
 
+/// A zip of Parasolid part files (Onshape's Parasolid export of a Part Studio with mesh bodies: the .x_t with the
+/// .xmm_txt holding its meshes, live c2-hex-bookcase-derived): each part file's parts, its meshes read beside it.
+fn read_xt_zip(zip: &Path, units: &UnitPrefs, iges_post: bool) -> anyhow::Result<Vec<(String, String, Foreign)>> {
+    use noshape_kernel as k;
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let dir = std::env::temp_dir().join(format!("noshape-xt-{}-{stamp}", std::process::id()));
+    std::fs::create_dir_all(&dir)?;
+    let result = (|| {
+        let names = k::extract_zip(zip, &dir)?;
+        let part_file = |n: &String| !n.contains('/') && n.rsplit_once('.').is_some_and(|(_, e)| ["x_t", "x_b", "xmt_txt", "xmt_bin"].contains(&e.to_ascii_lowercase().as_str()));
+        let mut out = Vec::new();
+        for n in names.iter().filter(|n| part_file(n)) {
+            let file = dir.join(n);
+            out.push((import_names(&file).0, import_names(zip).1, read_foreign_with(&file, units, iges_post)?));
+        }
+        Ok(out)
+    })();
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
 /// An .obj's groups as parts (each read as the mesh reader reads a file), named by the group and coloured by its
 /// material's `Kd` from the .mtl in `dir` (sRGB 0..1), in metres when its header says so; the whole file as one mesh
 /// when it has no groups or materials.
@@ -463,6 +484,10 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
                         Err(err) => errors.push(format!("Import failed: {}: {err:#}", path.display())),
                     }
                 }
+                Err(e) if e == noshape_model::native_assembly::XT_IN_ZIP => match read_xt_zip(path, units, c.iges_post) {
+                    Ok(parts) => read.extend(parts),
+                    Err(err) => errors.push(format!("Import failed: {}: {err:#}", path.display())),
+                },
                 // Onshape keeps the zip as a file tab and reports it.
                 Err(e) if e == noshape_model::native_assembly::STEP_IN_ZIP => errors.push(format!("{} was not translated. {e}", import_names(path).1)),
                 Err(e) => errors.push(format!("Import failed: {}: {e:#}", path.display())),
@@ -637,5 +662,24 @@ mod tests {
         for no in [&["a.step"][..], &["a.stp"], &["a.sat"], &["a.pvz"], &["a.stl"], &["a.ipt"], &["a.xmt_txt"]] {
             assert!(!offers(no), "{no:?}");
         }
+    }
+
+    /// Onshape's Parasolid export of a Part Studio with a mesh part comes zipped, the .x_t with the .xmm_txt holding
+    /// its meshes (live c2-hex-bookcase-derived; live's import of the zip: its 2 parts): both parts come in, named.
+    #[test]
+    fn a_parasolid_zip_imports_its_parts_and_meshes() {
+        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../kernel/tests/data/xt-parts");
+        let read = |f: &str| std::fs::read(data.join(f)).unwrap();
+        let (xt, xmm) = (read("hex-bookcase-mesh.x_t"), read("hex-bookcase-mesh.xmm_txt"));
+        let dir = std::env::temp_dir().join(format!("noshape-xt-zip-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let zip = dir.join("Part Studio 1.zip");
+        std::fs::write(&zip, crate::export::stored_zip(&[("Part Studio 1.x_t", &xt), ("Part Studio 1.xmm_txt", &xmm)])).unwrap();
+        let (inputs, errors) = super::read_inputs(std::slice::from_ref(&zip), &super::ImportChoice::default(), false, &noshape_units::UnitPrefs::default());
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(errors.is_empty(), "{errors:?}");
+        assert_eq!(inputs.read.iter().map(|r| (r.0.as_str(), r.1.as_str())).collect::<Vec<_>>(), [("Part Studio 1", "Part Studio 1.zip")]);
+        let parts = &inputs.read[0].2.parts;
+        assert!(parts.contains("\"shrunk\"") && parts.contains("\"imported\""), "{parts}");
     }
 }

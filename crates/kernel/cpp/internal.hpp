@@ -374,6 +374,9 @@ std::vector<MeshPiece> mesh_bodies(const std::vector<gp_Pnt>& nodes, std::vector
 // A body per closed piece (the closed pieces inside it its cavities) and per
 // open piece (a shell); returned as a compound of them.
 TopoDS_Shape mesh_compound(const std::vector<MeshPiece>& pieces);
+// A shape of mesh faces only (a STEP file's tessellated shell) as the mesh import makes it, a solid per closed piece;
+// any other shape as it is.
+TopoDS_Shape mesh_rebodied(const TopoDS_Shape& s);
 // 3MF / glTF / GLB triangles of every placed object, in millimetres
 // (mesh_formats.cpp); false for other files.
 bool read_mesh_format(const std::string& path, std::vector<gp_Pnt>& nodes, std::vector<std::array<int, 3>>& tris);

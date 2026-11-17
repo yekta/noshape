@@ -960,7 +960,7 @@ fn xml_escape(s: &str) -> String {
 }
 
 /// A zip archive with the files stored (no compression), dated now (UTC).
-fn stored_zip(files: &[(&str, &[u8])]) -> Vec<u8> {
+pub(crate) fn stored_zip(files: &[(&str, &[u8])]) -> Vec<u8> {
     let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     stored_zip_at(files, dos_time(secs))
 }

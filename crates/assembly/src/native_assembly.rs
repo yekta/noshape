@@ -48,6 +48,9 @@ pub const STEP_IN_ZIP: &str = "Translation is not supported for STEP (.stp) file
 /// An OBJ export's zip (.obj + .mtl): the same, for the .mtl (live request
 /// 1540; qa OBJ-ZIP-MSG).
 pub const MTL_IN_ZIP: &str = "Translation is not supported for MTL (.mtl) files.";
+/// A zip of Parasolid part files with no native assembly (Onshape's Parasolid export of a Part Studio with mesh
+/// bodies: the .x_t with its .xmm_txt): the importer reads its part files. Never shown.
+pub const XT_IN_ZIP: &str = "Parasolid part files";
 
 /// A native assembly as Onshape imports it (live G38): a flat zip named like
 /// its root assembly, with the part files the assembly references by name.
@@ -118,6 +121,8 @@ pub fn read_assembly_zip(path: &std::path::Path) -> Result<AssemblyZip, String> 
                 MTL_IN_ZIP
             } else if has(&["step", "stp"]) {
                 STEP_IN_ZIP
+            } else if has(&["x_t", "x_b", "xmt_txt", "xmt_bin"]) {
+                XT_IN_ZIP
             } else {
                 NO_ROOT
             }

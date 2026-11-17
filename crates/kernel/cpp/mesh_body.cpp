@@ -331,6 +331,44 @@ bool inside(const Closed& c, const gp_Pnt& p)
 }
 } // namespace
 
+TopoDS_Shape mesh_rebodied(const TopoDS_Shape& s)
+{
+  std::vector<gp_Pnt>             pts;
+  std::vector<std::array<int, 3>> tris;
+  for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(e.Current());
+    if (!is_mesh_face(f))
+      return s;
+    TopLoc_Location                        l;
+    const occ::handle<Poly_Triangulation>& t    = BRep_Tool::Triangulation(f, l);
+    const gp_Trsf                          at   = l.Transformation();
+    const int                              base = (int)pts.size();
+    for (int i = 1; i <= t->NbNodes(); ++i)
+      pts.push_back(t->Node(i).Transformed(at));
+    for (int k = 1; k <= t->NbTriangles(); ++k)
+    {
+      int a, b, c;
+      t->Triangle(k).Get(a, b, c);
+      if (f.Orientation() == TopAbs_REVERSED)
+        std::swap(b, c);
+      tris.push_back({base + a - 1, base + b - 1, base + c - 1});
+    }
+  }
+  if (tris.empty())
+    return s;
+  // Wound inward as a whole (live's STEP of a mesh part: its import reads it facing out, 10364.977 mm³): turned out,
+  // cavities with it.
+  double v = 0;
+  for (const auto& t : tris)
+    v += pts[t[0]].XYZ().Dot(pts[t[1]].XYZ().Crossed(pts[t[2]].XYZ()));
+  if (v < 0)
+    for (auto& t : tris)
+      std::swap(t[1], t[2]);
+  const TopoDS_Shape c = mesh_compound(mesh_bodies(pts, std::move(tris), 0.0));
+  return c.NbChildren() == 1 ? TopoDS_Iterator(c).Value() : c;
+}
+
 TopoDS_Shape mesh_compound(const std::vector<MeshPiece>& pieces)
 {
   BRep_Builder    b;

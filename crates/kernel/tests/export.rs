@@ -135,6 +135,48 @@ fn an_onshape_file_of_three_parts_reads_as_them() {
     assert_eq!(read_parasolid(&p, LengthUnit::Millimeter).unwrap().count(ShapeType::Solid), 3);
 }
 
+/// Onshape's Parasolid of a Part Studio with a mesh part (live c2-hex-bookcase-derived's zip: the B-rep "shrunk" and the
+/// imported mesh "imported") keeps the mesh in the .xmm_txt written beside the .x_t: both parts read, the mesh as a
+/// mesh solid of live's volume. Without its mesh file the file fails, naming it, never reads as part of itself.
+#[test]
+fn an_onshape_parasolid_with_a_mesh_part_reads_the_mesh_beside_it() {
+    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts");
+    let parts = read_parasolid_parts(&data.join("hex-bookcase-mesh.x_t"), LengthUnit::Millimeter).unwrap();
+    let mut names: Vec<&str> = parts.iter().filter_map(|p| p.name.as_deref()).collect();
+    names.sort();
+    assert_eq!(names, ["imported", "shrunk"]);
+    let part = |n: &str| &parts.iter().find(|p| p.name.as_deref() == Some(n)).unwrap().shape;
+    let mesh = part("imported");
+    assert!(mesh.is_mesh() && mesh.count(ShapeType::Solid) == 1, "{} solids", mesh.count(ShapeType::Solid));
+    // Live's import of the same zip: 10364.977 mm³ (band 10364.502 .. 10365.452), 9366.251 (9358.891 .. 9373.612).
+    let v = volume_properties(mesh).unwrap().mass;
+    assert!((10364.502..=10365.452).contains(&v), "mesh volume {v}");
+    let v = volume_properties(part("shrunk")).unwrap().mass;
+    assert!((9358.891..=9373.612).contains(&v), "shrunk volume {v}");
+    let dir = std::env::temp_dir().join(format!("noshape-xt-mesh-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::copy(data.join("hex-bookcase-mesh.x_t"), dir.join("alone.x_t")).unwrap();
+    let e = read_parasolid_parts(&dir.join("alone.x_t"), LengthUnit::Millimeter).map(|_| ()).unwrap_err().to_string();
+    assert!(e.contains(".xmm_txt"), "{e}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Onshape's STEP of a mesh part (live c2-hex-bookcase-derived's "imported", trimmed to it: a TESSELLATED_SHELL of one
+/// COMPLEX_TRIANGULATED_FACE) reads as a mesh solid of live's volume, as live's import of it.
+#[test]
+fn an_onshape_step_tessellated_part_reads_as_a_mesh_solid() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/step/hex-bookcase-mesh.step");
+    let parts = read_step(&p, LengthUnit::Millimeter).unwrap();
+    let shapes: Vec<_> = parts.iter().map(|p| (p.name.clone(), p.shape.shape_type(), p.shape.count(ShapeType::Solid), p.shape.count(ShapeType::Face), p.shape.is_mesh())).collect();
+    assert_eq!(parts.len(), 1, "{shapes:?}");
+    let part = &parts[0];
+    assert_eq!(part.name.as_deref(), Some("imported"));
+    assert!(part.shape.is_mesh() && part.shape.count(ShapeType::Solid) == 1, "{shapes:?}");
+    // Live's import of its STEP: 10364.977 mm³ (band 10364.502 .. 10365.453).
+    let v = volume_properties(&part.shape).unwrap().mass;
+    assert!((10364.502..=10365.453).contains(&v), "volume {v}");
+}
+
 /// An IGES part whose faces come split on one surface (IGES writers split periodic faces: Onshape's own writes a
 /// cylinder in halves) reads with them merged, as Onshape's import (the exchange suite's pulley: 16 faces, live 9).
 #[test]

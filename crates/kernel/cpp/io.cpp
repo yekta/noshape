@@ -499,13 +499,19 @@ void refine_freeform_pcurves(const std::vector<TopoDS_Shape>& shapes)
 // A surface model's closed shells as solids (a FreeCAD STEP: SHELL_BASED_SURFACE_MODEL of one CLOSED_SHELL, no
 // MANIFOLD_SOLID_BREP; live reads it as a solid part: asm-infento-subs' shaft, lever, halfClutch): each shell outside a
 // solid whose every edge bounds two of its faces (or is a seam or degenerate), made a solid facing out. Open shells
-// stay surfaces; the faces and their order (and colours) stay.
+// stay surfaces; the faces and their order (and colours) stay. A shape of mesh faces (a tessellated shell: Onshape's
+// STEP of a mesh part) is made a mesh body as the mesh import makes it.
 void solids_from_closed_shells(std::vector<TopoDS_Shape>& shapes)
 {
   for (TopoDS_Shape& s : shapes)
   {
     if (s.IsNull())
       continue;
+    if (has_mesh_faces(s))
+    {
+      s = mesh_rebodied(s);
+      continue;
+    }
     ShapeIMap in_solid;
     for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next())
       TopExp::MapShapes(e.Current(), TopAbs_SHELL, in_solid);
