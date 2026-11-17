@@ -725,11 +725,12 @@ impl noshape_render::camera_geometry::CameraGeometry for ScreenTriads {
     }
 }
 
-/// Half a mate glyph's side on screen (px): live2 asm-feel2 (b), ~26 px across face-on.
-pub const MATE_GLYPH_HALF_PX: f64 = 13.0;
-/// How far past the drawn glyph its pick reaches before the 5 px pick square (live2 asm-feel2 (b): the glyph plus
-/// ~6–7 px).
-const MATE_GLYPH_PICK_PAD_PX: f64 = 2.0;
+/// A mate glyph's drawing unit on screen (px): its icons span about ±0.75 of it, ~27 px across face-on (live2
+/// mate-glyphs 11-17, the 4x crops).
+pub const MATE_GLYPH_UNIT_PX: f64 = 18.0;
+/// The radius round a glyph's centre that takes the pointer before the 5 px pick square (live2 asm-feel2 (b): hovered
+/// to ~20 px from the centre).
+const MATE_GLYPH_PICK_PX: f64 = 15.0;
 
 /// Onshape's mate glyphs at screen size (live2 mate-glyphs 11-17): each (connector frame, pick id, highlighted, state,
 /// mate type). A ~26 px icon per mate type lying in the connector's plane, light blue rgb(152,204,234) with a dark
@@ -762,8 +763,8 @@ impl GlyphPen<'_> {
     }
     /// A light-blue stroke in a dark outline.
     fn stroke(&mut self, pts: &[(f64, f64)]) {
-        self.poly(pts, self.ink, 5.0);
-        self.poly(pts, self.blue, 3.0);
+        self.poly(pts, self.ink, 6.0);
+        self.poly(pts, self.blue, 4.0);
     }
     /// A filled quadrilateral (corners in order), by rows of strokes between its left and right sides.
     fn fill(&mut self, q: [(f64, f64); 4], color: [u8; 4]) {
@@ -801,19 +802,20 @@ impl GlyphPen<'_> {
     }
     /// The ¾-turn arc arrow round the centre (Revolute, Cylindrical, Pin slot).
     fn turn(&mut self) {
-        let pts = self.arc(0.62, 40.0, 300.0);
+        let pts = self.arc(0.55, 45.0, 230.0);
         self.stroke(&pts);
-        let t = 300f64.to_radians();
+        let t = 230f64.to_radians();
         self.head(pts[pts.len() - 1], (-t.sin(), t.cos()), (-t.cos(), -t.sin()));
     }
     fn ring(&mut self, r: f64) {
         let pts = self.arc(r, 0.0, 360.0);
-        self.stroke(&pts);
+        self.poly(&pts, self.ink, 8.0);
+        self.poly(&pts, self.blue, 6.0);
     }
     fn dot(&mut self) {
         let p = (self.at)(0.0, 0.0);
-        self.points.points.push(PointSprite { position: p, color: self.ink, pick_id: 0, size: 7.0, style: LineSegment::ON_TOP, _pad: 0 });
-        self.points.points.push(PointSprite { position: p, color: [255, 255, 255, 255], pick_id: 0, size: 5.0, style: LineSegment::ON_TOP, _pad: 0 });
+        self.points.points.push(PointSprite { position: p, color: self.ink, pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
+        self.points.points.push(PointSprite { position: p, color: [255, 255, 255, 255], pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 });
     }
 }
 
@@ -826,7 +828,7 @@ impl MateGlyphs {
         let (mut ol, mut pts, mut picks) = (LineData::default(), PointData::default(), Vec::new());
         for (f, id, hl, st, ty) in &self.items {
             let Some(px) = view.world_per_px(f.origin) else { continue };
-            let half = MATE_GLYPH_HALF_PX * px;
+            let half = MATE_GLYPH_UNIT_PX * px;
             let (u, v, n) = (f.x(), f.y(), f.z());
             let lift = n * (half * 0.02);
             let at = |a: f64, b: f64| -> [f32; 3] { (f.origin + lift + u * (a * half) + v * (b * half)).as_vec3().into() };
@@ -836,16 +838,16 @@ impl MateGlyphs {
             const WHITE: [u8; 4] = [255, 255, 255, 255];
             if *hl {
                 // A ~32 px translucent white square behind it (live2: 45 %).
-                let h = 16.0 / MATE_GLYPH_HALF_PX;
+                let h = 16.0 / MATE_GLYPH_UNIT_PX;
                 pen.fill([(-h, -h), (h, -h), (h, h), (-h, h)], [255, 255, 255, 115]);
             }
             match ty {
                 MateType::Fastened => {
-                    pen.fill([(-0.75, -0.75), (0.75, -0.75), (0.75, 0.0), (-0.75, 0.0)], pen.blue);
-                    pen.fill([(-0.75, 0.0), (0.75, 0.0), (0.75, 0.75), (-0.75, 0.75)], WHITE);
-                    pen.fill([(-0.4, -0.45), (0.4, -0.45), (0.4, 0.0), (-0.4, 0.0)], WHITE);
-                    pen.outline([(-0.75, -0.75), (0.75, -0.75), (0.75, 0.75), (-0.75, 0.75)]);
-                    pen.poly(&[(-0.75, 0.0), (-0.4, 0.0), (-0.4, -0.45), (0.4, -0.45), (0.4, 0.0), (0.75, 0.0)], DARK, 1.2);
+                    pen.fill([(-0.62, -0.62), (0.62, -0.62), (0.62, 0.0), (-0.62, 0.0)], pen.blue);
+                    pen.fill([(-0.62, 0.0), (0.62, 0.0), (0.62, 0.62), (-0.62, 0.62)], WHITE);
+                    pen.fill([(-0.33, -0.37), (0.33, -0.37), (0.33, 0.0), (-0.33, 0.0)], WHITE);
+                    pen.outline([(-0.62, -0.62), (0.62, -0.62), (0.62, 0.62), (-0.62, 0.62)]);
+                    pen.poly(&[(-0.62, 0.0), (-0.33, 0.0), (-0.33, -0.37), (0.33, -0.37), (0.33, 0.0), (0.62, 0.0)], DARK, 1.2);
                 }
                 MateType::Revolute | MateType::Cylindrical => {
                     pen.turn();
@@ -853,7 +855,7 @@ impl MateGlyphs {
                 }
                 MateType::PinSlot => {
                     pen.turn();
-                    pen.arrow((0.15, 0.0), (1.0, 0.0));
+                    pen.arrow((0.15, 0.0), (0.8, 0.0));
                     pen.dot();
                 }
                 MateType::Slider => {
@@ -861,24 +863,24 @@ impl MateGlyphs {
                     pen.dot();
                 }
                 MateType::Ball => {
-                    pen.poly(&[(-0.9, 0.0), (0.9, 0.0)], DARK, 1.0);
-                    pen.poly(&[(0.0, -0.9), (0.0, 0.9)], DARK, 1.0);
                     pen.ring(0.6);
+                    pen.poly(&[(-0.6, 0.0), (0.6, 0.0)], pen.ink, 1.0);
+                    pen.poly(&[(0.0, -0.6), (0.0, 0.6)], pen.ink, 1.0);
                     pen.dot();
                 }
                 MateType::Planar => {
-                    pen.rect(-0.55, -0.9, 0.2, -0.2, WHITE);
-                    pen.arrow((-0.15, -0.45), (-0.15, 0.9));
-                    pen.arrow((-0.15, -0.45), (0.95, -0.45));
+                    pen.rect(-0.6, -0.65, 0.05, 0.0, WHITE);
+                    pen.arrow((-0.25, -0.3), (-0.25, 0.6));
+                    pen.arrow((-0.25, -0.3), (0.7, -0.3));
                 }
                 MateType::Parallel => {
-                    for dy in [0.0, -0.75] {
-                        let q = [(-0.55, 0.15 + dy), (0.25, 0.15 + dy), (0.6, 0.45 + dy), (-0.2, 0.45 + dy)];
+                    for dy in [0.0, -0.95] {
+                        let q = [(-0.75, 0.25 + dy), (0.3, 0.25 + dy), (0.75, 0.65 + dy), (-0.3, 0.65 + dy)];
                         pen.fill(q, WHITE);
                         pen.outline(q);
                     }
-                    pen.arrow((0.0, -0.1), (0.0, 0.45));
-                    pen.arrow((0.0, -0.1), (0.0, -0.65));
+                    pen.arrow((0.0, -0.15), (0.0, 0.5));
+                    pen.arrow((0.0, -0.15), (0.0, -0.8));
                 }
                 _ => {
                     pen.ring(0.6);
@@ -886,7 +888,7 @@ impl MateGlyphs {
                 }
             }
             // A disc round it in its plane, both sides (the connector's Z may face away from the viewer).
-            let r = 1.0 + MATE_GLYPH_PICK_PAD_PX / MATE_GLYPH_HALF_PX;
+            let r = MATE_GLYPH_PICK_PX / MATE_GLYPH_UNIT_PX;
             let mut positions = vec![at(0.0, 0.0)];
             let mut indices = Vec::new();
             for k in 0..32u32 {

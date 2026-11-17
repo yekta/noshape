@@ -1207,12 +1207,8 @@ impl AssemblyView {
                 h.triads.push(Triad { frame: f, size: size * 1.2, strong: true });
             }
         }
-        if self.show_mates {
-            let hidden: HashSet<MateId> = self.assembly(cx).map(|a| a.mates.iter().filter(|m| m.hidden).map(|m| m.id).collect()).unwrap_or_default();
-            for ms in self.result.mates.iter().filter(|m| !m.inactive && !hidden.contains(&m.id)) {
-                mate_glyph(&mut h, ms, false, 0.6);
-            }
-        }
+        // Shown mates draw their glyphs alone at rest, no connector triads (live2 mate-glyphs 11-17: the triad only
+        // once the mate is selected).
         // Instance row hovered in the list: highlighted in the graphics area.
         if let Some(top) = self.ui.list_hover {
             h.accent_tops.push(top);

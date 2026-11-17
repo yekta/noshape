@@ -157,6 +157,8 @@ def strip_hidden(raw):
 # Surfaces whose dumps' hidden elements live never shows (live2 11-16, holes-plate: a hole table has no Title row,
 # Reorder items or Collapse tags row in its dialog, no insert / remove / merge rows in its Cell popup).
 HIDDEN_IS_ABSENT = {"Hole table"}
+# Texts display:none in every live drawing panel dump, whatever is listed (live2 11-17): never shown, so not items.
+NEVER_SHOWN = {"Reorder items", "Cut from section"}
 
 
 def texts_of(path, visible_only=False):
@@ -202,7 +204,7 @@ def texts_of(path, visible_only=False):
             continue
         if re.search(r"[{};=\"'›@]|\.svg|\.dxf|\.dwg|\bpx\b|xenon|Wt-|toolbar-|---|OVERLAY|ROOT |DIV\.|TEXTAREA|rgba|^[a-z]+[A-Z]\w+$|\sy\d+$", t):
             continue
-        if USER.search(t):
+        if USER.search(t) or t in NEVER_SHOWN:
             continue
         if t not in res:
             res.append(t)
