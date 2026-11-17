@@ -1743,6 +1743,28 @@ fn a_mirrored_surface_added_joins_the_surface_it_meets() {
     assert_eq!(res.context.bodies[0].faces.len(), 2);
 }
 
+/// A sheet split by a sheet across it comes apart in two (OCCT keeps the halves in one shell, joined along the cut:
+/// c2-surf-workshop-manualblend's Split 1 reported "does not split"; live 2 pieces of each).
+#[test]
+fn a_surface_split_by_a_surface_across_it_comes_apart() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    // Front: sketch x = X, y = Z. An L sheet (one shell): z = 0 over x ±20 mm and x = 20 mm up 5 mm; a sheet x = 0,
+    // z ±10 mm; all 40 mm deep.
+    let a = sk.add_line(DVec2::new(-0.02, 0.0), DVec2::new(0.02, 0.0)).0;
+    let c = sk.add_line(DVec2::new(0.02, 0.0), DVec2::new(0.02, 0.005)).0;
+    let b = sk.add_line(DVec2::new(0.0, -0.01), DVec2::new(0.0, 0.01)).0;
+    let s = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let xa = t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![Reference::SketchEntity { sketch: s, entity: a }, Reference::SketchEntity { sketch: s, entity: c }])), ("depth", e("40 mm"))]);
+    let xb = t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![Reference::SketchEntity { sketch: s, entity: b }])), ("depth", e("40 mm"))]);
+    t.add("splitPart", &[("targets", q(vec![body_ref(&BodyId { feature: xa, index: 0 })])), ("tool", q(vec![body_ref(&BodyId { feature: xb, index: 0 })])), ("keepTools", ParamValue::Bool(true))]);
+    let res = t.ok();
+    let mut areas: Vec<f64> = res.context.bodies.iter().map(|b| noshape_kernel::surface_properties(&b.shape).unwrap().mass * 1e6).collect();
+    areas.sort_by(f64::total_cmp);
+    assert_eq!(areas.len(), 3, "two pieces and the tool: {areas:?}");
+    assert!(areas.iter().zip([800.0, 800.0, 1000.0]).all(|(a, b)| (a - b).abs() < 1e-6), "{areas:?}");
+}
+
 #[test]
 fn circular_and_mirror_part_pattern() {
     let mut t = T::new();

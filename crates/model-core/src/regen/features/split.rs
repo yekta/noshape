@@ -121,11 +121,45 @@ fn side_of(tool: &Tool, p: DVec3) -> f64 {
 }
 
 /// Connected pieces of a split result with their face names.
-fn pieces_of(shape: &Shape, names: &[Name], kind: BodyKind, by: crate::reference::FeatureId) -> Vec<NamedShape> {
+/// A shell's faces in pieces joined only across edges off `tool`: OCCT keeps a sheet split by a sheet in one shell, its
+/// halves joined along the cut (c2-surf-workshop-manualblend's Split 1: live 2 pieces of each sheet).
+fn apart_at(shell: &Shape, tool: &Shape) -> Vec<Shape> {
+    let faces = shell.faces();
+    let Ok(edge_faces) = shell.edge_faces() else { return vec![shell.clone()] };
+    if faces.len() < 2 {
+        return vec![shell.clone()];
+    }
+    let mut root: Vec<usize> = (0..faces.len()).collect();
+    fn find(root: &mut [usize], mut i: usize) -> usize {
+        while root[i] != i {
+            root[i] = root[root[i]];
+            i = root[i];
+        }
+        i
+    }
+    for (e, fs) in shell.edges().iter().zip(&edge_faces) {
+        let [a, b] = fs[..] else { continue };
+        let on_tool = edge_mid(e).and_then(|p| k::make_vertex(p).ok()).and_then(|v| k::distance(&v, tool).ok()).is_some_and(|d| d.distance < 1e-6);
+        if !on_tool {
+            let (a, b) = (find(&mut root, a as usize), find(&mut root, b as usize));
+            root[a] = b;
+        }
+    }
+    let mut groups: BTreeMap<usize, Vec<Shape>> = BTreeMap::new();
+    for (i, f) in faces.into_iter().enumerate() {
+        groups.entry(find(&mut root, i)).or_default().push(f);
+    }
+    if groups.len() < 2 {
+        return vec![shell.clone()];
+    }
+    groups.values().map(|g| Shape::shell(g)).collect::<Result<Vec<Shape>, _>>().unwrap_or_else(|_| vec![shell.clone()])
+}
+
+fn pieces_of(shape: &Shape, names: &[Name], kind: BodyKind, tool: &Shape, by: crate::reference::FeatureId) -> Vec<NamedShape> {
     match kind {
         BodyKind::Solid => crate::regen::eval::split_solids(shape, names, Some(by)),
         BodyKind::Surface => {
-            let mut parts: Vec<Shape> = shape.shells();
+            let mut parts: Vec<Shape> = shape.shells().iter().flat_map(|s| apart_at(s, tool)).collect();
             let in_shell: Vec<Shape> = parts.iter().flat_map(|s| s.faces()).collect();
             for f in shape.faces() {
                 if !in_shell.iter().any(|g| g.is_same(&f)) {
@@ -206,7 +240,7 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         let target = ev.ctx.bodies[ti].clone();
         let res = k::split(std::slice::from_ref(&target.shape), std::slice::from_ref(&tool.shape), &k::BooleanOptions::default()).map_err(kerr("Tool entity cannot split the selected part/face."))?;
         let face_names = if target.kind == BodyKind::Wire { Vec::new() } else { ev.name_result(&[&target.shape_names(), &tool.names], &res.history, &res.shape, &BTreeMap::new(), None) };
-        let mut pieces: Vec<(f64, DVec3, NamedShape)> = pieces_of(&res.shape, &face_names, target.kind, ev.feature)
+        let mut pieces: Vec<(f64, DVec3, NamedShape)> = pieces_of(&res.shape, &face_names, target.kind, &tool.shape, ev.feature)
             .into_iter()
             .filter(|p| !p.shape.is_null())
             .map(|p| {
