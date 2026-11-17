@@ -1,0 +1,71 @@
+{
+  "name": "drw-inspection-table-iso-scrolled",
+  "about": "block-drawing-iso: one dimension (px clicks: the ISO A4 portrait sheet runs below the canvas), then the Inspection table panel's Characteristics scrolled right with its horizontal scrollbar: 9 columns, Item \u2026 Lower limit (live 11-17 has no 'Nominal & Tolerance' column)",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (live2 11-17: the drawing matrix's Inspection item gap 'Nominal & Tolerance')",
+  "start": "block-drawing-iso",
+  "steps": [
+    {
+      "do": "key",
+      "key": "d"
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          825,
+          295
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          825,
+          255
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Inspection table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "drag",
+      "from": {
+        "px": [
+          1600,
+          434
+        ]
+      },
+      "to": {
+        "px": [
+          1900,
+          434
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
