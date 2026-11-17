@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-17 14:21 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-17 17:55 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -8,7 +8,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Worktree /root/projects/noshape-wt/psui, branch agent/psui. Commit as yekta (AGENTS.md), subject "psui: …".
 - Builds and crate tests: the Mac slot only, `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo …` (one slot, rb.sh waits).
   Never cargo on this machine. Test the crate you changed (`--lib <module>::` or `--test all <file>::`).
-- Scenario / app runs: vibe6, at most 3 app instances (shared with studios). Heavy runs (scenario shards) through
+- Scenario / app runs: vibex6, at most 3 app instances (shared with studios). Heavy runs (scenario shards) through
   `~/bin/slot <cmd>` there (one per host, waits for 10 GB free). The app build there OOMs under load: scripts build
   with `-j 4`.
 - Land only with `tools/tiers/land.sh` (`--status` for results). Start an rb.sh run, wait until it builds (its sync
@@ -26,7 +26,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 ## Tools (/root/psui-scratch)
 
 - `uip-some.sh <out> <names…>`: release build on the rb host, then the named ui-parity scenarios on one Xvfb (:392).
-  Run: `NOSHAPE_RB_HOST=vibe6 tools/tiers/rb.sh bash -c "$(cat /root/psui-scratch/uip-some.sh)" uip-some <out> <names…>`
+  Run: `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh bash -c "$(cat /root/psui-scratch/uip-some.sh)" uip-some <out> <names…>`
   (`~` in remote paths expands locally: pass /home/ngyekta/… paths). Output buffered: the log fills at the end.
 - `psui-shards.sh <out> <names file>`: the same in 3 shards, then one `--compare-only` score. The names file must be on
   the host (scp it first). psui-names.txt: the 1021 psui-area scenarios with live takes.
@@ -34,7 +34,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
-- vibe6 can't reach vibe5: `scp -3`. vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
+- vibex6 can't reach vibe5: `scp -3`. vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
 ## In flight
 
@@ -52,7 +52,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Landed: d75fd4d1 (free-click readouts within one screen pixel on the sketch plane, doubled for two-click
   measures; `pixel_on_plane`; README), b752d3ad (toolbar dropdowns 180 px, icon 2 px in, rows with chips 35 px).
 - Landed df0f2ae0: the manipulator's arrows grabbed along their shafts (qa's sketch-entity-copy-paste regression).
-- Full psui run 11-16 16:00 (vibe6 full1116): 1009 / 1021. Mine fixed with this land: sketch readouts of two points /
+- Full psui run 11-16 16:00 (vibex6 full1116): 1009 / 1021. Mine fixed with this land: sketch readouts of two points /
   a point and a line ("Min dist") and two circles (Center / Max / Min dist), sketch-key-symmetric / -midpoint /
   -concentric-two-circles match. Left, others': bend / jog / tab "Face of …" labels and bend-relief related rows
   (skasm), gusset title error (skasm), face-rclick-export-dxf (dx).
@@ -84,7 +84,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   9.618 vs 10.110.
 - Mac target ~20 GB: prune-target.py, and drop debug/incremental dirs idle > 90 min.
 - Scratch: /root/psui-scratch/fb5/run.sh runs one one-off scenario (--scenarios ~/tmp/psui/fb5s --all, shots per
-  step); scenario files in fb5/ (tb.json, sm-click.json, …; copy one to vibe6 fb5s/ and set its name in run.sh).
+  step); scenario files in fb5/ (tb.json, sm-click.json, …; copy one to vibex6 fb5s/ and set its name in run.sh).
 
 ## Queued to land
 
@@ -96,7 +96,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   "Area" readout 167–185 ms; Extrude 1 double-click → dialog 322–448 ms (ours 17), preview 0.73–2.2 s. Put into the
   latency test's TARGETS comments when next touched.
 - Landed 11-17 09:54: 498b96a8 (leak fixes + NOSHAPE_SOAK + spawn_guard allow).
-- The Mac's one build slot can hold a test 10+ min: for a quick single test use NOSHAPE_RB_HOST=vibe6.
+- The Mac's one build slot can hold a test 10+ min: for a quick single test use NOSHAPE_RB_HOST=vibex6.
 
 ## Current order (lead 11-17 ~14:05)
 
@@ -143,16 +143,21 @@ e1ce5e41 readouts. qa verified both user P0s on green c330a760 (14:0x).
   ~18 of 24 psui failures) and users' older memories were lost. apply_remembered reads the system's per-unit groups
   too (own unit last, then the system group). Test updated (older store in "length:Millimeter").
 
-## Full ui-parity rerun (11-17)
+## Full ui-parity rerun (11-17; hosts renamed vibexN 17:3x, vibe5 dead)
 
-Script ~/agents/psui-keep/full-half.sh (/root/psui-scratch/full-half.sh), scenarios ~/tmp/psui/src-1117.
-- Half b (odd names) on vibe5, green 082bd57e (11:38): 1062 / 1074 (~/agents/psui-keep/full1117-b/score.log).
-  psui-area: jog-new-edit-reedit ("Face of Jog 1": fixed by skasm 8a958336 13:04, after this binary),
-  bend-relief-new-edit-reedit (related row, skasm's vertex label), gusset-new-edit-reedit (title error; core's frame
-  part order). studios: drw-* x5, rel-flow-two-parts, ver-flow-merge-same-feature. asm: asm-cylindrical-limits.
-- Half a (even names) on vibe6 (lead 14:17: vibe6 idle), green f6274d94, 4 apps :386-389, unit psui-full1117a via
-  ~/bin/slot -> ~/agents/psui-keep/full1117-a (log full1117-a.log). Then rerun b's failures with f6274d94 and score.
-  Before: 11-16 psui list 1009 / 1021.
+Scripts: ~/agents/psui-keep/full-half.sh (half 0 / 1 of every scenario with a live take), list-run.sh (named list with
+the staged green), on vibex7 (copies in /root/psui-scratch); scenarios ~/tmp/psui/src-1117 there.
+- Half a (vibex6, green f6274d94): 1029 / 1073. Not psui: dx drw-* note dialogs x10 (text.length 30 vs 39) + 2
+  (drawing), studios rel-flow-two-parts. psui 24: ~18 were the per-unit memory regression (582351aa); the rest
+  bend / flange / helix / jog / plane title errors, intersection-curve and mate-connector focus, mirror-face-type and
+  bend-relief-extend field state, hole-countersink-tab title.
+- Half b: vibe5's results died with it (1062 / 1074 on 082bd57e). Rerunning on vibex7 (unit psui-full1117b, 4 apps,
+  -> ~/agents/psui-keep/full1117-b).
+- The 26 psui failures (both halves, /root/psui-scratch/full1117/psui-fails.txt): local unit psui-after-land
+  (/root/psui-scratch/after-land.sh, log after-land.log) waits for 582351aa to land and reach green, stages that green
+  on vibex7 (half b uses it too if not started) and queues unit psui-list26 (-> ~/agents/psui-keep/list26). Read its
+  score.log, fix what is left.
+- Before: 11-16 psui list 1009 / 1021.
 
 ## Waiting on others
 
