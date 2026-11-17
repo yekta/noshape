@@ -13,13 +13,13 @@
   {"do": "rclick", "on": {"view": "Section"}},
   {"do": "click", "on": {"menu": "Edit section..."}},
   {"do": "wait", "until": "ms", "ms": 1500},
-  {"do": "hover", "on": {"px": [58, 153]}},
-  {"do": "hover", "on": {"px": [223, 153]}},
-  {"do": "click", "on": {"px": [223, 153]}},
+  {"do": "hover", "on": {"px": [58, 153]}, "ours_on": {"button": "Edit cutting line"}},
+  {"do": "hover", "on": {"px": [223, 153]}, "ours_on": {"button": "Opposite direction"}},
+  {"do": "click", "on": {"px": [223, 153]}, "ours_on": {"button": "Opposite direction"}},
   {"do": "wait", "until": "ms", "ms": 1500},
   {"do": "click", "on": {"checkbox": "Section depth"}},
   {"do": "wait", "until": "ms", "ms": 1000},
-  {"do": "hover", "on": {"px": [140, 238]}},
+  {"do": "hover", "on": {"px": [140, 238]}, "ours_on": {"button": "Up to geometry"}},
   {"do": "key", "key": "Escape"}
  ]
 }

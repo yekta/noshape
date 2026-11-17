@@ -1,12 +1,16 @@
 //! Drawing editor: section view menu › Edit section… (live drawing/499–504,
-//! dom/drawing-edit-section.txt): the Section view dialog reopens (label,
-//! Show cut geometry only, Section depth, ✓ ✗) with the points the cutting line passes
+//! dom/drawing-edit-section.txt): the Section view dialog reopens (label, Edit
+//! cutting line, Opposite direction, Show cut geometry only, Section depth with
+//! its End type, Depth of section cut and Offset as when the section is made,
+//! live2 drw-section-edit-depth-direction; ✓ ✗) with the points the cutting line passes
 //! through as orange dots; hovering another snap point previews the jog to
 //! it, clicking adds a stepped segment through it, clicking a dot again
 //! removes it. The section view updates live; ✗ / Esc puts it back.
 
 use crate::drawing_view::*;
 use crate::theme::p;
+use crate::os_ui::OsDropdownExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -25,6 +29,16 @@ pub struct SectionEdit {
     /// The section's label field (live: an input, as when creating it) and its text.
     pub label: (Entity<InputState>, Subscription),
     pub label_text: String,
+    /// Opposite direction: look the other way across the cutting line.
+    pub flip: bool,
+    /// Section depth's End type Up to entity (else Blind), its picked point, whether the field takes clicks, and its
+    /// Offset (field, value in meters, Opposite direction).
+    pub up_to: bool,
+    pub depth_ref: Option<noshape_model::drawing::PointRef>,
+    pub picking: bool,
+    pub offset: Option<(Entity<InputState>, Subscription)>,
+    pub offset_value: Option<f64>,
+    pub offset_flip: bool,
 }
 
 impl DrawingEditor {
@@ -32,7 +46,8 @@ impl DrawingEditor {
         let sheet = self.current_sheet();
         let Some(v) = sheet.view(view) else { return };
         let ViewKind::Section { parent, label: text, .. } = &v.kind else { return };
-        let (parent, text, cut_only, depth) = (*parent, text.clone(), v.cut_only, v.section_depth);
+        let (parent, text, cut_only, depth, flip) = (*parent, text.clone(), v.cut_only, v.section_depth, v.flip);
+        let (depth_ref, offset) = (v.section_depth_ref.clone(), v.section_depth_offset);
         let Some(cuts) = sheet.section_cuts(view) else { return };
         let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text.clone()));
         let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
@@ -44,9 +59,16 @@ impl DrawingEditor {
                 this.preview_section_edit(cx);
             }
         });
-        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only, depth: None, depth_value: None, label: (st, sub), label_text: text });
-        if let Some(d) = depth {
-            self.toggle_edit_depth(Some(d), window, cx);
+        let up_to = depth_ref.is_some();
+        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only, depth: None, depth_value: None, label: (st, sub), label_text: text, flip, up_to, depth_ref, picking: false, offset: None, offset_value: None, offset_flip: offset.is_some_and(|o| o < 0.0) });
+        if depth.is_some() || up_to {
+            self.toggle_edit_depth(depth, window, cx);
+            if let Some(e) = &mut self.section_edit {
+                e.up_to = up_to;
+            }
+        }
+        if let Some(o) = offset {
+            self.toggle_edit_offset(Some(o.abs()), window, cx);
         }
         self.tool = Tool::Select;
         cx.notify();
@@ -60,7 +82,11 @@ impl DrawingEditor {
         let Some(e) = &mut self.section_edit else { return };
         if !on {
             (e.depth, e.depth_value) = (None, None);
+            e.picking = false;
         } else {
+            // As when the section is made: Up to entity first, its field taking the pick.
+            e.up_to = true;
+            e.picking = e.depth_ref.is_none();
             let text = match value {
                 Some(m) if mm => format!("{} mm", noshape_model::drawing::format::format_number(m * 1000.0, None, 3)),
                 Some(m) => format!("{} in", noshape_model::drawing::format::format_number(m / 0.0254, None, 3)),
@@ -83,6 +109,36 @@ impl DrawingEditor {
         self.preview_section_edit(cx);
     }
 
+    /// Up to entity › ☑ Offset: its field (`value` meters, or the default length).
+    fn toggle_edit_offset(&mut self, value: Option<f64>, window: &mut Window, cx: &mut Context<Self>) {
+        let mm = self.drawing.units_mm;
+        let Some(e) = &mut self.section_edit else { return };
+        if e.offset.is_some() {
+            (e.offset, e.offset_value) = (None, None);
+        } else {
+            let text = match value {
+                Some(m) if mm => format!("{} mm", noshape_model::drawing::format::format_number(m * 1000.0, None, 3)),
+                Some(m) => format!("{} in", noshape_model::drawing::format::format_number(m / 0.0254, None, 3)),
+                None if mm => "25 mm".into(),
+                None => "1 in".into(),
+            };
+            e.offset_value = crate::drawing_section::parse_offset(&text, mm);
+            let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
+            let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
+                if matches!(ev, InputEvent::Change) {
+                    let v = crate::drawing_section::parse_offset(&st.read(cx).value(), mm);
+                    if let Some(e) = &mut this.section_edit {
+                        e.offset_value = v;
+                    }
+                    this.preview_section_edit(cx);
+                }
+            });
+            e.offset = Some((st, sub));
+        }
+        self.preview_section_edit(cx);
+        cx.notify();
+    }
+
     /// The drawing with the edited cut points.
     pub fn section_edited(&self) -> Option<noshape_model::drawing::Drawing> {
         let e = self.section_edit.as_ref()?;
@@ -90,17 +146,21 @@ impl DrawingEditor {
         let s = dr.sheets.get_mut(self.sheet)?;
         s.set_section_cuts(e.view, e.cuts.clone());
         if let Some(v) = s.view_mut(e.view) {
-            v.cut_only = e.cut_only;
+            v.cut_only = e.cut_only && e.depth.is_none();
+            v.flip = e.flip;
             if let ViewKind::Section { label, .. } = &mut v.kind
                 && !e.label_text.is_empty()
             {
                 label.clone_from(&e.label_text);
             }
-            if e.depth.is_none() {
-                (v.section_depth, v.section_depth_ref, v.section_depth_offset) = (None, None, None);
-            } else if e.depth_value != v.section_depth {
-                (v.section_depth, v.section_depth_ref, v.section_depth_offset) = (e.depth_value, None, None);
-            }
+            (v.section_depth, v.section_depth_ref, v.section_depth_offset) = match (&e.depth, e.up_to) {
+                (None, _) => (None, None, None),
+                (Some(_), false) => (e.depth_value, None, None),
+                (Some(_), true) => {
+                    let offset = e.offset_value.filter(|_| e.offset.is_some() && e.depth_ref.is_some()).map(|o| if e.offset_flip { -o } else { o });
+                    (None, e.depth_ref.clone(), offset)
+                }
+            };
         }
         Some(dr)
     }
@@ -114,6 +174,18 @@ impl DrawingEditor {
     /// of the parent view adds it. True when used.
     pub fn section_edit_click(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(e) = &self.section_edit else { return false };
+        // Up to entity's field takes the click: the point the depth runs to.
+        if e.picking {
+            let r = self.snap_at(self.cursor).and_then(|p| p.r);
+            if let (Some(r), Some(e)) = (r, &mut self.section_edit) {
+                (e.depth_ref, e.picking) = (Some(r), false);
+                self.preview_section_edit(cx);
+            } else {
+                self.status = Some("Select a vertex or circle center for the section depth".into());
+            }
+            cx.notify();
+            return true;
+        }
         let Some(pl) = self.placement(e.parent) else { return true };
         let tol = self.tol_mm(4.0);
         let c = self.cursor;
@@ -173,9 +245,38 @@ impl DrawingEditor {
         let e = self.section_edit.as_ref()?;
         let pal = p();
         let label = e.label.0.clone();
-        let cut_only = e.cut_only;
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Section view", "text": ["Section view", "Show cut geometry only", "Section depth"] }));
+        let (cut_only, flip, up_to, picking, has_ref, offset_flip) = (e.cut_only, e.flip, e.up_to, e.picking, e.depth_ref.is_some(), e.offset_flip);
         let depth = e.depth.as_ref().map(|(st, _)| st.clone());
+        let offset = e.offset.as_ref().map(|(st, _)| st.clone());
+        crate::ui_script::note_dialog(|| {
+            // Live (drw-section-edit-depth-direction): Show cut geometry only goes while Section depth is on; End type is
+            // a select, its options left out by live's recorder since 2026-11-17.3.
+            let mut t = crate::drawing_panels::PanelText::default();
+            t.text("Section view");
+            let mut fields = Vec::new();
+            if depth.is_none() {
+                t.text("Show cut geometry only");
+                fields.push(serde_json::json!({ "label": "Show cut geometry only", "kind": "checkbox", "value": cut_only }));
+            }
+            t.text("Section depth");
+            fields.push(serde_json::json!({ "label": "Section depth", "kind": "checkbox", "value": depth.is_some() }));
+            if depth.is_some() {
+                t.options(["Up to entity", "Blind"]);
+                fields.push(serde_json::json!({ "label": "End type", "kind": "select", "value": if up_to { "Up to entity" } else { "Blind" } }));
+                if up_to {
+                    t.texts([if has_ref { "Point" } else { "Depth of section cut" }, "Offset"]);
+                    fields.push(serde_json::json!({ "label": "Offset", "kind": "checkbox", "value": offset.is_some() }));
+                } else {
+                    t.text("Depth");
+                }
+            }
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Section view", "fields": fields }), t.0)
+        });
+        let ed = cx.entity();
+        // (Marked by their tooltips: live's runner aims at them by pixel, ours by name: `ours_on`.)
+        let square = |id: &'static str, on: bool, tip: &'static str| {
+            div().id(id).map(move |d| crate::ui_script::mark(d, move || format!("button:{tip}"))).size(px(26.)).flex().items_center().justify_center().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5))).cursor_pointer().tooltip(crate::ui::tooltip(tip))
+        };
         Some(
             v_flex()
                 .id("dr-section-edit")
@@ -198,32 +299,118 @@ impl DrawingEditor {
                         .child(div().id("se-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(false, cx)))),
                 )
                 .child(div().px(px(10.)).pt(px(4.)).child(Input::new(&label).xsmall()))
-                // The tool button (live 499–504, as in the creating dialog): the
-                // cutting line's points are being picked, so it shows active.
+                // The tool button (live 499–504, as in the creating dialog): the cutting line's points are being picked,
+                // so it shows active; Opposite direction at the row's right end (live2 drw-section-edit-depth-direction).
                 .child(
-                    h_flex().px(px(10.)).pt(px(6.)).child(
-                        div()
-                            .id("se-line")
-                            .size(px(30.))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .rounded(px(2.))
-                            .border_1()
-                            .border_color(gpui_kit::rgb(0x9aa5af))
-                            .bg(gpui_kit::rgb(0xcfdbe5))
-                            .tooltip(crate::ui::tooltip("Edit cutting line"))
-                            .child(crate::assets::icon("section-cut-line", 20., cx)),
-                    ),
+                    h_flex()
+                        .px(px(10.))
+                        .pt(px(6.))
+                        .child(
+                            div()
+                                .id("se-line")
+                                .map(|d| crate::ui_script::mark(d, || "button:Edit cutting line".into()))
+                                .size(px(30.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .rounded(px(2.))
+                                .border_1()
+                                .border_color(gpui_kit::rgb(0x9aa5af))
+                                .bg(gpui_kit::rgb(0xcfdbe5))
+                                .tooltip(crate::ui::tooltip("Edit cutting line"))
+                                .child(crate::assets::icon("section-cut-line", 20., cx)),
+                        )
+                        .child(div().flex_1())
+                        .child(square("se-flip", flip, "Opposite direction").child(crate::assets::icon("section-flip", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            if let Some(e) = &mut this.section_edit {
+                                e.flip = !e.flip;
+                            }
+                            this.preview_section_edit(cx);
+                            cx.notify();
+                        }))),
                 )
-                .child(div().px(px(10.)).pt(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("se-cut-only").label("Show cut geometry only").checked(cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
+                .when(depth.is_none(), |d| d.child(div().px(px(10.)).pt(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("se-cut-only").label("Show cut geometry only").checked(cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
                     if let Some(e) = &mut this.section_edit {
                         e.cut_only = *v;
                     }
                     this.preview_section_edit(cx);
-                }))))
+                })))))
                 .child(div().px(px(10.)).pt(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("se-depth").label("Section depth").checked(depth.is_some()).on_click(cx.listener(|this, _: &bool, w, cx| this.toggle_edit_depth(None, w, cx)))))
-                .when_some(depth, |d, st| d.child(div().px(px(10.)).pt(px(4.)).child(Input::new(&st).xsmall())))
+                .when(depth.is_some(), |d| {
+                    d.child(
+                        div().px(px(8.)).pt(px(4.)).child(
+                            Button::new("se-end-type")
+                                .ghost()
+                                .w_full()
+                                .h(px(26.))
+                                .border_1()
+                                .border_color(gpui_kit::rgb(0xcccccc))
+                                .rounded(px(4.))
+                                .dropdown_caret(true)
+                                .tooltip("End type")
+                                .child(div().flex_1().text_size(px(12.)).child(if up_to { "Up to entity" } else { "Blind" }))
+                                .os_dropdown_menu("se-end-type-dd", true, move |mut m, _, _| {
+                                    for (label, v) in [("Up to entity", true), ("Blind", false)] {
+                                        let ed = ed.clone();
+                                        m = m.item(crate::os_menu::OsMenuItem::new(label).checked(up_to == v).on_click(move |_, _, cx| {
+                                            ed.update(cx, |this, cx| {
+                                                if let Some(e) = &mut this.section_edit {
+                                                    e.up_to = v;
+                                                    e.picking = v && e.depth_ref.is_none();
+                                                }
+                                                this.preview_section_edit(cx);
+                                                cx.notify();
+                                            })
+                                        }));
+                                    }
+                                    m
+                                }),
+                        ),
+                    )
+                })
+                .when_some(depth.clone().filter(|_| !up_to), |d, st| d.child(h_flex().px(px(10.)).pt(px(4.)).gap(px(6.)).child(div().text_size(px(12.)).text_color(pal.text_muted).child("Depth")).child(div().flex_1().child(Input::new(&st).xsmall()))))
+                .when(depth.is_some() && up_to, |d| {
+                    d.child(
+                        div()
+                            .id("se-upto-field")
+                            .map(|d| crate::ui_script::mark(d, || "button:Up to geometry".into()))
+                            .tooltip(crate::ui::tooltip("Up to geometry"))
+                            .mx(px(10.))
+                            .mt(px(4.))
+                            .h(px(26.))
+                            .px(px(6.))
+                            .flex()
+                            .items_center()
+                            .text_size(px(12.))
+                            .border_1()
+                            .border_color(if picking { pal.accent } else { gpui_kit::rgb(0xd3d7d9) })
+                            .when(picking, |d| d.bg(gpui_kit::rgb(0xe8f1fb)))
+                            .cursor_pointer()
+                            .child(if has_ref { "Point" } else { "Depth of section cut" })
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                if let Some(e) = &mut this.section_edit {
+                                    e.picking = !e.picking;
+                                }
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        h_flex()
+                            .px(px(8.))
+                            .pt(px(4.))
+                            .gap(px(6.))
+                            .child(crate::drawing_chrome::DrCheckbox::new("se-offset").label("Offset").checked(offset.is_some()).on_click(cx.listener(|this, _: &bool, w, cx| this.toggle_edit_offset(None, w, cx))))
+                            .when_some(offset.clone(), |r, st| {
+                                r.child(div().flex_1().child(Input::new(&st).xsmall())).child(square("se-offset-flip", offset_flip, "Opposite direction").child(crate::assets::icon(&crate::assets::icon_path("flip"), 16., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    if let Some(e) = &mut this.section_edit {
+                                        e.offset_flip = !e.offset_flip;
+                                    }
+                                    this.preview_section_edit(cx);
+                                    cx.notify();
+                                })))
+                            }),
+                    )
+                })
                 .into_any_element(),
         )
     }

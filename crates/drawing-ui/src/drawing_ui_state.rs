@@ -603,7 +603,7 @@ impl DrawingEditor {
             return noshape_app_core::ui_script::open_list();
         }
         if self.frame_menu.as_ref().is_some_and(|m| noshape_app_core::os_menu::is_open_menu(m, cx)) {
-            return noshape_app_core::os_menu::ui_state(cx).map(|mut l| {
+            return noshape_app_core::os_menu::root_ui_state(cx).map(|mut l| {
                 l["drawing"] = serde_json::json!(true);
                 l
             });

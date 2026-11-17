@@ -236,6 +236,12 @@ impl DrawingEditor {
             self.close_hide_edges(false, cx);
             return;
         }
+        // Up to entity's field picking: Esc leaves the field, the panel stays (live2 drw-section-edit-depth-direction).
+        if let Some(e) = self.section_edit.as_mut().filter(|e| e.picking) {
+            e.picking = false;
+            cx.notify();
+            return;
+        }
         if self.section_edit.is_some() {
             self.close_section_edit(false, cx);
             return;
