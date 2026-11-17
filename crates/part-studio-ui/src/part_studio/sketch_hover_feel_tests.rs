@@ -209,8 +209,16 @@ fn the_first_pick_at_rest_lights_what_is_under_the_pointer(cx: &mut TestAppConte
     cx.executor().advance_clock(std::time::Duration::from_millis(300));
     cx.run_until_parked();
     draw(cx, window);
-    cx.update(|cx| view.read(cx).gpu.deliver_frames());
-    draw(cx, window);
+    // The GPU's answer on its own thread, waited for without the test clock moving (lavapipe under load: seconds).
+    let t = std::time::Instant::now();
+    loop {
+        cx.update(|cx| view.read(cx).gpu.deliver_frames());
+        draw(cx, window);
+        if hovered(cx, &view).is_some() || t.elapsed() > std::time::Duration::from_secs(30) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
     assert_eq!(hovered(cx, &view), want, "the first answer at rest lights the plane under the pointer");
 }
 
