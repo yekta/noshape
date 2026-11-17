@@ -26,6 +26,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   Results suites/<mmdd-hhmm-sha>/; host overrides QA_UI_HOST / QA_SPEED_HOST / QA_SUITES_HOST.
 - **qa-cut-0415 / qa-cut-1615** timers: bin/cut-verdict.sh (cut-check.sh: newest green's compat vs the baseline) -> one GO /
   NO-GO line in /tmp/lead/qa-alerts and compat/cut-<mmdd-hhmm>.txt. Add the verdict as a "Release blockers" section in TICKETS.md.
+  Fixed 11-17 04:25: cut-check waits for the loop's run under vibe5.lock (two runs at once gave "Text file busy" and a void GO);
+  cut-verdict says NO VERDICT unless the green's compat file has COMPAT-DONE, 4 USERDOCS lines and no Traceback. Ticket documents
+  are listed, not blocking, in the script, but read them: a ticket doc's wrong geometry is a HOLD (11-17 f197).
 - **qa-tabab-verify**: lat/hat/tabab-verify.sh 9beedeac (psui's hover card): on the first green with it, dock tab-B A/B vs 0.4.53 on vibe6.
 - **qa-land-footer**: bin/land-footer.sh (land-queue footer checks).
 - vibe7 user units **qa-fzloop** + **qa-fz-xvfb** (`systemctl --user` there): the GUI fuzz, ~/qa/bin/fzloop.sh :61 on
@@ -57,6 +60,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   ms on a block), dock's first switch to B 14.7 s settle. psui owns the hat15 fillet edit (Tab not applying a variable-bound
   Radius; ✓ leaving the dialog open); my 7.9 / 4.4 s were the caret blink (lat-steps now 450 ms quiet). Send owners only
   what the nightly confirms slow, or > 3x a PLAN 2.7 target.
+- **11-17 05:00 cut: HOLD** (a8e13593f): f197's Mirror 3 union leaves 56 mm³ slivers instead of Part 1's 32,264 mm³ since
+  ba7a8d75 (core range, core bisects). Next: when core fixes / reverts, run cut-verdict.sh on the new green and clear the HOLD.
 - **Clean A/B 11-17** (lead ran it by hand on vibe7 02:55-03:31; ab1117/ here and in lead-scratch): 0.4.48 -> 0.4.53 -> 0.4.55 ms:
   helical 159 / 398 | 380 / 96 (Sweep 1 fixed in 0.4.55, no ticket); knife 1700 / 3154 | 2947 / 2207 (0.4.48 had 9 features
   in error); impeller 15643 / 28592 | 27584 / 25314; live 40 / 408 / 2773. Green 35baa32f: knife 1803 (Mirror 1 128 / 220 /
