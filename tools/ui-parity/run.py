@@ -1345,6 +1345,14 @@ def compare(live, ours, whole_document=True):
         # A drawing panel's `fields` (live2's recorder from 2026-11-14: each checkbox's and select's value): compared
         # once both sides read them.
         da, db = a.get("dialog"), b.get("dialog")
+        # Drawing properties' tabs: live's recorder reads the panel's own header ("Drawing properties", then the tab's)
+        # in some takes and starts at the tab's in others (Dimensions: drw-properties-dimensions against
+        # drw-dprops-sketch-points-sharps-chamfer, same runtime): one reading, the tab's.
+        for x, y in ((da, db), (db, da)):
+            if isinstance(x, dict) and isinstance(y, dict) and x.get("kind") == y.get("kind") == "drawing-panel":
+                tx, ty = x.get("text") or [], y.get("text") or []
+                if len(tx) > 1 and tx[0] == "Drawing properties" and ty and ty[0] == tx[1] and ty[0] != "Drawing properties":
+                    x["text"], x["title"] = tx[1:], y.get("title")
         if isinstance(da, dict) and isinstance(db, dict) and da.get("kind") == "drawing-panel" and ("fields" in da) != ("fields" in db):
             da.pop("fields", None)
             db.pop("fields", None)

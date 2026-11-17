@@ -363,14 +363,17 @@ impl DrawingEditor {
                 None => "Composite",
             });
             let type_btn = type_btn.os_dropdown_menu(SharedString::from(format!("gdt-type-{ri}-dd")), false, move |mut m, _, _| {
-                let mut items: Vec<(Option<usize>, String)> = Vec::new();
+                // The symbol is the row's icon, its name the row (live2 drw-gtol-type-list: rows read "Position").
+                let mut items: Vec<(Option<usize>, &str, &str)> = Vec::new();
                 if ri > 0 {
-                    items.push((None, "Composite".into()));
+                    items.push((None, "", "Composite"));
                 }
-                items.extend(GDT_TYPES.iter().enumerate().map(|(i, (g, n))| (Some(i), format!("{g}  {n}"))));
-                for (v, l) in items {
+                items.extend(GDT_TYPES.iter().enumerate().map(|(i, (g, n))| (Some(i), *g, *n)));
+                for (v, g, l) in items {
                     let e = ed2.clone();
-                    m = m.item(crate::os_menu::OsMenuItem::new(l).checked(v == cur).on_click(move |_, _, cx| {
+                    let row = crate::os_menu::OsMenuItem::new(l.to_string());
+                    let row = if g.is_empty() { row } else { row.glyph(g) };
+                    m = m.item(row.checked(v == cur).on_click(move |_, _, cx| {
                         e.update(cx, |t, cx| {
                             if let Some(r) = t.gdt_dlg.as_mut().and_then(|d| d.rows.get_mut(ri)) {
                                 r.symbol = v;

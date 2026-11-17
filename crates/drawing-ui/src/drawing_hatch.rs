@@ -468,7 +468,8 @@ impl DrawingEditor {
             .border_1()
             .border_color(gpui_kit::rgb(0x5da7dd))
             .bg(gpui_kit::rgb(0xd9eef9))
-            .child(div().text_size(px(10.)).text_color(gpui_kit::rgb(0x5c6670)).child(if section_mode { "Hatches" } else { "Closed profiles" }))
+            // With profiles listed, its caption keeps the tooltip (live2 drw-hatch-panel-tips s9).
+            .child(div().id("hd-profiles-cap").text_size(px(10.)).text_color(gpui_kit::rgb(0x5c6670)).when(!section_mode && !d.profiles.is_empty(), |c| c.tooltip(crate::ui::tooltip("Select or create closed profile for hatch region"))).child(if section_mode { "Hatches" } else { "Closed profiles" }))
             .children(rows);
         // Tabs ANSI | ISO | General.
         let tabs = h_flex().mx(px(9.)).my(px(3.)).border_b_1().border_color(gpui_kit::rgb(0xe0e0e0)).children(GROUPS.iter().enumerate().map(|(g, (name, _))| {
@@ -488,7 +489,7 @@ impl DrawingEditor {
                 .cursor_pointer()
                 .when(on, |e| e.text_color(gpui_kit::rgb(0x1651b0)).font_weight(FontWeight::SEMIBOLD).border_b_2().border_color(gpui_kit::rgb(0x1651b0)))
                 .child(*name)
-                .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(w, cx))
+                .tooltip(crate::ui::tooltip(tip))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     this.set_hatch(
                         |d| {

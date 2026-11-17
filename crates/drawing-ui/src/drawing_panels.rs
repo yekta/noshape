@@ -294,15 +294,13 @@ impl DrawingEditor {
             .child(div().font_weight(FontWeight::BOLD).child(CHARS_EMPTY.0))
             .child(div().child(CHARS_EMPTY.1));
         let (dc, cc) = (self.insp_table.datums_closed, self.insp_table.chars_closed);
-        // The panel's texts in reading order for the ui-parity runner (live2 drw-inspection-table-*). Live's grid
-        // makes only the columns in view: the last one, scrolled out of the panel, isn't there to read (live2
-        // drw-inspection-table-assign-number).
-        const SEEN: usize = COLS.len() - 1;
+        // The panel's texts in reading order for the ui-parity runner (live2 drw-inspection-table-*; its 8 columns all
+        // in view since 11-17).
         let shown = if self.insp_table.current_sheet_only { "Current sheet" } else { "All sheets" };
         crate::ui_script::note_dialog(|| {
             let mut text: Vec<String> = ["Inspection table", "View:", "All sheets", "Current sheet", "Datums"].map(String::from).to_vec();
             let rows = |text: &mut Vec<String>, rows: &[noshape_model::drawing::inspection::InspectionRow]| {
-                text.extend(COLS[..SEEN].iter().map(|c| c.0.to_string()));
+                text.extend(COLS.iter().map(|c| c.0.to_string()));
                 for r in rows {
                     let dash = |v: &str| if v.is_empty() { "--".to_string() } else { v.to_string() };
                     text.extend([dash(&r.number), sheet_name(r.sheet), r.kind.clone(), r.unit.clone(), r.nominal.clone(), dash(&r.tolerance), dash(&r.upper), dash(&r.lower)]);

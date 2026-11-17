@@ -454,7 +454,7 @@ impl DrawingEditor {
                     .text_color(if d.reorder { pal.accent } else { pal.text_muted })
                     .cursor_pointer()
                     .child(if d.reorder { "DONE" } else { "⇅" })
-                    .when(!d.reorder, |e| e.tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Reorder items").build(w, cx)))
+                    .when(!d.reorder, |e| e.tooltip(crate::ui::tooltip("Reorder items")))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(d) = &mut this.stack_dlg {
                             d.reorder = !d.reorder;

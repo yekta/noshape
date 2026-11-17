@@ -851,6 +851,15 @@ impl DrawingEditor {
                 .into_any_element()
         };
         let select = |id: &'static str, current: String, items: Vec<(String, bool, Act)>| sel(id, current, items, 164.);
+        // A Wt dropdown (not a native select): live's recorder reads its value too (live drw-drawprops-first-angle: the
+        // hatch pattern "ANSI31 general").
+        let wt_sel = |id: &'static str, current: String, items: Vec<(String, bool, Act)>, w: f32| {
+            let el = sel(id, current.clone(), items, w);
+            if recording {
+                pending.borrow_mut().push((current, false));
+            }
+            el
+        };
         // A pen select (live: 0.13 mm … 2.00 mm).
         let thick_sel = |id: &'static str, cur: f64, set: fn(&mut DrawingProps, f64), w: f32| {
             let items: Vec<(String, bool, Act)> = noshape_model::drawing::LINE_THICKNESSES.iter().map(|&t| (format!("{t:.2} mm"), (t - cur).abs() < 1e-6, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, t)) as Act)).collect();
@@ -1206,7 +1215,7 @@ impl DrawingEditor {
                         body = body
                             // Live: its own table from column 147 / 146.
                             .child(trow("Target hatch pattern", 147., 33., 2., sel("dp-th-std", std_name.into(), stds, 197.)))
-                            .child(trow("", 146., 33., 2., sel("dp-th-pat", pat_name.into(), pats, 199.)));
+                            .child(trow("", 146., 33., 2., wt_sel("dp-th-pat", pat_name.into(), pats, 199.)));
                     }
                     AnnType::HoleCallouts => {
                         let ind: Vec<(String, bool, Act)> = HOLE_INDICATORS.iter().map(|&n| (n.to_string(), props.hole_indicator == n, std::rc::Rc::new(move |p: &mut DrawingProps| p.hole_indicator = n.into()) as Act)).collect();
@@ -1353,7 +1362,7 @@ impl DrawingEditor {
                 .child(label_at(123., 9, FontOf::SectionLabel, vt.section_label.font.clone(), ("dp-slb", "dp-sli", "dp-slcolor"), vt.section_label.color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.section_label.color = c), cx))
                 .child(section("View and region hatches"))
                 .child(trow("Hatch pattern", 116., 34., 2., sel("dp-hstd", noshape_model::drawing::hatch_pat::GROUPS[hstd.min(2)].0.into(), hatch_std_items, 228.)))
-                .child(trow("", 115., 32., 2., sel("dp-hpat", noshape_model::drawing::hatch_pat::pattern(hstd, hpat).map_or("", |p| p.name).into(), hatch_pat_items, 230.)))
+                .child(trow("", 115., 32., 2., wt_sel("dp-hpat", noshape_model::drawing::hatch_pat::pattern(hstd, hpat).map_or("", |p| p.name).into(), hatch_pat_items, 230.)))
                 .child(pen_at("", 115., 312., 319., 33., 2., ("dp-hatch", "dp-hatchc"), &vt.hatch_line, |p, v| p.view_tab.hatch_line.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.hatch_line.color = c)))
                 .child(section("Detail views"))
                 .child(pen_at("Detail profile lines", 121., 312., 319., 32., 1., ("dp-dpen", "dp-dpenc"), &vt.detail_pen, |p, v| p.view_tab.detail_pen.thickness = v, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.detail_pen.color = c)))

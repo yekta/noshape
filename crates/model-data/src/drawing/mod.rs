@@ -2369,11 +2369,12 @@ pub enum HoleCount {
     /// Same-size holes made by the same hole feature on one face.
     Face,
     /// The hole's feature or pattern instances.
-    #[default]
     Pattern,
     /// Same-size holes in the part.
     Part,
-    /// One face, pattern instances not counted.
+    /// One face, pattern instances not counted: a new callout's (live behaviours "Hole callout palette (single)", live2
+    /// drw-hcallout-palette-tips).
+    #[default]
     FaceExcludingPatterns,
 }
 

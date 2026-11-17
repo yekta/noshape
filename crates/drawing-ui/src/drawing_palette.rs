@@ -557,7 +557,7 @@ impl DrawingEditor {
                 .cursor_pointer()
                 .text_size(px(12.))
                 .child(label)
-                .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(w, cx))
+                .tooltip(crate::ui::tooltip(tip))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.edit_palette(f, cx)))
                 .into_any_element()
         };
@@ -665,7 +665,7 @@ impl DrawingEditor {
                 .when(on, |e| e.bg(gpui_kit::rgb(0xdfe7ee)))
                 .cursor_pointer()
                 .child(content)
-                .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(w, cx))
+                .tooltip(crate::ui::tooltip(tip))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.edit_palette(f, cx)))
                 .into_any_element()
         };
@@ -683,7 +683,10 @@ impl DrawingEditor {
             if crate::ui_script::active() {
                 // (The count is its Quantity's, not the value's.)
                 let count = format!("{n}{} ", self.drawing.props.hole_indicator);
-                let value = lines.iter().map(|l| l.iter().map(|r| r.0.as_str()).collect::<String>()).collect::<Vec<_>>().join(" ");
+                // The primary callout only: a dual's bracketed lines aren't in the field (live2 drw-hcallout-palette-dual).
+                let single = Annotation { format: noshape_model::drawing::DimFormat { dual: Some(false), ..core.format.clone() }, ..core.clone() };
+                let primary = noshape_model::drawing::build::hole_callout_preview(&self.drawing, sheet, &self.sources, &single).unwrap_or_default();
+                let value = primary.iter().map(|l| l.iter().map(|r| r.0.as_str()).collect::<String>()).collect::<Vec<_>>().join(" ");
                 let value = value.strip_prefix(&count).map(str::to_string).unwrap_or(value);
                 let picked = lines.iter().flatten().find(|r| r.1 == Some(d.hole_sel)).map(|r| r.0.clone()).unwrap_or_default();
                 let text = |st: &Entity<InputState>| st.read(cx).value().to_string();
@@ -722,9 +725,9 @@ impl DrawingEditor {
                 .h(px(54.))
                 .child(field(&d.prefix, Some(80.), 54.))
                 // Live drawing-hole-callout-panel: "Count type: <type>".
-                .child(div().id("dp-count-tip").tooltip(crate::ui::tooltip(format!("Count type: {}", opts.count.name()))).child(menu_tall("dp-count", small(format!("{n}{}", self.drawing.props.hole_indicator)), 104., counts)))
+                .child(crate::ui_script::mark(div().id("dp-count-tip"), || "dropdown:Count type".into()).tooltip(crate::ui::tooltip(format!("Count type: {}", opts.count.name()))).child(menu_tall("dp-count", small(format!("{n}{}", self.drawing.props.hole_indicator)), 104., counts)))
                 .child(v_flex().w(px(145.)).h(px(54.)).px(px(10.)).justify_center().rounded(px(2.)).bg(gpui_kit::rgb(0xe8e8e8)).text_size(px(12.)).text_color(gpui_kit::rgb(0x8a8a8a)).children(preview))
-                .child(menu_tall("dp-units", small(unit_label), 58., unit_items))
+                .child(crate::ui_script::mark(div().id("dp-hunits-tip"), || "dropdown:Units".into()).tooltip(crate::ui::tooltip("Dimension units")).child(menu_tall("dp-units", small(unit_label), 58., unit_items)))
                 .child(field(&d.suffix, Some(80.), 54.))
         } else {
             // Live drawing/15 (dom/drawing-dimension-edit-dialog.txt): prefix
@@ -749,7 +752,7 @@ impl DrawingEditor {
                 .child(value_combo)
                 // Live drawing-hole-callout-panel: "Tolerance: <type>".
                 .child(crate::ui_script::mark(div().id("dp-tol-tip"), { let t = format!("Tolerance: {tol}"); move || format!("button:{t}") }).tooltip(crate::ui::tooltip(format!("Tolerance: {tol}"))).child(pbutton("dp-tol", tol_icon, 45., tol_items.clone(), false)))
-                .child(crate::ui_script::mark(div().id("dp-units-tip"), || "button:Dimension units".into()).tooltip(crate::ui::tooltip("Dimension units")).child(pbutton("dp-units", div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(ink).child(unit_label).into_any_element(), 60., unit_items, false)))
+                .child(crate::ui_script::mark(crate::ui_script::mark(div().id("dp-units-tip"), || "button:Dimension units".into()), || "dropdown:Units".into()).tooltip(crate::ui::tooltip("Dimension units")).child(pbutton("dp-units", div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(ink).child(unit_label).into_any_element(), 60., unit_items, false)))
                 .child(field(&d.suffix, Some(80.), 30.))
         };
         // The dual row (live asbdd-9, a dimension showing its dual): "[ 0.39 ▾
@@ -783,7 +786,7 @@ impl DrawingEditor {
                 .when(shown, |e| e.bg(gpui_kit::rgb(0xdfe7ee)))
                 .cursor_pointer()
                 .child(crate::ui::glyph("eye", 16., ink))
-                .tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Show/hide units").build(w, cx))
+                .tooltip(crate::ui::tooltip("Show/hide units"))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.edit_palette(move |d| d.cur.format.dual_fmt.show_unit = Some(!shown), cx)));
             Some(
                 h_flex()
@@ -810,9 +813,9 @@ impl DrawingEditor {
         };
         // The toggles row.
         let radial = matches!(d.cur.kind, AnnotationKind::RadialDimension { .. });
-        let mut toggles = h_flex().gap(px(if hole { 4. } else { 2. })).child(crate::ui_script::wrap(symbols.into_any_element(), || "button:Symbols".into()));
+        let mut toggles = h_flex().gap(px(if hole { 4. } else { 2. })).child(crate::ui_script::wrap(div().id("dp-sym-tip").tooltip(crate::ui::tooltip("Insert symbol")).child(symbols).into_any_element(), || "button:Symbols".into()));
         if hole {
-            toggles = toggles.child(toggle("dp-ref", "(XX)", "Parentheses", fmt.reference, |d| d.cur.format.reference = !d.cur.format.reference, cx)).child(menu("dp-dual", small("[XX] x.xx".into()), 80., dual_items)).child(
+            toggles = toggles.child(toggle("dp-ref", "(XX)", "Parentheses", fmt.reference, |d| d.cur.format.reference = !d.cur.format.reference, cx)).child(crate::ui_script::wrap(menu("dp-dual", small("[XX] x.xx".into()), 80., dual_items), || "dropdown:Dual dimension".into())).child(
                 div().pl(px(8.)).child(crate::drawing_chrome::DrCheckbox::new("dp-override").label("Override precision/tolerance").checked(opts.override_tol).tooltip("Click to override the precision and tolerance from the hole feature").on_click(cx.listener(|this, v: &bool, _, cx| {
                     let v = *v;
                     this.edit_palette(|d| d.cur.hole.get_or_insert_with(Default::default).override_tol = v, cx)
@@ -835,7 +838,7 @@ impl DrawingEditor {
                 }, cx))
                 .child(icon_toggle("dp-paren", parens, "Parentheses", fmt.reference, |d| d.cur.format.reference = !d.cur.format.reference, cx))
                 .child(icon_toggle("dp-insp", oval, "Inspection dimension", fmt.inspection_frame, |d| d.cur.format.inspection_frame = !d.cur.format.inspection_frame, cx))
-                .child(pbutton("dp-dual", dual, 45., dual_items, false))
+                .child(crate::ui_script::wrap(pbutton("dp-dual", dual, 45., dual_items, false), || "dropdown:Dual dimension".into()))
                 .when(radial, |e| {
                     e.child(icon_toggle("dp-rd", div().text_size(px(12.)).text_color(ink).child("R/Ø").into_any_element(), "Toggle Radius/Diameter dimension", false, |d| {
                         if let AnnotationKind::RadialDimension { diameter, .. } = &mut d.cur.kind {
@@ -911,7 +914,7 @@ impl DrawingEditor {
             };
             let vis = {
                 let ed = ed.clone();
-                div()
+                crate::ui_script::mark(div(), move || format!("button:{tip}"))
                     .id("dp-fit-vis")
                     .h(px(28.))
                     .px(px(6.))
@@ -925,22 +928,24 @@ impl DrawingEditor {
                     .text_size(px(12.))
                     .text_color(ink)
                     .child(if hole { "g6" } else { "H7" })
-                    .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(w, cx))
+                    .tooltip(crate::ui::tooltip(tip))
                     .on_click(move |_, _, cx| ed.update(cx, |t, cx| t.edit_palette(flip, cx)))
             };
+            // Each list named and tipped as live's (live2 drw-hcallout-palette-fit-tips).
+            let tipped = |id: &'static str, tip: &'static str, el: AnyElement| crate::ui_script::mark(div().id(id), move || format!("dropdown:{tip}")).tooltip(crate::ui::tooltip(tip)).child(el);
             h_flex()
                 .gap(px(3.))
                 .pt(px(3.))
-                .child(crate::ui_script::wrap(menu("dp-fit-type", small(fo.fit_type.name().into()), 98., type_items), || "dropdown:Fit class".into()))
-                .child(crate::ui_script::wrap(menu("dp-fit-hole", small(or_none(&hole_class)), 58., hole_items), || "dropdown:Hole fit".into()))
+                .child(tipped("dp-fit-type-tip", "Fit class", menu("dp-fit-type", small(fo.fit_type.name().into()), 98., type_items)))
+                .child(crate::ui_script::wrap(tipped("dp-fit-hole-tip", "Hole class", menu("dp-fit-hole", small(or_none(&hole_class)), 58., hole_items)).into_any_element(), || "dropdown:Hole fit".into()))
                 .child(menu("dp-fit-shaft", small(or_none(&shaft_class)), 58., shaft_items))
-                .child(crate::ui_script::wrap(menu("dp-fit-std", small(match fo.iso {
+                .child(tipped("dp-fit-std-tip", "Fit standard", menu("dp-fit-std", small(match fo.iso {
                     None => format!("{standard} (Drawing)"),
                     Some(_) => standard.to_string(),
-                }), 110., std_items), || "dropdown:Fit standard".into()))
-                .when(fo.mode != FitMode::Fit, |e| e.child(menu("dp-fit-prec", small(PRECISIONS.iter().find(|x| x.1 == fo.precision).map(|x| x.0).unwrap_or("(Drawing)").to_string()), 80., fprec_items)))
+                }), 110., std_items)))
+                .when(fo.mode != FitMode::Fit, |e| e.child(tipped("dp-fit-prec-tip", "Fit tolerance precision", menu("dp-fit-prec", small(PRECISIONS.iter().find(|x| x.1 == fo.precision).map(|x| x.0).unwrap_or("(Drawing)").to_string()), 80., fprec_items))))
                 .child(vis)
-                .child(menu("dp-fit-stack", small("H7/g6".into()), 58., stack_items))
+                .child(tipped("dp-fit-stack-tip", "Fit type", menu("dp-fit-stack", small("H7/g6".into()), 58., stack_items)))
                 .into_any_element()
         };
         let tol_row = h_flex()
