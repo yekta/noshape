@@ -490,6 +490,22 @@ fn delete_and_offset_faces() {
     assert!(matches!(replace_face(&b, &[], &b), Err(KernelError::Unsupported(_))));
 }
 
+/// Two chamfers on opposite edges of a block, deleted at once: OCCT removes each on its own (two features apart, each
+/// under its work bound), the block whole again.
+#[test]
+fn chamfers_apart_deleted_at_once_each_go() {
+    let b = box10();
+    let top = b.edges().into_iter().filter(|e| e.endpoints().is_ok_and(|(p, q)| p.z > 9.99 && q.z > 9.99 && (p.y - q.y).abs() < 1e-9)).collect::<Vec<_>>();
+    assert_eq!(top.len(), 2, "the top's two edges along x");
+    let s = chamfer(&b, &top, ChamferSpec::Equal(1.0), &[]).unwrap().shape;
+    let bevels: Vec<Shape> = s.faces().into_iter().filter(|f| f.face_plane().ok().flatten().is_some_and(|p| p.unit_normal().z.abs() > 0.1 && p.unit_normal().z.abs() < 0.9)).collect();
+    assert_eq!(bevels.len(), 2);
+    let r = delete_faces(&s, &bevels).unwrap().shape;
+    assert!(r.is_valid());
+    assert_eq!(r.faces().len(), 6);
+    assert!(close(r.volume().unwrap(), 1000.0, 1e-6), "{}", r.volume().unwrap());
+}
+
 /// A boss's side and cap, and a pocket's side and floor, deleted: each one's loop dropped from the top face, which goes on
 /// across it, the block whole again (6 faces, 1000 mm³) and valid.
 #[test]
