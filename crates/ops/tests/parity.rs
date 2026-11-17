@@ -1905,6 +1905,20 @@ fn live_regions_that_are_pieces_of_ours_select_ours_whole() {
     }
     let parts = t.call("query_parts", json!({})).unwrap();
     assert_eq!(parts["parts"].as_array().map(Vec::len), Some(1), "{parts}");
+
+    // With a sliver of live's selected too (0.000474 mm², asm-isaac-ball c3fdd4's Extrude 7): the same, not nothing.
+    let mut features = features;
+    features["features"][1]["parameters"][1]["queries"][0]["deterministicIds"] = json!(["JA1", "JA2", "JA3"]);
+    let sketches = json!({ "sketches": [{ "featureId": "FS1", "bodies": [{ "id": "JB", "type": "SKETCH", "faces": [face("JA1", 0.3 * area), face("JA2", 0.7 * area), face("JA3", 4.74e-10)], "edges": [], "vertices": [] }] }] });
+    let refs = refs_from_sketches(&sketches, features["features"].as_array().unwrap());
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("region-pieces-sliver.noshape"), &features, refs).unwrap();
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok"), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+    }
+    let parts = t.call("query_parts", json!({})).unwrap();
+    assert_eq!(parts["parts"].as_array().map(Vec::len), Some(1), "{parts}");
 }
 
 /// A sketch on an in-context face (Onshape's "In context entity" sub-feature, its blob not fetched; asm-isaac-ball):

@@ -4780,7 +4780,8 @@ impl<'a> Translator<'a> {
         let g = self.sketch_geometry(&ours)?;
         let unit = per_unit(&g["units"]);
         let regions: Vec<(String, f64)> = g["regions"].as_array()?.iter().filter_map(|r| Some((r["id"].as_str()?.to_string(), r["area"].as_f64()? * unit * unit))).collect();
-        let near = |a: f64, b: f64| (a - b).abs() <= 1e-3 * a.max(b).max(1e-12);
+        // (A sliver live lists, 0.000474 mm², within 0.001 mm²: asm-isaac-ball c3fdd4's Extrude 7.)
+        let near = |a: f64, b: f64| (a - b).abs() <= (1e-3 * a.max(b)).max(1e-9);
         let mut left: Vec<f64> = refs.iter().filter_map(|r| r.measure).collect();
         let mut out = Vec::new();
         for (id, area) in regions {
@@ -4795,7 +4796,8 @@ impl<'a> Translator<'a> {
                 out.push(id);
             }
         }
-        left.is_empty().then_some(out)
+        // (A sliver of live's left over is no region of ours: nothing to extrude.)
+        left.iter().all(|a| *a <= 1e-9).then_some(out)
     }
 
     /// The sketch region of ours with live's area (when given) nearest
