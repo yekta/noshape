@@ -105,3 +105,5 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-17 A Boolean's history may call a shared edge or vertex Modified (same place) where OCCT says Kept (OCCT's choice
   follows its rounding) when the model suite is identical end to end over every feature, hats/dock are SAME, the
   corpus replay differs only in those labels, and a T1 test shows references keep their names through it.
+- 11-17 The Mac's one build slot is for speed numbers and Mac-only checks. When a job would queue behind another there,
+  build and test on the least-loaded vibe host instead (`uptime` first). Never end a turn to wait for a slot.
