@@ -161,6 +161,33 @@ fn an_onshape_parasolid_with_a_mesh_part_reads_the_mesh_beside_it() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A mesh part written to Parasolid as live writes one (c2-hex-bookcase-derived's "imported"): in the latest version a
+/// MESH whose triangles go in the .xmm_txt beside the .x_t, read back as the same mesh solid; in an older one, planar
+/// facets and no mesh file.
+#[test]
+fn a_mesh_part_goes_to_parasolid_as_a_mesh_beside_the_file() {
+    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts");
+    let parts = read_parasolid_parts(&data.join("hex-bookcase-mesh.x_t"), LengthUnit::Millimeter).unwrap();
+    let mesh = parts.iter().find(|p| p.name.as_deref() == Some("imported")).unwrap().shape.clone();
+    let want = volume_properties(&mesh).unwrap().mass;
+    let dir = std::env::temp_dir().join(format!("noshape-xt-mesh-out-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("part.x_t");
+    write_parasolid_version(&path, std::slice::from_ref(&mesh), LengthUnit::Millimeter, false, "38.1").unwrap();
+    let text = std::fs::read_to_string(dir.join("part.xmm_txt")).unwrap();
+    assert!(text.contains(": MESH FILE created by modeller version"), "{}", &text[..text.len().min(400)]);
+    let back = read_parasolid_parts(&path, LengthUnit::Millimeter).unwrap();
+    assert_eq!(back.len(), 1);
+    assert!(back[0].shape.is_mesh() && back[0].shape.count(ShapeType::Solid) == 1);
+    let v = volume_properties(&back[0].shape).unwrap().mass;
+    assert!((v - want).abs() <= 1e-9 * want, "{v} vs {want}");
+    write_parasolid_version(&path, std::slice::from_ref(&mesh), LengthUnit::Millimeter, false, "28.0").unwrap();
+    assert!(!dir.join("part.xmm_txt").exists());
+    let back = read_parasolid_parts(&path, LengthUnit::Millimeter).unwrap();
+    assert!(!back[0].shape.is_mesh() && back[0].shape.count(ShapeType::Face) == 948, "{} faces", back[0].shape.count(ShapeType::Face));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Onshape's STEP of a mesh part (live c2-hex-bookcase-derived's "imported", trimmed to it: a TESSELLATED_SHELL of one
 /// COMPLEX_TRIANGULATED_FACE) reads as a mesh solid of live's volume, as live's import of it.
 #[test]

@@ -48,6 +48,8 @@
 #include <BRepTools.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <BRep_Tool.hxx>
+#include <Bnd_Box.hxx>
+#include <Poly_Triangulation.hxx>
 #include <Geom2dConvert.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
@@ -96,6 +98,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <array>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
@@ -118,7 +121,7 @@ struct Field
 {
   char      type;
   long long i    = 0;
-  double    x[3] = {0, 0, 0};
+  double    x[6] = {0, 0, 0, 0, 0, 0}; // a vector's 3, a box's x, y and z intervals
   bool      null = false;
 };
 
@@ -192,6 +195,8 @@ struct Node
   bool               variable = false; // the last fields form the variable-length array
   int                var_count = 0;
   std::vector<Field> fields;
+  // Fields a version has and the base schema doesn't, by name (a BODY's boundary_mesh): set by to_version.
+  std::map<std::string, Field> extra = {};
 };
 
 // Node layouts per version (shared with the reader): the base schema and
@@ -284,6 +289,8 @@ std::vector<Node> to_version(std::vector<Node> nodes, const XtVersion& v)
       by_name[f.name] = std::move(vals);
       at += k;
     }
+    for (const auto& [name, f] : n.extra)
+      by_name[name] = {f};
     std::vector<Field> out;
     for (const FieldSpec& f : *lt->second)
     {
@@ -355,9 +362,9 @@ std::string num(double v)
   return r;
 }
 
-std::string text_body(const std::vector<Node>& nodes, const XtVersion& v)
+std::string text_body(const std::vector<Node>& nodes, const XtVersion& v, const char* kind = "TRANSMIT FILE")
 {
-  const std::string kVersion = std::string(": TRANSMIT FILE created by modeller version ") + kModeller;
+  const std::string kVersion = std::string(": ") + kind + " created by modeller version " + kModeller;
   const std::string kSchema  = v.schema;
   std::string       s        = "T";
   auto        put = [&](const std::string& t) {
@@ -395,6 +402,10 @@ std::string text_body(const std::vector<Node>& nodes, const XtVersion& v)
           break;
         case 'v':
           for (int k = 0; k < 3; ++k)
+            put(num(f.x[k]));
+          break;
+        case 'b':
+          for (int k = 0; k < 6; ++k)
             put(num(f.x[k]));
           break;
         default:
@@ -507,6 +518,10 @@ std::string binary_body(const std::vector<Node>& nodes, const XtVersion& v, bool
           for (int k = 0; k < 3; ++k)
             b.f64(f.null ? kNullReal : f.x[k]);
           break;
+        case 'b':
+          for (int k = 0; k < 6; ++k)
+            b.f64(f.null ? kNullReal : f.x[k]);
+          break;
       }
   }
   b.i16(1);
@@ -517,7 +532,7 @@ std::string binary_body(const std::vector<Node>& nodes, const XtVersion& v, bool
 // The header as Onshape's exports have it (live G25/G36: one key per line,
 // unknown machine fields, the file name, a UTC date; part 2 names the
 // writing modeller's schema whatever the body's version).
-std::string header(bool binary, const std::string& path, const std::string& application)
+std::string header(bool binary, const std::string& path, const std::string& application, const char* guise = "transmit")
 {
   const size_t      slash = path.find_last_of("/\\");
   const std::string file  = slash == std::string::npos ? path : path.substr(slash + 1);
@@ -537,7 +552,7 @@ std::string header(bool binary, const std::string& path, const std::string& appl
   h += "**PARASOLID !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~0123456789**************************\n";
   h += "**PART1;\nMC=unknown;\nMC_MODEL=unknown;\nMC_ID=unknown;\nOS=unknown;\nOS_RELEASE=unknown;\n";
   h += "FRU=" + application + ";\nAPPL=" + application + ";\nSITE=unknown;\nUSER=unknown;\n";
-  h += std::string("FORMAT=") + (binary ? "binary" : "text") + ";\nGUISE=transmit;\n";
+  h += std::string("FORMAT=") + (binary ? "binary" : "text") + ";\nGUISE=" + guise + ";\n";
   h += "KEY=" + file + ";\nFILE=" + file + ";\nDATE=" + date + ";\n";
   h += std::string("**PART2;\nSCH=") + kVersions[0].schema + ";\nUSFLD_SIZE=0;\n";
   h += "**PART3;\n";
@@ -568,6 +583,14 @@ struct Writer
   std::map<int, size_t> pos; // node index -> position in `nodes`
   int                   next_index = 1;
   int                   next_id    = 1;
+  // Solid mesh bodies' meshes (points in metres, 0-based triangles), for the .xmm_txt written beside the file; null:
+  // mesh bodies go as planar facets.
+  struct Mesh
+  {
+    std::vector<gp_Pnt>             pts;
+    std::vector<std::array<int, 3>> tris;
+  };
+  std::vector<Mesh>* meshes = nullptr;
 
   int alloc() { return next_index++; }
 
@@ -2823,10 +2846,72 @@ TopoDS_Shape seam_pieces_joined(const TopoDS_Shape& s)
   return out.IsNull() || !BRepCheck_Analyzer(out).IsValid() ? base : out;
 }
 
+// A solid mesh body as Onshape writes one (live c2-hex-bookcase-derived's "imported"): a void and a solid REGION, a
+// SHELL each side of one FACE with no loop on a MESH, its triangles in w.meshes (the .xmm_txt's PSM mesh rcv_index
+// names).
+int write_mesh_body(Writer& w, const TopoDS_Shape& s)
+{
+  Writer::Mesh m;
+  for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face&                     f = TopoDS::Face(e.Current());
+    TopLoc_Location                        l;
+    const occ::handle<Poly_Triangulation>& t    = BRep_Tool::Triangulation(f, l);
+    const int                              base = (int)m.pts.size();
+    for (int i = 1; i <= t->NbNodes(); ++i)
+      m.pts.push_back(t->Node(i).Transformed(l.Transformation()));
+    for (int k = 1; k <= t->NbTriangles(); ++k)
+    {
+      int a, b, c;
+      t->Triangle(k).Get(a, b, c);
+      if (f.Orientation() == TopAbs_REVERSED)
+        std::swap(b, c);
+      m.tris.push_back({base + a - 1, base + b - 1, base + c - 1});
+    }
+  }
+  Bnd_Box box;
+  for (const gp_Pnt& q : m.pts)
+    box.Add(q);
+  w.meshes->push_back(std::move(m));
+  w.next_id      = 1;
+  const int body = w.alloc(), void_region = w.alloc(), solid_region = w.alloc(), solid_shell = w.alloc(), front_shell = w.alloc();
+  const int face = w.alloc(), mesh = w.alloc();
+  w.add(19, void_region).fields  = {fd(w.next_id++), fp(0), fp(body), fp(solid_region), fp(0), fp(front_shell), fc('V')};
+  w.add(19, solid_region).fields = {fd(w.next_id++), fp(0), fp(body), fp(0), fp(void_region), fp(solid_shell), fc('S')};
+  w.add(13, solid_shell).fields  = {fd(w.next_id++), fp(0), fp(body), fp(0), fp(face), fp(0), fp(0), fp(solid_region), fp(0)};
+  w.add(13, front_shell).fields  = {fd(w.next_id++), fp(0), fp(0), fp(0), fp(0), fp(0), fp(0), fp(void_region), fp(face)};
+  w.add(14, face).fields = {fd(w.next_id++), fp(0), ff_null(), fp(0), fp(0), fp(0), fp(solid_shell), fp(mesh), fc('+'), fp(0), fp(0), fp(0), fp(0), fp(front_shell)};
+  double x0, y0, z0, x1, y1, z1;
+  box.Get(x0, y0, z0, x1, y1, z1);
+  Field b{'b'};
+  const double corners[6] = {x0, x1, y0, y1, z0, z1};
+  std::copy(corners, corners + 6, b.x);
+  // node_id, attributes_features, owner, next, previous, geometric_owner, sense, mesh_box, transform, rcv_key, rcv_index,
+  // psm_imesh, pff_imesh (38.1's layout, as live's file describes it).
+  w.add(201, mesh).fields = {fd(w.next_id++), fp(0), fp(face), fp(0), fp(0), fp(0), fc('+'), b, fp(0), fp(0), fd((long long)w.meshes->size()), fp(0), fp(0)};
+  Node& n  = w.add(12, body);
+  n.fields = {fd(w.next_id - 1), fp(0), fp(0), fp(0), fp(0), fp(0), fp(0), ff(1000), ff(1e-8), fp(0), fp(0), fp(0), fu(1), fp(0), fu(1), fu(1),
+              fp(solid_shell), fp(0), fp(0), fp(0), fp(void_region), fp(0), fp(0)};
+  n.extra["boundary_mesh"] = fp(mesh);
+  return body;
+}
+
 // One part's BODY, as write_parasolid writes it.
 int write_body(Writer& w, const TopoDS_Shape& s)
 {
   require_non_null(s, "shape");
+  if (has_mesh_faces(s))
+  {
+    bool solid = false, all = true;
+    for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next())
+      solid = true;
+    for (TopExp_Explorer e(s, TopAbs_FACE); e.More() && all; e.Next())
+      all = is_mesh_face(TopoDS::Face(e.Current()));
+    if (w.meshes && solid && all)
+      return write_mesh_body(w, s);
+    MeshFacets m;
+    return write_body(w, facet_mesh(s, m));
+  }
   const TopoDS_Shape p = prepared(seam_pieces_joined(s), true, RoundSplines::Parasolid, true);
   bool               solid = false;
   for (TopExp_Explorer ex(p, TopAbs_SOLID); ex.More(); ex.Next())
@@ -2848,6 +2933,64 @@ int write_named_body(Writer& w, AttrWriter& aw, const TopoDS_Shape& s, const std
   w.node(body).fields[0] = fd(id - 1);
   w.next_id              = id;
   return body;
+}
+
+// The mesh file Parasolid writes beside a part file with mesh bodies (Onshape's zip: "a.x_t" with "a.xmm_txt"; live
+// c2-hex-bookcase-derived): a POINTER_LIS_BLOCK of PSM meshes, each its positions and 1-based position indices as
+// combs of 16 tooth slots, a tooth holding 2^shift values (64 vectors, 512 integers at least), the last padded.
+std::vector<Node> mesh_file_nodes(const std::vector<Writer::Mesh>& meshes)
+{
+  Writer w;
+  const int list = w.alloc();
+  std::vector<int> psm;
+  auto comb = [&](int type, int tooth, size_t n, int min_shift, size_t per, const std::function<Field(size_t)>& value) {
+    int shift = min_shift;
+    while ((size_t(16) << shift) < n)
+      ++shift;
+    const size_t teeth = (n + (size_t(1) << shift) - 1) >> shift;
+    const int    c     = w.alloc();
+    std::vector<int> ts;
+    for (size_t t = 0; t < teeth; ++t)
+    {
+      ts.push_back(w.alloc());
+      Node& T    = w.add(tooth, ts.back());
+      T.variable = true;
+      T.var_count = (int)((size_t(1) << shift) * per);
+      for (size_t k = 0; k < (size_t(1) << shift) * per; ++k)
+      {
+        const size_t i = (t << shift) * per + k;
+        T.fields.push_back(i < n * per ? value(i) : tooth == 192 ? ff(0) : fd(0));
+      }
+    }
+    Node& C     = w.add(type, c);
+    C.variable  = true;
+    C.var_count = 16;
+    C.fields    = {fu(1), fd((long long)n), fd((long long)(teeth << shift))};
+    if (type == 191)
+      C.fields.push_back(fd(32));
+    C.fields.push_back(fd(shift));
+    for (int k = 0; k < 16; ++k)
+      C.fields.push_back(fp(k < (int)ts.size() ? ts[(size_t)k] : 0));
+    return c;
+  };
+  for (const Writer::Mesh& m : meshes)
+  {
+    psm.push_back(w.alloc());
+    const int pool = comb(193, 192, m.pts.size(), 6, 3, [&](size_t i) { return ff(m.pts[i / 3].Coord((int)(i % 3) + 1)); });
+    const int idx  = comb(191, 190, 3 * m.tris.size(), 9, 1, [&](size_t i) { return fd(m.tris[i / 3][i % 3] + 1); });
+    // precision, owner, position_pool, normal_pool, position_indices, normal_type, normal_indices, combs (none).
+    Node& P    = w.add(189, psm.back());
+    P.variable = true;
+    P.fields   = {fu(1), fp(0), fp(pool), fp(0), fp(idx), fu(1), fp(0)};
+  }
+  Node& L     = w.add(74, list);
+  L.variable  = true;
+  L.var_count = (int)psm.size();
+  L.fields    = {fd((long long)psm.size()), fp(0)};
+  for (int i : psm)
+    L.fields.push_back(fp(i));
+  std::rotate(w.nodes.begin(), w.nodes.end() - 1, w.nodes.end());
+  return w.nodes;
 }
 
 void write_file(const std::vector<Node>& nodes, const XtVersion& ver, bool binary, const std::string& path, const std::string& application, bool bare = false)
@@ -2882,6 +3025,11 @@ static void write_parasolid_as(const OcShapeList& shapes, rust::Slice<const rust
   Writer           w;
   AttrWriter       aw{w};
   std::vector<int> bodies;
+  // Mesh bodies as meshes in a text file of the latest version (live's 38.1 files are where their layouts come from),
+  // as planar facets otherwise.
+  std::vector<Writer::Mesh> meshes;
+  if (!binary && !bare && std::string(ver.name) == kVersions[0].name)
+    w.meshes = &meshes;
   const bool       list = shapes.items.size() != 1;
   const int        root = list ? w.alloc() : 0;
   for (size_t i = 0; i < shapes.items.size(); ++i)
@@ -2903,7 +3051,18 @@ static void write_parasolid_as(const OcShapeList& shapes, rust::Slice<const rust
       n.fields.push_back(fp(b));
     std::rotate(w.nodes.begin(), w.nodes.end() - 1, w.nodes.end());
   }
-  write_file(to_version(std::move(w.nodes), ver), ver, binary, std::string(path), std::string(application), bare);
+  const std::string file(path);
+  write_file(to_version(std::move(w.nodes), ver), ver, binary, file, std::string(application), bare);
+  const size_t      slash = file.find_last_of("/\\"), dot = file.rfind('.');
+  const std::string mesh_file = (dot == std::string::npos || (slash != std::string::npos && dot < slash) ? file : file.substr(0, dot)) + ".xmm_txt";
+  std::remove(mesh_file.c_str());
+  if (meshes.empty())
+    return;
+  const std::string data = header(false, mesh_file, std::string(application), "unknown") + text_body(to_version(mesh_file_nodes(meshes), ver), ver, "MESH FILE");
+  std::ofstream     out(mesh_file, std::ios::binary);
+  out.write(data.data(), (std::streamsize)data.size());
+  if (!out)
+    fail_op("writing " + mesh_file + " failed");
 }
 
 // An assembly as Onshape exports one (live samples/dx-nist-assembly.x_t and

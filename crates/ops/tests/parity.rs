@@ -921,14 +921,23 @@ fn exchange_round_trip() {
                 args["min_facet_width"] = json!(0.0254);
                 args["angular_deviation"] = json!(if native.iter().map(|p| p.faces).sum::<u64>() > 500 { 15 } else { 5 });
             }
+            let _ = std::fs::remove_file(&file);
             let started = std::time::Instant::now();
             if let Err(e) = t.call("export_parts", args) {
                 println!("{name}: ours.{ext} not exported: {e}");
                 continue;
             }
             time(&name, &format!("export {format}"), started.elapsed().as_secs_f64(), &times[format]);
-            // (OBJ comes zipped with its .mtl, as live's.)
-            let file = if !file.is_file() && file.with_extension("zip").is_file() { file.with_extension("zip") } else { file };
+            // (OBJ comes zipped with its .mtl, as live's; a Parasolid with mesh bodies with its .xmm_txt, kept as
+            // ours.x_t.zip as live's live.x_t.zip.)
+            let file = match (file.is_file(), file.with_extension("zip")) {
+                (false, zip) if zip.is_file() && format == "PARASOLID" => {
+                    let named = dir.join("ours.x_t.zip");
+                    std::fs::rename(&zip, &named).map(|_| named).unwrap_or(zip)
+                }
+                (false, zip) if zip.is_file() => zip,
+                _ => file,
+            };
             exports += 1;
             // Ours read back: the same parts as the model's (an STL's mesh by volume and area).
             let back = import(&scratch(&format!("{name}-back-{ext}.noshape")), &file);

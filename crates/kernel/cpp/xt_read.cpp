@@ -436,7 +436,7 @@ private:
           v.null = v.x[0] == -3.14158e13;
           break;
         case 'b':
-          // A box (a mesh's): its low corner kept, its high one read past.
+          // A box (a mesh's: x, y and z intervals): its first three values kept, unused.
           for (int k = 0; k < 6; ++k)
           {
             const double x = b64();

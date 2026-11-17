@@ -478,8 +478,7 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
             let t = tmp(i, ext);
             let one = ExportSettings { pmi: vec![s.pmi.get(i).cloned().flatten()], ..s.clone() };
             write_parts(&one, &t, std::slice::from_ref(p))?;
-            out.push((format!("{name}.{ext}"), std::fs::read(&t)?));
-            let _ = std::fs::remove_file(&t);
+            out.extend(with_mesh_file(&t, &format!("{name}.{ext}"))?);
         }
         Ok(out)
     };
@@ -527,6 +526,14 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
         return Ok(out);
     }
     write_parts(s, path, &parts)?;
+    if s.format == PartFormat::Parasolid && path.with_extension("xmm_txt").is_file() {
+        let name = path.file_name().map(|x| x.to_string_lossy().to_string()).unwrap_or_else(|| "part.x_t".into());
+        let files = with_mesh_file(path, &name)?;
+        let entries: Vec<(&str, &[u8])> = files.iter().map(|(n, b)| (n.as_str(), b.as_slice())).collect();
+        let out = path.with_extension("zip");
+        std::fs::write(&out, stored_zip(&entries))?;
+        return Ok(out);
+    }
     Ok(path.to_path_buf())
 }
 
@@ -665,9 +672,25 @@ pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &Ass
 }
 
 /// Formats whose writers take B-rep faces only: a mesh part (an imported STL) goes as its triangles' planar faces
-/// (their writers crashed on a mesh face's missing surface). STEP keeps it as a tessellated solid.
+/// (their writers crashed on a mesh face's missing surface). STEP keeps it as a tessellated solid, Parasolid's writer
+/// decides (a solid mesh in its .xmm_txt in the latest version, as live).
 fn faceted_meshes(f: PartFormat) -> bool {
-    !f.mesh() && !matches!(f, PartFormat::Step | PartFormat::Urdf)
+    !f.mesh() && !matches!(f, PartFormat::Step | PartFormat::Urdf | PartFormat::Parasolid)
+}
+
+/// A Parasolid file and the .xmm_txt its writer put beside it for its mesh bodies (Onshape's Parasolid of a Part
+/// Studio with a mesh part comes zipped with it, live c2-hex-bookcase-derived): (entry name, bytes) each, the files
+/// removed; the file alone when there is none.
+fn with_mesh_file(file: &std::path::Path, name: &str) -> anyhow::Result<Vec<(String, Vec<u8>)>> {
+    let mut out = vec![(name.to_string(), std::fs::read(file)?)];
+    let _ = std::fs::remove_file(file);
+    let mesh = file.with_extension("xmm_txt");
+    if mesh.is_file() {
+        let stem = name.rsplit_once('.').map_or(name, |x| x.0);
+        out.push((format!("{stem}.xmm_txt"), std::fs::read(&mesh)?));
+        let _ = std::fs::remove_file(&mesh);
+    }
+    Ok(out)
 }
 
 fn faceted(sh: k::Shape) -> k::Shape {

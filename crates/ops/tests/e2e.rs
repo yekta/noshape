@@ -4511,6 +4511,43 @@ fn export_store_file_in_a_new_tab() {
 
 /// Files that aren't CAD (Markdown, CSV, a picture) import as file tabs,
 /// one edit each, as the app's + › Import… (Onshape: imported for viewing).
+/// A mesh part through Parasolid as live (c2-hex-bookcase-derived: its x_t comes zipped with the .xmm_txt holding the
+/// mesh): live's file imports with the mesh read beside it, the Part Studio exports as a zip of "<name>.x_t" and
+/// "<name>.xmm_txt", and that zip imports as the same parts, the mesh still a mesh at its volume.
+#[test]
+fn a_mesh_part_goes_through_parasolid_zipped_with_its_mesh_file() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("xt_mesh.noshape").to_str().unwrap(), "length_unit": "mm" }));
+    let live = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../kernel/tests/data/xt-parts/hex-bookcase-mesh.x_t");
+    let r = call(&mut ctx, "import_files", json!({ "files": [live.to_str().unwrap()] }));
+    let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap_or_else(|| panic!("{r}"))["name"].as_str().unwrap().to_string();
+    let parts = |ctx: &mut Ctx, tab: &str| {
+        let q = call(ctx, "query_parts", json!({ "tab": tab }));
+        let mut v: Vec<(String, f64)> = q["parts"].as_array().unwrap().iter().map(|p| (p["name"].as_str().unwrap().to_string(), num(&p["volume"]))).collect();
+        v.sort_by(|a, b| a.0.cmp(&b.0));
+        v
+    };
+    let model = parts(&mut ctx, &studio);
+    assert_eq!(model.iter().map(|p| p.0.as_str()).collect::<Vec<_>>(), ["imported", "shrunk"], "{model:?}");
+    let z = call(&mut ctx, "export_parts", json!({ "tab": studio, "format": "PARASOLID", "file": scratch("xt_mesh_out.x_t").to_str().unwrap() }));
+    let zip = std::path::PathBuf::from(z["file"].as_str().unwrap());
+    assert_eq!(zip.extension().and_then(|e| e.to_str()), Some("zip"), "{z}");
+    let dir = scratch("xt_mesh_unzipped");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut names = noshape_kernel::extract_zip(&zip, &dir).unwrap();
+    names.sort();
+    assert_eq!(names, ["xt_mesh_out.x_t", "xt_mesh_out.xmm_txt"]);
+    let r = call(&mut ctx, "import_files", json!({ "files": [zip.to_str().unwrap()] }));
+    let back = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap_or_else(|| panic!("{r}"))["name"].as_str().unwrap().to_string();
+    let back = parts(&mut ctx, &back);
+    assert_eq!(back.iter().map(|p| p.0.as_str()).collect::<Vec<_>>(), ["imported", "shrunk"], "{back:?}");
+    for (m, b) in model.iter().zip(&back) {
+        assert!((m.1 - b.1).abs() <= 1e-6 * m.1, "{m:?} {b:?}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn import_files_stores_other_files_as_file_tabs() {
     let mut ctx = Ctx::new();
