@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 00:14 UTC.
+Updated 11-17 00:25 UTC.
 
 ## In flight
 - Landed 11-16: 190a71558 (cp2), 7d1b8799 (kernel profile per feature), 765b2281 (screws P0: OCCT 0031 + 0032),
@@ -33,6 +33,12 @@ Updated 11-17 00:14 UTC.
   /root/bool-hat-scratch/v5-oc33ident.log), then unit bool-udoc-oc33 (hats/dock with ~/agents/bool-keep/oc33/cli-*,
   /root/bool-hat-scratch/udoc-oc33.out). When both clean: tell the lead the libs are staged (paths above); after the
   lead installs them everywhere, land bool-oc33.
+- Fillet 2 findings (11-17): its fuse c1d9's sample: a third is BRepBndLib::AddOptimal (PSO) of the grind B-spline
+  (5 x 97 poles) for resting_on_plane / apart_across_slab, once per Boolean (cached per OcShape only); its four plane
+  x grind pairs are real (1-3 lines). Tried (dropped, no gain): an inner-extent shortcut in the slab test and pole-box /
+  edge-point bounds in the resting test (they settle 4 of 6 checks; the grind box is still needed). Next idea: the
+  exact boxes cached across Booleans (key: the surface handle held in the cache, the face's location and UV bounds;
+  LRU bounded): Fillet 2's cut 17b8 and fuse c1d9 both box the grind face; later knife Booleans the blade's faces.
 - Knife, mine (Mac): Fillet 2 85 ms vs live 10 (fuse: four plane x grind B-spline pairs 15-18 ms each, 1 line each,
   case c1d9f750d291ba85 / 17b8bafce508d06d; run-on tool op_split 25), next. Then core's handover: Revolve 1 (op_boolean
   63 ms Mac, sections ahead 44 vibe5), Extrude 8/9 (55/51), Extrude 2 (sections ahead 34), Extrude 3. Recorded cases:
