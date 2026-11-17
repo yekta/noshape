@@ -155,10 +155,6 @@ pub struct Size {
     /// Live's Thread length options by length, in live's order.
     #[serde(default)]
     pub threads: BTreeMap<String, Vec<String>>,
-    /// Live's default Thread length by length where it isn't the first
-    /// option (ISO 4014 M12: [60, 30] defaults to 30).
-    #[serde(default)]
-    pub thread_defaults: BTreeMap<String, String>,
     /// Selects whose options depend on the size (live's lists for it,
     /// the first the default), by label.
     #[serde(default)]
@@ -451,10 +447,9 @@ impl Component {
         out
     }
 
-    /// The Thread length the dialog picks for a size and length (live's
-    /// default, else the first option).
+    /// The Thread length the dialog picks for a size and length without a
+    /// previous one it offers: the first option (live q-stdthread 11-17).
     pub fn thread_default(&self, size: &Size, length: &str) -> Option<String> {
-        let options = self.thread_lengths(size, length);
-        size.thread_defaults.get(length).filter(|t| options.contains(*t)).cloned().or_else(|| options.into_iter().next())
+        self.thread_lengths(size, length).into_iter().next()
     }
 }

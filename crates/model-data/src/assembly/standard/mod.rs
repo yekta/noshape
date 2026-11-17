@@ -292,13 +292,28 @@ impl StandardSpec {
         Some(std::iter::once(first).chain(rows).find(|s| s.when.iter().all(|(k, v)| self.param(k) == v)).unwrap_or(first))
     }
 
-    /// A screw's Thread length: the chosen option, else live's default for
-    /// the size and length.
+    /// A screw's Thread length: the chosen one while the size and length
+    /// offer it, else the first option (live q-stdthread 11-17).
     pub fn thread_length(&self) -> Option<String> {
         let c = component(self)?;
         let (size, length) = (self.size_row()?, self.length.as_deref()?);
         let options = c.thread_lengths(size, length);
         self.params.get(THREAD_LENGTH).filter(|v| options.contains(*v)).cloned().or_else(|| c.thread_default(size, length))
+    }
+
+    /// After a Size or Length change, the Thread length shown becomes the
+    /// one kept: live's dialog keeps the previous Thread length while the
+    /// new list offers it and takes the first option otherwise, so a later
+    /// change starts from that one (M12 x 100 / 30 -> 60 keeps 30).
+    pub fn keep_thread_length(&mut self) {
+        match self.thread_length() {
+            Some(t) => {
+                self.params.insert(THREAD_LENGTH.into(), t);
+            }
+            None => {
+                self.params.remove(THREAD_LENGTH);
+            }
+        }
     }
 
     /// The part's name, which instances take ("<Name> <n>") and the

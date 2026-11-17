@@ -114,6 +114,7 @@ impl AssemblyView {
         self.ui.std.failed_size = None;
         let mut spec = self.std_spec();
         f(&mut spec);
+        spec.keep_thread_length();
         self.ui.std.spec = Some(spec);
         cx.notify();
     }

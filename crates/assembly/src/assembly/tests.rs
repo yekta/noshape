@@ -3139,15 +3139,27 @@ fn standard_content_auto_size_and_bom() {
     assert_eq!(m12.part_name(), format!("Hex socket head cap screw M12x1.75 x 60 x {short}"));
     m12.params.insert(standard::THREAD_LENGTH.into(), "60".into());
     assert_eq!(m12.part_name(), "Hex socket head cap screw M12x1.75 x 60");
-    // Live's defaults (q-stdthread): ISO 4762 M12 x 60 offers [36, 60] and takes 36; ISO 4014 M12 x 60
-    // offers [60, 30] and takes 30; ISO 4014 M6 x 40 offers [40, 18] and takes 40.
+    // Live's first option without a previous Thread length (q-stdthread 11-17): ISO 4762 M12 x 60 offers
+    // [36, 60] and takes 36; ISO 4014 M12 x 60 offers [60, 30] and takes 60; ISO 4014 M6 x 40 offers [40, 18].
     m12.params.remove(standard::THREAD_LENGTH);
     assert_eq!((bolt.thread_lengths(m12.size_row().unwrap(), "60"), m12.thread_length().as_deref()), (vec!["36".to_string(), "60".into()], Some("36")));
     let iso4014 = CATALOGUE.iter().find(|c| c.name == "Hex head bolt grade A & B ISO 4014").unwrap();
     let mut hex = StandardSpec::new(iso4014);
     hex.set_size("M12");
     hex.length = Some("60".into());
-    assert_eq!(hex.part_name(), "Hex head bolt grade A & B M12x1.75 x 60 x 30");
+    assert_eq!(hex.part_name(), "Hex head bolt grade A & B M12x1.75 x 60");
+    // A Length change keeps the previous Thread length while offered, else takes the first option (live's
+    // ISO 4014 probe: M12 x 100 / 30 -> 60 keeps 30; a list without it starts over).
+    hex.length = Some("100".into());
+    hex.params.insert(standard::THREAD_LENGTH.into(), "30".into());
+    hex.keep_thread_length();
+    hex.length = Some("60".into());
+    hex.keep_thread_length();
+    assert_eq!(hex.thread_length().as_deref(), Some("30"));
+    hex.params.insert(standard::THREAD_LENGTH.into(), "45".into());
+    hex.keep_thread_length();
+    assert_eq!(hex.thread_length().as_deref(), Some("60"));
+    hex.params.remove(standard::THREAD_LENGTH);
     hex.set_size("M6");
     hex.length = Some("40".into());
     assert_eq!(hex.part_name(), "Hex head bolt grade A & B M6x1.00 x 40");
