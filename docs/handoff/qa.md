@@ -74,10 +74,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    (verified 20:40 on 0cc996f7) and core's revert of c064b550a (c2-loft-paths-guides Mirror 1 wrong-volume Ok, shipped in
    v0.4.57). **qa-lp-verify** (lp/lp-verify.sh) waits for that revert on a green, runs the document alone on vibex6 -> lp/run.txt +
    qa-alerts. Rewrite cut-must.txt after each cut.
-0c. **Mac (lead 21:58)**: v0.4.57's macOS app staged at mac ~/noshape-host/qa/mac57/app (mf.sh: Fillet flow via NOSHAPE_UI_SCRIPT +
-   NOSHAPE_UI_STATE_OUT, in the slot, nice 19): Fillet opens empty (pass). Hover-over-planes and "Highlight tool in toolbar" wait
-   on the lead's decision: ssh has no Screen Recording / Accessibility on the Mac (screencapture fails; only the user's motile
-   binary and screen sharing hold them).
+0c. **Mac: headless only (lead 22:05)**: no app windows, permission requests or the user's motile app on the Mac; CLI / app records
+   only. GUI flows run on the Linux release on vibex6 Xvfb: v0.4.57 Fillet opens empty (Mac state), toolbar search pass,
+   P0 USER-HOVER-STAYS-LIT sent to psui + skasm 22:12 (re-run uh/uh2.sh <app> <out> on their fix's green; 3 runs, count lit
+   pixels per shot as in TICKETS).
 0b. **LOADED runs (lead 21:50)**: speed / timing at load > 16 (2 x 8 cores) don't count. suites-diff.py prints "LOADED: …" first,
    skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
    the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.

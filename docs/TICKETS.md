@@ -567,7 +567,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   with the wrong part (fa6f90cc: 13/33/25 faces/edges/vertices, 5269155 mm³; live 27/67/47, 6325199 mm³). qa-lp-verify runs
   that document alone on the first green with core's revert (vibex6) -> qa-alerts and here.
 - Green 592b0fc9 vs v0.4.57: hat8, hat15, hat15b, the dock, ticket and authored documents ALL-SAME.
-- [ ] **P0 USER-HOVER-STAYS-LIT (psui / skasm; qa 22:12, v0.4.57 Linux release, vibex6 Xvfb, load ~23, real xdotool moves)**:
+- [ ] **P0 USER-HOVER-STAYS-LIT (psui / skasm; qa 22:11, v0.4.57 Linux release, vibex6 Xvfb, load ~23, real xdotool moves)**:
   the user's flow (new Part Studio, Sketch 1 on Top, a rectangle, default iso, planes shown; each line hovered, the pointer moved
   off onto empty space over the Front plane, then back, a shot 700 ms after each rest; uh/uh2.sh), 3 runs: every line lights
   when hovered (never a plane over a line), but after leaving the top line **all four lines stay lit** with the pointer at rest
