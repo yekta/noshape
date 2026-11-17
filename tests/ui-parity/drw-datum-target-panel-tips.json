@@ -1,0 +1,266 @@
+{
+  "name": "drw-datum-target-panel-tips",
+  "about": "block-drawing: Datum tool, Datum target tab; hover Target area, Style and the Targets caption (tooltips Datum target area, Datum style, Click in space to add a target); a target placed (point on Front, then its location); hover Target location, X direction, Y direction (their select-prompt tooltips); Length list > Angle, hover Flip and Rotate (Flip measurement from reference line, Rotate angle measurement); the Label emptied (This field cannot be empty, the header A1: This field cannot be empty); Target area > Circle and the Style list opened (the outside styles appear) and closed; Escape",
+  "area": "drawing",
+  "source": "studios 11-16 matrix (Datum / Datum target: 12 items unseen); live2 11-17 exploration (panel controls by pixel: screen = iframe DOM + 40)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Datum"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Datum target"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          145,
+          159
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          145,
+          198
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          173,
+          262
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            40,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            60,
+            0,
+            30
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          178,
+          397
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          178,
+          470
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          178,
+          550
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Length"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Angle"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          75,
+          604
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          100,
+          604
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          197,
+          310
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "mod+a"
+    },
+    {
+      "do": "key",
+      "key": "Delete"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          197,
+          310
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          145,
+          90
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          145,
+          159
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          175,
+          250
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          145,
+          198
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          145,
+          198
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 700
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

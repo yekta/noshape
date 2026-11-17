@@ -1,0 +1,113 @@
+{
+  "name": "drw-hatch-panel-tips",
+  "about": "block-drawing: Hatch region with a corner-rectangle profile (Hatch 1); hover the Closed profiles caption (Select or create closed profile for hatch region), Hatch 1's x (Delete hatch 1) and the ANSI / ISO / General tabs (ANSI patterns, ISO patterns, General patterns); Escape",
+  "area": "drawing",
+  "source": "studios 11-16 matrix (Hatch region: 8 items unseen); live2 11-17 exploration (panel controls by pixel: screen = iframe DOM + 40)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Hatch region"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Corner rectangle"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          60,
+          40
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          90,
+          60
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          174,
+          162
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          282,
+          183
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          90,
+          215
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          166,
+          215
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          250,
+          215
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
