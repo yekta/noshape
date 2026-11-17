@@ -88,3 +88,5 @@ History: docs/handoff/archive/bool2.md. Rulings: docs/DECISIONS.md (read it firs
   regen_ms; under load use user CPU (`/usr/bin/time -f %U`, RAYON_NUM_THREADS=1). Private docs (hats, dock): mode-700
   copies in ~/tmp/bool2, deleted after (udoc run.sh does it). gdb only on a child (ptrace_scope 1): `gdb -batch -ex run
   -ex "thread apply all bt" --args ...` under `timeout -s INT`.
+
+- qa 11-17: in the clean A/B (vibe7, load at most 0.06, v0.4.48 to v0.4.53, median of 3), c2-helical-sweep Sweep 1 took 157 ms on 0.4.48 and 396 ms on 0.4.53 (Ok in both). Your 895c8e3b / e47268f2 are meant to fix this on main. The 11-18 nightly pair (v0.4.55 vs v0.4.56, alternating) will confirm or reopen it.
