@@ -1,0 +1,79 @@
+{
+  "name": "drw-view-adjust-linestyle-dashed-dotted",
+  "about": "Front's menu › Adjust linestyle...: the Edges list's caption tooltip, an edge picked, Linestyle Solid → Dashed → Dotted (Dashes enabled), then cancelled",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (live2 11-17: the drawing matrix's Adjust linestyle gaps)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Adjust linestyle..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "hover",
+      "on": {
+        "px": [
+          178,
+          123
+        ]
+      },
+      "ms": 1200
+    },
+    {
+      "do": "click",
+      "on": {
+        "px": [
+          726,
+          672
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Solid",
+        "pick": "Dashed"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Dashed",
+        "pick": "Dotted"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
