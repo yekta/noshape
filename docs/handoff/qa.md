@@ -71,7 +71,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **qa-imp-verify** (bin/imp-verify.sh f99cf571): on the first green with core's revert of 64744410b's Move face routing,
   impeller statuses v0.4.56 vs green on vibe6 -> ab1117/imp-verify.txt + alert; expect Delete face 2 / Fillet Flansch Ok.
 - Suites: suites-models.sh sets NOSHAPE_PARITY_DIFFERING; suites-diff.py prints `newdiff` (features differing now, not before).
-- f197 Mirror 3: blend re-applied ba7a8d755 (9a46f7d10) with its fix 74d05ad5e; check f197 SAME on 74d05ad5's compat.
+- f197 Mirror 3: blend re-applied ba7a8d755 (9a46f7d10) with its fix 74d05ad5e: f197 SAME on green 74d05ad5 (07:37), all docs SAME vs 0.4.56.
 - **Open P0s from qa 11-17**: IMPELLER-MOVE-FACE-2-REF (core, suspect 64744410b), SCISSOR-LIFT-BOM-ROWS (asm),
   IMPELLER-DELETE-FACE-2-SLOW (core). Re-check each on the green that claims the fix. dx: rings-loft x_t import works since
   0.4.56 but 9-10 s vs live 8.6 (queue item, not P0).
