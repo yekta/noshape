@@ -1,26 +1,29 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-17 09:30 UTC (restarted). Read docs/DECISIONS.md
+Updated 2026-11-17 10:16 UTC (restarted 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Unlanded (worktree /root/projects/noshape-wt/skasm, rebased on 143f22c12 2026-11-17 09:2x)
 - d3e6bcef5 (commit A of 11-16, squashed): held-direction zero lines, edge-on circle Use, orphans, bodies-line sketch
-  ids, use_entity, solved_circles, refs-sk.jsonl, sm-box colour (psui waits on it: tell psui
-  4d0a82b2-8fc7-43e6-b45d-bd8cb225741e when it lands), take-back TRACE. Core landed the same curved-wall flat
-  (198c2b6d3) and sheet metal Move face (b0e98fa3c) meanwhile: main's code kept, my two tests kept.
+  ids, use_entity, solved_circles, refs-sk.jsonl, sm-box colour (psui waits on it: tell psui when it lands), take-back
+  TRACE. Core landed the same curved-wall flat (198c2b6d3) and sheet metal Move face (b0e98fa3c): main's code kept,
+  my two tests kept.
 - b0bee2b62: while a feature is edited, sheet metal chips take label_owners from before_context (qa's bend/jog
-  re-edit regression, "Face of Bend 1" vs live "Face of Sheet metal model 1"; still red in qa's 1117-0627 run).
-  Verify with tools/ui-parity/run.py bend-new-edit-reedit jog-new-edit-reedit on vibe6 (app build) before landing.
-- Uncommitted: surface-workshop translator: a Bezier's `<id>.<n>.internal` = its poles, BEZIER_DEGREE checked
-  against our degree, EQUAL_CURVATURE -> curvature, EQUAL_CURVATURE_G3 -> flow; parity
-  a_beziers_control_points_take_its_constraints.
+  re-edit regression "Face of Bend 1" vs live "Face of Sheet metal model 1"). Verify: skasm-uip-1117a (vibe6 app build
+  + run.py bend-new-edit-reedit jog-new-edit-reedit, starts when the pair starts) -> /root/skasm-scratch/uip-1117a.log.
+- a26f18913 Bezier `<id>.<n>.internal` = poles, BEZIER_DEGREE checked, EQUAL_CURVATURE(_G3) -> Curvature / Flow.
+- 036070cc4 INTERSECTED via sketch_intersection; ids-only edge that is a sketch spline -> that spline by its ends.
+- Uncommitted (Mac tests skasm-mac-1117f / 1117h running): Pierce takes a curve (scene constraint_applicable; live's
+  pipe Loft profiles / knifehandle P2-P6 pierce ellipses and circles; live capture asked in REQUESTS.md 10:12);
+  CONCENTRIC of a model point and `X.center` takes the circle (manualblend Sketch 5); a sketch solve that lands
+  live's COINCIDENT model vertices (refs points) is kept, not taken back (cpcurves Sketch 4); AGENT_API.md regenerated
+  on the Mac (copy it back: mac ~/agents/skasm/src/docs/AGENT_API.md).
+- Single-doc effect of a26f/036070 (ops-b 10:09): manualblend 9 -> 11/19; BEZIER / internal-point drops gone in
+  bezier, boundary, britatap, knifehandle, loft, mutualtrim, pipe.
 
 ## Running
-- skasm-pair-1117a (systemd here): smab.sh (ops-a = main 143f22c12 in skasm-base, ops-b = skasm tree) then vibe6
-  `~/bin/slot pairrun.sh 1117a` (both on one cp -al snapshot, NOSHAPE_PARITY_DIFFERING) -> vibe6
-  ~/agents/skasm-keep/pair-1117a-{a,b}.log. Gate for landing A (no document worse, every differing feature read).
-- skasm-mac-1117a: sketch / parity:: / e2e / sheetmetal_std on the Mac (tree of A) -> /root/skasm-scratch/mac-1117a.log.
-- skasm-check-1117a: cargo check ops tests + part-studio-ui on vibe6 -> /root/skasm-scratch/check-1117a.log.
+- skasm-pair-1117a: vibe6 `~/bin/slot pairrun.sh 1117a` (ops-a = main 143f22c12, ops-b = skasm; rebuild ops-b with
+  .smb.sh before the slot frees) -> vibe6 ~/agents/skasm-keep/pair-1117a-{a,b}.log; waits behind qa's suite (08:40).
 
 ## Next, in order
 1. Pair green -> land A + chip fix (+ Bezier mapping if in ops-b). Tell psui.

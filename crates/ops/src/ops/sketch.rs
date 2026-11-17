@@ -59,7 +59,7 @@ const CONSTRAINTS: [(&str, ConstraintTool, &str); 15] = [
     ("symmetric", ConstraintTool::Symmetric, "two entities symmetric about a line (the last entity)"),
     ("fix", ConstraintTool::Fix, "fix in place"),
     ("normal", ConstraintTool::Normal, "line normal to a curve"),
-    ("pierce", ConstraintTool::Pierce, "point pierces external geometry"),
+    ("pierce", ConstraintTool::Pierce, "a point, or a curve through it, where external geometry pierces the sketch plane"),
     ("curvature", ConstraintTool::Curvature, "curvature continuity at a joint"),
     ("flow", ConstraintTool::Flow, "flow (G3) continuity at a joint: tangent, equal curvature and equal rate of change of curvature (a spline, conic or Bezier with a line, arc or spline)"),
 ];

@@ -8154,7 +8154,8 @@ fn kind_fits(sk: &Sketch, c: ConstraintTool, e: EntityId) -> bool {
         ConstraintTool::Tangent | ConstraintTool::Normal | ConstraintTool::Curvature | ConstraintTool::Flow => !point,
         ConstraintTool::Equal => k == EntityKind::Line || k.is_circular(),
         ConstraintTool::Midpoint => point || matches!(k, EntityKind::Line | EntityKind::Arc),
-        ConstraintTool::Pierce => point || sk.entity(e).is_some_and(|x| x.external),
+        // A point or a curve (live: c2-surf-workshop-pipe's Loft profiles pierce their ellipse onto two guides).
+        ConstraintTool::Pierce => true,
         ConstraintTool::Horizontal | ConstraintTool::Vertical => point || k == EntityKind::Line || k == EntityKind::Ellipse,
     }
 }
@@ -8182,7 +8183,7 @@ pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -
         ConstraintTool::Equal => n >= 2 && (all(&line) || all(&|k| k.is_circular())),
         ConstraintTool::Midpoint => (n == 2 && count(&point) == 1 && kinds.iter().any(|k| matches!(k, EntityKind::Line | EntityKind::Arc))) || (n == 3 && all(&point)),
         ConstraintTool::Normal => n == 2 && count(&line) >= 1 && all(&curve),
-        ConstraintTool::Pierce => n == 2 && ids.iter().filter(|e| sk.entity(**e).is_some_and(|x| x.external)).count() == 1 && ids.iter().any(|e| is_point(sk, *e) && !sk.entity(*e).is_some_and(|x| x.external)),
+        ConstraintTool::Pierce => n == 2 && ids.iter().filter(|e| sk.entity(**e).is_some_and(|x| x.external)).count() == 1,
         ConstraintTool::Symmetric => n == 3 && count(&line) >= 1,
         ConstraintTool::Fix => true,
         // Live 1716: a line and an arc (no spline, conic or Bezier) take

@@ -5036,7 +5036,10 @@ impl<'a> Translator<'a> {
         // geometry is the author's last solve, in a configured document another configuration's: c2-config-parts-nuts'
         // hexagon at M2, its lines at M4).
         let closer = matches!((self.off_live_points(&oid, &before), self.off_live_points(&oid, &after)), (Some(b), Some(a)) if a < b && a <= 1e-6);
-        let keep = (!live_regions.is_empty() && regions_as_live(&after) > regions_as_live(&before)) || closer;
+        // Or when it puts every point live makes coincident with a model vertex on that vertex where live's refs have
+        // it, and the stored geometry wasn't (c2-surf-workshop-cpcurves' Sketch 4: its circle stored 18.8 mm off JPg).
+        let anchored = matches!((self.anchors_off(k, &oid, f, &before), self.anchors_off(k, &oid, f, &after)), (Some(b), Some(a)) if b > 1e-6 && a <= 1e-6);
+        let keep = (!live_regions.is_empty() && regions_as_live(&after) > regions_as_live(&before)) || closer || anchored;
         if moved > 1e-7 && !keep {
             // Undone back to the edit before them (deleting them would leave
             // the points moved; some calls make no edit, so not by count).
@@ -5135,6 +5138,28 @@ impl<'a> Translator<'a> {
             let Some(q) = self.sketch_entities.get(&(oid.to_string(), eid.to_string())).and_then(|o| ours.get(o.as_str())) else { continue };
             let l = self.sketch_map.local(p);
             let d = (l[0] - q[0]).hypot(l[1] - q[1]);
+            worst = Some(worst.map_or(d, |w| w.max(d)));
+        }
+        worst
+    }
+
+    /// How far the points of sketch `oid` (`sketch_get` reply `g`) that live's COINCIDENTs put on a model vertex lie from
+    /// that vertex as live's refs give it, the largest, in metres; None when there are none.
+    fn anchors_off(&self, k: usize, oid: &str, f: &Value, g: &Value) -> Option<f64> {
+        let u = per_unit(&g["units"]);
+        let (o, x, y) = (f3(&g["frame"]["origin"])?, f3(&g["frame"]["x"])?, f3(&g["frame"]["y"])?);
+        let ours: HashMap<&str, [f64; 2]> = g["entities"].as_array()?.iter().filter(|e| e["type"] == "point").filter_map(|e| Some((e["id"].as_str()?, [e["at"][0].as_f64()?, e["at"][1].as_f64()?]))).collect();
+        let mut worst: Option<f64> = None;
+        for c in f["constraints"].as_array()?.iter().filter(|c| c["constraintType"] == "COINCIDENT") {
+            let params = c["parameters"].as_array().map(Vec::as_slice).unwrap_or_default();
+            let local = params.iter().find(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("local"))).and_then(|p| p["value"].as_str());
+            let ids = params.iter().find(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external"))).and_then(|p| p["queries"].as_array()).map(Vec::as_slice);
+            let (Some(local), Some([q])) = (local, ids) else { continue };
+            let Some([id]) = q["deterministicIds"].as_array().map(Vec::as_slice) else { continue };
+            let Some(live) = id.as_str().and_then(|id| self.refs.get(&(k, id.to_string()))).filter(|r| r.kind == "VERTEX").and_then(|r| r.point) else { continue };
+            let Some(at) = self.sketch_entities.get(&(oid.to_string(), local.to_string())).and_then(|e| ours.get(e.as_str())) else { continue };
+            let p = [0, 1, 2].map(|i| (o[i] + at[0] * x[i] + at[1] * y[i]) * u);
+            let d = (0..3).map(|i| (p[i] - live[i]).powi(2)).sum::<f64>().sqrt();
             worst = Some(worst.map_or(d, |w| w.max(d)));
         }
         worst
@@ -5458,9 +5483,10 @@ impl<'a> Translator<'a> {
             let mut placed: Vec<String> = Vec::new();
             // Model references given as co-edge queries (an edge as a face's boundary): where they are in `entities`.
             let mut co_edges: Vec<(usize, Value)> = Vec::new();
-            // A Concentric between two points (an arc's centre and a line's end, learning-center-frank's Skizze 1): live
-            // names a circle by its centre; ours takes the circle, whose centre then lies on the point.
-            let points_only = ty == "CONCENTRIC" && c["parameters"].as_array().into_iter().flatten().all(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("local")) && p["value"].as_str().is_some_and(|v| v.contains('.')));
+            // A Concentric between two points (an arc's centre and a line's end, learning-center-frank's Skizze 1; a
+            // circle's centre and a model vertex, c2-surf-workshop-manualblend's Sketch 5): live names a circle by its
+            // centre; ours takes the circle, whose centre then lies on the point.
+            let points_only = ty == "CONCENTRIC" && c["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("local"))).all(|p| p["value"].as_str().is_some_and(|v| v.contains('.')));
             for n in order {
                 if let Some(v) = par(n) {
                     let v = match v.strip_suffix(".center") {

@@ -1508,7 +1508,7 @@ Examples:
 | `sketch` | string | required | Sketch feature id or name. |
 | `tool` | one of `line`, `midpoint_line`, `corner_rectangle`, `center_rectangle`, `aligned_rectangle`, `circle`, `three_point_circle`, `three_point_arc`, `tangent_arc`, `center_point_arc`, `point`, `spline`, `bezier`, `conic`, `slot`, `inscribed_polygon`, `circumscribed_polygon`, `ellipse`, `elliptical_arc` |  | Drawing tool (required without `shapes`). |
 | `points` | array of array of number or string |  | The clicks, in order: [[x, y], ...] in sketch coordinates, or [[x, y, z], ...] model positions (required without `shapes`). |
-| `shapes` | array of object |  | Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. |
+| `shapes` | array of object |  | Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. A line's `direction` [x, y] with its two clicks at one point: a line a sketch fillet consumed, which keeps that direction. |
 | `construction` | boolean |  | Make the new geometry construction geometry. |
 | `sides` | integer |  | Polygon sides. |
 | `start_derivative` | array of number or string |  | spline: the open spline's derivative at its start, [x, y] (per unit of its 0–1 parameter, as Onshape stores `startDerivative`; its end handle placed for it). With `end_derivative`. |
@@ -1535,7 +1535,7 @@ Selects the entities and applies the constraint tool, as in the UI (select-first
 - symmetric: two entities symmetric about a line (the last entity)
 - fix: fix in place
 - normal: line normal to a curve
-- pierce: point pierces external geometry
+- pierce: a point, or a curve through it, where external geometry pierces the sketch plane
 - curvature: curvature continuity at a joint
 - flow: flow (G3) continuity at a joint: tangent, equal curvature and equal rate of change of curvature (a spline, conic or Bezier with a line, arc or spline)
 

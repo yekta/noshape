@@ -2762,7 +2762,8 @@ fn an_intersected_curve_is_made_by_the_intersection_tool() {
 }
 
 /// A Pierce to an earlier sketch's Bezier live names by its id alone (c2-surf-workshop-pipe's Loft profiles on Side
-/// profile's JHt / JHV): ours has no body edge there, so the sketch curve with live's ends is the one.
+/// profile's JHt / JHV): ours has no body edge there, so the sketch curve with live's ends is the one; a point and a
+/// curve both pierce it.
 #[test]
 fn a_pierce_to_a_sketch_bezier_by_its_id_takes_that_curve() {
     let plane = |name: &str| json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": format!("query=dummyQuery(id+\"{name}.planeOp\",EntityType.FACE);") }] }]);
@@ -2772,10 +2773,12 @@ fn a_pierce_to_a_sketch_bezier_by_its_id_takes_that_curve() {
               "geometry": { "btType": "BTCurveGeometryControlPointSpline-2197", "controlPointCount": 4, "dimension": 2, "isPeriodic": false, "isRational": false, "isBezier": true, "degree": 3,
                   "controlPoints": [-0.02, 0.01, -0.01, 0.015, 0.01, 0.005, 0.02, 0.01], "knots": [0, 0, 0, 0, 1, 1, 1, 1] } }], "constraints": [] },
         { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2", "parameters": plane("Right"),
-          "entities": [{ "btType": "BTMSketchPoint-158", "entityId": "pt", "isConstruction": false, "x": 0.01, "y": 0.0 }],
-          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "PIERCE", "entityId": "pc", "parameters": [
+          "entities": [{ "btType": "BTMSketchPoint-158", "entityId": "pt", "isConstruction": false, "x": 0.01, "y": 0.0 },
+              { "btType": "BTMSketchCurve-4", "entityId": "ci", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.005, "xCenter": 0.01, "yCenter": 0.005, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          // A point and a curve through where the Bezier pierces the plane (live: pipe's Loft profiles' ellipses).
+          "constraints": (["pt", "ci"].iter().map(|l| json!({ "btType": "BTMSketchConstraint-2", "constraintType": "PIERCE", "entityId": format!("p{l}"), "parameters": [
               { "btType": "BTMParameterQueryList-148", "parameterId": "externalEdge", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "", "deterministicIds": ["JE"] }] },
-              { "btType": "BTMParameterString-149", "parameterId": "localEntity", "value": "pt" }] }] }
+              { "btType": "BTMParameterString-149", "parameterId": "localEntity", "value": l }] })).collect::<Vec<_>>()) }
     ] });
     let refs = json!({ "index": 1, "id": "JE", "kind": "EDGE", "curveType": "SPLINE", "body": "JX", "point": [0.0, 0.01, 0.0], "start": [-0.02, 0.01, 0.0], "end": [0.02, 0.01, 0.0], "length": 0.0405 }).to_string();
     let mut ctx = Ctx::new();
@@ -2784,7 +2787,49 @@ fn a_pierce_to_a_sketch_bezier_by_its_id_takes_that_curve() {
     let step = t.step(1);
     assert!(step.problems.is_empty(), "{:?}", step.problems);
     let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
-    assert!(g["constraints"].as_array().unwrap().iter().any(|c| c["type"] == "Pierce"), "{g}");
+    assert_eq!(g["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == "Pierce").count(), 2, "{g}");
+}
+
+/// A Concentric between a model point and a circle's centre (c2-surf-workshop-manualblend's Sketch 5: vertex JNE and
+/// its profile circle's centre): ours on the circle, not refused as two points.
+#[test]
+fn a_concentric_of_a_model_point_and_a_circles_centre_takes_the_circle() {
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }]);
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1", "parameters": top,
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "ci", "isConstruction": false, "centerId": "ci.center", "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.005, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "CONCENTRIC", "entityId": "cc", "parameters": [
+              { "btType": "BTMParameterQueryList-148", "parameterId": "externalFirst", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "", "deterministicIds": ["IB"] }] },
+              { "btType": "BTMParameterString-149", "parameterId": "localSecond", "value": "ci.center" }] }] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("concentric-model-point.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    assert!(g["constraints"].as_array().unwrap().iter().any(|c| c["type"] == "Concentric"), "{g}");
+}
+
+/// A sketch whose stored geometry lags its model vertex (c2-surf-workshop-cpcurves' Sketch 4: the circle 18.8 mm off
+/// JPg, which live re-solves onto it): the solve that puts the point on live's vertex is kept, not taken back.
+#[test]
+fn a_solve_onto_lives_model_vertex_is_kept() {
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }]);
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1", "parameters": top,
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "ci", "isConstruction": false, "centerId": "ci.center", "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.003, "xCenter": 0.005, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "COINCIDENT", "entityId": "cc", "parameters": [
+              { "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "ci.center" },
+              { "btType": "BTMParameterQueryList-148", "parameterId": "externalSecond", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "", "deterministicIds": ["IB"] }] }] }] }
+    ] });
+    let refs = json!({ "index": 0, "id": "IB", "kind": "VERTEX", "point": [0.0, 0.0, 0.0] }).to_string();
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("solve-onto-vertex.noshape"), &features, parse_refs(&refs)).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    let circle = g["entities"].as_array().unwrap().iter().find(|e| e["type"] == "circle").cloned().unwrap_or_default();
+    assert_eq!(circle["center"], json!([0.0, 0.0]), "{g}");
 }
 
 /// An orphaned Use whose ids name only what the sketch made itself (bracket03-mattie's Sketch 2: live's refs resolve
