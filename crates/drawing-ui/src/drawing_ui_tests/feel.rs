@@ -2,7 +2,7 @@
 //! what lights at live's reach, what a click takes, and when a press becomes a drag.
 
 use super::*;
-use gpui_kit::{MouseButton, VisualTestContext};
+use gpui_kit::{Focusable as _, MouseButton, VisualTestContext};
 use noshape_scene::drawing_tools::Sel;
 
 /// The window point of sheet point `s` (mm).
@@ -531,6 +531,50 @@ fn a_dimension_moves_from_5_px_and_4_px_is_a_click(cx: &mut TestAppContext) {
             assert_eq!(sel, vec![Sel::Annotation(id)], "{dx} px: a click, the dimension selected");
         }
     }
+}
+
+/// Live drw-styles-dimension s26-30 (behaviours "qa5 ADV4": Wt spinboxes ignore Esc): a value typed in the Styles
+/// panel's Text gap is set on Enter, the field keeps the focus, and Esc after it leaves the dimension selected; leaving
+/// the field after that adds no second undo step.
+#[gpui::test]
+fn a_styles_text_gap_is_set_on_enter_and_esc_after_it_keeps_the_dimension_selected(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "feel-styles-gap");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| a.kind.is_dimension()).map(|a| a.id)).expect("a dimension");
+    cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            e.selection = vec![Sel::Annotation(id)];
+            e.right_panel = Some(crate::drawing_panels::RightPanel::Styles);
+            cx.notify();
+        })
+    });
+    draw(cx, window);
+    let field = cx.update(|cx| editor.read(cx).styles_gap[0].as_ref().map(|g| g.1.clone())).expect("the Text gap field");
+    cx.update_window(window, |_, w, cx| w.focus(&field.focus_handle(cx), cx)).unwrap();
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_keystrokes("secondary-a");
+    v.simulate_input("0.2");
+    v.simulate_keystrokes("enter");
+    draw(cx, window);
+    let gap = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| a.id == id).and_then(|a| a.style.as_ref()).and_then(|s| s.text_gap));
+    let unit = cx.update(|cx| noshape_model::drawing::format::length_units(&editor.read(cx).drawing, &noshape_model::drawing::DimFormat::default()).meters() * 1000.0);
+    assert!(gap(cx).is_some_and(|g| (g - 0.2 * unit).abs() < 1e-9), "Enter sets the gap: {:?}", gap(cx));
+    assert!(cx.update_window(window, |_, w, cx| field.focus_handle(cx).is_focused(w)).unwrap(), "the field keeps the focus");
+    VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::Annotation(id)], "Esc keeps the dimension selected");
+    cx.update_window(window, |_, w, cx| {
+        let f = editor.read(cx).focus.clone();
+        w.focus(&f, cx)
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update(|cx| editor.update(cx, |e, cx| e.doc.update(cx, |d, cx| d.undo(cx))));
+    draw(cx, window);
+    assert_eq!(gap(cx), None, "one undo takes the gap back: leaving the field added no step");
 }
 
 /// Live2 drw-centermark (behaviours "studios (11-17, P0 drawing feel)"): a hole's centre mark lights from its circle, its

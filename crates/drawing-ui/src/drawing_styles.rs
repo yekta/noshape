@@ -36,19 +36,21 @@ impl DrawingEditor {
         let digits = if self.drawing.units_mm { 2 } else { 4 };
         let text = noshape_model::drawing::format::format_number(value_mm / 1000.0 / u.meters(), Some(digits), 4);
         if !self.styles_gap[k].as_ref().is_some_and(|(id, _, _)| *id == ann) {
+            let mut set_text = text.clone();
             let stx = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
             let meters = u.meters();
-            let sub = cx.subscribe_in(&stx, window, move |this: &mut Self, stx, ev: &InputEvent, window, cx| {
-                // Enter gives the keys back to the sheet (Esc then clears the selection: live2 drw-styles-dimension s29);
-                // the blur that follows sets the value.
-                if matches!(ev, InputEvent::PressEnter { .. }) {
-                    window.focus(&this.focus, cx);
+            let sub = cx.subscribe_in(&stx, window, move |this: &mut Self, stx, ev: &InputEvent, _, cx| {
+                // Enter or leaving sets the value; the field keeps the focus after Enter and Esc there changes nothing
+                // (live's Wt spinboxes, behaviours "qa5 ADV4"; live drw-styles-dimension s29-30 keeps the selection).
+                if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                     return;
                 }
-                if !matches!(ev, InputEvent::Blur) {
+                let typed = stx.read(cx).value().trim().to_string();
+                if typed == set_text {
                     return;
                 }
-                if let Ok(v) = stx.read(cx).value().trim().parse::<f64>() {
+                set_text = typed.clone();
+                if let Ok(v) = typed.parse::<f64>() {
                     let mm = (v * meters * 1000.0).max(0.0);
                     this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| set(a.style.get_or_insert_with(Default::default), mm)), cx);
                 }
