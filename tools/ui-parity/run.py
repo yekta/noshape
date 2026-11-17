@@ -1139,6 +1139,9 @@ def compare(live, ours, whole_document=True):
     for s in steps:
         if s.get("step") in loading:
             continue
+        # Live's page died before the read ("Error: page.evaluate: Target crashed", asm-cylindrical-limits): nothing read.
+        if str((s.get("state") or {}).get("error") or "").startswith("Error: page.evaluate"):
+            continue
         o = ours_steps.get(s.get("step"), {})
         # A step ours couldn't do (its target not found) while live did: a difference, whatever the state after.
         failed = o.get("error") if o.get("ok") is False and s.get("ok") is not False else None
