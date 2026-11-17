@@ -16,6 +16,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (NOSHAPE_PARITY_ONLY=cf-hose-routing), rows "ours reads ours.x_t / .sat".
 
 ## qa, 2026-11-17
+- [ ] P2 DOCK-TAB-SWITCH-TRAILING-FRAMES (psui; qa 2026-11-17 10:30, vibe6 :661, load 2-14: hints only) Switching between the
+  user's dock document's two Part Studio tabs (both already open; pointer left resting on the clicked tab): the first frame is
+  always < 160 ms, but on about half of the switches frames keep coming ~700-860 ms after the click (settle), against 76-154 ms on
+  every switch in v0.4.53. Seen in v0.4.54, .55, .56 and greens f7c318a5 / 498b96a8 alike (not new in this release); no regeneration
+  in the perf log, only a target's textures and (on the return to B) "2 body meshes uploaded". If it is the tab's hover card
+  appearing under the resting pointer, close as expected; if not, what draws? B's first open settles 2.4-7.3 s on green (0.4.53
+  3.8-6.8 s; load-bound). Data /root/qa-scratch/lat/hat/tabab-{verify,rel}.out (lat/hat/tabab-rel.sh <rounds> <versions>).
 - [ ] P0 SCISSOR-LIFT-BOM-ROWS (bool bisects, lead 07:30; asm owns the BOM; qa 2026-11-17 07:20, assembly suite 1117-0227 on green ecf8c33a vs 1116-1642 on 684e77e2)
   asm-scissor-lift: BOM rows as live 59 -> 57 of 87 (rows 63 -> 62; occurrences 214/242 and mates 13/19 unchanged). New
   difference: ours has (1, "Motor Mount", 3.0, "Motor Mount", "", "- None -") under "Drive", live doesn't; the "Gear Frame"
