@@ -507,6 +507,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-17 05:00 release (qa list 04:42, newest green 5875109e; the latest release is v0.4.55)
+- **HOLD, P0 MIRROR3-UNION-LOSES-PART (core): wrong geometry in a saved ticket document**, new between greens 35baa32f (= 0.4.55)
+  and ba7a8d75, still on 5875109e. rust-zero-solid-f197 (vibe5 ~/qa/tickets) feature 19 "Mirror 3" (part mirror, ADD, merge
+  scope = the mirrored Part 1 itself, across Front; status Ok in both): 0.4.55 Part 1 43 faces 32,236.03 mm³ -> 44 faces
+  32,264.11 mm³ (the union); green: 4 slivers (6 / 5 / 5 / 6 faces, 9.31 + 18.77 + 18.77 + 9.31 mm³), the part's 32 cm³
+  gone: a union smaller than its inputs. Features 1-18 identical (rollback walk, both CLIs). The later changes follow from it
+  (Linear pattern 1, Mirror 4, Sketch 2, Draft 1 / 6, Linear pattern 2, Mirror 6 Error -> Ok on the slivers; 2 -> 13 parts).
+  Not bisected (qa builds nothing); code in 35baa32f..ba7a8d75: core b47afb3b7 (a surface added to others: touching faces by a
+  shared vertex, duplicate check by face box) first by its subject, then 92f5a7c76 / 64744410b / 631ba9aa5 / 5deebf6d1 /
+  3e998be12 / 34db722b7, blend ba7a8d755. Repro: rollback --index 19 then `query parts`, 0.4.55 CLI vs the green.
+- User documents (hats, dock): the same as 0.4.55 on ba7a8d75 (complete check 04:33). Authored documents the same.
+- The 04:20 GO in qa-alerts was void: that check ran no user / ticket documents (two compat runs on vibe5 at once, "Text file
+  busy"); cut-check now waits for the loop's run under the vibe5 lock, cut-verdict gives NO VERDICT on an incomplete check.
+
 ## Release blockers for the 2026-11-13 17:00 release (qa list 17:52, candidate release/v0.4.49 = b441978c6; the latest release is v0.4.48)
 - **qa, v0.4.50 checked (published 07:30, cut 1a665d952): no blocker.** Released CLI against v0.4.49's (vibe5): rust-zero-solid-f197,
   hat15, hat15b, hat8, the dock the same. Released app (vibe6): the user's cases as ui-parity scenarios, 13/13 = live (88/88 states:
