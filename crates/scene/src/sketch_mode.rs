@@ -8209,13 +8209,28 @@ pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityI
     let before = sk.clone();
     // Live (live2 11-17 part 2b): the first-picked entity stays, the second-picked moves (placed as live places it).
     place_second_line(sk, c, ids);
-    let still = if ids.len() == 2 { vec![ids[0]] } else { Vec::new() };
-    let report = sk.solve_with(&noshape_sketch::SolveOptions { light: centers, still, ..Default::default() });
+    let light = if centers.is_empty() { what_moves(sk, c, ids) } else { centers };
+    let report = sk.solve_with(&noshape_sketch::SolveOptions { light, ..Default::default() });
     if !report.is_solved() {
         *sk = before;
         return false;
     }
     true
+}
+
+/// What a constraint from two picks moves, the rest held where it can be (live2 11-17): the second pick; a point and a
+/// circle, arc or ellipse made coincident, the point, or, when the point can't move (a model vertex, a fixed point),
+/// the curve's centre, so it shifts the shortest way with its radii kept.
+fn what_moves(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> Vec<EntityId> {
+    let [first, second] = ids else { return Vec::new() };
+    let pinned = |p: EntityId| sk.entity(p).is_some_and(|e| e.external) || sk.constraints().any(|k| k.kind == ConstraintKind::Fix { entity: p });
+    if matches!(c, ConstraintTool::Coincident | ConstraintTool::Pierce) {
+        let (point, curve) = if is_point(sk, *first) { (*first, *second) } else { (*second, *first) };
+        if is_point(sk, point) && !is_point(sk, curve) && let Some(center) = sk.entity(curve).and_then(|e| e.center()) {
+            return vec![if pinned(point) { center } else { point }];
+        }
+    }
+    vec![*second]
 }
 
 /// Two lines constrained, the second free of everything else: it moves as live moves it before the solve (live2
@@ -10741,6 +10756,30 @@ mod tests {
         ed.commit_otf(&mut d, "0.3", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
         let conic = d.sketch.entities().find(|e| e.kind() == EntityKind::Conic).unwrap();
         assert!(matches!(conic.geometry, noshape_sketch::Geometry::Conic { rho, .. } if (rho - 0.3).abs() < 1e-12));
+    }
+
+    /// Live2 11-17 (REQUESTS (d)): a 5 mm circle 3 mm off a point. Coincident with a fixed point, the circle shifts
+    /// 3 mm toward it, its radius kept; with a free point, the point moves onto the circle and the circle stays.
+    #[test]
+    fn a_circle_coincident_with_a_fixed_point_shifts_and_a_free_point_moves() {
+        for fixed in [true, false] {
+            let mut sk = Sketch::new();
+            let c = sk.add_circle(v(0.0, 0.008), 0.005);
+            let p = sk.add_point(v(0.0, 0.0));
+            if fixed {
+                sk.add_constraint(ConstraintKind::Fix { entity: p }).unwrap();
+            }
+            assert!(apply_constraint(&mut sk, ConstraintTool::Coincident, &[c, p]).is_ok_and(|n| n > 0));
+            assert!(solve_after_constraint(&mut sk, ConstraintTool::Coincident, &[c, p]));
+            let Some(Curve2::Circle { center, radius }) = sk.curve(c) else { panic!("a circle") };
+            let at = sk.point(p).unwrap();
+            assert!((radius - 0.005).abs() < 1e-9, "fixed {fixed}: radius kept, {radius}");
+            if fixed {
+                assert!((center - v(0.0, 0.005)).length() < 1e-9 && at.length() < 1e-12, "the circle shifts 3 mm: {center}");
+            } else {
+                assert!((center - v(0.0, 0.008)).length() < 1e-9 && (at - v(0.0, 0.003)).length() < 1e-9, "the point moves: {at}");
+            }
+        }
     }
 
     /// Live2 11-17 part 2b: two free lines, L1 picked first, then a constraint from the selection. L1 never moves; L2
