@@ -2154,6 +2154,38 @@ fn a_cone_face_cut_at_its_seam_writes_as_one_face() {
     assert!((a - area).abs() < 1e-6 * area, "{a} vs {area}");
 }
 
+/// A tube wall whose closed section's seam is kinked by 0.4 mrad (as our sweep's degree-12 sections, core's
+/// SWEEP-SEAM-KINK: cf-hose-routing's hoses came back from our SAT split in two) goes round as one ACIS face, its seam
+/// made tangent by moving the poles beside it well under a micrometre.
+#[test]
+fn a_tube_wall_with_a_slightly_kinked_seam_goes_round_as_one_acis_face() {
+    let (r, eps) = (0.003, 4e-4_f64);
+    let mut poles: Vec<DVec3> = (0..8).map(|k| {
+        let a = std::f64::consts::TAU * k as f64 / 8.0;
+        DVec3::new(r * a.cos(), r * a.sin(), 0.0)
+    }).collect();
+    let t = poles[1].distance(poles[0]) * 0.5;
+    poles.insert(1, DVec3::new(r, t, 0.0));
+    poles.push(DVec3::new(r - t * eps.sin(), -t * eps.cos(), 0.0));
+    poles.push(DVec3::new(r, 0.0, 0.0));
+    let spans = poles.len() - 3;
+    let knots: Vec<f64> = (0..=spans).map(|i| i as f64).collect();
+    let mut mults = vec![1u32; spans + 1];
+    mults[0] = 4;
+    mults[spans] = 4;
+    let section = make_bspline(&poles, None, &knots, &mults, 3, false).unwrap();
+    let wall = extrude(&section, DVec3::new(0.0, 0.0, 0.02)).unwrap().shape;
+    assert_eq!(wall.count(ShapeType::Face), 1);
+    let want = surface_properties(&wall).unwrap().mass;
+    let path = std::env::temp_dir().join(format!("noshape-sat-kinked-wall-{}.sat", std::process::id()));
+    write_acis(&path, std::slice::from_ref(&wall), LengthUnit::Meter).unwrap();
+    let back = read_acis_parts(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(back.iter().map(|p| p.shape.count(ShapeType::Face)).sum::<usize>(), 1);
+    let a: f64 = back.iter().map(|p| surface_properties(&p.shape).unwrap().mass).sum();
+    assert!((a - want).abs() < 1e-6 * want, "{a} vs {want}");
+}
+
 /// c2-rings-loft Part 2's 510 mm² cylinder face and the 0.007 mm² piece of it across a seam segment the big face meets
 /// once (shown as one face; UnifySameDomain leaves them): written as the one face of live's model, in x_t and SAT (ours
 /// read both back with 133 faces for 132; the SAT cylinder's reference now lies where no cut crosses, so the reader's

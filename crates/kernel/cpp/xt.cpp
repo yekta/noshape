@@ -743,6 +743,59 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
   const bool round_u = fu1 - fu0 > u1 - u0 - 1e-9, round_v = fv1 - fv0 > v1 - v0 - 1e-9;
   if ((b->IsUPeriodic() && !round_u) || (b->IsVPeriodic() && !round_v))
     return nullptr;
+  // ACIS: a closed seam kinked by under a milliradian (our sweep's single-span sections: cf-hose-routing's hoses 0.41
+  // mrad, core's SWEEP-SEAM-KINK) is made tangent: the pole rows beside it take the mean of their two end derivatives,
+  // moving no pole over 1 um (SAT is written in millimetres), a tenth of live's 1e-5 m linear band. (Not Parasolid:
+  // its knot removal still fails there, and live dropped hoses written with such walls periodic, 2452.)
+  auto smooth_seam = [&](bool in_u) {
+    const int deg = in_u ? b->UDegree() : b->VDegree(), np = in_u ? b->NbUPoles() : b->NbVPoles();
+    const int nq = in_u ? b->NbVPoles() : b->NbUPoles();
+    const int nk = in_u ? b->NbUKnots() : b->NbVKnots();
+    if ((in_u ? b->IsUPeriodic() : b->IsVPeriodic()) || np < 4 || (in_u ? b->UMultiplicity(1) : b->VMultiplicity(1)) != deg + 1 ||
+        (in_u ? b->UMultiplicity(nk) : b->VMultiplicity(nk)) != deg + 1)
+      return;
+    auto P = [&](int i, int j) { return in_u ? b->Pole(i, j) : b->Pole(j, i); };
+    auto W = [&](int i, int j) { return in_u ? b->Weight(i, j) : b->Weight(j, i); };
+    auto K = [&](int i) { return in_u ? b->UKnot(i) : b->VKnot(i); };
+    const double h0 = K(2) - K(1), h1 = K(nk) - K(nk - 1);
+    gp_XYZ lo(1e300, 1e300, 1e300), hi(-1e300, -1e300, -1e300);
+    for (int i = 1; i <= np; ++i)
+      for (int j = 1; j <= nq; ++j)
+      {
+        const gp_XYZ q = P(i, j).XYZ();
+        lo.SetCoord(std::min(lo.X(), q.X()), std::min(lo.Y(), q.Y()), std::min(lo.Z(), q.Z()));
+        hi.SetCoord(std::max(hi.X(), q.X()), std::max(hi.Y(), q.Y()), std::max(hi.Z(), q.Z()));
+      }
+    const double              size = (hi - lo).Modulus();
+    std::vector<gp_Pnt>       first(nq + 1), last(nq + 1);
+    double                    moved = 0;
+    for (int j = 1; j <= nq; ++j)
+    {
+      if (P(1, j).Distance(P(np, j)) > kPrecision || std::abs(W(2, j) - W(np - 1, j)) > 1e-12 * W(2, j))
+        return;
+      const gp_Vec d0 = gp_Vec(P(1, j), P(2, j)) / h0, d1 = gp_Vec(P(np - 1, j), P(np, j)) / h1;
+      first[j] = P(2, j), last[j] = P(np - 1, j);
+      if (d0.Magnitude() < 1e-12 * size && d1.Magnitude() < 1e-12 * size)
+        continue;
+      if (d0.Magnitude() < 1e-12 * size || d1.Magnitude() < 1e-12 * size || d0.Angle(d1) > 1e-3)
+        return;
+      const gp_Vec g = (d0 + d1) / 2;
+      first[j] = P(1, j).Translated(g * h0), last[j] = P(np, j).Translated(-g * h1);
+      moved = std::max({moved, first[j].Distance(P(2, j)), last[j].Distance(P(np - 1, j))});
+    }
+    if (moved == 0 || moved > 1e-3)
+      return;
+    b = occ::down_cast<Geom_BSplineSurface>(b->Copy());
+    for (int j = 1; j <= nq; ++j)
+    {
+      in_u ? b->SetPole(2, j, first[j]) : b->SetPole(j, 2, first[j]);
+      in_u ? b->SetPole(np - 1, j, last[j]) : b->SetPole(j, np - 1, last[j]);
+    }
+  };
+  if (round == RoundSplines::Acis && round_u)
+    smooth_seam(true);
+  if (round == RoundSplines::Acis && round_v)
+    smooth_seam(false);
   // A closed direction is periodic when its seam is tangent (C1).
   auto tangent_seam = [&](bool in_u) {
     for (int i = 0; i <= 8; ++i)
