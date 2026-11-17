@@ -10891,6 +10891,68 @@ static bool delete_prism_rounds(const TopoDS_Shape& solid, const std::vector<Top
   return true;
 }
 
+// OCCT's defeature of one feature bounded by work (its break hook's and progress checks): a feature it can only
+// remove past it (none in the model suites) is kept, as OCCT keeps one it can't remove (c2-impeller-loft's Delete face
+// 2 on stand-in faces: 1.55 M steps, 9 s, trimming a chamfer's corner patches run on far past themselves, then not
+// removed; the other face's removal 274 K).
+constexpr uint64_t DEFEATURE_WORK = 300000;
+thread_local uint64_t t_defeature_work = 0;
+
+// The faces to delete in OCCT's features (faces joined by edges), one group each where no two share a neighbour (each
+// removed on its own, bounded, as OCCT removes them one by one); else all in one.
+static std::vector<std::vector<TopoDS_Shape>> defeature_groups(const TopoDS_Shape& body, const std::vector<TopoDS_Shape>& del)
+{
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(body, TopAbs_EDGE, TopAbs_FACE, ef);
+  std::vector<int> group(del.size(), -1);
+  int              n = 0;
+  auto             touch = [&](const TopoDS_Shape& a, const TopoDS_Shape& b) {
+    for (TopExp_Explorer x(a, TopAbs_EDGE); x.More(); x.Next())
+      for (const TopoDS_Shape& f : ef.FindFromKey(x.Current()))
+        if (f.IsSame(b))
+          return true;
+    return false;
+  };
+  for (size_t i = 0; i < del.size(); ++i)
+  {
+    if (group[i] >= 0)
+      continue;
+    std::vector<size_t> todo{i};
+    group[i] = n;
+    while (!todo.empty())
+    {
+      const size_t k = todo.back();
+      todo.pop_back();
+      for (size_t j = 0; j < del.size(); ++j)
+        if (group[j] < 0 && touch(del[k], del[j]))
+        {
+          group[j] = n;
+          todo.push_back(j);
+        }
+    }
+    ++n;
+  }
+  std::vector<std::vector<TopoDS_Shape>> out((size_t)n);
+  for (size_t i = 0; i < del.size(); ++i)
+    out[(size_t)group[i]].push_back(del[i]);
+  // Each group's faces and their neighbours: apart, or all in one.
+  std::vector<ShapeIMap> around(out.size());
+  for (size_t g = 0; g < out.size(); ++g)
+    for (const TopoDS_Shape& f : out[g])
+    {
+      around[g].Add(f);
+      for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+        for (const TopoDS_Shape& o : ef.FindFromKey(x.Current()))
+          around[g].Add(o);
+    }
+  for (size_t g = 0; g < out.size(); ++g)
+    for (size_t h = g + 1; h < out.size(); ++h)
+      for (int i = 1; i <= around[g].Extent(); ++i)
+        if (around[h].Contains(around[g](i)))
+          return {del};
+  return out;
+}
+
 static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
 {
   require_non_null(s.shape, "shape");
@@ -10916,33 +10978,75 @@ static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
   std::vector<TopoDS_Shape> del;
   for (const TopoDS_Shape& f : faces.items)
     del.push_back(cp.ModifiedShape(f));
-  BRepAlgoAPI_Defeaturing mk;
-  mk.SetShape(in);
-  mk.AddFacesToRemove(to_list(del));
-  // On this thread, so its CPU budget (run_budgeted) counts the work: in
-  // parallel the caller only waits and its budget never ran out (qa
-  // DRAFT-HANG: 623 s in one call).
-  mk.SetRunParallel(false);
-  mk.SetToFillHistory(true);
-  mk.Build(new_cancel_indicator()->Start());
-  if (std::getenv("NOSHAPE_DEFEATURE_DEBUG"))
-  {
-    std::fprintf(stderr, "defeature: done %d errors %d warnings %d\n", (int)mk.IsDone(), (int)mk.HasErrors(), (int)mk.HasWarnings());
-    mk.DumpWarnings(std::cerr);
-    mk.DumpErrors(std::cerr);
-  }
-  if (!mk.IsDone() || mk.HasErrors())
-    fail_op("delete face failed: " + algo_errors(mk));
   std::vector<TopoDS_Shape> args{s.shape};
+  // Each feature removed on its own, its faces' images in the shape so far.
+  TopoDS_Shape cur    = in;
+  HHist        steps;
+  bool         unable = false;
+  for (const std::vector<TopoDS_Shape>& group : defeature_groups(in, del))
+  {
+    ShapeIMap now;
+    TopExp::MapShapes(cur, TopAbs_FACE, now);
+    std::vector<TopoDS_Shape> faces_now;
+    for (const TopoDS_Shape& f : group)
+    {
+      if (now.Contains(f))
+        faces_now.push_back(f);
+      else if (!steps.IsNull())
+        for (const TopoDS_Shape& m : steps->Modified(f))
+          faces_now.push_back(m);
+    }
+    BRepAlgoAPI_Defeaturing mk;
+    mk.SetShape(cur);
+    mk.AddFacesToRemove(to_list(faces_now));
+    // On this thread, so its CPU budget (run_budgeted) and work bound count the work: in parallel the caller only
+    // waits and its budget never ran out (qa DRAFT-HANG: 623 s in one call).
+    mk.SetRunParallel(false);
+    mk.SetToFillHistory(true);
+    bool spent = false;
+    {
+      const double     t0 = steady_seconds();
+      const ScopedWork work(t_defeature_work != 0 ? t_defeature_work : DEFEATURE_WORK);
+      try
+      {
+        mk.Build(new_cancel_indicator()->Start());
+      }
+      catch (const Standard_Failure&)
+      {
+        if (!work.w.hit)
+          throw;
+      }
+      if (std::getenv("NOSHAPE_WORK_TRACE"))
+        std::fprintf(stderr, "work: defeature %llu steps in %.0f ms%s\n", (unsigned long long)work.w.used, 1e3 * (steady_seconds() - t0), work.w.hit ? " (spent)" : "");
+      spent = work.w.hit;
+    }
+    if (std::getenv("NOSHAPE_DEFEATURE_DEBUG"))
+    {
+      std::fprintf(stderr, "defeature: done %d errors %d warnings %d\n", (int)mk.IsDone(), (int)mk.HasErrors(), (int)mk.HasWarnings());
+      mk.DumpWarnings(std::cerr);
+      mk.DumpErrors(std::cerr);
+    }
+    if (spent)
+    {
+      unable = true;
+      continue;
+    }
+    if (!mk.IsDone() || mk.HasErrors())
+      fail_op("delete face failed: " + algo_errors(mk));
+    unable = unable || mk.HasWarning(STANDARD_TYPE(BOPAlgo_AlertUnableToRemoveTheFeature));
+    merge_into(steps, history_of({cur}, mk));
+    cur = mk.Shape();
+  }
   // Not removed: the region the faces enclose, taken away or filled in.
-  if (mk.HasWarning(STANDARD_TYPE(BOPAlgo_AlertUnableToRemoveTheFeature)))
+  if (unable)
     if (auto by = defeature_by_region(in, del))
     {
       merge_into(ch, by->second);
       return make_result(args, by->first, ch.get());
     }
-  merge_into(ch, history_of({in}, mk));
-  return make_result(args, mk.Shape(), ch.get());
+  if (!steps.IsNull())
+    merge_into(ch, steps);
+  return make_result(args, cur, ch.get());
 }
 
 OpOut op_defeature(const OcShape& s, const OcShapeList& faces)
