@@ -4,7 +4,7 @@ Updated 11-16 18:15 UTC. History (dated notes up to 11-15 14:48): docs/handoff/a
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
-- **LANDING 8ae595cc (queued 11-17 01:1x): the ten core-oc commits** (1357fddb1 split-face attributes, 11f1335b9
+- **LANDING 8ae595cc (queued 11-17 01:08): the ten core-oc commits** (1357fddb1 split-face attributes, 11f1335b9
   split by untrimmed cylinder, 8deb8156c + bd8b5f74f periodic classify, 3ce19f704 / 3ace68b3f / bcaf5ffdb lofts,
   97b778e7d captured configuration, b173dc5bb sweep path lines, d2605e45d pattern surface join). Pairs clean: vibe7
   1206 -> 1216 (knife 46 -> 32 there is 8deb8156c's projection, reverted by bd8b5f74f: 46/52 on HEAD), vibe5 1247 -> 1250.
