@@ -4,71 +4,46 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 05:49 UTC.
+Updated 11-17 07:35 UTC.
 
 ## In flight
-- Landed 11-17: bool-knife (ecf8c33a: hulls, Shell check, uv_of k-d tree, patch cache, validity-once unify, face
-  tolerance margin + DECISIONS note), OCCT 0033 (9ece8f66).
-- GATE GAP: the knurl corpora (kall, k10-25, k10-25-12, k25-15, k25-25, k25-71-12) need a 48 GB host for OCCT's cut;
-  none left (29-31 GB), gate-host.py skips them and says so. Instead (lead 11-17 ok): ours-only replay on main and
-  branch: NOSHAPE_BOOL_CORPUS=~/agents/bool-corpora/<k> NOSHAPE_BREP_OURS_ONLY=1 <kernel tests>
-  brep_replay::brep_corpus_replay (compares with the recorded OCCT result).
-- Landed 11-17 04:25: bool-knife2 as cf5a9aff (grid cache + Shell wall checked once; gate clean, Shell A/B 211/211,
-  hats/dock SAME).
-- Landed 11-17 05:48: bool-march as d3f24a83 (the plane x B-spline marcher, fit 1e-8; gate clean, hats/dock SAME):
-  knife Mirror 1 22/60/39 again; rings-loft on the Mac 920 -> 870 ms (Shell 1 ~228, live 235).
-- Rings-loft Extrude 5 (Mac 68 ms, live 39): boolean.rust.brep 31 (its cut c40a49c401d38878, Mac
-  ~/noshape-host/agents/bool-hat/rlrec), prism_until.split 14, unify 11. Hot: intervals_on's chords of mapped
-  sections (325 mappings of ~30 curves, 70K samples); caching their 3D points gave nothing measurable (parked
-  /root/bool-scratch/parked-points-along.diff). Circular pattern 1 (~300 ms, 51 prism_until splits): decision asked.
-- c2-config-parts-nuts Sweep 1: FIXED on bool-nuts b6466ab04 (bool-hat, on bool-march): one of core's thread turn
-  faces' helices fall 2.6e-8 rad short of a turn; that rounding gap became its th0 (a gap > 1e-9), both rulings on one
-  side (right empty), its outline swallowed the bore's strip between turns (bore pieces 24 / 14 OnSame) -> non-manifold.
-  Now a helix face's gap within the tolerance goes round between its rulings (falls back to the gap if the rulings
-  don't qualify). Ours valid, 42 faces, 135.267625 mm3 (OCCT invalid 156.81). Rebase on main first (march landed). Gate: unit bool-gate-nuts (waits for
-  core's) -> /root/bool-hat-scratch/chain-b6466ab04.out; then hats/dock, land. Debug diffs:
-  /root/bool-scratch/nuts-fix-with-debug.diff (ZZ_FACE_PIECES, ZZ_BOUND=<faces> print pieces' states / outlines).
-  Core told (its exact-cylinder sweep patch can unpark; it compares the volume with live).
-- core-sing 4254e715e gate for core (op_defeature per feature, 300K-step bound): unit bool-gate-coresing ->
-  /root/bool-hat-scratch/chain-4254e715e.out (started 04:28). Core checks the WORK_TRACE "(spent)" lines in its p6.
-- qa's knife Mirror 1 130 -> 223 ms (0.4.53 -> 0.4.55): the marcher's 1e-7 fit (Mirror 1 kept its halves, 31 faces),
-  fixed in bool-march. The mirror bisect (same recorded fuse, cold): 145ad9e67 21.4 ms, 35baa32fa 21.4: no Boolean code
-  change; the remaining +12 ms on green is its different input (below).
-- qa's Mirror 1 +12 ms vs v0.4.53 (vibe7 03:50, 3 runs each 129-131 vs 139): real, not the Boolean's code: unify
-  99.8 -> 82.3, the fuse 28.8 -> 54.8 because its input differs (v0.4.53's blade 9881.011 mm3, green's 9881.086, both
-  in live's band; upstream Fillet 2 / Chamfer 1); the same input times the same on both (cold 21.4 ms). On one binary
-  green's input fuses in 26-28 ms, v0.4.53's in 13-19. Told the lead.
-- Fillet 2 (11-17, Mac 100 ms vs live 9): op_boolean 30 (cut + fuse), op_split 28 (dump split-11: the 5-face
-  run-on tool split by 2 planes + the grind B-spline, OCCT's splitter 25 ms), min_distance x31 11, op_fillet 10,
-  props_surface x11 6. A cross-Boolean exact-box cache can't hit: the cut trims the grind face (a new face, a
-  new box). No single lever left in mine.
-- Revolve 1 (54f29c1fecb98afe) after the grid cache: 60 % OCCT's sections ahead (ComputeTolReached3d PSO 24,
-  CheckSingularPoints' Extrema grid on the whole blade 14, WLApprox 10, ImpPrm 8), free::apart 8.5. Extrude 8 =
-  5d62643e95aabaa7, Extrude 9 = b58272a7dbba8cc5 (all cut the blade's one B-spline face, x 6-122 mm).
-- learning-center-michael (11-17 Mac): 88 ms vs live 96, under live (the 363 was loaded vibe5). Only Fillet 2 over
-  (82 vs 46): its by_tools cuts 1447eaf22e0cd418 (12 tools, 34 ms in place) + 694e9aab23f65697 (9.8), seams 12.6;
-  the cut half OCCT's plane / cylinder x torus walking (ImpPrm). Cases: vibe5 ~/agents/bool-keep/lcmrec.
-- cf-spur-gear Boolean 1 (11-17 Mac): ~48 ms vs live 34 (fuse f30adc1991797392, 186 + 56 faces: ours 20, build 9,
-  check 8; unify 14, usd.build 9.5); diffuse, no single lever. Doc 467 ms vs live 2112. Case: vibe5
-  ~/agents/bool-keep/sgrec.
-- blend FYI 11-17: cf-spur-gear's Boolean 1 54 ms vs live 34 (others under live); raw /root/blend-scratch/sg.log.
-- Knife, mine (Mac): Fillet 2 85 ms vs live 10 (fuse: four plane x grind B-spline pairs 15-18 ms each, 1 line each,
-  case c1d9f750d291ba85 / 17b8bafce508d06d; run-on tool op_split 25), next. Then core's handover: Revolve 1 (op_boolean
-  63 ms Mac, sections ahead 44 vibe5), Extrude 8/9 (55/51), Extrude 2 (sections ahead 34), Extrude 3. Recorded cases:
-  vibe5 ~/tmp/bool/knrec (Mac ~/noshape-host/agents/bool-hat/knrec; feature order by mtime: 17b8 c1d9 (Fillet 2),
-  a3f9 (Chamfer 1), 682a (Mirror 1), then the cuts). Per-pair OCCT timing: /root/bool-scratch/ahead-debug3.diff
-  (NOSHAPE_AHEAD_DEBUG). Chamfer 1's hulls: ~15 ms CPU a run; kind pre-check / plane give-up gained <= 3 ms: dropped.
-- Fan-blade Boolean 2 (core-offset): OCCT's (tangent by design: thread crest r 4.000 along the 4 mm chamfer circle);
-  no safe early decline ("one-face section" decline lost hundreds of taken cases). Lead agreed 11-17.
-- Snap-hook Shell 1: its checks can't be skipped (the SI check is what finds offsets crossing; the wall can be
-  invalid, the repair path); the wall was checked twice: dc060ff1c. Rings-loft Shell 1 dump ~165-180 ms Mac vs live 235.
-- core: offset steps 1+2 gate passed (told 11-16 23:4x); offset_solid takes removed faces since 0c328e3b7: try on the
-  Shell corpora (k::last_offset_report()).
-- Scratch worktree with switches (ZZ_*): /root/bool-scratch/wt/bool-hat (rb.sh dir ~/agents/bool-hat on vibe5 / Mac,
-  shared with bool-hat: never build both at once), never landed. Probes in untracked crates/kernel/tests/xprobe.rs
-  (probe_shell_dump PROBE_REPS, probe_shell_corpus_ab, probe_unify_dump, probe_edge_off_face); before a build
-  `git apply /root/bool-scratch/probe-allrs.patch`, after it `git checkout crates/kernel/tests/all.rs`.
-- Not mine, handed back 11-16: tablet-stand Extrude 1, parting-line Rib (core bb61a968).
+- P0 MSVC (lead 07:3x): main's rust_boolean.cpp `fitted` failed on Windows (C2131 `double left[p + 1]` with p a local
+  constexpr captured by the lambdas; C2440 / C3536 the `check` lambda that follows). Fix: `static constexpr int p = 5;`
+  on branch bool-msvc 0dd58bd21 (bool-hat; pushed to origin bool-msvc), g++-13 clean; CI dispatch run 44039545068
+  (all three OSes, T1). Land when its Windows jobs are past the kernel, then delete the origin branch.
+- P0 SCISSOR-LIFT-BOM-ROWS (lead 07:30: bool bisects): fed22d alone as a model (asm's mfe, and a complete copy mfe2 with
+  sketches.json + metadata.json, vibe6 ~/agents/bool-keep/ms) gives the same at both ends (28/60, no Fillet 18 error):
+  the change only shows in the assembly run. Unit bool-bisect-sl (/root/bool-scratch/bisect-sl-run.sh): debug ops
+  tests in worktree 776dfea9 (vibe6 target ~/agents/776dfea9), asm-scissor-lift alone (snapshot vibe6
+  ~/agents/bool-keep/sl) through ~/bin/slot, judged by "Studio fed22d › Fillet 18: Error"; both ends first, then git
+  bisect run. Log /root/bool-scratch/sl-bisect.log, outputs sl-<sha>.out. ~16 min a step. Culprit -> owner as P0.
+- bool-nuts 787b7e70b (bool-hat branch bool-nuts-main, on main 1d77cd633): c2-config-parts-nuts' thread turn cut + T1
+  bool_patterns::a_nuts_thread_turns_cut_its_bore_between_them (tests/data/thread; fails on main, passes here). Gate
+  b6466ab04 (same change on the older stack): replay 0 differences vs bool-march's gate; 2 documents changed only in the
+  order of an untranslated note's sketch-region areas (sprockets, rocker-enclosure). hats/dock 12/12 SAME; hat15b
+  pending (vibe5 ~/tmp/bool/udoc, cli-br / cli-base). Then land.
+- bool-march's (landed d3f24a83) replay flags: 4 cases (inputs 74acee2ff54886eb, e001fa8eb5dbfe24: a common with a
+  z-prism, plane x B-spline caps) "equivalent", 5.4e-6 relative volume, history differs. Ours is the exact one: both
+  caps 8.029909 mm² and volume = cap x 20 mm exactly (160.598185); OCCT's caps differ (8.030027 / 8.030052) and don't
+  match its own volume. Accepted per DECISIONS 11-15 (end to end identical at its land).
+- bool-offedge (bool-hat, WIP commit on branch bool-offedge): off_shared_edges skips a shared edge whose box lies past
+  the limit (the 129-sample scan and the bisection compare only with the 10 um reach; the argmin and tolerance uses take
+  every edge): the same decisions by construction. Mac kernel binaries oc33/kern-main, kern-offedge for the A/B on the
+  knife's Fillet 2 fuse (knrec c1d9f750d291ba85: off_shared_edges 212 of occt_ahead's 905 samples). Then gate.
+- Knife Fillet 2 (Mac, loaded 5-7, hint): 74-81 ms vs live 9: op_boolean 22 (sections ahead 16: OCCT FaceFace
+  ParamParam 200 / ImpPrm 116 samples, MakeCurve 60, off_shared_edges 212), op_split 18.5, min_distance x31 10.6,
+  props_surface x11 6. Its four plane x grind pairs are the marcher's now (< 1 ms each). Knife 595-663 ms vs live 622.
+- GATE GAP: the knurl corpora need a 48 GB host (none); gate-host.py skips them. Ours-only replay instead (lead 11-17 ok):
+  NOSHAPE_BOOL_CORPUS=~/agents/bool-corpora/<k> NOSHAPE_BREP_OURS_ONLY=1 <kernel tests> brep_replay::brep_corpus_replay.
+- Landed 11-17: bool-knife (ecf8c33a), OCCT 0033 (9ece8f66), bool-knife2 (cf5a9aff), bool-march (d3f24a83).
+- core-sing 4254e715e gate: replay clean, 2 documents changed; core handled it (core-sing2 without the point loft).
+- Rings-loft Extrude 5 (Mac 68 ms, live 39): boolean.rust.brep 31 (cut c40a49c401d38878), prism_until.split 14,
+  unify 11; parked /root/bool-scratch/parked-points-along.diff. Circular pattern 1: decision asked.
+- qa's knife Mirror 1 +12 ms vs v0.4.53: real, from its different input (upstream Fillet 2 / Chamfer 1), not Boolean code.
+- learning-center-michael (Mac 88 ms vs live 96), cf-spur-gear Boolean 1 (~48 vs 34, diffuse): cases vibe5
+  ~/agents/bool-keep/lcmrec, sgrec.
+- Knife cases: vibe5 ~/tmp/bool/knrec, Mac ~/noshape-host/agents/bool-hat/knrec (17b8 c1d9 Fillet 2, a3f9 Chamfer 1, 682a
+  Mirror 1, then the cuts). Revolve 1 = 54f29c1fecb98afe, Extrude 8 = 5d62643e95aabaa7, Extrude 9 = b58272a7dbba8cc5.
 
 ## Parked (branches / diffs, not landing as they are)
 - Plane x B-spline marcher: un-parked 11-17, now bool-march (In flight above); its knife regression found and fixed.
@@ -105,7 +80,7 @@ Updated 11-17 05:49 UTC.
    waiting on it (wait_until_cold 34 %): the plane x B-spline marcher (item 3) is the lever. Fuse 4fa72ce21506c5f7
    (8 tools, 210 ms): BRepCheck 20 % (cuts' results 8.5, the fuse's 10; the fuse could trust the cut pieces' checked
    faces as made_valid does, but `a`'s are unchecked), ::at 19 % (chords of free curves 50 % of it, piece_box 20 %).
-3. Land bool-march (gate running), then the nuts cut (In flight).
+3. The off-edge pre-check (In flight), then the knife Fillet 2 op_split and min_distance.
 4. learning-center-michael (363 vs 96): cylinder x torus (22 pairs ~220 ms CPU), cylinder x sphere 24 pairs ~60 ms,
    cylinder x cylinder 10 pairs.
 5. skasm's cf-sheet-metal-shaped-flange: vibe6 ~/agents/skasm-keep/sf-bool-cases (40 cases): ~15 corner-relief cuts of a
