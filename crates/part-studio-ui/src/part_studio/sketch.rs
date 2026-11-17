@@ -3464,6 +3464,19 @@ impl PartStudioView {
         let readout = ed.selection_readout(&data, &units);
         let fixed = usize::from(!readout.is_empty());
         if !readout.is_empty() {
+            // Live psui/sketch-readouts: a circle or an arc alone leads with its tool's icon; the value as the model's
+            // readout (monospace, underlined), its unit after it.
+            let icon = ed.selection_readout_icon(&data).map(|name| div().mr(px(6.)).child(crate::assets::icon(name, 20., cx)));
+            let pal = p();
+            let item = |(label, text): (String, String)| {
+                let value = match text.split_once(' ') {
+                    Some((num, unit)) if num.parse::<f64>().is_ok() => h_flex().gap(px(2.)).child(crate::ui::measure_value(num.to_string()).text_color(pal.text)).child(div().child(unit.to_string())).into_any_element(),
+                    _ => div().font_family("monospace").child(text).into_any_element(),
+                };
+                h_flex().gap_1().child(format!("{label}:")).child(value)
+            };
+            let mut items = readout.into_iter().map(item);
+            let first = items.next();
             out.push(
                 h_flex()
                     .absolute()
@@ -3473,9 +3486,10 @@ impl PartStudioView {
                     .gap(px(12.))
                     .items_center()
                     .text_size(px(13.))
-                    .text_color(rgb(0x333333))
+                    .text_color(pal.text_muted)
                     .whitespace_nowrap()
-                    .children(readout.into_iter().map(|(label, value)| h_flex().gap_1().child(format!("{label}:")).child(div().font_family("monospace").child(value))))
+                    .child(h_flex().items_center().children(icon).children(first))
+                    .children(items)
                     .into_any_element(),
             );
         }

@@ -3794,6 +3794,16 @@ impl SketchEditor {
     /// the bottom right (live Onshape: `Length: 1.003 in`, `Diameter: 0.401
     /// in`, `Angle: 35.538 deg`, `Parallel dist: …`, `Point: X … Y … Z …`).
     /// Returns (label, value); `None` for an empty or mixed selection.
+    /// The icon live puts before a lone circle's or arc's readout (its tool's: psui/sketch-readouts).
+    pub fn selection_readout_icon(&self, data: &SketchData) -> Option<&'static str> {
+        let [e] = self.selection.as_slice() else { return None };
+        match data.sketch.curve(*e)? {
+            Curve2::Circle { .. } => Some("circle"),
+            Curve2::Arc { .. } => Some("center-point-arc"),
+            _ => None,
+        }
+    }
+
     pub fn selection_readout(&self, data: &SketchData, units: &UnitPrefs) -> Vec<(String, String)> {
         let sk = &data.sketch;
         // Live's readouts keep their precision ("30.000 mm", sketch-mirror-model-edge).
@@ -3815,27 +3825,32 @@ impl SketchEditor {
                 }
             }
             [a, b] => {
-                // Live sketch-key-symmetric / -midpoint / -concentric-two-circles: two points, a point and a line, two
-                // circles.
-                if let (Some(p), Some(q)) = (sk.point(*a), sk.point(*b)) {
-                    return one("Min dist", len((q - p).length()));
-                }
-                let line_of = |e: EntityId| match sk.curve(e) {
-                    Some(Curve2::Line { a, b }) => Some((a, b)),
+                // Live psui/sketch-readouts (11-17): the labels' order follows the kinds, never the pick order; arcs
+                // count as their arc for Min and Max.
+                let kind = |e: EntityId| match (sk.point(e), sk.curve(e)) {
+                    (Some(p), _) => Some(Pick::Point(p)),
+                    (_, Some(Curve2::Line { a, b })) => Some(Pick::Segment(a, b)),
+                    (_, Some(Curve2::Circle { center, radius })) => Some(Pick::Round(Round { center, radius, start: 0.0, sweep: TAU })),
+                    (_, Some(Curve2::Arc { center, radius, start_angle, end_angle })) => {
+                        Some(Pick::Round(Round { center, radius, start: start_angle, sweep: noshape_sketch::geom::ccw_sweep(start_angle, end_angle) }))
+                    }
                     _ => None,
                 };
-                if let Some((p, (l0, l1))) = sk.point(*a).zip(line_of(*b)).or_else(|| sk.point(*b).zip(line_of(*a))) {
-                    let d = l1 - l0;
-                    let t = if d.length_squared() > 0.0 { ((p - l0).dot(d) / d.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
-                    return one("Min dist", len((l0 + d * t - p).length()));
-                }
-                match (sk.curve(*a), sk.curve(*b)) {
-                    (Some(Curve2::Circle { center: c1, radius: r1 }), Some(Curve2::Circle { center: c2, radius: r2 })) => {
-                        let cd = (c2 - c1).length();
-                        let min = if cd >= r1 + r2 { cd - r1 - r2 } else { (r1.max(r2) - cd - r1.min(r2)).max(0.0) };
-                        vec![("Center dist".into(), len(cd)), ("Max dist".into(), len(cd + r1 + r2)), ("Min dist".into(), len(min))]
+                let (Some(ka), Some(kb)) = (kind(*a), kind(*b)) else { return Vec::new() };
+                let min_max_center = |(min, max): (f64, f64), center: f64| vec![("Min dist".into(), len(min)), ("Max dist".into(), len(max)), ("Center dist".into(), len(center))];
+                match (ka, kb) {
+                    (Pick::Point(p), Pick::Point(q)) => one("Min dist", len((q - p).length())),
+                    (Pick::Point(p), Pick::Segment(l0, l1)) | (Pick::Segment(l0, l1), Pick::Point(p)) => one("Min dist", len(segment_distance(p, l0, l1))),
+                    (Pick::Point(p), Pick::Round(r)) | (Pick::Round(r), Pick::Point(p)) => min_max_center(r.extremes_from(p), (p - r.center).length()),
+                    (Pick::Segment(l0, l1), Pick::Round(r)) | (Pick::Round(r), Pick::Segment(l0, l1)) => {
+                        let Some(d) = (l1 - l0).try_normalize() else { return Vec::new() };
+                        min_max_center(r.extremes_from_segment(l0, l1), (r.center - l0).perp_dot(d).abs())
                     }
-                    (Some(Curve2::Line { a: a0, b: a1 }), Some(Curve2::Line { a: b0, b: b1 })) => {
+                    (Pick::Round(r), Pick::Round(s)) => {
+                        let (min, max) = r.extremes_from_round(&s);
+                        vec![("Center dist".into(), len((s.center - r.center).length())), ("Max dist".into(), len(max)), ("Min dist".into(), len(min))]
+                    }
+                    (Pick::Segment(a0, a1), Pick::Segment(b0, b1)) => {
                         let (Some(u), Some(v)) = ((a1 - a0).try_normalize(), (b1 - b0).try_normalize()) else { return Vec::new() };
                         if u.perp_dot(v).abs() < 1e-9 {
                             one("Parallel dist", len((b0 - a0).perp_dot(u).abs()))
@@ -3845,16 +3860,6 @@ impl SketchEditor {
                             one("Angle", format!("{} deg", noshape_units::to_fixed(ang.to_degrees(), units.angle_precision)))
                         }
                     }
-                    // A line and a circle (live sketch-mirror-preselected-batch): the nearest and farthest distances
-                    // between them and the centre's distance to the line.
-                    (Some(Curve2::Line { a: l0, b: l1 }), Some(Curve2::Circle { center, radius })) | (Some(Curve2::Circle { center, radius }), Some(Curve2::Line { a: l0, b: l1 })) => {
-                        let Some(d) = (l1 - l0).try_normalize() else { return Vec::new() };
-                        let t = (center - l0).dot(d).clamp(0.0, (l1 - l0).length());
-                        let near = (l0 + d * t - center).length();
-                        let far = (l0 - center).length().max((l1 - center).length());
-                        vec![("Min dist".into(), len((near - radius).max(0.0))), ("Max dist".into(), len(far + radius)), ("Center dist".into(), len((center - l0).perp_dot(d).abs()))]
-                    }
-                    _ => Vec::new(),
                 }
             }
             _ => Vec::new(),
@@ -8294,6 +8299,135 @@ pub fn apply_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) ->
     }
 }
 
+/// A sketch selection as the readout measures it.
+#[derive(Clone, Copy)]
+enum Pick {
+    Point(DVec2),
+    Segment(DVec2, DVec2),
+    Round(Round),
+}
+
+/// A circle, or an arc from `start` sweeping `sweep` counter-clockwise.
+#[derive(Clone, Copy)]
+struct Round {
+    center: DVec2,
+    radius: f64,
+    start: f64,
+    sweep: f64,
+}
+
+fn segment_distance(p: DVec2, l0: DVec2, l1: DVec2) -> f64 {
+    let d = l1 - l0;
+    let t = if d.length_squared() > 0.0 { ((p - l0).dot(d) / d.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
+    (l0 + d * t - p).length()
+}
+
+fn min_max(ds: &[f64]) -> (f64, f64) {
+    ds.iter().fold((f64::INFINITY, 0.0_f64), |(lo, hi), d| (lo.min(*d), hi.max(*d)))
+}
+
+impl Round {
+    fn holds(&self, angle: f64) -> bool {
+        self.sweep >= TAU || noshape_sketch::geom::angle_in_range(angle, self.start, self.sweep, 1e-12).is_some()
+    }
+
+    fn ends(&self) -> Vec<DVec2> {
+        if self.sweep >= TAU {
+            return Vec::new();
+        }
+        [self.start, self.start + self.sweep].iter().map(|a| self.center + DVec2::from_angle(*a) * self.radius).collect()
+    }
+
+    /// The nearest and farthest distances from `p` to the curve.
+    fn extremes_from(&self, p: DVec2) -> (f64, f64) {
+        let d = (p - self.center).length();
+        if d < 1e-12 {
+            return (self.radius, self.radius);
+        }
+        let toward = (p - self.center).to_angle();
+        let mut ds: Vec<f64> = self.ends().iter().map(|e| (*e - p).length()).collect();
+        if self.holds(toward) {
+            ds.push((d - self.radius).abs());
+        }
+        if self.holds(toward + PI) {
+            ds.push(d + self.radius);
+        }
+        min_max(&ds)
+    }
+
+    /// The nearest and farthest distances between the segment `l0`–`l1` and the curve.
+    fn extremes_from_segment(&self, l0: DVec2, l1: DVec2) -> (f64, f64) {
+        let (e0, e1) = (self.extremes_from(l0), self.extremes_from(l1));
+        let mut ds = vec![e0.0, e1.0];
+        ds.extend(self.ends().iter().map(|e| segment_distance(*e, l0, l1)));
+        let line = l1 - l0;
+        if let Some(u) = line.try_normalize() {
+            let t = (self.center - l0).dot(u);
+            let foot = l0 + u * t;
+            let h = (foot - self.center).length();
+            let normal = if h > 1e-12 { (foot - self.center) / h } else { u.perp() };
+            if (0.0..=line.length()).contains(&t) && self.holds(normal.to_angle()) {
+                ds.push((h - self.radius).abs());
+            }
+            // Where the segment crosses the curve.
+            if h <= self.radius {
+                let half = (self.radius * self.radius - h * h).sqrt();
+                for s in [t - half, t + half] {
+                    if (0.0..=line.length()).contains(&s) && self.holds((l0 + u * s - self.center).to_angle()) {
+                        ds.push(0.0);
+                    }
+                }
+            }
+        }
+        (min_max(&ds).0, e0.1.max(e1.1))
+    }
+
+    /// The nearest and farthest distances between two circles or arcs.
+    fn extremes_from_round(&self, other: &Round) -> (f64, f64) {
+        let mut ds = Vec::new();
+        for (from, to) in [(self, other), (other, self)] {
+            for e in from.ends() {
+                let (a, b) = to.extremes_from(e);
+                ds.extend([a, b]);
+            }
+        }
+        let between = other.center - self.center;
+        let cd = between.length();
+        let (r1, r2) = (self.radius, other.radius);
+        if cd > 1e-12 {
+            // Inside both curves the extremes lie on the line through the centres.
+            let u = between / cd;
+            for s1 in [1.0, -1.0] {
+                for s2 in [1.0, -1.0] {
+                    if self.holds((u * s1).to_angle()) && other.holds((u * s2).to_angle()) {
+                        ds.push((self.center + u * s1 * r1 - other.center - u * s2 * r2).length());
+                    }
+                }
+            }
+            // Where they cross.
+            if cd <= r1 + r2 && cd >= (r1 - r2).abs() {
+                let along = (cd * cd + r1 * r1 - r2 * r2) / (2.0 * cd);
+                let off = (r1 * r1 - along * along).max(0.0).sqrt();
+                for side in [1.0, -1.0] {
+                    let x = self.center + u * along + u.perp() * off * side;
+                    if self.holds((x - self.center).to_angle()) && other.holds((x - other.center).to_angle()) {
+                        ds.push(0.0);
+                    }
+                }
+            }
+        } else {
+            // Concentric: a shared direction gives the radii's difference, opposite ones their sum.
+            if self.holds(other.start) || other.holds(self.start) {
+                ds.push((r1 - r2).abs());
+            }
+            if self.holds(other.start + PI) || other.holds(self.start + PI) {
+                ds.push(r1 + r2);
+            }
+        }
+        min_max(&ds)
+    }
+}
+
 impl SketchEditor {
     /// Add intersection curves of a model face with the sketch plane; they
     /// are re-computed on every regeneration.
@@ -8991,6 +9125,50 @@ mod tests {
         ed.selection.clear();
         assert!(ed.selection_readout(&d, &u).is_empty());
         let _ = &mut d;
+    }
+
+    #[test]
+    fn pair_readouts_follow_lives_kinds_and_arcs() {
+        // Live2 feel/sketch-readouts (11-17), mm: each pair either way round reads the same.
+        let (ed, mut d) = editor(Tool::Select);
+        let u = UnitPrefs::default();
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let pt1 = d.sketch.add_point(mm(-80.0, 40.0));
+        let c1 = d.sketch.add_circle(mm(0.0, 0.0), 0.025);
+        let c3 = d.sketch.add_circle(mm(0.0, 0.0), 0.006);
+        let c4 = d.sketch.add_circle(mm(15.0, 0.0), 0.005);
+        let a1 = d.sketch.add_arc_angles(mm(70.0, 0.0), 0.015, 0.0, PI);
+        let a2 = d.sketch.add_arc_angles(mm(70.0, -50.0), 0.010, PI, TAU);
+        let l1 = d.sketch.add_line(mm(-80.0, -40.0), mm(20.0, -40.0));
+        let pt2 = d.sketch.add_point(mm(-30.0, -40.0));
+        let readout = |sel: [EntityId; 2]| {
+            let text = |sel: &[EntityId]| {
+                let mut ed2 = SketchEditor::new(ed.feature, ed.frame);
+                ed2.selection = sel.to_vec();
+                ed2.selection_readout(&d, &u).iter().map(|(l, v)| format!("{l} {}", v.trim_end_matches(" mm"))).collect::<Vec<_>>().join(" | ")
+            };
+            let (ab, ba) = (text(&sel), text(&[sel[1], sel[0]]));
+            assert_eq!(ab, ba, "the pick order changes nothing");
+            ab
+        };
+        assert_eq!(readout([pt1, c1]), "Min dist 64.443 | Max dist 114.443 | Center dist 89.443");
+        assert_eq!(readout([pt1, a1]), "Min dist 140.242 | Max dist 169.779 | Center dist 155.242");
+        assert_eq!(readout([l1, a1]), "Min dist 53.151 | Max dist 170.242 | Center dist 40.000");
+        assert_eq!(readout([c1, a1]), "Center dist 70.000 | Max dist 110.000 | Min dist 30.000");
+        assert_eq!(readout([a1, a2]), "Center dist 50.000 | Max dist 75.000 | Min dist 50.249");
+        assert_eq!(readout([c1, c3]), "Center dist 0.000 | Max dist 31.000 | Min dist 19.000");
+        assert_eq!(readout([c1, c4]), "Center dist 15.000 | Max dist 45.000 | Min dist 5.000");
+        assert_eq!(readout([pt2, l1]), "Min dist 0.000");
+        assert_eq!(readout([pt1, pt2]), "Min dist 94.340");
+        assert_eq!(readout([c1, l1]), "Min dist 15.000 | Max dist 114.443 | Center dist 40.000");
+        let mut lone = SketchEditor::new(ed.feature, ed.frame);
+        lone.selection = vec![a1];
+        assert_eq!(lone.selection_readout(&d, &u), vec![("Radius".to_string(), "15.000 mm".to_string())]);
+        assert_eq!(lone.selection_readout_icon(&d), Some("center-point-arc"));
+        lone.selection = vec![c1];
+        assert_eq!(lone.selection_readout_icon(&d), Some("circle"));
+        lone.selection = vec![c1, a1];
+        assert_eq!(lone.selection_readout_icon(&d), None, "pairs have no icon");
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-16 17:49 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-17 10:45 UTC (new thread on this account since 10:35). History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -119,6 +119,21 @@ docs/DECISIONS.md (read first; it wins over anything here).
    centre). Circle+arc, two arcs, circle+circle: Center | Max | Min (r10/r5 concentric 0/15/5; r10/r3 2 mm apart
    2/15/5). Point on a line: "Min dist: 0.000 mm" only. Label order by the kinds, not the selection order.
    Ours: scene/sketch_mode.rs `selection_readout` (two points, point+line, two circles done 11-16).
+
+## In progress (11-17, new thread)
+
+- Full ui-parity run (all 2146 with live takes, green 793cb58e) queued on vibe6: unit psui-full1117 (systemd --user),
+  `~/bin/slot timeout 10800 ~/agents/psui-keep/full.sh ~/tmp/psui/full1117` (4 shards, displays 386-389, snapshot
+  of the scenarios in ~/tmp/psui/src-1117). Log ~/tmp/psui/full1117.log; score in full1117/score.log.
+- Feel matrices on the Mac: `cargo test -p noshape-part-studio-ui --lib -- sketch_ui_tests::{feel,snaps,list,measure,
+  nav,chrome,toolbar_highlight,sm,sketchtools,editing,dialogs,fields,feedback}::` (a plain `feel` filter only hits 4).
+- Toolbar box model patch applied in the worktree; screenshot run fb5/run1.sh tooldd (fb5/tooldd.json) on vibe6.
+- Sketch readouts (item 3) written: sketch_mode.rs `Pick` / `Round` extremes (arcs as arcs, Center to the infinite
+  line, order by kinds), `selection_readout_icon` (circle / center-point-arc), sketch.rs value as measure_value; test
+  `pair_readouts_follow_lives_kinds_and_arcs` (live2's table). Not yet built.
+- qa P2 (11-17): TICKETS DOCK-TAB-SWITCH-TRAILING-FRAMES: since 0.4.54 about half the switches between the dock's two
+  open tabs keep drawing frames 700-860 ms (0.4.53 settled in 76-154 ms); no regen in the perf log; suspect the tab's
+  hover card under the resting pointer. Data /root/qa-scratch/lat/hat/tabab-rel.out. After items 1-3.
 
 ## Waiting on others
 

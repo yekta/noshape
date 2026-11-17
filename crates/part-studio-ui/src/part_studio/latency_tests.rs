@@ -20,10 +20,11 @@ struct Target {
 const TARGETS: [Target; 5] = [
     // "Pre-highlight": on a hardware-GL desktop ≈ 10–50 ms + one pick (2–10 ms) after the pointer stops.
     Target { what: "hover: a face lit after a jump", live: "10-50 ms + pick (2-10)", max_ms: 30.0 },
-    // Not timed live; one frame of a 60 Hz display.
-    Target { what: "click: the face selected and drawn", live: "(a frame)", max_ms: 16.7 },
-    // "speed: core edit commit": Enter → the preview's regeneration reply 0.2–0.3 s.
-    Target { what: "dialog: Extrude 1 open on its preview", live: "200-300 ms", max_ms: 100.0 },
+    // Live psui/timings-1117 (software GL): pointerup → the selected face drawn 57–67 ms; held to one 60 Hz frame.
+    Target { what: "click: the face selected and drawn", live: "57-67 ms", max_ms: 16.7 },
+    // Live psui/timings-1117: double-click → the dialog 322–448 ms, its preview drawn 0.73–2.2 s; "speed: core edit
+    // commit": Enter → the preview's regeneration reply 0.2–0.3 s.
+    Target { what: "dialog: Extrude 1 open on its preview", live: "322-448 ms (preview 0.7-2.2 s)", max_ms: 100.0 },
     // interaction-feel "preview timing while dragging (every ~0.4 s)".
     Target { what: "drag: a depth step's preview drawn", live: "~400 ms", max_ms: 100.0 },
     // "speed: core edit commit": ✓ → the new tessellation 0.31–0.35 s.
