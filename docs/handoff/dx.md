@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 21:09 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 21:26 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -192,20 +192,17 @@ Open, ranked:
 - 21:00 incident (lead): queue state lost; re-queued 21:0x from dx-main branch dx-land2 = t_work fix + x_t mesh export
   (4ce6c052a / dac9d1713 / 706b2c23b cherry-picked) + 25.0 confirmed comment (live2 21:0x: ours-duct at 25.0 / 28.1 /
   30.0 / 38.1 all import as live's own). Lead 21:0x: keep the disjoint-piece split.
-- In progress: live2 21:1x: our re-export of OUR IMPORT of live's hex-bookcase x_t (38.1 and 28.1 alike) imports in
-  live as shrunk 60/169/110 (live's own 168/108): the r 2 mm ring at (4.871, 155, 4) between a cylinder and live's
-  CONE (80.943 mm²) is written as 2 half circles (two CIRCLE nodes). Our imported model has that cone face as a
-  B-spline surface and the ring edge reports start (6.87,155,4) / end (2.87,155,4) with length 12.566: a reader bug
-  (prepared()'s DivideClosed paths don't fire: uncommitted NOSHAPE_XT_TRACE prints in dx-land xt.cpp, remove before
-  committing). Our own model's export (18:14 ours.x_t.zip) imports as 168/108, so it's import-only. Batches:
-  vibex8 ~/tmp/dx/xmmv/r*.jsonl, live2's diff live/dx/ours-xt-versions/edge-diff-live-vs-ours381.json.
+- d49566497 (dx-land, not queued): Parasolid import takes a B-surface that is a plane / cylinder / cone / sphere / torus
+  within 1e-7 m as that surface (not one an SP-curve lies on), as live: hex-bookcase "shrunk"'s B-surface is a cone
+  80.943666 mm² (live 80.943); our re-export now writes its ring as one circle (was two: live read 60/169/110). T1
+  export::a_parasolid_bspline_cone_reads_as_a_cone; kernel export/import 82/82, ops e2e export/import 12/12. Lands
+  with the suite proof below (it can move x_t import rows).
 - config-parts at live's 18:0x retake (ops-fix, vibex8 ~/agents/dx-keep/cfgp-fix.log): linear-rail 26/26, links 35/35,
   sprockets 24/24, standoffs 32/32, nuts 14/17 (Sweep 1 "non-manifold" ERROR, live OK: core/bool), pulleys 12/22
-  (Circular pattern 1 of 5 tooth faces x #Teeth "Failed to create pattern": check the 5 face refs, mine first).
+  (Circular pattern 1: refs = live's; faces_tool's cap fails, core's 06ecaff5a fixes it, 22/22).
   Speed: standoffs Threads=true Revolve 2 5.6 s / Boolean 1 3.2 s / Boolean 2 4.2 s (live 26-29 ms): OCCT Edge-Face
-  intersections (366 calls, 3.2 s in Revolve 2), profile ~/agents/dx-keep/stoff-prof.log: for bool.
-- Suite proof run: vibex8 slot ~/agents/dx-keep/exfix.sh ops-fix fix (binary md5 3ce71350, all of the above but
-  706b2c23b): full suite -> ~/agents/dx-keep/exch-fix.log, then first6 x3; lines in ~/agents/dx-keep/f6.out. Compare
+  intersections (366 calls, 3.2 s in Revolve 2), profile ~/agents/dx-keep/stoff-prof.log: lead gave it to bool2.
+- Suite proof run: vibex8 slot ~/agents/dx-keep/exfix.sh ops-fix fix (binary md5 88ef6080 = dx-land d49566497): full suite -> ~/agents/dx-keep/exch-fix.log, then first6 x3; lines in ~/agents/dx-keep/f6.out. Compare
   with /root/dx-scratch/exch-x1117c.log (59/75, 46/48, 114/119, DXF 0/4, times 49/50) and vibex7 exch-rest.log; land
   dx-land (land.sh) if only the hose / mesh rows changed and no crash.
 - Asked live2 20:28: import ours-duct-{25.0,28.1,30.0,38.1}.x_t and ours-hexmesh-{28.1,30.0}.zip
