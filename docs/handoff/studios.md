@@ -37,6 +37,8 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
     view selected grips only); the hole circle lights / takes its mark (`SheetPick::centermark_of_edge`), a press on
     it drags the view (`hole_press_view`); feel test `a_holes_centre_mark_lights_from_its_circle_and_a_press_there_drags_the_view`;
   - the matrix drops the hole callout palette's hidden dimension controls and «Varies» (live2 11-17).
+- Sheet fit checked 11-17 19:05: on open = Zoom to fit = live (feel `a_drawing_opens_fitted_and_zoom_to_fit_puts_it_back`,
+  queued ccab6c95). Asked live2 (low priority, after the grip drags): refit or keep zoom + centre on a window resize.
 - Asked live2 (18:45): centre mark grip drags (inward outside the circle, an automatic mark's stored length, hover-only
   drags). Ours: automatic marks don't drag; a Single mark's selected grip moves all four arms. Then implement + test.
 - Side-by-side crops for the lead: /root/studios-scratch/mate-glyphs-live-vs-ours.png, dimhover-sbs.png,
