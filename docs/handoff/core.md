@@ -1,24 +1,25 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-16 18:15 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-17 03:22 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
-- **STATE 11-17 02:15 (for the compaction):**
-  - core-offset (worktree core-trace, pushed) HEAD b281fe0d6 = merge-base 68371308e + offset 1/2/2b (landed as 822f3632,
-    will drop on rebase) + 87c383316 Boolean offset + 661df0163 parallel tools/StopState + 0c328e3b7 NaN removed faces +
-    4c463c807 Move face offset_solid first + 3c320fc0a prism patch + 01df8c3a1 guided loft speed + 4d1a3b93f
-    surface_result speed + b281fe0d6 no per-hit classify. core-trace has the uncommitted parity probe (never land it).
-  - Pairs: p3 (to 4c463c807) CLEAN; p4 (4c463c807 -> 4d1a3b93f, knife commits) running on vibe5 (p34.sh, p4res).
-  - Hats/dock A/B running (background): CLIs base 68371308e (core-bis) vs b281fe0d6 (core-trace) into vibe5
-    ~/tmp/core/udoc, then ~/agents/core-keep/udoc-cmp.sh (prints differences, UDOC-DONE). Delete src copies after.
-  - Then: if p4 clean and udoc SAME: rebase core-offset on main (drop landed offset commits), git checkout parity.rs
-    probe first, diff --stat, g++-13 build, land.sh.
-  - sew_closing (one sew for "solid if it closes", surface Add / surfaces.rs merge): /root/core-scratch/sew-closing.patch,
-    testing on core-oc (applied there, uncommitted; core-oc also has its parity probe). Commit into core-trace after
-    the udoc branch build has synced (don't change core-trace's tree before that).
-  - core-oc: main-based, probe uncommitted (/root/core-scratch/probe-wip.patch). core-bis: docs lands.
-- **LANDED 5b280750 (11-17 01:23): the ten core-oc commits** (pairs clean; details in the archive).
+- **STATE 11-17 03:22:**
+  - **LANDED b47afb3b (03:20): core-offset's 7 commits** (Boolean offset via offset_solid, parallel tools + StopState,
+    NaN removed faces, Move face offset_solid first, prism footprint patch, guided loft speed, surface_result speed).
+    p3 clean (1237 = 1237), p4 clean (1206 = 1206; branch 681 s vs base 849 s), hats/dock SAME (12 studios).
+  - **p5 pair running on vibe5** (~/agents/core-keep/p5pair.sh, p5res; base b47afb3b7): branch core-next (worktree
+    core-oc) = 4cb14d709 sew_closing (surface Add / surfaces.rs merge sew once, a solid where shells close) +
+    71e0c4fc6 straight B-spline seams join faces in shown_topology (fan-blade's right hole; T1
+    core::faces_split_at_a_seam_whose_curves_are_straight_bsplines_show_as_one) + d777a79b3 no per-hit classify in
+    the prism footprint patch. If clean: hats/dock A/B (udoc-cmp.sh), then land. Kernel tests 486 ok, clippy clean.
+  - fan-blade Boolean 2 topology (57/142/86 vs live 56/143/88): our base = live's at Chamfer 1 (50/119/68). Right hole
+    7 faces vs left's 6 (seam edge 99's pcurves straight B-splines: fixed by 71e0c4fc6 -> expect 56/139/84). Live
+    per hole then +2 edges +2 vertices: which vertices Parasolid keeps (ours hides the flank/seam crossings) needs
+    live's B-rep: REQUESTS (23:03, 02:35, 03:20: export "base" as x_t to the model folder, live-base.x_t). Probe:
+    vibe5 ~/tmp/core/probefan (base3.txt; OCCT brep tools q/x/edges/nuts, src /root/core-scratch/brepq).
+  - Worktrees: core-trace (branch core-nuts at main, clean; probe /root/core-scratch/probe-wip.patch), core-oc
+    (core-next, probe /root/core-scratch/probe-wip-oc.patch), core-bis: docs lands.
 - Impeller Extrude 4 model side: closed, nothing to fix. The 12 mm² sliver alone never meets the offset wall: even its
   surface over all of its own bounds only grazes the prism at the sketch plane (replayed dump vibe5
   ~/agents/core-keep/e4dump/prism_until-10, experiment patch /root/core-scratch/uptowiden-exp.patch). Live's Extrude 4
@@ -155,13 +156,20 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Saved documents' part names are Part N, not live's.
 
 ## Waiting on others
-- **c2-config-parts-nuts Sweep 1 (14/17): mine (bool 11-17 01:3x: the sweep's geometry).** The tool's crest strip is a
-  B-spline (1 x 11) exactly on the bore's cylinder (r 1.621113885844308 mm), so OCCT intersects instead of seeing one
-  surface and misclassifies the bore (its Cut removes more than the tool). Rust Boolean declines. WIP PARKED:
-  /root/core-scratch/sweep-cylinders-wip.patch (op_pipe_shell: faces_on_cylinders, cylinder_of fits the strip exactly,
-  pcurves by unwrapped sampling) -> the reshaped solid fails BRepCheck with no sub-shape status printed; next: write
-  the reshaped tool to brep and check it in a probe (orientation of the new face? wires order?). Dumps vibe5
-  ~/agents/core-keep/nm-nuts/{target,tool0,result}.brep.
+- **c2-config-parts-nuts Sweep 1 (14/17, parked again 11-17 02:55; mine per bool 01:3x).** The tool's crest strip is
+  a B-spline (1 x 11) exactly on the bore's cylinder (r 1.621113885844308 mm); OCCT intersects instead of seeing one
+  surface, and its Cut removes more than the tool. Rust Boolean declines. Live 135.268 mm3 (29/59/32), target
+  143.883, tool 11.888. WIP /root/core-scratch/sweep-cylinders-wip*.patch (op_pipe_shell faces_on_cylinders: strips
+  made exact cylinders, unwrapped pcurves; ShapeFix_Shape makes it valid). Probe (vibe5 ~/tmp/core/probefan/nuts,
+  src /root/core-scratch/brepq/nuts.cpp, dumps ~/agents/core-keep/nm-nuts-cyl): with exact cylinders the cut is
+  still wrong (144.384 mm3, 18 non-manifold edges): each strip is ONE face spanning ~7 turns (u -21.3..23.6), which
+  OCCT's Booleans can't place points on (they project into one period). ShapeUpgrade can't split it
+  (SplitSurface::Init clamps a periodic range to one period); BRepAlgoAPI_Splitter by the seam half-plane gives 27
+  faces but no separate solids. 11-17 03:15: per-turn split DONE in WIP /root/core-scratch/sweep-cylinder-turns-wip.patch
+  (cylinder_turns: strips cut at u = 2 pi k, pcurves in [0, 2 pi], edges split via ReShape; wire reversed where the
+  cylinder's normal opposes the B-spline's: valid with no ShapeFix). The cut is still wrong (155.4 mm3, invalid;
+  TooSmallEdge, AcquiredSelfIntersection): the r 2.0 crest passes through the chamfer rims (r 2.0 at z 0 / 4.06).
+  Sent to bool 03:20 (dumps ~/agents/core-keep/nm-nuts-turns with probe.cpp). Waiting on bool.
 - c2-config-parts-standoffs Revolve 1 (13/32): Sketch 3 solved 4 x 22 mm, chamfers on the axis side; live 3 x 24 (Length),
   outer corners chamfered (sketches.json). Already in skasm's handoff (translator takes Sketch 3 back). Variables OK.
 - **c2-sm-rocker-enclosure-body 15/28 (stable now):** Extrude 6's pocket is ~2 mm off live's and differently shaped
