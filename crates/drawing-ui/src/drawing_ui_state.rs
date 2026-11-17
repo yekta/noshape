@@ -321,8 +321,14 @@ impl DrawingEditor {
         for s in &self.selection {
             match s {
                 Sel::View(id) => {
+                    // (Light-framed views read VIEW for the 11-15 recorder too: live2 drw-section-edit-depth-direction.)
                     let framed = !sheet.view(*id).is_some_and(|v| matches!(v.kind, ViewKind::Section { .. } | ViewKind::Auxiliary { .. } | ViewKind::Detail { .. }));
-                    selection.push((if framed { "VIEW" } else { "EDGE" }.into(), self.ui_view_name(*id)));
+                    if framed {
+                        selection.push(("VIEW".into(), self.ui_view_name(*id)));
+                    } else {
+                        selection.push(("EDGE-".into(), self.ui_view_name(*id)));
+                        selection.push(("VIEW+".into(), self.ui_view_name(*id)));
+                    }
                 }
                 Sel::Edge(id, _) => selection.push(("EDGE".into(), self.ui_view_name(*id))),
                 // Live's recorder can't read an annotation's selection (a clicked callout records []: live2's batch
