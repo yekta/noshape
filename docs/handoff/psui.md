@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-17 22:25 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-17 22:18 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
