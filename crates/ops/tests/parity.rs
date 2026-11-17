@@ -777,12 +777,21 @@ fn exchange_round_trip() {
                 (Ok(ours), Some(live)) if mesh(format) => differences(&live, &mesh_counts(ours)),
                 (Ok(ours), Some(live)) => {
                     let diff = differences(&live, &ours);
-                    // Where live's import loses detail against its own model and ours keeps the model's: live's
-                    // shortcoming, not counted against ours.
+                    // Where live's import loses detail against its own model and ours keeps the model's, or splits
+                    // no more than live's own import of the same file, its volume and area as that import's (lead
+                    // 11-17, as the export rows: c2-rings-loft's live.igs, ours 275/771/514, live's 279/787/524, the
+                    // model's 273/762/508): live's shortcoming, not counted against ours.
                     let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], false));
+                    // (Live's own import off its model's volume, as its IGES of c2-rings-loft's ring, 565.6 mm³ for
+                    // 440.8: counts from the model's Parasolid on.)
+                    let held = xt.as_ref().zip(own.as_ref()).and_then(|(x, o)| model_topology(o, x));
                     match (&xt, own) {
-                        (Some(x), Some(own)) if !diff.is_empty() && let Some(held) = model_topology(&own, x) && differences(&held, &ours).is_empty() => {
-                            println!("{name}: live's own {format} import splits its model's edges or faces: ours keeps the model's (live's shortcoming)");
+                        (Some(x), Some(own))
+                            if !diff.is_empty()
+                                && (held.as_ref().is_some_and(|h| differences(h, &ours).is_empty())
+                                    || (counts_between(held.as_deref().unwrap_or(x), &own, &ours) && differences(&live, &with_counts(&ours, &live)).is_empty())) =>
+                        {
+                            println!("{name}: live's own {format} import splits its model's edges or faces: ours keeps the model's or splits less (live's shortcoming)");
                             Vec::new()
                         }
                         _ => diff,
@@ -1011,19 +1020,27 @@ fn dxf_differences(live: &DxfSummary, ours: &DxfSummary) -> Vec<String> {
 /// seam): part for part (by volume), counts between the model's (`held`) and its own file's (`own`), volume and area
 /// as `held` holds them.
 fn splits_no_more(held: &[PartState], own: &[PartState], read: &[PartState]) -> bool {
+    counts_between(held, own, read) && differences(held, &with_counts(read, held)).is_empty()
+}
+
+/// Part for part (by volume), `read`'s counts between the model's (`held`) and live's own import's (`own`).
+fn counts_between(held: &[PartState], own: &[PartState], read: &[PartState]) -> bool {
     if held.len() != read.len() || own.len() != read.len() {
         return false;
     }
-    let by_volume = |v: &[PartState]| {
-        let mut v: Vec<PartState> = v.to_vec();
-        v.sort_by(|a, b| a.volume.unwrap_or(0.0).total_cmp(&b.volume.unwrap_or(0.0)));
-        v
-    };
-    let (h, o, r) = (by_volume(held), by_volume(own), by_volume(read));
     let between = |m: u64, x: u64, l: u64| m <= x && x <= l;
-    let counts = h.iter().zip(&o).zip(&r).all(|((h, o), r)| between(h.faces, r.faces, o.faces) && between(h.edges, r.edges, o.edges) && between(h.vertices, r.vertices, o.vertices));
-    let as_held: Vec<PartState> = r.iter().zip(&h).map(|(r, h)| PartState { faces: h.faces, edges: h.edges, vertices: h.vertices, face_types: h.face_types.clone(), edge_types: h.edge_types.clone(), ..r.clone() }).collect();
-    counts && differences(&h, &as_held).is_empty()
+    by_volume(held).iter().zip(&by_volume(own)).zip(&by_volume(read)).all(|((h, o), r)| between(h.faces, r.faces, o.faces) && between(h.edges, r.edges, o.edges) && between(h.vertices, r.vertices, o.vertices))
+}
+
+/// `read`'s parts (by volume) with `of`'s counts and types: compared with `of`, only their volume, area and box differ.
+fn with_counts(read: &[PartState], of: &[PartState]) -> Vec<PartState> {
+    by_volume(read).iter().zip(&by_volume(of)).map(|(r, h)| PartState { faces: h.faces, edges: h.edges, vertices: h.vertices, face_types: h.face_types.clone(), edge_types: h.edge_types.clone(), ..r.clone() }).collect()
+}
+
+fn by_volume(v: &[PartState]) -> Vec<PartState> {
+    let mut v: Vec<PartState> = v.to_vec();
+    v.sort_by(|a, b| a.volume.unwrap_or(0.0).total_cmp(&b.volume.unwrap_or(0.0)));
+    v
 }
 
 /// Live's default STL chordal tolerance (its Export dialog's Medium, mm): how far live's own mesh may lie from ours.
@@ -1229,6 +1246,11 @@ fn an_import_splitting_fewer_edges_than_lives_own_is_lives_shortcoming() {
     assert!(splits_no_more(&held, &own, &[part(12, 13, 2)]), "between the model and live's own file");
     assert!(!splits_no_more(&held, &own, &[part(12, 17, 2)]), "more edges than live's own");
     assert!(!splits_no_more(&held, &own, &[part(11, 13, 2)]), "fewer faces than the model");
+    // Ours reading live's file (c2-rings-loft's live.igs): counts between, volume and area as live's import is held.
+    assert!(counts_between(&held, &own, &[part(12, 14, 4)]));
+    assert!(!counts_between(&held, &own, &[part(13, 14, 4)]), "more faces than live's own");
+    let off = PartState { volume: Some(8.4e-6), ..part(12, 13, 2) };
+    assert!(!differences(&held, &with_counts(&[off], &held)).is_empty(), "the volume still counts");
 }
 
 /// Reading our own file back (docs/PARITY-SUITES.md §3): a volume off by up to the largest edge tolerance times the

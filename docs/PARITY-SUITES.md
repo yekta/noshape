@@ -128,6 +128,11 @@ Per document under `/root/parity/exchange/<doc>/` (a corpus document's name, nev
 NOSHAPE_PARITY_MODELS, NOSHAPE_PARITY_ONLY as the model suite): ours imports each live file and its parts are compared
 with live-self.json's (counts exact, volume and area within live's band or 1e-6; an STL's mesh by its parts, volume
 and area only); then ours is exported, and live-ours.json, once given, is compared with live-self.json the same way.
+Where live's own import of a file splits its model's edges or faces, a row (ours importing live's file, or live
+importing ours) passes when its counts lie between the model's and live's own import's, part for part, its volume
+and area within the model's (live importing ours) or live's own import's of that file (ours importing live's: the
+file's own approximations; lead 11-17: live splitting more is live's shortcoming, not a target; c2-rings-loft's
+live.igs: ours 275 faces, live's own import 279, the model 273).
 Its last line is the score: `exchange score: ours imports live's files m/n; live imports ours m/n; ours reads ours
 back m/n`.
 
