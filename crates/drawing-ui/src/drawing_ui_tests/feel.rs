@@ -334,3 +334,38 @@ fn a_dragged_view_lands_where_released_with_no_alignment_snap(cx: &mut TestAppCo
         drag_to(cx, top_y - 40.0 * mm_per_px);
     }
 }
+
+/// Live2 feel/drawing.json D3: the Dimension tool snaps to a view's vertex from 7 px (not 9; ours 8) and marks it;
+/// Select puts no snap marker on it.
+#[gpui::test]
+fn the_dimension_tool_snaps_to_a_vertex_within_its_reach_and_select_marks_none(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::{DimTool, Tool};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-snap-mark");
+    real_sheet(cx, window, &editor);
+    // A view's vertex with no other snap point near it: the corner farthest down-left.
+    let (corner, mm_per_px) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let corner = g.snaps.iter().map(|s| pl.to_sheet(s.p)).min_by(|a, b| (a[0] + a[1]).total_cmp(&(b[0] + b[1]))).expect("a vertex");
+        let (a, b) = (e.sheet_to_local([0.0, 0.0]), e.sheet_to_local([100.0, 0.0]));
+        (corner, 100.0 / (b[0] - a[0]).abs())
+    });
+    let snapped = |cx: &mut TestAppContext, d_px: f64| {
+        // Straight out from the corner, away from the view.
+        let at = [corner[0] - d_px * mm_per_px, corner[1]];
+        lit_at(cx, window, &editor, at);
+        cx.update(|cx| editor.read(cx).hover_snap)
+    };
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)));
+    draw(cx, window);
+    for d in [0.0, 4.0, 7.0] {
+        let s = snapped(cx, d).unwrap_or_else(|| panic!("{d} px from the vertex: snapped"));
+        assert!((s[0] - corner[0]).abs() < 1e-6 && (s[1] - corner[1]).abs() < 1e-6, "{d} px: onto the vertex, {s:?} vs {corner:?}");
+    }
+    assert!(snapped(cx, 10.0).is_none(), "10 px from the vertex: no snap");
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Select, cx)));
+    draw(cx, window);
+    assert!(snapped(cx, 2.0).is_none(), "Select: no snap marker");
+}
