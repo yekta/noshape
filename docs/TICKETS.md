@@ -517,6 +517,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Not bisected (qa builds nothing); code in 35baa32f..ba7a8d75: core b47afb3b7 (a surface added to others: touching faces by a
   shared vertex, duplicate check by face box) first by its subject, then 92f5a7c76 / 64744410b / 631ba9aa5 / 5deebf6d1 /
   3e998be12 / 34db722b7, blend ba7a8d755. Repro: rollback --index 19 then `query parts`, 0.4.55 CLI vs the green.
+- **Lead 04:45: v0.4.56 cut from 35baa32fa (before core's range): GO for it** (compat 35baa32f.txt complete, user, ticket incl.
+  f197 and authored documents ALL-SAME vs 0.4.55). The HOLD stays on main until core's fix / revert is green (qa-hold-watch
+  re-runs the verdict on it).
 - User documents (hats, dock): the same as 0.4.55 on ba7a8d75 (complete check 04:33). Authored documents the same.
 - The 04:20 GO in qa-alerts was void: that check ran no user / ticket documents (two compat runs on vibe5 at once, "Text file
   busy"); cut-check now waits for the loop's run under the vibe5 lock, cut-verdict gives NO VERDICT on an incomplete check.

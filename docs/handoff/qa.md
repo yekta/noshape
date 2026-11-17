@@ -60,8 +60,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   ms on a block), dock's first switch to B 14.7 s settle. psui owns the hat15 fillet edit (Tab not applying a variable-bound
   Radius; ✓ leaving the dialog open); my 7.9 / 4.4 s were the caret blink (lat-steps now 450 ms quiet). Send owners only
   what the nightly confirms slow, or > 3x a PLAN 2.7 target.
-- **11-17 05:00 cut: HOLD** (a8e13593f): f197's Mirror 3 union leaves 56 mm³ slivers instead of Part 1's 32,264 mm³ since
-  ba7a8d75 (core range, core bisects). Next: when core fixes / reverts, run cut-verdict.sh on the new green and clear the HOLD.
+- **11-17 05:00 cut**: v0.4.56 from 35baa32fa (lead, before core's range; GO). Main HOLD (a8e13593f): f197's Mirror 3 union
+  leaves 56 mm³ slivers instead of Part 1's 32,264 mm³ since ba7a8d75 (core bisects). Unit **qa-hold-watch** (bin/hold-watch.sh)
+  runs cut-verdict.sh on the first complete green with f197 SAME, alerts, exits; then clear the HOLD in TICKETS.md.
+- **v0.4.56 published check**: unit **qa-pub-0456** = bin/rel-pub-all.sh 0.4.55 0.4.56 ~/tmp/qa/cand/noshape (vibe5; the
+  35baa32f app, from vibe7's fuzz copy): waits for the release, rel-published.sh then rel-compat.sh, one line to qa-alerts.
+  Delete vibe5 ~/tmp/qa/cand after it.
 - **Clean A/B 11-17** (lead ran it by hand on vibe7 02:55-03:31; ab1117/ here and in lead-scratch): 0.4.48 -> 0.4.53 -> 0.4.55 ms:
   helical 159 / 398 | 380 / 96 (Sweep 1 fixed in 0.4.55, no ticket); knife 1700 / 3154 | 2947 / 2207 (0.4.48 had 9 features
   in error); impeller 15643 / 28592 | 27584 / 25314; live 40 / 408 / 2773. Green 35baa32f: knife 1803 (Mirror 1 128 / 220 /
