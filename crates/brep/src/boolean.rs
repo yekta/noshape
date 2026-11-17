@@ -2662,6 +2662,17 @@ impl Ctx<'_> {
     /// the other's box) on the other's surface, and some; or every point of one on the other's ([`Self::lies_on`]).
     fn same_surface(&self, fs: usize, ft: usize) -> bool {
         let tol = self.tol;
+        // (A free-form face all of whose samples lie on a plane's, cylinder's or cone's surface: a part of that
+        // surface, coincident wherever the two overlap (a thread's crest strip, a B-spline on the bore's cylinder,
+        // c2-config-parts-standoffs: the bore's samples between its turns are off the strip, not off its surface).)
+        for (f, g) in [(fs, ft), (ft, fs)] {
+            if matches!(self.faces[f].s, Surf::Nurbs { .. }) && !matches!(self.faces[g].s, Surf::Nurbs { .. }) {
+                let samples = self.face_samples(f);
+                if samples.len() >= 8 && samples.iter().all(|&p| free::whole_surface_distance(&self.faces[g], p) <= tol) {
+                    return true;
+                }
+            }
+        }
         let mut n = 0;
         for (f, g) in [(fs, ft), (ft, fs)] {
             let (lo, hi) = (self.faces[g].lo, self.faces[g].hi);
