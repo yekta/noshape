@@ -936,6 +936,24 @@ fn exchange_round_trip() {
         for k in 0..t.len() {
             t.step(k);
         }
+        // Our parts named as live's where ours keep their default names (a name is the document's, the user's: live
+        // c2-hex-bookcase-derived's "imported" and "shrunk", ours both "Part 1"), each the live part nearest in volume
+        // within 1 %: our files carry the names live's import of them reads.
+        if let (Ok(q), Some(last)) = (t.call("query_parts", json!({})), live.last()) {
+            let theirs: Vec<(&str, f64)> = last["parts"].as_array().into_iter().flatten().filter_map(|p| Some((p["name"].as_str()?, p["volume"].as_f64()?))).collect();
+            let default_name = |n: &str| n.strip_prefix("Part ").is_some_and(|k| k.parse::<u32>().is_ok());
+            let mut taken: Vec<&str> = Vec::new();
+            for (p, mine) in q["parts"].as_array().into_iter().flatten().zip(parts_from_query(&q)) {
+                let (Some(id), Some(v)) = (p["id"].as_str(), mine.volume) else { continue };
+                let near = theirs.iter().filter(|(n, w)| !taken.contains(n) && (v - w).abs() <= 1e-2 * w.abs()).min_by(|a, b| (v - a.1).abs().total_cmp(&(v - b.1).abs()));
+                if let Some((n, _)) = near.filter(|(n, _)| default_name(&mine.name) && *n != mine.name) {
+                    taken.push(n);
+                    if let Err(e) = t.call("part_rename", json!({ "part": id, "name": n })) {
+                        println!("{name}: part {} not renamed \"{n}\": {e}", mine.name);
+                    }
+                }
+            }
+        }
         let native = t.call("query_parts", json!({})).map(|q| parts_from_query(&q)).unwrap_or_default();
         for (format, ext) in FORMATS {
             let file = dir.join(format!("ours.{ext}"));
