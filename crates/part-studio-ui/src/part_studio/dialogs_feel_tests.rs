@@ -397,6 +397,61 @@ fn rows() -> Vec<Row> {
             let typed = state(cx).1;
             expect((picked, typed), ((Some("Acetal (Delrin)".to_string()), false, true, String::new()), true), "(the material, the list open, the search focused, its text) after Enter; the list after typing")
         } },
+        Row { id: "fields / an empty click changes nothing", live: "a click on empty background leaves the box's entries and the dialog as they are (live feature-dialogs-1117)", gap: false, check: |cx| {
+            let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-empty-click")?;
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::Click { pick: None, position: glam::DVec2::new(40., 40.), modifiers: Modifiers::default() }, w, cx);
+            }))
+            .unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let entries = cx.update(|cx| dialog.read(cx).feature.params.query("entities").len());
+            expect((entries, cx.update(|cx| view.read(cx).edit.is_some())), (1, true), "entries, dialog open")
+        } },
+        Row { id: "fields / Radius focused, an edge click goes into the box", live: "with Radius's text focused the Entities box stays active: an edge click adds to it and takes the keyboard out of Radius (live feature-dialogs-1117)", gap: false, check: |cx| {
+            let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-radius-click")?;
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("radius", w, cx))).unwrap();
+            draw(cx, window);
+            let in_radius = cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap();
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let other = v.display.bodies.first().and_then(|b| b.edge_refs.get(3).cloned());
+                let pick = other.and_then(|e| v.built.as_ref().and_then(|b| b.picks.ids_for(&e).first().copied()));
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::Click { pick, position: glam::DVec2::new(500., 300.), modifiers: Modifiers::default() }, w, cx);
+            }))
+            .unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let entries = cx.update(|cx| dialog.read(cx).feature.params.query("entities").len());
+            let after = cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap();
+            expect((entries, after == in_radius), (2, false), "entries, still in Radius")
+        } },
+        Row { id: "Boolean / Subtract: picks stay in Tools", live: "after switching to Subtract, Tools stays active: Part 2, then Part 1 both land in Tools; no auto-advance to Targets (live feature-dialogs-1117)", gap: false, check: |cx| {
+            let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+            let (window, view) = part_studio_from(cx, "dlg-boolean-subtract", Some(starts["two-blocks"].clone()));
+            wait_until(cx, window, |cx| view.read(cx).display.bodies.len() == 2 && !view.read(cx).ui_busy());
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("booleanBodies", w, cx))).unwrap();
+            wait_until(cx, window, |cx| view.read(cx).edit.is_some() && !view.read(cx).ui_busy());
+            let dialog = cx.update(|cx| view.read(cx).edit.as_ref().unwrap().dialog.clone());
+            dialog.update(cx, |d, cx| d.set_value("operationType", noshape_model::ParamValue::Enum("SUBTRACTION".into()), cx));
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            for i in [1, 0] {
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                    let face = v.display.bodies.get(i).and_then(|b| b.face_refs.first().cloned());
+                    let pick = face.and_then(|f| v.built.as_ref().and_then(|b| b.picks.ids_for(&f).first().copied()));
+                    let vp = v.viewport.clone();
+                    v.on_viewport_event(&vp, &ViewportEvent::Click { pick, position: glam::DVec2::new(500., 300.), modifiers: Modifiers::default() }, w, cx);
+                }))
+                .unwrap();
+                wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+                draw(cx, window);
+            }
+            let (tools, targets) = cx.update(|cx| {
+                let d = dialog.read(cx);
+                (d.feature.params.query("tools").len(), d.feature.params.query("targets").len())
+            });
+            expect((tools, targets), (2, 0), "Tools, Targets")
+        } },
         Row { id: "Properties / no field has the keyboard on opening", live: "no field focused; typing does nothing until a field is clicked", gap: false, check: |cx| {
             let (window, view) = block(cx, "dlg-props");
             cx.update_window(window, |_, w, cx| {

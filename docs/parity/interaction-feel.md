@@ -581,7 +581,7 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). part-studio-ui
 `dialogs::the_dialogs_matrix_matches_live` (T1, no GPU) on the block start, and `manipulators::snap_tests`.
 
-**Matched: 20 / 20** (11-15 11:29 UTC: 2 rows added, both fixed: Material's picked row, Tab with the unit list open; 18 / 18 at 11-14 04:24 UTC; 17 / 18 at 04:13 UTC: the click-again row had passed only when its second click beat the Fillet preview; 18 / 18 at 00:29 UTC; 1 / 5 at the first run, then 11 rows added: 8 matching, 3 fixed).
+**Matched: 23 / 23** (11-17 22:59 UTC: 3 rows added from live's feature-dialogs-1117, all matched as they were).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -608,6 +608,10 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | Material on opening | 280 × 368 at the graphics area's bottom; nothing picked ('- None -') | the same | = |
 | Material: a picked row | the list closes, the search keeps the keyboard with its text cleared; typing opens the list again; "No material assigned" stays under the open list (material-search-acetal-ok, material-library-pick-abs-cancel) | the keyboard went nowhere and the line hid while the list was open; now as live (the search stays in the tree, unseen) | = (fixed) |
 | Material's search and Esc | filters as you type ("steel": 38 rows; live's read counted its highlighted first row twice), the first highlighted; Esc closes the list only, a second Esc the dialog | the second Esc did nothing (the keyboard was left on the closed list's search); now it cancels | = (fixed) |
+| An empty click with a box active | the box's entries and the dialog stay as they are (no deselect, no close; live feature-dialogs-1117) | the same | = |
+| Radius focused, an edge clicked | the Entities box stays active: the edge is added and the keyboard leaves Radius | the same | = |
+| Boolean Subtract | picks stay in Tools (no auto-advance to Targets); a click on Targets makes it active | the same | = |
+| What lights while a box is active (GPU, real pointer: `feel::a_dialogs_active_box_filters_what_lights`) | Extrude: an edge lights the face beside it; Fillet / Chamfer: a vertex an edge at it; Boolean: a face the whole part; a plane's empty spot nothing | the same (the field's pick filter, `highlighted_hover`'s part for a parts box) | = |
 | Not yet in the matrix | the drag's 2–3 px dead zone, no snap to geometry, no value box while dragging, preview timing while dragging (every ~0.4 s);  the Appearance palette's swatch grid and the Material picker's rows (look); Appearance's keys are in `sketch_ui_tests` (escape / Tab / Enter); live dialogs-gaps2 (11-16): the Depth arrow moves from 4 px with the full displacement (its readout updates every ~3 px, so the first tick may be the throttle; ours from 3 px), sideways drags nothing, no value box, no snap to geometry, preview cadence host-bound (450–850 ms there) | – | – |
 
 ## Fields (matrix)
