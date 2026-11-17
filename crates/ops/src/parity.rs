@@ -9137,17 +9137,23 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             res.untranslated.push(format!("subassembly {}: {e}", l.element));
             continue;
         }
-        // Its own properties, as live's BOM row of it shows them (the assembly's Properties dialog): part number,
-        // description, vendor, BOM behavior (asm-xdev-subs' FXAA3-10-F43-SET, "Show Assembly only": its parts no rows).
-        if k != 0
-            && let Some(row) = asm["liveBom"]["root"]["bom"]["bomTable"]["items"].as_array().into_iter().flatten().find(|r| r["itemSource"]["elementId"] == l.element.as_str() && r["itemSource"]["partId"] == "")
-        {
-            let text = |key: &str| row[key].as_str().filter(|v| !v.is_empty() && *v != "N/A");
+        // Its own properties: live's metadata of it (`subAssemblyMetadata`, at its instances' configuration), else as
+        // live's BOM row of it shows them: part number, description, vendor, BOM behavior, excluded from all BOMs
+        // (asm-xdev-subs' FXAA3-10-F43-SET, "Show Assembly only": its parts no rows; DC12_X430_DUMMY_ASSY_ASM excluded).
+        if k != 0 {
+            let configuration = levels.iter().flat_map(|l| l.instances.iter()).find(|i| i["elementId"] == l.element.as_str()).and_then(|i| i["fullConfiguration"].as_str()).unwrap_or("default");
+            let metadata = &asm["subAssemblyMetadata"][l.element.as_str()];
+            let picked = metadata.get(configuration).or_else(|| metadata.get("default")).map(|m| &m["picked"]);
+            let row = asm["liveBom"]["root"]["bom"]["bomTable"]["items"].as_array().into_iter().flatten().find(|r| r["itemSource"]["elementId"] == l.element.as_str() && r["itemSource"]["partId"] == "");
+            let text = |v: &Value| v.as_str().or(v["label"].as_str()).filter(|v| !v.is_empty() && *v != "N/A").map(str::to_string);
             let mut args = json!({ "tab": l.tab });
-            for (ours, theirs) in [("part_number", "partNumber"), ("description", "description"), ("vendor", "vendor"), ("bom_behavior", "bomBehavior")] {
-                if let Some(v) = text(theirs) {
+            for (ours, meta, theirs) in [("part_number", "Part number", "partNumber"), ("description", "Description", "description"), ("vendor", "Vendor", "vendor"), ("bom_behavior", "Subassembly BOM behavior", "bomBehavior")] {
+                if let Some(v) = picked.and_then(|p| text(&p[meta])).or_else(|| row.and_then(|r| text(&r[theirs]))) {
                     args[ours] = json!(v);
                 }
+            }
+            if picked.is_some_and(|p| p["Exclude from all BOMs"] == true) {
+                args["exclude_from_bom"] = json!(true);
             }
             if args.as_object().is_some_and(|o| o.len() > 1)
                 && let Err(e) = placer.call("assembly_properties", args)
@@ -9468,6 +9474,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     // differ): set in the tab holding the subassembly instance, relative to that tab's occurrence; a subassembly
     // used more than once there takes its first occurrence's.
     let mut placed_inside: HashSet<(String, String)> = HashSet::new();
+    let mut tab_lists: HashMap<String, Value> = HashMap::new();
     for o in &occurrences {
         let p = ids(&o["path"]);
         if p.len() < 2 {
@@ -9483,7 +9490,35 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         if !placed_inside.insert((tab.clone(), name.clone())) {
             continue;
         }
-        let m = match (transform_of(&p).and_then(|m| mat(&m)), outer.is_empty()) {
+        // A subassembly whose own parts don't follow its occurrence but move together (a flexible one turned inside:
+        // asm-xdev-subs' SFRRGA3-29-P25 in Latch pusher linkage <1>, its parts turned over against <2>'s): where its parts
+        // land with their places in our tab of it, when they all agree on it.
+        let mut frames: Vec<glam::DMat4> = Vec::new();
+        if let Some((sub_element, sub_tab)) = element_at("", &p).and_then(|e| levels.iter().find(|l| l.element == e).map(|l| (e, l.tab.clone()))) {
+            if !tab_lists.contains_key(&sub_tab)
+                && let Ok(list) = placer.call("assembly_list", json!({ "tab": sub_tab }))
+            {
+                tab_lists.insert(sub_tab.clone(), list);
+            }
+            let list = tab_lists.get(&sub_tab);
+            for q in occurrences.iter().map(|o| ids(&o["path"])).filter(|q| q.len() == p.len() + 1 && q[..p.len()] == p[..]) {
+                let Some(leaf) = q.last().and_then(|id| ours.get(&(sub_element.clone(), id.clone()))) else { continue };
+                let Some(i) = list.and_then(|l| l["instances"].as_array()).and_then(|a| a.iter().find(|i| i["name"] == leaf.as_str())) else { continue };
+                let k = list.map_or(1.0, |l| per_unit(&l["units"]));
+                let r: Vec<f64> = i["rotation"].as_array().into_iter().flatten().filter_map(Value::as_f64).collect();
+                let (&[x, y, z, w], Some(t)) = (r.as_slice(), f3(&i["translation"])) else { continue };
+                let local = glam::DMat4::from_rotation_translation(glam::DQuat::from_xyzw(x, y, z, w), glam::DVec3::from(t) * k);
+                if let Some(c) = transform_of(&q).and_then(|m| mat(&m)) {
+                    frames.push(c * local.inverse());
+                }
+            }
+        }
+        let agree = |a: &glam::DMat4, b: &glam::DMat4| a.to_cols_array().iter().zip(b.to_cols_array()).all(|(x, y)| (x - y).abs() < 1e-6);
+        let by_part = frames.first().filter(|f| frames.iter().all(|g| agree(f, g))).copied();
+        if !frames.is_empty() {
+            trace(&format!("{tab} › {name}: {} parts' frames, {}", frames.len(), by_part.map_or("they differ".to_string(), |f| format!("at {:?} mm, its occurrence {:?} mm", (f.w_axis.truncate() * 1e3).to_array(), transform_of(&p).and_then(|m| mat(&m)).map(|m| (m.w_axis.truncate() * 1e3).to_array())))));
+        }
+        let m = match (by_part.or_else(|| transform_of(&p).and_then(|m| mat(&m))), outer.is_empty()) {
             (Some(m), true) => m,
             (Some(m), false) => match transform_of(outer).and_then(|m| mat(&m)) {
                 Some(frame) => frame.inverse() * m,

@@ -3604,6 +3604,15 @@ fn parity_assemblies() {
         if let Some(bom) = read(&dir.join("bom.json")) {
             asm["liveBom"] = bom;
         }
+        // Its subassemblies' own properties (live 11-17: studios/<element>.asm-metadata.json, by configuration).
+        for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().filter_map(|e| e.ok()) {
+            let file = e.file_name().to_string_lossy().to_string();
+            if let Some(element) = file.strip_suffix(".asm-metadata.json")
+                && let Some(m) = read(&e.path())
+            {
+                asm["subAssemblyMetadata"][element] = m;
+            }
+        }
         // Live's mate messages and unresolved connectors (live / live2 11-15: `mate-messages.json`).
         if let Some(m) = read(&dir.join("mate-messages.json")) {
             asm["liveMateMessages"] = m;
@@ -4156,8 +4165,8 @@ fn a_subassembly_is_rebuilt_as_lives() {
     assert_eq!((r.occurrences_matching, r.occurrences, r.mates_matching, r.mates), (3, 3, 1, 1));
 }
 
-/// A subassembly's own properties come from live's BOM row of it: its part number, and "Show Assembly only", so its
-/// part has no row under it (asm-xdev-subs' FXAA3-10-F43-SET).
+/// A subassembly's own properties come from live's metadata of it, else its BOM row: its part number, and "Show
+/// Assembly only", so its part has no row under it (asm-xdev-subs' FXAA3-10-F43-SET); excluded from all BOMs, no row.
 #[test]
 fn a_subassemblys_properties_are_lives_bom_rows() {
     let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
@@ -4183,7 +4192,17 @@ fn a_subassemblys_properties_are_lives_bom_rows() {
         "liveBom": { "root": { "bom": { "bomTable": { "items": [
             { "itemSource": { "indentLevel": 0, "elementId": "SUB1", "partId": "" }, "name": "Clamp set", "quantity": 1, "partNumber": "CS-10", "description": "A clamp set", "vendor": "MISUMI", "bomBehavior": "Show Assembly only", "material": "N/A" }] } } } } });
     let mut ctx = Ctx::new();
-    let r = rebuild_assembly(&mut ctx, &scratch("subassembly-properties.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    let r = rebuild_assembly(&mut ctx, &scratch("subassembly-properties.noshape"), &asm, &[("E1".into(), studio.clone(), parts.clone())]);
+    assert_eq!((r.bom_matching, r.bom_rows), (1, 1), "{r:?}");
+    assert!(r.differences.is_empty(), "{r:?}");
+    // Excluded from all BOMs by live's metadata of it (live's BOM has no row to say so: DC12_X430_DUMMY_ASSY_ASM): no
+    // row of it or its part, beside the root's own part.
+    let mut excluded = asm.clone();
+    excluded["rootAssembly"]["instances"].as_array_mut().unwrap().push(json!({ "id": "IA", "name": "Part 1 <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }));
+    excluded["rootAssembly"]["occurrences"].as_array_mut().unwrap().push(json!({ "path": ["IA"], "fixed": true, "transform": at }));
+    excluded["subAssemblyMetadata"] = json!({ "SUB1": { "default": { "picked": { "Name": "Clamp set", "Exclude from all BOMs": true, "Subassembly BOM behavior": { "value": "0", "label": "Show Assembly and components" } } } } });
+    excluded["liveBom"] = json!({ "root": { "bom": { "bomTable": { "items": [{ "itemSource": { "indentLevel": 0 }, "name": "Part 1", "quantity": 1, "partNumber": "", "description": "", "material": { "displayName": "" } }] } } } });
+    let r = rebuild_assembly(&mut ctx, &scratch("subassembly-excluded.noshape"), &excluded, &[("E1".into(), studio, parts)]);
     assert_eq!((r.bom_matching, r.bom_rows), (1, 1), "{r:?}");
     assert!(r.differences.is_empty(), "{r:?}");
 }
