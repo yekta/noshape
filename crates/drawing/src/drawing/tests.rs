@@ -4086,6 +4086,24 @@ fn concentric_circles_share_one_centermark() {
     }
 }
 
+/// A circle drawn only as a tangent edge (a fillet's rim round a bump) is no centermark's circle: live's cf-snap-hook and
+/// c2-variable-fillet-faceblend drawings mark none. The demo's Top view with its circles' edges made smooth.
+#[test]
+fn tangent_circles_get_no_centermark() {
+    let (doc, drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let sheet = &drawing.sheets[0];
+    let geo = compute_view(&drawing, sheet, ViewId(2), &sources, &ViewCache::new(), false);
+    let full = geo.full_circles();
+    assert!(!full.is_empty());
+    let mut smooth = (*geo).clone();
+    let circle_edges: Vec<u32> = (0..smooth.model_edges.len() as u32).filter(|i| matches!(smooth.model_edges[*i as usize].geom, views::EdgeGeom::Circle { face_on: true, .. })).collect();
+    for e in smooth.edges.iter_mut().filter(|e| e.model.is_some_and(|m| circle_edges.contains(&m))) {
+        e.class = EdgeClass::Smooth;
+    }
+    assert!(smooth.full_circles().is_empty(), "{:?}", smooth.full_circles());
+}
+
 /// A base view and a pictorial projection keep their label in the DXF when it says nothing, an orthographic projection
 /// doesn't (live's exchange-suite drawings: Front and Isometric each one empty MTEXT in -View-Label on ANNOTATION_TEXT,
 /// attached top centre under the view; Right and Top none).

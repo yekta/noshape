@@ -1565,11 +1565,19 @@ impl ViewGeometry {
     /// DRAWING-SCALE).
     pub fn full_circles(&self) -> Vec<([f64; 2], f64, Option<PointRef>)> {
         let drawn = self.drawn_model_edges();
+        // Not a circle drawn only as a tangent edge (a fillet's rim round a bump: live's cf-snap-hook and
+        // c2-variable-fillet-faceblend drawings mark none).
+        let mut sharp = vec![false; self.model_edges.len()];
+        for e in self.edges.iter().filter(|e| e.class != EdgeClass::Smooth) {
+            if let Some(x) = e.model.and_then(|m| sharp.get_mut(m as usize)) {
+                *x = true;
+            }
+        }
         let arcs: Vec<([f64; 2], f64, f64)> = self
             .model_edges
             .iter()
             .enumerate()
-            .filter(|(i, _)| drawn[*i])
+            .filter(|(i, _)| drawn[*i] && sharp[*i])
             .filter_map(|(_, m)| match m.geom {
                 EdgeGeom::Circle { center, radius, face_on: true, mid, .. } => {
                     let span = match (&m.ends[0], &m.ends[1]) {
