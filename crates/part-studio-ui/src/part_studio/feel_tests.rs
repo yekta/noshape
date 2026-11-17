@@ -479,3 +479,71 @@ fn a_part_row_clicked_after_passing_another_leaves_no_stale_hover(cx: &mut TestA
     assert_eq!(selection, vec![p2.clone()], "the click selects Part 2");
     assert_ne!(hover(cx), Some(p1), "Part 1's outline doesn't stay");
 }
+
+/// live psui/feature-dialogs-1117 (lead 11-17 ~22:40, P0): while a dialog's first box is active, hover is filtered by
+/// what the box takes, under the real pointer in iso with the planes shown. Extrude: an edge lights the face beside it
+/// (never the edge); Fillet / Chamfer: a vertex lights an edge at it; Boolean: a face lights the whole part; a plane's
+/// empty spot lights nothing in any of them.
+#[gpui::test]
+fn a_dialogs_active_box_filters_what_lights(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, _top, _) = block_part(cx, "dialog-hover-filter");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // The top face's longest edge a third along, a top corner, the top face's middle and an empty spot over a plane.
+    let (edge_at, corner, face_at) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let vp = v.viewport.read(cx);
+        let p = |q: &[f32; 3]| glam::DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64);
+        let top_z = b.mesh.positions.iter().map(|q| q[2]).fold(f32::MIN, f32::max);
+        let (a, z) = b
+            .mesh
+            .edges
+            .iter()
+            .filter(|pl| pl.iter().all(|q| (q[2] - top_z).abs() < 1e-7))
+            .filter_map(|pl| Some((vp.project(p(pl.first()?))?, vp.project(p(pl.last()?))?)))
+            .max_by(|x, y| (x.1 - x.0).length().total_cmp(&(y.1 - y.0).length()))
+            .unwrap();
+        let tops: Vec<DVec2> = b.mesh.positions.iter().filter(|q| (q[2] - top_z).abs() < 1e-7).filter_map(|q| vp.project(p(q))).collect();
+        let centre = tops.iter().sum::<DVec2>() / tops.len() as f64;
+        (a + (z - a) / 3.0, a, centre)
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).hover.clone());
+    let plane_spot = [DVec2::new(face_at.x - 220.0, face_at.y + 120.0), DVec2::new(face_at.x + 220.0, face_at.y + 120.0), DVec2::new(face_at.x, face_at.y + 200.0)]
+        .into_iter()
+        .find(|s| {
+            pointer.move_to(cx, &view, *s);
+            matches!(lit(cx), Some(Reference::Plane(_)))
+        })
+        .expect("a plane beside the part, no dialog");
+    let mut wrong = Vec::new();
+    for (ty, at, want) in [
+        ("extrude", edge_at, "face"),
+        ("fillet", corner, "edge"),
+        ("chamfer", corner, "edge"),
+        ("booleanBodies", face_at, "part"),
+    ] {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature(ty, w, cx))).unwrap();
+        wait_until(cx, window, |cx| view.read(cx).edit.is_some() && !view.read(cx).ui_busy());
+        pointer.move_to(cx, &view, at);
+        // (What is drawn lit: a face under a parts box stands for its part.)
+        let got = cx.update(|cx| view.read(cx).highlighted_hover(cx));
+        let ok = match want {
+            "face" => matches!(got.as_slice(), [Reference::Face(_)]),
+            "edge" => matches!(got.as_slice(), [Reference::Edge(_)]),
+            _ => matches!(got.as_slice(), [Reference::Body(_)]),
+        };
+        if !ok {
+            wrong.push(format!("{ty}: lit {got:?}, want a {want}"));
+        }
+        pointer.move_to(cx, &view, plane_spot);
+        if let Some(got) = lit(cx) {
+            wrong.push(format!("{ty}: a plane's spot lit {got:?}, want nothing"));
+        }
+        keys(cx, window, &["escape", "escape"]);
+        wait_until(cx, window, |cx| view.read(cx).edit.is_none());
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
