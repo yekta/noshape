@@ -1793,8 +1793,9 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
     let mut new_ribs: Vec<NamedShape> = Vec::new();
     for bi in parts.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
-        let mut shape = body.shape.clone();
-        let mut trail = RibTrail::new(&body.shape);
+        // rib.fs: each rib its own body, cut against the part as it was, then all of them merged at once (one Boolean,
+        // V432_RIB_GROUP_BOOLEANS): crossing ribs each run through the others.
+        let mut ribs: Vec<Shape> = Vec::new();
         for w in &wires {
             // Normal to the sketch plane, an open chain is one rib per edge as
             // in rib.fs (each edge of the profiles query is a profile): a leg
@@ -1807,28 +1808,32 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
             };
             for w in &pieces {
                 let res = if normal && w.edges().len() > 1 {
-                    rib_normal(&shape, w, dir, t, draft)
+                    rib_normal(&body.shape, w, dir, t, draft)
                 } else if normal {
-                    rib_sheet(&shape, w, dir, None, t, extend, draft)
+                    rib_sheet(&body.shape, w, dir, None, t, extend, draft)
                 } else {
-                    rib_parallel(&shape, w, frame.normal, opposite, t, extend, draft)
+                    rib_parallel(&body.shape, w, frame.normal, opposite, t, extend, draft)
                 };
                 match res {
                     Ok(r) => {
-                        trail.step(&r.history);
-                        shape = r.shape;
+                        ribs.extend(r);
                         made += 1;
                     }
                     Err(e) => last_err = Some(e),
                 }
             }
         }
-        if shape.is_same(&body.shape) {
+        if ribs.is_empty() {
             continue;
         }
         if merge {
-            // The part with its ribs fused in is the merge: its history is the part's faces through the rib steps
-            // (as the fuse of the part with it gave, 3 s of OCCT a rib in c2-parting-line-draft-parting-line).
+            let fused = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&body.shape), &ribs, &k::BooleanOptions::default())?;
+            let mut trail = RibTrail::new(&body.shape);
+            trail.step(&fused.history);
+            let shape = fused.shape;
+            // The part with its ribs fused in is the merge: its history is the part's faces through the fuse, the rest
+            // new (as the fuse of the part with the merged shape gave, 3 s of OCCT a rib in
+            // c2-parting-line-draft-parting-line).
             let res = k::OpResult { history: trail.history(&shape), shape: shape.clone() };
             let empty = crate::naming::ShapeNames::default();
             let names = ev.name_result(&[&body.shape_names(), &empty], &res.history, &res.shape, &BTreeMap::new(), None);
@@ -1844,9 +1849,10 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
             };
             ev.replace_body(bi, shape, names);
         } else {
-            let res = k::cut(&shape, &body.shape)?;
-            let names = name_new(ev, &res.shape);
-            new_ribs.push(NamedShape::new(res.shape, names));
+            // (The ribs alone: each was cut against the part already.)
+            let shape = if ribs.len() == 1 { ribs.remove(0) } else { k::boolean(k::BooleanOp::Fuse, &ribs[..1], &ribs[1..], &k::BooleanOptions::default())?.shape };
+            let names = name_new(ev, &shape);
+            new_ribs.push(NamedShape::new(shape, names));
         }
     }
     if made == 0 {
@@ -1908,7 +1914,7 @@ impl RibTrail {
     }
 }
 
-fn rib_parallel(base: &Shape, wire: &Shape, normal: DVec3, opposite: bool, t: f64, extend: bool, draft: Option<(f64, bool)>) -> FResult<k::OpResult> {
+fn rib_parallel(base: &Shape, wire: &Shape, normal: DVec3, opposite: bool, t: f64, extend: bool, draft: Option<(f64, bool)>) -> FResult<Vec<Shape>> {
     let edges = wire.edges();
     let [e] = edges.as_slice() else { return err(RIB_FAILED) };
     let info = e.edge_info()?;
@@ -1926,7 +1932,7 @@ fn rib_parallel(base: &Shape, wire: &Shape, normal: DVec3, opposite: bool, t: f6
 /// sketch plane `plane` for a parallel rib, about the surface for a rib
 /// normal to the sketch); the part splits it, and the pieces that touch the
 /// profile but not the far end of the sweep or of an extension are the rib.
-fn rib_sheet(base: &Shape, wire: &Shape, dir: DVec3, plane: Option<DVec3>, t: f64, extend: bool, draft: Option<(f64, bool)>) -> FResult<k::OpResult> {
+fn rib_sheet(base: &Shape, wire: &Shape, dir: DVec3, plane: Option<DVec3>, t: f64, extend: bool, draft: Option<(f64, bool)>) -> FResult<Vec<Shape>> {
     let edges = wire.edges();
     let [e] = edges.as_slice() else { return err(RIB_FAILED) };
     let info = e.edge_info()?;
@@ -1996,7 +2002,7 @@ fn rib_sheet(base: &Shape, wire: &Shape, dir: DVec3, plane: Option<DVec3>, t: f6
     if let Some((angle, draft_opposite)) = draft {
         rib = draft_rib(base, &rib, e, |s| rib_sides(s, e, dir, tol), p0, dir, angle, draft_opposite, tol)?;
     }
-    Ok(k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(base), &rib, &k::BooleanOptions::default())?)
+    Ok(rib)
 }
 
 /// A rib piece's thicken caps: the faces along the rib direction beside the
@@ -2040,7 +2046,7 @@ fn draft_rib(base: &Shape, rib: &[Shape], profile: &Shape, caps: impl Fn(&Shape)
 
 /// Rib normal to the sketch plane from a closed chain of curves: the profile
 /// thickened in-plane, extruded along `dir` up to the part, fused with it.
-fn rib_normal(base: &Shape, wire: &Shape, dir: DVec3, t: f64, draft: Option<(f64, bool)>) -> FResult<k::OpResult> {
+fn rib_normal(base: &Shape, wire: &Shape, dir: DVec3, t: f64, draft: Option<(f64, bool)>) -> FResult<Vec<Shape>> {
     let outline = k::offset_wire_2d(wire, t * 0.5, k::JoinType::Arc, false).map_err(|_| fe(RIB_FAILED))?;
     let outline = outline.wires().into_iter().next().unwrap_or(outline);
     let face = k::make_face_from_wire(&outline, true).map_err(|_| fe(RIB_FAILED))?;
@@ -2055,11 +2061,11 @@ fn rib_normal(base: &Shape, wire: &Shape, dir: DVec3, t: f64, draft: Option<(f64
         let top = wire.vertices().first().and_then(|v| v.vertex_point().ok()).unwrap_or_default();
         ribs = draft_rib(base, &ribs, wire, |s| rib_sides(s, wire, dir, tol), top, dir, angle, opposite, tol)?;
     }
-    let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(base), &ribs, &k::BooleanOptions::default())?;
-    if res.shape.count(ShapeType::Solid) != base.count(ShapeType::Solid) {
+    // (A rib that doesn't reach the part is no rib of it.)
+    if !ribs.iter().all(|r| k::distance(r, base).is_ok_and(|d| d.distance < 1e-7 * (1.0 + t))) {
         return err(RIB_MISS);
     }
-    Ok(res)
+    Ok(ribs)
 }
 
 // ------------------------------------------------------------------ primitives
