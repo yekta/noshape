@@ -566,8 +566,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   nothing lit over the region or Front while the line tool draws); one first hover missed on vibe6 at load 48, not on vibe5
   (2 runs). Green 1775b123's authored-documents step failed (vibe5's ~/tmp pruned the staged copies; moved to ~/agents/qa-keep
   at 15:20, the hats / dock / tickets there ALL-SAME); bc58c02b is next in the compat loop.
-- SCISSOR-LIFT: core's revert ddfea0eb1 queued 15:05; qa runs scissor-lift alone on it now (qa-sl-at, vibe6) and again on
-  the first green with it (qa-sl-verify).
+- SCISSOR-LIFT: core's revert ddfea0eb1 queued 15:05; core 15:30: on vibe6 (release) BOM 59/87, no Fillet 18 / Extrude 20
+  errors. Also must ship: core eb3c2bd48 (queued), asm's rack-pinion P0 from core 747c2bf0d, which is in v0.4.56 too (Studio
+  ab25c5 9 -> 18/29 with the fix). qa-sl-verify runs asm-scissor-lift + asm-rack-pinion alone on the first green with the
+  revert, again on the first with eb3c2bd48 -> qa-alerts and here. The 17:00 candidate must contain both.
 - **Must carry core's fix: SCISSOR-LIFT-BOM-ROWS** (lead 14:15). The culprit core 41f62884a (01:23) is in v0.4.56 (not
   0.4.55): asm-scissor-lift's BOM rows as live 59 -> 57/87 shipped. The 17:00 candidate must contain core's fix or revert
   (not on main at 14:15). qa-sl-verify runs asm-scissor-lift alone on the first green with it (vibe6, bool's method):
