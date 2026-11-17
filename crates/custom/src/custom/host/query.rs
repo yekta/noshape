@@ -2125,6 +2125,9 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             for e in sub(i, "subquery")? {
                 if let Ent::Face(b, f) = e {
                     out.extend(q.edges_of_face(b, f));
+                } else if matches!(e, Ent::SketchRegion(..)) {
+                    // A sketch region's own edges (GearLab's Fill of its tooth profile's region).
+                    out.extend(q.adjacent(&e, EType::Edge, false));
                 } else if matches!(e, Ent::Edge(..)) {
                     out.extend(tangent_edges(q, vec![e]));
                 }

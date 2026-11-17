@@ -4788,3 +4788,53 @@ fn two_offset_chamfer_on_a_custom_features_faces_measures_as_live() {
     let kept = sides(&r) / before;
     assert!((kept - 0.96).abs() < 1e-6, "the cylinder keeps {kept} of its area, 0.96 with 0.2 mm off it");
 }
+
+/// GearLab's tooth profile (two fit-spline involutes, a tip line, a root arc and two radial lines; asm-isaac-ball
+/// 8f5622): `Fill` of `qLoopEdges(qSketchRegion(sketch))` found no edges ("(FILL) Failed to create cylindrical involute
+/// tooth profile."); live builds the gear.
+#[test]
+fn a_sketch_regions_loop_edges_are_its_edges() {
+    let src = studio(r#"
+annotation { "Feature Type Name" : "Tooth profile" }
+export const toothProfile = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        const rb = 20 * cos(20 * degree) * millimeter;
+        const rd = 18.75 * millimeter;
+        const ra = 21 * millimeter;
+        const inv = function(r) { const a = acos(rb / r); return tan(a) - a / radian; };
+        const tw = PI / 80 + inv(20 * millimeter);
+        var invA = [];
+        var invB = [];
+        for (var i = 0; i < 10; i += 1)
+        {
+            const r = rb + i * (ra - rb) / 9;
+            const phi = (inv(r) - tw) * radian;
+            invA = append(invA, vector(r * cos(phi), r * sin(phi)));
+            invB = append(invB, vector(r * cos(-phi), r * sin(-phi)));
+        }
+        const root = [vector(rd * cos(-tw * radian), rd * sin(-tw * radian)), vector(rd, 0 * millimeter), vector(rd * cos(tw * radian), rd * sin(tw * radian))];
+        const sketchId = id + "sketch";
+        const sketch = newSketchOnPlane(context, sketchId, { "sketchPlane" : plane(vector(0, 0, 0) * meter, vector(0, 0, 1)) });
+        skFitSpline(sketch, "a", { "points" : invA });
+        skFitSpline(sketch, "b", { "points" : invB });
+        skLineSegment(sketch, "tip", { "start" : invA[9], "end" : invB[9] });
+        skArc(sketch, "root", { "start" : root[0], "mid" : root[1], "end" : root[2] });
+        skLineSegment(sketch, "la", { "start" : invA[0], "end" : root[0] });
+        skLineSegment(sketch, "lb", { "start" : invB[0], "end" : root[2] });
+        skSolve(sketch);
+        const n = size(evaluateQuery(context, qSketchRegion(sketchId)));
+        const e = size(evaluateQuery(context, qLoopEdges(qSketchRegion(sketchId))));
+        if (n != 1 || e != 6)
+            throw regenError("regions " ~ n ~ ", loop edges " ~ e);
+    });
+"#);
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("toothProfile"), &fx.units).unwrap();
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    assert_ok(&fx.regen(&mut reg, &ps));
+}
