@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-17 12:35 on the Ubeyd account)
+# QA handoff (agent qa; current state only, updated 2026-11-17 14:10 on the Ubeyd account)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -61,6 +61,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (12:35: GO on 7f287e52; c101c3c0 has core's
    four Split / Use / Rib lands; suites 827a23a6 clean; fan-blade-sweep Boolean 2 is now live's volume, 8x slower: core's Offset, sent to core). Still to come:
    blend's impeller Fillet 3 (when it lands: compat on its green + the impeller re-time below).
+   Coming for 17:00 (lead 13:20): psui 452838df + skasm b87dd3dcf (user P0s: verified in the app on c330a760 14:05), blend
+   9e40ad95a, bool2 555bcb4c (queue/bool2-555bcb4c): compat on each green as it lands. Watcher: bin/watch-lands.sh <state>
+   <commit>... (matches by subject, exits when one is in a green with COMPAT-DONE; state compat/lands-1700.state).
+   App user-flow checks: /root/qa-scratch/uh/uh2.sh <app> <out> (sketch hover, real xdotool moves after a UI-script setup)
+   and uf.sh (seeded feature_settings.json; NOSHAPE_UI_REMEMBERED=1 or the runner ignores the memory), on vibe6 :663.
    The qa-cut-1615 timer runs cut-verdict.sh at 16:15 -> one line in /tmp/lead/qa-alerts + compat/cut-1117-1615.txt. Read
    the ticket section of that compat file too (a ticket doc's wrong geometry is a HOLD), then update the entry with the
    verdict and the green it names, commit docs-only. HOLD only for a real P0 (crash, wrong geometry, speed regression, a user
