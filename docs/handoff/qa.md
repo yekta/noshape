@@ -78,7 +78,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    (suites/<run>/worse.txt from bin/suites-diff.py: models, scenarios, `failure`, `speed`, `newdiff`; assemblies.log
    `^asm-…: … BOM rows` and `^assemblies:`; exchange.log `exchange score` and times over live). Regressions -> owners as P0
    (paused agents: to the lead), tickets the run confirms fixed -> mark verified.
-4. Open P0s to re-check on the green that claims each fix: SCISSOR-LIFT-BOM-ROWS (culprit core 41f62884a, bool corrected; core has it:
+4. Open P0s to re-check on the green that claims each fix: SCISSOR-LIFT-BOM-ROWS (41f62884a shipped in v0.4.56; 17:00 must carry
+   core's fix: unit qa-sl-verify (sl/sl-verify.sh) waits for it on green, runs scissor-lift alone, -> qa-alerts + sl/run.txt;
    when it lands, the next qa-suites assemblies run must show asm-scissor-lift 59/87 BOM rows).
    IMPELLER-DELETE-FACE-2-SLOW reclassified 10:55: slower than live (~19 s vs 2.8 s), not a regression (v0.4.48 built other
    parts); core told. The knife Chamfer 2 / Fillet 5 / Fillet 3 "regressions" (v0.4.48 -> v0.4.53) were the same: blend's Mac
