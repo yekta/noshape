@@ -560,6 +560,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-17 17:00 release (qa list 12:35, newest checked green 7f287e52; the latest release is v0.4.56)
+- **v0.4.57 published 20:15, qa check clean 21:44**: 3 Linux assets = SHA256SUMS; released CLI vs the candidate: hat8, hat15, hat15b,
+  the dock, f197 SAME; QUIT-ABORT-DOCK guard 5/5 rc 0 (vibex6); released CLI vs v0.4.56: user / ticket / authored documents
+  ALL-SAME; compat baseline -> 0.4.57.
 - **GO on release/v0.4.57 = 519afe8e2 (qa 18:11)**: green a1383a65 + core's cdd1df63 (revert of 41f62884a) and 711356ca (rack-pinion).
   Its release CLI (vibex7) vs v0.4.56: hat8, hat15, hat15b, the dock, f197, the 4 Hole documents, 47 ticket documents, qa's
   authored documents ALL-SAME (compat/cand-v0457*.txt). asm-scissor-lift alone at 519afe8e2 (vibex6): BOM rows 59/87 as
