@@ -224,8 +224,13 @@ TopoDS_Edge edge_2d(const PlaneMap& pm, const Seg2d& s)
         rot += M_PI / 2.0;
         shift = -M_PI / 2.0;
       }
-      occ::handle<Geom_Ellipse> e =
-        new Geom_Ellipse(gp_Elips(pm.ax2_at(p[0], p[1], rot), rmaj, rmin));
+      // Equal radii: a circle, as Parasolid has it (cf-o-ring-generator's skEllipse section revolves to a torus, not a
+      // surface of revolution written split in ACIS); the same parameterisation.
+      occ::handle<Geom_Conic> e;
+      if (rmaj - rmin <= 1e-12 * rmaj)
+        e = new Geom_Circle(gp_Circ(pm.ax2_at(p[0], p[1], rot), rmaj));
+      else
+        e = new Geom_Ellipse(gp_Elips(pm.ax2_at(p[0], p[1], rot), rmaj, rmin));
       if (s.kind == 4)
         return BRepBuilderAPI_MakeEdge(e).Edge();
       double a0 = p[5] + shift;

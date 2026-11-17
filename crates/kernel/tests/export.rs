@@ -2098,6 +2098,22 @@ fn a_loft_wall_closed_but_for_its_weights_last_digits_stays_one_face() {
     assert!((a - want).abs() < 1e-6 * want, "{a} vs {want}");
 }
 
+/// A sketch ellipse of equal radii is a circle (as Parasolid's): revolved, a torus, one face through ACIS
+/// (cf-o-ring-generator's rings: a surface of revolution of an ellipse, written as a B-surface split in four).
+#[test]
+fn an_equal_radii_ellipse_revolves_to_a_torus() {
+    let mm = 1e-3;
+    let plane = Plane::new(DVec3::ZERO, DVec3::Y, DVec3::X);
+    let section = make_face_2d(&plane, &[Segment2d::Ellipse { center: DVec2::new(20.0 * mm, 0.0), major_radius: 3.175 * mm, minor_radius: 3.175 * mm, rotation: 0.4 }], &[]).unwrap();
+    let ring = revolve(&section, DVec3::ZERO, DVec3::Z, std::f64::consts::TAU).unwrap().shape;
+    assert!(ring.faces().iter().all(|f| matches!(f.face_surface(), Ok(Surface::Torus { .. }))));
+    let path = std::env::temp_dir().join(format!("noshape-sat-oring-{}.sat", std::process::id()));
+    write_acis(&path, std::slice::from_ref(&ring), LengthUnit::Meter).unwrap();
+    let back = read_acis_parts(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(back.iter().map(|p| p.shape.count(ShapeType::Face)).sum::<usize>(), 1);
+}
+
 /// A draft's cone face OCCT cut in two at its seam (shown as one face), with the four faces round it: written as one
 /// face, its rims one arc each (Parasolid has no seam), as shown: c2-housing-draft's Part 1 read back 37/82/46 for
 /// its 36/79/44.
