@@ -1321,12 +1321,23 @@ impl AssemblyView {
                     } else {
                         assembly_scene::MateGlyphState::Ok
                     };
-                    h.mate_glyphs.push((f, hl, st));
-                    // A hovered glyph outlines the part it sits on (live2 asm-feel (3)).
+                    let ty = asm.mate(ms.id).map(|m| m.mate_type).or_else(|| self.mate.as_ref().map(|s| s.dialog.read(cx).mate_type())).unwrap_or(MateType::Fastened);
+                    h.mate_glyphs.push((f, hl, st, ty));
+                    // A hovered glyph outlines the face it sits on (live2 mate-glyphs: the face outline light orange).
                     if hovered_overlay == Some(OverlayPick::Mate(i))
                         && let Some(m) = asm.mate(ms.id)
                     {
-                        h.accent_tops.push(if ms.frame_b.is_some() { m.b.instance } else { m.a.instance });
+                        let c = if ms.frame_b.is_some() { &m.b } else { &m.a };
+                        let face = match &c.reference {
+                            Reference::Implicit { on, .. } if matches!(**on, Reference::Face(_)) => Some((**on).clone()),
+                            r @ Reference::Face(_) => Some(r.clone()),
+                            _ => None,
+                        };
+                        if let Some(face) = face {
+                            let mut path = vec![c.instance];
+                            path.extend(c.path.iter().copied());
+                            h.hover_outline = Some((path, face));
+                        }
                     }
                     overlay_mates.push(ms.id);
                 }
@@ -1458,7 +1469,7 @@ impl AssemblyView {
         for (f, s, _, o) in &h.connectors {
             sig.extend([f.origin.x, f.origin.y, f.origin.z, f.rotation.x, f.rotation.y, f.rotation.z, *s, f64::from(*o)]);
         }
-        for (f, _, _) in &h.mate_glyphs {
+        for (f, _, _, _) in &h.mate_glyphs {
             sig.extend([f.origin.x, f.origin.y, f.origin.z, f.rotation.x, f.rotation.y, f.rotation.z]);
         }
         let geometry_changed = geometry_changed || sig != self.overlay_sig;
@@ -1472,7 +1483,7 @@ impl AssemblyView {
             crate::scene_builder::ConnectorGlyphs::picked(items) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
         });
         let mate_glyphs: Option<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = (!h.mate_glyphs.is_empty()).then(|| {
-            let items = h.mate_glyphs.iter().enumerate().map(|(i, (f, hl, st))| (*f, assembly_scene::overlay_id(built, OverlayPick::Mate(i)), *hl, *st)).collect();
+            let items = h.mate_glyphs.iter().enumerate().map(|(i, (f, hl, st, ty))| (*f, assembly_scene::overlay_id(built, OverlayPick::Mate(i)), *hl, *st, *ty)).collect();
             std::sync::Arc::new(assembly_scene::MateGlyphs { items }) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
         });
         // Live (mates.json after_second_pick): a mate's axes 50 px long at any zoom; the triads' relative sizes kept.
@@ -4047,6 +4058,10 @@ impl AssemblyView {
         let row = h_flex()
             .id(SharedString::from(format!("inst-{}", path.iter().map(|i| i.0.to_string()).collect::<Vec<_>>().join("-"))))
             .group(SharedString::from(format!("inst-row-{}", top.0)))
+            .debug_selector({
+                let name = name.clone();
+                move || format!("inst-row {name}")
+            })
             .h(px(crate::ui::ROW_H))
             // Live assembly/10: part icon x 66, name x 86.
             .pl(px(7. + depth as f32 * 22.))
@@ -4155,9 +4170,6 @@ impl AssemblyView {
                     ),
                 )
             })
-            .when(!crate::os_menu::is_open(cx), |d| {
-                d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(row_tip.clone()).build(w, cx)).tooltip_show_delay(crate::ui::ROW_TIP_DELAY)
-            })
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 // Hovering a row highlights the instance in the graphics area.
                 let new = if *h { Some(top) } else { None };
@@ -4228,6 +4240,7 @@ impl AssemblyView {
                 })
                 .into_any_element();
         }
+        let row = if crate::os_menu::is_open(cx) { row } else { crate::assembly_flyout::with_row_tip(row, row_tip.to_string()) };
         // Drag and drop: reorder (drives BOM order), joining the target's folder.
         let row = row
             .relative()

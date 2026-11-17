@@ -515,7 +515,7 @@ pub struct Highlights {
     pub mate_lines: Vec<(DVec3, DVec3, bool)>,
     /// Pickable mate indicators: (connector frame, highlighted, state), drawn flat in the connector's XY plane like
     /// Onshape's, at screen size ([`MateGlyphs`]).
-    pub mate_glyphs: Vec<(Frame, bool, MateGlyphState)>,
+    pub mate_glyphs: Vec<(Frame, bool, MateGlyphState, noshape_model::assembly::MateType)>,
     /// Placement preview cross at the cursor (insert).
     pub cursor_mark: Option<(DVec3, f64)>,
     /// Explode lines (dashed), start to exploded position.
@@ -731,53 +731,159 @@ pub const MATE_GLYPH_HALF_PX: f64 = 13.0;
 /// ~6–7 px).
 const MATE_GLYPH_PICK_PAD_PX: f64 = 2.0;
 
-/// Onshape's mate glyphs (assembly/41-43) at screen size: each (connector frame, pick id, highlighted, state). A small
-/// square lying in the connector plane, a white piece and a light-blue L inside a dark outline (red when failing, grey
-/// when inactive, amber when hovered or selected); a hovered or selected one sits on a light backing square (live2
-/// asm-feel (3)). The whole square takes the pointer.
+/// Onshape's mate glyphs at screen size (live2 mate-glyphs 11-17): each (connector frame, pick id, highlighted, state,
+/// mate type). A ~26 px icon per mate type lying in the connector's plane, light blue rgb(152,204,234) with a dark
+/// outline and white parts: Fastened a white block in a U socket, Revolute and Cylindrical a ¾-turn arc arrow round a
+/// dot, Slider a ring round a dot, Planar X and Y arrows from a white corner square, Pin slot the arc and a short +X
+/// arrow, Ball a ring, a dot and a thin cross, Parallel two white plates with a double arrow. Hovered or selected: a
+/// ~32 px translucent white square behind it. The glyph and a little round it take the pointer.
 pub struct MateGlyphs {
-    pub items: Vec<(Frame, u32, bool, MateGlyphState)>,
+    pub items: Vec<(Frame, u32, bool, MateGlyphState, noshape_model::assembly::MateType)>,
 }
 
+/// A glyph's strokes in its own units (half its side = 1, b up), drawn into the frame's plane.
+struct GlyphPen<'a> {
+    lines: &'a mut LineData,
+    points: &'a mut PointData,
+    at: &'a dyn Fn(f64, f64) -> [f32; 3],
+    /// The light blue (grey when inactive) and the outline (red when failing).
+    blue: [u8; 4],
+    ink: [u8; 4],
+}
+
+impl GlyphPen<'_> {
+    fn seg(&mut self, a: (f64, f64), b: (f64, f64), color: [u8; 4], width: f32) {
+        self.lines.segments.push(LineSegment { a: (self.at)(a.0, a.1), b: (self.at)(b.0, b.1), color, pick_id: 0, width, style: LineSegment::ON_TOP });
+    }
+    fn poly(&mut self, pts: &[(f64, f64)], color: [u8; 4], width: f32) {
+        for w in pts.windows(2) {
+            self.seg(w[0], w[1], color, width);
+        }
+    }
+    /// A light-blue stroke in a dark outline.
+    fn stroke(&mut self, pts: &[(f64, f64)]) {
+        self.poly(pts, self.ink, 5.0);
+        self.poly(pts, self.blue, 3.0);
+    }
+    /// A filled quadrilateral (corners in order), by rows of strokes between its left and right sides.
+    fn fill(&mut self, q: [(f64, f64); 4], color: [u8; 4]) {
+        let lerp = |p: (f64, f64), r: (f64, f64), t: f64| (p.0 + (r.0 - p.0) * t, p.1 + (r.1 - p.1) * t);
+        for k in 0..=12 {
+            let t = f64::from(k) / 12.0;
+            self.seg(lerp(q[0], q[3], t), lerp(q[1], q[2], t), color, 2.5);
+        }
+    }
+    fn outline(&mut self, q: [(f64, f64); 4]) {
+        self.poly(&[q[0], q[1], q[2], q[3], q[0]], self.ink, 1.2);
+    }
+    fn rect(&mut self, a0: f64, b0: f64, a1: f64, b1: f64, color: [u8; 4]) {
+        let q = [(a0, b0), (a1, b0), (a1, b1), (a0, b1)];
+        self.fill(q, color);
+        self.outline(q);
+    }
+    /// An arrow from `from` to `to` with a filled head at `to`.
+    fn arrow(&mut self, from: (f64, f64), to: (f64, f64)) {
+        let (dx, dy) = (to.0 - from.0, to.1 - from.1);
+        let l = dx.hypot(dy).max(1e-9);
+        let (u, n) = ((dx / l, dy / l), (-dy / l, dx / l));
+        let base = (to.0 - u.0 * 0.32, to.1 - u.1 * 0.32);
+        self.stroke(&[from, base]);
+        self.head(base, u, n);
+    }
+    /// A filled arrowhead from `base` along `u` (`n` across it).
+    fn head(&mut self, base: (f64, f64), u: (f64, f64), n: (f64, f64)) {
+        let (l, r, tip) = ((base.0 + n.0 * 0.26, base.1 + n.1 * 0.26), (base.0 - n.0 * 0.26, base.1 - n.1 * 0.26), (base.0 + u.0 * 0.34, base.1 + u.1 * 0.34));
+        self.poly(&[l, tip, r, l], self.ink, 1.6);
+        self.fill([l, tip, tip, r], self.blue);
+    }
+    fn arc(&mut self, r: f64, from_deg: f64, to_deg: f64) -> Vec<(f64, f64)> {
+        (0..=24).map(|k| (from_deg + (to_deg - from_deg) * f64::from(k) / 24.0).to_radians()).map(|t| (r * t.cos(), r * t.sin())).collect()
+    }
+    /// The ¾-turn arc arrow round the centre (Revolute, Cylindrical, Pin slot).
+    fn turn(&mut self) {
+        let pts = self.arc(0.62, 40.0, 300.0);
+        self.stroke(&pts);
+        let t = 300f64.to_radians();
+        self.head(pts[pts.len() - 1], (-t.sin(), t.cos()), (-t.cos(), -t.sin()));
+    }
+    fn ring(&mut self, r: f64) {
+        let pts = self.arc(r, 0.0, 360.0);
+        self.stroke(&pts);
+    }
+    fn dot(&mut self) {
+        let p = (self.at)(0.0, 0.0);
+        self.points.points.push(PointSprite { position: p, color: self.ink, pick_id: 0, size: 7.0, style: LineSegment::ON_TOP, _pad: 0 });
+        self.points.points.push(PointSprite { position: p, color: [255, 255, 255, 255], pick_id: 0, size: 5.0, style: LineSegment::ON_TOP, _pad: 0 });
+    }
+}
+
+/// The glyphs' light blue (live2 mate-glyphs: rgb(152,204,234)).
+const GLYPH_BLUE: [u8; 4] = [0x98, 0xcc, 0xea, 255];
+
 impl MateGlyphs {
-    fn geometry(&self, view: &noshape_render::camera_geometry::View) -> (LineData, Vec<MeshData>) {
-        let (mut ol, mut picks) = (LineData::default(), Vec::new());
-        for (f, id, hl, st) in &self.items {
+    fn geometry(&self, view: &noshape_render::camera_geometry::View) -> (LineData, PointData, Vec<MeshData>) {
+        use noshape_model::assembly::MateType;
+        let (mut ol, mut pts, mut picks) = (LineData::default(), PointData::default(), Vec::new());
+        for (f, id, hl, st, ty) in &self.items {
             let Some(px) = view.world_per_px(f.origin) else { continue };
             let half = MATE_GLYPH_HALF_PX * px;
             let (u, v, n) = (f.x(), f.y(), f.z());
             let lift = n * (half * 0.02);
             let at = |a: f64, b: f64| -> [f32; 3] { (f.origin + lift + u * (a * half) + v * (b * half)).as_vec3().into() };
-            let outline = match (hl, st) {
-                (true, _) => HANDLE_HL,
-                (_, MateGlyphState::Error) => theme::rgb8(theme::viewport::ERROR),
-                _ => DARK,
-            };
-            // Filled with dense on-top strokes (meshes can't draw over the parts).
-            let mut fill = |a0: f64, b0: f64, a1: f64, b1: f64, color: [u8; 4]| {
-                let rows = ((b1 - b0) / 0.18).ceil().max(1.0) as usize;
-                for r in 0..=rows {
-                    let b = b0 + (b1 - b0) * r as f64 / rows as f64;
-                    ol.segments.push(LineSegment { a: at(a0, b), b: at(a1, b), color, pick_id: 0, width: 4.0, style: LineSegment::ON_TOP });
-                }
-            };
+            let blue = if *st == MateGlyphState::Inactive { [0xc8, 0xc8, 0xc8, 255] } else { GLYPH_BLUE };
+            let ink = if *st == MateGlyphState::Error { theme::rgb8(theme::viewport::ERROR) } else { DARK };
+            let mut pen = GlyphPen { lines: &mut ol, points: &mut pts, at: &at, blue, ink };
             const WHITE: [u8; 4] = [255, 255, 255, 255];
-            const BACKING: [u8; 4] = [0xe9, 0xef, 0xf4, 255];
             if *hl {
-                fill(-1.5, -1.5, 1.5, 1.5, BACKING);
+                // A ~32 px translucent white square behind it (live2: 45 %).
+                let h = 16.0 / MATE_GLYPH_HALF_PX;
+                pen.fill([(-h, -h), (h, -h), (h, h), (-h, h)], [255, 255, 255, 115]);
             }
-            let l = if *st == MateGlyphState::Inactive { [0xc8, 0xc8, 0xc8, 255] } else { [0x90, 0xce, 0xf1, 255] };
-            fill(-0.45, -0.2, 1.0, 1.0, WHITE);
-            fill(-0.45, -0.6, 0.3, -0.2, WHITE);
-            fill(-1.0, -1.0, -0.45, 1.0, l);
-            fill(-0.45, -1.0, 1.0, -0.6, l);
-            fill(0.3, -0.6, 1.0, -0.2, l);
-            let edge = |a: (f64, f64), b: (f64, f64)| LineSegment { a: at(a.0, a.1), b: at(b.0, b.1), color: outline, pick_id: 0, width: if *hl { 2.0 } else { 1.2 }, style: LineSegment::ON_TOP };
-            for (a, b) in [((-1.0, -1.0), (1.0, -1.0)), ((1.0, -1.0), (1.0, 1.0)), ((1.0, 1.0), (-1.0, 1.0)), ((-1.0, 1.0), (-1.0, -1.0))] {
-                ol.segments.push(edge(a, b));
-            }
-            for (a, b) in [((-0.45, 1.0), (-0.45, -0.6)), ((-0.45, -0.6), (0.3, -0.6)), ((0.3, -0.6), (0.3, -0.2)), ((0.3, -0.2), (1.0, -0.2))] {
-                ol.segments.push(LineSegment { width: 1.0, ..edge(a, b) });
+            match ty {
+                MateType::Fastened => {
+                    pen.fill([(-0.75, -0.75), (0.75, -0.75), (0.75, 0.0), (-0.75, 0.0)], pen.blue);
+                    pen.fill([(-0.75, 0.0), (0.75, 0.0), (0.75, 0.75), (-0.75, 0.75)], WHITE);
+                    pen.fill([(-0.4, -0.45), (0.4, -0.45), (0.4, 0.0), (-0.4, 0.0)], WHITE);
+                    pen.outline([(-0.75, -0.75), (0.75, -0.75), (0.75, 0.75), (-0.75, 0.75)]);
+                    pen.poly(&[(-0.75, 0.0), (-0.4, 0.0), (-0.4, -0.45), (0.4, -0.45), (0.4, 0.0), (0.75, 0.0)], DARK, 1.2);
+                }
+                MateType::Revolute | MateType::Cylindrical => {
+                    pen.turn();
+                    pen.dot();
+                }
+                MateType::PinSlot => {
+                    pen.turn();
+                    pen.arrow((0.15, 0.0), (1.0, 0.0));
+                    pen.dot();
+                }
+                MateType::Slider => {
+                    pen.ring(0.6);
+                    pen.dot();
+                }
+                MateType::Ball => {
+                    pen.poly(&[(-0.9, 0.0), (0.9, 0.0)], DARK, 1.0);
+                    pen.poly(&[(0.0, -0.9), (0.0, 0.9)], DARK, 1.0);
+                    pen.ring(0.6);
+                    pen.dot();
+                }
+                MateType::Planar => {
+                    pen.rect(-0.55, -0.9, 0.2, -0.2, WHITE);
+                    pen.arrow((-0.15, -0.45), (-0.15, 0.9));
+                    pen.arrow((-0.15, -0.45), (0.95, -0.45));
+                }
+                MateType::Parallel => {
+                    for dy in [0.0, -0.75] {
+                        let q = [(-0.55, 0.15 + dy), (0.25, 0.15 + dy), (0.6, 0.45 + dy), (-0.2, 0.45 + dy)];
+                        pen.fill(q, WHITE);
+                        pen.outline(q);
+                    }
+                    pen.arrow((0.0, -0.1), (0.0, 0.45));
+                    pen.arrow((0.0, -0.1), (0.0, -0.65));
+                }
+                _ => {
+                    pen.ring(0.6);
+                    pen.dot();
+                }
             }
             // A disc round it in its plane, both sides (the connector's Z may face away from the viewer).
             let r = 1.0 + MATE_GLYPH_PICK_PAD_PX / MATE_GLYPH_HALF_PX;
@@ -791,18 +897,19 @@ impl MateGlyphs {
             }
             picks.push(MeshData { normals: vec![n.as_vec3().into(); positions.len()], pick_ids: vec![*id; positions.len()], indices, positions });
         }
-        (ol, picks)
+        (ol, pts, picks)
     }
 }
 
 impl noshape_render::camera_geometry::CameraGeometry for MateGlyphs {
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
-        let (lines, picks) = self.geometry(view);
+        let (lines, points, picks) = self.geometry(view);
         if lines.segments.is_empty() {
             return Vec::new();
         }
         let mut out: Vec<Instance> = picks.iter().map(|m| Instance::new(Drawable::Mesh(up.upload_mesh(m))).pick_only().ignore_clip().on_top().layer(20)).collect();
         out.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(20));
+        out.push(Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().unpickable().ignore_clip().layer(21));
         out
     }
 }

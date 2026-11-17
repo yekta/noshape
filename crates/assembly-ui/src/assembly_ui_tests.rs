@@ -1214,3 +1214,28 @@ fn a_mate_rows_flyout_shows_the_type_alone_until_a_parameter_is_set(cx: &mut Tes
         assert_eq!(rows, vec![FlyRow::Text("Revolute".into()), FlyRow::Check("Offset".into(), false), FlyRow::Check("Limits".into(), true), FlyRow::Text("No minimum".into()), FlyRow::Text("No maximum".into()), FlyRow::Check("Simulation connection".into(), false)], "Limits ticked: every parameter");
     });
 }
+
+/// live2 asm-feel2 (a): every instance row shows its name as its tooltip, whether it fits or not, a moment after the
+/// pointer comes to rest on it (~0.1 s); the next row's replaces it at once.
+#[gpui::test]
+fn every_instance_row_tooltips_its_name(cx: &mut TestAppContext) {
+    let (window, _view) = pattern_assembly(cx, "row-tips");
+    draw(cx, window);
+    for (name, sel) in [("Part 1 <1>", "inst-row Part 1 <1>"), ("Part 2 <1>", "inst-row Part 2 <1>")] {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let b = vcx.debug_bounds(sel).unwrap_or_else(|| panic!("{name}'s row"));
+        crate::ui_script::clear_tooltip();
+        vcx.simulate_mouse_move(b.center(), None, gpui_kit::Modifiers::default());
+        cx.executor().advance_clock(std::time::Duration::from_millis(40));
+        draw(cx, window);
+        // The first only after a pause; the next row's at once in its place (live2 13:05 (1): ~17 ms).
+        if name == "Part 1 <1>" {
+            assert_eq!(crate::ui_script::shown_tooltip(), None, "{name}: not at once");
+        } else {
+            assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some(name), "{name}: replaces the last at once");
+        }
+        cx.executor().advance_clock(std::time::Duration::from_millis(400));
+        draw(cx, window);
+        assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some(name), "{name}: its name");
+    }
+}

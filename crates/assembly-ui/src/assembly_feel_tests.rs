@@ -296,6 +296,12 @@ fn a_part_inside_a_subassembly_hovers_and_is_taken_alone(cx: &mut TestAppContext
         let v = view.read(cx);
         let h = v.hover.as_ref().expect("the face under the pointer");
         assert_eq!((h.kind, &h.path), (crate::scene_builder::PickKind::Face, &part1), "the pre-selection: that part's face, its two-level path");
+        // asm-feel2 (c): the face's edges in the hover colour and that part's silhouette in #FFC20E, nothing filled.
+        let scene = v.viewport.read(cx).scene();
+        assert!(scene.hover_outline && scene.hover_outline_rgb == Some([0xff, 0xc2, 0x0e]), "the part's silhouette band, #FFC20E");
+        let built = v.built.as_ref().unwrap();
+        let outlined: Vec<u32> = (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & noshape_render::state::OUTLINE != 0).collect();
+        assert!(!outlined.is_empty() && outlined.iter().all(|id| built.picks.get(*id).is_some_and(|t| t.path == part1)), "only that part outlined");
     });
     let w = at_window(cx, &view, centre);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());

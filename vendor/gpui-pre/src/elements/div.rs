@@ -4016,7 +4016,8 @@ fn handle_tooltip_mouse_move(
             active_tooltip.borrow_mut().take();
         }
         Action::ScheduleShow => {
-            let show_delay = if show_delay == DEFAULT_TOOLTIP_SHOW_DELAY && tooltip_warm(window, cx) { Duration::ZERO } else { show_delay };
+            // NOSHAPE PATCH: a shorter delay too (live2 asm-feel 13:05 (1): the next mate or instance row's tip, 110 ms cold, at once).
+            let show_delay = if show_delay <= DEFAULT_TOOLTIP_SHOW_DELAY && tooltip_warm(window, cx) { Duration::ZERO } else { show_delay };
             let delayed_show_task = window.spawn(cx, {
                 let weak_active_tooltip = Rc::downgrade(active_tooltip);
                 let build_tooltip = build_tooltip.clone();

@@ -53,8 +53,10 @@ impl Render for MateFlyout {
                 FlyRow::Check(t, on) => div().h(px(ROW_H)).flex().items_center().gap(px(6.)).text_size(px(14.)).child(check(*on)).child(t.clone()).into_any_element(),
             }))
         });
+        // A name-only tip (an instance row's) is as wide as its text (live2 13:05: "Part 1 <1>" 63 wide).
         let content = div()
-            .w(px(WIDTH))
+            .when(!self.rows.is_empty(), |d| d.w(px(WIDTH)))
+            .whitespace_nowrap()
             .text_size(px(12.))
             .text_color(ink)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(1.)), blur_radius: px(2.), spread_radius: px(0.), inset: false }])
@@ -65,6 +67,11 @@ impl Render for MateFlyout {
         let at = point(a.right() + px(3.), a.center().y - px(self.height() / 2.));
         div().child(anchored().position(at).snap_to_window().child(content))
     }
+}
+
+/// An instance row's tooltip (live2 asm-feel2 (a)): its name alone, in the flyout's place and look, cut off or not.
+pub fn with_row_tip(row: Stateful<Div>, text: String) -> Stateful<Div> {
+    with_mate_flyout(row, text.clone(), Vec::new(), text)
 }
 
 /// Gives a mate row its flyout: `head` ("Revolute 1 (Hidden)"), the body's `rows`, and `note`, what the recorder
