@@ -1,37 +1,60 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-17 11:13 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-17 15:46 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## In flight
-- **11-17 08:36 landed:** c85e75070 (Move face offset routing reverted + T1), core-sing2 (21dd0e7ab reapply cylinder,
-  ba77957ae bounded per-feature defeature, cd3f1c01b Thicken pinched guard). f197: blend's, re-landed 74d05ad5.
-- **Impeller P0 (TICKETS IMPELLER-DELETE-FACE-2-SLOW; qa b1d13282e: not a regression, a speed item vs live (doc ~19 s
-  vs 2.8 s); lead 11-17 order): parity of the input first, then the local rebuild on live's faces.**
-  - blend: Fillet 3 LANDED be6f0ca8 (10:45), arcs fix 9e40ad95a (34/95/62 = live, Stevenrohr einnschub too) lands ~11:15,
-    then Fillet Stevenrohr zum Halter ("Adjoining edge not filleted."). On 9e40ad95a ours matches 29/48.
-  - **Extrude impellerraum (mine; bool: not in its queue):** same volume / area as live, topology off (ours +3 faces,
-    live +20). Ours (dump vibe5 ~/tmp/core/impdump/unify-29, pre-unify 38 faces = after): outer wall ONE cylinder
-    8168.14 mm2, inner ONE 7414.16, cap 584.34, plane 212.49. Live: outer in 4 pieces (3 x 2107.33 + 1846.21), inner in 15
-    (1464.7 ... 10.5), cap 584.37: axial splits. Extrude 6 extrudes that CAP_FACE (isStart false) -> live 21/57/38 (19
-    arcs), ours 4 faces; Move face 1 then needs the split sides. Live's outer splits at -136/-44/49/131 deg (round
-    (y 0, z -34) mm, the circles' real centre) = where our part's edges cross the circles at x = 0 (inner: -146/-82/49/131
-    match too; -11/12/57..124 not found by my crude finder, xa.cpp). Reading: Parasolid splits the tool's walls along the
-    part's boundary vertices (a Boolean merge rule) -> bool's area per lead: recording running (vibe5
-    ~/agents/core-keep/impbool, NOSHAPE_RECORD_BOOLEANS + EXACT; the case = result volume 95981.76 mm3), then send the
-    case id to bool 7fa8ceab. Check first whether the inner -11..124 splits need the second direction's walls (x 0..25).
-  - Delete face 2 (later): Mac median main 2822 ms, on 4efe95564 1825 ms, live 12. On our part it deletes stand-ins
-    (planes x 5 / 6, faces 26 / 29 of 38). OCCT's defeature: ~75 % in its final MakerVolume (df4.cpp scope timer).
-    Prototypes vibe5 ~/agents/core-keep/localrm (src /root/core-scratch/brepq/lr.cpp, lr2.cpp): trim + re-sew: planar
-    images = OCCT's exactly; the B-spline neighbour's image 1.55 mm2 larger (OCCT trims it against non-neighbours),
-    invalid, 342 ms vs 2587: the case to solve. Gap solid fused / cut: wrong (527 vs 650 mm3), Boolean ~850 ms.
-  - Probes (vibe5 ~/tmp/core/probefan, src /root/core-scratch/brepq; build: g++-15 -O1 -w -I/opt/occt/include/opencascade
-    x.cpp -L/opt/occt/lib -Wl,--start-group <all libs> -Wl,--end-group -lpthread -ldl): df2 (dump faces + OCCT per group),
-    df4 (OCCT progress-scope timer), fl (faces in an x range), uc (faces / volume), xa, sp/sp2/sh (split), ang, sw.
-- **core-split LANDED 0d7e2fc2 (11-17 09:57):** quick Gauss Split centre, Rib one Boolean, exact B-spline Use,
-  sheet halves. parting-line Split 3 edges 30/20 vs live 34/24: live's inner parting edges come in 4 pieces + 0.016 mm
-  stubs + duplicates (Parasolid artefacts, same geometry): not a target. Pair note: the FIRST run of a pair sees 7 cf
-  docs + extension-spring compared fully, the second not (run-order artefact): compare common documents only.
+- **11-17 P0s (afternoon):**
+  - SCISSOR-LIFT-BOM-ROWS (bool's bisect): my 41f62884a (pattern / Mirror Add joins surface copies) made asm-scissor-lift
+    fed22d's Fillet 18 / Extrude 20 fail, BOM 59 -> 57/87. The joins happen in studios 56d3a6 / b7e381 / 37a1a7 (Mirror 2:
+    PART, ADD, surface copies). REVERT queued ddfea0eb (15:14; verified on vibe6: 59/87, no errors). makeSolid=false for
+    the pattern join (std's) did NOT fix it (/root/core-scratch/sl-makesolid-wip.patch): find what live's
+    joinSurfaceBodiesWithAutoMatching does with those Mirror 2s (maybe the copies don't match edges fully) before re-landing
+    with fed22d as its test (repro: vibe6 ~/agents/bool-keep/sl, NOSHAPE_PARITY_ASSEMBLIES=NOSHAPE_PARITY_MODELS=that dir,
+    ops parity::parity_assemblies --exact; release binaries ~/tmp/core/ops-*). 5b2807501 is innocent.
+  - asm-rack-pinion (asm): my 747c2bf0d moved Sketch 4's frame 22.5 deg on the SpurGear's face after Transform 1 (a turn
+    about the face's normal). Fix queued eb3c2bd4: a move that leaves the face's plane as it was keeps the frame of the
+    face where it is; a tilt keeps the moved frame (hem-plus 6/6). ab25c5 9 -> 18/29 (asm's model vibe7 ~/agents/asm-keep/mab).
+  - Projection classification (knife Fillet 5 vs periodic faces): face_project_point's ON within the face tolerance
+    takes points 0.005 mm past a corner as on the face; WIP /root/core-scratch/proj-tight.patch (tight ON when moved by a
+    period) didn't fix knife Fillet 5's extra face; not needed now (scissor wasn't it). Parked.
+- **Impeller P0 (TICKETS IMPELLER-DELETE-FACE-2-SLOW):**
+  - Extrude impellerraum is OURS (not the Boolean): the sketch lies on the part's face; live splits the sketch's circles
+    at the face's vertices on them (IMPRINT edges) and keeps each piece's side face. Fix 00279fbca (core-oc, on main
+    744d23a0e): SketchResult.imprint_points (face edges' ends + imprinted pieces' ends), region_profile splits lines /
+    arcs there (split_at_points), Profile.split_points, extrude marks its tool's edges there kept (k::mark_kept_edges)
+    and clears them after its own operation (new k::clear_kept_marks_at: live's Boolean 1 merges Extrude 1's pieces
+    later). T1 sketch_assoc::a_ring_imprinted_by_the_faces_edge_extrudes_split_walls. Impeller 29/48 kept, Extrude
+    impellerraum 38 -> 43 faces (live 59: the rest waits on blend's Halter, a multi-day build; our sketch face differs),
+    Extrude 6's Part 2 2337.34 mm3 = live's. Move face 1 now ERRORS (was Ok-but-wrong). Suite pair running (vibe5
+    ~/tmp/core/pair-{base,new}.log, scripts /root/core-scratch/pair-run.sh); then the g++-13 kernel build, then land.
+  - Then: measure Delete face 2 on our 35-face input (blend: Halter is days away), local rebuild on live's faces
+    (prototypes vibe5 ~/agents/core-keep/localrm, src /root/core-scratch/brepq/lr*.cpp: B-spline neighbour 1.55 mm2 off).
+  - Probes vibe5 ~/tmp/core/probefan (src /root/core-scratch/brepq; static libs: g++-15 -O1 -w
+    -I/opt/occt/include/opencascade x.cpp -L/opt/occt/lib -Wl,--start-group $(ls /opt/occt/lib/libTK*.a ...) ...): cy
+    (faces per child, cylinders), onc (edges on the ring's cylinders), xa, df2/df4, lr, lr2, uc.
+- **Queue after the impeller (from the 11-17 messages, in order):**
+  1. knifehandle Move face 1/2 (lead): both ERROR in ours after 2.3 s (live OK, 16 / 14 ms): ROTATE 0.3 deg of a blade's
+     B-spline side goes through move_rigid = defeature of the whole side (0.5 / 1.1 s) + 2 Booleans, which fail. Upstream
+     Fillet 3 7 faces vs live 6 (Sweep 2 area 1.4 mm2 off). Fix = a face tweak (rotated surface, neighbours re-intersected):
+     the same kernel work as the local Delete face rebuild.
+  2. c2-parting-line-draft-parting-line Split 3 (bool2, lead): Info "does not split" (live BOTTOM / TOP 13/34/24 each);
+     our Draft 1/2 walls are B-spline approximations (Shell 1 -25 mm3) so the parting edges sit um off Extrude 2's surface;
+     fuzzy 1e-5 splits but 13/49/39 + 17/53/39. Dumps vibe5 ~/tmp/bool2/spd, doc ~/tmp/bool2/pl-save.
+  3. qa: c2-fan-blade-sweep Boolean 2 75-88 -> 647-655 ms (my exact offsets; live 364): offsets ~85 ms each (parallel),
+     brep fast path ~90 ms before declining, OCCT subtract ~340 ms.
+  4. skasm: c2-config-parts-pulleys Circular pattern 1 (FACE pattern of one tooth groove's 5 faces, 24x): "Failed to
+     create pattern" (live 12 -> 150 faces, 9130.291 mm3); trace vibe6 ~/agents/skasm/trace-c2-config-parts-pulleys.log;
+     script core-oc/.pul.sh (RUST_LOG debug shows pattern_faces' real error).
+  5. bool2: c2-loft-paths-guides Loft 3 17/37/26 vs live 15/33/23 (my c064b550a); Mirror 1 then Ok-but-wrong (13/33/25,
+     5269155 vs 6325198 mm3): check whether Mirror 1 failed before c064b550a (DECISIONS 11-17); tell bool2 when Loft 3
+     matches (it takes the fuse, case vibe5 ~/agents/bool2-keep/lp-rec/61b92e93c065aeed).
+  6. asm (P2, on its unlanded asm-partorigin): robot-relations 0c3466 Thicken 1 of live's sheet JFD's 28 faces gives 11
+     tiny parts (8.5 mm3) vs live one part 223.99 mm3: silent wrong geometry until it makes one part or errors; repro
+     vibe7 ~/agents/asm-keep/m0c with ~/agents/asm-keep/bin/ops-c05.
+  7. dx (P2): asm-isaac-ball 8f5622 GearLab Helical 1M 40T 363 vs live 283 faces: our sweep's start cap is tilted 5e-9
+     rad off the planar profile's plane, so the union's unify won't merge it; fix = a sweep's cap on a planar profile keeps
+     its plane (and its image). 8.1 s vs 1.15. Repro vibe6 ~/agents/dx-keep/gearlab (body 8f5622-0.brep).
 - **core-pipe2 (core-trace; HELD by lead until Split 1's Surface 1 = live 9608 mm2):** 3e106dca0 N-profile guided loft
   without conditions, 829ac26ef intersection n1 x n2, f6aa8f16f parity pairs by type, bd2a1af82 sheet halves,
   a1142dcfb Move boundary on free-form sheets (extend_face_sides) + Keep front by a sheet piece's area (T1s).
@@ -68,12 +91,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   corners, 10293.9930 mm2, centre (50,50,7.5). Next after the impeller.
 - fan-blade Boolean 2: 56/139/84 with core-next (live 56/143/88): +2 edges +2 vertices per hole need live's x_t
   (now at /root/parity/models/c2-fan-blade-sweep/live-base.x_t, 11-17). Probe vibe5 ~/tmp/core/probefan (src /root/core-scratch/brepq).
-- Worktrees: core-trace (core-pipe2; probe /root/core-scratch/probe-wip.patch), core-oc (detached on blend's impeller Fillet 3 for the impeller dumps), core-bis: docs
+- Worktrees: core-trace (core-pipe2; probe /root/core-scratch/probe-wip.patch), core-oc (00279fbca impeller split walls, on main), core-rv (scissor revert), core-rp (rack-pinion), core-bis: docs
   lands + Mac timing (.mac.sh, .macdoc = qa's impeller copy).
-- Impeller Extrude 4 model side: closed, nothing to fix. The 12 mm² sliver alone never meets the offset wall: even its
-  surface over all of its own bounds only grazes the prism at the sketch plane (replayed dump vibe5
-  ~/agents/core-keep/e4dump/prism_until-10, experiment patch /root/core-scratch/uptowiden-exp.patch). Live's Extrude 4
-  is the whole region, which we match (impeller 27/48 on main after blend's d7f9264c9; first difference Fillet 3).
 - rocker-enclosure-sm Extrude 2 (next): Sketch 4's four Use circles (PROJECTED, live's external edges at x 45-60 mm,
   not on our part) come out as two: Extrude 2 names one region twice and cuts 2 holes of 4. Sketch translation:
   written into docs/handoff/skasm.md (landed 11-16).
@@ -114,15 +133,6 @@ docs/DECISIONS.md (read first; it wins over anything here).
   /root/core-scratch/loft-closed-path-wip.patch closes it round the path but comes out −11279 mm³: two profiles sit
   83 mm off the 26 mm ring, so MakePipeShell's carried sections twist. c2-surf-workshop-pipe: guided loft of more than
   two profiles unsupported (a Gordon surface over n profiles: big kernel item).
-- **Impeller speed P0 (qa 11-16 04:40): waiting on blend.** Delete face 2 3.9 -> 26.4 s from v0.4.48 to v0.4.53
-  (release A/B beside asm's full7: a hint; qa reruns it quiet). Chamfer 26 now builds (Error -> Ok, as live), so OCCT's
-  Defeaturing gets a bigger part (trimming faces 13.2 s, FF 6.4 s, EF 6.1 s). Root: Part 1 differs from Fillet 28 on
-  (ours 34/89 vs live 35/100; Fillet 29 fails, live 39/111; both hang on Fillet 3 (27), blend's next item), so the face
-  "Sketch Stroemungskanal" is imprinted on differs: our sketch's circles are split (4 regions) but Extrude impellerraum
-  adds 3 faces (live 20) and Extrude 6's ring is 4 faces (live 21, same 2337 mm³). Move face 1's 4 SWEPT_FACEs of the
-  ring's split sides don't exist in ours: it fails ("Could not offset ...", 8 s in the reblend's defeature) and Delete
-  face 2 defeatures a part live never has. Turning the fuse's unify off changes nothing there. blend (thread 0e6e9942) tells me when
-  27-29 match (blend's Fillet 3 needs f24c11cc on main to measure); then recheck from Extrude impellerraum (the probe now prints a sketch's regions: NOSHAPE_PROBE_SKETCH).
 - Extrude 33 (asm-pattern-std 36b90f) P0: 150 ms on main (debug, loaded vibe5); re-time once asm's Boolean feature
   pattern fix lands (Linear pattern 1 still errors upstream).
 - **Handed off 11-16:** c2-config-parts-screws memory (14.8 GB): Revolve 9's unify (usd_kept_volume -> OCCT UnifyFaces)
@@ -170,9 +180,6 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - **1dc32b (asm-infento-subs):** Draft 1 = live on dx's corrected input (-1306.543 vs -1306.54 mm³; OCCT 0030 +
   draft work bound landed af81dda05). Left: Fillet 2 / 3 / 12, Chamfer 3 (blend's); Extrude 42 17.6 s (bool's
   Boolean); Mirror 2 2.2 s (unify, bool2's). Hole 4-6 time: f1f212d03 above.
-- **c2-impeller-loft:** first difference feature 15 (Boolean Flansch+Gehäuse 19/53/36 vs 19/56/39) is the fuse-then-unify
-  merge (eval.rs fuse_targets -> unify_same_domain): bool takes it (11-15 22:40). Move face 1 / Delete face 2 speed only
-  after that (they act on a part live never has). OCCT's Defeaturing dumps vibe7 ~/tmp/core/imp/dd.
 - **asm-bjr-config 5d8bc1:** Sweep 1 landed 72248180. Kerf Compensation 1: live's corpus line is Manufacture=true
   (3 plain Ø2.2 holes, 3704.237 -> 3745.156 mm³, offset faces 454.835 -> 454.462 mm²); at false live leaves the part
   unchanged; ours offsets at false (dx's translation). Check our offset against the true numbers once dx has that input.
@@ -182,8 +189,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. Impeller P0 (In flight): Extrude impellerraum's split walls (Boolean case to bool), then Move face 1, Fillet 4,
-   Move face 2 on the right input, then Delete face 2's local rebuild on live's faces, re-timed on the Mac vs 12 ms.
+0. Impeller P0 (In flight): land Extrude impellerraum's split walls after the pair, then Delete face 2 on our input and
+   the local rebuild, re-timed on the Mac vs 12 ms; then the In-flight queue 1-7.
 1. Guided-loft conditions P1 (live 06:14 answered: match live's errors first), then pipe (our guide 2.69 mm off live's),
    singularities Loft with bad singularity / Loft 3. Then: Fill G0 = intro-examples' Fill 1 (live's fitted 14x18 surface),
    mutualtrim Sweep 1 (path cut at Surface 1), fan-blade Boolean 2 with live's x_t, manualblend Intersection curve 1
@@ -214,7 +221,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 ## How to run
 - Agent ids (11-17): lead 818534eb-f6b1-4a00-bb48-ebf0f7cdbd8a, blend 0e6e9942-0713-46c1-ae55-132fbbb4a14b, bool
   7fa8ceab-4549-499f-9b01-3a289c2c95b4, qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6,
-  live e8549719-ef9a-42de-960c-e24b29f142a6, psui 4973e295-9e92-463f-a13f-2ec5258bc5f9 (old ids stopped; never message a paused agent: DECISIONS 11-17).
+  live e8549719-ef9a-42de-960c-e24b29f142a6, live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7, asm
+  d8d597e0-675c-497b-a804-544ceab99bbd, dx (ask the lead), psui 4973e295-9e92-463f-a13f-2ec5258bc5f9 (old ids stopped; never message a paused agent: DECISIONS 11-17).
 - Builds / tests: `NOSHAPE_RB_HOST=<host> tools/tiers/rb.sh bash <script>` from the worktree (env prefixes don't
   reach the host: put them in the script). Mac: builds and crate tests only, one worktree of mine at a time.
 - Heavy runs on a vibe host (suites, gates, pairs) through `~/bin/slot <cmd>` there (one per host).
