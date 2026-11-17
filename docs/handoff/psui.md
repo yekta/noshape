@@ -125,6 +125,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   ui_tests::feel:: ui_tests::snaps:: ui_tests::list:: ui_tests::measure:: ui_tests::nav:: ui_tests::chrome::
   ui_tests::toolbar_highlight:: ui_tests::sm:: ui_tests::sketchtools:: ui_tests::editing:: ui_tests::dialogs::
   ui_tests::fields:: ui_tests::feedback::` (module path part_studio::sketch::ui_tests::<m>; one test per matrix).
+- 11-17 12:00: sketch-linear- / -circular-pattern-click-commit match (28/28 states, build e1ce5e41 + toolbar).
+- Queued 22349e4f (toolbar box model, chips y 11-29 vs live 11-30).
 - Landed e1ce5e41 (11:12): sketch pair readouts as live's (arcs as arcs, Center to the infinite line, order by kinds,
   point on line Min only), lone circle / arc icon, values as measure_value; latency TARGETS note live's timings.
 - Toolbar box model: patch applied in the worktree (uncommitted) + chips on the foot of a 22.5 px line
@@ -135,7 +137,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   script: /root/psui-scratch/tooldd (chip #aaa extents). Then commit + land.
 - qa P2 DOCK-TAB-SWITCH-TRAILING-FRAMES: repro ~/tmp/psui/tabab (vibe6; live-30-features + duplicated tab;
   ab.sh rounds apps). Same session 0.4.53 and 0.4.55 both ~850 ms at load 36-43; 0.4.55 208 ms at load 29: load /
-  software GL, not a regression. Told qa (11:50). Left: confirm on the Mac (real GPU) before closing.
+  software GL, not a regression. Told qa (11:50). qa agrees (vibe7 load 17: 0.4.53 818 ms too); qa's nightly (vibe7 alone, 3 rounds) -> /root/qa-scratch/nightly/tabab-1118.txt: close if both settle ~100-200 ms there.
 
 ## Waiting on others
 
