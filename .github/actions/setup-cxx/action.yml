@@ -25,9 +25,14 @@ runs:
         v=${{ inputs.gcc }}
         if ! command -v "g++-$v" > /dev/null; then
           # (noble ships GCC 14; newer ones come from the toolchain PPA.)
-          if [ "$v" -gt 14 ]; then sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test > /dev/null; fi
-          sudo apt-get update -q
-          sudo apt-get install -y --no-install-recommends "gcc-$v" "g++-$v"
+          # (Launchpad's PPA answers 503 for minutes at a time (11-17): retry, then fail.)
+          for i in 1 2 3 4 5 6; do
+            if [ "$v" -gt 14 ]; then sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test > /dev/null || true; fi
+            sudo apt-get update -q || true
+            sudo apt-get install -y --no-install-recommends -o Acquire::Retries=5 "gcc-$v" "g++-$v" && break
+            [ "$i" = 6 ] && exit 1
+            echo "GCC install failed (try $i), retrying in $((i * 30)) s"; sleep $((i * 30))
+          done
         fi
         # (Baseline x86-64, whatever the compiler's default: Ubuntu 26.04's GCC 14 and 15 default to x86-64-v3, whose
         # FMA contraction rounds differently (michael's Fillet 2 failed so) and which older CPUs can't run.)
