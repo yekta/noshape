@@ -5384,6 +5384,28 @@ fn edge_condition_symbol_exports_as_lives() {
     assert_eq!(doc.entities().filter(|e| matches!(e, EntityType::Arc(a) if a.common.layer == "ANNOTATION_LINES")).count(), 2, "( )");
 }
 
+/// Drawing properties › Annotations › Edge condition symbols (live drw-properties-annotations): its text height and
+/// color are the edge condition symbols' own, other annotations keep theirs.
+#[test]
+fn edge_condition_symbols_take_their_annotation_type_style() {
+    use super::edge_condition::{EdgeConditionSpec, EdgeRow, EdgeSign};
+    use super::sheet::AnnType;
+    let mut d = Drawing::default();
+    let t = templates::DrawingTemplate::standard("ANSI A", SheetSize::AnsiA, TitleBlockStyle::Ansi, true, Projection::ThirdAngle);
+    d.props = templates::template_props(&t, "ANSI_A_INCH.dwt");
+    templates::apply_template(&mut d, 0, &t);
+    let spec = EdgeConditionSpec { rows: [EdgeRow { sign: EdgeSign::Plus, value: 0.3 * 0.0254 }, EdgeRow::default()], ..Default::default() };
+    d.sheets[0].annotations.push(Annotation { id: 1, kind: AnnotationKind::EdgeCondition { view: None, target: [81.5, 140.0], spec: Box::new(spec) }, position: [70.0, 160.0], ..Default::default() });
+    let value = |d: &Drawing| {
+        let b = render_sheet(d, 0, &super::views::Sources::new(), &ViewCache::new(), false).unwrap();
+        b.geometry.texts.iter().find(|t| t.text.ends_with("+.300") || t.text.ends_with(".300")).map(|t| t.height).expect("the value")
+    };
+    let before = value(&d);
+    *d.props.ann_type_mut(AnnType::EdgeCondition) = super::sheet::AnnTypeStyle { height: Some(before * 2.0), ..Default::default() };
+    assert!((value(&d) - before * 2.0).abs() < 1e-9, "{before} -> {}", value(&d));
+    assert_eq!(AnnType::ALL.iter().position(|t| *t == AnnType::EdgeCondition), Some(6), "listed after Surface finish symbols");
+}
+
 /// The showcase's plate has its holes made by Hole features: its hole table lists them (live lists only Hole
 /// features' holes), A1 the Ø24 and B1 / B2 the Ø9.6 ones (its precision one decimal).
 #[test]

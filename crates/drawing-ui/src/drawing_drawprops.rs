@@ -317,7 +317,7 @@ fn font_of(p: &mut DrawingProps, w: FontOf) -> &mut Option<noshape_model::drawin
 }
 
 /// Element ids of the per-type rows (font select, bold, italic, color).
-const TYPE_IDS: [[&str; 4]; 9] = [
+const TYPE_IDS: [[&str; 4]; 10] = [
     ["dp-t0-font", "dp-t0-b", "dp-t0-i", "dp-t0-color"],
     ["dp-t1-font", "dp-t1-b", "dp-t1-i", "dp-t1-color"],
     ["dp-t2-font", "dp-t2-b", "dp-t2-i", "dp-t2-color"],
@@ -327,6 +327,7 @@ const TYPE_IDS: [[&str; 4]; 9] = [
     ["dp-t6-font", "dp-t6-b", "dp-t6-i", "dp-t6-color"],
     ["dp-t7-font", "dp-t7-b", "dp-t7-i", "dp-t7-color"],
     ["dp-t8-font", "dp-t8-b", "dp-t8-i", "dp-t8-color"],
+    ["dp-t9-font", "dp-t9-b", "dp-t9-i", "dp-t9-color"],
 ];
 
 /// Hole/thread callouts › Indicator choices (the count's sign: "4X").
@@ -555,7 +556,7 @@ impl DrawingEditor {
                 let mut f = vec![dropdown(h, |p, v| p.ann_text_height = v, window, cx), dropdown(a, |p, v| p.ann_arrow = v, window, cx)];
                 // Per type text heights (shown: the type's, else All annotations'),
                 // then Datum size, the center of mass diameter, the stack gap.
-                let setters: [fn(&mut DrawingProps, f64); 9] = [set_type_height::<0>, set_type_height::<1>, set_type_height::<2>, set_type_height::<3>, set_type_height::<4>, set_type_height::<5>, set_type_height::<6>, set_type_height::<7>, set_type_height::<8>];
+                let setters: [fn(&mut DrawingProps, f64); 10] = [set_type_height::<0>, set_type_height::<1>, set_type_height::<2>, set_type_height::<3>, set_type_height::<4>, set_type_height::<5>, set_type_height::<6>, set_type_height::<7>, set_type_height::<8>, set_type_height::<9>];
                 for (t, set) in AnnType::ALL.iter().zip(setters) {
                     f.push(dropdown(p.ann_type(*t).height.unwrap_or(h), set, window, cx));
                 }
@@ -1151,7 +1152,7 @@ impl DrawingEditor {
                 // Live drawing/ui2-ah-tab-Annotations-p1, -end: every group a
                 // table from its own column.
                 let col = match t {
-                    AnnType::Notes | AnnType::GeometricTolerances | AnnType::SurfaceFinish | AnnType::WeldSymbols | AnnType::BendNotes => Some(108.),
+                    AnnType::Notes | AnnType::GeometricTolerances | AnnType::SurfaceFinish | AnnType::EdgeCondition | AnnType::WeldSymbols | AnnType::BendNotes => Some(108.),
                     AnnType::FlagNotes => Some(114.),
                     AnnType::Callouts | AnnType::Datums => Some(123.),
                     AnnType::HoleCallouts => Some(110.),

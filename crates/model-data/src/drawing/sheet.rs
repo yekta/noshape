@@ -249,17 +249,20 @@ pub enum AnnType {
     FlagNotes,
     WeldSymbols,
     BendNotes,
+    /// Edge condition symbols (live drw-properties-annotations, between Surface finish and Weld symbols).
+    EdgeCondition,
 }
 
 impl AnnType {
     /// In the Annotations tab's order.
-    pub const ALL: [AnnType; 9] = [
+    pub const ALL: [AnnType; 10] = [
         AnnType::Notes,
         AnnType::FlagNotes,
         AnnType::Callouts,
         AnnType::Datums,
         AnnType::GeometricTolerances,
         AnnType::SurfaceFinish,
+        AnnType::EdgeCondition,
         AnnType::WeldSymbols,
         AnnType::BendNotes,
         AnnType::HoleCallouts,
@@ -276,6 +279,7 @@ impl AnnType {
             AnnType::FlagNotes => "Flag notes",
             AnnType::WeldSymbols => "Weld symbols",
             AnnType::BendNotes => "Bend notes",
+            AnnType::EdgeCondition => "Edge condition symbols",
         }
     }
 
@@ -289,6 +293,7 @@ impl AnnType {
             K::SurfaceFinish { .. } => AnnType::SurfaceFinish,
             K::HoleCallout { .. } => AnnType::HoleCallouts,
             K::Weld { .. } => AnnType::WeldSymbols,
+            K::EdgeCondition { .. } => AnnType::EdgeCondition,
             _ => return None,
         })
     }
