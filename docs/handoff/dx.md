@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-16 23:25 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 00:15 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -40,14 +40,20 @@ the period of the B-surface's range as written (rings-loft Part 1 read back 302.
 export::offsets_of_a_periodic_bsurface_round_trip_through_parasolid).
 Landed 11-16 late: 212337b1 x_t import: a blend's tube stations from its spine's curvature, halved until round to
 1 nm (were r/16: 618-1235 stations; live's rings-loft x_t imported 7.1 -> 3.1 s on the Mac, same parts; query_parts' 4.7 s
-is OCCT volume integration, generic). Queued: x_t export joins a periodic face's pieces OCCT cut only at its seam
-(face_joins) into one face, and fuses a rim's arcs meeting at a vertex only they use (housing-draft x_t matches;
-T1 export::a_cone_face_cut_at_its_seam_writes_as_one_face).
-Suite x1116j (main + both, vibe6 23:12): ours imports live's 59/75, live imports ours 46/48, ours reads ours 112/118,
-times 48/49, drawings' DXF 0/4.
+is OCCT volume integration, generic). 4a77e41a x_t export joins a periodic face's pieces OCCT cut only at its seam
+(face_joins) into one face and fuses a rim's arcs meeting at a vertex only they use (housing-draft x_t matches).
+5d0813e0 ACIS / JT export: offsets as B-surfaces again (my 4dd88057 had broken rings-loft's SAT; T1
+offset_walls_export_to_acis, area 0.17 % off: the B-surface approximation, open). Queued: x_t export: a B-surface
+closed but for its end rows' weights' last digits (6e-12) is one periodic face (rings-loft Part 1 x_t matches; T1
+a_loft_wall_closed_but_for_its_weights_last_digits_stays_one_face, fixture rings-loft-wall.brep).
+Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live imports ours 46/48, ours reads ours
+112/119, times 49/50, drawings' DXF 0/4.
 Open, ranked:
-1. rings-loft ours.sat not exported ("Geom_RectangularTrimmedSurface::V parameters out of range"): SAT writer.
-2. rings-loft own x_t Part 1 275/776/517 for 273/762/508, Part 2 133/338/208 for 132/335/206.
+1. rings-loft own x_t Part 2 133/338/208 for 132/335/206 (a 0.007 mm² cylinder piece joined to its neighbour stays
+   apart: seam_pieces_joined's unify refused?). rings-loft own SAT 275/776/517 + 133/339/209 (SAT writer splits the
+   loft walls itself).
+2. Probes: a saved rings-loft doc on the Mac (~/noshape-host/dx-keep/rl-save; copy it before each use, export_parts
+   saves into the open doc).
 3. Our SAT read-backs: motor-mount-jack 24/26/2 for 16/24/0; hose 22/44/24 for 12/12/0; o-ring Part 3 4/7/2 for 1/0/0.
    live's: sm-louver Part 2 40/82/44 for 38/76/40; rings-loft live.sat/.igs 275/771/514 for 273/762/508.
 4. Drawings DXF 0/4. rings-loft ARC 40 for 91 is model geometry: live's Shell walls are exact rational tubes (deg 3x2;
