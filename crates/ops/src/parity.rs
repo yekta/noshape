@@ -409,6 +409,19 @@ impl<'a> Translator<'a> {
                 frames.insert(id.to_string(), [[m[3], m[7], m[11]], [m[0], m[4], m[8]], [m[1], m[5], m[9]]]);
             }
         }
+        // A configured document: its sketches where live solved them at the captured configuration (sketches.json),
+        // which is the one built; features.json's are the workspace's (c2-config-parts-links' Sketch 1 at pitch 05B,
+        // stored at 03B: our solve of the 3 mm change took the waist arcs' other branch).
+        if doc["sketchBodies"]["capturedConfiguration"].as_str().is_some_and(|c| !c.is_empty()) {
+            for s in doc["sketchBodies"]["sketches"].as_array().into_iter().flatten() {
+                let Some(id) = s["featureId"].as_str() else { continue };
+                for g in s["geomEntities"].as_array().into_iter().flatten() {
+                    if let Some(e) = g["id"].as_str() {
+                        solved.insert((id.to_string(), e.to_string()), g.clone());
+                    }
+                }
+            }
+        }
         let foreign = doc["foreignFiles"].as_object().map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
         let mut config_defaults: HashMap<String, String> = doc["configuration"]["configurationParameters"]
             .as_array()

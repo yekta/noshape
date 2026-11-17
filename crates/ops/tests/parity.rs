@@ -1786,6 +1786,29 @@ fn a_configuration_variable_takes_the_captured_configurations_value() {
     assert!((volume - std::f64::consts::PI * 25.0 * 20.0).abs() < 1e-3, "{volume} mm³: Ø10 × 20 mm, live's captured 20 mm, not the workspace's 30");
 }
 
+/// A configured document's sketch is drawn where live solved it at the captured configuration (sketches.json), not
+/// as stored at the workspace's (c2-config-parts-links' Sketch 1, stored at pitch 03B, built at 05B).
+#[test]
+fn a_configured_sketch_is_drawn_at_lives_captured_solve() {
+    let doc = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"], "queryString": "query=qCompressed(1.0,\"%B5$QueryM4S…TopplaneOp…\",id);" }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "centerId": "c1.center", "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.005, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] }
+    ], "configuration": { "configurationParameters": [{ "btType": "BTMConfigurationParameterEnum-105", "parameterId": "Pitch", "defaultValue": "_05B", "options": [{ "option": "_03B" }, { "option": "_05B" }] }],
+        "currentConfiguration": [{ "btType": "BTMParameterEnum-145", "parameterId": "Pitch", "value": "_03B" }] },
+      "sketchBodies": { "capturedConfiguration": "Pitch=_05B", "sketches": [{ "featureId": "FS1", "geomEntities": [
+          { "id": "c1", "entityType": "circle", "center": [0.0, 0.0], "radius": 0.008 },
+          { "id": "c1.center", "entityType": "point", "point": [0.0, 0.0] }] }] } });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("captured-solve.noshape"), &doc, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    let circle = g["entities"].as_array().unwrap().iter().find(|e| e["type"] == "circle").cloned().unwrap_or_default();
+    assert_eq!(circle["radius"], json!(8.0), "{g}");
+}
+
 /// A refs.jsonl line names every parameter live evaluated it for: one (`parameter`) or several (`parameters`, when two
 /// of a feature's queries name the same entity: Delete part's entities and nonCompositeEntities, an extrude's two end
 /// faces up to one face); each of those parameters gets it.
