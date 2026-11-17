@@ -568,7 +568,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   at 15:20, the hats / dock / tickets there ALL-SAME); bc58c02b is next in the compat loop.
 - 16:30: vibe5 down (~16:20), vibe3 gone: qa's compat / cut / release checks moved to vibe7 (CLIs 0.4.56 / 0.4.43 from the
   release assets). vibe7's ~/lead-private has hat15 and hat8 only: hat15b and the dock are NOT checked until they are
-  there (16:45: the dock is on vibe7 now and checked; hat15b not run, vibe5 down). The compat loop restarted on green a1383a65 (the 16:15 verdict was stuck on vibe5; it is given by hand on the
+  there (16:45: the dock is on vibe7 now and checked; hat15b not run, vibe5 down). Green a1383a65: hat15, hat8 and the
+  dock SAME as v0.4.56; vibe7's dock copy is another version (416 features / 7 Part Studios; vibe5's had 499 / 8). The compat loop restarted on green a1383a65 (the 16:15 verdict was stuck on vibe5; it is given by hand on the
   green with core's fixes). The scissor-lift / rack-pinion check stays on vibe6.
 - SCISSOR-LIFT: core's revert ddfea0eb1 queued 15:05; core 15:30: on vibe6 (release) BOM 59/87, no Fillet 18 / Extrude 20
   errors. Also must ship: core eb3c2bd48 (queued), asm's rack-pinion P0 from core 747c2bf0d, which is in v0.4.56 too (Studio
