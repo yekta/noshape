@@ -4,25 +4,41 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 02:05 UTC.
+Updated 11-17 04:08 UTC.
 
 ## In flight
-- Landed 11-16: 190a71558 (cp2), 7d1b8799 (kernel profile per feature), 765b2281 (screws P0: OCCT 0031 + 0032),
-  8e3067d8, 9d68c081, a8b8f1851, a2952b329.
-- bool-knife landing (queued 01:47 as b0739092, 7 commits + the DECISIONS note under the 11-15 near-tangent ruling):
-  gate cd9ad917c clean (all corpora + parity56 0 differences; suite only the sprockets / rocker region-order flake),
-  hats/dock 12/12 SAME, g++-13 clean.
-- GATE GAP: the knurl corpora (kall, k10-25, k10-25-12, k25-15, k25-25, k25-71-12) need a 48 GB host for OCCT's
-  cut (35-50 GB); none is left (vibe3/5/6/7 29-31 GB, vibe4 gone), so gate-host.py skips them and says so in the
-  VERDICT. Instead (lead 11-17 ok): ours-only replay of each on main and branch, e.g.
-  NOSHAPE_BOOL_CORPUS=~/agents/bool-corpora/<k> NOSHAPE_BREP_OURS_ONLY=1 <kernel tests> brep_replay::brep_corpus_replay
-  (compares with the recorded OCCT result; knife: all taken, 0 differ, kall 15/15).
-- OCCT 0033 landed 11-17 01:24 as 9ece8f66 (libs on every host; Mac build dirs removed).
-- bool-knife2 (bool-hat, on bool-knife): a5c287f9a free-form samples + k-d index kept across Booleans (GRID_CACHE,
-  same LRU as the patches; knife Extrude 8 22-34 -> 12-17, Extrude 9 24-34 -> 14-20, Revolve 1 58-76 -> 49-59 Mac);
-  dc060ff1c Shell's wall checked once (it was checked twice), parallel past 16 faces (snap-hook Shell 1 dump
-  -15 %, same faces / edges). Gate dc060ff1c running (unit bool-gate-knife2, /root/bool-hat-scratch/chain-dc060ff1c.out); Shell corpus A/B
-  (ZZ_OLDCHECK scratch switch, vibe5 ~/tmp/bool/shab-kern, /root/bool-hat-scratch/v5-shab.out) in the slot; then hats/dock, land.
+- Landed 11-17: bool-knife (ecf8c33a: hulls, Shell check, uv_of k-d tree, patch cache, validity-once unify, face
+  tolerance margin + DECISIONS note), OCCT 0033 (9ece8f66).
+- GATE GAP: the knurl corpora (kall, k10-25, k10-25-12, k25-15, k25-25, k25-71-12) need a 48 GB host for OCCT's cut;
+  none left (29-31 GB), gate-host.py skips them and says so. Instead (lead 11-17 ok): ours-only replay on main and
+  branch: NOSHAPE_BOOL_CORPUS=~/agents/bool-corpora/<k> NOSHAPE_BREP_OURS_ONLY=1 <kernel tests>
+  brep_replay::brep_corpus_replay (compares with the recorded OCCT result).
+- bool-knife2 (dc060ff1c, on bool-knife): grid cache a5c287f9a + Shell wall checked once dc060ff1c. Gate clean (all
+  corpora + parity56 0 differences, suite only the sprockets / rocker order flake), Shell corpus A/B 211/211 same
+  (ZZ_OLDCHECK switch). Hats/dock: unit bool-udoc-knife2 -> /root/bool-hat-scratch/udoc-knife2.out (queued in the
+  slot). When SAME: land (bool-split: checkout bool-knife2, rebase, land.sh).
+- bool-march (bool-hat, bb7c5c4c9 = knife2 + the parked plane x B-spline marcher ca8c628f6 + fix): the knife Mirror 1
+  regression was the marcher's 1e-7 fit: Fillet 2's by-tools path refaces a face (build.cpp reface_on, forced
+  BRepLib::SameParameter) and re-fitted those edges' curves on the faces (13 poles vs the 3D curve's 14); the faces'
+  integrals then changed under a mirror and unify's volume check (usd_volume_change) refused Mirror 1's merge (31
+  faces). Fit at 1e-8: knife 46/52 as main, Mirror 1 22/60/39, Extrude 2 29 -> 3-4 ms, Revolve 1 59 -> 21-26, knife
+  699-752 ms Mac (main ~1000, live 622). slots_across_a_rings_rounds_cut_as_occt widened 1e-8 -> 2e-8 (ours 474.543498
+  converged at fits 1e-7..1e-10; OCCT's sections 474.5435035; lead ok if gate + hats/dock identical). Gate: unit
+  bool-gate-march -> /root/bool-hat-scratch/chain-bb7c5c4c9.out (running 04:02). Then hats/dock
+  (/root/bool-hat-scratch/udoc-ab.sh bb7c5c4c9), land. g++-13 clean.
+- c2-config-parts-nuts Sweep 1 (core, yours now): core's exact-cylinder tool vibe5 ~/agents/core-keep/nm-nuts-turns
+  (Mac copy ~/noshape-host/agents/bool-hat/nm-nuts-turns). OCCT's cut invalid 156.8 mm3; ours declines "a
+  non-manifold result": bore (face 7) pieces at its seam (x -1.62, angle pi) where the tool's 0.0875 mm crest strip
+  crosses it: seam pieces z .3789-.4375 / 1.05-1.1375 / 1.75-1.8375 used once, the tool's helix edges ending on the
+  seam (origins 71-77) used by flank pieces only: the bore isn't split by them on one side of its seam. A helix end
+  1 nm past the seam (6e-7 rad) mapped across it (free::mapped seam eps 1e-9 rad); widening that to the face tolerance
+  alone didn't fix it. Debug diff /root/bool-scratch/nuts-debug-wip.diff (ZZ_NM_DEBUG, ZZ_NM_PIECE, ZZ_MAP_FACE,
+  ZZ_FACE_SEGS=7 prints the bore's 2D segments: /tmp/bool-segs7.txt). Next: which 2D place ("right" side) the helix
+  ends at the seam vertices get in the bore's split (boolean.rs ~5885).
+- qa's Mirror 1 +12 ms vs v0.4.53 (vibe7 03:50, 3 runs each 129-131 vs 139): real, not the Boolean's code: unify
+  99.8 -> 82.3, the fuse 28.8 -> 54.8 because its input differs (v0.4.53's blade 9881.011 mm3, green's 9881.086, both
+  in live's band; upstream Fillet 2 / Chamfer 1); the same input times the same on both (cold 21.4 ms). On one binary
+  green's input fuses in 26-28 ms, v0.4.53's in 13-19. Told the lead.
 - Fillet 2 (11-17, Mac 100 ms vs live 9): op_boolean 30 (cut + fuse), op_split 28 (dump split-11: the 5-face
   run-on tool split by 2 planes + the grind B-spline, OCCT's splitter 25 ms), min_distance x31 11, op_fillet 10,
   props_surface x11 6. A cross-Boolean exact-box cache can't hit: the cut trims the grind face (a new face, a
@@ -45,8 +61,8 @@ Updated 11-17 02:05 UTC.
   (NOSHAPE_AHEAD_DEBUG). Chamfer 1's hulls: ~15 ms CPU a run; kind pre-check / plane give-up gained <= 3 ms: dropped.
 - Fan-blade Boolean 2 (core-offset): OCCT's (tangent by design: thread crest r 4.000 along the 4 mm chamfer circle);
   no safe early decline ("one-face section" decline lost hundreds of taken cases). Lead agreed 11-17.
-- Snap-hook Shell 1 (after the knife): SI check 35 %, BRepCheck 23 %, add_pcurve projections 19 % (vibe7 sample);
-  lead's question: can either check be skipped where our builder guarantees the property? Then rings-loft Shell 1.
+- Snap-hook Shell 1: its checks can't be skipped (the SI check is what finds offsets crossing; the wall can be
+  invalid, the repair path); the wall was checked twice: dc060ff1c. Rings-loft Shell 1 dump ~165-180 ms Mac vs live 235.
 - core: offset steps 1+2 gate passed (told 11-16 23:4x); offset_solid takes removed faces since 0c328e3b7: try on the
   Shell corpora (k::last_offset_report()).
 - Scratch worktree with switches (ZZ_*): /root/bool-scratch/wt/bool-hat (rb.sh dir ~/agents/bool-hat on vibe5 / Mac,
@@ -56,15 +72,7 @@ Updated 11-17 02:05 UTC.
 - Not mine, handed back 11-16: tablet-stand Extrude 1, parting-line Rib (core bb61a968).
 
 ## Parked (branches / diffs, not landing as they are)
-- Plane x B-spline marcher + our own least-squares fit (branch bool-free-sections-wip: 71efdd87e, f6c77c748, ...):
-  fitted() degree 5 by chord length, one solve for the curve and both pcurves; tpd's fillet cut CPU 3.4 -> 2.2 s per
-  9 runs. FAILED gate f6c77c748: c2-hunting-knife's Mirror 1 31/81/51 vs live 22/60/39 (46 -> 39/52). Every recorded
-  knife case gives the same counts marcher on / off on the same inputs (probe_case_unify); the cut decfe3013034332d
-  (vibe5 ~/tmp/bool/kn) keeps 16/44, volume 1e-8 off, and the mirror's fuse 69dc7f64260fff42 (~/tmp/bool/kn1,
-  recorded marcher on) then gives 36 faces, 31 after unify, for ours and OCCT alike. The curves' tolerance is not it
-  (a 1e-9 floor: still 31/81/51). Next there: compare decfe3's result edges / pcurves on the mirror plane with
-  OCCT's. Its plane_tube_sections refinement (steps hiding a short run cut 64x; flat arcs' steps skipped; tpd: 13
-  more pairs) moves rings-loft's slot cut 1.2e-8 off OCCT (slots_across_a_rings_rounds_cut_as_occt).
+- Plane x B-spline marcher: un-parked 11-17, now bool-march (In flight above); its knife regression found and fixed.
 - Circle-square-circle loft sides (creased at the square's corners) stall that fit in the face's parameters: why 10.
 - Torus x cylinder sections: /root/bool-scratch/torus-cylinder-wip.diff (per u the tube circle against the cylinder,
   math_TrigonometricFunctionRoots, branches by Newton). michael: 5 more pairs, but two all but flat curves end
@@ -98,7 +106,7 @@ Updated 11-17 02:05 UTC.
    waiting on it (wait_until_cold 34 %): the plane x B-spline marcher (item 3) is the lever. Fuse 4fa72ce21506c5f7
    (8 tools, 210 ms): BRepCheck 20 % (cuts' results 8.5, the fuse's 10; the fuse could trust the cut pieces' checked
    faces as made_valid does, but `a`'s are unchecked), ::at 19 % (chords of free curves 50 % of it, piece_box 20 %).
-3. The marcher's knife regression (above), then gate it again.
+3. Land bool-march (gate running), then the nuts cut (In flight).
 4. learning-center-michael (363 vs 96): cylinder x torus (22 pairs ~220 ms CPU), cylinder x sphere 24 pairs ~60 ms,
    cylinder x cylinder 10 pairs.
 5. skasm's cf-sheet-metal-shaped-flange: vibe6 ~/agents/skasm-keep/sf-bool-cases (40 cases): ~15 corner-relief cuts of a
