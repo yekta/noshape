@@ -32,7 +32,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   psui 11:50: not separable from load (live-30-features, vibe6 load 36-43: 0.4.53 and 0.4.55 both ~850 ms; load 29: 0.4.55
   ~210 ms); spaced presents, no hover card (the pointer rests on the active tab). qa 11:53 vibe7 load 17: 0.4.53 tabToA 818 ms
   too. Decided by the nightly's quiet run from 11-18 (nightly/tabab-<mmdd>.txt).
-- [ ] P0 SCISSOR-LIFT-BOM-ROWS (**bool: culprit core 41f62884a** (corrected from 5b2807501; bad vs its good parent): fed22d Fillet 18 fails, BOM 59 -> 57/87; core's fix on branch core-proj; qa re-checks on its green; asm owns the BOM; qa 2026-11-17 07:20, assembly suite 1117-0227 on green ecf8c33a vs 1116-1642 on 684e77e2)
+- [x] verified on release/v0.4.57 519afe8e2 (qa 18:11: BOM rows 59/87, no Motor Mount row under Drive, no fed22d errors; vibex6) P0 SCISSOR-LIFT-BOM-ROWS (**bool: culprit core 41f62884a** (corrected from 5b2807501; bad vs its good parent): fed22d Fillet 18 fails, BOM 59 -> 57/87; core's fix on branch core-proj; qa re-checks on its green; asm owns the BOM; qa 2026-11-17 07:20, assembly suite 1117-0227 on green ecf8c33a vs 1116-1642 on 684e77e2)
   asm-scissor-lift: BOM rows as live 59 -> 57 of 87 (rows 63 -> 62; occurrences 214/242 and mates 13/19 unchanged). New
   difference: ours has (1, "Motor Mount", 3.0, "Motor Mount", "", "- None -") under "Drive", live doesn't; the "Gear Frame"
   row under "Gearbox" no longer differs. 106 commits in range (bool, core, dx, blend; no asm). Logs:
@@ -560,6 +560,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-17 17:00 release (qa list 12:35, newest checked green 7f287e52; the latest release is v0.4.56)
+- **GO on release/v0.4.57 = 519afe8e2 (qa 18:11)**: green a1383a65 + core's cdd1df63 (revert of 41f62884a) and 711356ca (rack-pinion).
+  Its release CLI (vibex7) vs v0.4.56: hat8, hat15, hat15b, the dock, f197, the 4 Hole documents, 47 ticket documents, qa's
+  authored documents ALL-SAME (compat/cand-v0457*.txt). asm-scissor-lift alone at 519afe8e2 (vibex6): BOM rows 59/87 as
+  v0.4.55, the extra "Motor Mount" row under Drive gone, no fed22d Fillet 18 / Extrude 20 error; asm-rack-pinion 25/25
+  occurrences, 8/8 mates (4/8 before), 20/20 BOM rows as live. Known, for 05:00: REMEMBERED-VALUES-OLD-FORMAT (P1).
 - **No blocker so far (GO on 7f287e52).** 12:35: greens 551d200b, 6bb61e69 and 7f287e52 (have blend's conic round be6f0ca8c
   and skasm's FeatureScript colours 0bb94eede) ALL-SAME vs v0.4.56: hats, dock, 47 ticket documents, authored documents.
   blend's impeller Fillet 3 (9e40ad95a) is not on main yet; checked on its green when it lands.

@@ -58,6 +58,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.56** published check done 11-17 06:58: clean, baseline 0.4.56. Next: the 17:00 cut (qa-cut-1615).
 
 ## Next (in this order)
+00. **v0.4.57: GO given 18:11** (519afe8e2). When published: `systemd-run --unit qa-pub-0457 bash /root/qa-scratch/bin/rel-pub-all.sh
+   0.4.56 0.4.57 /home/ngyekta/agents/qa-bisect/target/release/noshape-cli` (vibex7; candidate CLI there), then spot-check rows 9-16.
 0a. **Validity column (lead 11-17 ruling)**: compat (userdocs.py / sig.py) and suite comparisons (suites-diff.py) also compare
    each changed feature's solid validity (BRepCheck): valid on the base, invalid on the candidate = a difference. bool told
    (gate.sh). Do it when next touching those tools (find whether the CLI exposes validity first).
