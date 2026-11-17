@@ -338,8 +338,9 @@ fn helix_about_axis_length_and_turns() {
 
 /// A curve pattern along a helix carries its seed as a sweep along it would (curvePattern.fs sweeps a line along the
 /// path; Onshape's frame turns with the helix): each instance is the seed screwed along the helix, a plate standing at
-/// its start radially stays radial (c2-loft-guide-curves-driven-pattern's Curve pattern 1; ours tilted the plates by
-/// the shortest turn between the tangents).
+/// its start radially stays radial (c2-loft-guide-curves-driven-pattern's Curve pattern 1). Every 18° each instance
+/// sits on a joint of the helix's 9° arcs, whose own curvature turns there: ours rolled 0-0.57° by where the frames
+/// were sampled.
 #[test]
 fn a_curve_pattern_along_a_helix_screws_its_seed() {
     let mut s = Studio::new();
@@ -357,19 +358,22 @@ fn a_curve_pattern_along_a_helix_screws_its_seed() {
     s.add("curvePattern", move |p| {
         p.set("entities", ParamValue::Query(vec![Reference::Body(BodyId { feature: plate, index: 0 })]));
         p.set("edges", ParamValue::Query(vec![Reference::Body(BodyId { feature: helix, index: 0 })]));
-        p.set("instanceCount", expr("9"));
+        p.set("instanceCount", expr("41"));
     });
     let r = s.ok();
     let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| b.shape.bounding_box(true).unwrap()).collect();
-    assert_eq!(solids.len(), 9);
+    assert_eq!(solids.len(), 41);
     let seed = solids[0];
-    // Quarter turns, 2.5 mm up each (but the last, at the helix spline's end, where its curvature turns 0.7° off the
-    // true helix's).
-    for (i, b) in solids.iter().enumerate().take(8).skip(1) {
-        let rot = glam::DQuat::from_rotation_z(std::f64::consts::FRAC_PI_2 * i as f64);
-        let (p, q) = (rot * seed.min + DVec3::Z * 0.0025 * i as f64, rot * seed.max + DVec3::Z * 0.0025 * i as f64);
-        let (lo, hi) = (p.min(q), p.max(q));
-        assert!((b.min - lo).abs().max_element() < 1e-5 && (b.max - hi).abs().max_element() < 1e-5, "instance {i}: {b:?}, the seed screwed {lo:?} {hi:?}");
+    // 18° turns, 0.5 mm up each (within the path samples' chord sag, 0.4 µm at 1° a sample here; the sampled
+    // frames' roll put them up to 49 µm off).
+    for (i, b) in solids.iter().enumerate().skip(1) {
+        let rot = glam::DQuat::from_rotation_z(std::f64::consts::PI / 10.0 * i as f64);
+        let corners = (0..8).map(|c| DVec3::new([seed.min.x, seed.max.x][c & 1], [seed.min.y, seed.max.y][(c >> 1) & 1], [seed.min.z, seed.max.z][c >> 2]));
+        let moved: Vec<DVec3> = corners.map(|c| rot * c + DVec3::Z * 0.0005 * i as f64).collect();
+        let lo = moved.iter().fold(DVec3::INFINITY, |a, &c| a.min(c));
+        let hi = moved.iter().fold(DVec3::NEG_INFINITY, |a, &c| a.max(c));
+        let off = (b.min - lo).abs().max_element().max((b.max - hi).abs().max_element());
+        assert!(off < 5e-7, "instance {i}: {b:?}, the seed screwed {lo:?} {hi:?}");
     }
 }
 

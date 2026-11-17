@@ -91,6 +91,14 @@ splitting one edge into two pieces of the same curve, the faces alike, the volum
 referencing it (lead 11-15, DECISIONS bb69638d4): c2-impeller-loft's Extrude 4 splits Part 3's +y cap edge 0.047 mm
 from its corner (0.0469 + 65.4207 mm = ours, one 65.4677 mm edge), kept to the end in Part 1 after Boolean 1.
 
+**Curve pattern along a helix: live frame noise ≤ 4.5 µm, accepted (dx, lead 11-17).**
+c2-loft-guide-curves-driven-pattern's Curve pattern 1 places 61 plates, one every 18° along a 3-turn helix. Live's
+instances are exact screw copies of the seed at 0° and 180° only. Elsewhere they tilt up to 0.51° about the radius,
+which is 4.5 µm across a 0.508 mm plate, and the pattern repeats every half turn. That noise comes from Parasolid's
+sweep of curvePattern.fs's 0.1 mm line along the helix's 9° arcs. Ours are exact screw copies: each frame's bend
+comes from the fitted helix's axis. The suite is not loosened for this, and live's tilt is not chased. Since 11-17
+the document matches to the end (11/11).
+
 ## 2. Interaction suite: the same steps in live and in noshape
 
 **Scenarios (qa, live).** `tests/ui-parity/<name>.json`: short scripts of what a user does: keys, typed text, clicks

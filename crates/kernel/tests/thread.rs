@@ -60,3 +60,17 @@ fn a_helix_is_onshapes_curve() {
     let Ok(Curve::BSpline { degree, nb_poles, rational, .. }) = edge.edge_curve() else { panic!("{:?}", edge.edge_curve()) };
     assert_eq!((degree, nb_poles, rational), (2, 761, true));
 }
+
+/// Onshape's helix is fitted whatever its turns: three turns put a third and two thirds of its knots on whole turns,
+/// where the tangents are one (c2-loft-guide-curves-driven-pattern's 3-turn Helix 1 wasn't known as a helix).
+#[test]
+fn a_helix_of_whole_turns_is_fitted() {
+    let frame = Plane::from_normal(DVec3::ZERO, DVec3::Z);
+    for turns in [2.0, 3.0, 6.0] {
+        let helix = make_helix(&frame, 0.00127, 0.000508, 0.000508 * turns, true, 0.0).unwrap();
+        let edge = helix.edges().into_iter().next().unwrap();
+        let fit = edge.helix_fit().unwrap().unwrap_or_else(|| panic!("{turns} turns: no helix"));
+        assert!((fit.radius - 0.00127).abs() < 1e-12 && (fit.pitch - 0.000508).abs() < 1e-12, "{turns} turns: {fit:?}");
+        assert!(fit.axis.cross(DVec3::Z).length() < 1e-9 && fit.origin.length() < 1e-12 && fit.left_handed, "{turns} turns: {fit:?}");
+    }
+}

@@ -259,10 +259,17 @@ impl Path {
 
 fn sample_edge(e: &Shape) -> FResult<Vec<Sample>> {
     let info = e.edge_info()?;
+    // Along a helix, its axis gives the bend: Onshape's helix is planar 9° arcs whose own curvature turns ±0.29° about
+    // the tangent at each joint, where a curve pattern's instances sit (driven-pattern's Curve pattern 1 rolled 0-0.57°).
+    let helix = e.helix_fit().ok().flatten();
     let at = |t: f64| -> FResult<Sample> {
         let [p, d1, d2, _] = e.derivatives_at(t)?;
         let t = d1.normalize_or_zero();
-        Ok(Sample { p, t, k: d2 - t * d2.dot(t) })
+        let k = match helix {
+            Some(h) => h.origin + h.axis * (p - h.origin).dot(h.axis) - p,
+            None => d2,
+        };
+        Ok(Sample { p, t, k: k - t * k.dot(t) })
     };
     if matches!(info.curve, k::Curve::Line { .. }) {
         return Ok(vec![at(info.first_param)?, at(info.last_param)?]);

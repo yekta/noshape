@@ -1641,8 +1641,18 @@ static std::optional<HelixFit> helix_like_edge(const TopoDS_Edge& e)
   // The axis: the tangents make one angle with it (three of them, apart).
   if (n < 2)
     return std::nullopt;
-  const int i1 = std::max(1, n / 3), i2 = std::max(i1 + 1, 2 * n / 3);
-  gp_Vec    axis = (t[i1] - t[0]).Crossed(t[i2] - t[0]);
+  int    i1 = std::max(1, n / 3), i2 = std::max(i1 + 1, 2 * n / 3);
+  gp_Vec axis = (t[i1] - t[0]).Crossed(t[i2] - t[0]);
+  // (Else the pair turned furthest apart: a third and two thirds of a 3-turn helix's knots are whole turns, one
+  // tangent.)
+  const int step = std::max(1, n / 16);
+  for (int a = 1; a < n && axis.Magnitude() < 1e-6; a += step)
+    for (int b = a + 1; b <= n; b += step)
+    {
+      const gp_Vec v = (t[a] - t[0]).Crossed(t[b] - t[0]);
+      if (v.SquareMagnitude() > axis.SquareMagnitude())
+        axis = v, i1 = a, i2 = b;
+    }
   if (axis.Magnitude() < 1e-12)
     return std::nullopt;
   axis.Normalize();
