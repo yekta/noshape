@@ -11012,6 +11012,38 @@ mod tests {
         }
     }
 
+    /// Live2 11-17 part 2b (p2b2.json "apply"): two free lines picked, every constraint button as live's: Parallel,
+    /// Perpendicular, Equal and Coincident add one, Horizontal, Vertical and Fix one per line, each clearing the
+    /// selection with no tool left armed; Tangent, Concentric, Midpoint and Normal refuse in std's words, the selection
+    /// cleared; Symmetric arms its tool with both lines kept for the third pick.
+    #[test]
+    fn two_lines_through_every_constraint_button_as_lives() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let applies = [(ConstraintTool::Parallel, 1), (ConstraintTool::Perpendicular, 1), (ConstraintTool::Equal, 1), (ConstraintTool::Coincident, 1), (ConstraintTool::Horizontal, 2), (ConstraintTool::Vertical, 2), (ConstraintTool::Fix, 2)];
+        let refuses = [ConstraintTool::Tangent, ConstraintTool::Concentric, ConstraintTool::Midpoint, ConstraintTool::Normal];
+        let fresh = || {
+            let (mut ed, mut d) = editor(Tool::Select);
+            let l1 = d.sketch.add_line(mm(44.92, -9.72), mm(84.88, -3.70));
+            let l2 = d.sketch.add_line(mm(49.85, 10.23), mm(94.90, 31.12));
+            ed.selection = vec![l1, l2];
+            (ed, d)
+        };
+        for (c, n) in applies {
+            let (mut ed, mut d) = fresh();
+            assert!(ed.constraint_command(&mut d, c), "{c:?} applies");
+            assert_eq!(d.sketch.constraints().count(), n, "{c:?}");
+            assert!(ed.selection.is_empty() && ed.tool == Tool::Select && ed.refusal.is_none(), "{c:?}: selection cleared, no tool");
+        }
+        for c in refuses {
+            let (mut ed, mut d) = fresh();
+            assert!(!ed.constraint_command(&mut d, c), "{c:?} refuses");
+            assert!(ed.refusal.is_some() && d.sketch.constraints().count() == 0 && ed.selection.is_empty() && ed.tool == Tool::Select, "{c:?}");
+        }
+        let (mut ed, mut d) = fresh();
+        ed.constraint_command(&mut d, ConstraintTool::Symmetric);
+        assert!(ed.tool == Tool::Constraint(ConstraintTool::Symmetric) && ed.selection.len() == 2 && d.sketch.constraints().count() == 0, "Symmetric arms");
+    }
+
     /// Live2 11-17 part 2b: Horizontal / Vertical on two lines, one each; both turn about their midpoints.
     #[test]
     fn horizontal_and_vertical_turn_both_lines_about_their_midpoints() {

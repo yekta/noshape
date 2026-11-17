@@ -22,10 +22,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   7 -> 8/24; tablet-stand 16/16.
 
 ## Running
-- skasm-pair-1117a: vibe6 slot pairrun.sh (ops-a = main 143f22c12, ops-b 09:48) -> ~/agents/skasm-keep/pair-1117a-
+- skasm-pair-1117a: vibex6 slot pairrun.sh (ops-a = main 143f22c12, ops-b 09:48) -> ~/agents/skasm-keep/pair-1117a-
   {a,b}.log; a started 11:17.
 - skasm-mac-1117p: Mac parity:: tests -> /root/skasm-scratch/mac-1117p.log (needs a rerun with the hidden-parameter rule).
-- skasm-pu-1117c, then skasm-tr-1117a (pulleys, pipe traces) -> /root/skasm-scratch/tr-<doc>.log, vibe6
+- skasm-pu-1117c, then skasm-tr-1117a (pulleys, pipe traces) -> /root/skasm-scratch/tr-<doc>.log, vibex6
   ~/agents/skasm/trace-<doc>.log.
 
 ## Next, in order
@@ -34,11 +34,12 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
    tool first, inference / snapping, drags). Landed b87dd3dc and 24441238 (hover re-resolved on each move; reach 7.5 /
    Dimension 8.5 px straight out from the pointer; a point beats the GPU's line; the region past every reach; no plane /
    face / region hover while drawing; the second-picked line moves as live2's 2b; range errors from a variable).
-   Checked as live by hand on vibe6 (Xvfb :391, ~/tmp/skasm/hov): constraints from a selection, dimension place / edit,
-   drags. Landing now: a woken model edge's ends give H / V alignment (live2 wake-parallel; matrix 65 / 67); H / V on
-   two lines turn both about their midpoints; Normal on two lines refused; curve drags as live2's sketch-drags
-   (`Sketch::lives_drag`: arc end / centre, LENGTH line end, ellipse rim). Gaps left: the ellipse's minor-axis rim,
-   a free chain's L2 dragged by its middle, the HORIZONTAL an arc end makes released level. Show constraints memory is already live's.
+   Checked as live by hand on vibex6 (Xvfb :391, ~/tmp/skasm/hov): constraints from a selection, dimension place / edit,
+   drags. Queued on vibex7 (vibe5/vibe3 gone; NOSHAPE_LAND_QUEUE_HOST=vibex7): e038a9ea (the
+   parting-line `r.sketch` fix; woken edge ends' H / V; H / V on two lines about their midpoints; Normal on two lines
+   refused; curve drags as live2's sketch-drags via `Sketch::lives_drag`) and 6857ba59 (drag glyphs, an arc end's
+   level drop, the spline rows: snaps matrix 67 / 67). Gaps left: the ellipse's minor-axis rim (live ×2.07 for a
+   10.8 mm drag), a free chain's L2 dragged by its middle (live slides the shared end). Show constraints memory is already live's.
 1. config-parts: linear-rail 26/26, links 35/35 (live fetched Derived 1's source), standoffs 32/32, sprockets 24/24
    (live's volume band carried while its volume stays: carry_volume_bands); pulleys 12/22 (Circular pattern 1, a face
    pattern ADD, fails in our op on main too: core's since 11:45); nuts 14/17 (Sweep 1, bool's). Standoffs regenerates
@@ -115,9 +116,9 @@ qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, asm d8d597e0-675c-497b-a804-544ceab99bb
   Flange 1 … Mirror 1): needs a contact rule, not an area check. (tablet-stand's was the curved wall: fixed in A.)
 
 ## Current numbers
-- Model suite 2026-11-16 00:01 vibe6 (suite-2354.log): 80/111 documents, 1019/1292 features (24 documents new to the
+- Model suite 2026-11-16 00:01 vibex6 (suite-2354.log): 80/111 documents, 1019/1292 features (24 documents new to the
   set). Sketch constraints left to the solved geometry: 586 over all, 74 over the 87 of 2026-11-15 (16:10: 83).
-- Sheet metal speed, quiet vibe6 19:00, ops binary of 17:43 (ours vs live ms): corner-break 1637-1782 / 1972,
+- Sheet metal speed, quiet vibex6 19:00, ops binary of 17:43 (ours vs live ms): corner-break 1637-1782 / 1972,
   shaped-flange 809 / 1026, overcut-dogbone 210 / 270, hem 65 / 95. All four are faster than live; the suite's slower
   figures were host load.
 - Exchange: model-plus STEP / IGES import in live as 58/151/94 (6f5b151e snap_coplanar); dx "live imports ours" 43/48.
@@ -126,21 +127,21 @@ qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, asm d8d597e0-675c-497b-a804-544ceab99bb
 ## Hosts and rules (mine; DECISIONS.md has the general ones)
 - Builds and crate tests on the Mac: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c '…'` (one slot; rb.sh keeps file
   times: touch an edited file inside the command when a result looks cached). No suites, pairs or app runs there.
-- Suites and A/B pairs on vibe6 (or vibe7) through `~/bin/slot <cmd>` there. ~/tmp on vibe hosts is pruned after
+- Suites and A/B pairs on vibex6 (or vibex7) through `~/bin/slot <cmd>` there. ~/tmp on vibe hosts is pruned after
   6-12 h: lasting binaries in ~/agents/skasm-keep (cli-*, ops-a / ops-b).
 - Any change touching projection / Use: userdocs check (hats hat8 / hat15 / hat15b, dock) on vibe5 against 0.4.52
-  (~/qa-rel/0.4.52/noshape-cli) before landing: candidate CLI built on vibe6 (buildcli.sh), copied with `scp -3` via
-  this host (vibe6 can't reach vibe5). The private documents only as mode-700 copies in ~/tmp/skasm (or userdocs.py's
+  (~/qa-rel/0.4.52/noshape-cli) before landing: candidate CLI built on vibex6 (buildcli.sh), copied with `scp -3` via
+  this host (vibex6 can't reach vibe5). The private documents only as mode-700 copies in ~/tmp/skasm (or userdocs.py's
   ~/tmp/qa/ud-<pid>), deleted after with their outputs; never in the repo.
 - Live captures: append to /root/onshape-research/live/REQUESTS.md (timestamps from `date -u`).
 
 ## How to run my tools (/root/skasm-scratch/bin)
-- fullsuite.sh <log>: the whole model suite through rb.sh on $HOST (default vibe6); wrap the remote command in
+- fullsuite.sh <log>: the whole model suite through rb.sh on $HOST (default vibex6); wrap the remote command in
   `~/bin/slot`. dropped.py <log>: count the constraints a suite log leaves to the solved geometry.
 - ut3t.sh <doc>: one model-suite document with NOSHAPE_PARITY_TRACE (translator TRACE lines, untranslated, DIFFs).
   ut3p.sh <docs,comma> <models dir>: the same from another models dir (a fresh copy), binary kept as skasm-keep/ops-c.
 - smab.sh: release ops test binaries for skasm-base (A, /root/projects/noshape-wt/skasm-base: reset it to my
-  branch's base first) and skasm (B) on vibe6 -> ~/agents/skasm-keep/ops-{a,b}; vibe6 ~/tmp/skasm/smrun.sh <runs>
+  branch's base first) and skasm (B) on vibex6 -> ~/agents/skasm-keep/ops-{a,b}; vibex6 ~/tmp/skasm/smrun.sh <runs>
   <docs,comma> interleaves them (A/B by the match lines' times).
 - buildcli.sh <name>: release noshape-cli -> ~/agents/skasm-keep/<name>.
 - Profiling: NOSHAPE_KERNEL_PROFILE=cpu, NOSHAPE_FS_PROFILE=1, NOSHAPE_RECORD_BOOLEANS=<dir> (one .brep + .txt per
