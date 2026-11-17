@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-17 10:36 on the Ubeyd account)
+# QA handoff (agent qa; current state only, updated 2026-11-17 11:30 on the Ubeyd account)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -29,6 +29,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   664/755 (scissor-lift BOM 59 -> 57: P0 to asm), exchange 58/74. The models report.json is written beside the corpus
   snapshot (~/tmp/qa/report.json): qa-suites.sh copies it from there since 07:15 (lost since 11-16's snapshot change).
   Results suites/<mmdd-hhmm-sha>/; host overrides QA_UI_HOST / QA_SPEED_HOST / QA_SUITES_HOST.
+  1117-0627-827a23a6 compared 11:20 (report scp'd by hand: the run began before the 07:15 path fix; next runs fetch it).
 - **qa-cut-0415 / qa-cut-1615** timers: bin/cut-verdict.sh (cut-check.sh: newest green's compat vs the baseline) -> one GO /
   NO-GO line in /tmp/lead/qa-alerts and compat/cut-<mmdd-hhmm>.txt. Add the verdict as a "Release blockers" section in TICKETS.md.
   Fixed 11-17 04:25: cut-check waits for the loop's run under vibe5.lock (two runs at once gave "Text file busy" and a void GO);
@@ -57,7 +58,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.56** published check done 11-17 06:58: clean, baseline 0.4.56. Next: the 17:00 cut (qa-cut-1615).
 
 ## Next (in this order)
-1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (early list written 09:30: GO on fa9f84b8).
+1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (11:25: GO on c101c3c0, which has core's
+   four Split / Use / Rib lands; suites 827a23a6 clean apart from fan-blade-sweep Boolean 2, sent to bool). Still to come:
+   blend's impeller Fillet 3 (when it lands: compat on its green + the impeller re-time below).
    The qa-cut-1615 timer runs cut-verdict.sh at 16:15 -> one line in /tmp/lead/qa-alerts + compat/cut-1117-1615.txt. Read
    the ticket section of that compat file too (a ticket doc's wrong geometry is a HOLD), then update the entry with the
    verdict and the green it names, commit docs-only. HOLD only for a real P0 (crash, wrong geometry, speed regression, a user
