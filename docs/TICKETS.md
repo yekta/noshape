@@ -16,7 +16,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (NOSHAPE_PARITY_ONLY=cf-hose-routing), rows "ours reads ours.x_t / .sat".
 
 ## qa, 2026-11-17
-- [ ] P1 REMEMBERED-VALUES-OLD-FORMAT (psui; qa 2026-11-17 17:15, confirmed on green a1383a65 = v0.4.57's base) Since
+- [x] verified 40a994a16 (qa 20:40 on green 0cc996f7, vibex6: old-format "3 mm" opens 3 mm / 0.3 cm / 0.2 in (inch default), old "9 mm + #wall_thickness" 5 mm; with it db4ff933c: no parallel glyph left in any "off" shot of the user's hover flow, lines / region / Top / line tool as before; uh/f2-0cc996f7, uh/x-0cc996f7) P1 REMEMBERED-VALUES-OLD-FORMAT (psui; qa 2026-11-17 17:15, confirmed on green a1383a65 = v0.4.57's base) Since
   1313b3c9 a memory stored by an older build ("length:Millimeter" / "length:Inch": every user's existing store) is ignored: a
   seeded fillet radius "3 mm" opens 5 mm in an mm document and 0.5 cm in a cm one (inch 0.2 in, the default, is right; an old
   "9 mm + #wall_thickness" opens 5 mm, right). Users' remembered values reset once on updating to v0.4.57. Fix 582351aab
