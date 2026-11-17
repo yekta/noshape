@@ -277,8 +277,15 @@ impl VarCompletion {
     /// Whether Enter inserts the selected entry: it changes `text` (live
     /// 11-02: `#va` + Enter gives `#var` and the field stays; with `#var`
     /// typed, Enter commits).
+    /// An entry offered only by the word's first letter (a function after a number) isn't inserted unless picked
+    /// with the arrows: live2 11-17 sketch-dim-sel, "1abc" Enter commits the text (invalid) though the list shows
+    /// abs( and acos(.
     pub fn enter_inserts(&self, text: &str) -> bool {
-        self.inserted(None, text).is_some_and(|(t, _)| t != text)
+        if !self.inserted(None, text).is_some_and(|(t, _)| t != text) {
+            return false;
+        }
+        let word = text.get(self.range.clone()).unwrap_or_default().to_ascii_lowercase();
+        self.moved || matches!(self.entries.get(self.selected), Some(Entry::Variable(_))) || self.entries.get(self.selected).is_some_and(|e| match_rank(e.name(), &word).is_some())
     }
 
     /// Insert entry `index` (the selected one when `None`) into `state`.
@@ -408,6 +415,21 @@ mod tests {
     use super::*;
     // The glob import brings GPUI's `test` attribute; use the built-in one.
     use std::prelude::v1::test;
+
+    /// Live2 11-17 sketch-dim-sel: "1abc" Enter commits the text though the list offers abs( by its first letter;
+    /// "45 c" Enter still takes cm, a matching entry.
+    #[test]
+    fn enter_inserts_only_an_entry_matching_the_word() {
+        let list = |text: &str| {
+            let (range, entries) = word_entries(text, text.len(), &[], Some(Dim::LENGTH)).unwrap();
+            VarCompletion { key: "dim".into(), range, entries, selected: 0, moved: false, scroll: ScrollHandle::new(), new_variable: None }
+        };
+        assert!(!list("1abc").enter_inserts("1abc"), "1abc: committed as typed");
+        assert!(list("45 c").enter_inserts("45 c"), "45 c: cm inserted");
+        let mut moved = list("1abc");
+        moved.moved = true;
+        assert!(moved.enter_inserts("1abc"), "picked with the arrows: inserted");
+    }
 
     fn shown(text: &str, dim: Option<Dim>, vars: &[&str]) -> Vec<String> {
         let Some((_, e)) = word_entries(text, text.len(), vars, dim) else { return Vec::new() };

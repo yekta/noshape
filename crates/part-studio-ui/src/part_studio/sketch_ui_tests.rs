@@ -1337,6 +1337,135 @@ fn line_then_dimension_tool(cx: &mut TestAppContext, name: &str) -> (AnyWindowHa
     (window, view)
 }
 
+/// Live2 11-17 sketch-dim-sel: with the Dimension tool a pick previews the dimension at once (the line kept selected);
+/// the placement click creates it and opens its box, the measured value with its unit pre-selected; Esc in the box
+/// keeps the dimension, the tool on; "1abc" Enter keeps the box (invalid), the first Esc restores the measured text
+/// with the box open, the second closes it; Esc after a pick drops it and ends the tool; Delete on a rectangle side
+/// takes the line and every constraint on it, the rest staying.
+#[gpui::test]
+fn the_dimension_tool_flow_as_lives(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "dim-flow", Tool::CornerRect);
+    click(cx, window, &view, (450., 300.));
+    click(cx, window, &view, (650., 420.));
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    draw(cx, window);
+    let dims = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().filter(|c| c.kind.is_dimension()).count());
+    let tool = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().map(|ed| ed.tool));
+    let pointer = |cx: &mut TestAppContext, at: (f64, f64)| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: DVec2::new(at.0, at.1), modifiers: Modifiers::default() }, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    // The sides' middles on screen: top, left, bottom, right.
+    let mids: Vec<(f64, f64)> = {
+        let m = cx.update(|cx| {
+            let d = view.read(cx).sketch_data(cx).unwrap();
+            let ms: Vec<DVec2> = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).filter_map(|e| { let (a, b) = d.sketch.endpoints(e.id)?; Some((d.sketch.point(a)? + d.sketch.point(b)?) * 0.5) }).collect();
+            let by = |f: &dyn Fn(&DVec2) -> f64| *ms.iter().max_by(|a, b| f(a).total_cmp(&f(b))).unwrap();
+            [by(&|p| p.y), by(&|p| -p.x), by(&|p| -p.y), by(&|p| p.x)]
+        });
+        m.iter().map(|q| { let p = on_screen(cx, &view, *q); (p.x, p.y) }).collect()
+    };
+    let off = |p: (f64, f64), dx: f64, dy: f64| (p.0 + dx, p.1 + dy);
+    let input = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).dim_input.as_ref().map(|(_, st, _)| { let s = st.read(cx); (s.value().to_string(), s.selected_range()) }));
+    // A pick, the preview following the pointer, the placement.
+    click(cx, window, &view, mids[0]);
+    pointer(cx, off(mids[0], 0., -40.));
+    let preview = cx.update(|cx| { let v = view.read(cx); v.sketch.as_ref().unwrap().dimension_preview(&v.sketch_data(cx).unwrap()).is_some() });
+    let state = cx.update(|cx| { let v = view.read(cx); let ed = v.sketch.as_ref().unwrap(); (ed.tool, ed.tool_picks(), ed.selection.clone(), v.sketch_data(cx).unwrap().sketch.entities().count()) });
+    assert!(preview && dims(cx) == 0, "the pick previews (nothing added yet): {state:?}");
+    click(cx, window, &view, off(mids[0], 0., -40.));
+    let (text, sel) = input(cx).expect("the placed dimension's box");
+    assert!(dims(cx) == 1 && text.ends_with(" mm") && sel == (0..text.len()), "created at once, its box the measured value pre-selected: {text:?} {sel:?}");
+    keys(cx, window, &["escape"]);
+    assert!(input(cx).is_none() && dims(cx) == 1 && tool(cx) == Some(Tool::Dimension), "Esc in the box: the dimension kept, the tool on");
+    // "1abc" Enter, Esc, Esc.
+    click(cx, window, &view, mids[1]);
+    pointer(cx, off(mids[1], -40., 0.));
+    click(cx, window, &view, off(mids[1], -40., 0.));
+    let measured = input(cx).expect("the second box").0;
+    keys(cx, window, &["1", "a", "b", "c", "enter"]);
+    let got = (input(cx), cx.update(|cx| view.read(cx).ui.dim_invalid), cx.update(|cx| view.read(cx).message.clone()));
+    assert!(got.0.as_ref().is_some_and(|t| t.0 == "1abc") && got.1, "\"1abc\" Enter: the box stays, invalid: {got:?}");
+    keys(cx, window, &["escape"]);
+    assert_eq!(input(cx).map(|t| t.0), Some(measured.clone()), "the first Esc restores the measured text, the box open");
+    keys(cx, window, &["escape"]);
+    assert!(input(cx).is_none() && dims(cx) == 2 && tool(cx) == Some(Tool::Dimension), "the second Esc closes it, the dimension kept");
+    // Esc after a pick: dropped, the tool off.
+    click(cx, window, &view, mids[2]);
+    keys(cx, window, &["escape"]);
+    assert!(dims(cx) == 2 && tool(cx) == Some(Tool::Select), "Esc before placing: nothing added, the tool off: {:?}", tool(cx));
+    // Delete on the right side: it and every constraint on it go.
+    let (right, before, on_it) = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        let right = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).max_by(|a, b| {
+            let mx = |e: &noshape_sketch::Entity| d.sketch.curve(e.id).map_or(0.0, |c| c.point(0.5).x);
+            mx(a).total_cmp(&mx(b))
+        }).unwrap().id;
+        let (pa, pb) = d.sketch.endpoints(right).unwrap();
+        // (The corners stay with the other sides, and so do the constraints on them.)
+        let _ = (pa, pb);
+        let on = d.sketch.constraints().filter(|c| c.kind.entities().contains(&right)).count();
+        (right, d.sketch.constraints().count(), on)
+    });
+    click(cx, window, &view, mids[3]);
+    keys(cx, window, &["delete"]);
+    let (gone, after) = cx.update(|cx| { let d = view.read(cx).sketch_data(cx).unwrap(); (d.sketch.entity(right).is_none(), d.sketch.constraints().count()) });
+    assert!(gone && after == before - on_it, "Delete: the line and its {on_it} constraints go, the rest stays ({before} -> {after})");
+}
+
+/// qa 11-17 SKSNAP-MODEL-EDGE (live 11-17 sketch-snap-1117 rows 1, 3): in a new sketch on Top under a block, the
+/// block's edge on the plane takes a line's end 2 px off it (COINCIDENT with the edge used) and offers its midpoint at
+/// its middle, with no hover of it (in a normal view the block's top edge is drawn over it and is the one lit).
+#[gpui::test]
+fn a_model_edge_on_the_sketch_plane_snaps_unhovered(cx: &mut TestAppContext) {
+    let (window, view, _top, _bottom) = block_part(cx, "model-edge-snap");
+    let (window, view) = sketch_in(cx, window, view, Tool::Line);
+    let edge = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        super::model_straight_edges(&v.display, &ed.frame).into_iter().max_by(|a, b| ((a.1 + a.2).x).total_cmp(&(b.1 + b.2).x)).map(|(_, a, z)| (a, z)).expect("an edge on the plane")
+    });
+    let (a, z) = edge;
+    let pointer = |cx: &mut TestAppContext, q: DVec2| {
+        let at = on_screen(cx, &view, q);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+        at
+    };
+    let inference = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().inference.as_ref().map(|i| (i.kind, i.position)));
+    let start = on_screen(cx, &view, (a + z) * 0.5 + DVec2::new(0.02, 0.003));
+    click(cx, window, &view, (start.x, start.y));
+    let wpp = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
+    let mid = (a + z) * 0.5;
+    pointer(cx, mid + DVec2::new(3.0 * wpp, 0.0));
+    let at_mid = inference(cx);
+    assert!(at_mid.is_some_and(|(k, q)| k == noshape_sketch::InferenceKind::Midpoint && (q - mid).length() < 1e-9), "the edge's middle: its midpoint, {at_mid:?}");
+    let off = a + (z - a) * 0.3 + DVec2::new(2.0 * wpp, 0.0);
+    let at = pointer(cx, off);
+    let on = inference(cx);
+    assert!(on.is_some_and(|(_, q)| (q.x - a.x).abs() < 1e-7), "2 px off the edge: on it, {on:?}");
+    click(cx, window, &view, (at.x, at.y));
+    let (end, coincident) = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let line = d.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line && !e.external).map(|e| e.id).unwrap();
+        let (_, b) = d.sketch.endpoints(line).unwrap();
+        let used: Vec<noshape_sketch::EntityId> = d.sketch.entities().filter(|e| e.external).map(|e| e.id).collect();
+        (d.sketch.point(b).unwrap(), d.sketch.constraints().any(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Coincident { a: p, b: q } if (p == b && used.contains(&q)) || (q == b && used.contains(&p)))))
+    });
+    // (Within the edge's f32 mesh precision.)
+    assert!((end.x - a.x).abs() < 1e-7 && coincident, "the end on the edge (x {}), coincident with it: {end:?}, {coincident}", a.x);
+}
+
 /// User P0 11-12 (hat15b, 5th report): a line's end over a point, hovered, then clicked: the end is the point.
 /// Live (behaviours "sketch snapping and hover"): a point takes the end from 8–9 px (a line from 7); here 7.8 px.
 fn a_line_ends_on_the_hovered_point(cx: &mut TestAppContext, scale: f32) {

@@ -539,7 +539,8 @@ impl PartStudioView {
         if let Some(ed) = &self.sketch {
             ed.model_lines.get_or_init(|| model_straight_edges(&self.display, &ed.frame));
         }
-        let lit = self.hover.as_ref().and_then(|r| self.model_snap_of(r, cursor, vp));
+        let own = matches!(&self.hover, Some(Reference::SketchEntity { sketch, .. }) if Some(*sketch) == self.sketch.as_ref().map(|ed| ed.feature));
+        let lit = self.hover.as_ref().and_then(|r| self.model_snap_of(r, cursor, vp)).or_else(|| (!own).then(|| self.plane_edge_snap(cursor, vp)).flatten());
         if matches!(lit, Some(ExternalSnap::Vertex { .. } | ExternalSnap::Edge { midpoint: true, .. })) {
             return lit;
         }
@@ -578,32 +579,7 @@ impl PartStudioView {
                 return None;
             }
             let pts: Vec<DVec2> = pl.iter().map(|v| frame.to_local(world(v))).collect();
-            let mut best: Option<(f64, DVec2, DVec2)> = None;
-            for w in pts.windows(2) {
-                let (a, b) = (w[0], w[1]);
-                let d = b - a;
-                let t = if d.length_squared() < 1e-30 { 0.0 } else { ((cursor - a).dot(d) / d.length_squared()).clamp(0.0, 1.0) };
-                let q = a + d * t;
-                let dist = (q - cursor).length();
-                if best.is_none_or(|bb| dist < bb.0) {
-                    best = Some((dist, q, d));
-                }
-            }
-            let (_, q, d) = best?;
-            // A straight edge's midpoint first (a point beats a curve), as a 15 px square.
-            if let (Some(&a), Some(&z)) = (pts.first(), pts.last())
-                && pts.iter().all(|p| (z - a).perp_dot(*p - a).abs() <= 1e-9 * (z - a).length_squared().max(1e-30))
-            {
-                let m = (a + z) * 0.5;
-                let off = (to_screen(frame.to_world(m))? - cursor_s).abs();
-                if off.x.max(off.y) < half_px {
-                    return Some(ExternalSnap::Edge { position: m, tangent: (z - a).try_normalize().unwrap_or(DVec2::X), reference: r.clone(), midpoint: true });
-                }
-            }
-            let s = to_screen(frame.to_world(q))?;
-            // (The edge's direction there: a direction inference meets the edge along it.)
-            let tangent = d.try_normalize().unwrap_or(DVec2::X);
-            ((s - cursor_s).length() < half_px).then_some(ExternalSnap::Edge { position: q, tangent, reference: r.clone(), midpoint: false })
+            edge_snap(r, &pts, cursor, &|q| to_screen(frame.to_world(q)))
         };
         match r {
             Reference::Vertex(_) => {
@@ -625,6 +601,21 @@ impl PartStudioView {
             }
             _ => None,
         }
+    }
+
+    /// The model edges on the sketch plane snap without being hovered (live 11-17 sketch-snap-1117: the block's edge on
+    /// the plane takes the end at 7 px, its middle the midpoint, in a normal view where the block's top edge, drawn over
+    /// it, is the one lit): the nearest straight one within reach.
+    fn plane_edge_snap(&self, cursor: DVec2, vp: &Viewport) -> Option<ExternalSnap> {
+        let ed = self.sketch.as_ref()?;
+        let frame = ed.frame;
+        let screen = |q: DVec2| vp.project(frame.to_world(q));
+        let cursor_s = screen(cursor)?;
+        let seen = |snap: &ExternalSnap| match snap {
+            ExternalSnap::Edge { position, .. } => screen(*position).map_or(f64::MAX, |s| (s - cursor_s).length()),
+            _ => f64::MAX,
+        };
+        ed.model_lines.get()?.iter().filter_map(|(r, a, z)| edge_snap(r, &[*a, *z], cursor, &screen)).min_by(|x, y| seen(x).total_cmp(&seen(y)))
     }
 
     /// Whether sketch entity `e` is within live's pick reach of plane point `p`, on screen
@@ -733,9 +724,10 @@ impl PartStudioView {
         let Some(ed) = self.sketch.as_mut() else { return };
         ed.reinfer(&data.sketch);
         let (cursor, shift) = (ed.cursor, ed.shift_held);
+        let own = hover.is_some_and(|r| matches!(r, Reference::SketchEntity { sketch, .. } if Some(*sketch) == self.sketch.as_ref().map(|ed| ed.feature)));
         if !shift
-            && let (Some(c), Some(r)) = (cursor, hover)
-            && let Some(snap) = self.model_snap_of(r, c, self.viewport.read(cx))
+            && let Some(c) = cursor
+            && let Some(snap) = hover.and_then(|r| self.model_snap_of(r, c, self.viewport.read(cx))).or_else(|| (!own).then(|| self.plane_edge_snap(c, self.viewport.read(cx))).flatten())
             && let Some(ed) = &mut self.sketch
         {
             ed.apply_external_snap(snap);
@@ -5586,6 +5578,39 @@ fn model_circle_centres(display: &noshape_model::display::StudioDisplay, frame: 
 }
 
 /// The model's straight edges lying in the sketch's plane: each one's reference, its start and direction there.
+/// A snap onto a model edge given by its points on the sketch plane, the pointer at plane point `cursor`: a straight
+/// edge's midpoint first (a point beats a curve) as a 15 px square, else the nearest point of the edge within 7.5 px
+/// on screen (`screen` maps a plane point to the screen).
+fn edge_snap(r: &Reference, pts: &[DVec2], cursor: DVec2, screen: &dyn Fn(DVec2) -> Option<DVec2>) -> Option<ExternalSnap> {
+    let half_px = 7.5;
+    let cursor_s = screen(cursor)?;
+    let mut best: Option<(f64, DVec2, DVec2)> = None;
+    for w in pts.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let d = b - a;
+        let t = if d.length_squared() < 1e-30 { 0.0 } else { ((cursor - a).dot(d) / d.length_squared()).clamp(0.0, 1.0) };
+        let q = a + d * t;
+        let dist = (q - cursor).length();
+        if best.is_none_or(|bb| dist < bb.0) {
+            best = Some((dist, q, d));
+        }
+    }
+    let (_, q, d) = best?;
+    if let (Some(&a), Some(&z)) = (pts.first(), pts.last())
+        && pts.iter().all(|p| (z - a).perp_dot(*p - a).abs() <= 1e-9 * (z - a).length_squared().max(1e-30))
+    {
+        let m = (a + z) * 0.5;
+        let off = (screen(m)? - cursor_s).abs();
+        if off.x.max(off.y) < half_px {
+            return Some(ExternalSnap::Edge { position: m, tangent: (z - a).try_normalize().unwrap_or(DVec2::X), reference: r.clone(), midpoint: true });
+        }
+    }
+    let s = screen(q)?;
+    // (The edge's direction there: a direction inference meets the edge along it.)
+    let tangent = d.try_normalize().unwrap_or(DVec2::X);
+    ((s - cursor_s).length() < half_px).then_some(ExternalSnap::Edge { position: q, tangent, reference: r.clone(), midpoint: false })
+}
+
 fn model_straight_edges(display: &noshape_model::display::StudioDisplay, frame: &PlaneFrame) -> Vec<(Reference, DVec2, DVec2)> {
     let mut out = Vec::new();
     for b in display.bodies.iter().filter(|b| !b.hidden) {
