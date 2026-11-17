@@ -68,7 +68,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    (only when both logs have CHECK lines); qa-suites.sh copies those to qa-alerts. bool's gate 2d5bf386 does the same.
    Compat: v0.4.56's CLI query parts has no "check"; once cfd943d5 is in a release CLI, add it to sig.py's part tuple.
    (suites-models.sh was moved to bin/retired by mistake at 16:35 and restored 18:28; the hosts kept their copy meanwhile.)
-0. **05:00 checklist (psui via lead)**: REMEMBERED-VALUES-OLD-FORMAT fix 582351aab (uh/wait-uf2.sh waits for its green, runs uf2.sh: 3 mm, 0.3 cm,
+0. **05:00 checklist (psui via lead)**: landed 20:13 as 40a994a16 (memory fix), db4ff933c (glyph after 550 ms), 65ceee7f2 +
+   ea25d544e (glyph row, plane click); uh/wait-0500.sh <commits> runs uf2.sh + uh2.sh on their first green. REMEMBERED-VALUES-OLD-FORMAT (uf2.sh: 3 mm, 0.3 cm,
    0.2 in, 5 mm; v0.4.57 / a1383a65 gives 5 mm, 0.5 cm, 0.2 in, 5 mm), f6ef6a252 glyph (uh2.sh: no parallel glyph in the
    "off" shots), f74af0d9a. psui sends main shas if the land rebases them.
 1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (12:35: GO on 7f287e52; c101c3c0 has core's
