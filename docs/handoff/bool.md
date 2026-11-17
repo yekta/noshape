@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-17 04:08 UTC.
+Updated 11-17 04:37 UTC.
 
 ## In flight
 - Landed 11-17: bool-knife (ecf8c33a: hulls, Shell check, uv_of k-d tree, patch cache, validity-once unify, face
@@ -13,28 +13,31 @@ Updated 11-17 04:08 UTC.
   none left (29-31 GB), gate-host.py skips them and says so. Instead (lead 11-17 ok): ours-only replay on main and
   branch: NOSHAPE_BOOL_CORPUS=~/agents/bool-corpora/<k> NOSHAPE_BREP_OURS_ONLY=1 <kernel tests>
   brep_replay::brep_corpus_replay (compares with the recorded OCCT result).
-- bool-knife2 (dc060ff1c, on bool-knife): grid cache a5c287f9a + Shell wall checked once dc060ff1c. Gate clean (all
-  corpora + parity56 0 differences, suite only the sprockets / rocker order flake), Shell corpus A/B 211/211 same
-  (ZZ_OLDCHECK switch). Hats/dock: unit bool-udoc-knife2 -> /root/bool-hat-scratch/udoc-knife2.out (queued in the
-  slot). When SAME: land (bool-split: checkout bool-knife2, rebase, land.sh).
+- Landed 11-17 04:25: bool-knife2 as cf5a9aff (grid cache + Shell wall checked once; gate clean, Shell A/B 211/211,
+  hats/dock SAME).
 - bool-march (bool-hat, bb7c5c4c9 = knife2 + the parked plane x B-spline marcher ca8c628f6 + fix): the knife Mirror 1
   regression was the marcher's 1e-7 fit: Fillet 2's by-tools path refaces a face (build.cpp reface_on, forced
   BRepLib::SameParameter) and re-fitted those edges' curves on the faces (13 poles vs the 3D curve's 14); the faces'
   integrals then changed under a mirror and unify's volume check (usd_volume_change) refused Mirror 1's merge (31
   faces). Fit at 1e-8: knife 46/52 as main, Mirror 1 22/60/39, Extrude 2 29 -> 3-4 ms, Revolve 1 59 -> 21-26, knife
   699-752 ms Mac (main ~1000, live 622). slots_across_a_rings_rounds_cut_as_occt widened 1e-8 -> 2e-8 (ours 474.543498
-  converged at fits 1e-7..1e-10; OCCT's sections 474.5435035; lead ok if gate + hats/dock identical). Gate: unit
-  bool-gate-march -> /root/bool-hat-scratch/chain-bb7c5c4c9.out (running 04:02). Then hats/dock
-  (/root/bool-hat-scratch/udoc-ab.sh bb7c5c4c9), land. g++-13 clean.
-- c2-config-parts-nuts Sweep 1 (core, yours now): core's exact-cylinder tool vibe5 ~/agents/core-keep/nm-nuts-turns
-  (Mac copy ~/noshape-host/agents/bool-hat/nm-nuts-turns). OCCT's cut invalid 156.8 mm3; ours declines "a
-  non-manifold result": bore (face 7) pieces at its seam (x -1.62, angle pi) where the tool's 0.0875 mm crest strip
-  crosses it: seam pieces z .3789-.4375 / 1.05-1.1375 / 1.75-1.8375 used once, the tool's helix edges ending on the
-  seam (origins 71-77) used by flank pieces only: the bore isn't split by them on one side of its seam. A helix end
-  1 nm past the seam (6e-7 rad) mapped across it (free::mapped seam eps 1e-9 rad); widening that to the face tolerance
-  alone didn't fix it. Debug diff /root/bool-scratch/nuts-debug-wip.diff (ZZ_NM_DEBUG, ZZ_NM_PIECE, ZZ_MAP_FACE,
-  ZZ_FACE_SEGS=7 prints the bore's 2D segments: /tmp/bool-segs7.txt). Next: which 2D place ("right" side) the helix
-  ends at the seam vertices get in the bore's split (boolean.rs ~5885).
+  converged at fits 1e-7..1e-10; OCCT's sections 474.5435035; lead ok if gate + hats/dock identical). Gate clean
+  (/root/bool-hat-scratch/chain-bb7c5c4c9.out: all corpora + parity56 0 differences, only the sprockets / rocker
+  flake). Hats/dock: unit bool-udoc-march -> /root/bool-hat-scratch/udoc-march.out (in the slot). When SAME: land
+  (bool-split: checkout bool-march, rebase, diff --stat, land.sh). g++-13 clean.
+- c2-config-parts-nuts Sweep 1: FIXED on bool-nuts b6466ab04 (bool-hat, on bool-march): one of core's thread turn
+  faces' helices fall 2.6e-8 rad short of a turn; that rounding gap became its th0 (a gap > 1e-9), both rulings on one
+  side (right empty), its outline swallowed the bore's strip between turns (bore pieces 24 / 14 OnSame) -> non-manifold.
+  Now a helix face's gap within the tolerance goes round between its rulings (falls back to the gap if the rulings
+  don't qualify). Ours valid, 42 faces, 135.267625 mm3 (OCCT invalid 156.81). Gate: unit bool-gate-nuts (waits for
+  core's) -> /root/bool-hat-scratch/chain-b6466ab04.out; then hats/dock, land. Debug diffs:
+  /root/bool-scratch/nuts-fix-with-debug.diff (ZZ_FACE_PIECES, ZZ_BOUND=<faces> print pieces' states / outlines).
+  Core told (its exact-cylinder sweep patch can unpark; it compares the volume with live).
+- core-sing 4254e715e gate for core (op_defeature per feature, 300K-step bound): unit bool-gate-coresing ->
+  /root/bool-hat-scratch/chain-4254e715e.out (started 04:28). Core checks the WORK_TRACE "(spent)" lines in its p6.
+- qa's knife Mirror 1 130 -> 223 ms (0.4.53 -> 0.4.55): the marcher's 1e-7 fit (Mirror 1 kept its halves, 31 faces),
+  fixed in bool-march. The mirror bisect (same recorded fuse, cold): 145ad9e67 21.4 ms, 35baa32fa 21.4: no Boolean code
+  change; the remaining +12 ms on green is its different input (below).
 - qa's Mirror 1 +12 ms vs v0.4.53 (vibe7 03:50, 3 runs each 129-131 vs 139): real, not the Boolean's code: unify
   99.8 -> 82.3, the fuse 28.8 -> 54.8 because its input differs (v0.4.53's blade 9881.011 mm3, green's 9881.086, both
   in live's band; upstream Fillet 2 / Chamfer 1); the same input times the same on both (cold 21.4 ms). On one binary
