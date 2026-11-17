@@ -553,8 +553,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
-## Release blockers for the 2026-11-17 17:00 release (qa list 11:25, newest checked green c101c3c0; the latest release is v0.4.56)
-- **No blocker so far (GO on c101c3c0).** Compat 11:2x on c101c3c0 (has core's Split pieces apart 0d7e2fc2f, Use B-spline
+## Release blockers for the 2026-11-17 17:00 release (qa list 12:35, newest checked green 7f287e52; the latest release is v0.4.56)
+- **No blocker so far (GO on 7f287e52).** 12:35: greens 551d200b, 6bb61e69 and 7f287e52 (have blend's conic round be6f0ca8c
+  and skasm's FeatureScript colours 0bb94eede) ALL-SAME vs v0.4.56: hats, dock, 47 ticket documents, authored documents.
+  blend's impeller Fillet 3 (9e40ad95a) is not on main yet; checked on its green when it lands.
+- c101c3c0 (11:2x): Compat 11:2x on c101c3c0 (has core's Split pieces apart 0d7e2fc2f, Use B-spline
   0b93cf9d5, Rib a9900df79, Split placing 85010cc40): user documents (hats, dock), 47 ticket documents and qa's authored
   documents ALL-SAME vs v0.4.56. Earlier: fa9f84b8 (08:49) and dd344ea1 the same.
 - Suites on green 827a23a6 (11:19) vs ecf8c33a: models 85/126 (0 worse, 0 better), scenarios 0 worse; exchange imports

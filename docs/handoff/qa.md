@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-17 11:30 (11:50) on the Ubeyd account)
+# QA handoff (agent qa; current state only, updated 2026-11-17 12:35 on the Ubeyd account)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -58,7 +58,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.56** published check done 11-17 06:58: clean, baseline 0.4.56. Next: the 17:00 cut (qa-cut-1615).
 
 ## Next (in this order)
-1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (11:25: GO on c101c3c0, which has core's
+1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (12:35: GO on 7f287e52; c101c3c0 has core's
    four Split / Use / Rib lands; suites 827a23a6 clean; fan-blade-sweep Boolean 2 is now live's volume, 8x slower: core's Offset, sent to core). Still to come:
    blend's impeller Fillet 3 (when it lands: compat on its green + the impeller re-time below).
    The qa-cut-1615 timer runs cut-verdict.sh at 16:15 -> one line in /tmp/lead/qa-alerts + compat/cut-1117-1615.txt. Read
