@@ -48,7 +48,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    the previous release) -> compat/rel-<v>.txt; any user-document worse = P0 to the lead at once.
 3. The app spot-check rows (archive "Release checks: the app spot-check list"): user cases + 8 interaction-feel rows in
    rotation (next: rows 9-16).
-- **v0.4.55** published check done 11-16 21:16: 3 SHA OK, userdocs ALL-SAME, quit rc0 5/5, baseline 0.4.55. Next: the 05:00 cut.
+- **v0.4.56** published check done 11-17 06:58: clean, baseline 0.4.56. Next: the 17:00 cut (qa-cut-1615).
 
 ## Open items
 - **Speed (P0)**: owners got their slower-than-live documents 11-15 (from 11-14's vibe7 window, v0.4.48): blend (faceblend,
@@ -64,9 +64,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   what the nightly confirms slow, or > 3x a PLAN 2.7 target.
 - **11-17 05:00 cut**: v0.4.56 from 35baa32fa (published 06:35). Main HOLD (f197 Mirror 3, blend ba7a8d755) cleared 05:57 by
   the revert b596da51b (qa-hold-watch, exited). blend owes a fixed full-round strip with f197 in its T1 case.
-- **v0.4.56 published check**: unit **qa-pub-0456** = bin/rel-pub-all.sh 0.4.55 0.4.56 ~/tmp/qa/cand/noshape (vibe5; the
-  35baa32f app, from vibe7's fuzz copy): waits for the release, rel-published.sh then rel-compat.sh, one line to qa-alerts.
-  Delete vibe5 ~/tmp/qa/cand after it.
+- **v0.4.56 published check** done 06:58 (compat/published-0.4.56.txt, rel-0.4.56.txt): clean; compat baseline 0.4.56.
 - **Clean A/B 11-17** (lead ran it by hand on vibe7 02:55-03:31; ab1117/ here and in lead-scratch): 0.4.48 -> 0.4.53 -> 0.4.55 ms:
   helical 159 / 398 | 380 / 96 (Sweep 1 fixed in 0.4.55, no ticket); knife 1700 / 3154 | 2947 / 2207 (0.4.48 had 9 features
   in error); impeller 15643 / 28592 | 27584 / 25314; live 40 / 408 / 2773. Green 35baa32f: knife 1803 (Mirror 1 128 / 220 /
