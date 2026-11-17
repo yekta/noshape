@@ -26,6 +26,8 @@ const SUB_POINT: &str = "subpoint:";
 struct Use {
     eid: String,
     reference: String,
+    /// Live's Intersection (INTERSECTED): the curve where `reference`, a face, crosses the sketch plane.
+    intersect: bool,
     shape: Value,
     ends: Option<[[f64; 2]; 2]>,
     point: Option<[f64; 2]>,
@@ -68,6 +70,8 @@ pub struct LiveRef {
     /// Live's sketch makes it itself (refs.jsonl `method`: "the sketch creates it itself"): what an orphaned Use's ids
     /// name once its model geometry is gone, the Use's own point (bracket03-mattie's Sketch 2).
     pub self_made: bool,
+    /// An edge's ends (refs.jsonl `start`, `end`).
+    pub ends: Option<[[f64; 3]; 2]>,
 }
 
 /// What became of one Onshape feature.
@@ -284,7 +288,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         // A curved face's normal is its tangent plane's at a point: no filter for planar faces of ours (c2-hunting-knife's
         // Extrude 10 took the blade's flat spine for the handle's B-spline side through the same point).
         let normal = f3(&v["normal"]).filter(|_| v["surfaceType"].as_str().is_none_or(|t| t.eq_ignore_ascii_case("plane")));
-        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")) };
+        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")), ends: f3(&v["start"]).zip(f3(&v["end"])).map(|(a, b)| [a, b]) };
         let key = (k as usize, id.to_string());
         if let Some(old) = out.remove(&key) {
             r.constraints = old.constraints;
@@ -1596,7 +1600,7 @@ impl<'a> Translator<'a> {
         let top = |t: &mut Self| t.ctx.doc(None).ok().and_then(|od| od.session.undo_tops().0);
         let mark = top(self);
         let point = u.shape["tool"] == "point";
-        let made = self.call("sketch_use", json!({ "sketch": id, "references": [u.reference] })).inspect_err(|e| if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() { eprintln!("TRACE use {} {}: {e}", u.eid, u.reference) }).ok();
+        let made = if u.intersect { self.call("sketch_intersection", json!({ "sketch": id, "face": u.reference })) } else { self.call("sketch_use", json!({ "sketch": id, "references": [u.reference] })) }.inspect_err(|e| if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() { eprintln!("TRACE use {} {}: {e}", u.eid, u.reference) }).ok();
         let near = |c: &Value, key: &str, q: [f64; 2]| {
             let q = map.local(q);
             // A spline's ends are its first and last points (control points of a B-spline).
@@ -4322,7 +4326,10 @@ impl<'a> Translator<'a> {
                 self.nearest("faces", &r, part.as_deref()).ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p)))
             }
             // A sketch's line or arc: that one of ours (a part's edge of its length may lie beside it).
-            "EDGE" if r.sketch && let Some(curve) = self.sketch_curve_at(p, r.measure) => Ok(curve),
+            "EDGE" if r.sketch && let Some(curve) = self.sketch_curve_at(p, r.measure, r.ends) => Ok(curve),
+            // A spline on no part of live's whose ends a sketch's spline has (c2-surf-workshop-pipe's Loft profiles
+            // pierce Side profile's Beziers, JHt / JHV): ours has no body for it, so no edge of ours lies there.
+            "EDGE" if r.geometry.is_none() && r.ends.is_some() && self.part_of(k, &r).is_none() && let Some(curve) = self.sketch_curve_at(p, None, r.ends) => Ok(curve),
             "EDGE" => {
                 let part = self.part_of(k, &r);
                 self.nearest("edges", &r, part.as_deref()).ok_or_else(|| format!("{id}: no edge of ours at {:?} mm", mm(p)))
@@ -4383,7 +4390,7 @@ impl<'a> Translator<'a> {
 
     /// A line or arc of one of our sketches with its (arc length) midpoint at `mid` (model, m) and live's length,
     /// within 1e-6 m (asm-hand-drill-pinslot's Gear Selector Pin: its sweep path's sketch fillet arcs).
-    fn sketch_curve_at(&mut self, mid: [f64; 3], length: Option<f64>) -> Option<String> {
+    fn sketch_curve_at(&mut self, mid: [f64; 3], length: Option<f64>, ends: Option<[[f64; 3]; 2]>) -> Option<String> {
         let sketches: Vec<String> = self.feature_ids.values().cloned().collect();
         for s in sketches {
             let Some(g) = self.sketch_geometry(&s) else { continue };
@@ -4400,6 +4407,17 @@ impl<'a> Translator<'a> {
                 let on = (0..3).all(|i| ((a[i] + b[i]) / 2.0 - mid[i]).abs() < 1e-6);
                 let long = length.is_none_or(|l| ((0..3).map(|i| (b[i] - a[i]).powi(2)).sum::<f64>().sqrt() - l).abs() < 1e-6);
                 if on && long {
+                    return e["id"].as_str().map(str::to_string);
+                }
+            }
+            // A spline or Bezier: live's ends its first and last points (either way round).
+            let world = |v: &Value| Some([v[0].as_f64()?, v[1].as_f64()?]).map(|[u, w]| [0, 1, 2].map(|i| (o[i] + u * x[i] + w * y[i]) * k));
+            let close = |a: [f64; 3], b: [f64; 3]| (0..3).all(|i| (a[i] - b[i]).abs() < 1e-6);
+            for e in entities.iter().filter(|e| e["type"] == "bspline" || e["type"] == "spline") {
+                let Some([s, f]) = ends else { break };
+                let Some(pts) = e["control_points"].as_array().or(e["points"].as_array()) else { continue };
+                let (Some(a), Some(b)) = (pts.first().and_then(world), pts.last().and_then(world)) else { continue };
+                if (close(a, s) && close(b, f)) || (close(a, f) && close(b, s)) {
                     return e["id"].as_str().map(str::to_string);
                 }
             }
@@ -4749,7 +4767,7 @@ impl<'a> Translator<'a> {
             .as_array()
             .into_iter()
             .flatten()
-            .filter(|c| c["constraintType"] == "PROJECTED" || c["constraintType"] == "SILHOUETTED")
+            .filter(|c| matches!(c["constraintType"].as_str(), Some("PROJECTED" | "SILHOUETTED" | "INTERSECTED")))
             .filter_map(|c| {
                 // (A silhouette: its curve and the curved face it outlines.)
                 let params = c["parameters"].as_array()?;
@@ -4757,6 +4775,14 @@ impl<'a> Translator<'a> {
                 let external = params.iter().find(|p| p["parameterId"] == "externalSecond" || p["parameterId"] == "externalFace")?.clone();
                 Some((local, (c["entityId"].as_str().unwrap_or("").to_string(), external)))
             })
+            .collect();
+        // Live's Intersections (a face's crossing with the sketch plane, made by our Intersection tool).
+        let intersected: std::collections::HashSet<String> = f["constraints"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|c| c["constraintType"] == "INTERSECTED")
+            .filter_map(|c| c["parameters"].as_array()?.iter().find(|p| p["parameterId"] == "localCurve")?["value"].as_str().map(str::to_string))
             .collect();
         let mut uses: Vec<Use> = Vec::new();
         let mut unnamed_uses: Vec<Use> = Vec::new();
@@ -4895,7 +4921,7 @@ impl<'a> Translator<'a> {
             match shape {
                 Some(s) if used.is_some() => {
                     let point = (s["tool"] == "point").then(|| [e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0)]);
-                    uses.push(Use { eid, reference: used.unwrap_or_default(), shape: s, ends: end_points, point });
+                    uses.push(Use { intersect: intersected.contains(&eid), eid, reference: used.unwrap_or_default(), shape: s, ends: end_points, point });
                 }
                 // A Use whose model geometry isn't named: drawn after the Uses ours makes (`moved_uses`).
                 Some(s) if projected.contains_key(&eid) => {
@@ -4903,7 +4929,7 @@ impl<'a> Translator<'a> {
                         eprintln!("TRACE use {oid} {eid}: its model geometry not found: {}", projected.get(&eid).map(|(c, p)| format!("{c} {p}")).unwrap_or_default().chars().take(400).collect::<String>());
                     }
                     let point = (s["tool"] == "point").then(|| [e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0)]);
-                    unnamed_uses.push(Use { eid, reference: String::new(), shape: s, ends: end_points, point });
+                    unnamed_uses.push(Use { intersect: intersected.contains(&eid), eid, reference: String::new(), shape: s, ends: end_points, point });
                 }
                 Some(s) => {
                     shapes.push(s);
@@ -5380,7 +5406,7 @@ impl<'a> Translator<'a> {
                 // Ours made with Use (`use_projected`), else drawn where live's solve put it.
                 // A used curve's ends are projected with it; an orphaned Use (no model reference in live either) is
                 // drawn where it is stored, as live keeps it.
-                "PROJECTED" | "SILHOUETTED" => {
+                "PROJECTED" | "SILHOUETTED" | "INTERSECTED" => {
                     let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name);
                     let local = par("localFirst").or(par("localCurve")).and_then(|p| p["value"].as_str());
                     // An orphan: no model reference in live either, or only ids naming what the sketch made itself.

@@ -24,9 +24,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 
 ## Next, in order
 1. Pair green -> land A + chip fix (+ Bezier mapping if in ops-b). Tell psui.
-2. Surface workshop (lead's order 11-17): mutualtrim Sweep 1: live's path JHR is the Bezier (P0 (-53.7, -28.8) ->
-   P3 (-27.21, 55.05) mm sketch), Plane 1 at vertex JHE = P0; ours ends at (-10.38, 60.56) = the construction line
-   ZYv9J4xUoBps's other end: check which edge our Sweep path / Plane 1 resolve (ut3t.sh trace). Then the remaining
+2. Surface workshop (lead's order 11-17): mutualtrim Sweep 1 handed back to core 09:5x (our sketch and Plane 1 are
+   live's; our sweep's rails are 36.5 mm, live 94.15: trimEnds cuts the path at world z 0). pipe (core's return):
+   PIERCE to Side profile's Beziers by id alone mapped to a body edge; fix uncommitted (LiveRef.ends,
+   sketch_curve_at matches splines by ends; parity a_pierce_to_a_sketch_bezier_by_its_id_takes_that_curve). Then
    surface-workshop drops: INTERSECTED (Onshape's sketch Intersect tool, SECTION: manualblend Sketch 6/7; we have no
    such tool), PIERCE rejected (same sketches), britatap Blend curves taken back (14 mm), cpcurves Sketch 4.
 3. core's sketch cases below. 4. tablet-stand Flange 2 (core landed Move face; re-check first). 5. Remaining dropped
@@ -74,6 +75,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   copies of the seeds"), so our hexagon-and-lines stays as stored: one region of 107.106 mm² where live has two
   (84.163 + 22.943, refs.jsonl) at the solved place; the cut removes 115 mm³ more than live's and has one face more.
 
+
+## Agents
+- qa: 132756b3-e48d-4b9f-8a0e-3d4f23629c8b (since 2026-11-17; old 60d72cb7 stopped). core 6692ae35-758a-4442-81c8-29f67be2e21a, psui 4d0a82b2-8fc7-43e6-b45d-bd8cb225741e.
 
 ## Waiting on others
 - psui (4d0a82b2-8fc7-43e6-b45d-bd8cb225741e): told 20:3x the tab row is a pick difference (live hit Flange 1's wall).

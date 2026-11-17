@@ -2714,6 +2714,79 @@ fn a_beziers_control_points_take_its_constraints() {
     assert!(kinds.contains(&"Horizontal") && kinds.contains(&"Curvature"), "{g}");
 }
 
+/// Live's Intersection (INTERSECTED, c2-surf-workshop-manualblend's Sketch 6): ours made by the Intersection tool
+/// from the face live names, where the face crosses the sketch plane, not counted as left to the solved geometry.
+#[test]
+fn an_intersected_curve_is_made_by_the_intersection_tool() {
+    let line = |id: &str, (x0, y0): (f64, f64), (x1, y1): (f64, f64)| {
+        let l = ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)).sqrt();
+        json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "isConstruction": false, "startParam": 0.0, "endParam": l,
+            "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": x0, "pntY": y0, "dirX": (x1 - x0) / l, "dirY": (y1 - y0) / l } })
+    };
+    let plane = |name: &str| json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": format!("query=dummyQuery(id+\"{name}.planeOp\",EntityType.FACE);") }] }]);
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1", "parameters": plane("Top"),
+          "entities": [line("a", (0.0, -0.01), (0.02, -0.01)), line("b", (0.02, -0.01), (0.02, 0.01)), line("c", (0.02, 0.01), (0.0, 0.01)), line("d", (0.0, 0.01), (0.0, -0.01))], "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterEnum-145", "parameterId": "domain", "value": "MODEL" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "deterministicIds": ["JGC"], "featureId": "FS1" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "10 mm" }] },
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2", "parameters": plane("Front"),
+          "entities": [line("ix", (0.0, 0.01), (0.02, 0.01))],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "INTERSECTED", "entityId": "ix.sect", "parameters": [
+              { "btType": "BTMParameterString-149", "parameterId": "localCurve", "value": "ix" },
+              { "btType": "BTMParameterQueryList-148", "parameterId": "externalFace", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "", "deterministicIds": ["JTF"] }] },
+              { "btType": "BTMParameterEnum-145", "parameterId": "sketchToolType", "value": "SECTION" }] }] }
+    ] });
+    let refs = [
+        json!({ "index": 1, "id": "JGC", "kind": "SKETCH_REGION", "point": [0.01, 0.0, 0.0], "measure": 0.0004 }),
+        json!({ "index": 2, "id": "JTF", "kind": "FACE", "point": [0.01, 0.0, 0.01], "normal": [0.0, 0.0, 1.0] }),
+    ]
+    .iter()
+    .map(|v| v.to_string())
+    .collect::<Vec<_>>()
+    .join("\n");
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("intersected-curve.noshape"), &features, parse_refs(&refs)).unwrap();
+    for k in 0..2 {
+        let step = t.step(k);
+        assert!(step.problems.is_empty(), "{k}: {:?}", step.problems);
+    }
+    let step = t.step(2);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    let lines: Vec<&Value> = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "line").collect();
+    assert!(lines.len() == 1 && lines[0]["external"] == true && lines[0]["start"][1] == json!(10.0), "{g}");
+}
+
+/// A Pierce to an earlier sketch's Bezier live names by its id alone (c2-surf-workshop-pipe's Loft profiles on Side
+/// profile's JHt / JHV): ours has no body edge there, so the sketch curve with live's ends is the one.
+#[test]
+fn a_pierce_to_a_sketch_bezier_by_its_id_takes_that_curve() {
+    let plane = |name: &str| json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": format!("query=dummyQuery(id+\"{name}.planeOp\",EntityType.FACE);") }] }]);
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1", "parameters": plane("Top"),
+          "entities": [{ "btType": "BTMSketchCurveSegment-155", "entityId": "bz", "startPointId": "bz.start", "endPointId": "bz.end", "startParam": 0.0, "endParam": 1.0,
+              "geometry": { "btType": "BTCurveGeometryControlPointSpline-2197", "controlPointCount": 4, "dimension": 2, "isPeriodic": false, "isRational": false, "isBezier": true, "degree": 3,
+                  "controlPoints": [-0.02, 0.01, -0.01, 0.015, 0.01, 0.005, 0.02, 0.01], "knots": [0, 0, 0, 0, 1, 1, 1, 1] } }], "constraints": [] },
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2", "parameters": plane("Right"),
+          "entities": [{ "btType": "BTMSketchPoint-158", "entityId": "pt", "isConstruction": false, "x": 0.01, "y": 0.0 }],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "PIERCE", "entityId": "pc", "parameters": [
+              { "btType": "BTMParameterQueryList-148", "parameterId": "externalEdge", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "", "deterministicIds": ["JE"] }] },
+              { "btType": "BTMParameterString-149", "parameterId": "localEntity", "value": "pt" }] }] }
+    ] });
+    let refs = json!({ "index": 1, "id": "JE", "kind": "EDGE", "curveType": "SPLINE", "body": "JX", "point": [0.0, 0.01, 0.0], "start": [-0.02, 0.01, 0.0], "end": [0.02, 0.01, 0.0], "length": 0.0405 }).to_string();
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("pierce-sketch-bezier.noshape"), &features, parse_refs(&refs)).unwrap();
+    assert!(t.step(0).problems.is_empty());
+    let step = t.step(1);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    assert!(g["constraints"].as_array().unwrap().iter().any(|c| c["type"] == "Pierce"), "{g}");
+}
+
 /// An orphaned Use whose ids name only what the sketch made itself (bracket03-mattie's Sketch 2: live's refs resolve
 /// them only after the sketch): drawn where it is stored, as live keeps it, not counted as a Use ours missed.
 #[test]
