@@ -26,7 +26,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   psui 11:50: not separable from load (live-30-features, vibe6 load 36-43: 0.4.53 and 0.4.55 both ~850 ms; load 29: 0.4.55
   ~210 ms); spaced presents, no hover card (the pointer rests on the active tab). qa 11:53 vibe7 load 17: 0.4.53 tabToA 818 ms
   too. Decided by the nightly's quiet run from 11-18 (nightly/tabab-<mmdd>.txt).
-- [ ] P0 SCISSOR-LIFT-BOM-ROWS (**bool 12:4x: culprit core 5b2807501**, geom.cpp face point classification: fed22d Fillet 18 fails, BOM 59 -> 57/87; core's fix on branch core-proj; qa re-checks on its green; asm owns the BOM; qa 2026-11-17 07:20, assembly suite 1117-0227 on green ecf8c33a vs 1116-1642 on 684e77e2)
+- [ ] P0 SCISSOR-LIFT-BOM-ROWS (**bool: culprit core 41f62884a** (corrected from 5b2807501; bad vs its good parent): fed22d Fillet 18 fails, BOM 59 -> 57/87; core's fix on branch core-proj; qa re-checks on its green; asm owns the BOM; qa 2026-11-17 07:20, assembly suite 1117-0227 on green ecf8c33a vs 1116-1642 on 684e77e2)
   asm-scissor-lift: BOM rows as live 59 -> 57 of 87 (rows 63 -> 62; occurrences 214/242 and mates 13/19 unchanged). New
   difference: ours has (1, "Motor Mount", 3.0, "Motor Mount", "", "- None -") under "Drive", live doesn't; the "Gear Frame"
   row under "Gearbox" no longer differs. 106 commits in range (bool, core, dx, blend; no asm). Logs:
