@@ -3560,9 +3560,9 @@ impl PartStudioView {
         } else {
             crate::ui::tool_button(SharedString::from(format!("tb-{id}")), &icon_name, active, cx)
         };
-        // Tool search with "Highlight tool in toolbar": the selected result's
-        // button (or its group) turns yellow (live: `#fcda7f`, border `#fab601`).
-        let found = self.palette_found_tool(cx).is_some_and(|f| f == id || group.contains(&f));
+        // Tool search with "Highlight tool in toolbar": the selected result's button turns yellow (a tool inside the
+        // group's dropdown lights the ⌄ alone: `tool_button_group`).
+        let found = self.palette_found_tool(cx).is_some_and(|f| f == id);
         let main = main.when(found, crate::ui::search_highlight);
         // The active tool clicked again keeps its dialog (`start_feature`).
         let main = main.on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_feature(id, window, cx)));
@@ -3574,10 +3574,13 @@ impl PartStudioView {
     fn tool_button_group(&mut self, ty: &'static FeatureType, group: &'static [&'static str], key: &'static str, main: AnyElement, cx: &mut Context<Self>) -> AnyElement {
         let id = ty.id;
         let view = cx.entity();
+        // Tool search's highlighted tool in this dropdown, not on its face: the ⌄ lit alone (live Face blend).
+        let in_menu = self.palette_found_tool(cx).is_some_and(|f| f != id && group.contains(&f));
         crate::ui::tool_group(
             SharedString::from(format!("tg-{id}")),
             main,
             crate::ui::tool_caret(SharedString::from(format!("tbm-{id}")), cx)
+                    .when(in_menu, crate::ui::search_highlight)
                     .dropdown_menu(move |mut menu, window, _| {
                         // Onshape: the dropdown lists every tool of the group
                         // (the face included), 180 px wide, with shortcut chips; under the group's left edge, not

@@ -233,10 +233,12 @@ pub fn pressed_shadow() -> Vec<BoxShadow> {
     vec![gpui_kit::component::button::pressed_inset_shadow()]
 }
 
-/// Search tools' "Highlight tool in toolbar" on a toolbar button (live: `#fcda7f`, a 2 px `#fab601` border; the
-/// user's 11-16 capture).
+/// Search tools' "Highlight tool in toolbar" on a toolbar button (live psui/toolbar-highlight 11-17: `.is-highlighted`
+/// on the button itself, background #fcda7f and `box-shadow: inset 0 0 0 2px #fab601`, following its corners; no
+/// border, so nothing in the toolbar moves).
 pub fn search_highlight<E: Styled>(b: E) -> E {
-    b.bg(gpui_kit::rgb(0xfcda7f)).border_2().border_color(gpui_kit::rgb(0xfab601))
+    let ring = BoxShadow { color: gpui_kit::rgb(0xfab601).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(2.), inset: true };
+    b.bg(gpui_kit::rgb(0xfcda7f)).shadow(vec![ring])
 }
 
 /// A 32x32 toolbar button holding a 20 px full-color icon (§3.2). Add

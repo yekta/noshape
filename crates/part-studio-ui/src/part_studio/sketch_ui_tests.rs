@@ -4449,6 +4449,8 @@ mod measure;
 mod nav;
 #[path = "chrome_feel_tests.rs"]
 mod chrome;
+#[path = "toolbar_highlight_tests.rs"]
+mod toolbar_highlight;
 #[path = "sm_feel_tests.rs"]
 mod sm;
 #[path = "sketchtools_feel_tests.rs"]
