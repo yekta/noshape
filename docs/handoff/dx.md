@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 03:58 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-17 05:01 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -57,13 +57,17 @@ B-splines); extension-spring same. ui-parity drawing exports 84/84 still match (
 a38f0629 (landed 11-17 03:24): on_conic also takes a 2-point piece (the shorter way) and HLR points within 10 µm
 (ends 1 µm apart close it): housing-draft's drafted rims Right 2 LINE / Front 2 SPLINE / Iso 1 SPLINE -> ELLIPSE;
 sm-louver ARC 68 / CIRCLE 2 as live. ops e2e 222/222 (Mac), ui-parity drawing exports 84/84 (vibe6 exp-tol).
-In progress (dx worktree, commit 561d8704a, not landed): SAT writes a face going round its B-surface in ACIS's
-periodic form (clamped knots, "periodic", no seam: live's own SAT) and reads that form back periodic (shared
-bsurface_as_periodic, xt_read); RoundSplines {Split, Parasolid, Acis} replaces the periodic_splines bool, prepared()
-takes `offsets` apart and converts extrusions for ACIS; a vertex where only seams cross isn't shown; a free-form
-face's box holds the highest point its climb finds (OCCT's was 1.9 µm short). Mac exs-sat: o-ring generator 4/7/2 ->
-1/0/0 and motor-mount-jack 24/26/2 -> 16/24/0 read back as the model; hose unchanged (sections split, as in x_t).
-T1 export::a_loft_wall_goes_round_as_one_acis_face. Full Mac suite exs-all running (03:58), then kernel tests, land.
+59c0be35 (landed 04:37): SAT writes a face going round its B-surface in ACIS's periodic form (clamped knots,
+"periodic", no seam: live's own SAT) and reads that form back periodic (shared bsurface_as_periodic, xt_read);
+RoundSplines {Split, Parasolid, Acis} replaces the periodic_splines bool, prepared() takes `offsets` apart and converts
+extrusions for ACIS. Ours reads ours.sat: motor-mount-jack 16/24/0 and rings-loft Part 1 273/762/508 as the model
+(Mac exs-all). T1 export::a_loft_wall_goes_round_as_one_acis_face.
+9a19e358 (landed 05:00; lead: split from it, checked alone): a vertex where only seams cross isn't shown (live
+behaviours.md "kern (10-25) seam counts": no seam vertices; free-form one-face bodies 1/0/0) and a free-form face's
+box holds the highest point its climb finds (OCCT's was 1.9 µm short): o-ring generator's elliptic rings read back
+1/0/0 as live. Model suite A/B vibe7 (~/tmp/dx/abK-*): identical but c2-loft-paths-guides Loft 3 vertices 27 -> 26
+(live 23, edges same); hats/dock SAME on every tab (vibe5); psui 206/206, scene, kernel 480/480 on the Mac.
+Left in SAT: cf-hose-routing 22/44/24 for 12/12/0 (sections split, as in x_t); rings-loft Part 2 (x_t's parked piece).
 Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live imports ours 46/48, ours reads ours
 112/119, times 49/50, drawings' DXF 0/4.
 Open, ranked:
@@ -207,8 +211,15 @@ Open, ranked:
   a configured part). Run them alone once in, sort first differences to owners.
 
 ## Next, in order
-1. Ours reads ours back 112/119 (x1117a): the SAT rows (hose, motor-mount-jack, o-ring Part 3: closed B-surfaces
-   written split at mid, Open 3); then the drawing hole-rim idea (Open 1) if another doc shows it.
+1. x1117c (vibe6 04:46, main + 59c0be35 + 9a19e358): ours imports live's 59/75, live imports ours 46/48, ours reads
+   ours 114/119, DXF 0/4, times 49/50. Left: rings-loft live.igs / live.sat 275/771/514 for the model's 273 (live's
+   files hold two closed faces each as halves split at the seam and mid-period; live's own IGES import 279/787/524:
+   decision asked of the lead 05:1x: an import row passes when ours splits no more than live's own import, as the
+   export rows' splits_no_more; the SAT row waits on live2's own SAT import, REQUESTS 01:47); sm-louver live.sat
+   Part 2 40/82/44 (same wait); extension-spring live.sat area +0.016 % (ACIS procedural approximations); hose SAT.
+   Drawings: all four follow model differences (extension-spring Fillet 1 10/24/16 for live's 11/27/18: blend;
+   rings-loft walls) or live rules without evidence (housing-draft lug chords, hole rim: lead, wait for more docs).
+   View placement waits (lead).
 2. After ~10:17: live's answers to REQUESTS 01:47 (sm-louver scale, live's own SAT import); set 2 after live2's refetch.
 3. Curve pattern 1 path (driven-pattern, above): translator, mine.
 4. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
