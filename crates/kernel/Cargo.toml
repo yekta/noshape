@@ -21,6 +21,7 @@ noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
 cxx-build.workspace = true
 
 [dev-dependencies]
+zstd.workspace = true
 
 # Integration tests (tools/tiers/merge-tests.py): tests/all.rs holds every file but the standalone ones.
 [[test]]

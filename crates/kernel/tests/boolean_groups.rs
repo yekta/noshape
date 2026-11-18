@@ -508,6 +508,18 @@ fn an_engravings_edges_split_where_a_seam_was_show_whole() {
     assert_eq!((t.edge_count(), t.vertices.iter().filter(|v| **v).count()), (83, 54));
 }
 
+/// c2-parting-line-draft-parting-line's Split 3, its TOP part: the sections between the parting extrusion and each draft
+/// face, three B-spline pieces with no seam between two faces neither periodic nor analytic, keep their vertices as live
+/// (13/34/24; joined as if a seam had been there, 13/30/20).
+#[test]
+fn sections_between_faces_with_no_seam_keep_their_vertices() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/topology/parting-line-split3-top.brep.zst");
+    let bytes = zstd::decode_all(std::fs::File::open(path).unwrap()).unwrap();
+    let s = Shape::from_brep_bytes(&bytes).unwrap();
+    let t = s.shown_topology().unwrap();
+    assert_eq!((s.faces().len(), t.edge_count(), t.vertex_count()), (13, 34, 24));
+}
+
 /// c2-impeller-loft's Loft Gehäuse: its end's sketch circle split into three arcs, one curve, between the loft's side and
 /// the end's plane with no seam: three edges and their vertices, as live (4/10/8).
 #[test]

@@ -4868,6 +4868,7 @@ dependencies = [
  "noshape-workspace-hack",
  "serde",
  "thiserror 2.0.21",
+ "zstd",
 ]
 
 [[package]]
