@@ -3828,6 +3828,13 @@ fn a_detail_label_hangs_under_its_whole_circle() {
         assert!((first.pos[0] - c[0]).abs() < 1e-6, "clip {clip}: centred: {first:?} / {c:?}");
         assert!((first.pos[1] + first.height - (c[1] - r - 5.3)).abs() < 1e-6, "clip {clip}: top 5.3 mm under the circle: {first:?} / {c:?} r {r}");
     }
+    // A section's label: its top 3.02 mm under the view's geometry, centred on it (drw-section-vertical.dxf).
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let section = ViewId(5);
+    assert!(matches!(drawing.sheets[0].view(section).unwrap().kind, ViewKind::Section { .. }));
+    let pl = built.placement(section).unwrap();
+    let t = built.geometry.texts.iter().find(|t| built.picks.get(t.pick as usize) == Some(&PickTarget::ViewLabel(section))).expect("SECTION A - A");
+    assert!((t.pos[0] - (pl.min[0] + pl.max[0]) / 2.0).abs() < 1e-6 && (t.pos[1] + t.height - (pl.min[1] - 3.02)).abs() < 1e-6, "{t:?} / {pl:?}");
 }
 
 /// Detail profile In line on a circle (live qa4-r5-s11.dxf, detail B): the

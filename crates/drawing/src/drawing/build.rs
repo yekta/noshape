@@ -2577,7 +2577,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }).flatten();
             let (lo, hi, gap) = match profile {
                 Some((lo, hi)) => (lo, hi, 5.3),
-                None => (pl.min, pl.max, if auto_label || aux_label { 3.1 } else { 6.0 }),
+                // live2 labels-1118 drw-section-vertical.dxf: SECTION A - A's top 0.1191 in (3.02 mm) under the geometry.
+                None => (pl.min, pl.max, if auto_label || aux_label { 3.02 } else { 6.0 }),
             };
             let mut y = lo[1] - gap;
             let label_mark = g.texts.len();

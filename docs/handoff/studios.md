@@ -42,9 +42,12 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   the popover heights fit); the popover hides the title tooltip (vendored gpui-component `tooltip::hide_tooltip`) and
   its steps wrap; a detail's label 5.3 mm under its whole profile (circle / polygon box), centred, clipped border or
   not (live2 labels-1118: 39.2 mm under a 2:1 r 33.9 circle's centre; test).
-- Label rule open: the two sections both have 30 mm of geometry centred on the view, yet live's label gaps are 5.81
-  (exclude-from-cut) and 3.02 mm (vertical); ours keeps 3.1 for sections. The exclude case's extra 2.8 mm is not
-  explained by the visible, hatch or model box; next: compare our section box with live's per take (dxfl.py).
+- Local, to land: a section / auxiliary label's top 3.02 mm under the geometry (drw-section-vertical.dxf; was 3.1;
+  test). drw-section-exclude-from-cut's 5.81 mm comes after an Edit section… session ended by Escape (excluded parts,
+  a cleared field): not a placement rule; ask live2 for a plain section of pin-block if it matters.
+- live2 retakes queued to land (11:5x): drw-bom-table reads TABLE after placing; drw-note-editor presses ✓, waits
+  1.5 s, Esc ("MATRIX" committed from s6). When on main: rerun both, drop `placed_table`'s reader rule if TABLE reads
+  from the placing click.
 - Checked against live 08:4x, already as live: documents search on Enter only; version row menu (View in repair,
   Restore to Main…, Releases only with candidates; Copy link web-only); Restore strategy dialog; Create version (V<n>
   focused, Enter creates, Esc closes); Branch (B<n> selected, Enter creates and opens).
