@@ -809,7 +809,7 @@ fn exchange_round_trip() {
         };
         op("document_create", json!({ "path": doc, "length_unit": "mm" }))
             .and_then(|_| op("import_files", json!({ "files": [file], "mesh_unit": "Millimeter" })))
-            .and_then(|_| op("query_parts", json!({})))
+            .and_then(|r| op("query_parts", json!({ "tab": r["first"] })))
             .map(|q| parts_from_query(&q))
             .map_err(|e| format!("import failed: {e}"))
     };
@@ -1068,6 +1068,12 @@ fn exchange_round_trip() {
                 continue;
             }
         };
+        // The drawing's own sheet scale and view positions, as live's stored drawing holds them: the suite compares
+        // what a drawing holds; the suggested-views rule is judged against live's captures of Create Drawing alone
+        // (lead 11-18: how the stored drawings were made is unknown).
+        if let Err(e) = place_as_live(&mut t, &drawing, &dir.join("drawing-live.json")) {
+            println!("{name}: drawing not placed as live's: {e}");
+        }
         let mut exported = true;
         for (format, ext) in [("PDF", "pdf"), ("DXF", "dxf"), ("DWG", "dwg")] {
             let file = dir.join(format!("ours-drawing.{ext}"));
@@ -1092,6 +1098,38 @@ fn exchange_round_trip() {
         println!("{name}: drawing DXF: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
     }
     println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet); ours reads ours back {selfs_ok}/{exports}; drawings' DXF {drawings_ok}/{drawings}; times at or under live's {faster}/{timed}", exports - waiting);
+}
+
+/// Give `drawing`'s first sheet the scale and view positions of live's stored drawing (`live`, DRAWING_JSON: sheet
+/// inches): the scale of its view on the sheet's scale, then each view, paired in order (Front, Right, Top,
+/// Isometric: suggested views' order), dragged there: Front first (Right and Top follow across their axes), then Right
+/// along x, Top along y, the Isometric whole.
+fn place_as_live(t: &mut Translator, drawing: &str, live: &Path) -> Result<(), String> {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(live).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    let views = live["sheets"][0]["views"].as_array().ok_or("no views in live's drawing")?;
+    let sheet_scale = views.iter().find(|v| v["scale"]["scaleSource"] == "Sheet").map(|v| &v["scale"]).ok_or("no view on the sheet's scale")?;
+    let (n, d) = (sheet_scale["numerator"].as_f64().unwrap_or(1.0), sheet_scale["denumerator"].as_f64().unwrap_or(1.0));
+    let fmt = |x: f64| if (x - x.round()).abs() < 1e-9 { format!("{}", x.round()) } else { format!("{x}") };
+    t.call("drawing_sheet", json!({ "drawing": drawing, "action": "properties", "set": { "scale": format!("{}:{}", fmt(n), fmt(d)) } }))?;
+    let ours = |t: &mut Translator| -> Result<Vec<(Value, [f64; 2])>, String> {
+        let g = t.call("drawing_get", json!({ "drawing": drawing, "edges": false }))?;
+        let views = g["views"].as_array().or_else(|| g["sheet"]["views"].as_array()).ok_or_else(|| format!("no views in {g}"))?;
+        Ok(views.iter().map(|v| (v["id"].clone(), [v["position"][0].as_f64().unwrap_or(0.0), v["position"][1].as_f64().unwrap_or(0.0)])).collect())
+    };
+    if ours(t)?.len() != views.len() {
+        return Err(format!("{} views for live's {}", ours(t)?.len(), views.len()));
+    }
+    let target = |i: usize| [views[i]["position"]["x"].as_f64().unwrap_or(0.0) * 25.4, views[i]["position"]["y"].as_f64().unwrap_or(0.0) * 25.4];
+    // (view index, which axes it moves along)
+    for (i, axes) in [(0, [true, true]), (1, [true, false]), (2, [false, true]), (3, [true, true])].into_iter().filter(|(i, _)| *i < views.len()) {
+        let (id, at) = ours(t)?[i].clone();
+        let to = target(i);
+        let by = [if axes[0] { to[0] - at[0] } else { 0.0 }, if axes[1] { to[1] - at[1] } else { 0.0 }];
+        if by[0].abs() > 1e-6 || by[1].abs() > 1e-6 {
+            t.call("drawing_view_move", json!({ "drawing": drawing, "view": id, "by": by }))?;
+        }
+    }
+    Ok(())
 }
 
 /// A drawing DXF read by entity type and layer (the exchange suite's drawing leg): blocks' entities counted, their

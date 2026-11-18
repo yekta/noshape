@@ -283,11 +283,12 @@ mod tests {
     }
 
     /// Live 1898 (blocks L x W x H on ANSI A and ISO A3), qa 1441 (82 x 82 x 20 on ANSI A mm), c2-housing-draft
-    /// (30 x 37 x 6, ANSI A: 1:1) and live's q-svscale blocks on ANSI A (1:40 / 1:50): suggested views' sheet scale.
+    /// (30 x 37 x 6, ANSI A: 1:1), live's q-svscale blocks on ANSI A (1:40 / 1:50) and clamp-guillem's Part 3 (61 x 33 x
+    /// 43, Create Drawing of Part 3 on ANSI A: 1:1, live clamp-drawing-1118): suggested views' sheet scale.
     #[test]
     fn suggested_scale_fits_all_three_views() {
         use crate::drawing::SheetSize::{A3, AnsiA};
-        for (size, e, want) in [(AnsiA, [20.0, 10.0, 5.0], 3.0), (AnsiA, [100.0, 50.0, 20.0], 0.5), (AnsiA, [60.0, 60.0, 120.0], 1.0 / 3.0), (A3, [100.0, 50.0, 20.0], 1.0), (AnsiA, [82.0, 82.0, 20.0], 0.5), (AnsiA, [30.5, 37.0, 6.0], 1.0)]
+        for (size, e, want) in [(AnsiA, [20.0, 10.0, 5.0], 3.0), (AnsiA, [100.0, 50.0, 20.0], 0.5), (AnsiA, [60.0, 60.0, 120.0], 1.0 / 3.0), (A3, [100.0, 50.0, 20.0], 1.0), (AnsiA, [82.0, 82.0, 20.0], 0.5), (AnsiA, [30.5, 37.0, 6.0], 1.0), (AnsiA, [61.0, 33.0, 43.0], 1.0)]
             .into_iter()
             .chain([2230.0, 2300.0, 2350.0, 2400.0, 2450.0].map(|l| (AnsiA, [l, 600.0, 700.0], 1.0 / 40.0)))
             .chain([[2500.0, 600.0, 700.0], [2678.0, 600.0, 700.0], [2800.0, 600.0, 700.0], [3000.0, 600.0, 700.0], [2678.0, 841.0, 978.0], [2678.0, 1500.0, 978.0], [2678.0, 841.0, 2000.0], [1000.0, 2500.0, 500.0], [1000.0, 600.0, 2500.0]].map(|e| (AnsiA, e, 1.0 / 50.0)))
