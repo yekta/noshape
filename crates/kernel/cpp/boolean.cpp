@@ -37,6 +37,7 @@
 #include <BOPAlgo_BuilderFace.hxx>
 #include <BOPTools_AlgoTools2D.hxx>
 #include <ShapeAnalysis_Curve.hxx>
+#include <BRepAlgo.hxx>
 #include <ShapeAnalysis_FreeBounds.hxx>
 #include <NCollection_HSequence.hxx>
 
@@ -12779,6 +12780,100 @@ bool project_line_along(const TopoDS_Shape& item, const TopoDS_Shape& target, co
 }
 } // namespace
 
+namespace {
+// A projection's sliver where it meets the target's boundary at a tangent: two short edges sharing both ends, one of
+// them on a boundary edge (c2-surf-workshop-britatap's Touch screen split: the line's section stopped 0.12 mm short of
+// the face's corner where its top circle touches the section's plane, the gap closed by a short line and an arc of
+// that circle). The arc dropped and the line joined to the curve: one edge to the corner, as live's.
+TopoDS_Shape without_tangent_slivers(const TopoDS_Shape& r, const TopoDS_Shape& target)
+{
+  std::vector<TopoDS_Edge> es;
+  for (TopExp_Explorer x(r, TopAbs_EDGE); x.More(); x.Next())
+    es.push_back(TopoDS::Edge(x.Current()));
+  if (es.size() < 3)
+    return r;
+  std::vector<double> len(es.size());
+  double              total = 0;
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    if (BRep_Tool::Degenerated(es[i]))
+      return r;
+    len[i] = GCPnts_AbscissaPoint::Length(BRepAdaptor_Curve(es[i]));
+    total += len[i];
+  }
+  const auto ends = [](const TopoDS_Edge& e, gp_Pnt& a, gp_Pnt& b) {
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    if (v0.IsNull() || v1.IsNull())
+      return false;
+    a = BRep_Tool::Pnt(v0), b = BRep_Tool::Pnt(v1);
+    return true;
+  };
+  const auto on_boundary = [&](const TopoDS_Edge& e) {
+    const BRepAdaptor_Curve c(e);
+    for (TopExp_Explorer x(target, TopAbs_EDGE); x.More(); x.Next())
+    {
+      double                        f, l;
+      const occ::handle<Geom_Curve> bc = BRep_Tool::Curve(TopoDS::Edge(x.Current()), f, l);
+      if (bc.IsNull())
+        continue;
+      bool all = true;
+      for (int k = 0; k <= 4 && all; ++k)
+      {
+        gp_Pnt proj;
+        double at;
+        all = ShapeAnalysis_Curve().Project(bc, c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 4), 1e-9, proj, at, f, l, false) <= 1e-7;
+      }
+      if (all)
+        return true;
+    }
+    return false;
+  };
+  constexpr double gap = 1e-6;
+  size_t           drop = es.size();
+  for (size_t i = 0; i < es.size() && drop == es.size(); ++i)
+    for (size_t j = 0; j < es.size() && drop == es.size(); ++j)
+    {
+      gp_Pnt a0, a1, b0, b1;
+      if (i == j || len[i] > 0.01 * total || len[j] > 0.01 * total || !ends(es[i], a0, a1) || !ends(es[j], b0, b1))
+        continue;
+      const bool same = (a0.Distance(b0) <= gap && a1.Distance(b1) <= gap) || (a0.Distance(b1) <= gap && a1.Distance(b0) <= gap);
+      if (same && a0.Distance(a1) > gap && on_boundary(es[j]) && !on_boundary(es[i]))
+        drop = j;
+    }
+  if (drop == es.size())
+    return r;
+  occ::handle<NCollection_HSequence<TopoDS_Shape>> kept = new NCollection_HSequence<TopoDS_Shape>;
+  for (size_t i = 0; i < es.size(); ++i)
+    if (i != drop)
+      kept->Append(es[i]);
+  const occ::handle<NCollection_HSequence<TopoDS_Shape>> wires = ShapeAnalysis_FreeBounds::ConnectEdgesToWires(kept, gap, false);
+  if (wires.IsNull() || wires->IsEmpty())
+    return r;
+  BRep_Builder    b;
+  TopoDS_Compound out;
+  b.MakeCompound(out);
+  for (int i = 1; i <= wires->Length(); ++i)
+  {
+    const TopoDS_Wire w = TopoDS::Wire(wires->Value(i));
+    int               n = 0;
+    for (TopExp_Explorer x(w, TopAbs_EDGE); x.More(); x.Next())
+      ++n;
+    if (n == 1)
+    {
+      for (TopExp_Explorer x(w, TopAbs_EDGE); x.More(); x.Next())
+        b.Add(out, x.Current());
+      continue;
+    }
+    const TopoDS_Edge one = BRepAlgo::ConcatenateWireC0(w);
+    if (one.IsNull())
+      return r;
+    b.Add(out, one);
+  }
+  return out;
+}
+} // namespace
+
 std::unique_ptr<OcShape> project_along(const OcShape& curves, const OcShape& target, P3 dir)
 {
   require_non_null(curves.shape, "curves");
@@ -12807,7 +12902,7 @@ std::unique_ptr<OcShape> project_along(const OcShape& curves, const OcShape& tar
       r = pr.Shape();
     }
     if (!r.IsNull())
-      results.push_back(exact_on_extrusion(r, target.shape));
+      results.push_back(exact_on_extrusion(without_tangent_slivers(r, target.shape), target.shape));
   }
   if (results.empty())
     fail_op("projection failed (curves do not project onto the target)");

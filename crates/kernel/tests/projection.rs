@@ -188,3 +188,19 @@ fn lines_projected_along_onto_a_cylinder() {
     assert!(k::project_curves(&line(0.015, 0.02, 0.01), &cyl, Some(DVec3::Y)).is_err());
     assert!(k::project_curves(&line(-0.02, 0.02, 0.04), &cyl, Some(DVec3::Y)).is_err());
 }
+
+/// A line projected along -y onto a revolved face, from the face's corner where its top circle touches the section's
+/// plane (c2-surf-workshop-britatap's Touch screen split): one curve, from the far end's foot to the corner itself (OCCT's
+/// section stopped 0.12 mm short of it and closed the gap with a short line and an arc of the circle; live: one edge).
+#[test]
+fn a_line_projected_from_a_tangent_corner_is_one_curve_to_it() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/projection/line-to-a-tangent-corner.brep");
+    let s = k::read_brep(&path).unwrap();
+    let parts = s.children();
+    let r = k::project_curves(&parts[0], &parts[1], Some(DVec3::NEG_Y)).unwrap();
+    let edges = r.sub_shapes(k::ShapeType::Edge);
+    assert_eq!(edges.len(), 1);
+    let corner = DVec3::new(91.0714, 0.0, 339.6737) * 1e-3;
+    let ends: Vec<DVec3> = edges[0].vertices().iter().map(|v| v.vertex_point().unwrap()).collect();
+    assert!(ends.iter().any(|p| (*p - corner).length() < 1e-7), "{ends:?}");
+}
