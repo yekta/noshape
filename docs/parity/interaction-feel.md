@@ -395,6 +395,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Parts list rename (live2 parts-list-1118) | row menu › Rename: the whole name selected; Esc cancels, Enter commits, a click away commits; Shift+N on a selected part renames, F2 nothing | the same, but a click away left the box open; now it commits (`on_mouse_down_out`, as the feature rename) | = (fixed) |
 | A part hovered in the graphics (live2 parts-list-1118 c1) | its row gets no hover or related tint (list → graphics only) | the same | = (new) |
 | While a sketch is edited (live2 sketch-entry-1118) | the rows after it grey italic, Parts (2) -> Parts (1), ✗ brings them back; another feature row clicked does nothing | the rows and parts the same; a row click selected the feature; now nothing | = (fixed) |
+| Delete on a used sketch (live2 keys-1118) | no dialog; its user red, the tooltip "Extrude 1 did not regenerate properly: Select face or sketch region to extrude." + "1 missing selection" | the same | = (new) |
 | Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); an empty new folder's caret (live featurelist-gaps 11-16: shown, collapsed, on "New folder (0)"); the insertion line (live featurelist-gaps: rgb(22, 81, 176), 2 px, the row's width, a ~6 px ring filled rgb(202, 216, 237) at its left end, centred on the boundary above the hovered row in its upper half, below in its lower half; ours the same, the ring's fill was white) | – | – |
 
 ## Measure (matrix)
@@ -467,6 +468,9 @@ Alt+right drags, view keys, animations, double middle click, acted out with real
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
+| Pick ranking and reach (live's client code, behaviours "pick and snap tolerances", 11-18) | the square round(5·dpr) px each side of the pointer's pixel; priority first, then (1 + distance)·(1 − coverage) | nearest pixel after priority, the radius truncated (7 at 1.5×); now live's ranking and rounding (render `picks_rank_by_priority_then_distance_and_coverage_as_live`) | = (fixed) |
+| Device-px thresholds (live's unsuffixed constants) | drag start > 2 device px after 50 ms; the right-press menu cancelled past 4 device px of summed move path; hover picks at once below 0.15 device px/ms | CSS px, and the menu used the straight distance; now device px and the summed path (app-core viewport press tests) | = (fixed) |
+| Dragged angle snap (live W@480991) | within 0.4·(1 + level/3) steps: 2° at the 5° level; whole 1° and 0.1° steps finer | ÷ instead of × at the finer levels (free in between); now always rounded there | = (fixed) |
 | Wheel notch in / out | the view scale × 2^(∓1/12) on Linux and Mac, 2^(∓1/4) on Windows (×3 there) | the same | = |
 | Wheel toward the pointer | the point under the pointer stays (≤ 1 px), zooming out too | the same | = |
 | Sideways wheel | ignored | the same | = |

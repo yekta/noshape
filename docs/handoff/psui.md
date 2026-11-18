@@ -130,11 +130,22 @@ docs/DECISIONS.md (read first; it wins over anything here).
   - 34fe22c9 FAILED on vibe2 (02:23): the dropdown row and the part click-away rename passed alone on vibex6 but not
     in the full parallel run. OsSelect bound its keys under a process-wide Once (only the first test app got ↑ / ↓ /
     Esc): now once per App (a global). The part rename commits directly on a press elsewhere (`commit_part_rename`).
+- 1d6f75b5 FAILED on vibe2 02:47 (the click-away rename row read the names before the rename's regeneration on a
+  loaded host): the rename rows wait for the new name. Stacked on it (live's client constants, 11-18): pick ranking
+  (1 + distance)·(1 − coverage) after priority, pick radius rounded, drag / menu / hover thresholds in device px, the
+  menu's summed move path, the dragged angle's 0.4·(1 + level/3) deviation; 24-hour times without a leading zero
+  (live2 prefs-1118).
 - Pointer offset with skasm (02:2x): measured on vibex6 Xvfb (reach.sh, nav trace): X pointer → viewport +0.01 px,
   origin whole (246, 76) at 1919×1079 and 1440×900; the block's edges drawn in the column of their projection. No
   app offset; skasm owns the reach rule (qa's integer-pixel distances vs our continuous < 7.5).
 
 ## Next queue
+- live's number display rows 1–5 (behaviours "number and unit display rules", numfmt-1118): formatValue's
+  Math.round(v·10^p) half up (noshape_units to_fixed / format_number: affects every crate: run units + the users'
+  suites), toExponential at ≥ 1e6 / ≤ 1e-5 / rounding to 0, compound units sorted and spaced ("deg mm", "mm⁴"), the
+  angle handle written at workspace precision (manipulators.rs:883), Mass properties' click toggling max precision.
+- live2 keys-1118 (2): Tab from the graphics → the bottom-right Measure / Analysis tools / Mass buttons → out to the
+  header (Share, logo); Shift+Tab back. Ours: those buttons aren't Tab stops.
 0. The first-pick T2 after the 05:00 cut. (live2 sketch-entry-1118: skasm checked Shift+S, no dimming, Final; mine
    the list rows, done in the worktree.)
 1. qa P2 HOVER-LEAVES-WINDOW: a face hovered just before the pointer leaves the window stays outlined. GPUI clears

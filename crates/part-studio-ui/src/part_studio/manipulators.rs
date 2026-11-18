@@ -1155,13 +1155,13 @@ pub(super) fn linear_step(m_per_px: f64, unit_m: f64) -> f64 {
 }
 
 /// A dragged angle (degrees, ≥ 0) as live sets it (feel/dialogs.json "angularStep"): the step is 5° while 5° of arc at
-/// the pointer is at most 50 px (`radius_px` ≤ 573), else 1° (≤ 2865 px), else 0.1°; it snaps within 0.4 step of a
-/// multiple at 5° (2°), less at the finer levels (÷ (1 + level / 3): 0.3° at 1°; live's note reads "× (1 + level / 3)",
-/// which would always snap a 1° step), and is free in between; at most a whole turn.
+/// the pointer is at most 50 px (`radius_px` ≤ 573), else 1° (≤ 2865 px), else 0.1°; it snaps within 0.4 · (1 + level / 3)
+/// steps of a multiple (live's client code, W@480991): 2° at 5°, free in between; at 1° and 0.1° that is over half a step,
+/// so they always round; at most a whole turn.
 pub(super) fn snap_degrees(deg: f64, radius_px: f64) -> f64 {
     let (step, level) = if radius_px <= 573.0 { (5.0, 0.0) } else if radius_px <= 2865.0 { (1.0, 1.0) } else { (0.1, 2.0) };
     let near = (deg / step).round() * step;
-    (if (deg - near).abs() <= 0.4 * step / (1.0 + level / 3.0) { near } else { deg }).min(360.0)
+    (if (deg - near).abs() <= 0.4 * step * (1.0 + level / 3.0) { near } else { deg }).min(360.0)
 }
 
 /// A point on a triangulated region near its area centroid (the centroid of
@@ -1346,14 +1346,15 @@ mod snap_tests {
         assert!((linear_step(0.01 * inch, inch) / inch - 0.01).abs() < 1e-9);
     }
 
-    /// Live "angularStep": 5° within 2° up to a 573 px radius, then 1° (within 0.3°), then 0.1°; free in between.
+    /// Live "angularStep": 5° within 2° up to a 573 px radius, free in between; then whole 1° and 0.1° steps (the
+    /// deviation 0.4 · (1 + level / 3) is over half a step there).
     #[test]
     fn a_dragged_angle_snaps_by_its_radius_as_live() {
         assert_eq!(snap_degrees(43.5, 300.), 45.0);
         assert_eq!(snap_degrees(42.4154, 300.), 42.4154);
         assert_eq!(snap_degrees(42.25, 1000.), 42.0);
-        assert_eq!(snap_degrees(42.6, 1000.), 42.6);
+        assert_eq!(snap_degrees(42.6, 1000.), 43.0);
         assert!((snap_degrees(42.42, 4000.) - 42.4).abs() < 1e-9);
-        assert_eq!(snap_degrees(42.45, 4000.), 42.45);
+        assert!((snap_degrees(42.46, 4000.) - 42.5).abs() < 1e-9);
     }
 }

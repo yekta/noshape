@@ -154,39 +154,47 @@ const PICK_HALF: i32 = 40;
 /// Half the pick square around the pointer, CSS px (live's MOUSE_PICK_RADIUS_PX).
 const PICK_RADIUS: f64 = 5.0;
 
+/// The pick square's half size in device px: live's `_PX` rule, round(value × DPR) (5 at 1, 8 at 1.5, 10 at 2).
+fn pick_radius_px(scale: f32) -> i32 {
+    (PICK_RADIUS * f64::from(scale)).round() as i32
+}
+
 /// Onshape's pre-highlight with "reduce mouse hover highlight" (on for
 /// accounts, live "nav2 pre-highlight"): `PREHIGHLIGHT_SPEED_THRESHOLD`
-/// (px/ms), `PAUSED_MOUSE_PREHIGHLIGHT_TIMEOUT_MULTIPLIER`, `_MAX_MS`.
+/// (device px/ms), `PAUSED_MOUSE_PREHIGHLIGHT_TIMEOUT_MULTIPLIER`, `_MAX_MS`.
 const PREHIGHLIGHT_SPEED_THRESHOLD: f64 = 0.15;
 const PAUSED_PREHIGHLIGHT_MULTIPLIER: f64 = 5.0;
 const PAUSED_PREHIGHLIGHT_MAX_MS: f64 = 250.0;
 
-/// A left press becomes a drag (a box) once the pointer is this far from it, CSS px (live: 3 px drags, 2 doesn't;
-/// halfway, as a pixel ratio's positions aren't whole), and…
+/// A left press becomes a drag (a box) once the pointer is this far from it, device px (live: 3 px drags, 2 doesn't;
+/// halfway, as a pixel ratio's positions aren't whole; LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE has no `_PX`, so it isn't
+/// scaled by the pixel ratio), and…
 const LEFT_DRAG_PX: f64 = 2.5;
 /// …the press is older than this: moves within it still make a click (live/feel/3d.json "drag_thresholds",
 /// `LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE`, `_TIME_TOLERANCE`).
 const LEFT_DRAG_TIME: Duration = Duration::from_millis(50);
-/// A right press's release opens the context menu if the pointer got less than this far from it, CSS px (live: 4 px
-/// opens it, 5 doesn't), within…
-const RIGHT_MENU_PX: f64 = 4.5;
+/// A right press's release opens the context menu if the pointer moved at most this far in all since it, device px
+/// (live's CONTEXT_MENU_DISTANCE_THRESHOLD over the summed move path, not scaled by the pixel ratio), within…
+const RIGHT_MENU_PX: f64 = 4.0;
 /// …this long (`CONTEXT_MENU_DISTANCE_THRESHOLD`, `_TIME_THRESHOLD`).
 const RIGHT_MENU_HOLD: Duration = Duration::from_millis(1000);
 
-/// Whether a press `travel` px from where it was, `held` after it, is a drag now: a left press from 3 px after 50 ms,
+/// Whether a press `travel` CSS px from where it was (`scale` device px each), `held` after it, is a drag now: a left
+/// press from 3 device px after 50 ms,
 /// a right one (orbit) from its first pixel, others past [`nav::DRAG_THRESHOLD_PX`]. A right press macOS converted from
 /// Ctrl+left never navigates: it keeps its threshold.
-fn press_becomes_drag(button: MouseButton, travel: f64, held: Duration, converted_ctrl_click: bool) -> bool {
+fn press_becomes_drag(button: MouseButton, travel: f64, scale: f64, held: Duration, converted_ctrl_click: bool) -> bool {
     match button {
-        MouseButton::Left => travel > LEFT_DRAG_PX && held > LEFT_DRAG_TIME,
+        MouseButton::Left => travel * scale > LEFT_DRAG_PX && held > LEFT_DRAG_TIME,
         MouseButton::Right if !converted_ctrl_click => travel > 0.0,
         _ => travel > nav::DRAG_THRESHOLD_PX,
     }
 }
 
-/// Whether releasing a right press that got `travel` px from where it was, `held` after it, opens the context menu.
-fn right_release_opens_menu(travel: f64, held: Duration) -> bool {
-    travel < RIGHT_MENU_PX && held < RIGHT_MENU_HOLD
+/// Whether releasing a right press whose pointer moved `path` CSS px in all (`scale` device px each), `held` after it,
+/// opens the context menu.
+fn right_release_opens_menu(path: f64, scale: f64, held: Duration) -> bool {
+    path * scale <= RIGHT_MENU_PX && held < RIGHT_MENU_HOLD
 }
 
 /// InputHandler `onMouseMove`: a move of `dist` px `ms` after the previous
@@ -358,6 +366,8 @@ pub struct Viewport {
     /// The last middle release that wasn't the second of a double click.
     middle_released: Option<Instant>,
     press_travel: f64,
+    /// The press's summed move path (CSS px) and where it last was: the right-click menu's travel (live sums it).
+    press_path: (f64, DVec2),
     last_pos: DVec2,
     /// The hover was cleared by a fast move before a pick said what is under the pointer.
     hover_unconfirmed: bool,
@@ -680,6 +690,7 @@ impl Viewport {
             clock: Rc::new(Instant::now),
             middle_released: None,
             press_travel: 0.0,
+            press_path: (0.0, DVec2::ZERO),
             last_pos: DVec2::ZERO,
             hover_unconfirmed: false,
             selection_count: 0,
@@ -1192,7 +1203,7 @@ impl Viewport {
     fn pick_at(&self, local: DVec2) -> Option<Option<u32>> {
         let pick = self.pick_cache.as_ref()?;
         let (x, y) = self.device_px(local);
-        let r = (PICK_RADIUS * self.scale as f64) as i32;
+        let r = pick_radius_px(self.scale);
         if !pick.covers(x, y, r) {
             return None;
         }
@@ -1216,8 +1227,8 @@ impl Viewport {
             return;
         }
         let (x, y) = self.device_px(self.last_pos);
-        let half = PICK_HALF.max((PICK_RADIUS * self.scale as f64) as i32 + 1);
-        let reach = half - (PICK_RADIUS * self.scale as f64) as i32;
+        let half = PICK_HALF.max(pick_radius_px(self.scale) + 1);
+        let reach = half - pick_radius_px(self.scale);
         let (_, (ax, ay)) = self.hover_query_newest;
         // One in flight while the pointer stays in its rectangle; past it, latest wins: asked again where it is now (the
         // older answer then counts only where it still covers the pointer).
@@ -1252,7 +1263,7 @@ impl Viewport {
         {
             self.pick_cache = Some(b.clone());
         }
-        let r = (PICK_RADIUS * self.scale as f64) as i32;
+        let r = pick_radius_px(self.scale);
         let prio = self.pick_priority.clone();
         let pick_in = |b: &Option<Arc<PickBuffer>>, p: DVec2, s: f64| -> Option<u32> {
             b.as_ref()?.pick((p.x * s) as i32, (p.y * s) as i32, r, |id| prio(id))
@@ -2250,6 +2261,7 @@ impl Viewport {
         self.press_pos = p;
         self.press_at = (self.clock)();
         self.press_travel = 0.0;
+        self.press_path = (0.0, p);
         self.last_pos = p;
         if let Some(id) = self.label_at(p) {
             cx.emit(ViewportEvent::LabelDown { id, button: e.button, click_count: e.click_count, modifiers: e.modifiers });
@@ -2335,8 +2347,9 @@ impl Viewport {
             }
         }
         self.press_travel = self.press_travel.max(p.distance(self.press_pos));
+        self.press_path = (self.press_path.0 + p.distance(self.press_path.1), p);
         if let Drag::Pending(button) = self.drag
-            && press_becomes_drag(button, self.press_travel, self.press_held(), self.ctrl_click_press)
+            && press_becomes_drag(button, self.press_travel, f64::from(self.scale), self.press_held(), self.ctrl_click_press)
         {
             // `onDragStart`: what this button + modifier combination does.
             let resolver = ModeResolver::new(MouseControls::current(), nav::Space::ThreeD);
@@ -2393,7 +2406,7 @@ impl Viewport {
                 self.paused_hover = None;
                 // Measured live in plain selection; a tool's own hover
                 // (sketch snapping) follows the pointer.
-                let delay = if self.tool_captures_left { None } else { prehighlight_delay(delta.length(), ms, self.avg_pick_ms) };
+                let delay = if self.tool_captures_left { None } else { prehighlight_delay(delta.length() * f64::from(self.scale), ms, self.avg_pick_ms) };
                 match delay {
                     None => match self.pick_at(p) {
                         Some(id) => self.set_hover(id, cx),
@@ -2433,7 +2446,7 @@ impl Viewport {
         }
         let p = self.local(e.position);
         self.buttons.set(e.button, false);
-        let menu = e.button == MouseButton::Right && right_release_opens_menu(self.press_travel, self.press_held());
+        let menu = e.button == MouseButton::Right && right_release_opens_menu(self.press_path.0, f64::from(self.scale), self.press_held());
         // Two middle releases within 500 ms zoom to fit (live: its own timer, not the OS's double click).
         if e.button == MouseButton::Middle {
             let now = (self.clock)();
@@ -3189,14 +3202,18 @@ mod press_tests {
     fn presses_drag_and_open_the_menu_as_live() {
         let ms = Duration::from_millis;
         // Left, held 150 ms: 1 and 2 px stay a click, 3 px is a drag (a box); within the first 50 ms nothing drags.
-        assert!(!press_becomes_drag(MouseButton::Left, 2.0, ms(150), false));
-        assert!(press_becomes_drag(MouseButton::Left, 3.0, ms(150), false));
-        assert!(!press_becomes_drag(MouseButton::Left, 6.0, ms(10), false));
+        assert!(!press_becomes_drag(MouseButton::Left, 2.0, 1.0, ms(150), false));
+        assert!(press_becomes_drag(MouseButton::Left, 3.0, 1.0, ms(150), false));
+        assert!(!press_becomes_drag(MouseButton::Left, 6.0, 1.0, ms(10), false));
         // Right: an orbit from the first pixel; the menu still opens on release after up to 4 px within 1 s.
-        assert!(press_becomes_drag(MouseButton::Right, 1.0, ms(1), false));
-        assert!(right_release_opens_menu(0.0, ms(200)) && right_release_opens_menu(4.0, ms(200)));
-        assert!(!right_release_opens_menu(5.0, ms(200)) && !right_release_opens_menu(0.0, ms(1200)));
+        assert!(press_becomes_drag(MouseButton::Right, 1.0, 1.0, ms(1), false));
+        assert!(right_release_opens_menu(0.0, 1.0, ms(200)) && right_release_opens_menu(4.0, 1.0, ms(200)));
+        assert!(!right_release_opens_menu(5.0, 1.0, ms(200)) && !right_release_opens_menu(0.0, 1.0, ms(1200)));
         // macOS's Ctrl+click arrives as a right press that never navigates: it keeps the 3 px threshold.
-        assert!(!press_becomes_drag(MouseButton::Right, 3.0, ms(150), true));
+        assert!(!press_becomes_drag(MouseButton::Right, 3.0, 1.0, ms(150), true));
+        // Device px (live's unsuffixed constants, skasm + psui 11-18 pick code): at a pixel ratio of 2, 1.5 CSS px drags
+        // and 2.5 CSS px is past the menu's travel.
+        assert!(press_becomes_drag(MouseButton::Left, 1.5, 2.0, ms(150), false));
+        assert!(!right_release_opens_menu(2.5, 2.0, ms(200)));
     }
 }

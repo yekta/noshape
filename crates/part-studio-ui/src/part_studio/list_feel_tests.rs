@@ -536,6 +536,7 @@ fn rows() -> Vec<Row> {
             let esc = (cx.update(|cx| l.view.read(cx).ui.part_renaming.is_some()), parts(cx));
             part_rename(l, cx);
             l.keys(cx, "F o o enter");
+            wait_until(cx, l.window, |cx| l.view.read(cx).display.bodies.iter().any(|b| b.name == "Foo"));
             let entered = (cx.update(|cx| l.view.read(cx).ui.part_renaming.is_some()), parts(cx));
             let three = |b: &str| names(&["Part 1", b, "Part 3"]);
             expect((input, esc, entered), (Some(("Part 2".to_string(), 6)), (false, three("Part 2")), (false, three("Foo"))), "(input, after x + Esc, after Foo + Enter)")
@@ -547,6 +548,8 @@ fn rows() -> Vec<Row> {
             l.keys(cx, "B a r");
             let at = l.canvas(cx);
             l.press(cx, at, MouseButton::Left, NONE, 1);
+            // The rename regenerates the studio before the list shows it (a loaded host: not within the press).
+            wait_until(cx, l.window, |cx| l.view.read(cx).display.bodies.iter().any(|b| b.name == "Bar"));
             let parts = cx.update(|cx| l.view.read(cx).display.bodies.iter().map(|b| b.name.clone()).collect::<Vec<_>>());
             expect((cx.update(|cx| l.view.read(cx).ui.part_renaming.is_some()), parts), (false, names(&["Part 1", "Bar", "Part 3"])), "(still renaming, names)")
         } },
@@ -597,6 +600,15 @@ fn rows() -> Vec<Row> {
             l.click(cx, "feature:Extrude 1", NONE);
             let after = (l.editing(cx), cx.update(|cx| l.view.read(cx).sketch.is_some()), l.selected(cx));
             expect(after, (Some("Sketch 2".to_string()), true, names(&[])), "(editing, sketch open, selected) after the click")
+        } },
+        Row { id: "keys / Delete on a used sketch: no dialog, its user fails", live: "Sketch 1 selected, Delete: gone at once, no dialog; Extrude 1 red, its tooltip 'Extrude 1 did not regenerate properly: Select face or sketch region to extrude.' then '1 missing selection' (live2 keys-1118)", gap: false, check: |l, cx| {
+            l.click(cx, "feature:Sketch 1", NONE);
+            l.keys(cx, "delete");
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).studio(cx).is_some_and(|s| s.features.iter().all(|f| f.name != "Sketch 1")));
+            let dialog = (cx.update(|cx| l.view.read(cx).edit.is_some()), cx.update(|cx| l.view.read(cx).context_menu.is_some()));
+            l.hover(cx, "feature:Extrude 1", 450);
+            let tip = crate::ui_script::shown_tooltip();
+            expect((dialog, tip), ((false, false), Some("Extrude 1 did not regenerate properly: Select face or sketch region to extrude.\n1 missing selection".to_string())), "((a dialog, a menu), Extrude 1's tooltip)")
         } },
         Row { id: "rollback bar / its whole row grabs", live: "a drag from the row's top edge (outside the 7 px bar) onto Extrude 1's bottom half rolls back to after Extrude 1", gap: false, check: |l, cx| {
             let h = f32::from(l.bounds(cx, "feature:Extrude 1").ok_or("no row")?.size.height);

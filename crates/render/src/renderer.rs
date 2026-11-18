@@ -346,28 +346,45 @@ impl PickBuffer {
         x0 >= self.x0 as i32 && y0 >= self.y0 as i32 && x1 < (self.x0 + self.width) as i32 && y1 < (self.y0 + self.height) as i32
     }
 
-    /// Pick id at pixel: in the square of `radius` around it (live's pick rectangle), the id of the highest priority
-    /// (the caller's function), the nearest of those.
+    /// Pick id at pixel: in the square of `radius` around it (live's pick rectangle, 2r + 1 a side), the id of the
+    /// highest priority (the caller's function); among those the lowest (1 + distance)·(1 − coverage) (live's
+    /// gatherPicksFromPickPass: coverage its share of the square's pixels, distance its nearest pixel's from the centre,
+    /// 0 there and 1 at a corner); then the lower id.
     pub fn pick(&self, x: i32, y: i32, radius: i32, priority: impl Fn(u32) -> i32) -> Option<u32> {
-        let mut best: Option<(i32, i32, u32)> = None; // (priority, -dist2, id)
+        // (id, its priority, pixels hit, nearest squared distance); a few ids under the pointer.
+        let mut hits: Vec<(u32, i32, u32, i32)> = Vec::new();
         for dy in -radius..=radius {
             for dx in -radius..=radius {
-                let d2 = dx * dx + dy * dy;
                 let Some(id) = self.id_at(x + dx, y + dy) else { continue };
                 if id == 0 {
                     continue;
                 }
-                // `i32::MIN`: never picked (filtered out by the caller).
-                let key = (priority(id), -d2, id);
-                if key.0 == i32::MIN {
-                    continue;
-                }
-                if best.is_none_or(|b| (key.0, key.1) > (b.0, b.1)) {
-                    best = Some(key);
+                let d2 = dx * dx + dy * dy;
+                match hits.iter_mut().find(|h| h.0 == id) {
+                    Some(h) => {
+                        h.2 += 1;
+                        h.3 = h.3.min(d2);
+                    }
+                    None => {
+                        // `i32::MIN`: never picked (filtered out by the caller).
+                        let p = priority(id);
+                        if p != i32::MIN {
+                            hits.push((id, p, 1, d2));
+                        }
+                    }
                 }
             }
         }
-        best.map(|b| b.2)
+        let side = f64::from(2 * radius + 1);
+        let half_diagonal = (2.0 * f64::from(2 * radius).powi(2)).sqrt() / 2.0;
+        let score = |h: &(u32, i32, u32, i32)| {
+            let coverage = f64::from(h.2) / (side * side);
+            let distance = if half_diagonal > 0.0 { f64::from(h.3).sqrt() / half_diagonal } else { 0.0 };
+            (1.0 + distance) * (1.0 - coverage)
+        };
+        hits.iter()
+            .max_by(|a, b| a.1.cmp(&b.1).then_with(|| score(b).total_cmp(&score(a))).then_with(|| b.0.cmp(&a.0)))
+            .map(|h| h.0)
     }
 
     /// Distinct non-zero ids inside a frame-pixel rectangle `[x0, x1) x [y0, y1)`
@@ -4371,6 +4388,35 @@ fn room_of(bounds: Option<(glam::Vec3, glam::Vec3)>) -> [f32; 4] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live's ranking (webgl gatherPicksFromPickPass): priority first, then (1 + distance)·(1 − coverage). An 11 × 11
+    /// square at DPR 1: a face filling the left 9 columns from 1 px away beats a 2 × 2 one under the pointer; a
+    /// higher priority wins whatever its share.
+    #[test]
+    fn picks_rank_by_priority_then_distance_and_coverage_as_live() {
+        let (w, h) = (11u32, 11u32);
+        let mut ids = vec![0u32; (w * h) as usize];
+        for y in 0..h {
+            for x in 0..w {
+                let i = (y * w + x) as usize;
+                if x <= 3 {
+                    ids[i] = 1;
+                }
+                if (5..=6).contains(&x) && (5..=6).contains(&y) {
+                    ids[i] = 2;
+                }
+                if x == 10 && y == 0 {
+                    ids[i] = 3;
+                }
+            }
+        }
+        // Face 1: columns 0-3 (44 px, nearest 2 px from the centre (5, 5)); face 2: 4 px under the pointer.
+        let buf = PickBuffer { x0: 0, y0: 0, width: w, height: h, frame_width: w, frame_height: h, ids, samples: Vec::new(), samples_with_planes: Vec::new(), view_proj: None };
+        // 1: (1 + 2/7.07)(1 − 44/121) = 0.817; 2: (1 + 0)(1 − 4/121) = 0.967.
+        assert_eq!(buf.pick(5, 5, 5, |_| 0), Some(1), "the larger, a little farther, wins at the same priority");
+        assert_eq!(buf.pick(5, 5, 5, |id| if id == 3 { 1 } else { 0 }), Some(3), "a higher priority in a corner wins");
+        assert_eq!(buf.pick(5, 5, 5, |id| if id == 1 { i32::MIN } else { 0 }), Some(2), "a filtered id is never picked");
+    }
 
     /// The shaders' `mesh_pos` / `oct_decode`, on the CPU.
     fn unpack_pos([a, b]: [u32; 2]) -> Vec3 {

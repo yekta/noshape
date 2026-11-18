@@ -204,7 +204,7 @@ fn the_dimension_tool_takes_the_hovered_line(cx: &mut TestAppContext) {
 }
 
 /// Live/feel/3d.json "drag_thresholds" through the real pointer: a right drag orbits from its first pixel and its
-/// release still opens the context menu within 4 px (not from 5); a left press moved 6 px within its first 50 ms is
+/// release still opens the context menu within 4 device px (not from 5); a left press moved 6 px within its first 50 ms is
 /// a click, moved 3 px later a box. The press rules read a clock the test sets (T1: no wall-clock time).
 #[gpui::test]
 fn presses_orbit_box_and_open_the_menu_as_live(cx: &mut TestAppContext) {
@@ -237,14 +237,15 @@ fn presses_orbit_box_and_open_the_menu_as_live(cx: &mut TestAppContext) {
             tick(50);
             vcx.simulate_mouse_up(to, gpui_kit::MouseButton::Right, Modifiers::default());
         };
+        // Device px (live's CONTEXT_MENU_DISTANCE_THRESHOLD has no `_PX`: 2 CSS px at a ratio of 2).
         for (dx, menu) in [(3.0, true), (4.0, true), (6.0, false)] {
             cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.close_context_menu(cx))).unwrap();
             pointer.frames(cx, &view);
             let before = cx.update(|cx| pointer.vp.read(cx).camera);
-            right(&mut vcx, dx);
+            right(&mut vcx, dx / f64::from(scale));
             pointer.settle(cx, &view);
-            assert_ne!(cx.update(|cx| pointer.vp.read(cx).camera), before, "scale {scale}: a {dx} px right drag orbits");
-            assert_eq!(cx.update(|cx| view.read(cx).context_menu.is_some()), menu, "scale {scale}: the menu after a {dx} px right drag");
+            assert_ne!(cx.update(|cx| pointer.vp.read(cx).camera), before, "scale {scale}: a {dx} device px right drag orbits");
+            assert_eq!(cx.update(|cx| view.read(cx).context_menu.is_some()), menu, "scale {scale}: the menu after a {dx} device px right drag");
         }
         cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.close_context_menu(cx))).unwrap();
         pointer.frames(cx, &view);
