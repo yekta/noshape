@@ -927,6 +927,8 @@ enum Mode {
 #[derive(Clone, PartialEq)]
 struct Snapshot {
     items: Vec<ReleaseItem>,
+    /// Which items are associated drawings under their part.
+    children: Vec<bool>,
     name: String,
     notes: String,
 }
@@ -941,6 +943,10 @@ struct Row {
     initial_pn: String,
     /// Unchanged (or metadata only) since its latest revision: can revert.
     since: Option<SinceRelease>,
+    /// The release conditions that hold for it (checked when it is listed and on Refresh).
+    held: Vec<Issue>,
+    /// An associated drawing, listed under the part it shows (live release-gaps-1118).
+    child: bool,
 }
 
 pub struct ReleaseDialog {
@@ -1002,9 +1008,10 @@ pub struct ReleaseDialog {
     /// buttons).
     seq_parts: bool,
     seq_names: bool,
-    /// Release conditions that hold for each row (computed on open and on
-    /// Refresh: they regenerate Part Studios).
-    conditions: Vec<Vec<Issue>>,
+    /// Parents whose associated drawings are folded away (by item key).
+    folded: std::collections::HashSet<String>,
+    /// Include associated drawings was used: the button stays pressed (live release-gaps-1118).
+    drawings_included: bool,
     _subs: Vec<Subscription>,
 }
 
@@ -1017,7 +1024,7 @@ impl ReleaseDialog {
             let log = release_log(d);
             items.iter().map(|it| if mode == Mode::Release { since_release(d, &log, it) } else { None }).collect()
         };
-        let rows: Vec<Row> = items
+        let mut rows: Vec<Row> = items
             .into_iter()
             .zip(sinces)
             .map(|(item, since)| {
@@ -1038,7 +1045,7 @@ impl ReleaseDialog {
                         }
                     }));
                 }
-                Row { initial_pn: item.part_number.clone(), item, part_number, revision, revision_touched: false, since }
+                Row { initial_pn: item.part_number.clone(), item, part_number, revision, revision_touched: false, since, held: Vec::new(), child: false }
             })
             .collect();
         let name = cx.new(|cx| InputState::new(window, cx).default_value(name));
@@ -1055,7 +1062,12 @@ impl ReleaseDialog {
             }
         }));
         let numbering = numbering_schemes();
-        let conditions = if mode == Mode::Release { crate::release_conditions::condition_issues(&doc.read(cx).session, &rows.iter().map(|r| r.item.clone()).collect::<Vec<_>>()) } else { Vec::new() };
+        if mode == Mode::Release {
+            let held = crate::release_conditions::condition_issues(&doc.read(cx).session, &rows.iter().map(|r| r.item.clone()).collect::<Vec<_>>());
+            for (r, h) in rows.iter_mut().zip(held) {
+                r.held = h;
+            }
+        }
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search"));
         subs.push(cx.subscribe_in(&search, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::Change) {
@@ -1063,7 +1075,7 @@ impl ReleaseDialog {
             }
         }));
         let dependents = dependents_of(doc.read(cx), rows.iter().map(|r| &r.item));
-        Self { doc, mode, applied: false, rows, dependents, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, comments: Vec::new(), comments_view: false, props_view: None, comment_input, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, conditions, _subs: subs }
+        Self { doc, mode, applied: false, rows, dependents, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, approvers: Vec::new(), observers: Vec::new(), people_menu: None, candidate: None, comments: Vec::new(), comments_view: false, props_view: None, comment_input, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, folded: Default::default(), drawings_included: false, _subs: subs }
     }
 
     /// A new part number suggests its next revision (unless one was typed).
@@ -1127,9 +1139,19 @@ impl ReleaseDialog {
     /// shows exactly one object.
     fn drawing_partner(&self, i: usize, cx: &App) -> Option<usize> {
         let r = self.rows.get(i).filter(|r| r.item.kind == ItemKind::Drawing)?;
-        let shown: Vec<ReleaseItem> = tab_items(self.doc.read(cx), r.item.tab).into_iter().filter(|it| it.kind != ItemKind::Drawing).collect();
+        self.shown_row(&r.item, cx)
+    }
+
+    /// The listed part or assembly row a drawing shows, when it shows exactly one object (its configuration's
+    /// row first).
+    fn shown_row(&self, drawing: &ReleaseItem, cx: &App) -> Option<usize> {
+        if drawing.kind != ItemKind::Drawing {
+            return None;
+        }
+        let shown: Vec<ReleaseItem> = tab_items(self.doc.read(cx), drawing.tab).into_iter().filter(|it| it.kind != ItemKind::Drawing).collect();
         let [one] = &shown[..] else { return None };
-        self.rows.iter().position(|o| o.item.kind != ItemKind::Drawing && o.item.tab == one.tab && o.item.part == one.part)
+        let listed = |o: &Row| !o.child && o.item.kind != ItemKind::Drawing && o.item.tab == one.tab && o.item.part == one.part;
+        self.rows.iter().position(|o| listed(o) && o.item.config == one.config).or_else(|| self.rows.iter().position(listed))
     }
 
     /// The audit trail of the candidate's workflow object (Help: "View audit
@@ -1173,14 +1195,27 @@ impl ReleaseDialog {
         }
     }
 
-    /// Add items (Add Items to Release, associated drawings), skipping
-    /// ones already listed.
+    /// Add items (Add Items to Release, a snapshot's rows) at the end, skipping ones already listed.
     fn add_items(&mut self, items: Vec<ReleaseItem>, window: &mut Window, cx: &mut Context<Self>) {
+        self.add_rows(items.into_iter().map(|it| (it, false)).collect(), false, window, cx);
+    }
+
+    /// Include associated drawings: each drawing goes under the listed part it shows, after that part's other
+    /// drawings (live release-gaps-1118: a child row, the part gets an expander); one showing no listed part goes last.
+    fn include_drawings(&mut self, drawings: Vec<ReleaseItem>, window: &mut Window, cx: &mut Context<Self>) {
+        self.drawings_included = true;
+        self.add_rows(drawings.into_iter().map(|it| (it, true)).collect(), true, window, cx);
+    }
+
+    /// Add rows, skipping items already listed; `under_parts`: a child row goes under the part it shows.
+    fn add_rows(&mut self, items: Vec<(ReleaseItem, bool)>, under_parts: bool, window: &mut Window, cx: &mut Context<Self>) {
         let mut added = Vec::new();
-        for item in items {
+        for (item, child) in items {
             if self.rows.iter().any(|r| r.item.same_object(&item)) {
                 continue;
             }
+            let parent = if under_parts && child { self.shown_row(&item, cx) } else { None };
+            let child = child && (parent.is_some() || !under_parts);
             added.push(item.clone());
             let part_number = cx.new(|cx| InputState::new(window, cx).default_value(item.part_number.clone()));
             let revision = cx.new(|cx| InputState::new(window, cx).default_value(item.revision.clone()));
@@ -1201,7 +1236,21 @@ impl ReleaseDialog {
                 let d = self.doc.read(cx);
                 since_release(d, &release_log(d), &item)
             };
-            self.rows.push(Row { initial_pn: item.part_number.clone(), item, part_number, revision, revision_touched: false, since });
+            let held = match self.mode {
+                Mode::Release => crate::release_conditions::condition_issues(&self.doc.read(cx).session, std::slice::from_ref(&item)).pop().unwrap_or_default(),
+                _ => Vec::new(),
+            };
+            let row = Row { initial_pn: item.part_number.clone(), item, part_number, revision, revision_touched: false, since, held, child };
+            match parent {
+                Some(p) => {
+                    let mut at = p + 1;
+                    while self.rows.get(at).is_some_and(|r| r.child) {
+                        at += 1;
+                    }
+                    self.rows.insert(at, row);
+                }
+                None => self.rows.push(row),
+            }
         }
         self.dependents = dependents_of(self.doc.read(cx), self.rows.iter().map(|r| &r.item));
         if self.thumbs_started {
@@ -1246,7 +1295,7 @@ impl ReleaseDialog {
     }
 
     fn snapshot(&self, cx: &App) -> Snapshot {
-        Snapshot { items: self.items(cx), name: self.name.read(cx).value().to_string(), notes: self.notes.read(cx).value().to_string() }
+        Snapshot { items: self.items(cx), children: self.rows.iter().map(|r| r.child).collect(), name: self.name.read(cx).value().to_string(), notes: self.notes.read(cx).value().to_string() }
     }
 
     /// Note a change of the form (one undo step).
@@ -1290,7 +1339,7 @@ impl ReleaseDialog {
         self.typing = None;
         self.restoring = true;
         self.rows.clear();
-        self.add_items(snap.items, window, cx);
+        self.add_rows(snap.items.into_iter().zip(snap.children).collect(), false, window, cx);
         self.name.update(cx, |s, cx| s.set_value(snap.name.clone(), window, cx));
         self.notes.update(cx, |s, cx| s.set_value(snap.notes.clone(), window, cx));
         self.restoring = false;
@@ -1307,7 +1356,10 @@ impl ReleaseDialog {
             row.item = it;
         }
         if self.mode == Mode::Release {
-            self.conditions = crate::release_conditions::condition_issues(&self.doc.read(cx).session, &self.items(cx));
+            let held = crate::release_conditions::condition_issues(&self.doc.read(cx).session, &self.items(cx));
+            for (r, h) in self.rows.iter_mut().zip(held) {
+                r.held = h;
+            }
         }
         // The pictures show the refreshed items.
         self.thumbs.clear();
@@ -1333,8 +1385,8 @@ impl ReleaseDialog {
         match self.mode {
             Mode::Release => {
                 let mut issues = release_log(self.doc.read(cx)).validate(&self.items(cx));
-                for (row, held) in issues.iter_mut().zip(&self.conditions) {
-                    row.extend(held.iter().cloned());
+                for (row, r) in issues.iter_mut().zip(&self.rows) {
+                    row.extend(r.held.iter().cloned());
                 }
                 issues
             }
@@ -1767,7 +1819,7 @@ impl Render for ReleaseDialog {
                         })))
                     })
                     .when(self.mode == Mode::Release, |d| {
-                        d.child(small("rel-assoc-drawings", "release-drawings", "Include associated drawings", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        d.child(small("rel-assoc-drawings", "release-drawings", "Include associated drawings", cx).when(self.drawings_included, |d| d.bg(gpui_kit::rgb(0xeaeaea))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let (extra, left_out) = associated_drawings(this.doc.read(cx), &this.items(cx));
                             // The client's bubbles (Onshape's strings).
                             let bubble = if !left_out.is_empty() {
@@ -1778,7 +1830,7 @@ impl Render for ReleaseDialog {
                             if let Some(msg) = bubble {
                                 this.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(msg)));
                             }
-                            this.add_items(extra, window, cx);
+                            this.include_drawings(extra, window, cx);
                         })))
                         .child(small("rel-add-items", "plus", "Add to Release…", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let me = cx.entity();
@@ -1941,8 +1993,17 @@ impl Render for ReleaseDialog {
         let mut rows_el: Vec<AnyElement> = Vec::new();
         // Company settings › Release management › "Require a new revision when an item's properties have changed".
         let policy_new_revision = release_settings().require_new_revision;
+        let mut parent_key = String::new();
         for (i, row) in self.rows.iter().enumerate() {
             let row_issues = issues.get(i).cloned().unwrap_or_default();
+            if !row.child {
+                parent_key = crate::release_thumbs::key(&row.item);
+            }
+            let parent_of = self.rows.get(i + 1).is_some_and(|r| r.child) && !row.child;
+            let folded = self.folded.contains(&parent_key);
+            if row.child && folded {
+                continue;
+            }
             if self.problems_only && !row_issues.iter().any(Issue::blocks) {
                 continue;
             }
@@ -2004,11 +2065,36 @@ impl Render for ReleaseDialog {
                         .w(px(col_item()))
                         .flex_none()
                         .h_full()
-                        .pl(px(20.))
+                        .pl(px(if row.child { 40. } else { 20. }))
                         .pr(px(10.))
                         .gap(px(8.))
-                        // The row's item is new in this candidate (yellow mark, Help image).
-                        .when(editing && !reverted, |d| d.child(crate::ui::glyph("ui-corner-mark", 9., gpui_kit::rgb(0xf5b400)).absolute().top_0().left_0()))
+                        // The row's item is new in this candidate (yellow mark, Help image); an associated drawing's
+                        // mark is blue, indented under its part (live release-gaps-1118).
+                        .when(editing && !reverted && !row.child, |d| d.child(crate::ui::glyph("ui-corner-mark", 9., gpui_kit::rgb(0xf5b400)).absolute().top_0().left_0()))
+                        .when(row.child, |d| d.child(crate::ui::glyph("ui-corner-mark", 9., gpui_kit::rgb(0x90cef1)).absolute().top(px(4.)).left(px(20.))))
+                        .when(parent_of, |d| {
+                            let key = parent_key.clone();
+                            d.child(
+                                div()
+                                    .id(SharedString::from(format!("rel-fold-{i}")))
+                                    .absolute()
+                                    .left(px(4.))
+                                    .top(px(15.))
+                                    .w(px(16.))
+                                    .h(px(16.))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .cursor_pointer()
+                                    .child(crate::ui::glyph(if folded { "ui-chevron-right" } else { "ui-chevron-down" }, 11., pal.text))
+                                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                        if !this.folded.remove(&key) {
+                                            this.folded.insert(key.clone());
+                                        }
+                                        cx.notify();
+                                    })),
+                            )
+                        })
                         .child(div().w(px(54.)).h(px(40.)).flex_none().children(picture.map(|im| img(ImageSource::Render(im)).w(px(54.)).h(px(40.)).object_fit(ObjectFit::Contain))))
                         .child(
                             v_flex()
@@ -2041,7 +2127,12 @@ impl Render for ReleaseDialog {
                                     .tooltip(crate::ui::tooltip("Remove from release"))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         if i < this.rows.len() {
+                                            let parent = !this.rows[i].child;
                                             this.rows.remove(i);
+                                            // A removed part's drawings stay, listed on their own.
+                                            for r in this.rows[i..].iter_mut().take_while(|r| parent && r.child) {
+                                                r.child = false;
+                                            }
                                         }
                                         this.record(cx);
                                     })),

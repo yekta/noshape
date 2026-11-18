@@ -33,9 +33,14 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   (the 8 drw-revision-* set config_files); Release all configurations… (live release-gaps-1118: part menu after
   Release…, one row per configuration named as the part, tooltip "Part 1 / Size / Small"; op release_create
   `all_configurations`, e2e). run19–22: drw-detail-* all match, drw-section-exclude-from-cut 22/23 before the Esc fix.
-- Next: release dialog's associated drawings as live (child row under its part with an expander, the button stays
-  pressed, a funnel filter appears; the red "Drawing has a pending update" box under the drawing row, which blocks
-  Submit / Release: ours appends drawings at the end); a full drawing run after the land.
+- e24a63d1 (2eb64993 + 7f8eab37) checking on the queue since 15:57.
+- Local (next land): release dialog associated drawings as live (release-gaps-1118): Include associated drawings puts
+  each drawing as a child row under the part it shows (its configuration's row first; blue corner mark, indented; the
+  part gets a ⌄ expander that folds it), the button stays pressed; release conditions now live on each row (a drawing
+  added after the dialog opened had no "Drawing has a pending update", and a removed row shifted the others' issues);
+  undo / redo keep child rows; removing the part lists its drawings on their own. Test
+  an_associated_drawing_goes_under_its_part_with_its_pending_update. The funnel already shows with two item kinds.
+- Next: a full drawing run after the land; drw-section-exclude-from-cut s22 rerun (run23).
 - Full run drw1118d (vibex6, ~/agents/studios-keep/drw1118d): 333/341. Not targets: inspection-table-iso-scrolled s2,
   revision-table-delete s8, replicate-region-place s21 (server toast); drw-canvas-zoom-to-sheet / drw-ref-pin-reference
   have no usable recording.

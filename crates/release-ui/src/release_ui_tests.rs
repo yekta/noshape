@@ -34,6 +34,11 @@ fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
 
 /// A document with a Part Studio of one part, and the Release candidate dialog of its items in `mode`.
 fn dialog(cx: &mut TestAppContext, name: &str, mode: Mode, release_name: &str) -> (AnyWindowHandle, Entity<ReleaseDialog>, TabId) {
+    dialog_with(cx, name, mode, release_name, |_, _| {})
+}
+
+/// [`dialog`], with `more` run on the document (through the agent API) before it opens.
+fn dialog_with(cx: &mut TestAppContext, name: &str, mode: Mode, release_name: &str, more: impl FnOnce(&mut noshape_ops::Ctx, &dyn Fn(&mut noshape_ops::Ctx, &str, serde_json::Value) -> serde_json::Value)) -> (AnyWindowHandle, Entity<ReleaseDialog>, TabId) {
     cx.update(gpui_kit::init);
     register_hooks();
     let dir = std::env::temp_dir().join(format!("noshape-release-ui-{name}-{}", std::process::id()));
@@ -50,6 +55,7 @@ fn dialog(cx: &mut TestAppContext, name: &str, mode: Mode, release_name: &str) -
         let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
         let regions: Vec<serde_json::Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
         call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+        more(&mut ctx, &call);
     }
     let session = crate::session::Session::open(&path).unwrap();
     let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).unwrap().id;
@@ -206,4 +212,53 @@ fn the_release_dialog_ignores_enter_and_esc_and_notes_take_a_new_line(cx: &mut T
         assert_eq!(rel.read(cx).name.read(cx).value().to_string(), "r1");
         assert_eq!(rel.read(cx).notes.read(cx).value().to_string(), "\nb", "Enter in the notes is a new line");
     });
+}
+
+/// Live release-gaps-1118: Include associated drawings lists the drawing as a child row under the part it shows, the
+/// button stays pressed, and a drawing whose part changed since its views were made has "Drawing has a pending update",
+/// which holds the release back; undo / redo keep the child row; a folded part hides it.
+#[gpui::test]
+fn an_associated_drawing_goes_under_its_part_with_its_pending_update(cx: &mut TestAppContext) {
+    let (window, view, _) = dialog_with(cx, "assoc", Mode::Release, "R1", |ctx, call| {
+        call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+        call(ctx, "feature_edit", json!({ "feature": "Extrude 1", "params": { "depth": "15 mm" } }));
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let (extra, _) = super::associated_drawings(v.doc.read(cx), &v.items(cx));
+            v.include_drawings(extra, w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let pending = noshape_model::release::Issue::Prevented("Drawing has a pending update".into());
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.drawings_included);
+        let kinds: Vec<_> = v.rows.iter().map(|r| (r.item.kind, r.child)).collect();
+        assert_eq!(kinds, vec![(noshape_model::release::ItemKind::Part, false), (noshape_model::release::ItemKind::Drawing, true)]);
+        let issues = v.issues(cx);
+        assert!(issues[1].contains(&pending), "{issues:?}");
+        assert!(!issues[0].contains(&pending), "{issues:?}");
+    });
+    // Refresh keeps each row's conditions on that row.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.refresh(w, cx))).unwrap();
+    cx.update(|cx| assert!(view.read(cx).issues(cx)[1].contains(&pending)));
+    // Undo takes the drawing out, Redo lists it under the part again.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.undo(false, w, cx))).unwrap();
+    cx.update(|cx| assert_eq!(view.read(cx).rows.len(), 1));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.undo(true, w, cx))).unwrap();
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.rows[1].child);
+        assert!(v.issues(cx)[1].contains(&pending));
+    });
+    // The part's expander folds the drawing away.
+    cx.update(|cx| {
+        view.update(cx, |v, _| {
+            let key = crate::release_thumbs::key(&v.rows[0].item);
+            v.folded.insert(key);
+        })
+    });
+    draw(cx, window);
 }
