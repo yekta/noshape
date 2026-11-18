@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 15:10 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 17:50 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -13,20 +13,30 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - efd27713 sketch patterns linked first (rocker-enclosure-body 28/28); EDGE -> sketch-curve fallback only for a
   PIERCE's edge (parting-line back to 10/17; bool told).
 
-## In the worktree (15:10; land after suite-1515 on vibe2, compared with suite-0545)
-- Committed (queue FAILED 14:15 on ops prefs: a Form warned; fixed): search highlight in the sketch toolbar; hover reach
-  outside sketch mode (point 9 px beats lines, line 6.5 px); SM flip arrow (`CtxState::sm_built` part -> definition:
-  CREATED_BY of bodies inside the feature skips those parts and adds only their definitions; the first version let in
-  every hidden body made by the feature, so Form's registered tools looked unused); Title text (carry_text_box +
-  translator text ends). SM suite docs 12/13 as before, cf-sheet-metal-model-plus 11/14 -> 14/14 (first version).
-- Uncommitted: translator keeps a query's text when it names one of our sketch entities (live gave no ids; its
-  evaluated id went to a region: surf-intro-simple Revolve 1, 12 -> 14/15); MIRROR of two lines = the lines mirrored,
-  ends free (asm d8d597e0: asm-pinslot washer, 4 occurrences): Hints::lines_only, EqKind MirrorOnLine / MirrorDir, ops
-  constraint "mirror", translator MIRROR -> "mirror"; tests (sketch constraints_more, e2e, AGENT_API regenerated).
-  Tell asm when landed. live2 asked (REQUESTS 14:40) whether the app's Mirror / Symmetric tools tie ends.
-- Handed: surf-intro-simple Loft 1 (wire profiles as sketch regions; 1 face vs live 4) to core; surf-intro-examples
-  Fill 1 overshoots (boundary curves are live's) is Fill's (blend / core), not yet told.
-- sm-form-1118 row = (Form Part Studio remembered). ≠ Location(s) has no pencil button: REQUESTS 14:01.
+## Landed 17:09 (270e489b)
+Search highlight in the sketch toolbar; hover reach outside sketch mode; SM flip arrow (`CtxState::sm_built`); Title
+text (carry_text_box); MIRROR of two lines = lines mirrored, ends free (ops "mirror"); query text kept for a named
+sketch entity. Suite 1515 (vibe2): 90/126, 1322/1585 (vibe2's cf-sheet-metal-overcut-dogbone 2/10 is its model copy:
+the custom feature doesn't load there; 10/10 on vibex8).
+
+## Queued 17:50
+- Alignment: a point wakes on the first snap onto it (Endpoint / Center, external vertex), no `ACQUIRE_REST` (live
+  feel retaken 11-18); a drag wakes the points it snaps onto and then aligns with them (Drop::Level). ≠ left: a
+  midpoint's / quadrant's snap wakes no alignment source (ours aligns with points only).
+- Symmetric tool on two lines: one lines-only mirror, the second line moved onto the first's mirror image (length and
+  place kept) (live2 mirror-sym-1118). The Mirror tool keeps its ends tied (live: line + end-pair MIRRORs).
+
+## Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
+regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).
+
+## Next
+- core: asm-welding-config studio 9c7704 Sketch 9 region 109.56 vs live 105.68 mm² (prepared on vibe2:
+  ~/tmp/skasm/cfgm/wc-9c7704; run cfg.sh with its models dir).
+- live2 sm-1118: convert-to-rip right after a Radius edit added no second Modify joint (live folds it into the last
+  one); check ours. live sktools-1118: a Trim pass ~1 px by a chain's corner isn't a crossing; check ours.
+- Form Location(s): live's second button is Flip direction (OPPOSITE_DIRECTION shown inline on Location(s)), not a
+  sketch: check where ours shows Flip direction.
+- Handed: surf-intro-simple Loft 1 (core), surf-intro-examples Fill 1 overshoot (lead to route).
 
 ## Waiting on live (REQUESTS)
 - Answered 11-18 13:xx: wave-washer sketches.json (Sketch 4 / 3 solved inward) and surf-intro Derived 1 sources

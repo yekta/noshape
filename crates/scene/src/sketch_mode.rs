@@ -413,8 +413,6 @@ const INFERENCE_PX: f64 = 7.5;
 /// go at 9–10 px straight out and 11–12 diagonally, curves, edges and the horizontal / vertical bands at 8–10).
 const HOLD_PX: f64 = 9.5;
 const HOLD_DIAGONAL_PX: f64 = 11.5;
-/// How long the pointer rests on a point before it counts for alignment while drawing (live2 "feel (sketch)" (1)).
-const ACQUIRE_REST: std::time::Duration = std::time::Duration::from_millis(100);
 /// How long the pointer rests on a model edge before it wakes (live sketch-gaps 1c: 60 ms did, 30 didn't).
 const EDGE_WAKE_REST: std::time::Duration = std::time::Duration::from_millis(60);
 /// Stands for the woken model edge in an inference's constraints until the click uses the edge
@@ -752,8 +750,6 @@ pub struct SketchEditor {
     pub otf_typing: bool,
     /// Curves the cursor passed over while drawing, and points it rested on (wake-up inferences).
     pub woken: Vec<EntityId>,
-    /// The point the pointer is near while drawing, and since when: it wakes once rested on for [`ACQUIRE_REST`].
-    acquiring: Option<(EntityId, std::time::Instant)>,
     /// The straight model edge the pointer is on while drawing, and since when ([`EDGE_WAKE_REST`]); the edge snapped
     /// since the last move.
     edge_acquiring: Option<(noshape_model::reference::Reference, std::time::Instant)>,
@@ -761,11 +757,8 @@ pub struct SketchEditor {
     /// The model edge woken last and its ends in the sketch (live sketch-gaps 1c: a line from a start then offers
     /// PERPENDICULAR to it; live2 wake-parallel: its ends give horizontal / vertical alignment, never a parallel).
     pub woken_edge: Option<(noshape_model::reference::Reference, DVec2, DVec2)>,
-    /// A point outside the sketch the pointer is on while drawing (an external vertex snap), and since when; the one
-    /// snapped since the last move; the one woken last (rested on [`ACQUIRE_REST`]: live 11-17 sketch-snap-1117, Sketch
-    /// 2's point then offers its horizontal / vertical alignment, as a point of the sketch does).
-    point_acquiring: Option<(noshape_model::reference::Reference, std::time::Instant)>,
-    point_seen: Option<(noshape_model::reference::Reference, DVec2)>,
+    /// The point outside the sketch woken last: snapped onto while drawing (an external vertex snap; live 11-17
+    /// sketch-snap-1117, Sketch 2's point then offers its horizontal / vertical alignment, as a point of the sketch does).
     pub woken_point: Option<(noshape_model::reference::Reference, DVec2)>,
     /// Press position of a drawing tool (press-drag-release placement).
     press: Option<DVec2>,
@@ -1478,12 +1471,9 @@ impl SketchEditor {
             otf: None,
             otf_typing: false,
             woken: Vec::new(),
-            acquiring: None,
             edge_acquiring: None,
             edge_seen: None,
             woken_edge: None,
-            point_acquiring: None,
-            point_seen: None,
             woken_point: None,
             press: None,
             tangent_mode: false,
@@ -1559,10 +1549,8 @@ impl SketchEditor {
         self.otf = None;
         self.otf_typing = false;
         self.woken.clear();
-        self.acquiring = None;
         self.edge_acquiring = None;
         self.woken_edge = None;
-        self.point_acquiring = None;
         self.woken_point = None;
         self.press = None;
         self.tangent_mode = false;
@@ -1996,18 +1984,10 @@ impl SketchEditor {
         self.alt_held = alt;
         self.external_snap = None;
         if self.tool.draws() {
-            // Curves and points the cursor passes over wake up their
-            // inferences (a point: alignment, live "skb (10-25) sketch
-            // inference"): what lies within 9 px of it (the GPU hover
-            // arrives a move late), else the hover.
-            // A point wakes only once rested on (live2 "feel (sketch)" (1): ≥ 100 ms on it acquires it, passing
-            // over in ~25 ms doesn't; it stays acquired after the pointer leaves). Also when this move left it.
+            // Curves the cursor passes over wake up their inferences (live "skb (10-25) sketch inference"): what lies
+            // within 9 px of it (the GPU hover arrives a move late), else the hover. A point wakes when a snap lands
+            // on it (below).
             let now = std::time::Instant::now();
-            if let Some((c, since)) = self.acquiring
-                && now.duration_since(since) >= ACQUIRE_REST
-            {
-                self.wake(c);
-            }
             // A model edge wakes once rested on (live sketch-gaps 1c), the pointer on it until this move.
             let seen = self.edge_seen.take();
             match self.edge_acquiring.take() {
@@ -2021,32 +2001,13 @@ impl SketchEditor {
                 }
                 _ => {}
             }
-            let seen = self.point_seen.take();
-            match (self.point_acquiring.take(), seen) {
-                (Some((r, since)), Some((on, at))) if on == r => {
-                    if now.duration_since(since) >= ACQUIRE_REST {
-                        self.woken_point = Some((r.clone(), at));
-                    }
-                    self.point_acquiring = Some((r, since));
-                }
-                _ => {}
-            }
             // (The hover only while it is still within reach: one left from an earlier place isn't rested on here,
             // sketch-trim-drag's ends aligned with the previous line's end clicked before the tool was restarted.)
             let reach = self.world_per_px * 9.0;
             let metric = self.screen_metric();
             let near = |e: EntityId| data.sketch.point(e).is_none_or(|q| metric.as_ref().map_or((q - p).length(), |m| m.len(q - p)) <= reach);
-            match data.sketch.pick_on_screen(p, reach, metric.as_ref()).or(self.hover.filter(|h| near(*h))) {
-                Some(h) if is_point(&data.sketch, h) => {
-                    if self.acquiring.is_none_or(|(c, _)| c != h) {
-                        self.acquiring = Some((h, now));
-                    }
-                }
-                Some(h) => {
-                    self.acquiring = None;
-                    self.wake(h);
-                }
-                None => self.acquiring = None,
+            if let Some(h) = data.sketch.pick_on_screen(p, reach, metric.as_ref()).or(self.hover.filter(|h| near(*h))).filter(|h| !is_point(&data.sketch, *h)) {
+                self.wake(h);
             }
             // Line chain: moving back onto the chain end switches to a tangent arc.
             if self.tool == Tool::Line
@@ -2062,6 +2023,11 @@ impl SketchEditor {
                 }
             }
             self.inference = self.infer(&data.sketch, p, shift);
+            // Live (feel retaken 11-18): a point wakes for alignment as soon as a snap lands on it (its
+            // wakeupInferenceSource, no rest time: a 10 ms rest or a slow pass wakes it) and stays woken for the line.
+            if let Some(e) = self.inference.as_ref().filter(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Center)).and_then(|i| i.entity).filter(|e| is_point(&data.sketch, *e)) {
+                self.wake(e);
+            }
             return EditOutcome::redraw();
         }
         self.inference = None;
@@ -2200,10 +2166,7 @@ impl SketchEditor {
             }
         }
         if let ExternalSnap::Vertex { reference, position } = &snap {
-            self.point_seen = Some((reference.clone(), *position));
-            if self.point_acquiring.as_ref().is_none_or(|(r, _)| r != reference) {
-                self.point_acquiring = Some((reference.clone(), std::time::Instant::now()));
-            }
+            self.woken_point = Some((reference.clone(), *position));
         }
         let strong = self.inference.as_ref().is_some_and(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center));
         if strong {
@@ -4408,6 +4371,8 @@ impl SketchEditor {
                 // redoing it (qa SKETCH-DRAG-BIG: 30–50 ms per step on 1000
                 // entities).
                 self.drag_origin = data.sketch.begin_drag(&[(handle, p)]).then(|| data.sketch.clone());
+                // A drag aligns only with points it snaps onto itself.
+                self.woken.clear();
                 self.drag = Some(DragState::Geometry { handle, at: None });
                 self.tool_drag(data, p)
             }
@@ -4432,6 +4397,12 @@ impl SketchEditor {
                         self.drag = Some(DragState::Geometry { handle, at: Some(p) });
                         // Shift suppresses snapping onto other geometry.
                         self.drag_snap = if self.shift_held { None } else { self.point_drop_target(&data.sketch, id) };
+                        // A point the drag snaps onto wakes: the drag then aligns with it (live feel retaken 11-18).
+                        if let Some((t, _, Drop::Merge)) = self.drag_snap
+                            && is_point(&data.sketch, t)
+                        {
+                            self.wake(t);
+                        }
                     }
                     #[allow(unreachable_patterns)]
                     _ => {}
@@ -4668,15 +4639,25 @@ impl SketchEditor {
             .min_by(|a, b| a.2.total_cmp(&b.2))
             .map(|(e, q, _)| (e, q, Drop::OnCurve))
             .or_else(|| {
-                // An arc's end level or plumb with its other end, within a line's reach (live2 sketch-drags b1x).
-                let other = sk.entities().find_map(|e| match e.geometry {
+                // An arc's end level or plumb with its other end, within a line's reach (live2 sketch-drags b1x); a
+                // point the drag snapped onto earlier (woken) too, never the dragged line's own ends (live feel retaken
+                // 11-18).
+                let arc_end = sk.entities().find_map(|e| match e.geometry {
                     noshape_sketch::Geometry::Arc { start, end, .. } if start == id => Some(end),
                     noshape_sketch::Geometry::Arc { start, end, .. } if end == id => Some(start),
                     _ => None,
-                })?;
-                let q = sk.point(other)?;
-                let (dy, dx) = (seen(DVec2::new(0.0, pos.y - q.y)), seen(DVec2::new(pos.x - q.x, 0.0)));
-                [(dy, DVec2::new(pos.x, q.y), true), (dx, DVec2::new(q.x, pos.y), false)].into_iter().filter(|(d, ..)| *d <= r).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(_, at, h)| (other, at, Drop::Level(h)))
+                });
+                let woken = self.woken.iter().copied().filter(|w| *w != id && !siblings.contains(w) && sk.point(*w).is_some());
+                arc_end
+                    .into_iter()
+                    .chain(woken)
+                    .filter_map(|other| {
+                        let q = sk.point(other)?;
+                        let (dy, dx) = (seen(DVec2::new(0.0, pos.y - q.y)), seen(DVec2::new(pos.x - q.x, 0.0)));
+                        [(dy, DVec2::new(pos.x, q.y), true), (dx, DVec2::new(q.x, pos.y), false)].into_iter().filter(|(d, ..)| *d <= r).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(d, at, h)| (d, other, at, h))
+                    })
+                    .min_by(|a, b| a.0.total_cmp(&b.0))
+                    .map(|(_, other, at, h)| (other, at, Drop::Level(h)))
             })
     }
 
@@ -8472,6 +8453,7 @@ pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityI
     place_second_line(sk, c, ids);
     level_lines(sk, c, ids);
     carry_text_box(sk, c, ids);
+    mirror_second_line(sk, c, ids);
     let light = if centers.is_empty() { what_moves(sk, c, ids) } else { centers };
     let report = sk.solve_with(&noshape_sketch::SolveOptions { light, ..Default::default() });
     if !report.is_solved() {
@@ -8479,6 +8461,31 @@ pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityI
         return false;
     }
     true
+}
+
+/// Symmetric on two lines (a lines-only mirror): the second line moves onto the first's mirror image, keeping its
+/// length and its place along it (live2 mirror-sym-1118: B jumps onto A's mirrored line, its length and place kept).
+fn mirror_second_line(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
+    if c != ConstraintTool::Symmetric {
+        return;
+    }
+    let Some((a, b, axis)) = sk.constraints().filter(|k| k.hints.lines_only).find_map(|k| match k.kind {
+        ConstraintKind::Symmetric { a, b, axis } if [a, b, axis].iter().all(|e| ids.contains(e)) => Some((a, b, axis)),
+        _ => None,
+    }) else {
+        return;
+    };
+    let (Some(Curve2::Line { a: a0, b: a1 }), Some(Curve2::Line { a: b0, b: b1 }), Some(Curve2::Line { a: x0, b: x1 })) = (sk.curve(a), sk.curve(b), sk.curve(axis)) else { return };
+    let Some(u) = (x1 - x0).try_normalize() else { return };
+    let mirror = |p: DVec2| x0 + u * (2.0 * (p - x0).dot(u)) - (p - x0);
+    let (m0, m1) = (mirror(a0), mirror(a1));
+    let Some(dir) = (m1 - m0).try_normalize() else { return };
+    let (mid, half) = ((b0 + b1) * 0.5, (b1 - b0).length() * 0.5);
+    let dir = if dir.dot(b1 - b0) >= 0.0 { dir } else { -dir };
+    let on = m0 + dir * (mid - m0).dot(dir);
+    let Some((s, e)) = sk.endpoints(b) else { return };
+    let _ = sk.set_point(s, on - dir * half);
+    let _ = sk.set_point(e, on + dir * half);
 }
 
 /// A text box's corner made coincident with what can't move (a model edge or vertex, a fixed point): the whole box is
@@ -8692,8 +8699,15 @@ pub fn apply_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) ->
             n += 1;
             continue;
         }
+        // Live (live2 mirror-sym-1118): Symmetric on two lines is one MIRROR of the lines, their ends free.
+        let lines = matches!(k, ConstraintKind::Symmetric { a, b, .. } if [a, b].iter().all(|e| sk.kind(*e) == Some(EntityKind::Line)));
         match sk.add_constraint(k) {
-            Ok(_) => n += 1,
+            Ok(id) => {
+                n += 1;
+                if lines {
+                    let _ = sk.mirror_lines_only(id);
+                }
+            }
             Err(e) => last_err = Some(e.to_string()),
         }
     }
@@ -9960,15 +9974,12 @@ mod tests {
         let l2 = line(&mut ed, &mut d, mm(40.0, 45.0), mm(20.3, 45.3));
         assert_eq!(kinds(&d, l2), ["Horizontal"], "{:?}", at(&d, l2));
         assert!((at(&d, l2).1.x - 20.3).abs() < 0.05, "no snap to the point's x: {:?}", at(&d, l2));
-        // Resting on the point first wakes it (live: 1.5 s; live2 "feel (sketch)": ≥ 100 ms): the end snaps to its x
-        // and gets a Vertical with it.
+        // Snapping onto the point first wakes it (live feel retaken 11-18: the snap wakes it, no rest): the end snaps
+        // to its x and gets a Vertical with it.
         ed.set_tool(Tool::Line);
         for (p, hv) in [(mm(40.0, 60.0), None), (mm(20.0, 30.0), Some(pt)), (mm(20.3, 60.3), None)] {
             ed.hover = hv;
             ed.pointer_move(&mut d, p, false, false);
-            if hv.is_some() {
-                std::thread::sleep(ACQUIRE_REST + std::time::Duration::from_millis(10));
-            }
             if hv.is_none() {
                 ed.tool_down(&mut d, p, None, false, false);
                 ed.tool_up(&mut d, p);
@@ -10942,23 +10953,41 @@ mod tests {
         }
     }
 
-    /// Live2 "feel (sketch)" (1): a point counts for alignment only once the pointer has rested on it ≥ 100 ms;
-    /// passing over it doesn't (the origin always counts).
+    /// Live (feel retaken 11-18): a point counts for alignment once a snap has landed on it, with no rest (a 10 ms rest
+    /// or a slow pass woke it; its wakeupInferenceSource), and stays woken; passing by 9 px off it, outside its 15 px
+    /// square, doesn't (the origin always counts).
     #[test]
-    fn a_point_aligns_only_after_a_rest_on_it() {
-        for rest in [false, true] {
+    fn a_point_aligns_once_a_snap_lands_on_it() {
+        for (off, snapped) in [(9.0, false), (5.0, true), (0.0, true)] {
             let (mut ed, mut d) = editor(Tool::Line);
             let pt = d.sketch.add_point(v(200.0 * PX, 300.0 * PX));
             click(&mut ed, &mut d, v(500.0 * PX, 100.0 * PX));
-            ed.hover = Some(pt);
-            ed.pointer_move(&mut d, v(200.0 * PX, 300.0 * PX), false, false);
-            if rest {
-                std::thread::sleep(ACQUIRE_REST + std::time::Duration::from_millis(10));
-            }
-            ed.hover = None;
+            ed.pointer_move(&mut d, v((200.0 + off) * PX, 300.0 * PX), false, false);
             ed.pointer_move(&mut d, v(203.0 * PX, 120.0 * PX), false, false);
             let aligned = ed.inference.as_ref().is_some_and(|i| i.constraints.iter().any(|c| matches!(c, AutoConstraint::VerticalWith(p) if *p == pt)));
-            assert_eq!(aligned, rest, "rested on the point: {rest}: {:?}", ed.inference);
+            assert_eq!(aligned, snapped, "passed {off} px off the point: {:?}", ed.inference);
+        }
+    }
+
+    /// Live (feel retaken 11-18, dragged line end): no alignment with points the drag hasn't snapped onto; once it has
+    /// snapped onto a point, moving on aligns with it (Vertical on release).
+    #[test]
+    fn a_drag_aligns_with_a_point_it_snapped_onto() {
+        for snap_first in [false, true] {
+            let (mut ed, mut d) = editor(Tool::Select);
+            let t = d.sketch.add_point(v(100.0 * PX, 100.0 * PX));
+            let l = d.sketch.add_line(v(300.0 * PX, 300.0 * PX), v(400.0 * PX, 300.0 * PX));
+            let end = d.sketch.endpoints(l).unwrap().1;
+            ed.tool_down(&mut d, v(400.0 * PX, 300.0 * PX), Some(end), false, false);
+            ed.tool_drag(&mut d, v(380.0 * PX, 280.0 * PX));
+            if snap_first {
+                ed.tool_drag(&mut d, v(101.0 * PX, 101.0 * PX));
+            }
+            ed.tool_drag(&mut d, v(103.0 * PX, 200.0 * PX));
+            ed.tool_up(&mut d, v(103.0 * PX, 200.0 * PX));
+            let at = d.sketch.point(end).unwrap();
+            let vertical = d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { a, b: Some(b) } if (a, b) == (end, t)));
+            assert_eq!((vertical, (at.x - 100.0 * PX).abs() < 1e-9), (snap_first, snap_first), "snapped onto it first: {snap_first}, end at {at}");
         }
     }
 
@@ -11317,6 +11346,35 @@ mod tests {
         }
     }
 
+    /// Live2 mirror-sym-1118: Symmetric on two lines and an axis: one mirror of the lines, the second line onto the
+    /// first's mirror image with its length and place kept; shortening the first then leaves the second as it is.
+    #[test]
+    fn symmetric_lines_mirror_the_lines_with_their_ends_free() {
+        let mut sk = Sketch::new();
+        let axis = sk.add_line(v(0.0, -0.05), v(0.0, 0.05));
+        sk.add_constraint(ConstraintKind::Fix { entity: axis }).unwrap();
+        let a = sk.add_line(v(-0.03, 0.0), v(-0.01, 0.02));
+        let b = sk.add_line(v(0.012, 0.0), v(0.05, 0.004));
+        let ids = [a, b, axis];
+        assert!(apply_constraint(&mut sk, ConstraintTool::Symmetric, &ids).is_ok_and(|n| n == 1));
+        assert!(solve_after_constraint(&mut sk, ConstraintTool::Symmetric, &ids));
+        let ends = |sk: &Sketch, l: EntityId| match sk.curve(l) {
+            Some(Curve2::Line { a, b }) => (a, b),
+            _ => panic!("a line"),
+        };
+        let (a0, a1) = ends(&sk, a);
+        let (b0, b1) = ends(&sk, b);
+        assert!((a0 - v(-0.03, 0.0)).length() < 1e-9 && (a1 - v(-0.01, 0.02)).length() < 1e-9, "the first stays");
+        let mirror = |p: DVec2| v(-p.x, p.y);
+        assert!((b1 - b0).normalize().perp_dot((mirror(a1) - mirror(a0)).normalize()).abs() < 1e-9, "b along a's mirror");
+        assert!((b0 - mirror(a0)).perp_dot((mirror(a1) - mirror(a0)).normalize()).abs() < 1e-9, "b on a's mirrored line");
+        assert!(((b1 - b0).length() - v(0.038, 0.004).length()).abs() < 1e-9, "b's length kept");
+        let start = sk.entity(a).and_then(|e| e.point_refs().first().copied()).unwrap();
+        assert!(sk.drag(&[(noshape_sketch::DragHandle::Point(start), v(-0.02, 0.01))]).is_solved());
+        let (c0, c1) = ends(&sk, b);
+        assert!((c0 - b0).length() < 1e-9 && (c1 - b1).length() < 1e-9, "shortening the first leaves the second: {c0} {c1}");
+    }
+
     /// Live (c2-surf-intro-mutualtrim's Title, live title-frame-1118): a text box's corner made coincident with a fixed
     /// line 40 mm below it: the box moves down whole, its size and direction kept (the solve alone scaled it).
     #[test]
@@ -11459,7 +11517,7 @@ mod tests {
     }
 
     /// qa 11-17 SKSNAP-ALIGN-WOKEN-POINT (live 11-17 sketch-snap-1117 row 2): another sketch's point rested on (an
-    /// external vertex snap held 100 ms) wakes as a point of the sketch does: 60 px below it, 6 px off its vertical, a
+    /// external vertex snap; live feel retaken 11-18: the snap wakes it, no rest) wakes as a point of the sketch does: 60 px below it, 6 px off its vertical, a
     /// line's end aligns with it, and the click asks for that point used (the alignment then on the used point).
     #[test]
     fn a_rested_point_of_another_sketch_offers_its_alignment() {
@@ -11468,9 +11526,8 @@ mod tests {
         let w = v(0.02, 0.012);
         ed.pointer_move(&mut d, w, false, false);
         ed.apply_external_snap(ExternalSnap::Vertex { position: w, reference: other.clone() });
-        std::thread::sleep(ACQUIRE_REST + std::time::Duration::from_millis(10));
         ed.pointer_move(&mut d, w + v(PX, 0.0), false, false);
-        assert_eq!(ed.woken_point.as_ref().map(|p| &p.0), Some(&other), "woken once rested on");
+        assert_eq!(ed.woken_point.as_ref().map(|p| &p.0), Some(&other), "woken by the snap onto it");
         click(&mut ed, &mut d, v(0.0, 0.0));
         ed.pointer_move(&mut d, w + v(6.0 * PX, -60.0 * PX), false, false);
         let i = ed.inference.clone().expect("an inference");
