@@ -4,17 +4,17 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-18 04:50 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
+Updated 11-18 05:05 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
 (NOSHAPE_GATE_HOST=vibe2); Mac for crate tests, probes and speed numbers (NOSHAPE_RB_HOST=mac; vibex8 runs ~x10 slower at
 load 26); land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs on vibex7 ~/lead-private (hat8, hat15,
 hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree from a computed pid (lead 21:06):
 `systemctl stop <unit>`; kill only own pids > 1.
 
 ## In flight
-- GATE unit bool-gate-8ba7c6dcc: starts 04:01 on vibex7 (vibe2's and vibex8's slots hours deep; lead 11-18: run
-  wherever starts first) -> /root/bool-hat-scratch/chain-8ba7c6dcc.out. Then private docs (udoc-ab8.sh 8ba7c6dcc),
+- GATE unit bool-gate-b5b566884 on vibex7, queued behind bool2's gate c9c3759aa (lead 11-18: run wherever starts
+  first) -> /root/bool-hat-scratch/chain-b5b566884.out. Then private docs (udoc-ab8.sh b5b566884),
   list relabelled / seam cases per condition (c), knurls ours-only, land, tell dx (2108c2b7-2f48-43a7-87a0-3f652e3cda6d),
-  core, blend, asm. Branch bool-shared2 (bool-hat) on main f6274d94e, 12 commits, all g++-13 OK:
+  core, blend, asm. Branch bool-shared2 (bool-hat) on main f6274d94e, 13 commits, all g++-13 OK:
   1-10. as before: e61278b1d usd room; 8a9351e4b shared shapes (lead conditions (a) suite identical, (b) hats/dock
      SAME, (c) replay label-only by case, (d) split_names T1); a1d7ca0b4 + 65befe285 NURBS piece boxes; 51ee7c1cb unify
      room order; 0b17fee66 par_map_by cancel; 26ce2dffa fuse_glued mirror normal; b11d72be6 gap() (pulleys seam
@@ -27,19 +27,14 @@ hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree 
      of the volume. e54410 Extrude 22 14 faces as live; 850efe Extrude 5 36 as live, doc 300 s -> 1.7 s, 12/18.
      Not matched: q-union-merge's overlap variant (face coincidence, not a strip). 850efe Extrude 6 33 vs 28 (live
      merges with 2e-6 of volume change: not ours to take). Kernel T1 496/496 on the Mac.
+  13. b5b566884 fan-blade P0: an offset face grazing another argument's circle declined first (offset_grazes_a_circle,
+     rust_boolean.cpp): 36 -> 0.4 ms on the Mac; not where one of its edges lies on the circle (impeller halves).
   cf-surface-pattern 385 vs 386 edges: its Booleans identical branch vs main (the gate's same-base pair decides).
 - a04711 notes: Part 3 = live's faces / volume / area but 8/17/11 vs 9/22/15 (live's 10 um JT6 sliver; the rounded
   retry's other firings, Extrude 23 / 27, are rejected and stay errors). The doc's 19.9 s vs live 1.93: fillets on
   parts off from Extrude 1 (asm's). Repro vibex8 ~/agents/asm-keep/ma04; dumps ~/tmp/bool/a04-box.log.
-- P0 c2-fan-blade-sweep Boolean 2 (lead 11-18 04:20; core's 3e998be12 exact offsets: 190 -> 1187 ms on vibex7):
-  Mac: our declined attempt 36 ms + OCCT 186 (live's feature 364). Dropped levers: an early tangent decline (no r 4
-  cylinder touches the thread; the overlapping ones are r 13 / 3 / 2), OCCT on B-spline fits of the offset faces
-  (186 -> 171 only), declining all offset-of-B-spline cases (ours takes 3 corpus ones 6x / 3x faster than OCCT:
-  Mac ~/noshape-host/bool-keep/offc). NEXT: ours taking it: piece 81 of tool face 69 (arg 1 F19, the offset thread
-  flank) is bounded by the object's own rim arcs (s12/s14/s24, origins arg 0, at the boss planes x = -54.1 / -60.1)
-  as edges lying on it (projected_edge, boolean.rs ~1194), kept flipped while its neighbours (F20 offset, F21, F22
-  cone) drop: the result non-manifold. Dump: apply /root/bool-scratch/dbg-nm-fan.diff (DBG_NM=1), case Mac
-  ~/noshape-host/bool-keep/fan 3e8c1e09636d4fd7, bool-hat .fan.sh / .fan2.sh.
+- P0 c2-fan-blade-sweep Boolean 2: our attempt fixed in 13. OCCT's 186 ms (Mac) is offset-surface evaluation; B-spline
+  fits of the offsets gave -8 % only (dropped); core works the offset side. Case Mac ~/noshape-host/bool-keep/fan.
 - 850efe: cases Mac ~/noshape-host/bool-keep/m85 (Extrude 5 110173579c7126ff, Extrude 6 cc1019ddbd364035), vibex8
   ~/tmp/bool/m85acc. Blend told of the invalid Fillet 2 earlier; with 8ba7 Fillet 2 gets live's Extrude 5.
 - e54410: cases Mac ~/noshape-host/bool-keep/me5 (Extrude 22 6dc4464f40a8b0b2, Extrude 17 10c21d285eec6c3a). Live's
