@@ -582,6 +582,30 @@ fn deleting_faces_leaves_its_input_as_it_was() {
     assert!(s.to_brep_bytes().unwrap() == before, "the input changed");
 }
 
+/// c2-impeller-loft's Delete face 2, the flange's end (face 27, the plane x = 6 mm): put onto the housing's B-spline
+/// below it, run on past its edges, and made one face with it, where the housing bulges 0.68 mm past the end at its
+/// corners (their edges with the flange's underside become one). OCCT's defeature (2 s) gives the same part: 34 faces,
+/// 96,645.148 mm³.
+#[test]
+fn a_flanges_end_is_deleted_onto_the_housing_below_it() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/defeature/impeller-delete-face-2.brep");
+    let s = read_brep(&path).unwrap();
+    let faces = s.faces();
+    let r = delete_faces(&s, &[faces[27].clone()]).unwrap();
+    assert!(r.shape.is_valid());
+    assert_eq!(r.shape.faces().len(), faces.len() - 1);
+    let v = r.shape.volume().unwrap() * 1e9;
+    assert!((v - 96_645.148).abs() < 0.05, "{v} mm³");
+    // The housing's face is one with the end's: its image the face on the housing's surface, the end's none.
+    assert!(r.history.modified(0, ShapeType::Face, 27).is_empty());
+    assert_eq!(r.history.modified(0, ShapeType::Face, 33).len(), 1);
+    // With the groove floor (face 21), which OCCT can't remove: it is still in the part and its history says so (Delete
+    // face then fails, never Ok with it left).
+    let r = delete_faces(&s, &[faces[21].clone(), faces[27].clone()]).unwrap();
+    assert_eq!(r.history.modified(0, ShapeType::Face, 21).len(), 1);
+    assert_eq!(r.shape.faces().len(), faces.len() - 1);
+}
+
 /// cf-lighten's Lighten deletes its tools' rounds before rounding them again: a prism's rounds between plane sides,
 /// convex or concave, go by running the sides on to their corner (the prism built again, as OCCT's Defeaturing).
 #[test]

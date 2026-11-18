@@ -11219,6 +11219,9 @@ static std::vector<std::vector<TopoDS_Shape>> defeature_groups(const TopoDS_Shap
   return out;
 }
 
+bool delete_onto_neighbours(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& del, TopoDS_Shape& out, HHist& hist,
+                            std::vector<TopoDS_Shape>& rest);
+
 static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
 {
   require_non_null(s.shape, "shape");
@@ -11249,7 +11252,25 @@ static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
   TopoDS_Shape cur    = in;
   HHist        steps;
   bool         unable = false;
-  for (const std::vector<TopoDS_Shape>& group : defeature_groups(in, del))
+  // Faces deleted onto a neighbour first; the others by OCCT.
+  std::vector<TopoDS_Shape> left = del;
+  {
+    TopoDS_Shape              onto;
+    HHist                     oh;
+    std::vector<TopoDS_Shape> rest;
+    if (delete_onto_neighbours(in, del, onto, oh, rest))
+    {
+      if (rest.empty())
+      {
+        merge_into(ch, oh);
+        return make_result(args, onto, ch.get());
+      }
+      cur   = onto;
+      steps = oh;
+      left  = rest;
+    }
+  }
+  for (const std::vector<TopoDS_Shape>& group : defeature_groups(in, left))
   {
     ShapeIMap now;
     TopExp::MapShapes(cur, TopAbs_FACE, now);
@@ -12464,6 +12485,29 @@ public:
   NCollection_DataMap<TopoDS_Shape, occ::handle<Geom_Surface>, TopTools_ShapeMapHasher> made;
 
   bool is_moved(const TopoDS_Shape& f) const { return moved.Contains(f.Oriented(TopAbs_FORWARD)); }
+  // A face put onto a neighbour's own surface (a deleted face's gap closed by that neighbour): their shared edges stay,
+  // and so do the vertices on that neighbour.
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> onto;
+  bool                                                                     rev_wires = false;
+  void move_onto(const TopoDS_Face& f, const TopoDS_Face& to, const occ::handle<Geom_Surface>& s)
+  {
+    moved.Add(f.Oriented(TopAbs_FORWARD));
+    onto.Bind(f.Oriented(TopAbs_FORWARD), to);
+    made.Bind(f.Oriented(TopAbs_FORWARD), s);
+  }
+  // A face given a larger surface it lies on (its parameters kept): its edges and vertices stay.
+  ShapeIMap in_place;
+  void      extend(const TopoDS_Face& f, const occ::handle<Geom_Surface>& s)
+  {
+    moved.Add(f.Oriented(TopAbs_FORWARD));
+    in_place.Add(f.Oriented(TopAbs_FORWARD));
+    made.Bind(f.Oriented(TopAbs_FORWARD), s);
+  }
+  bool onto_neighbour(const TopoDS_Shape& f, const TopoDS_Shape& n) const
+  {
+    const TopoDS_Shape k = f.Oriented(TopAbs_FORWARD);
+    return onto.IsBound(k) && onto(k).IsSame(n);
+  }
   occ::handle<Geom_Surface> new_surface(const TopoDS_Face& f)
   {
     const TopoDS_Shape key = f.Oriented(TopAbs_FORWARD);
@@ -12495,6 +12539,8 @@ public:
         return fail("an edge of a moved face isn't between two faces");
       const TopoDS_Face a = TopoDS::Face(fs.First()), b = TopoDS::Face(fs.Last());
       const TopoDS_Face m = is_moved(a) ? a : b, s = is_moved(a) ? b : a;
+      if (onto_neighbour(m, s) || in_place.Contains(m.Oriented(TopAbs_FORWARD)))
+        continue;
       GeomAPI_IntSS ss(new_surface(m), new_surface(s), 1e-7);
       if (!ss.IsDone() || ss.NbLines() == 0)
         return fail("a moved face no longer meets its neighbour");
@@ -12535,6 +12581,15 @@ public:
       for (const TopoDS_Shape& f : vf(i))
         nm += is_moved(f) ? 1 : 0;
       if (nm == 0 || nm == vf(i).Extent())
+        continue;
+      bool on_neighbour = false;
+      for (const TopoDS_Shape& f : vf(i))
+        for (const TopoDS_Shape& g : vf(i))
+          on_neighbour = on_neighbour || onto_neighbour(f, g);
+      bool stays = true;
+      for (const TopoDS_Shape& f : vf(i))
+        stays = stays && (!is_moved(f) || in_place.Contains(f.Oriented(TopAbs_FORWARD)));
+      if (on_neighbour || stays)
         continue;
       const gp_Pnt p0 = BRep_Tool::Pnt(v);
       bool         done = false;
@@ -12599,7 +12654,11 @@ public:
       TopoDS_Vertex                 v1, v2;
       TopExp::Vertices(e, v1, v2);
       const bool unbounded = Precision::IsInfinite(c->FirstParameter()) || Precision::IsInfinite(c->LastParameter());
-      if (v1.IsNull() || v2.IsNull() || (!unbounded && !c->IsPeriodic()) || v1.IsSame(v2))
+      // (On a face put onto a neighbour, an intersection's B-spline too: it runs on past the neighbour's surface.)
+      bool on_onto = false;
+      for (const TopoDS_Shape& f : ef(i))
+        on_onto = on_onto || onto.IsBound(f.Oriented(TopAbs_FORWARD));
+      if (v1.IsNull() || v2.IsNull() || (!unbounded && !c->IsPeriodic() && !on_onto) || v1.IsSame(v2))
         continue;
       auto at = [&](const TopoDS_Vertex& v) { return points.IsBound(v) ? points(v) : BRep_Tool::Pnt(v); };
       GeomAPI_ProjectPointOnCurve p1(at(v1), c), p2(at(v2), c);
@@ -12614,7 +12673,7 @@ public:
         continue;
       }
       const double lo = std::min(u1, u2), hi = std::max(u1, u2), m = 0.1 * (hi - lo) + 1e-6;
-      curves.Bind(e, new Geom_TrimmedCurve(c, lo - m, hi + m));
+      curves.Bind(e, new Geom_TrimmedCurve(c, std::max(lo - m, c->FirstParameter()), std::min(hi + m, c->LastParameter())));
     }
   }
   void fail(const char* w)
@@ -12630,6 +12689,13 @@ public:
     L        = TopLoc_Location();
     Tol      = BRep_Tool::Tolerance(F);
     RevWires = RevFace = false;
+    // (Onto a neighbour: oriented as that neighbour, to be one face with it.)
+    const TopoDS_Shape k = F.Oriented(TopAbs_FORWARD);
+    if (onto.IsBound(k))
+    {
+      RevFace  = F.Orientation() != onto(k).Orientation();
+      RevWires = RevFace && rev_wires;
+    }
     return true;
   }
   bool NewCurve(const TopoDS_Edge& E, occ::handle<Geom_Curve>& C, TopLoc_Location& L, double& Tol) override
@@ -12680,6 +12746,15 @@ public:
       if (!is_moved(F))
         return false;
       double f0, l0;
+      // An edge shared with the neighbour a face went onto: its curve on that neighbour.
+      if (onto.IsBound(F.Oriented(TopAbs_FORWARD)))
+      {
+        C = BRep_Tool::CurveOnSurface(E, TopoDS::Face(onto(F.Oriented(TopAbs_FORWARD))), f0, l0);
+        if (C.IsNull())
+          return false;
+        C = occ::down_cast<Geom2d_Curve>(C->Copy());
+        return true;
+      }
       C = BRep_Tool::CurveOnSurface(E, F, f0, l0);
       if (C.IsNull())
         return false;
@@ -12735,6 +12810,435 @@ public:
     return curves.IsBound(E) ? GeomAbs_C0 : BRep_Tool::Continuity(E, F1, F2);
   }
 };
+
+// A face put onto its neighbour T's surface whose new edge with a face N runs on along T's own edge with N from their
+// shared vertex (the neighbour bulges past the deleted face: c2-impeller-loft's housing under the flange's end): the two
+// edges become one from the new corner to the far end of T's, the shared vertex goes, and the face and T are built as
+// one face on T's surface from their edges less those between them and the overlapped ones. 0 where no edges overlap
+// (the faces then unified), 1 built (`out`, its history in `h`), -1 where it couldn't be.
+static int onto_overlaps(const TopoDS_Shape& r, BRepTools_Modifier& md, const std::vector<std::pair<TopoDS_Face, TopoDS_Face>>& pairs,
+                         const std::vector<occ::handle<Geom_Surface>>& surf, TopoDS_Shape& out, HHist& h)
+{
+  auto bad = [](const char* w) {
+    if (std::getenv("NOSHAPE_DEFEATURE_DEBUG"))
+      std::fprintf(stderr, "onto overlaps: %s\n", w);
+    return -1;
+  };
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
+  // The direction an edge leaves its vertex v in.
+  auto leaving = [](const TopoDS_Edge& e, const TopoDS_Vertex& v) {
+    BRepAdaptor_Curve c(e);
+    const double      t = BRep_Tool::Parameter(v, e);
+    gp_Pnt            p;
+    gp_Vec            d;
+    c.D1(t, p, d);
+    const bool at_first = std::abs(t - c.FirstParameter()) < std::abs(t - c.LastParameter());
+    return at_first ? d : d.Reversed();
+  };
+  auto other_face = [&](const TopoDS_Shape& e, const TopoDS_Shape& f) {
+    TopoDS_Shape o;
+    for (const TopoDS_Shape& g : ef.FindFromKey(e))
+      if (!g.IsSame(f))
+        o = g;
+    return o;
+  };
+  ShapeIMap                                                             gone;   // edges replaced
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> by;  // their replacement
+  ShapeIMap                                                             changed; // faces to rebuild
+  ShapeIMap                                                             fresh;   // the new edges
+  ShapeIMap                                                             against; // replaced edges running against theirs
+  std::vector<TopoDS_Face>                                              merged_from;
+  std::vector<occ::handle<Geom_Surface>>                                merged_on;
+  for (size_t k = 0; k < pairs.size(); ++k)
+  {
+    const TopoDS_Face fn = TopoDS::Face(md.ModifiedShape(pairs[k].first)), tn = TopoDS::Face(md.ModifiedShape(pairs[k].second));
+    bool              any = false;
+    for (TopExp_Explorer x(fn, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge  e = TopoDS::Edge(x.Current());
+      const TopoDS_Shape n = other_face(e, fn);
+      if (n.IsNull() || n.IsSame(tn) || gone.Contains(e))
+        continue;
+      for (TopExp_Explorer y(tn, TopAbs_EDGE); y.More(); y.Next())
+      {
+        const TopoDS_Edge g = TopoDS::Edge(y.Current());
+        if (!other_face(g, tn).IsSame(n) || gone.Contains(g))
+          continue;
+        TopoDS_Vertex e1, e2, g1, g2;
+        TopExp::Vertices(e, e1, e2);
+        TopExp::Vertices(g, g1, g2);
+        TopoDS_Vertex v = e1.IsSame(g1) || e1.IsSame(g2) ? e1 : (e2.IsSame(g1) || e2.IsSame(g2) ? e2 : TopoDS_Vertex());
+        if (v.IsNull() || leaving(e, v).Dot(leaving(g, v)) <= 0)
+          continue;
+        const TopoDS_Vertex p = v.IsSame(e1) ? e2 : e1, w = v.IsSame(g1) ? g2 : g1;
+        // The far end of T's edge on the new edge, between its ends.
+        double                  f0, l0;
+        occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f0, l0);
+        if (c.IsNull())
+          return bad("no curve");
+        GeomAPI_ProjectPointOnCurve pw(BRep_Tool::Pnt(w), c, f0, l0);
+        if (pw.NbPoints() == 0 || pw.LowerDistance() > 1e-6)
+        {
+          if (std::getenv("NOSHAPE_DEFEATURE_DEBUG"))
+            std::fprintf(stderr, "onto overlaps: far end %.3g mm off the new edge\n", pw.NbPoints() ? pw.LowerDistance() * 1e3 : -1.0);
+          return -1;
+        }
+        double tp = BRep_Tool::Parameter(p, e), tw = pw.LowerDistanceParameter();
+        TopoDS_Vertex a = p, b = w;
+        if (tp > tw)
+        {
+          std::swap(tp, tw);
+          std::swap(a, b);
+        }
+        BRepBuilderAPI_MakeEdge mk(c, a, b, tp, tw);
+        if (!mk.IsDone())
+          return bad("edge not made");
+        // (T's edge runs along the new one's curve or against it: its uses take the new edge turned to match.)
+        auto at_first = [&](const TopoDS_Edge& x) {
+          double a0, a1;
+          BRep_Tool::Range(x, a0, a1);
+          const double t = BRep_Tool::Parameter(v, x);
+          return std::abs(t - a0) < std::abs(t - a1);
+        };
+        if (at_first(e) != at_first(g))
+          against.Add(g);
+        gone.Add(e);
+        gone.Add(g);
+        fresh.Add(mk.Edge());
+        by.Bind(e, mk.Edge());
+        by.Bind(g, mk.Edge());
+        changed.Add(n);
+        any = true;
+        break;
+      }
+    }
+    if (any)
+    {
+      merged_from.push_back(fn);
+      merged_from.push_back(tn);
+      merged_on.push_back(surf[k]);
+    }
+  }
+  if (gone.IsEmpty())
+    return 0;
+  BRep_Builder bb;
+  ShapeIMap    used;
+  // A face on `surf` (null: the one face's own) oriented `o`, bounded by `faces`' edges, the replaced ones swapped for
+  // their replacement (once) and those between the faces left out, chained end to start into wires. The last face's
+  // edges keep their sense; new edges and the others' are turned where only that chains (the tweak can leave a face
+  // moved onto its neighbour's surface turned against it). Edges without a curve on `surf` get one. Null where they
+  // don't chain.
+  auto wires_of = [&](const std::vector<TopoDS_Face>& faces, const occ::handle<Geom_Surface>& surf, TopAbs_Orientation o) -> TopoDS_Face {
+    ShapeIMap inside, added;
+    for (const TopoDS_Face& f : faces)
+      for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+      {
+        bool all = true;
+        for (const TopoDS_Shape& g : ef.FindFromKey(x.Current()))
+          all = all && std::any_of(faces.begin(), faces.end(), [&](const TopoDS_Face& q) { return q.IsSame(g); });
+        if (all && faces.size() > 1)
+          inside.Add(x.Current());
+      }
+    std::vector<TopoDS_Shape> edges;
+    std::vector<bool>         turnable;
+    for (size_t fi = 0; fi < faces.size(); ++fi)
+      for (TopExp_Explorer x(faces[fi].Oriented(TopAbs_FORWARD), TopAbs_EDGE); x.More(); x.Next())
+      {
+        TopoDS_Shape e = x.Current();
+        if (inside.Contains(e))
+          continue;
+        if (gone.Contains(e))
+          e = by.Find(e).Oriented(against.Contains(e) ? TopAbs::Reverse(e.Orientation()) : e.Orientation());
+        if (added.Contains(e))
+          continue;
+        added.Add(e);
+        edges.push_back(e);
+        turnable.push_back(fi + 1 < faces.size() || fresh.Contains(e));
+      }
+    // Chained from edges of known sense; an edge of unknown sense (new, or of a face turned against the last) is
+    // turned where only its end meets the chain.
+    std::vector<size_t> order;
+    for (int pass = 0; pass < 2; ++pass)
+      for (size_t k = 0; k < edges.size(); ++k)
+        if ((bool)turnable[k] == (pass == 1))
+          order.push_back(k);
+    std::vector<bool>        done(edges.size(), false);
+    std::vector<TopoDS_Wire> wires;
+    for (const size_t s0 : order)
+    {
+      if (done[s0])
+        continue;
+      TopoDS_Wire w;
+      bb.MakeWire(w);
+      size_t cur = s0;
+      for (;;)
+      {
+        done[cur] = true;
+        bb.Add(w, edges[cur]);
+        const TopoDS_Vertex end = TopExp::LastVertex(TopoDS::Edge(edges[cur]), true);
+        if (end.IsSame(TopExp::FirstVertex(TopoDS::Edge(edges[s0]), true)))
+          break;
+        size_t next = edges.size();
+        for (size_t k = 0; k < edges.size() && next == edges.size(); ++k)
+          if (!done[k] && TopExp::FirstVertex(TopoDS::Edge(edges[k]), true).IsSame(end))
+            next = k;
+        for (size_t k = 0; k < edges.size() && next == edges.size(); ++k)
+          if (!done[k] && turnable[k] && TopExp::LastVertex(TopoDS::Edge(edges[k]), true).IsSame(end))
+          {
+            edges[k].Reverse();
+            next = k;
+          }
+        if (next == edges.size())
+        {
+          if (std::getenv("NOSHAPE_DEFEATURE_DEBUG"))
+            for (const TopoDS_Shape& e : edges)
+            {
+              const TopoDS_Edge ed = TopoDS::Edge(e);
+              const gp_Pnt      p0 = BRep_Tool::Pnt(TopExp::FirstVertex(ed, true)), p1 = BRep_Tool::Pnt(TopExp::LastVertex(ed, true));
+              std::fprintf(stderr, "onto overlaps: unchained edge %s%s %.3f %.3f %.3f -> %.3f %.3f %.3f\n", fresh.Contains(e) ? "new " : "", e.Orientation() == TopAbs_REVERSED ? "R" : "F", p0.X() * 1e3, p0.Y() * 1e3, p0.Z() * 1e3, p1.X() * 1e3, p1.Y() * 1e3, p1.Z() * 1e3);
+            }
+          return {};
+        }
+        cur = next;
+      }
+      w.Closed(true);
+      wires.push_back(w);
+    }
+    TopoDS_Face nf;
+    if (surf.IsNull())
+      nf = TopoDS::Face(faces.back().Oriented(TopAbs_FORWARD).EmptyCopied());
+    else
+      bb.MakeFace(nf, surf, Precision::Confusion());
+    for (const TopoDS_Wire& w : wires)
+      bb.Add(nf, w);
+    for (const TopoDS_Shape& e : edges)
+      ShapeFix_Edge().FixAddPCurve(TopoDS::Edge(e), nf, false, 1e-7);
+    return TopoDS::Face(nf.Oriented(o));
+  };
+  std::vector<std::pair<std::vector<TopoDS_Shape>, TopoDS_Shape>> repl;  // old faces -> new face
+  for (size_t k = 0; k < merged_on.size(); ++k)
+  {
+    const TopoDS_Face fn = merged_from[2 * k], tn = merged_from[2 * k + 1];
+    const TopoDS_Face m  = wires_of({fn, tn}, merged_on[k], tn.Orientation());
+    if (m.IsNull())
+      return bad("merged face not made");
+    repl.push_back({{fn, tn}, m});
+    used.Add(fn);
+    used.Add(tn);
+  }
+  for (int i = 1; i <= changed.Extent(); ++i)
+  {
+    const TopoDS_Face n  = TopoDS::Face(changed(i));
+    const TopoDS_Face nn = wires_of({n}, {}, n.Orientation());
+    if (nn.IsNull())
+      return bad("neighbour not made");
+    repl.push_back({{n}, nn});
+    used.Add(n);
+  }
+  TopoDS_Shell sh;
+  bb.MakeShell(sh);
+  for (TopExp_Explorer x(r, TopAbs_FACE); x.More(); x.Next())
+    if (!used.Contains(x.Current()))
+      bb.Add(sh, x.Current());
+  for (const auto& [olds, nf] : repl)
+    bb.Add(sh, nf);
+  TopoDS_Solid so;
+  bb.MakeSolid(so);
+  bb.Add(so, sh);
+  BRepLib::SameParameter(so, 1e-7, true);
+  BRepLib::UpdateTolerances(so, false);
+  h = new BRepTools_History();
+  for (const auto& [olds, nf] : repl)
+    for (const TopoDS_Shape& o : olds)
+      h->AddModified(o, nf);
+  for (int i = 1; i <= gone.Extent(); ++i)
+    h->AddModified(gone(i), by.Find(gone(i)));
+  out = so;
+  return 1;
+}
+
+// Planar faces deleted onto their one neighbour across them: every other neighbour a plane or a cylinder along the
+// face's normal (it runs on through the gap), the face put onto that neighbour's surface (its edges with the others
+// their intersections with it) and made one face with it (c2-impeller-loft's Delete face 2: a flange's end onto the
+// housing's B-spline, 5 s in OCCT's defeature, ~0.2 s here). The faces this can't delete are left in `rest`; false where it
+// deletes none or the result isn't valid.
+bool delete_onto_neighbours(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& del, TopoDS_Shape& out, HHist& hist,
+                            std::vector<TopoDS_Shape>& rest)
+{
+  const bool dbg = std::getenv("NOSHAPE_DEFEATURE_DEBUG") != nullptr;
+  auto       no  = [&](const char* w) {
+    if (dbg)
+      std::fprintf(stderr, "delete onto: %s\n", w);
+    return false;
+  };
+  if (solid.ShapeType() != TopAbs_SOLID || std::getenv("NOSHAPE_DELETE_ONTO_OFF"))
+    return no("not a solid");
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+  ShapeIMap dm;
+  for (const TopoDS_Shape& f : del)
+    dm.Add(f);
+  std::vector<std::pair<TopoDS_Face, TopoDS_Face>> pairs;
+  for (const TopoDS_Shape& x : del)
+  {
+    const TopoDS_Face f = TopoDS::Face(x);
+    BRepAdaptor_Surface fs(f, false);
+    if (fs.GetType() != GeomAbs_Plane)
+    {
+      rest.push_back(x);
+      continue;
+    }
+    const gp_Dir n = fs.Plane().Axis().Direction();
+    ShapeIMap    nb;
+    bool         ok = true;
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More() && ok; e.Next())
+    {
+      const auto& fs2 = ef.FindFromKey(e.Current());
+      ok = fs2.Extent() == 2 && !BRep_Tool::Degenerated(TopoDS::Edge(e.Current()));
+      for (const TopoDS_Shape& g : fs2)
+        if (!g.IsSame(f))
+          nb.Add(g);
+    }
+    TopoDS_Face across;
+    for (int i = 1; i <= nb.Extent() && ok; ++i)
+    {
+      const TopoDS_Face   g = TopoDS::Face(nb(i));
+      BRepAdaptor_Surface gs(g, false);
+      const bool along = (gs.GetType() == GeomAbs_Plane && std::abs(gs.Plane().Axis().Direction().Dot(n)) < 1e-9) ||
+                         (gs.GetType() == GeomAbs_Cylinder && gs.Cylinder().Axis().Direction().IsParallel(n, 1e-9));
+      if (dm.Contains(g) || (!along && !across.IsNull()))
+        ok = false;
+      else if (!along)
+        across = g;
+    }
+    if (!ok || across.IsNull())
+    {
+      if (dbg)
+        std::fprintf(stderr, "delete onto: face left (ok %d, across %d, neighbours %d)\n", (int)ok, (int)!across.IsNull(), nb.Extent());
+      rest.push_back(x);
+      continue;
+    }
+    TopLoc_Location l;
+    BRep_Tool::Surface(across, l);
+    if (!l.IsIdentity())
+    {
+      rest.push_back(x);
+      continue;
+    }
+    pairs.emplace_back(f, across);
+  }
+  if (pairs.empty())
+    return no("no face");
+  // (Two faces onto one neighbour, or one's neighbour another's: left to OCCT.)
+  for (size_t i = 0; i < pairs.size(); ++i)
+    for (size_t j = i + 1; j < pairs.size(); ++j)
+      if (pairs[i].second.IsSame(pairs[j].second))
+        return false;
+  // The neighbour's surface run on past its edges as OCCT's defeature runs it (BRepLib::ExtendFace by the deleted face's
+  // box diagonal: a B-spline's ends short of where the others meet it, the housing's side planes), both faces on it.
+  std::vector<occ::handle<Geom_Surface>> surf;
+  for (const auto& [f, to] : pairs)
+  {
+    occ::handle<Geom_Surface> sf = BRep_Tool::Surface(to);
+    if (!occ::down_cast<Geom_BSplineSurface>(sf).IsNull())
+    {
+      Bnd_Box box;
+      BRepBndLib::Add(f, box);
+      TopoDS_Face ext;
+      BRepLib::ExtendFace(to, std::sqrt(box.SquareExtent()), true, true, true, true, ext);
+      if (ext.IsNull())
+        return no("no extension");
+      sf = BRep_Tool::Surface(ext);
+    }
+    surf.push_back(sf);
+  }
+  for (const bool rw : {false, true})
+  {
+    occ::handle<FaceTweak> tw = new FaceTweak;
+    tw->rev_wires = rw;
+    for (size_t i = 0; i < pairs.size(); ++i)
+    {
+      tw->move_onto(pairs[i].first, pairs[i].second, surf[i]);
+      if (surf[i] != BRep_Tool::Surface(pairs[i].second))
+        tw->extend(pairs[i].second, surf[i]);
+    }
+    tw->prepare(solid);
+    if (!tw->ok)
+      return no(tw->why.c_str());
+    BRepTools_Modifier md(solid, tw);
+    if (!md.IsDone())
+      return no("modifier failed");
+    const TopoDS_Shape r = md.ModifiedShape(solid);
+    BRepLib::SameParameter(r, 1e-7, true);
+    BRepLib::UpdateTolerances(r, false);
+    // One face with the neighbour: only their edges may go (every other face and edge as it was).
+    ShapeIMap mine;
+    for (const auto& [f, to] : pairs)
+      for (const TopoDS_Shape& g : {md.ModifiedShape(f), md.ModifiedShape(to)})
+        TopExp::MapShapes(g, TopAbs_EDGE, mine);
+    ShapeIMap all;
+    TopExp::MapShapes(r, TopAbs_EDGE, all);
+    NCollection_Map<TopoDS_Shape, TopTools_ShapeMapHasher> keep;
+    for (int i = 1; i <= all.Extent(); ++i)
+      if (!mine.Contains(all(i)))
+        keep.Add(all(i));
+    TopoDS_Shape res;
+    HHist        uh;
+    const int    over = onto_overlaps(r, md, pairs, surf, res, uh);
+    if (over < 0)
+      return no("overlapping edges not merged");
+    if (over == 0)
+    {
+      ShapeUpgrade_UnifySameDomain u(r, true, true, false);
+      u.KeepShapes(keep);
+      u.Build();
+      res = u.Shape();
+      uh  = u.History();
+    }
+    ShapeIMap before, after;
+    TopExp::MapShapes(solid, TopAbs_FACE, before);
+    TopExp::MapShapes(res, TopAbs_FACE, after);
+    if (after.Extent() != before.Extent() - (int)pairs.size() || !BRepCheck_Analyzer(res).IsValid())
+    {
+      if (dbg)
+        std::fprintf(stderr, "delete onto: rev_wires %d: faces %d -> %d, valid %d (modified valid %d)\n", (int)rw, before.Extent(), after.Extent(), (int)BRepCheck_Analyzer(res).IsValid(), (int)BRepCheck_Analyzer(r).IsValid());
+      if (dbg)
+        BRepTools::Write(r, (std::string(std::getenv("NOSHAPE_DEFEATURE_DEBUG")) + "-" + std::to_string((int)rw) + ".brep").c_str());
+      if (dbg)
+        BRepTools::Write(res, (std::string(std::getenv("NOSHAPE_DEFEATURE_DEBUG")) + "-res" + std::to_string((int)rw) + ".brep").c_str());
+      continue;
+    }
+    // The deleted faces removed (not merged into their neighbours), as OCCT's defeature has them; those left for OCCT
+    // (`rest`) stay.
+    ShapeIMap gone;
+    for (const auto& [f, to] : pairs)
+      gone.Add(f);
+    HHist m = modifier_history(solid, md);
+    merge_into(m, uh);
+    HHist h = new BRepTools_History();
+    for (TopAbs_ShapeEnum k : {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    {
+      ShapeIMap xs;
+      TopExp::MapShapes(solid, k, xs);
+      for (int i = 1; i <= xs.Extent(); ++i)
+      {
+        if ((k == TopAbs_FACE && gone.Contains(xs(i))) || m->IsRemoved(xs(i)))
+        {
+          h->Remove(xs(i));
+          continue;
+        }
+        for (const TopoDS_Shape& y : m->Modified(xs(i)))
+          if (!y.IsSame(xs(i)) && y.ShapeType() == k)
+            h->AddModified(xs(i), y);
+      }
+    }
+    out  = res;
+    hist = h;
+    return true;
+  }
+  return no("no valid result");
+}
 
 OpOut op_tweak_faces(const OcShape& s, const OcShapeList& faces, rust::Slice<const double> m)
 {
