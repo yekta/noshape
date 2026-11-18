@@ -131,3 +131,16 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   keep that import as an empty module marked `"stub": true` with the reason, if no feature of the document uses
   anything from it (asm-bjr-config's "Packing"). If a feature uses it, the document leaves the suite with the reason
   recorded.
+- 11-18 (user) Speed is judged at human scale, not in milliseconds. Noshape runs on all kinds of machines; the
+  comparison with live is "not far behind", not a strict race. A difference counts only when it is >= 100 ms and >= 2x
+  (against live or against main) on a whole user action: a click to its result, opening a tab, a document's rebuild.
+  Per-feature or per-call millisecond ratios are not targets and are not reported as gaps. A speed regression (P0) is a
+  user action or document rebuild >= 20 % and >= 100 ms slower, confirmed by an alternating A/B on one host (>= 5 runs
+  each, medians). Single runs on a loaded host are not evidence.
+- 11-18 (user) Our own Boolean lands on correctness: identical results on the gate corpora and the hats/dock (live wins
+  over OCCT where they differ). Timing only blocks a land when a document rebuild is >= 20 % and >= 100 ms slower
+  (A/B-confirmed); this replaces the 11-18 "no document > 5 % slower" rule. bool and bool2 work down the reasons ours
+  declines a case to OCCT, ranked by how many recorded cases each reason blocks; their daily report is the share ours
+  takes (count) and the number of differing cases.
+- 11-18 (lead) Hosts: psui builds off vibex6 (the watcher's host) to vibe2; the Mac takes two build slots (12 cores);
+  at most one suite, gate or timing pair at a time on an 8-core host (via ~/bin/slot).
