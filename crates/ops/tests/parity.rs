@@ -3883,18 +3883,19 @@ fn an_assembly_is_rebuilt_as_lives() {
     let with_curve = json!([{ "partId": "JHD", "name": "Part 1", "bodyType": "solid" }, { "partId": "JiD", "name": "Curve 1", "bodyType": "wire" }]);
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-meta.noshape"), &with_bom, &[("E1".into(), with_meta, with_curve)]);
     assert_eq!((r.bom_matching, r.bom_rows), (1, 1), "{r:?}");
-    // Live's Revolute in error with its connectors unresolved (red in its dialog, or its tooltip's message), ours
-    // solving it: a live defect, counted as live (docs/DECISIONS.md 11-15); without either a difference.
+    // Live's Revolute in error with its connectors unresolved (red in its dialog, or its tooltip's message): ours
+    // leaves those ends unresolved too, the mate in error as live's (lead 11-18: a reference live can't resolve is
+    // never ours to find); without either, ours solving it is a difference.
     let mut defect = asm.clone();
     defect["features"]["featureStates"]["M1"]["featureStatus"] = json!("ERROR");
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-defect0.noshape"), &defect, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
     assert_eq!((r.mates_matching, r.live_defects.len()), (0, 0), "{r:?}");
     defect["liveMateMessages"] = json!({ "M1": { "name": "Revolute 1", "status": "ERROR", "message": null, "redFields": ["Mate connector of Part 1 <2>"] } });
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-defect.noshape"), &defect, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
-    assert_eq!((r.mates_matching, r.mates, r.live_defects.len()), (1, 1, 1), "{r:?}");
+    assert_eq!((r.mates_matching, r.mates, r.live_defects.len(), r.occurrences_matching), (1, 1, 0, 2), "{r:?}");
     defect["liveMateMessages"] = json!({ "M1": { "name": "Revolute 1", "status": "ERROR", "message": "Mate cannot resolve mate connectors." } });
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-defect2.noshape"), &defect, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
-    assert_eq!((r.mates_matching, r.live_defects.len()), (1, 1), "{r:?}");
+    assert_eq!((r.mates_matching, r.live_defects.len(), r.occurrences_matching), (1, 0, 2), "{r:?}");
     // An instance of a part live can't resolve (its partId empty): a live defect, not an occurrence counted.
     let mut lost = asm.clone();
     lost["rootAssembly"]["instances"].as_array_mut().unwrap().push(json!({ "id": "IC", "name": "Part 1 <3>", "type": "Part", "partId": "", "elementId": "E1" }));

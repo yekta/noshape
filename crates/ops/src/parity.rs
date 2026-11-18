@@ -7990,6 +7990,10 @@ pub struct AssemblyResult {
     pub untranslated: Vec<String>,
 }
 
+/// A mate end live can't resolve, as ours: a Part Studio mate connector no feature makes, so the mate reads "Mate cannot
+/// resolve mate connectors." as live's.
+const UNRESOLVED_CONNECTOR: &str = "mc:F0.0";
+
 /// Onshape's mate types in assembly_mate's words.
 fn mate_type(t: &str) -> Option<&'static str> {
     Some(match t {
@@ -9330,11 +9334,25 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 continue;
             };
             let mut ends: Vec<Option<Value>> = Vec::new();
+            // The ends live can't resolve (its dialog's red "Mate connector of <instance>"): unresolved in ours too, the
+            // part left where live leaves it, not found again by live's last point (lead 11-18: asm-pattern-std's
+            // Fastened 10 / 11 on AR-S2-108.2's lost hole edge pulled it 10.4 mm).
+            let live_msg = f["featureId"].as_str().map_or(&Value::Null, |id| if l.element.is_empty() { &asm["liveMateMessages"][id] } else { &asm["liveMateMessages"][l.element.as_str()][id] });
+            let red: Vec<&str> = live_msg["redFields"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
+            // (Its tooltip's message alone, no end named: both.)
+            let all_red = red.is_empty() && live_msg["message"].as_str().is_some_and(|m| m.contains("Mate cannot resolve mate connectors."));
             for q in par("mateConnectorsQuery").and_then(|p| p["queries"].as_array()).into_iter().flatten() {
                 let end = (|| {
                     let id = q["featureId"].as_str()?;
                     if let Some(name) = origin_connectors.get(id) {
                         return Some((json!({ "connector": name }), String::new(), None, None));
+                    }
+                    let path = connectors.get(&(l.element.clone(), id.to_string())).map_or_else(|| path_of(&q["path"]), |c| c.0.clone());
+                    if let Some(live_name) = instance_at(&l.element, &path).and_then(|i| i["name"].as_str())
+                        && (all_red || red.contains(&format!("Mate connector of {live_name}").as_str()))
+                    {
+                        trace(&format!("{name}: its end on {live_name} unresolved, as live's"));
+                        return Some((json!({ "instance": path_names(&path)?, "reference": UNRESOLVED_CONNECTOR }), String::new(), None, None));
                     }
                     // A Part Studio's Mate connector on an instance: ours there.
                     if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMPartStudioMateConnectorQuery")) {
