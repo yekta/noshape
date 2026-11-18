@@ -44,6 +44,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
    wrap at 400 px; a hidden sketch's eye only on hover; chip tooltip right; "#" list redraw; configuration names
    spreadsheet keys (Tab out of the add row is the input's IndentInline action, not a key event); X11 press-interval
    double-click; selected cap colour render test. Part Studio lib 273 passed, app-core, render caps, clippy clean.
+2b. Next land: a released box stays until the frame with its selection is presented (`Viewport::box_held`; live
+   recheck 5c922906 ≠: frames with neither); compound units take the larger precision (qa numfmt-1118). Hole callout
+   glyphs still hollow outlines after `on_top` (shot 23:2x): the fill mesh itself, open.
 3. Speed rows closed (lead 23:14): rollback 0.24 s and Mass 313 ms are software-render frame cadence (handler < 1 ms,
    frame 8 ms; frame log /root/psui-scratch/lat). Rule: act on a feel row only if our handler + layout + paint
    exceeds ~100 ms or the event order differs from live.
