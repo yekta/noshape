@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 00:05 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 00:25 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed today
@@ -29,17 +29,20 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   ~/agents/skasm/trace-<doc>.log.
 
 ## Next, in order
-0. USER P0 (lead 11-17): interaction feel. Landed 11-17: b87dd3dc, 24441238, 4a8381fc, 3621f719, 5245720f, and
-   0892eeed (11-18 00:00: drags, Fix on a line, unsolved state, glyph select, snap let-go, region from the pointer,
-   qa SELFEEL-* x4, value boxes mid-chain, Dimension tool flow, SKSNAP-MODEL-EDGE). Queued next: SKSNAP-ALIGN-WOKEN-
-   POINT (another sketch's rested point wakes; checked in the app: guide + "|" at 60 / 150 px, lights ~5 px off,
-   live 6-7), sketch menus scenario (already as live), Flange / Hem edges box mutes wall faces (sm-feel-1117), SKSNAP-
-   REACH (other sketches' points snap from their 15 px square), a joint row hovered lights its rip (3D).
-   Open: SKSNAP-GLYPHS-AFTER is likely the Show constraints setting (live's account had it ticked; told qa);
-   SKSNAP-SHIFT-ICON = our use glyph on a snapped external point (live unknown: ask live before changing);
-   sm-feel-1117 rest (Bend relief / Corner side face + corner disc, Flange flip button, joint flat edges, Rip -> Bend
-   toast); hat15b sketch state by hand. Rigs on vibex6 :391: ~/tmp/skasm/{uh,sf,sk} (qa's scripts pointed at
-   ~/agents/skasm-keep/noshape; bin/appbuild.sh rebuilds it). Land NOSHAPE_LAND_QUEUE_HOST=vibe2.
+0. USER P0 (lead 11-17): interaction feel. Landed 11-17/18: b87dd3dc, 24441238, 4a8381fc, 3621f719, 5245720f,
+   0892eeed (drags, Fix on a line, unsolved state, glyph select, snap let-go, region from the pointer, qa SELFEEL-* x4,
+   value boxes mid-chain, Dimension tool flow, SKSNAP-MODEL-EDGE), a6236ed3 (SKSNAP-ALIGN-WOKEN-POINT, SKSNAP-REACH,
+   menus scenario, Flange / Hem box mutes wall faces, joint row lights its rip in 3D).
+   hat15b by hand (copy deleted): state colours / badge / tooltip / conflict bubble / undo as live. Found: in a
+   1440 x 900 window with the 145-feature list scrolled the viewport reads the pointer ~10 px right (psui told, repro).
+   Open: SKSNAP-GLYPHS-AFTER = Show constraints setting (qa re-runs ticked); SKSNAP-SHIFT-ICON (use glyph on a snapped
+   external point) asked live (REQUESTS 11-18); live: mitred flange corners are not rips (ours the same).
+   sm-feel-1117 rest: Corner / Bend relief taking a rip's side face (tried: std's findCornerDefinitionVertex throws
+   SHEET_METAL_RIP_NO_CORNER for our rip face, and the native corner search needs both bends on one parent: in a
+   converted open box bend 0's parent is wall 0, the others wall 1, so native can't pair them; a vertex works via
+   std); joint row's flat edges; Rip -> Bend unfold-failure toast. Rigs on vibex6 :391: ~/tmp/skasm/{uh,sf,sk}
+   (qa's scripts pointed at ~/agents/skasm-keep/noshape; bin/appbuild.sh rebuilds it). Land
+   NOSHAPE_LAND_QUEUE_HOST=vibe2.
 1. config-parts: linear-rail 26/26, links 35/35 (live fetched Derived 1's source), standoffs 32/32, sprockets 24/24
    (live's volume band carried while its volume stays: carry_volume_bands); pulleys 12/22 (Circular pattern 1, a face
    pattern ADD, fails in our op on main too: core's since 11:45); nuts 14/17 (Sweep 1, bool's). Standoffs regenerates
