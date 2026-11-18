@@ -457,17 +457,23 @@ fn corpus_triangle_counts_against_brepmesh() {
 fn the_checks_catch_a_triangle_turned_over_or_across_a_hole() {
     let shape = cable_box(0.0);
     let mesh = display_mesh(&shape, 1.0);
-    assert!(planar_face_problems(&shape, &mesh).is_empty() && coverage_problems(&shape, &mesh).is_empty());
+    let clean = (planar_face_problems(&shape, &mesh), coverage_problems(&shape, &mesh));
+    assert!(clean.0.is_empty() && clean.1.is_empty(), "the display mesh itself: {clean:?}");
     // The flat face with the most triangles: the cavity's floor round the recess.
     let (fi, &(first, count)) = mesh.face_ranges.iter().enumerate().filter(|(i, _)| shape.sub_shape(ShapeType::Face, *i).is_ok_and(|f| matches!(f.face_surface(), Ok(k::Surface::Plane(_))))).max_by_key(|(_, r)| r.1).expect("a flat face");
     let mut turned = mesh.clone();
     turned.indices.swap(first as usize + 1, first as usize + 2);
     assert!(planar_face_problems(&shape, &turned).iter().any(|p| p.starts_with(&format!("face {fi} "))), "a turned triangle passed");
-    // Its first triangle's corner moved to the face's corner farthest from it: across the face.
+    // One triangle's third corner moved across the face: the triangle and corner that stretch it most (the mesh's
+    // first triangle may have a side too short to cover much at any corner).
     let mut across = mesh.clone();
-    let tri = &mesh.indices[first as usize..first as usize + 3];
     let p = |i: u32| DVec3::from(mesh.positions[i as usize].map(f64::from));
-    let far = mesh.indices[first as usize..(first + count) as usize].iter().copied().max_by(|&a, &b| p(a).distance(p(tri[0])).total_cmp(&p(b).distance(p(tri[0])))).expect("corners");
-    across.indices[first as usize + 2] = far;
+    let face = &mesh.indices[first as usize..(first + count) as usize];
+    let area = |a: u32, b: u32, c: u32| 0.5 * (p(b) - p(a)).cross(p(c) - p(a)).length();
+    let (at, far) = (0..face.len() / 3)
+        .flat_map(|t| face.iter().map(move |&c| (t, c)))
+        .max_by(|&(t, c), &(u, d)| (area(face[3 * t], face[3 * t + 1], c) - area(face[3 * t], face[3 * t + 1], face[3 * t + 2])).total_cmp(&(area(face[3 * u], face[3 * u + 1], d) - area(face[3 * u], face[3 * u + 1], face[3 * u + 2]))))
+        .expect("corners");
+    across.indices[first as usize + 3 * at + 2] = far;
     assert!(coverage_problems(&shape, &across).iter().any(|p| p.starts_with(&format!("face {fi} "))), "a triangle across the face passed: {:?}", coverage_problems(&shape, &across));
 }
