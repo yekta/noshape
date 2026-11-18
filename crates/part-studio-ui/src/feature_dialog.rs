@@ -269,6 +269,9 @@ pub struct FeatureDialog {
     /// keyboard then, the selection field stays active; `ui_focus`). A press in the dialog or a field's focus
     /// brings it back.
     pub keyboard_left: bool,
+    /// Tab or Shift+Tab took the keyboard out of the dialog (live dialogs-1118: Esc then does nothing until a click
+    /// on the graphics or the dialog).
+    pub tabbed_out: bool,
     /// The field Enter just applied: the input's change event for the last typed key can arrive after the commit
     /// rewrote the text ("15" → "15 mm") and must not open a list for it.
     just_applied: Option<String>,
@@ -461,6 +464,7 @@ impl FeatureDialog {
             focus_active_pending: false,
             mc_mode: None,
             keyboard_left: false,
+            tabbed_out: false,
             create_var: None,
             external_field: None,
             extra: None,
@@ -2670,7 +2674,8 @@ impl FeatureDialog {
     #[cfg(test)]
     pub(crate) fn focused_control(&self, window: &Window, cx: &App) -> Option<String> {
         let stop = self.tab_stops.iter().find(|(_, h)| h.is_focused(window)).map(|(k, _)| k.clone());
-        stop.or_else(|| self.inputs.iter().find(|(_, st)| st.read(cx).focus_handle(cx).is_focused(window)).map(|(p, _)| format!("in:{p}")))
+        let select = || self.selects.iter().find(|(_, s)| s.read(cx).has_focus(window)).map(|(p, _)| format!("sel:{p}"));
+        stop.or_else(select).or_else(|| self.inputs.iter().find(|(_, st)| st.read(cx).focus_handle(cx).is_focused(window)).map(|(p, _)| format!("in:{p}")))
     }
 
     /// A text field's text and its selected part.

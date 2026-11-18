@@ -479,6 +479,10 @@ pub struct Viewport {
     pub manipulators: Vec<(DVec3, DVec3, f64)>,
     /// Pick ids that win ties in the pick radius (edges/points over faces).
     pub pick_priority: Arc<dyn Fn(u32) -> i32 + Send + Sync>,
+    /// A finished box carries the pick ids inside it (read back from the GPU first). Off: the box's event goes out at
+    /// the release, with no ids (a Part Studio works out what a box takes itself; the readback held its selection
+    /// 4–5 frames, live recheck 11-18).
+    pub box_by_pick: bool,
     /// What zoom to fit frames (set by the owner, e.g. the visible parts);
     /// `None` frames the whole scene (default planes included).
     pub fit_bounds: Option<(DVec3, DVec3)>,
@@ -755,6 +759,7 @@ impl Viewport {
             step_clock: None,
             manipulators: Vec::new(),
             pick_priority: Arc::new(|_| 0),
+            box_by_pick: true,
             fit_bounds: None,
             fit_inset_left: 0.0,
             box_rect: None,
@@ -2622,6 +2627,10 @@ impl Viewport {
         if std::mem::take(&mut self.zoom_window) {
             self.zoom_to_box(a, b, cx);
             cx.notify();
+            return;
+        }
+        if !self.box_by_pick {
+            cx.emit(ViewportEvent::BoxSelect { ids: Vec::new(), modifiers, crossing, rect: (a, b) });
             return;
         }
         // Crossing selection only needs the box; window selection also needs

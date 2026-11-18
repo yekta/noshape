@@ -619,6 +619,58 @@ fn rows() -> Vec<Row> {
             let want_back: Vec<Option<String>> = stops.iter().rev().skip(1).map(|s| Some(s.to_string())).chain([Some("in:depth".to_string())]).collect();
             expect((forward, back), (want_forward, want_back), "(the focus after each Tab from Depth, after each Shift+Tab from the help link)")
         } },
+        Row { id: "keys / Tab orders of Chamfer, Shell, Hole, Revolve, Linear and Circular pattern", live: "from the first number field, to out of the dialog: Chamfer Distance -> ± -> Tangent propagation -> help; Shell thickness -> its flip arrow -> help; Hole's size -> ± -> Start plane -> Termination (its dropdowns are stops) -> flip -> depth -> ± -> tip angle -> help; Revolve (Full revolve off) angle -> ± -> Symmetric -> Second end position -> help; Linear Distance -> Instance count -> flip -> Centered -> Second direction -> Skip instances -> help; Circular Angle -> Instance count -> flip -> Equal spacing -> Centered -> Skip instances -> help (live dialogs-1118 batches 1-3)", gap: false, check: |cx| {
+            // (Feature, checkboxes set first, the field Tab starts from, the stops after it.)
+            type Case = (&'static str, &'static [(&'static str, bool)], &'static str, &'static [&'static str]);
+            let cases: [Case; 6] = [
+                ("chamfer", &[], "width", &["tol:width", "cb:tangentPropagation"]),
+                ("shell", &[], "thickness", &["flip:oppositeDirection"]),
+                ("hole", &[], "holeDiameterV3", &["tol:holeDiameterV3", "sel:startStyle", "sel:endStyleV2", "flip:oppositeDirection", "in:holeDepthV3", "tol:holeDepthV3", "sel:tipAngleStyle"]),
+                ("revolve", &[("fullRevolve", false)], "angle", &["tol:angle", "cb:symmetric", "cb:hasStartBound"]),
+                ("linearPattern", &[], "distance", &["in:instanceCount", "flip:oppositeDirection", "cb:isCentered", "cb:hasSecondDir", "cb:skipInstances"]),
+                ("circularPattern", &[], "angle", &["in:instanceCount", "flip:oppositeDirection", "cb:equalSpace", "cb:isCentered", "cb:skipInstances"]),
+            ];
+            let (mut got, mut want) = (Vec::new(), Vec::new());
+            for (feature, bools, field, stops) in cases {
+                let (window, view) = block(cx, &format!("dlg-tab-{feature}"));
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature(feature, w, cx))).unwrap();
+                draw(cx, window);
+                let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).ok_or("no dialog")?;
+                cx.update(|cx| dialog.update(cx, |d, cx| bools.iter().for_each(|(p, b)| d.set_value(p, noshape_model::params::ParamValue::Bool(*b), cx))));
+                draw(cx, window);
+                cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected(field, w, cx))).unwrap();
+                draw(cx, window);
+                let mut walk = Vec::new();
+                for _ in 0..stops.len() + 2 {
+                    keys(cx, window, &["tab"]);
+                    walk.push(cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap().unwrap_or_else(|| "out".into()));
+                }
+                got.push((feature, walk));
+                want.push((feature, stops.iter().map(|s| s.to_string()).chain(["help".into(), "out".into()]).collect::<Vec<String>>()));
+            }
+            expect(got, want, "(feature, the focus after each Tab from its first number field)")
+        } },
+        Row { id: "keys / Esc after Tab has left the dialog does nothing", live: "Tab past the help link takes the keyboard out of the dialog (the page, then its header): Esc twice leaves the dialog open; a click on empty graphics, then Esc, cancels it (live dialogs-1118 batch 3)", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "dlg-esc-tab-out");
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+            draw(cx, window);
+            for _ in 0..8 {
+                keys(cx, window, &["tab"]);
+            }
+            let out = cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap();
+            keys(cx, window, &["escape"]);
+            keys(cx, window, &["escape"]);
+            let open = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).edit.is_some());
+            let after_tab = open(cx);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::Click { pick: None, position: glam::DVec2::new(40., 40.), modifiers: Modifiers::default() }, w, cx);
+            }))
+            .unwrap();
+            draw(cx, window);
+            keys(cx, window, &["escape"]);
+            expect((out, after_tab, open(cx)), (None, true, false), "(the focus after Tab past the help link, open after Esc ×2, open after a graphics click and Esc)")
+        } },
         Row { id: "keys / Space toggles a focused checkbox", live: "Symmetric focused by Tab: Space on, Space off, the preview following (live2 dialog-keys-1118 c1)", gap: false, check: |cx| {
             let (window, _view, dialog) = edit_extrude(cx, "dlg-space");
             cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
@@ -739,9 +791,10 @@ fn rows() -> Vec<Row> {
 #[gpui::test]
 fn the_dialogs_matrix_matches_live(cx: &mut TestAppContext) {
     let rows = rows();
+    let only = std::env::var("DIALOG_ROW").ok();
     let mut report = Vec::new();
     let mut moved = Vec::new();
-    for r in &rows {
+    for r in rows.iter().filter(|r| only.as_ref().is_none_or(|o| r.id.contains(o.as_str()))) {
         let res = (r.check)(cx);
         let ok = res.is_ok();
         report.push(format!("{} {} (live: {}){}", if ok { "=" } else { "≠" }, r.id, r.live, res.err().map(|e| format!("\n    {e}")).unwrap_or_default()));

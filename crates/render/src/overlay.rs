@@ -490,9 +490,12 @@ pub mod view_cube {
             if let Some(v) = view {
                 return Camera::rotation_for(v);
             }
-            // A corner looks down its diagonal, Z up (live ui-parity view-cube-front-then-iso's camera: (-1, 1, -1)/√3
-            // from the front-right-top corner); an edge between two faces halfway between them.
-            let eye = DVec3::new(self.0[0] as f64, self.0[1] as f64, self.0[2] as f64).normalize();
+            // A corner: the Trimetric view turned to its quarter, 15° short of its diagonal (counter-clockwise from
+            // above), 30° above or below, Z up (live viewcube-1118, from iso: the front-right-top corner gives the
+            // Trimetric view, the front-left-top one (−0.75, −0.433, 0.5) from the eye).
+            let az = (self.0[1] as f64).atan2(self.0[0] as f64) - 15f64.to_radians();
+            let el = 30f64.to_radians() * self.0[2].signum() as f64;
+            let eye = DVec3::new(el.cos() * az.cos(), el.cos() * az.sin(), el.sin());
             Camera::look_rotation(-eye, DVec3::Z)
         }
     }
@@ -568,6 +571,30 @@ pub mod view_cube {
                 Arrow::Right => tri([[o, 0.0], [b, w], [b, -w]]),
                 Arrow::Cw => vec![head(1.0), arc(0.25 * PI, 0.4 * PI)],
                 Arrow::Ccw => vec![head(-1.0), arc(0.6 * PI, 0.75 * PI)],
+            }
+        }
+
+        /// Where a click or hover takes the arrow, larger than its drawing (live viewcube-1118's 10 px click grid
+        /// from iso): a triangle's box 61–79 px out and 12.5 px either side, a roll's band 59–78 px out over
+        /// 41–73° (mirrored for the counter-clockwise one).
+        fn hit_poly(self) -> Vec<DVec2> {
+            let sector = |a0: f64, a1: f64| {
+                let at = |k: usize| (a0 + (a1 - a0) * k as f64 / 8.0).to_radians();
+                let mut p: Vec<DVec2> = (0..=8).map(|k| DVec2::from_angle(at(k)) * 78.0).collect();
+                p.extend((0..=8).rev().map(|k| DVec2::from_angle(at(k)) * 59.0));
+                p
+            };
+            let bar = |d: DVec2| {
+                let t = d.perp() * 12.5;
+                vec![d * 61.0 - t, d * 79.0 - t, d * 79.0 + t, d * 61.0 + t]
+            };
+            match self {
+                Arrow::Up => bar(DVec2::Y),
+                Arrow::Down => bar(DVec2::NEG_Y),
+                Arrow::Left => bar(DVec2::NEG_X),
+                Arrow::Right => bar(DVec2::X),
+                Arrow::Cw => sector(41.0, 73.0),
+                Arrow::Ccw => sector(107.0, 139.0),
             }
         }
     }
@@ -679,7 +706,7 @@ pub mod view_cube {
 
     /// What's under a widget point: an arrow's pseudo cell or a cube cell.
     pub fn widget_hit(rotation: DQuat, p: DVec2) -> Option<CubeCell> {
-        Arrow::ALL.into_iter().find(|a| a.polys().iter().any(|q| point_in_poly(p, q))).map(Arrow::cell).or_else(|| cube_hit(rotation, p))
+        Arrow::ALL.into_iter().find(|a| point_in_poly(p, &a.hit_poly())).map(Arrow::cell).or_else(|| cube_hit(rotation, p))
     }
 
     pub fn point_in_poly(p: DVec2, poly: &[DVec2]) -> bool {
@@ -951,5 +978,70 @@ mod cube_hover_map {
             let n = |m: &Vec<Vec<char>>| m.iter().flatten().filter(|c| **c == t).count() as f64;
             assert!((n(&ours) - n(&live)).abs() <= 0.3 * n(&live), "{t}: ours {} cells, live {}\n{map}", n(&ours), n(&live));
         }
+    }
+
+    /// Live viewcube-1118 (vc.json): a click every 10 px over the widget from the iso view, what each did (the faces
+    /// T F R L K B, the corners * 1 2 3, the arrows ^ v < > and the rolls c (clockwise) / w; '.' nothing). Columns
+    /// x = 1760 … 1900, rows y = 100 … 240 page px; the cube's centre there is about (1828, 167) (its arrows' midpoints).
+    const LIVE_CLICKS: [&str; 15] = [
+        "...www^^^cc....",
+        "..wwww...cccc..",
+        "..ww..LKK..cc..",
+        "....LLTTTKK....",
+        "...22TTTTT1K...",
+        "...22LTTTK11...",
+        "<..LFL***RRK.>>",
+        "<..LFF***RRK.>>",
+        "...LFFFBRRRK...",
+        "...BFFFBRRB....",
+        "....BB333BB....",
+        ".....B33B......",
+        "...............",
+        "......vvv......",
+        "......vv.......",
+    ];
+
+    #[test]
+    fn the_cube_click_grid_from_iso_matches_live() {
+        let z = DVec3::new(1.0, -1.0, 1.0).normalize();
+        let y = DVec3::new(-0.408248, 0.408248, 0.816497).normalize();
+        let rot = DQuat::from_mat3(&DMat3::from_cols(y.cross(z), y, z));
+        let ch = |p: DVec2| match widget_hit(rot, p) {
+            None => '.',
+            Some(c) => match (Arrow::of(c), c.0) {
+                (Some(Arrow::Up), _) => '^',
+                (Some(Arrow::Down), _) => 'v',
+                (Some(Arrow::Left), _) => '<',
+                (Some(Arrow::Right), _) => '>',
+                (Some(Arrow::Cw), _) => 'c',
+                (Some(Arrow::Ccw), _) => 'w',
+                (None, [0, 0, 1]) => 'T',
+                (None, [0, -1, 0]) => 'F',
+                (None, [1, 0, 0]) => 'R',
+                (None, [-1, 0, 0]) => 'L',
+                (None, [0, 1, 0]) => 'K',
+                (None, [0, 0, -1]) => 'B',
+                (None, [1, -1, 1]) => '*',
+                (None, [1, 1, 1]) => '1',
+                (None, [-1, -1, 1]) => '2',
+                (None, [1, -1, -1]) => '3',
+                _ => '?',
+            },
+        };
+        let grid = |cx: f64, cy: f64| -> Vec<String> { (0..15).map(|j| (0..15).map(|i| ch(DVec2::new(1760.0 + 10.0 * i as f64 - cx, cy - (100.0 + 10.0 * j as f64)))).collect()).collect() };
+        let agree = |g: &[String]| LIVE_CLICKS.iter().zip(g).map(|(a, b)| a.chars().zip(b.chars()).filter(|(x, y)| x == y && *x != '.').count()).sum::<usize>();
+        let covered = |g: &[String]| LIVE_CLICKS.iter().zip(g).map(|(a, b)| a.chars().zip(b.chars()).filter(|(x, y)| *x != '.' || *y != '.').count()).sum::<usize>();
+        let mut best = (0usize, 0.0, 0.0);
+        for cx in 1822..=1834 {
+            for cy in 161..=173 {
+                let n = agree(&grid(cx as f64, cy as f64));
+                if n > best.0 {
+                    best = (n, cx as f64, cy as f64);
+                }
+            }
+        }
+        let g = grid(1828.0, 167.0);
+        eprintln!("best centre ({}, {}): {} agree; at (1828, 167): {} of {}\n{}", best.1, best.2, best.0, agree(&g), covered(&g), g.join("\n"));
+        assert!(agree(&g) as f64 >= 0.8 * covered(&g) as f64, "{} of {} clicks agree with live:\n{}", agree(&g), covered(&g), g.join("\n"));
     }
 }

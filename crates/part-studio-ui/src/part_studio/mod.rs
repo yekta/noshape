@@ -541,7 +541,12 @@ impl PartStudioView {
 
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         OPEN_VIEWS.with(|m| m.borrow_mut().insert((doc.entity_id(), tab), cx.entity().downgrade()));
-        let viewport = cx.new(|cx| Viewport::new(gpu.clone(), window, cx));
+        let viewport = cx.new(|cx| {
+            let mut vp = Viewport::new(gpu.clone(), window, cx);
+            // What a box takes is worked out here (box_select.rs): it selects at the release.
+            vp.box_by_pick = false;
+            vp
+        });
         let mut subs = Vec::new();
         subs.push(cx.subscribe_in(&viewport, window, |this, vp, ev, window, cx| {
             this.on_viewport_event(vp, ev, window, cx);
@@ -1979,7 +1984,10 @@ impl PartStudioView {
             self.draft_checkpoint(cx);
         }
         if press && let Some(e) = &self.edit {
-            e.dialog.update(cx, |d, _| d.keyboard_left = true);
+            e.dialog.update(cx, |d, _| {
+                d.keyboard_left = true;
+                d.tabbed_out = false;
+            });
         }
         if press && let Some(sd) = &mut self.ui.section_dialog {
             sd.keyboard_left = true;
@@ -2803,8 +2811,16 @@ impl PartStudioView {
             // Live (psb 10-19 h): Tab past the dialog's last control goes to
             // the navbar; Shift+Tab before its first one to <body> (here the
             // Part Studio itself, so shortcuts keep working).
-            DialogEvent::LeaveFocus { forward: true } => window.dispatch_action(Box::new(crate::actions::FocusNavbar), cx),
-            DialogEvent::LeaveFocus { forward: false } => window.focus(&this.focus, cx),
+            DialogEvent::LeaveFocus { forward } => {
+                if let Some(e) = &this.edit {
+                    e.dialog.update(cx, |d, _| d.tabbed_out = true);
+                }
+                if *forward {
+                    window.dispatch_action(Box::new(crate::actions::FocusNavbar), cx);
+                } else {
+                    window.focus(&this.focus, cx);
+                }
+            }
             DialogEvent::CreateSelection(field) => this.open_create_selection_for_field(field.clone(), cx),
             DialogEvent::CreateVariable(v) => this.create_variable_from_field(v, cx),
             DialogEvent::ImportReference { param, file } => this.import_reference_file(param.clone(), file.clone(), cx),
@@ -7493,8 +7509,12 @@ impl Render for PartStudioView {
                     this.sketch_cancel(cx);
                     return;
                 }
-                if this.edit.is_some() {
-                    this.cancel_edit(window, cx);
+                if let Some(e) = &this.edit {
+                    // Live (dialogs-1118): once Tab has taken the keyboard out of the dialog, Esc leaves it open.
+                    let out = e.dialog.read(cx).tabbed_out && !e.dialog.read(cx).focus_handle(cx).contains_focused(window, cx);
+                    if !out {
+                        this.cancel_edit(window, cx);
+                    }
                 } else if this.close_tool_panel(window, cx) {
                 } else {
                     // Live ("nav2 selection" (4)): Esc never clears the

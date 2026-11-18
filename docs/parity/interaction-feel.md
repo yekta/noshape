@@ -30,7 +30,7 @@ GPU `feel::presses_orbit_box_and_open_the_menu_as_live`).
 | Pick area | a square of 5 px each way | the same (`PickBuffer::pick`, `PICK_RADIUS`) | matrix | = |
 | A part hidden behind another, selected or hovered | its orange silhouette (selected) or light-orange outline (list-row hover, a face's hover) is drawn through the part in front; the fill only where it shows (live2 11-14, feel/hidden-part-selection.png) | the same: selected, `outline_through` on the part's meshes (studios' renderer flag); hovered, the hover mask takes the part's whole image, depth ignored | GPUI `a_selected_part_outlines_through_parts_in_front`, offscreen `a_hovered_part_is_outlined_through_the_part_in_front` | = |
 | Priority | sketch point > sketch line > mate connector > vertex > edge > origin > sketch region > face > plane; the nearest within it | the same (`PickKind::priority`) | matrix (a sketch line over a part edge, a sketch point on a vertex) | = |
-| Edge (over the background or its face) | lights at 7 px; stays lit to 9–10 (retaken 11-18 16:29, live/feel/reach-1118; 6–7 on 11-13) | 7; 9 (a line picks at least 5 px wide, 9 hovered itself; the shaders' `picking`) | matrix; GPU `feel::a_click_beside_an_edge_selects_what_is_lit` | ≠ (live recheck 11-18 on green b5b664aaa: lights at 7 =, lets go at 9, held only to 8; live 9–10) |
+| Edge (over the background or its face) | lights at 7 px; stays lit to 9–10 (retaken 11-18 16:29, live/feel/reach-1118; 6–7 on 11-13) | 7; 10 (a line picks at least 5 px wide, 11 hovered itself, was 9: held to 8 in live's recheck; the shaders' `picking`) | matrix; GPU `feel::a_click_beside_an_edge_selects_what_is_lit` | = (fixed after live recheck 11-18: was lit at 7 =, let go at 9) |
 | Vertex | 7 px across, 9 diagonally; stays lit to 7–8 | 7 / 9; 7 (a point picks at most 5 px wide) | matrix | = |
 | Sketch line / point, not editing | 7, lit to 9–11 / 7–8, lit to 7–8 (retaken 11-18; the line 5–6 on 11-13) | 7, 9 / 7, 7 | matrix | = |
 | A part in iso with the planes behind and through it (user P0 11-17) | the part lights, never a plane behind it: each face's middle (a face, or a seen edge by it), a top corner 5 px out its vertex; beside it a plane | the same | GPU `feel::part_faces_and_vertices_light_over_the_planes_behind` | = |
@@ -391,7 +391,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Undo steps (live2 doc-level-1117) | a rename and a part's Hide are one step each, with no toast; a selection and Shift+5 are none; Ctrl+Y redoes, Ctrl+Shift+Z doesn't (app-core `actions` tests); Ctrl+Z in a dialog's field does nothing (`undo_does_nothing_while_a_dialog_control_has_the_keyboard`) | the same | = (new) |
 | Graphics menu over a selection (live ctx-menus-1117) | the face clicked selected: Clear selection above Select; two faces: "Add appearance to 2 faces…", no New sketch… / Offset plane… / Extrude… / Revolve… / Export as DXF/DWG…; a face and an edge: the faces' menu without View normal to, Delete Part 1…, the part's material and appearance rows, Fillet… / Chamfer… or analysis ; a face with Part 1's row selected: no New sketch… … Revolve…, no Export as DXF/DWG…; a vertex: no Section view…, Zoom to selection; the Top plane and Origin rows | the same (sketch_ui_tests `graphics_menus_over_a_selection_as_live`, list matrix rows; a face + an edge gave the edge's menu, a face with the part selected its creation rows) | = (fixed) |
 | Parts list: Cmd+click | toggles like Ctrl (metaKey or ctrlKey on every OS) | the same | = (new) |
-| Hover: the row tooltip | "Extrude 1 <- Sketch 1"; fades in from 65–100 ms, opaque at 166–209 (retaken 11-18, live/feel/list-1118, 3 runs; 11-13: from 160, full by 390) | the text as before; shown at 80 ms with a 130 ms fade (`ui::ROW_TIP_DELAY`) | ≠ (live recheck 11-18 on green b5b664aaa: first visible 150–167 ms after the row lights, opaque at ~250; live 65–100 / 166–209) |
+| Hover: the row tooltip | "Extrude 1 <- Sketch 1"; fades in from 65–100 ms, opaque at 166–209 (retaken 11-18, live/feel/list-1118, 3 runs; 11-13: from 160, full by 390) | the text as before; shown at 80 ms, its 110 ms fade starting at a fifth (`ui::ROW_TIP_DELAY`, `ROW_TIP_FADE`: from nothing its first frame drew nothing, a frame or two late on a slow lane) | = (fixed after live recheck 11-18: first visible 150–167 ms after the row lit, opaque ~250) |
 | Hover: the geometry | lit 100 ms after the pointer arrives, cleared 100 ms after it leaves; a sweep lights only where it rests | the same (`LIST_HOVER_DEBOUNCE`; was at once) | = (fixed) |
 | Folders: New folder | nothing selected: an empty folder above the rollback bar; features and a part: the features; only default geometry: nothing; Escape: none | the same (default geometry alone opened the popover) | = (fixed) |
 | Folders: dropping on a collapsed folder | top third before it, middle inside at its end, bottom third after it | the same (every drop went inside, first) | = (fixed) |
@@ -506,6 +506,8 @@ Alt+right drags, view keys, animations, double middle click, acted out with real
 | Double middle click | two middle releases within 500 ms fit (150 ms did, 600 ms didn't) | the OS's double click count; now live's own 500 ms timer | = (fixed) |
 | Wheel, Ctrl+wheel, pinch (live nav-1117) | one wheel event = one 2^(1/12) step about the pointer whatever its deltaY (1–240), not animated; Ctrl+wheel the same; a pinch one step per update (5 updates ×1.335 either way); a precise trackpad proportional (0.5 · wheelDelta / 120, ×2^(x/6)) | the same (`wheel_zoom_amount`, `pinch_zoom_amount`) | = |
 | View changes below 20 fps (live nav-1117) | an average frame over 50 ms: the view jumps, no animation (500 ms views / F / cube / 180, 250 ms arrows and keys, 125 / 250 ms levelling otherwise, smootherstep) | animated at any rate; now jumps (`navigation::view_change_duration`) | = (fixed) |
+| View cube clicks from iso (live viewcube-1118, a 10 px click grid) | faces their views; a corner the Trimetric view turned to its quarter (azimuth 15° short of the corner's, ±30°: the front-right-top corner Trimetric (−0.433, 0.75, −0.5)); the hidden faces' bands past the silhouette theirs (the bottom ~30 px under the cube); the arrows' click areas larger than drawn (a triangle's 61–79 px out, ±12.5; a roll's 59–78 px over 41–73°), 15° each | a corner looked down its diagonal (iso: read from a ui-parity step whose "Isometric" click wasn't on the cube) and the arrows took only their drawn shapes; now as live (`CubeCell::rotation`, `Arrow::hit_poly`); from other views asked of live (REQUESTS 21:30) | = (fixed) |
+| View cube press and drag (live viewcube-1118) | a press released within 2 px is a click; 3 or 5 px nothing; a 40 px drag neither orbits nor clicks (the cube moves); a press held 1.2 s without moving nothing (the limit between ~0.2 and 1.2 s) | the same (`CLICK_TOLERANCE`, the cube's own drag) except the hold: any hold still clicks (the limit asked of live, REQUESTS 21:30) | ≠ (hold) |
 | Not yet in the matrix | inertia (a flick keeps turning, ×0.77 per 16.67 ms; none held still 50 ms; none below 20 fps: it reads real time and the frame rate, so not a T1 row; navigation `inertia_decays_like_onshape` checks the decay); Alt+right on a tilted view animates upright first; the view cube (150 px, 15 px margins, face / edge / corner 500 ms, arrows 15° in 250 ms, curved arrows roll, hover fill) and its menu; live navigation-gaps2 (client source): Alt+right levels the view on the first drag move over 125 ms (tilt ≤ 45°) or 250 ms (> 45°), smootherstep, drag moves ignored until it ends (ours the same: `level_view`, `CAMERA_SNAP_ANIMATION` / `CAMERA_SHORT_ANIMATION`, `AxisTag::Levelling`) | – | – |
 
 ## Chrome (matrix)
@@ -682,7 +684,7 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). part-studio-ui
 `dialogs::the_dialogs_matrix_matches_live` (T1, no GPU) on the block start, and `manipulators::snap_tests`.
 
-**Matched: 31 / 31** (11-18 02:17 UTC: live2 parts-list-1118 and dialog-keys-1118 rows, 2 fixed; 23 / 23 at 11-17 22:59 UTC).
+**Matched: 33 / 33** (11-18 21:28 UTC: live dialogs-1118 Tab orders =, Esc after Tab-out fixed; 31 / 31 at 11-18 02:17 UTC: live2 parts-list-1118 and dialog-keys-1118 rows, 2 fixed; 23 / 23 at 11-17 22:59 UTC).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -720,6 +722,8 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | Add appearance to face… (live2 parts-list-1118 e1-e4) | "Face appearance 1", 220 × 401 in the feature dialogs' place; "Faces or features" with the chip "Face of Extrude 2" and its ×; a swatch recolours only that face at once; ✓ keeps it, no feature row | 431 px at the graphics' bottom left, "1 face" in the field; now as live | = (fixed) |
 | Keyboard on opening (live2 dialog-keys-1118) | a new Extrude / Fillet and an edited Extrude focus their first selection field | the same | = (new) |
 | Tab from Depth (live2 dialog-keys-1118 b1) | ± → Direction → Starting offset → Symmetric → Draft → Second end position → help → out of the dialog; End type, the selection field, the tabs and ✓ / ✗ skipped; Shift+Tab back | the same | = (new) |
+| Tab orders of the other dialogs (live dialogs-1118 batches 1–3) | from the first number field: Chamfer Distance → ± → Tangent propagation → help; Shell thickness → its flip arrow → help; Hole's size → ± → Start plane → Termination (dropdowns are stops) → flip → depth → ± → tip angle → help; Revolve (Full revolve off) angle → ± → Symmetric → Second end position → help; Linear Distance → Instance count → flip → Centered → Second direction → Skip instances → help; Circular Angle → Instance count → flip → Equal spacing → Centered → Skip instances → help; then out | the same | = (new) |
+| Esc after Tab has left the dialog (live dialogs-1118 batch 3) | does nothing (twice); a click on empty graphics, then Esc, cancels | Esc cancelled it; now the dialog remembers Tab took the keyboard out (`tabbed_out`) and Esc leaves it open until a press in the graphics or the keyboard is back in it | = (fixed) |
 | Space, dropdown keys, Ctrl+Enter (live2 dialog-keys-1118 c1-c3) | Space toggles a focused checkbox; End type clicked: a focused search box, Down moves the highlight, Esc closes it unchanged; Ctrl+Enter in a field is Enter | the same | = (new) |
 | An empty click with a box active | the box's entries and the dialog stay as they are (no deselect, no close; live feature-dialogs-1117) | the same | = |
 | Radius focused, an edge clicked | the Entities box stays active: the edge is added and the keyboard leaves Radius | the same | = |
@@ -842,7 +846,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| During a box drag nothing lights; on release the result is selected at once | = | ≠ (live recheck 11-18 on green b5b664aaa: nothing lights =; the selection shows 67–83 ms, 4–5 frames, after the box clears; live at once) |
+| During a box drag nothing lights; on release the result is selected at once | = | = (fixed after live recheck 11-18: the selection came 4–5 frames after the box cleared, waiting on a GPU readback a Part Studio doesn't use; `Viewport::box_by_pick` off) |
 | Window box counts on two blocks (28 / 21); a block's 18 / 5 / crossing 13 | = | feel_tests::box_select_takes_what_live_takes (one block; the two-block counts missing) |
 | A press whose first move ends over a default plane lights the plane and draws no box until the next move | = (fixed 11-18: was the box on the first move, live2 ours-1118) | feel tests `a_box_whose_first_move_ends_on_a_plane_waits_a_move` |
 | A click on a default plane selects it, a second adds; a face then a plane gives both; an empty click clears all | = | sketch_box_feel_tests::midpoint_glyph_and_plane_clicks_in_a_sketch_as_live (sketch mode); list matrix "click / a default plane: Default geometry related" |
@@ -1276,14 +1280,14 @@ live/feel/recheck-b5b664aaa/). Sketch reach outside sketch mode and the plane-fi
 
 | Row | Ours vs live |
 |---|---|
-| Edge hover reach | lights at 7 px = ; held to 8, lost at 9 (live 9–10) ≠ |
+| Edge hover reach | lights at 7 px = ; held to 8, lost at 9 (live 9–10) ≠ → fixed (a held edge picks 11 px wide) |
 | Default plane row double-clicked | the plane stays selected = |
-| Row tooltip | first visible 150–167 ms after the row lights, opaque ~250 (live 65–100 / 166–209) ≠ |
+| Row tooltip | first visible 150–167 ms after the row lights, opaque ~250 (live 65–100 / 166–209) ≠ → fixed (the fade starts at a fifth, 110 ms) |
 | Alignment on a snap (no rest) | = |
 | Symmetric on two lines | ≠: B lands on A's mirrored line by its midpoint (86.165, −4.247)→(72.297, 16.554); live by its start (81.538, 2.692)→(67.671, 23.494) (live2 mirror-sym-1118; ours by the CLI, select-first); skasm's fix 47fcfb52 queued |
 | Trim past a chain's corner | ≠: stops at the corner (the line crosses the chain 0.12 mm either side of it); live trims on to the next segment; unchanged on green 3c4e4c9f3 (f6ea6d5c3) |
 | Dimension edit box | double-click, slow second click, label drag = ; the value drawn selected = once the window has focus (`xdotool windowfocus`; a bare Xvfb leaves the window inactive, so neither the box nor a feature dialog's field paints its selection) |
-| Box drag | nothing lights during it = ; selection 67–83 ms after the box clears ≠ |
+| Box drag | nothing lights during it = ; selection 67–83 ms after the box clears ≠ → fixed (selected at the release, no readback) |
 
 ### pattern-hole-1118 (P0, Linear / Circular pattern, Hole, Mirror dialogs, live2 11-18 09:27 + live 11:17)
 

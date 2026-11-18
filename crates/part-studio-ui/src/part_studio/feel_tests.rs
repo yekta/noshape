@@ -599,14 +599,10 @@ fn a_box_drag_lights_nothing_and_selects_at_release(cx: &mut TestAppContext) {
     }
     let win = pointer.window_point(cx, end);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: win, modifiers: Modifiers::default(), click_count: 1 });
-    // (The box's pick comes back from the GPU's thread: a loaded software GPU can take a while.)
-    let t = std::time::Instant::now();
-    while cx.update(|cx| view.read(cx).selection.is_empty()) && t.elapsed() < std::time::Duration::from_secs(15) {
-        pointer.frames(cx, &view);
-    }
+    // At the release itself, no GPU readback first (live recheck 11-18: ours showed it 4–5 frames after the box went).
     let n = cx.update(|cx| view.read(cx).selection.len());
     if n != 18 {
-        wrong.push(format!("released: {n} selected, want live's 18 (6 faces, 12 edges)"));
+        wrong.push(format!("released: {n} selected at once, want live's 18 (6 faces, 12 edges)"));
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }

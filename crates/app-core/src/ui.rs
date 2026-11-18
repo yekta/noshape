@@ -480,19 +480,20 @@ pub struct PlacedTooltip {
     expanded: Option<(SharedString, bool)>,
     /// The text is user-authored (a list row's name): no translation.
     user: bool,
-    /// Fades in over this long once shown (a feature row's, live feel/featurelist.json: from about 160 ms to 390 ms
-    /// after the pointer arrives).
-    fade: Option<std::time::Duration>,
+    /// Fades in over this long once shown, from this opacity (a feature row's, live feel/list-1118).
+    fade: Option<(std::time::Duration, f32)>,
 }
 
-/// A feature list row's tooltip: shown 80 ms after the pointer arrives, fully by ~210 ms (live feel/list-1118, three runs:
-/// fading in from 65–100 ms, opaque at 166–209; 11-13's "from 160, full by 390" was a slower lane).
+/// A feature list row's tooltip: shown 80 ms after the pointer arrives, fully by ~200 ms (live feel/list-1118, three runs:
+/// fading in from 65–100 ms, opaque at 166–209; 11-13's "from 160, full by 390" was a slower lane). Its fade starts a
+/// fifth in: from nothing, its first frame drew nothing, and on a slow lane the tip showed 150–167 ms after the row
+/// lit (live recheck 11-18).
 /// A menu row's side tooltip unfolds sooner (live fs-ps-ws-feature-tooltip: unfolded within a 1.5 s hover).
 const SIDE_TIP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_millis(1500);
 /// A toolbar tooltip's longer help unfolds this long after it shows (live: `data-expand-delay` 2000 ms, feel/chrome.json).
 pub const TOOLTIP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_millis(2000);
 pub const ROW_TIP_DELAY: std::time::Duration = std::time::Duration::from_millis(80);
-const ROW_TIP_FADE: std::time::Duration = std::time::Duration::from_millis(130);
+const ROW_TIP_FADE: (std::time::Duration, f32) = (std::time::Duration::from_millis(110), 0.2);
 /// Tooltips fade in (live feel/chrome.json "tooltips": fully shown 470-545 ms after the pointer arrives, the 400 ms
 /// delay and ~150 ms of Bootstrap's fade).
 pub const TOOLTIP_FADE_IN: std::time::Duration = std::time::Duration::from_millis(150);
@@ -560,7 +561,7 @@ impl Render for PlacedTooltip {
         let hidden = self.side != TipSide::Right && w.is_none();
         let content = content.when(hidden, |c| c.opacity(0.));
         let content = match self.fade {
-            Some(fade) => content.with_animation("tooltip-fade", Animation::new(fade), |c, t| c.opacity(t)).into_any_element(),
+            Some((fade, from)) => content.with_animation("tooltip-fade", Animation::new(fade), move |c, t| c.opacity(from + (1. - from) * t)).into_any_element(),
             None => content.into_any_element(),
         };
         div().when(!crate::os_menu::is_open(cx) && !self.pressed.get(), |d| d.child(anchored().position(at).snap_to_window().child(content)))
@@ -606,7 +607,7 @@ fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool) ->
         .on_any_mouse_down(move |_, _, _| p3.set(true))
         .tooltip(move |_, cx| {
             let (text, anchor, pressed) = (text.clone(), anchor.get(), pressed.clone());
-            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None, user, fade: Some(TOOLTIP_FADE_IN) }).into()
+            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None, user, fade: Some((TOOLTIP_FADE_IN, 0.)) }).into()
         })
 }
 
@@ -643,7 +644,7 @@ pub fn with_side_tooltip_expanded(row: Stateful<Div>, text: impl Into<SharedStri
                     });
                 })
                 .detach();
-                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: Some((extra, false)), user: false, fade: Some(TOOLTIP_FADE_IN) }
+                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: Some((extra, false)), user: false, fade: Some((TOOLTIP_FADE_IN, 0.)) }
             })
             .into()
         })

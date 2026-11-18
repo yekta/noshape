@@ -282,12 +282,20 @@ mod tests {
         // Three near faces, three far frames, four corner disks.
         assert_eq!(cube_shapes(rot).len(), 10);
         assert!(CubeCell([0, 0, 1]).rotation().abs_diff_eq(Camera::rotation_for(StandardView::Top), 1e-9));
-        // Corners give Onshape's trimetric views.
-        // Live (ui-parity view-cube-front-then-iso's camera): the front-right-top corner looks down its diagonal.
-        let iso = CubeCell([1, -1, 1]).rotation();
-        assert!((iso * DVec3::NEG_Z).abs_diff_eq(DVec3::new(-1.0, 1.0, -1.0) / 3f64.sqrt(), 1e-12) && (iso * DVec3::Y).z > 0.8, "{iso}");
-        let fwd = CubeCell([-1, 1, -1]).rotation() * DVec3::NEG_Z;
-        assert!(fwd.z > 0.0 && fwd.x > 0.0 && fwd.y < 0.0, "{fwd}");
+        // Corners give Onshape's Trimetric view turned to their quarter (live viewcube-1118's grid from iso: the
+        // looking direction and up after a click on each visible corner, and on the bottom one through the cube).
+        let look = |c: [i8; 3]| {
+            let r = CubeCell(c).rotation();
+            ((r * DVec3::NEG_Z * 1000.0).round() / 1000.0, (r * DVec3::Y * 1000.0).round() / 1000.0)
+        };
+        for (corner, dir, up) in [
+            ([1, -1, 1], [-0.433, 0.75, -0.5], [-0.25, 0.433, 0.866]),
+            ([-1, -1, 1], [0.75, 0.433, -0.5], [0.433, 0.25, 0.866]),
+            ([1, 1, 1], [-0.75, -0.433, -0.5], [-0.433, -0.25, 0.866]),
+            ([1, -1, -1], [-0.433, 0.75, 0.5], [0.25, -0.433, 0.866]),
+        ] {
+            assert_eq!(look(corner), (DVec3::from(dir), DVec3::from(up)), "corner {corner:?}");
+        }
         // The roll arcs sit around the cube, which stays inside them.
         assert!((HALF_EDGE - 29.5).abs() < 1e-9);
     }

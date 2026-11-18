@@ -1,12 +1,14 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-18 21:10 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-18 21:30 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
 
 - Worktree /root/projects/noshape-wt/psui, branch agent/psui. Commit as yekta (AGENTS.md), subject "psui: …".
-- Builds and crate tests: `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh bash -c '~/bin/slot …'` (Mac for Mac-only checks).
+- Builds and crate tests: plain `NOSHAPE_RB_HOST=vibe2 tools/tiers/rb.sh bash -c "$(cat script)"` (DECISIONS 9e5b481d4;
+  ~/bin/slot only for suites, gates, timing pairs). Scripts in /root/psui-scratch/run*.sh. The GPUI dialog matrix is
+  `dialogs::the_dialogs_matrix_matches_live` (rows filter: DIALOG_ROW=…).
 - Scenario / app runs: vibex6, at most 3 app instances (shared with studios). Heavy runs (scenario shards) through
   `~/bin/slot <cmd>` there (one per host, waits for 10 GB free). The app build there OOMs under load: scripts build
   with `-j 4`.
@@ -33,69 +35,41 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## P0s 11-18 (lead order 13:1x)
+## Now (lead order after the 21:1x compaction)
 
-1. HEAVY-ASM-SOFTWARE-FRAME (asm-xdev-subs). Live's display rule, final (behaviours "psui (lead 11-18 ~13:55): display
-   mesh by surface type, read from the viewer"): 12 / 24 / 72 / 300 segments a turn (Coarse / Medium / Fine=Auto /
-   Very fine); cylinders and cones one band (side 2n, pointed side n, caps n-fans); spheres n × n/2; tori n·n·2;
-   edges reuse the face boundary points. Viewer counts: _787261002 428,069, EFL673ZZ 17,568, E673ZZ 12,096,
-   Gehaeuse 23,466, Finger 1,702.
-   - Landed 270e489b (17:09; rides the 05:00 train): 72 a turn + drill-point fans (OCCT StripAlgo). Then (17:50,
-     landing with the feel batch): the Rust mesher's grid (brep::mesh) at a cone's apex: the ring radius rounds to
-     ±1e-18 and the normal flipped, rows 8 µm apart; collapsed derivatives are a pole now. asm-xdev-subs: 7.76 M →
-     2.14 M triangles, headless render 18.1 → 7.3 s; Gehaeuse 24,356 (live 23,466), Finger 1,708 (1,702), bearings
-     and screws within 5 %; _787261002 254k (live 428k: ours under).
-   - WIP set aside: /root/psui-scratch/revol-wip.patch (OCCT revolutions → StripAlgo): not needed for these faces.
-   - Coarse level (lead approved 18:4x after live2 tess-1118: live draws RB 18 at 14.3 M first, refining to 22.8 M
-     over ~65 s, per occurrence by screen error): `RegenOptions::coarser_levels` (body levels Coarse..own),
-     `AssemblyEvaluator::set_coarser_levels`, assembly_view `big_scene` (> 1 M scene triangles; a first open with no
-     cached result re-evaluates once). The renderer already picks per body (`mesh_lod_level`, live's ratios and 3 px)
-     and keeps the finest shown. Conditions: off the UI thread, small documents unchanged, TTF and memory reported:
-     /root/psui-scratch/ttf.sh (vibe2 Xvfb :391, A = NOSHAPE_NO_COARSER probe build, never committed).
-2. live2's ≠ rows: Translate ghost (live m6-grid: old place light grey #D6DADD see-through + orange silhouette, the
-   moved part dark grey see-through; ours: old body colour × 0.3 alpha, moved part unchanged); section preview cap
-   (#E3C9A7 vs live #EBBD8A = 80 % toward #FFC685, which our shader does: find what pales it); Hole callout (live
-   h1-cbore: text on the top face right beside the hole, short leader; ours runs the leader to the part's edge). All
-   three need our frame beside live's: one app session on vibex6.
-3. live2 UI speed (green c7d388e8): rollback bar after a drop 0.24 / 0.14 s (live ~0.1: the bar reads the studio at
-   once, so it's the SQLite commit on the UI thread + the frame); Mass values 313 ms (live 154; bg_job has no delay).
-   Frame-log capture each.
-4. Tag (live std 3112): the tooltip text and the "Standard content" purpose with "Standard content part"
-   (/root/psui-scratch/tag.patch, set aside from the P0 land: apply, run ops coverage / AGENT_API, land).
-5. asm: live's in-context pane strings (Switch to assembly, Change assembly configuration…, Update <context>,
-   "Update all out of date contexts") are mine when live2's capture lands (live/asm/insert-1118/).
-6. Live 11-18 retakes still to compare: view cube clicks (live/feel/viewcube-1118/vc.json, a 10 px click grid from
-   iso with the resulting camera: the hidden bottom face's band ~30 px under the cube, corners and edge bands at 30°
-   elevation / azimuth multiples, arrows 15°) against `overlay.rs` CORNER_HIT / SILHOUETTE_REACH_PX; Fillet's
-   handle a white-outlined ~16 px triangle on the edge's middle (ours an arrow) and its ~5 px dead zone.
-7. Live 11-18 new rows still open: Fillet handle look (triangle) and dead zone; the Section arrow turning blue while
-   dragged (unchecked); view cube press/drag (≤2 px is a click, 3+ nothing, a 40 px drag neither orbits nor clicks).
-8. (21:1x, next up) Live's feature-dialog rows 11-18. Checked: a tool clicked with a dialog open accepts it (ours
-   `accept_open_dialog`, =); no auto-advance for multi-pick boxes (ours advances only a filled max-picks field, =).
-   To do: the Tab orders (find our Fillet Tab row in docs/parity/interaction-feel.md "Tab from Fillet's Radius" and
-   its test), Esc after Tab left the dialog, Hole's title, Revolve's Full revolve checkbox. Live's feature-dialog rows 11-18 (behaviours "feel (feature dialogs) 11-18, batch 1" / "batch 2", live/feel/
-   dialogs-1118/): check ours and add rows: Extrude's flip on the End type row, Depth's ± after the value; Chamfer
-   focus "Entities to chamfer", Tab Distance → ± → Tangent propagation → help → out (dropdowns and boxes skipped), Two
-   distances' flip on Distance 1 + "Direction overrides"; Shell Tab thickness → flip → help; Hole Tab with its
-   dropdowns as stops, title = the size; Revolve Tab angle → ± → Symmetric → Second end → help, a region pick doesn't
-   advance to the axis (the axis box red, a hovered line not lit), Full revolve a checkbox; after a pick the keyboard
-   on the page body. Batch 3: no auto-advance (the second box red until clicked, what only it takes doesn't light, a
-   plane row not taken); flip arrows are Tab stops (Linear / Circular orders); another feature tool clicked while a
-   dialog is open COMMITS it; Esc does nothing once Tab left the dialog. Preview timings are live's lane.
-9. Queue: suppress row lag, "#" list 0.7 s, chip tooltip to the chip's right, panel offsets shared between studios
-   (store rects), Mass ~12 px shorter, FEEL-EDGE-VS-FACE-HOLD, Roll to here (live2 hold), press-interval patch
-   (/root/psui-scratch/press-interval2.patch), live pattern-hole rows / live2 field-keys tests, config table keys,
-   chips-expr rows, plane reach decision. Not to build: 3D Sketch, Fault analysis (server flags off).
-- Landed 18:27–20:12: d439dd0d (apex grid fix, reach / tooltip / plane-row / Fillet handle retakes), 45f2d798 +
-  548d795f (red main: box-drag tests held their press 0 ms; a box lights nothing; the press remembers empty space;
-  both box tests 10 / 10 beside a build on vibe2), 3fa69088 (Section dialog at (396, 179), its arrow's 5 px dead zone
-  and value box by the head).
-- Queued 404f2e1f (21:0x): the Coarse level (big_scene > 1 M; xdev-subs A/B: first frame unchanged, orbit 10.5 → 13
-  frames / 4 s, RSS +0.4 GB; the regen result key now includes coarser_levels), Fillet triangle + dead zone, no
-  sketch-line midpoint with no tool, Tag "Standard content". Heavy doc copies deleted on vibe2 and vibex6.
+1. Watch 404f2e1f (queued 21:13, #1): Coarse level for big assemblies (> 1 M triangles; xdev-subs A/B: first frame
+   unchanged, orbit 10.5 → 13 frames / 4 s, RSS +0.4 GB; the regen result key includes coarser_levels), Fillet's
+   triangle handle + 5 px dead zone, no sketch-line midpoint with no tool, Tag "Standard content".
+2. In the worktree, tests run on vibe2, to land next (WIP commit eb1ef8894 + later edits):
+   - live dialogs-1118: Tab orders of Chamfer / Shell / Hole / Revolve / Linear / Circular all = (new matrix row);
+     Esc after Tab left the dialog now does nothing (`FeatureDialog::tabbed_out`, set on `LeaveFocus`, cleared by a
+     graphics press; the studio's Cancel skips it while the focus is outside the dialog). Checked = earlier: a tool
+     click commits the open dialog, no auto-advance between boxes, first box focused, Hole title = its callout,
+     Revolve's Full revolve checkbox.
+   - live recheck 11-18 (b5b664aaa) ≠ fixed: a held edge picks 11 px wide (was 9; matrix now 10 px, live 9–10); the
+     row tooltip's fade starts at 0.2 over 110 ms (`ROW_TIP_FADE`; it showed 150–167 ms after the row lit); a Part
+     Studio box selects at the release (`Viewport::box_by_pick` off: it waited for a GPU readback it never used).
+   - View cube corners: live's Trimetric view turned to the corner's quarter (azimuth corner − 15°, elevation ±30°;
+     vc.json from iso), was the diagonal (misread ui-parity step: its "Isometric" was the home button). New test
+     `cube_hover_map::the_cube_click_grid_from_iso_matches_live` (vc.json's 15 × 15 grid, centre ~(1828, 167)).
+3. Next: view cube press/drag rows (≤ 2 px a click, 3+ nothing, a 40 px drag neither orbits nor clicks, a 1.2 s hold
+   nothing); the Section arrow turning blue while dragged.
+4. live2's ≠ rows: Translate ghost (old place light grey #D6DADD see-through + orange silhouette, the moved part dark
+   grey see-through); section preview cap (#E3C9A7 vs live #EBBD8A); Hole callout placement (text by the hole). Our
+   frame beside live's: one app session on vibe2 Xvfb.
+5. live2 UI speed: rollback bar after a drop 0.24 / 0.14 s (live ~0.1); Mass values 313 ms (live 154). Under the
+   11-18 ruling only gaps ≥ 100 ms and ≥ 2× on a whole action count: check against it first.
+6. live's other recheck ≠ (not mine unless the lead says): Symmetric on two lines, Trim past a chain's corner (skasm);
+   the dimension box's selected text not drawn highlighted (skasm).
+7. Queue: suppress row lag, "#" list 0.7 s, chip tooltip to the chip's right, panel offsets shared between studios,
+   Mass ~12 px shorter, FEEL-EDGE-VS-FACE-HOLD, Roll to here, press-interval patch
+   (/root/psui-scratch/press-interval2.patch), config table keys, chips-expr rows, plane reach decision, asm in-context
+   pane strings when live2's capture lands (live/asm/insert-1118/). Not to build: 3D Sketch, Fault analysis.
 - Agent ids (11-18 20:xx): core d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde.
-- Done today: tab return 9595bbf05 (qa: 111 vs 151 ms, in the 17:00 cut); Windows nav e7d9df8c (12:57).
-- Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over; vibex6 ~/tmp/psui/heavy after the mesh work.
+- Landed today: 270e489b (72 a turn, drill-point fans), 933d8e41 (apex grid), 45f2d798 + 548d795f (box-drag red
+  main), 3fa69088 (Section dialog place, arrow dead zone), 9595bbf05 (tab return), e7d9df8c (Windows nav).
+- Set aside: /root/psui-scratch/revol-wip.patch (OCCT revolutions → StripAlgo, not needed).
+- Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over.
 
 ## Open decisions
 
