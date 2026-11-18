@@ -117,6 +117,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    SNAPMODE-REACH (70 vs 57 px), P1 SNAPMODE-RELEASE-DIALOG; psui P1 ROW-DBLCLICK-DISTANCE. Runner-built docs reopened without the
    runner (vibex8 ~/tmp/qa/fl/docs: asm-feel, hole-plate-drawing): stable views. Drivers qa-scratch/af/snapm2.py, hv2/rowk.py, hv2/drw.py.
    qa-wait-33c5 re-runs FEEL-FL-AUTOSCROLL-DROP on psui's 33c57541 green.
+0z2. **P0 HEAVY-ASM-SOFTWARE-FRAME (lead 11:45; asm leads, psui later)**: xDev frames render in 46.7-49.4 s on llvmpipe (live 3.4 s
+   per zoom on SwiftShader); 84% llvmpipe in the profile. Repro + data sent 12:00 (TICKETS; qa-scratch/heavy perf1, prof1). Re-run
+   runperf.sh / probe.py (screen timings; the frame log's presents are UI frames only) on asm's fix. Driven-pattern rows wait for core's
+   DRIVEN-PATTERN-SWEEP (live's 723k-triangle solid is missing in ours).
 0z. **Heavy-model feel (lead 09:10)**: live measures c2-loft-guide-curves-driven-pattern (Part Studio, live 125 bodies; ours 124, Sweep 1
    fails: P1 DRIVEN-PATTERN-SWEEP core) + asm-xdev-subs (ours only exists in the assembly suite's scratch: not prepared). Ours:
    qa-scratch/heavy (heavy.py: live's moves / offsets / 600x400 poll at 140 ms + NOSHAPE_FRAME_LOG; hvs.sh on :154 1920x1080 with

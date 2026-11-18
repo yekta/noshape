@@ -12,6 +12,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   still running after 10s" on every view change; a 2 s orbit shows 0-1 screen frames (live ~0.4 fps). The tab click -> assembly drawn
   took 43-200 s and the app stays busy ~5 min (11 min CPU) before going idle; the frame log's presents (UI) don't show the 3D view's lag.
   Load 8-25 (live's Chrome runs alongside). Data qa-scratch/heavy (x1, p1, p2; perf1 with NOSHAPE_PERF=1 follows).
+  qa 12:00 (NOSHAPE_PERF=1 + perf record, sent to asm and psui): loading is ~27 s (115 regens 11.5 s, 99 tessellations 11.7 s); then
+  **every viewport frame renders in 46.7-49.4 s** (1674x974, 4x MSAA). CPU: 72% llvmpipe JIT shaders + 12% lvp (= rasterising the
+  drawn scene), 11% our meshing. Repro: copy of vibex8 ~/agents/asm-keep/qa-save/asm-xdev-subs.noshape, release app, Xvfb 1920x1080,
+  open, Assembly 1 tab, one wheel notch (qa-scratch/heavy/hvs.sh DOC=asm-xdev-subs, runperf.sh); data heavy/perf1, heavy/prof1.
   **Timing heavy scenes: NOSHAPE_FRAME_LOG's "present" lines are the window's (UI) frames, not the 3D view's**: here they showed 2 fps
   / 513 ms frames while the screen's graphics didn't change for 40-70 s (the viewport frame is read back later). Time heavy scenes on
   the screen (crop diffs), as live does.
