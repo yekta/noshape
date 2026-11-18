@@ -32,7 +32,8 @@ pub struct LinestyleDlg {
 impl DrawingEditor {
     pub fn open_linestyle(&mut self, view: ViewId, window: &mut Window, cx: &mut Context<Self>) {
         let dashes = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value("1.00"));
-        self.linestyle = Some(LinestyleDlg { view, edges: Vec::new(), pattern: LinePattern::Solid, dashes, thickness: 0.35, color: None, revert: false });
+        // Nothing picked: the Thickness select on its first value (live2 drw-view-adjust-linestyle: 0.13 mm).
+        self.linestyle = Some(LinestyleDlg { view, edges: Vec::new(), pattern: LinePattern::Solid, dashes, thickness: LINE_THICKNESSES[0], color: None, revert: false });
         // Live: the view's selection clears; the dialog's Edges field takes the picks.
         self.selection.clear();
         self.redraw(cx);
@@ -67,7 +68,14 @@ impl DrawingEditor {
                 Some(i) => {
                     d.edges.remove(i);
                 }
-                None => d.edges.push(key),
+                None => {
+                    // The first edge picked shows its thickness, a visible edge's (live2 drw-view-adjust-linestyle-
+                    // dashed-dotted s5: 0.40 mm).
+                    if d.edges.is_empty() {
+                        d.thickness = self.drawing.props.view_tab.visible_thickness;
+                    }
+                    d.edges.push(key);
+                }
             }
             self.preview_linestyle(cx);
         }
@@ -140,15 +148,18 @@ impl DrawingEditor {
         crate::ui_script::note_dialog(|| {
             let mut text = crate::drawing_panels::PanelText::default();
             text.texts(["Adjust linestyle", "Edges"]);
-            if empty {
-                text.text("Select edges in a view to change linestyle");
-            }
             for _ in &d.edges {
                 text.texts([format!("{view_name} : entity"), "×".into()]);
             }
+            // (The field's placeholder, read after its chips too: live2 drw-view-adjust-linestyle-dashed-dotted s5.)
+            text.text("Select edges in a view to change linestyle");
             text.text("Linestyle").options(LinePattern::ALL.iter().map(|p| p.name().to_string()));
             text.texts(["Dashes", "Thickness"]).options(LINE_THICKNESSES.iter().map(|t| format!("{t:.2} mm")));
-            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Adjust linestyle" }), text.0)
+            text.text("Revert to drawing properties");
+            // (Live's recorder labels both selects with the three row labels.)
+            let select = |v: String| serde_json::json!({ "label": "Linestyle Dashes Thickness", "kind": "select", "value": v });
+            let fields = [select(d.pattern.name().to_string()), select(format!("{:.2} mm", d.thickness))];
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Adjust linestyle", "fields": fields }), text.0)
         });
         Some(
             v_flex()

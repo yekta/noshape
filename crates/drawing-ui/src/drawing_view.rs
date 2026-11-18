@@ -452,6 +452,9 @@ pub struct DrawingEditor {
     pub ext_checking: bool,
     /// Selected table cells (drawing_cells.rs).
     pub cell_sel: Option<crate::drawing_cells::CellSel>,
+    /// A BOM / cut list table just placed (selected), until the next press: live's recorder reads no EDGE under it
+    /// then, as it does once the table is clicked (drw-bom-*).
+    pub placed_table: Option<u64>,
     /// A table just made by the Table dialog's ✓, its first cell in the Note editor: still the Table tool and not yet in
     /// live's recorded state (live 2184); a double-clicked cell clears it.
     pub fresh_table: Option<u64>,
@@ -832,6 +835,7 @@ impl DrawingEditor {
             leader_sel: None,
             menu_broken_out: None,
             cell_sel: None,
+            placed_table: None,
             fresh_table: None,
             cell_panel: None,
             note_color: None,

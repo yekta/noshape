@@ -288,7 +288,7 @@ fn placing_a_note_lines_up_with_another_within_8_px(cx: &mut TestAppContext) {
 /// Live2 feel/drawing.json F4: a dragged view lands exactly where it is released, with no snap to another view's
 /// centre line at 12, 9, 5 or 3 px from it (and no guide line). The isometric view is dragged level with Top's centre.
 #[gpui::test]
-fn a_dragged_view_lands_where_released_with_no_alignment_snap(cx: &mut TestAppContext) {
+fn a_dragged_view_lands_where_released_with_no_alignment_snap_or_line(cx: &mut TestAppContext) {
     use noshape_model::drawing::ViewKind;
     SUGGESTED.set(true);
     let (window, editor) = drawing(cx, "feel-view-align");
@@ -320,6 +320,9 @@ fn a_dragged_view_lands_where_released_with_no_alignment_snap(cx: &mut TestAppCo
             let t = f64::from(k) / 6.0;
             let m = at_window(cx, &editor, [g[0] + (to[0] - g[0]) * t, g[1] + (to[1] - g[1]) * t]);
             VisualTestContext::from_window(window, cx).simulate_mouse_move(m, Some(MouseButton::Left), Modifiers::default());
+            // No dashed alignment lines at any distance either (live2 drw-feel-1118: none from 60 px to 0).
+            draw(cx, window);
+            assert!(cx.update(|cx| editor.read(cx).infer_lines.is_empty()), "no alignment line while a view is dragged");
         }
         let q = at_window(cx, &editor, to);
         VisualTestContext::from_window(window, cx).simulate_mouse_up(q, MouseButton::Left, Modifiers::default());
@@ -527,6 +530,45 @@ fn a_tool_picks_an_edge_within_7_px(cx: &mut TestAppContext) {
     }
 }
 
+/// Live2 drw-inspection-table-iso-scrolled: in an ISO drawing a linear dimension's value (drawn above its line) is
+/// placed with its centre on the pointer, the line under it.
+#[gpui::test]
+fn an_iso_dimensions_value_lands_centred_on_the_pointer(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-iso-value");
+    real_sheet(cx, window, &editor);
+    assert!(cx.update(|cx| !editor.read(cx).drawing.is_ansi()), "an ISO drawing");
+    let (mid, normal) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let len = |p: &[[f64; 2]]| (p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]);
+        // The lowest long horizontal edge of the first view: the value placed under it, clear of other views.
+        let edge = g.edges.iter().filter(|x| x.visible && x.points.len() == 2 && (x.points[0][1] - x.points[1][1]).abs() < 1e-9 && len(&[pl.to_sheet(x.points[0]), pl.to_sheet(x.points[1])]) > 5.0).min_by(|a, b| pl.to_sheet(a.points[0])[1].total_cmp(&pl.to_sheet(b.points[0])[1])).expect("a horizontal edge");
+        let (a, b) = (pl.to_sheet(edge.points[0]), pl.to_sheet(edge.points[1]));
+        ([(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0], [0.0, -1.0])
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)));
+    draw(cx, window);
+    click_at(cx, window, &editor, mid, Modifiers::default());
+    let tool = cx.update(|cx| format!("{:?}", editor.read(cx).tool));
+    assert!(tool.contains("Line"), "the edge picked: {tool}");
+    let at = [mid[0], mid[1] + normal[1] * 8.0];
+    click_at(cx, window, &editor, at, Modifiers::default());
+    let centre = cx.update(|cx| {
+        let e = editor.read(cx);
+        let sheet = e.current_sheet();
+        let id = sheet.annotations.iter().find(|a| a.kind.is_dimension()).expect("the dimension placed").id;
+        let b = e.built.as_ref().expect("built");
+        let pts: Vec<[f64; 2]> = b.geometry.texts.iter().filter(|t| matches!(b.picks.get(t.pick as usize), Some(PickTarget::Annotation(x)) if *x == id)).flat_map(noshape_model::drawing::font::text_box).collect();
+        let (lo, hi) = pts.iter().fold((f64::MAX, f64::MIN), |(lo, hi), p| (lo.min(p[1]), hi.max(p[1])));
+        (lo + hi) / 2.0
+    });
+    assert!((centre - at[1]).abs() < 0.05, "the value's centre {centre:.2} on the pointer {:.2}", at[1]);
+}
+
 /// Live tables-1118 (h-stack; behaviours 1482): a hovered table keeps its ink black (no hover tint on its lines or
 /// text); its look is the grey rows, the hovered row or cell darker, and a tan frame.
 #[gpui::test]
@@ -607,6 +649,36 @@ fn a_click_on_a_bom_cell_opens_the_cell_panel_and_a_double_click_adds_nothing(cx
     assert_eq!(one, (Some((id, (1, 0), (1, 0))), vec![Sel::Table(id)], true, true), "one click: the cell, the table, the Cell panel, no editor");
     cx.executor().advance_clock(std::time::Duration::from_millis(600));
     assert_eq!(press(cx, 1..=2), one, "a double-click: the same");
+}
+
+/// Live2 bomsel-1118 (tables-1118 d3): the BOM table tool places the table on one click (no ✓); the panel closes and
+/// the table stays selected.
+#[gpui::test]
+fn the_bom_tool_places_on_one_click_and_keeps_the_table_selected(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-bom-place");
+    real_sheet(cx, window, &editor);
+    let empty = empty_sheet_point(cx, window, &editor);
+    let placed = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            // (The drawing's Part Studio stands in for an assembly: the tool lists assemblies only.)
+            e.sources.values_mut().for_each(|s| s.assembly = true);
+            e.tool = Tool::Table { kind: noshape_scene::drawing_tools::TableTool::Bom, view: None, origin: None };
+            e.sync_table_dlg();
+            assert!(e.table_dlg.is_some(), "the BOM table panel is open");
+            e.cursor = empty;
+            assert!(e.table_dlg_click(cx), "the click is the tool's");
+            let id = e.current_sheet().tables.iter().map(|t| t.id).max().expect("a table placed");
+            (id, e.selection.clone(), e.table_dlg.is_none(), matches!(e.tool, Tool::Select))
+        })
+    });
+    assert_eq!(placed.1, vec![Sel::Table(placed.0)], "the placed table is selected");
+    assert!(placed.2 && placed.3, "the panel closed and Select is back");
+    let after_esc = cx.update(|cx| editor.update(cx, |e, cx| {
+        e.cancel(cx);
+        e.selection.clone()
+    }));
+    assert_eq!(after_esc, vec![Sel::Table(placed.0)], "Esc keeps it selected");
 }
 
 /// Live2 feel/drawing.json D5: a dimension's text moves from 5 px of drag (4 px is a click, which selects it); no hold

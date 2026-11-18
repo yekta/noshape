@@ -94,6 +94,10 @@ impl DrawingEditor {
     }
 
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
+        // A BOM table just placed stays selected through Esc (live2 bomsel-1118).
+        if self.placed_table.is_some_and(|id| self.selection == [Sel::Table(id)]) {
+            return;
+        }
         if matches!(self.drag, Drag::MoveViews { .. }) {
             self.view_drag_cancelled = true;
             return;
@@ -1235,6 +1239,9 @@ impl DrawingEditor {
 
     pub fn on_mouse_down(&mut self, e: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         self.glyph_selected = None;
+        if self.placed_table.take().is_some() {
+            cx.notify();
+        }
         let quick = match (e.button, self.last_press) {
             (MouseButton::Left, Some((t, at))) => quick_double_click(t.elapsed(), (e.position - at).magnitude() as f32),
             _ => false,
@@ -2192,6 +2199,7 @@ impl DrawingEditor {
     }
 
     fn context_menu_rows(&mut self, pick: Option<u32>, cx: &mut Context<Self>) -> Vec<MenuEntry> {
+        self.placed_table = None;
         let mut sel = self.sel_at(pick, self.cursor);
         // The empty sheet with one note selected: the note's menu (live2 drw-note-copy-paste s8).
         if sel.is_none()

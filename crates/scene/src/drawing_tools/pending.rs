@@ -37,6 +37,29 @@ impl SheetPick<'_> {
         Some(a)
     }
 
+    /// Where a linear dimension's line goes for the pointer at `c`: ISO draws the value above its line (sheet.rs), so
+    /// the line passes under the pointer by the gap and half the value's box and the value's centre is on the pointer,
+    /// as live's (drw-inspection-table-iso-scrolled: the value at 237.8 on the pointer, ours 2.1 mm over it). ANSI's
+    /// value sits on its line.
+    fn iso_value_on_pointer(&self, ps: [f64; 2], qs: [f64; 2], o: DimOrientation, c: [f64; 2]) -> [f64; 2] {
+        let props = &self.drawing.props;
+        if self.drawing.is_ansi() || props.dim_text_horizontal {
+            return c;
+        }
+        let d = match o {
+            DimOrientation::Horizontal => [1.0, 0.0],
+            DimOrientation::Vertical => [0.0, 1.0],
+            DimOrientation::Aligned => norm(sub(qs, ps)),
+        };
+        let mut angle = d[1].atan2(d[0]);
+        if angle > std::f64::consts::FRAC_PI_2 + 1e-9 || angle < -std::f64::consts::FRAC_PI_2 - 1e-9 {
+            angle += std::f64::consts::PI;
+        }
+        // (The value's box: 0.35 of its height over the baseline at its middle, font::text_box.)
+        let k = props.dim_text_gap + 0.35 * props.dim_text_height;
+        [c[0] + angle.sin() * k, c[1] - angle.cos() * k]
+    }
+
     fn pending_annotation_raw(&self, v: &ToolValues) -> Option<Annotation> {
         let c = self.cursor;
         let id = self.current_sheet().next_annotation_id();
@@ -83,8 +106,9 @@ impl SheetPick<'_> {
                 let (ps, qs) = (self.pick_sheet(&a)?, self.pick_sheet(&b)?);
                 // Horizontal / vertical / aligned follows the cursor (Onshape).
                 let o = auto_orientation(ps, qs, c);
+                let c = self.iso_value_on_pointer(ps, qs, o, c);
                 let offset = dim_offset(ps, qs, o, c);
-                Some(Annotation { one_edge, ..ann(AnnotationKind::LinearDimension { view: a.view, a: a.p, b: b.p, offset, orientation: o, override_text: None }, vec![(0, a.r), (1, b.r)]) })
+                Some(Annotation { one_edge, position: c, ..ann(AnnotationKind::LinearDimension { view: a.view, a: a.p, b: b.p, offset, orientation: o, override_text: None }, vec![(0, a.r), (1, b.r)]) })
             }
             // Diameter on a cylinder's silhouette: across both silhouettes.
             Tool::Dimension { kind: DimTool::Diameter, picks } if matches!(picks.as_slice(), [Pick::Line { .. }, Pick::Line { .. }]) => {

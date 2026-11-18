@@ -382,6 +382,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Add jog", Op("drawing_annotation_edit")),
     ("drawing:Add leader", Op("drawing_annotation_edit")),
     ("drawing:Add node", Op("drawing_annotation_edit")),
+    ("drawing:Reset ordinate", Op("drawing_annotation_edit")),
     ("drawing:Add revision callout", Op("drawing_revision_callout")),
     ("drawing:Add stacked callouts...", Op("drawing_annotation_edit")),
     ("drawing:Add to ordinate dimension group", Op("drawing_ordinate")),

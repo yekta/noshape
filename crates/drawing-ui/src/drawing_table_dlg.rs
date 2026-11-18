@@ -483,12 +483,14 @@ impl DrawingEditor {
             return false;
         }
         let Some((t, name)) = self.table_dlg_table(self.cursor) else { return true };
+        let id = t.id;
         self.edit_sheet(name, cx, |s| s.tables.push(t));
         self.table_dlg = None;
         self.tool = Tool::Select;
-        // Placed, not selected (live: a new BOM table isn't drawn orange, drw-bom-table; live2 tables-1118 d3 saw it
-        // selected: a retake is asked).
-        self.selection.clear();
+        // One click places it and it stays selected (live2 bomsel-1118, tables-1118 d3).
+        self.selection = vec![Sel::Table(id)];
+        self.cell_sel = None;
+        self.placed_table = Some(id);
         cx.notify();
         true
     }

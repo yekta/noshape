@@ -35,7 +35,8 @@ pub struct SectionDlg {
     pub offset: Option<(Entity<InputState>, Subscription)>,
     pub offset_value: Option<f64>,
     pub offset_flip: bool,
-    /// "Exclude from cut" (assembly views): the parts picked.
+    /// ☑ "Exclude from cut" (assembly views) and its Excluded parts picked (live2 drw-section-exclude-from-cut s10).
+    pub exclude_on: bool,
     pub exclude: Vec<noshape_model::BodyId>,
     /// The model point under the cutting line's first click.
     pub anchor: Option<noshape_model::drawing::PointRef>,
@@ -90,7 +91,7 @@ impl DrawingEditor {
                 let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
                 // Live drawing/20: the dialog opens with the label selected.
                 label.update(cx, |s, cx| s.focus(window, cx));
-                self.section_dlg = Some(SectionDlg { mode: 0, label, label_focused: true, select_label: true, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, offset: None, offset_value: None, offset_flip: false, exclude: Vec::new(), anchor: None, picking: 0, placed: None, angle: 45.0, angle_input: None, angle_on: false, opposite: false, flip: false, cut_from: true });
+                self.section_dlg = Some(SectionDlg { mode: 0, label, label_focused: true, select_label: true, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, offset: None, offset_value: None, offset_flip: false, exclude_on: false, exclude: Vec::new(), anchor: None, picking: 0, placed: None, angle: 45.0, angle_input: None, angle_on: false, opposite: false, flip: false, cut_from: true });
             }
             (Some(_), false) => self.section_dlg = None,
             _ => {}
@@ -284,9 +285,10 @@ impl DrawingEditor {
         let pal = p();
         let mode = d.mode;
         let (opp, flip, angle_on) = (d.opposite, d.flip, d.angle_on);
-        // Exclude from cut is for assembly views.
+        // Exclude from cut is for assembly views, once the parent view is picked (live2 drw-section-exclude-from-cut s1-s3).
         let assembly = match &self.tool {
             Tool::Section { parent: Some(p), .. } => noshape_model::drawing::views::view_source(self.current_sheet(), *p).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly),
+            Tool::Section { parent: None, .. } => false,
             _ => self.current_sheet().views.iter().any(|v| noshape_model::drawing::views::view_source(self.current_sheet(), v.id).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly)),
         };
         let line_done = matches!(self.tool, Tool::Section { line: Some(_), .. });
@@ -353,7 +355,10 @@ impl DrawingEditor {
                 }
             }
             if assembly {
-                t.text("Exclude from cut");
+                check(&mut t, &mut fields, "Exclude from cut", d.exclude_on);
+                if d.exclude_on {
+                    t.text("Excluded parts");
+                }
             }
             crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Section view", "fields": fields }), t.0)
         });
@@ -618,9 +623,23 @@ impl DrawingEditor {
                             })
                         })
                         .when(assembly, |e| {
+                            e.child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("ds-exclude-on").label("Exclude from cut").checked(d.exclude_on).on_click(cx.listener(|this, v: &bool, _, cx| {
+                                if let Some(d) = &mut this.section_dlg {
+                                    // Ticked, its Excluded parts field takes the clicks; unticked, nothing is excluded.
+                                    d.exclude_on = *v;
+                                    d.picking = if *v { 2 } else { 0 };
+                                    if !*v {
+                                        d.exclude.clear();
+                                    }
+                                }
+                                this.update_preview(cx);
+                                cx.notify();
+                            }))))
+                        })
+                        .when(assembly && d.exclude_on, |e| {
                             let n = d.exclude.len();
                             let on = d.picking == 2;
-                            e.child(div().px(px(6.)).pt(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("Exclude from cut")).child(
+                            e.child(div().px(px(6.)).pt(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("Excluded parts")).child(
                                 div()
                                     .id("ds-exclude")
                                     .mx(px(6.))

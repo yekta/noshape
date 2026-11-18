@@ -452,7 +452,8 @@ impl DrawingEditor {
                 let Some(p) = b.picks.get(pick as usize) else { return false };
                 self.selection.iter().any(|s| match (s, p) {
                     // A table with cells picked is orange only in them (live2 drw-revision-cell-*: no view's box reads it).
-                    (Sel::Table(a), PickTarget::Table(t)) => a == t && self.cell_sel.is_none_or(|c| c.table != *a),
+                    // (One just placed reads nothing until it's pressed: live2 drw-bom-table s2.)
+                    (Sel::Table(a), PickTarget::Table(t)) => a == t && self.cell_sel.is_none_or(|c| c.table != *a) && self.placed_table != Some(*a),
                     (Sel::Hatch(a), PickTarget::Hatch(t)) => a == t,
                     (Sel::Annotation(a), PickTarget::Annotation(t)) => a == t && thin(*a) == thin_ones && tan != Some(Sel::Annotation(*a)),
                     (Sel::AutoCentermark(v, k), PickTarget::AutoCentermark { view, center }) => thin_ones && v == view && k == center,

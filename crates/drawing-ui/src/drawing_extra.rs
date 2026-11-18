@@ -409,6 +409,7 @@ impl DrawingEditor {
                     this.switch_sheet(sheet_i, cx);
                 }
                 this.selection = vec![Sel::Table(id)];
+                this.placed_table = None;
                 this.redraw(cx);
             }))
             .on_mouse_down(
@@ -420,6 +421,7 @@ impl DrawingEditor {
                     }
                     // The table selected, as a right-click on it on the sheet (live drw-bom-row-replace: orange).
                     this.selection = vec![Sel::Table(id)];
+                    this.placed_table = None;
                     this.redraw(cx);
                     // Live 2240: Properties..., Replace..., Switch to BOM, Delete.
                     let mut entries = vec![MenuEntry::item("Properties...", move |t, _, cx| t.open_table_props(id, cx))];

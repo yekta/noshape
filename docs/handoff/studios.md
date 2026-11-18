@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 06:18 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 07:25 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -27,18 +27,27 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   document_update_references move it (the app's dialog now uses ops' workspace_update, no copy). Checks: ver-* +
   hist* 135/136 (723/723 states), workspace / merge takes 45/45, config-* takes, ops e2e 227, feel tests per item.
   Also in it: workspaces (see the rows below), fractional units and pick constants, Create Drawing options, 24 h time.
-- Still differing (drawings, in order): drw-revision-table-delete s8 (hover-after-menu rule), ordinate add-to-group /
-  Reset ordinate, note copy-paste menu, note editor closing, sheet properties zones, view adjust linestyle rows,
-  replicate region panel, detail-id label position, section exclude-from-cut, synchronize-breaks Gap distance,
-  simplification-absolute BOM row name, toolbar Undo tip take, drw-gtol-type-list, drw-hatch-panel s29.
+- Still differing (drawings): local fixes in verification: ordinate Reset ordinate on a value's text (drw-ordinate-
+  value-rclick), Section view's Exclude from cut a checkbox shown once the parent view is picked, ticked: Excluded
+  parts (drw-section-exclude-from-cut), Adjust linestyle (Thickness on its first value until an edge is picked, then
+  the edge's; reader: placeholder after chips, Revert, fields). Next: Edit section… has no Exclude from cut at all
+  (live s7-s21: the checkbox, Excluded parts chips "Part 2 ×", tooltips "Select parts to exclude from cut" /
+  "Delete Part 2"): model + panel + op; drw-view-adjust-linestyle-dashed-dotted s4: the Edges field's tooltip exists,
+  the hover pixel misses our field (layout). Left: drw-ordinate-add-to-group s7, sheet properties custom zones, replicate region panel (2 takes),
+  detail-id label position, synchronize-breaks Gap distance, simplification-absolute BOM row name, projected-from-
+  section text, toolbar Undo tip take, drw-gtol-type-list s5 / drw-hatch-panel s29 (list highlight). Not targets:
+  drw-revision-table-delete s8 (live still draws the deleted table 1 s later: server latency; resting-pointer hover
+  varies), drw-note-editor (retake asked: type → ✓).
 - Full drawing run drw1118b on vibex8 (build of bfc56d3e; ~/agents/studios-keep/drw1118b): 317/341 (drw1118a
   288/334). Its one regression, drw-dimension-radius s4 (the reader counted a hovered dimension's leader at 2 px), is
   fixed by the reader counting a hovered annotation's lines at 1 px (d2eb5c15). New live2 takes, local: dprops footer
   (runner: the footer goes with the header reading), hole-table / inspection-table select options marked as options,
   a note with a leader reads its alignment buttons greyed, the hole table's title red + tooltip with no view, a note
   quoting the lane's "(1)" tab name (runner), the empty sheet's menu with one note selected = the note's (drw-note-
-  copy-paste s8; its pasted note then lands 13 mm off live's: check). drw-note-editor s5: live's typed keys missed its
-  editor (recorder artifact).
+  copy-paste s8; Paste lands where its row is clicked, so the 13 mm came from Paste's row, now live's): landed b5c4ccc4.
+  drw-note-editor s5: live's typed keys missed its editor (recorder artifact). drw-inspection-table-iso-scrolled: not
+  the pixel mapping (live's weld take puts Front's top edge at 825,295, ours the same); an ISO dimension's value lands
+  centred on the pointer in live, ours had the line there (value 2.1 mm over): local fix in pending.rs, test.
   drw-inspection-table-iso-scrolled s2 left: px clicks on the ISO A4 portrait sheet land 2.1 mm apart from live's
   (dimension 237.8 vs 239.9), so live's first click took no edge; needs live's sheet-to-pixel at open.
 
@@ -47,8 +56,11 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   #e2e2e2, tan frame; 37ecb60c); the BOM row's part tan in the views and its callouts blue were ours already. Local:
   one click on a BOM cell selects it and opens the Cell panel (sizes + formats + a greyed Override), a double-click the
   same (live cferr-bomclk-1118 (b)); Split BOM table below puts the second part 3 mm under the first, same x and width.
-  Left: the "︿" chevron (unknown role); a placed BOM staying selected (live2 d3) contradicts the drw-bom-* takes (7 read
-  no EDGE after placing, though a selected BOM over Isometric reads EDGE): kept unselected, retake asked. Update from
+  A placed BOM stays selected (live2 bomsel-1118; the recorder can't read tables, and reads no EDGE under a just-placed
+  one, so ours doesn't count it until the next press, `placed_table`): local. live2 is adding a TABLE kind to the
+  recorder and retaking the seven drw-bom-* + drw-note-editor (type → ✓): then drop `placed_table`'s reader rule and
+  report the table as live's new kind. The "︿" is the isometric part's corner, not a control
+  (live2). Update from
   this workspace enabling ~3 s late is live's server latency, not a target. Custom feature ✓ with a field error:
   live (a) confirms ours (pale, Enter no-op; no field named: ✓ commits).
 - live2 drawing tables (behaviours "studios (lead 11-18 ~03:36, feel): drawing tables", live/studios/tables-1118/):

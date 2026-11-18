@@ -1139,7 +1139,8 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         ("datum", with_tail(&["Edit...", "Copy", "Paste as table"])),
         ("gdt", with_tail(&["Edit...", "Copy", "Paste as table", "Add leader", "Move to ▸"])),
         ("edge-condition", with_tail(&["Edit...", "Copy", "Paste as table", "Add leader", "Remove leaders", "Move to ▸"])),
-        ("ordinate", with_tail(&["Add to ordinate dimension group", "Edit...", "Paste as table", "Unbreak dimension"])),
+        // On a value's text: Reset ordinate too (live2 drw-ordinate-value-rclick).
+        ("ordinate", with_tail(&["Add to ordinate dimension group", "Edit...", "Paste as table", "Reset ordinate", "Unbreak dimension"])),
         ("revision-table", with_tail(&["Revision table properties...", "Paste as table", "Move to ▸", "Bring to front", "Send to back"])),
         ("surface-finish", with_tail(&["Edit...", "Copy", "Paste as table", "Add leader", "Move to ▸"])),
         // On an edge, no leader (live2 drw-surface-finish-flip 11-15): Flip where the free one has Add leader.
