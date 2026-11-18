@@ -132,6 +132,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    stopped, own userdocs.py killed, loop restarted with a 02:00-04:05 skip. Tonight's latency rows overlapped it 02:41-02:53: read
    them as possibly loaded. Green 08597f71a has core's 55fc929c: faces-pattern-slots comes from the loop after 04:05 / cut-check 04:15.
    SKSNAP-REACH closed not a bug (02:50, sub-pixel targets).
+0p. **Nightly 11-18 done (03:06)**: SCORE row 584e957c6 by hand (the script looked for "vibex7" in the heading; heading renamed, so
+   tomorrow's push works): load 1.4-3.5, 60/84 faster than live, sum 54.8 s (live 41.1), dock cold 7.51 s, reopen 3.46 s; quit
+   guard 5/5. Selection latency (v0.4.57 release, polled crop): face 216 / plane 153 / list row 163 / box release 218 ms medians.
+   Tab A/B at load < 1.2: return to an open tab settles 73-87 ms on 0.4.53 vs ~700 ms in 4 of 6 on 0.4.57 (sent to psui 03:08).
+   SELFEEL-PART-ROW verified on 08597f71 at load 0.2.
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
