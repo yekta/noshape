@@ -728,11 +728,11 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   build at load 24, re-check on a release build in the quiet window. Not run: Sketch 3's region (our two-blocks start has no
   Sketch 3), the view cube click.
 
-## Release blockers for the 2026-11-18 17:00 release (qa list 06:30, newest checked green 8b4812511; the latest release is v0.4.58)
+## Release blockers for the 2026-11-18 17:00 release (qa list 06:25, newest checked green 8b4812511; the latest release is v0.4.58)
 - **Must carry (qa-cut-1615 blocks the cut if the candidate lacks one; list in qa-scratch cut-must.txt)**: psui fff088e5, the fix of
   P0 DOCK-TAB-SWITCH-TRAILING-FRAMES (returns to an open tab settled ~700 ms from v0.4.54, 2219c4373); psui's macOS Ctrl+Enter fix
   once it lands (v0.4.58 marks that matrix row a gap).
-- No open release blocker at 06:30. v0.4.58 = 9c015658 + docs (qa GO 04:46); its published check runs when release.yml publishes.
+- No open release blocker at 06:25. v0.4.58 = 9c015658 + docs (qa GO 04:46); its published check runs when release.yml publishes.
 - Re-checks owed on the candidate: the dock tab return at vibex7 load < 2 (qa-wait-67eb: fff088e5 green vs 0.4.53), the hover flow
   (uh/uh2.sh, release check 4), user documents + f197 + tickets vs 0.4.58 (cut-check at 16:15).
 
