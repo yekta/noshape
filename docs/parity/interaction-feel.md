@@ -1331,7 +1331,7 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 
 | Finding | Ours | Test |
 |---|---|---|
-| A press-drag on a fixed instance: the cursor `no-drop` and a small fix glyph at the pointer, nothing moves, no toast; hovering it (no press) keeps the default cursor (behaviours "icons2 (10-23)" (b)) | = during the drag (two-blocks, Part 1 <1>: the arrow with ⊘ and the fix glyph, the block stays); ≠ after it: the ⊘ cursor stays after the release (still there 2 s later, after a 2 px move on the block and on empty space; the default came back on a later move onto the block) (live: the default at the release) | missing |
+| A press-drag on a fixed instance: the cursor `no-drop` and a small fix glyph at the pointer, nothing moves, no toast; hovering it (no press) keeps the default cursor (behaviours "icons2 (10-23)" (b)) | = (the arrow with ⊘ and the fix glyph during the drag, the block stays; the default cursor at the release: the release refreshes the viewport's cursor, which ours had kept until a later hover) | `a_fixed_instances_drag_drops_the_no_drop_cursor_at_the_release` |
 | A free instance's drag keeps the default cursor, no snap without Snap mode (icons2 (a)) | = (the default arrow) | missing |
 
 ## Fix queue (biggest feel impact first)

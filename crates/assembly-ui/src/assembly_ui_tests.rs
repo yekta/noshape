@@ -1796,3 +1796,57 @@ fn an_assembly_export_is_written_off_the_ui_thread(cx: &mut TestAppContext) {
     });
     assert_eq!(tabs, ["Assembly 1", "l2 exp asm.step"]);
 }
+
+/// Live asm-fixed-drag-1118 / icons2 10-23 (b): a press-drag on a fixed instance shows the no-drop cursor and moves
+/// nothing; the release brings the default cursor back at once (ours kept ⊘ until a later move onto the part).
+#[gpui::test]
+fn a_fixed_instances_drag_drops_the_no_drop_cursor_at_the_release(cx: &mut TestAppContext) {
+    use crate::cursor::AppCursor;
+    use crate::viewport::ViewportEvent;
+    use gpui_kit::Modifiers;
+    let (window, view) = pattern_assembly(cx, "fixed-drag");
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let id = instance(v, "Part 1 <1>", cx);
+            v.edit("Fix", cx, |a| {
+                if let Some(i) = a.instances.iter_mut().find(|i| i.id == id) {
+                    i.fixed = true;
+                }
+            });
+        })
+    })
+    .unwrap();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    draw(cx, window);
+    let cursor = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).viewport.read(cx).tool_cursor);
+    let (at, before) = cx
+        .update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let id = instance(v, "Part 1 <1>", cx);
+                assert!(v.assembly(cx).unwrap().instance(id).unwrap().fixed, "fixed");
+                let (lo, hi) = v.result.instance_bounds(id).unwrap();
+                let at = v.viewport.read(cx).project((lo + hi) * 0.5).unwrap();
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+                // (A drag starts past 2 px and 50 ms.)
+                std::thread::sleep(std::time::Duration::from_millis(60));
+                v.on_viewport_event(&vp, &ViewportEvent::ToolDrag { position: at + glam::DVec2::new(20.0, 0.0) }, w, cx);
+                (at, v.result.solved.placement(id))
+            })
+        })
+        .unwrap();
+    assert_eq!(cursor(cx), Some(AppCursor::NoDrop), "⊘ while dragging it");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: at + glam::DVec2::new(20.0, 0.0), modifiers: Modifiers::default() }, w, cx);
+        })
+    })
+    .unwrap();
+    assert_eq!(cursor(cx), None, "the default cursor at the release");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert_eq!(v.result.solved.placement(instance(v, "Part 1 <1>", cx)), before, "nothing moved");
+    });
+}

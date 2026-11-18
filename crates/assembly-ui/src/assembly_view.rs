@@ -3410,7 +3410,9 @@ impl AssemblyView {
                 if self.end_section_drag(window, cx) {
                     return;
                 }
+                // The no-drop cursor goes with the release (live icons2 10-23 (b), asm-fixed-drag-1118).
                 if self.ui.fixed_drag.take().is_some() {
+                    self.refresh_scene(false, cx);
                     cx.notify();
                 }
                 if self.snap_drag.is_some() {
