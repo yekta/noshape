@@ -836,12 +836,12 @@ impl PartStudioView {
     }
 
     /// The GPU's hover pick outside sketch mode, held to live's reach for the shown sketches (live2 11-18 hover-p0
-    /// ours-1118, live "feel (3D) retaken 11-18"): a sketch point within 9 px of the pointer on screen wins (over its
+    /// ours-1118, live "feel (3D) retaken 11-18"): a sketch point within 8.5 px of the pointer on screen wins (over its
     /// lines at a corner too), a curve lights within 7 px and stays lit to 10 (the 5 px pick square reached a slanted
     /// line at 8–9). A curve out of reach gives way to what the pick finds without it. Faces and edges keep their own
     /// pick (a sketch point behind a part stays hidden).
     pub(super) fn shown_sketch_hover_id(&self, id: Option<u32>, cx: &App) -> Option<u32> {
-        const POINT_REACH: f64 = 9.5;
+        const POINT_REACH: f64 = 8.5;
         const CURVE_REACH: f64 = 7.5;
         const CURVE_HOLD: f64 = 10.5;
         if self.sketch.is_some() {

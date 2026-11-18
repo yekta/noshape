@@ -124,7 +124,8 @@ fn sketch_hover_reach_and_priority_as_live(cx: &mut TestAppContext) {
 }
 
 /// Live2 hover-p0 (ours-1118, qa FEEL-SKETCH-REACH-OUTSIDE) and live "feel (3D) retaken 11-18": outside sketch mode a
-/// shown sketch's line lights from 7 px (8: not) and stays lit to 10 px on the way out (12: not), a point to 9 px, and
+/// shown sketch's line lights from 7 px (8: not) and stays lit to 10 px on the way out (12: not), a point to 9 px (qa
+/// 11-18 on f09f8eca: 10 lit, live's 9: 8.5 px here), and
 /// 8 px off a corner along its diagonal the corner point lights, not its lines, drawn as a disc.
 #[gpui::test]
 fn a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live(cx: &mut TestAppContext) {
@@ -174,7 +175,7 @@ fn a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live(cx: &mut Tes
     }
     let corner = lines[0].1;
     let out = (corner - centre).normalize();
-    for (d, want) in [(6.0, true), (8.0, true), (11.0, false)] {
+    for (d, want) in [(6.0, true), (8.0, true), (10.0, false), (11.0, false)] {
         pointer.move_to(cx, &view, corner + out * d);
         let got = hovered(cx, &view);
         let point = cx.update(|cx| {

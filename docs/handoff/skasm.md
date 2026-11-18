@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 22:47 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 23:40 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -30,20 +30,16 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
   `midpoint_overlay`; psui narrows its midpoint rule), 303e9d91 (Symmetric: B's start at its foot; Trim near a chain's
   corner `trim_near` 1.5 px; a passed midpoint's alignment `woken_mids` / `link_woken_mids`). live rechecks on green.
 
-## Committed, not landed (df427f1b, 22:4x): waits for suite B3
-- Error sweep P1 (live errors-1118, lead 22:3x): "Sketch could not be solved." follows the edited sketch's solve
-  (`update_conflicts`, also after background regens; it was cleared on the row's Warning); conflicts red whatever
-  Show errors says (live: the box changes nothing seen); a Dimension-tool dimension placed driven takes a typed value
-  as driving (`apply_dimension`); regeneration warns and keeps the last shape on any unsolved report (was only
-  Overconstrained). Show expressions row withdrawn by live (options remembered as live).
-- Solver `redundant_nearby` (welding 9c7704 Sketch 13's singular Ø kept; live 1862's stays redundant); translator: a
-  Use'd B-spline's ends by its first pole (asm-suspension 805e29 Sketch 2 solves); line across a circle: minimum
-  distance r - d (`h.internal`, 995636 Sketch 4); `sketch_draw` shape `apart` + translator `loose_ends` (995636
-  Sketch 13's 65 mm). AGENT_API regenerated.
-- Suites: A (old) vs B (nearby + B-spline ends): identical, 90/126, 1325/1585. B3 (everything) running on vibe2
-  ~/agents/skasm-keep/ab-B3.log; compare with `cmpsuite.sh ab-A.log ab-B3.log` (copies in /root/skasm-scratch).
-- Then land; rerun asm-suspension (vibe2 ~/tmp/skasm/asmz.sh) and welding (cfg.sh); tell asm (it reruns the pair).
-  asm-suspension's Fillet 3 / 4 and 3 instance offsets: our edges are B-splines where live's are r40 circles (core).
+- 7a8ca3b2 (23:38): error sweep P1 (live errors-1118): "Sketch could not be solved." follows the edited sketch's
+  solve (`update_conflicts`, also after background regens); conflicts red whatever Show errors says; a
+  Dimension-tool dimension placed driven takes a typed value as driving (`apply_dimension`); regeneration warns and
+  keeps the last shape on any unsolved report. Solver `redundant_nearby` (singular redundancy kept: welding 9c7704
+  Sketch 13); translator: Use'd B-spline ends by first pole (asm-suspension 805e29 Sketch 2), line-across-circle
+  minimum distance r - d (`h.internal`, 995636 Sketch 4), `sketch_draw` `apart` + `loose_ends` (995636 Sketch 13);
+  the Origin selectable in a sketch (qa session-1118). Suite A/B: identical (90/126, 1325/1585).
+- Queued: a678e02c (shown point reach 8.5 px: qa measured 10 lit at 9.5, live 9).
+- asm-suspension still: Fillet 3 / 4, Body / Joint / Lower Control Arm offsets: our edges B-splines where live's are
+  r40 circles (core's; asm routes). asm-tvc-mount ring: not cce30a1a (A/B identical); asm bisects.
 
 ## Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
 regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).
