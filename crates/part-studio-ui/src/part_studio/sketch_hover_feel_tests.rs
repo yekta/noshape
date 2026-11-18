@@ -436,4 +436,46 @@ fn sketch_lines_and_points_light_as_live(cx: &mut TestAppContext) {
         cx.update_window(window, |_, w, _| w.remove_window()).unwrap();
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+
+/// qa 11-18 SELFEEL-DBLCLICK-FACE-SKETCH (live2 11-17 sel-feel row 3), through the real pointer and the GPU's pick: a
+/// part's top face double-clicked draws its feature's hidden sketch at the part's base (its curves in the scene) while
+/// the feature and the sketch are related.
+#[gpui::test]
+fn a_face_double_clicked_draws_its_sketch_through_the_pointer(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    // qa's set-up: the two-blocks start, Part 2's top (Extrude 2 of Sketch 2).
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "dblclick-gpu", Some(starts["two-blocks"].clone()));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.len() == 2);
+    let pointer = Pointer::new(cx, window, &view);
+    let at = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).nth(1).unwrap();
+        let top_z = b.mesh.positions.iter().map(|p| p[2]).fold(f32::MIN, f32::max);
+        let top: Vec<glam::DVec3> = b.mesh.positions.iter().filter(|p| (p[2] - top_z).abs() < 1e-7).map(|p| glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).collect();
+        let c = top.iter().copied().sum::<glam::DVec3>() / top.len() as f64;
+        v.viewport.read(cx).project(c).unwrap()
+    });
+    pointer.move_to(cx, &view, at);
+    let win = pointer.window_point(cx, at);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    for n in [1, 2] {
+        vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: win, modifiers: Modifiers::default(), click_count: n, first_mouse: false });
+        vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: win, modifiers: Modifiers::default(), click_count: n });
+    }
+    pointer.frames(cx, &view);
+    pointer.move_to(cx, &view, at + DVec2::new(2.0, 0.0));
+    let (related, shown, drawn) = cx.update(|cx| {
+        let v = view.read(cx);
+        let drawn = v.built.as_ref().is_some_and(|b| (1..20_000).filter_map(|i| b.picks.get(i)).any(|t| matches!(t.reference, Reference::SketchEntity { .. })));
+        (v.related_features(cx).len(), v.sketches_shown_for_now().len(), drawn)
+    });
+    // Live feel/3d dblclick-face.png: drawn through the part, blue with its corner dots, as an edited sketch looks.
+    let through = cx.update(|cx| {
+        let sketch = view.read(cx).sketches_shown_for_now();
+        view.update(cx, |v, cx| v.scene_options(cx).through_sketches.iter().filter(|f| sketch.contains(f)).count())
+    });
+    assert_eq!((related, shown, drawn, through), (2, 1, true, 1), "(related rows, sketches shown for now, its curves in the scene, drawn through the parts)");
 }

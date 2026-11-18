@@ -3489,6 +3489,9 @@ fn a_face_double_clicked_shows_its_features_sketch(cx: &mut TestAppContext) {
     at.set(at.get() + std::time::Duration::from_millis(200));
     click_at(cx, pick);
     let (after, selected) = (shown(cx), cx.update(|cx| view.read(cx).selection.len()));
+    // (Drawn: the scene has its curves, qa 11-18 SELFEEL-DBLCLICK-FACE-SKETCH on green: related but not drawn.)
+    let drawn = cx.update(|cx| view.read(cx).built.as_ref().is_some_and(|b| (1..20_000).filter_map(|i| b.picks.get(i)).any(|t| matches!(t.reference, Reference::SketchEntity { .. }))));
+    assert!(drawn, "the double-clicked face's sketch in the scene");
     let related = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).related_features(cx).len());
     let lit = related(cx);
     at.set(at.get() + std::time::Duration::from_millis(800));

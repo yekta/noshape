@@ -433,6 +433,9 @@ pub struct SceneOptions {
     pub show_origin: bool,
     /// Sketch being edited (drawn with constraint-state colors, others dimmed).
     pub editing_sketch: Option<FeatureId>,
+    /// Sketches drawn through the parts as an edited one looks (constraint-state colours, its points): a double-clicked
+    /// face's sketch (live feel/3d dblclick-face.png: Sketch 1 blue with its corner dots, seen through the block).
+    pub through_sketches: Vec<FeatureId>,
     /// Bodies rendered dimmed (e.g. features below the rolled-back bar preview).
     pub transparent_bodies: bool,
     /// Solid bodies drawn light gray instead of their colour (Interference
@@ -967,6 +970,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     if opts.show_sketches || opts.editing_sketch.is_some() {
         for sk in &display.sketches {
             let editing = opts.editing_sketch == Some(sk.feature);
+            let through = !editing && opts.through_sketches.contains(&sk.feature);
             // (A sketch on a sheet metal flat is drawn in the flat view: live 2468.)
             if (sk.hidden || sk.on_flat) && !editing {
                 continue;
@@ -990,14 +994,14 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     Some(c) => lin_to_u8(c),
                     // (A handle arm: Onshape's thin grey handle line, sketch/100–101.)
                     None if c.handle => theme::rgb8(theme::viewport::SKETCH_HANDLE_LINE),
-                    None => sketch_color(&opts.graphics, c.state, c.construction, editing, c.external),
+                    None => sketch_color(&opts.graphics, c.state, c.construction, editing || through, c.external),
                 };
                 // Hovered / selected it keeps a dark core like a part edge
                 // (live sketch/21, 22).
                 // (A handle arm on top: it runs along its spline from the end, and under it it couldn't be picked.)
-                let style = sketch_curve_style(c, editing);
+                let style = sketch_curve_style(c, editing) | if through { LineSegment::ON_TOP } else { 0 };
                 // Graphics preferences: active 2 px, inactive 1 px by default.
-                let width = if c.handle { 1.0 } else if editing { opts.graphics.sketch_line_width } else { opts.graphics.inactive_line_width };
+                let width = if c.handle { 1.0 } else if editing || through { opts.graphics.sketch_line_width } else { opts.graphics.inactive_line_width };
                 lines.push_polyline(&c.points, color, id, width, style);
             }
             let mut points = PointData::default();
@@ -1009,14 +1013,14 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 });
                 let color = match sk.color.filter(|_| !editing) {
                     Some(c) => lin_to_u8(c),
-                    None => sketch_color(&opts.graphics, p.state, false, editing, false),
+                    None => sketch_color(&opts.graphics, p.state, false, editing || through, false),
                 };
                 // Live (sketch/07, 28; with the anti-aliased rim): vertices of
                 // the edited sketch are 6.7 px dots while under-defined (blue),
                 // 6 px once defined.
                 let vertex = if p.state == SketchEntityState::Under { 6.7 } else { 6.0 };
                 // (A spline's handle tip: Onshape's 9 px hollow handle in the point's colour, on top; lit, its disc.)
-                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.tip { 9.0 } else if p.handle { 5.0 } else { vertex };
+                let size = if p.standalone { 7.0 } else if !editing && !through { 0.0 } else if p.tip { 9.0 } else if p.handle { 5.0 } else { vertex };
                 // Standalone points and spline handles are hollow (live sketch/100, Point tool).
                 let style = if p.tip { PointSprite::HANDLE_TIP | LineSegment::ON_TOP } else if p.standalone || p.handle { PointSprite::HOLLOW } else { 0 };
                 let style = style | PointSprite::SKETCH_POINT | if p.center { PointSprite::CENTER } else { 0 };

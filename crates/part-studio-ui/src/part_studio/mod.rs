@@ -1342,6 +1342,7 @@ impl PartStudioView {
             o.body_layer = noshape_render::scene::compare::TARGET;
         }
         o.display_only = self.ui.transform_ghost.clone();
+        o.through_sketches = self.dblclick_sketches();
         // Isolate (live ui/iso-901): the planes fade to faint outlines; below
         // 10 % the other parts are solid washed-out ghosts.
         // Show dimensions: the parts' shadowed faces come up a little (live).

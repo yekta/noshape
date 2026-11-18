@@ -1237,15 +1237,20 @@ impl PartStudioView {
     /// stands (live feel/3d.json "double_click_face": Sketch 1 drawn in blue, feel/3d/dblclick-face.png), and a
     /// hidden sketch's list row hovered shows it in place, lit (live2 11-17 sel-feel 4: Sketch 1 light orange).
     pub(super) fn sketches_shown_for_now(&self) -> Vec<FeatureId> {
-        let mut out: Vec<FeatureId> = match &self.ui.dblclick_related {
-            Some((lit, sel)) if *sel == self.selection => lit.iter().copied().collect(),
-            _ => Vec::new(),
-        };
+        let mut out = self.dblclick_sketches();
         out.extend(self.ui.list_hover);
         out.retain(|f| self.display.sketches.iter().any(|s| s.hidden && s.feature == *f));
         out.sort();
         out.dedup();
         out
+    }
+
+    /// The double-clicked face's feature and sketch while that selection stands (drawn through the parts).
+    pub(super) fn dblclick_sketches(&self) -> Vec<FeatureId> {
+        match &self.ui.dblclick_related {
+            Some((lit, sel)) if *sel == self.selection => lit.iter().copied().collect(),
+            _ => Vec::new(),
+        }
     }
 
     pub(super) fn with_dblclick_sketch(&self, d: Arc<StudioDisplay>) -> Arc<StudioDisplay> {
