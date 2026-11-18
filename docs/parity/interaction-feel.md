@@ -1265,19 +1265,19 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 
 | Finding | Ours | Test |
 |---|---|---|
-| Linear and Circular pattern: no manipulator, no distance / count / angle arrow in the graphics | ? | missing |
-| A typed count or distance changes nothing until Enter (3–4 s watched); Enter: the preview at 0.8–1.5 s | ? | missing |
-| Linear pattern: the preview instance (translucent) after the Direction edge is picked (3.0 s on live's lane) | ? | missing |
-| Skip instances ☑: "Instances to skip" and a small white ring at each instance's centroid (the seed a dot); a hovered ring turns blue | ? | missing |
-| A ring click adds the chip "(1, 0)" with a CLEAR link and drops the instance from the preview; a second click on it removes the chip | ? | missing |
-| Circular pattern fields: Entities, Axis of pattern, Angle 360 deg, Instance count 4, Equal spacing ☑, Centered, Skip instances | ? | missing |
-| Hole: the dialog title (and the feature-list row) is the size summary "Ø 6.35 mm ↧ 12 mm", "… \| ⌴Ø 10 mm ↧ 5 mm" (Counterbore), "… \| ⌵Ø 10 mm X 90°" (Countersink); with no point its tooltip "[Hole] did not regenerate properly: No hole points selected." | ? | missing |
-| Hole picks: only sketch points light (0.31–0.47 s after the pointer stops) and take; a part vertex or a face never lights and adds nothing | ? | missing |
-| Hole: each point click adds a chip "Vertex of Hole points" (with the click), a click on a picked point removes it; the first pick fills Merge scope "Part 1" | ? | missing |
-| Hole callout: one "Ø6.35 THRU" label on a leader to the first hole, in the face's plane (a second line "⌴Ø10 ↧5" with Counterbore); it covers points behind it | ? | missing |
-| Hole Simple / Counterbore / Countersink and Inch / Metric tabs: the title changes at 0.8–0.9 s, the preview at 2.5–2.8 s; Counterbore adds diameter 10 mm and depth 5 mm rows; Metric makes Ø 5 mm | ? | missing |
-| Hole depth typed: nothing until Enter; Enter: the title at 0.5 s, the preview at 2.8 s | ? | missing |
-| Mirror: a side face in the Mirror plane box ("Face of Extrude 1"); the preview at 1.8 s; the operation turns to Add with "Merge with all" and Merge scope "Part 1" when the mirror touches the seed | ? | missing |
+| Linear and Circular pattern: no manipulator, no distance / count / angle arrow in the graphics | = (green e503ca2f, live2 ours-1118 pattern: neither draws an arrow or a value box) | missing |
+| A typed count or distance changes nothing until Enter (3–4 s watched); Enter: the preview at 0.8–1.5 s | = (green e503ca2f, live2 ours-1118 pattern: "3" and "40" typed: no change for 3.5 s; Enter: the preview at 0.32 s) | missing |
+| Linear pattern: the preview instance (translucent) after the Direction edge is picked (3.0 s on live's lane) | = (green e503ca2f, live2 ours-1118 pattern: translucent instance 0.57 s after the edge pick) | missing |
+| Skip instances ☑: "Instances to skip" and a small white ring at each instance's centroid (the seed a dot); a hovered ring turns blue | = (green e503ca2f, live2 ours-1118 pattern: white rings at the instances' centroids, the seed a dot, the hovered ring blue) | missing |
+| A ring click adds the chip "(1, 0)" with a CLEAR link and drops the instance from the preview; a second click on it removes the chip | = (green e503ca2f, live2 ours-1118 pattern: chip "(1, 0)" with CLEAR, the instance gone at 0.74 s; a second click removes it at 0.24 s) | missing |
+| Circular pattern fields: Entities, Axis of pattern, Angle 360 deg, Instance count 4, Equal spacing ☑, Centered, Skip instances | = (green e503ca2f, live2 ours-1118 pattern: the same fields and defaults; a vertical edge as axis: the preview at 0.35 s, no arrows) | missing |
+| Hole: the dialog title (and the feature-list row) is the size summary "Ø 6.35 mm ↧ 12 mm", "… \| ⌴Ø 10 mm ↧ 5 mm" (Counterbore), "… \| ⌵Ø 10 mm X 90°" (Countersink); with no point its tooltip "[Hole] did not regenerate properly: No hole points selected." | ≠ (green e503ca2f, live2 ours-1118 pattern, start holes: block + sketch "Hole points"): the titles and list rows as live (Simple, Counterbore, Countersink, Metric "Ø 5 mm ↧ 12 mm"); but the no-point tooltip appends "A parameter value is not valid." after "No hole points selected." | missing |
+| Hole picks: only sketch points light (0.31–0.47 s after the pointer stops) and take; a part vertex or a face never lights and adds nothing | = (green e503ca2f, live2 ours-1118 pattern: a sketch point lights 0.28–0.51 s after the pointer arrives; a top corner never lights) | missing |
+| Hole: each point click adds a chip "Vertex of Hole points" (with the click), a click on a picked point removes it; the first pick fills Merge scope "Part 1" | = (green e503ca2f, live2 ours-1118 pattern: "Vertex of Hole points" 0.20 s after the click, Merge scope "Part 1", the preview at 0.85 s; a click on it again removes the chip) | missing |
+| Hole callout: one "Ø6.35 THRU" label on a leader to the first hole, in the face's plane (a second line "⌴Ø10 ↧5" with Counterbore); it covers points behind it | ≠ (green e503ca2f, live2 ours-1118 pattern): "Ø6.35 THRU" in the face's plane, but on a long leader with the text along the face's far edge (overhanging it); live's lies on the face by the hole, over the other points | missing |
+| Hole Simple / Counterbore / Countersink and Inch / Metric tabs: the title changes at 0.8–0.9 s, the preview at 2.5–2.8 s; Counterbore adds diameter 10 mm and depth 5 mm rows; Metric makes Ø 5 mm | = (green e503ca2f, live2 ours-1118 pattern: the title and list row at 0.13–0.28 s, the preview at 0.73–1.48 s; Counterbore 10 mm / 5 mm rows, Countersink 10 mm / 90 deg, Metric Ø 5 mm) | missing |
+| Hole depth typed: nothing until Enter; Enter: the title at 0.5 s, the preview at 2.8 s | = (green e503ca2f, live2 ours-1118 pattern: "5" typed: nothing for 4 s; Enter: the title at 0.19 s, the preview at 0.79 s) | missing |
+| Mirror: a side face in the Mirror plane box ("Face of Extrude 1"); the preview at 1.8 s; the operation turns to Add with "Merge with all" and Merge scope "Part 1" when the mirror touches the seed | = (green e503ca2f, live2 ours-1118 pattern: "Face of Extrude 1", the preview at 0.93 s, the operation Add with "Merge with all" and Merge scope "Part 1") | missing |
 
 ### asm-dstates-1118 + sm-form-1118 (Display states, Form placement, live2 11-18 09:25) [asm, skasm]
 
