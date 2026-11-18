@@ -2758,11 +2758,7 @@ impl AssemblyView {
                                     let (v0, v1, v2, v3, v4, n) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), name.clone());
                                     return m
                                         .item(crate::os_menu::OsMenuItem::new(format!("Activate {n}")).on_click(move |_, _, cx| {
-                                            v0.update(cx, |this, cx| {
-                                                this.ui.explode_sel = Some((i, None));
-                                                this.explode_edit = true;
-                                                this.activate_explode(Some(i), cx);
-                                            })
+                                            v0.update(cx, |this, cx| this.activate_explode_from_menu(i, cx))
                                         }))
                                         .item(crate::os_menu::OsMenuItem::new("Rename").on_click(move |_, window, cx| v1.update(cx, |this, cx| this.start_rename(RenameTarget::Explode(i), n.clone(), window, cx))))
                                         // Our views start from the assembly as it is

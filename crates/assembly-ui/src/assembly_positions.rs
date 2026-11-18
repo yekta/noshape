@@ -13,6 +13,7 @@ use super::*;
 use gpui_kit::component::input::InputEvent;
 
 /// "Driving mate selector": mates listed, their degrees of freedom checked.
+#[derive(Clone)]
 pub struct NpDriver {
     pub mates: Vec<MateId>,
     pub checked: Vec<(MateId, u8)>,
@@ -48,6 +49,16 @@ pub(super) fn driver_dof(ix: u8) -> (&'static str, &'static str) {
         1 => ("↔", "- X"),
         2 => ("↔", "- Y"),
         _ => ("↔", "- Z"),
+    }
+}
+
+/// A driven DOF as the "added to named positions" bubble names it (live extras-1118: "Revolute 1 Rz").
+fn driver_short(ix: u8) -> &'static str {
+    match ix {
+        0 => "Rz",
+        1 => "Tx",
+        2 => "Ty",
+        _ => "Tz",
     }
 }
 
@@ -133,9 +144,8 @@ impl AssemblyView {
             mates.push(mate);
         }
         let checked = asm.position_drivers.clone();
-        if asm.named_positions.is_empty() {
-            self.add_named_position_row(None, cx);
-        } else if self.ui.np_editing.is_none() {
+        // (With no position yet, the first ticked DOF makes one: `toggle_np_driver`.)
+        if !asm.named_positions.is_empty() && self.ui.np_editing.is_none() {
             self.ui.np_editing = Some(self.ui.np_applied.unwrap_or(0));
         }
         self.panel = Some(SidePanel::Positions);
@@ -143,8 +153,43 @@ impl AssemblyView {
         cx.notify();
     }
 
-    fn accept_np_driver(&mut self, cx: &mut Context<Self>) {
-        let Some(d) = self.ui.np_driver.take() else { return };
+    /// A DOF ticked or unticked in the selector applies at once (live extras-1118 n0/n1): the first tick of a
+    /// document makes "Named position 1" and edits it, and a tick says "<mate> Rz added to named positions" in the
+    /// blue bubble. The ✓ only closes the selector.
+    pub(super) fn toggle_np_driver(&mut self, m: MateId, ix: u8, cx: &mut Context<Self>) {
+        let Some(d) = &mut self.ui.np_driver else { return };
+        let added = match d.checked.iter().position(|x| *x == (m, ix)) {
+            Some(k) => {
+                d.checked.remove(k);
+                false
+            }
+            None => {
+                d.checked.push((m, ix));
+                true
+            }
+        };
+        self.commit_np_drivers(cx);
+        if !added {
+            return;
+        }
+        let Some(asm) = self.assembly(cx) else { return };
+        let mate = asm.mate(m).map(|x| x.name.clone()).unwrap_or_default();
+        if asm.named_positions.is_empty() {
+            self.add_named_position_row(None, cx);
+        }
+        self.np_bubble(format!("{mate} {} added to named positions", driver_short(ix)), true, 4400, cx);
+        cx.notify();
+    }
+
+    pub(super) fn accept_np_driver(&mut self, cx: &mut Context<Self>) {
+        self.commit_np_drivers(cx);
+        self.ui.np_driver = None;
+        cx.notify();
+    }
+
+    /// The selector's ticks as the assembly's position drivers (an undo step when they change).
+    fn commit_np_drivers(&mut self, cx: &mut Context<Self>) {
+        let Some(d) = self.ui.np_driver.clone() else { return };
         // Keep the mates' order, each mate's DOFs in their own order.
         let mut drivers: Vec<(MateId, u8)> = Vec::new();
         for m in &d.mates {
@@ -155,8 +200,10 @@ impl AssemblyView {
                 }
             }
         }
+        if self.assembly(cx).is_some_and(|a| a.position_drivers == drivers) {
+            return;
+        }
         self.edit("Driving mate selector", cx, |a| a.position_drivers = drivers);
-        cx.notify();
     }
 
     /// Apply a position: its driving values are imposed (the other mates
@@ -244,7 +291,13 @@ impl AssemblyView {
     /// A named position's green toast; it goes by itself (live 1671: Apply
     /// after ≈4.4 s, Update ≈3.9 s), ✕ closes it sooner.
     fn np_toast(&mut self, text: String, ms: u64, cx: &mut Context<Self>) {
+        self.np_bubble(text, false, ms, cx);
+    }
+
+    /// [`Self::np_toast`], blue (`info`) or green.
+    fn np_bubble(&mut self, text: String, info: bool, ms: u64, cx: &mut Context<Self>) {
         self.ui.np_toast = Some(text.clone());
+        self.ui.np_toast_info = info;
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(std::time::Duration::from_millis(ms)).await;
             let _ = this.update(cx, |this: &mut Self, cx| {
@@ -633,7 +686,7 @@ impl AssemblyView {
                 .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w(self.tab) }))
                 .flex()
                 .justify_center()
-                .child(crate::os_ui::message_bubble("np-toast", crate::os_ui::BubbleKind::Success, text, move |_, _, cx| {
+                .child(crate::os_ui::message_bubble("np-toast", if self.ui.np_toast_info { crate::os_ui::BubbleKind::Info } else { crate::os_ui::BubbleKind::Success }, text, move |_, _, cx| {
                     view.update(cx, |this, cx| {
                         this.ui.np_toast = None;
                         cx.notify();
@@ -679,6 +732,7 @@ impl AssemblyView {
                                     d.mates.retain(|x| *x != m);
                                     d.checked.retain(|(x, _)| *x != m);
                                 }
+                                this.commit_np_drivers(cx);
                                 cx.notify();
                             })),
                     )
@@ -715,17 +769,7 @@ impl AssemblyView {
                             )
                             .child(div().text_size(px(13.33)).text_color(rgb(0x666666)).child(driver_dof(ix).0))
                             .child(div().text_size(px(13.33)).text_color(rgb(0x666666)).child(driver_dof(ix).1))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                if let Some(d) = &mut this.ui.np_driver {
-                                    match d.checked.iter().position(|x| *x == (m, ix)) {
-                                        Some(k) => {
-                                            d.checked.remove(k);
-                                        }
-                                        None => d.checked.push((m, ix)),
-                                    }
-                                }
-                                cx.notify();
-                            })),
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_np_driver(m, ix, cx))),
                     );
                 }
             }

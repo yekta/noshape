@@ -1189,6 +1189,80 @@ fn a_typed_limit_turns_the_new_mates_preview_into_range(cx: &mut TestAppContext)
     assert!((angle(cx) - 30.0).abs() < 1e-6, "stays at 30°");
 }
 
+/// Live extras-1118 n0/n1: ticking a driver mate's DOF applies at once: the first makes "Named position 1" and edits
+/// it, with the blue bubble "Revolute 1 Rz added to named positions"; the ✓ only closes the selector.
+#[gpui::test]
+fn ticking_a_driver_mate_makes_the_first_named_position_at_once(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "np-driver");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Revolute, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            v.accept_mate(w, cx);
+        });
+    })
+    .unwrap();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let m = v.assembly(cx).unwrap().mates.iter().find(|m| m.name == "Revolute 1").expect("Revolute 1").id;
+            v.open_np_driver(m, cx);
+            assert!(v.assembly(cx).unwrap().named_positions.is_empty(), "opening the selector makes no position");
+            v.toggle_np_driver(m, 0, cx);
+            let a = v.assembly(cx).unwrap();
+            assert_eq!(a.position_drivers, vec![(m, 0)]);
+            assert_eq!(a.named_positions.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["Named position 1"]);
+            assert_eq!(v.ui.np_editing, Some(0));
+            assert_eq!(v.ui.np_toast.as_deref(), Some("Revolute 1 Rz added to named positions"));
+            assert!(v.ui.np_toast_info, "the blue bubble");
+            v.accept_np_driver(cx);
+            assert!(v.ui.np_driver.is_none());
+            assert_eq!(v.assembly(cx).unwrap().position_drivers, vec![(m, 0)]);
+        });
+    });
+}
+
+/// Live extras-1118: "Activate Explode 1" jumps to the exploded state at once (no playback), then the camera zooms to
+/// fit the exploded parts, animated.
+#[gpui::test]
+fn activating_an_exploded_view_jumps_then_zooms_to_fit(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "explode-activate");
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            let step: noshape_model::assembly::ExplodeStep = serde_json::from_value(json!({ "instances": [pin], "translation": [0.0, 0.0, 0.5], "rotation_axis": null, "rotation_angle": 0.0 })).unwrap();
+            v.edit("Insert : Explode 1", cx, |a| a.exploded_views.push(noshape_model::assembly::ExplodedView { name: "Explode 1".into(), steps: vec![step] }));
+            let before = v.result.instance_bounds(pin).unwrap();
+            v.activate_explode_from_menu(0, cx);
+            assert_eq!(v.explode, Some(0));
+            assert!(v.explode_progress.is_none(), "no playback");
+            let after = v.result.instance_bounds(pin).unwrap();
+            assert!((after.0.z - before.0.z - 0.5).abs() < 1e-6, "exploded at once: {before:?} -> {after:?}");
+            let (to, _) = v.viewport.read(cx).animation().expect("an animated zoom to fit");
+            assert!(to.distance > v.viewport.read(cx).camera.distance, "zooms out to the exploded pin");
+        });
+    })
+    .unwrap();
+}
+
+/// Live extras-1118: opening Linear pattern adds its red row at once, counted in "Instances (N)".
+#[gpui::test]
+fn an_opened_linear_pattern_counts_its_row(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "pattern-count");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let before = v.instance_count(cx);
+            v.open_pattern(super::PatternDialogKind::Linear, w, cx);
+            assert!(v.pending_pattern_row(cx).is_some(), "the red row");
+            assert_eq!(v.instance_count(cx), before + 1);
+        });
+    })
+    .unwrap();
+}
+
 /// Live asm/feel-1117 c-a-rowhover: hovering an instance's row outlines the part in the graphics, in hover orange, with
 /// no tint on its faces (was: the accent fill).
 #[gpui::test]

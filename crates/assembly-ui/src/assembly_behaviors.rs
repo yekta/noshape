@@ -343,6 +343,8 @@ pub struct AsmUi {
     pub np_driver: Option<super::positions::NpDriver>,
     pub np_cell: Option<super::positions::NpCell>,
     pub np_toast: Option<String>,
+    /// The toast is the blue info bubble, not the green one.
+    pub np_toast_info: bool,
     pub np_count: usize,
     /// The Shift+/ Keyboard shortcuts sheet (app-core's, shared by the studios).
     pub shortcut_sheet: Option<(Entity<crate::shortcut_sheet::ShortcutSheet>, Subscription)>,

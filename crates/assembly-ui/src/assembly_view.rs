@@ -2486,6 +2486,15 @@ impl AssemblyView {
         self.reapply_display(cx);
     }
 
+    /// Row menu › Activate <view>: the view jumps to its exploded state, then the camera zooms to fit, animated
+    /// (live extras-1118: no playback; a plain row click only selects).
+    fn activate_explode_from_menu(&mut self, i: usize, cx: &mut Context<Self>) {
+        self.ui.explode_sel = Some((i, None));
+        self.explode_edit = true;
+        self.activate_explode(Some(i), cx);
+        self.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx));
+    }
+
     /// Add exploded view (panel footer, top row menu): a new empty view in
     /// explode mode, "Editing Explode N [Done]" (live assembly/62; the how-to
     /// is the panel's info box, not a message).
@@ -4199,8 +4208,9 @@ impl AssemblyView {
                 )
             })
             .when(dyn_suppressed && is_top, |d| d.child(svg().path(icon_path("function")).size(px(14.)).flex_none().text_color(pal.text_faint)))
-            .when_some(dof.filter(|d| *d > 0 && !fixed && !dyn_suppressed), |d, n| {
-                d.child(div().id(SharedString::from(format!("dof-{}", top.0))).flex_none().child(crate::assets::icon(&icon_path("list-free"), 20., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(format!("Has degrees of freedom ({n})")).build(w, cx)))
+            // Live (extras-1118 and every capture): "Has degrees of freedom", no count.
+            .when_some(dof.filter(|d| *d > 0 && !fixed && !dyn_suppressed), |d, _| {
+                d.child(div().id(SharedString::from(format!("dof-{}", top.0))).flex_none().child(crate::assets::icon(&icon_path("list-free"), 20., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new("Has degrees of freedom").build(w, cx)))
             })
             // In-context arrows (Assembly contexts of its Part Studio).
             .when(is_top, |d| d.children(self.context_icons(top, cx)))
@@ -5276,12 +5286,19 @@ impl AssemblyView {
     /// and the "Instances (N)" row. Rendered with the view, outside the rows'
     /// cached slice, so the filter box's keystrokes and caret blinks leave
     /// the rows cached (the filter notifies them when it changes).
+    /// The "Instances (N)" count: top-level rows, a pattern being defined counting its row (live extras-1118,
+    /// "Instances (3)" for a block, a pin and the new red "Linear pattern 1").
+    fn instance_count(&self, cx: &App) -> usize {
+        let pending = usize::from(self.pattern.as_ref().is_some_and(|s| s.editing.is_none()));
+        self.assembly(cx).map_or(0, |a| {
+            let generated: std::collections::HashSet<InstanceId> = a.patterns.iter().flat_map(|p| p.generated.iter().map(|g| g.instance)).collect();
+            top_level_rows(a.instances.iter().map(|i| i.id), &generated, a.patterns.len() + pending)
+        })
+    }
+
     fn render_list_head(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
-        let instances = self.assembly(cx).map(|a| {
-            let generated: std::collections::HashSet<InstanceId> = a.patterns.iter().flat_map(|p| p.generated.iter().map(|g| g.instance)).collect();
-            top_level_rows(a.instances.iter().map(|i| i.id), &generated, a.patterns.len())
-        }).unwrap_or(0);
+        let instances = self.instance_count(cx);
         // A configured assembly: the Configurations box above the list (live 191).
         let mut head: Vec<AnyElement> = self.render_asm_config_box(cx).into_iter().collect();
         head.push(self.render_list_filter(cx));
