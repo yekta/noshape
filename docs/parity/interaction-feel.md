@@ -1430,6 +1430,23 @@ before / +1.5 s and ours before / +1.5 s for each key). Mac: drawing Ctrl+S / Q 
 | Ctrl+S Sheets (drawing) | the Sheets panel opens over the left; the sheet stays where it is | the panel opens and the sheet re-fits smaller | ≠ [studios] |
 | The rest: asm 1–7 views, arrows, Ctrl/Ctrl+Shift arrows, Z / Shift+Z / F, I Insert, M Mate, Ctrl+M Mate connector, Shift+V Named views, Shift+X Section, ` Select other, J, K, S, Delete / Backspace; drawing D, Shift+D/R/H, Ctrl+M, L, C, G, R, M, H, V, I, Shift+L, B, T, N, P, S, Z / Shift+Z, F, arrows, Ctrl+arrows, Ctrl+Shift+arrows, Page Up/Down, Home, End, Shift+Q, Ctrl+Q, Ctrl+C / Ctrl+V (a view: the copy pasted beside it), Delete / Backspace | the same | the same | = |
 
+### shortcuts-ps-1118 (Part Studio default keys, live 11-18 23:00–23:40) [psui]
+
+Each of the 56 keys in live's `partStudio` map (live/keys-1118/linux/capture.json; the Mac map has the same keys), pressed once in live and once in ours from the same
+state. Live reloads the page for every key, on a fresh "q keys" studio when the key changes the document; ours relaunches the green app (5c9229069 / c3d3470d2) on a
+fresh copy of a block document. The pointer rests in the graphics at (1300, 700); keys that need a selection have Part 1 picked in the Parts list first. A
+screenshot 1.3–1.5 s after the key (live/keys-1118/live/ps-pairs/). All 56 keys do the same thing in both apps: the same view, rotation, pan, zoom, dialog, tool,
+toggle or bubble. Esc closes Curve/surface analysis in both. Mac: live's Mac and Linux maps match; ours binds Ctrl/⌘ pairs, Control-only keys and Redo as
+live (`ctrl_cmd`, `shared_keys_follow_lives_list_per_os`) =. Feature-dialog widths and the sketch dialog's Show expressions differed only because of saved settings.
+
+| Key (state) | Live | Ours | Status |
+|---|---|---|---|
+| A view key with the pointer resting on the model (Shift+1/2/3/4/5/6, Shift+Z, Ctrl+Shift+Down/Right) | whatever comes under the resting pointer lights after the view moves (a plane's or the part's orange outline, an edge) | nothing lights until the pointer moves | ≠ [psui] |
+| Shift+T Make transparent (Part 1 selected) | the dialog; the part drawn as a pale see-through ghost, its row no longer selected | the dialog; the part stays selected, see-through orange, its row highlighted | ≠ [psui] |
+| Delete / Backspace (Part 1 selected) | the Delete part 1 dialog; the part drawn as a see-through ghost with orange edges | the same dialog; the part drawn solid, tan | ≠ [psui] |
+| Shift+X Section view | the dialog at the list's side like other feature dialogs (top left ~ (396, 192)) | the dialog low on the left (~ (336, 620)) | ≠ [psui] |
+| Shift+Y Show selected parts (Part 1 selected) | the selection cleared | Part 1 stays selected | ≠ [psui] (live's studio had Part 1 hidden first; to retake from one state) |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
