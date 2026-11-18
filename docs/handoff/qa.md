@@ -94,6 +94,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    fls.sh start <doc>|shot|stop (:669), fl2.py / fl3.sh / fl4.sh / vs*.sh / fs.sh. Hover re-run on 7187ac75 (5e498ffb): fixed (sent).
    skasm 00:00: SKSNAP-MODEL-EDGE / ALIGN / REACH fixed (landing after da22ce56); SKSNAP-GLYPHS-AFTER: re-run glyphs.py with Show
    constraints ticked (sketch dialog checkbox, screen (738, 352) in sks.sh's session). qa-wait-da22 re-runs sel-feel C2/C3/B1/D.
+0i. **Re-checks owed on the greens with**: skasm da22ce56 (sel-feel C2/C3/B1/D: qa-wait-da22 runs it), skasm's snap fixes (sweep.py /
+   hv.py / glyphs.py with Show constraints ticked), skasm f90cf944 (Flange broad face; joint-row hover: fl/joint*.sh, sm.sh), psui
+   2234f511 (rollback bar: fl2.py onto-top / back-to-end + bar right-click; face + edge menu: menu.sh; rename click in graphics).
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).

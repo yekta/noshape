@@ -576,8 +576,12 @@ animate ~550-690 ms from the first frame to the last (500 ms + a frame on this d
 - [ ] **P2 MENUFEEL-FACE-EDGE (psui)**: a face + an edge selected: no "Add appearance to face…" (live keeps it). psui: fixed in 2234f511.
 - [ ] **P2 HOVER-LEAVES-WINDOW (psui)**: a face hovered just before the pointer leaves the window stays outlined (twice, sm-box and
   block-fillet).
-- Not judged: hover per box in the Sheet metal model dialog (our start is a Thicken model, live's a Convert); joint row hover and the
-  Type change (sm-box's mitred corner lists no "Other joints" row; live's converted box had 4 rips; skasm to say whether it should).
+- Joint rows (skasm's route: Bend A's row menu › "Convert Bend A to rip"): "Modify joint 1" added, Joint A | Rip ▾ | Edge joint ▾ under
+  Other joints; Type offers Bend, Rip (= live); Rip -> Bend puts it back in Bends as "Bend A" within 1 s, flat view redrawn, but the
+  list keeps one "Modify joint 1" (live adds a Modify joint per change; skasm to confirm). Hovering the Joint A row lights nothing in
+  either view (live: the rip in 3D and both edges in the flat): skasm's f90cf944 (land queue) adds it, with SMFEEL-FLANGE-BROAD-FACE.
+- Not judged: hover per box in the Sheet metal model dialog (our start is a Thicken model, live's a Convert); whether a mitred corner
+  should list a rip under Other joints (skasm is asking live).
 
 ## Feature list, document and Variable / Feature Studio feel vs live2's / live's 11-17 captures (qa 00:04, green 7187ac751, vibex6 Xvfb, real pointer and keys)
 Documents built from starts block-fillet / two-blocks and the louver corpus copy, opened without the runner (qa-scratch/fl: build.sh,
