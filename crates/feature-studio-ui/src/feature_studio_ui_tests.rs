@@ -100,9 +100,10 @@ fn a_typed_run_undoes_in_one_step(cx: &mut TestAppContext) {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// Live vs-fs-feel-1117: an error shows while typing, within 0.5 s and before the text is saved.
+/// Live fsvs-feel-1118: a new error's squiggle shows 1891 ms after the last key, never while typing; the key fixing
+/// it clears it 275 ms after.
 #[gpui::test]
-fn a_typing_error_shows_before_the_save(cx: &mut TestAppContext) {
+fn a_new_error_shows_1891_ms_after_the_last_key_and_its_fix_clears_at_275_ms(cx: &mut TestAppContext) {
     cx.update(gpui_kit::init);
     let dir = std::env::temp_dir().join(format!("noshape-ui-fs-check-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -133,16 +134,36 @@ fn a_typing_error_shows_before_the_save(cx: &mut TestAppContext) {
     draw(cx, window);
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
     pause(cx, window, 2000);
-    let saved = cx.update(|cx| text_of(&doc, tab, cx)).unwrap();
-    assert!(cx.update(|cx| view.read(cx).notices.iter().all(|n| !n.error)), "the new studio has no error");
-    for k in ["x", "x", "x"] {
-        type_key(cx, window, k);
+    let error = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).notices.iter().any(|n| n.error));
+    let squiggles = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).editor.read(cx).diagnostics().map_or(0, |d| d.len()));
+    assert!(!error(cx), "the new studio has no error");
+    let clean = squiggles(cx);
+    for k in 0..3 {
+        if k > 0 {
+            pause(cx, window, 500);
+        }
+        type_key(cx, window, "x");
     }
-    for _ in 0..40 {
+    assert!(!error(cx), "no error while typing, a key every 500 ms");
+    for _ in 0..180 {
         pause(cx, window, 10);
     }
-    assert!(cx.update(|cx| view.read(cx).notices.iter().any(|n| n.error)), "the error shows 400 ms after the last key");
-    assert_eq!(cx.update(|cx| text_of(&doc, tab, cx)).unwrap(), saved, "before the save");
+    assert!(!error(cx), "none 1.8 s after the last key");
+    assert_eq!(squiggles(cx), clean, "no squiggle 1.8 s after the last key");
+    pause(cx, window, 150);
+    assert!(error(cx), "the error shows by 1.95 s");
+    assert!(squiggles(cx) > clean, "with its squiggle");
+    for k in ["backspace", "backspace", "backspace"] {
+        type_key(cx, window, k);
+    }
+    for _ in 0..25 {
+        pause(cx, window, 10);
+    }
+    assert!(error(cx), "still showing 250 ms after the fix");
+    pause(cx, window, 50);
+    assert!(!error(cx), "gone 300 ms after the fix");
+    assert_eq!(squiggles(cx), clean, "the squiggle too");
+    let _ = (doc, tab);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -224,9 +245,9 @@ fn ace_line_keys_comment_move_duplicate_and_remove(cx: &mut TestAppContext) {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// Live2 (REQUESTS 11-14 00:43): Ace's list shows ~250 ms after a letter with matches, not on the keystroke.
+/// Live2 (REQUESTS 11-14 00:43) and live fsvs-feel-1118: Ace's list shows 232 ms (median) after a letter with matches, not on the keystroke.
 #[gpui::test]
-fn the_completion_list_shows_250_ms_after_the_key(cx: &mut TestAppContext) {
+fn the_completion_list_shows_230_ms_after_the_key(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         super::bind_keys(cx);
@@ -262,8 +283,10 @@ fn the_completion_list_shows_250_ms_after_the_key(cx: &mut TestAppContext) {
     type_key(cx, window, "enter");
     type_key(cx, window, "o");
     assert!(!open(cx), "not on the keystroke");
-    pause(cx, window, 300);
-    assert!(open(cx), "after ~250 ms");
+    pause(cx, window, 210);
+    assert!(!open(cx), "not 210 ms after");
+    pause(cx, window, 40);
+    assert!(open(cx), "by 250 ms (live fsvs-feel-1118: 232 ms median)");
     let _ = std::fs::remove_dir_all(&dir);
 }
 

@@ -9,35 +9,33 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 08:24 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 09:00 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
 tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh`; drawing runs vibex8.
-- Landed 11-18: 882a3ecd 01:57, 781eac7c 03:47 (config / history / workspaces / custom features / pick constants /
-  number formats), 37ecb60c (table look), d2eb5c15 (reader 1 px for hovered annotations), b5c4ccc4 (duplicate
-  workspace names, ruling in DECISIONS; BOM cell click + Cell panel; BOM split under; live2's new takes). Queued:
-  ffeb42c5 07:42 (ISO value on the pointer, placed BOM selected, Reset ordinate, section Exclude checkbox, linestyle).
-- Local, in verification (run9): Variable Studio invalid name pink 526 ms after Enter, not while typing (lead 11-18
-  on live fsvs-feel-1118; live2's 11-17 take said while typing: superseded); Edit section… Exclude from cut (checkbox,
-  Excluded parts chips "Part 2 ×", tooltips; op drawing_edit_section: label, cut_only, flip, depth, exclude by part
-  name or body id; drawing_get `exclude_from_cut`; e2e); section / detail views' menus without Explode/Position and
-  Display state; drawing Measure button bottom right ("Measure ([)"), Sheets tab tooltip "Sheets (ctrl+s)";
-  Replicate region reader, first Esc → "Select closed profile", Place starts unselected; readers: Break view,
-  Sheet properties (fields; Format tooltip "Select a DWT"), View properties (child orientation as option, assembly
-  Explode/Position + Display state rows, no Show annotations from model on assemblies, Threshold + unit); a selected
-  table read as TABLE "<kind> table" for recorders from 2026-11-18.1 (live2's six BOM retakes, not landed yet: then
-  check the order beside EDGE Isometric and drop `placed_table` if they read TABLE from the placing click); ui_script
-  `tool:` falls back to `button:` (Undo / Redo). Left: section / detail
-  label position (views agree; the label's distance below the view's centre differs per view, live vs ours: 11.7 /
-  10.1, 22.4 / 20.1, 19.6 / 20.1, detail 50.0 / 47.6: live's gap isn't from our geometry bottom; needs each view's
-  extents), drw-ordinate-add-to-group s7 (resting-pointer hover after the menu), sheet properties custom zones,
-  replicate region panel (2 takes), synchronize-breaks Gap distance, simplification-absolute BOM row name, projected-
-  from-section text, toolbar Undo tip take, drw-gtol-type-list s5 / drw-hatch-panel s29 (list highlight), Adjust
-  linestyle Edges tooltip (hover pixel misses our field). Not targets: drw-revision-table-delete s8 (server latency),
-  drw-inspection-table-iso-scrolled s2 (live's first click is on Front's top edge, live's weld take: same pixel; the
-  reader's count, not the pick), drw-note-editor (retake asked: type → ✓).
+- Landed 11-18: 882a3ecd, 781eac7c, 37ecb60c, d2eb5c15, b5c4ccc4 (duplicate workspace names, BOM cell panel, BOM
+  split), 4beed1be (ISO value on the pointer, placed BOM selected, Reset ordinate, section Exclude checkbox, linestyle).
+- Queued a584ed06 08:47: Variable Studio invalid name pink 526 ms after Enter (live fsvs-feel-1118); Edit section…
+  Exclude from cut (op drawing_edit_section + e2e, drawing_get `exclude_from_cut`); section / detail menus without
+  Explode/Position, Display state; Measure button bottom right; Sheets tab tooltip; Replicate region reader; panel
+  readers (Break view, Sheet properties, View properties); a selected table read as TABLE for recorders ≥ 2026-11-18.1
+  (when live2's BOM retakes land: check TABLE's order beside EDGE Isometric, drop `placed_table`'s reader rule if
+  they read TABLE from the placing click).
+- Local, to land: the Release dialog ignores Esc (Close closes; Enter never submits, notes take a new line) per live
+  docs-versions-release-1118; Feature Studio: a new error shows 1891 ms after the last key (never while typing), a
+  fixed one goes at 275 ms, the completion list at 230 ms (live fsvs-feel-1118); tests.
+- Checked against live 08:4x, already as live: documents search on Enter only; version row menu (View in repair,
+  Restore to Main…, Releases only with candidates; Copy link web-only); Restore strategy dialog; Create version (V<n>
+  focused, Enter creates, Esc closes); Branch (B<n> selected, Enter creates and opens).
+- Drawing items left: section / detail label position (live's distance below the view centre differs per view:
+  11.7 / 10.1, 22.4 / 20.1, 19.6 / 20.1, detail 50.0 / 47.6; needs each view's extents); toolbar help popovers
+  (Update, Projected view read "title / title description" in live; asked in REQUESTS 08:56); drw-ordinate-add-to-
+  group s7; custom-zones Format and Adjust linestyle Edges tooltips (live's hover pixel misses our field);
+  drw-gtol-type-list s5 / drw-hatch-panel s29 (list highlight). Not targets: replicate-region-place s21 (live's
+  toast comes ~9.75 s after ✓, server time; ours at once, gone by the 12 s read), drw-revision-table-delete s8,
+  drw-inspection-table-iso-scrolled s2 (reader count), drw-note-editor (retake asked).
 - Full drawing run drw1118b on vibex8 (build of bfc56d3e; ~/agents/studios-keep/drw1118b): 317/341 (drw1118a
   288/334). Its one regression, drw-dimension-radius s4 (the reader counted a hovered dimension's leader at 2 px), is
   fixed by the reader counting a hovered annotation's lines at 1 px (d2eb5c15). New live2 takes, local: dprops footer

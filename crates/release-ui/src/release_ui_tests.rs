@@ -154,3 +154,56 @@ fn add_items_opens_with_the_parts_listed_and_a_row_click_picks_one(cx: &mut Test
     draw(cx, window);
     assert!(picked(cx).is_empty(), "a second click puts it back");
 }
+
+struct Blank;
+
+impl Render for Blank {
+    fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+        div().size_full()
+    }
+}
+
+/// Live docs-versions-release-1118: Enter in Release name does nothing, Enter in Release notes adds a line, and Esc
+/// doesn't close the dialog, in a field or not (another modal closes on Esc in the same window).
+#[gpui::test]
+fn the_release_dialog_ignores_enter_and_esc_and_notes_take_a_new_line(cx: &mut TestAppContext) {
+    use gpui_kit::component::WindowExt as _;
+    let (_, view, _) = dialog(cx, "keys", Mode::Release, "");
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(900.)) };
+    let (window, _) = cx.update(|cx| gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |_, cx| cx.new(|_| Blank)).unwrap());
+    let open = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| w.has_active_dialog(cx)).unwrap();
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.update(|w, cx| w.open_dialog(cx, |d, _, _| d));
+    vcx.run_until_parked();
+    vcx.simulate_keystrokes("escape");
+    assert!(!open(&mut vcx), "a plain modal closes on Esc");
+    let rel = vcx.update(|w, cx| {
+        let items = tab_items(doc.read(cx), view.read(cx).rows[0].item.tab);
+        let rel = cx.new(|cx| ReleaseDialog::new(doc.clone(), Mode::Release, items, String::new(), String::new(), w, cx));
+        let r = rel.clone();
+        w.open_dialog(cx, move |d, _, _| super::release_dialog_modal(d, &r));
+        rel
+    });
+    vcx.run_until_parked();
+    vcx.simulate_keystrokes("escape");
+    assert!(open(&mut vcx), "Esc with no field focused leaves it open");
+    vcx.update(|w, cx| rel.read(cx).name.clone().update(cx, |s, cx| s.focus(w, cx)));
+    vcx.update(|w, cx| {
+        rel.update(cx, |_, cx| cx.notify());
+        w.draw(cx).clear(cx);
+    });
+    vcx.simulate_keystrokes("r 1 enter escape");
+    assert!(open(&mut vcx), "Enter and Esc in Release name leave it open");
+    vcx.update(|w, cx| rel.read(cx).notes.clone().update(cx, |s, cx| s.focus(w, cx)));
+    vcx.update(|w, cx| {
+        rel.update(cx, |_, cx| cx.notify());
+        w.draw(cx).clear(cx);
+    });
+    vcx.simulate_keystrokes("enter b escape");
+    assert!(open(&mut vcx), "Enter and Esc in Release notes leave it open");
+    vcx.update(|_, cx| {
+        assert_eq!(rel.read(cx).name.read(cx).value().to_string(), "r1");
+        assert_eq!(rel.read(cx).notes.read(cx).value().to_string(), "\nb", "Enter in the notes is a new line");
+    });
+}

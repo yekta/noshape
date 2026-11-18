@@ -103,9 +103,13 @@ pub fn bind_keys(cx: &mut App) {
 /// Pause after the last keystroke before the text is saved (not committed).
 const SAVE_DELAY: Duration = Duration::from_millis(700);
 
-/// Pause after the last keystroke before the typed text is checked (live vs-fs-feel-1117: an error's gutter x and
-/// squiggle within 0.5 s, before saving).
-const CHECK_DELAY: Duration = Duration::from_millis(300);
+/// Pause after the last keystroke before the typed text is checked: a fixed error's squiggle goes then (live
+/// fsvs-feel-1118: 275 ms median after the Backspace).
+const CHECK_DELAY: Duration = Duration::from_millis(275);
+
+/// Pause after the last keystroke before a new error shows (live fsvs-feel-1118: the squiggle and gutter ✕ 1891 ms
+/// after one syntax-breaking key, 1883–1899 over 7 reps), never while typing.
+const ERROR_DELAY: Duration = Duration::from_millis(1891);
 
 /// Requests for the workspace.
 pub enum FeatureStudioEvent {
@@ -582,6 +586,9 @@ pub struct FeatureStudioView {
     save_task: Option<Task<()>>,
     /// The typed text's check ([`CHECK_DELAY`]).
     check_task: Option<Task<()>>,
+    /// Typed less than [`ERROR_DELAY`] ago: a check shows no error that isn't showing already.
+    quiet: bool,
+    error_task: Option<Task<()>>,
     compile_task: Option<Task<()>>,
     /// Module outline popover: its "Search symbols…" field.
     outline: Option<Entity<InputState>>,
@@ -739,7 +746,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, check_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, check_task: None, quiet: false, error_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, _subs: subs };
         this.recompile(source, cx);
         // std's names, read for the completion list off the UI thread before the first key needs them.
         cx.background_spawn(async {
@@ -1170,6 +1177,15 @@ impl FeatureStudioView {
                 this.recompile(src, cx);
             });
         }));
+        self.quiet = true;
+        self.error_task = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(ERROR_DELAY).await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                this.quiet = false;
+                let src = this.editor.read(cx).value().to_string();
+                this.recompile(src, cx);
+            });
+        }));
         cx.notify();
     }
 
@@ -1249,6 +1265,11 @@ impl FeatureStudioView {
         self.compile_task = Some(cx.spawn(async move |this, cx| {
             let notices = cx.background_spawn(async move { studio_notices(&imports, tab, &src) }).await;
             let _ = this.update(cx, |this: &mut Self, cx| {
+                let shown = |n: &Notice| this.notices.iter().any(|o| o.error && o.line == n.line && o.message == n.message);
+                if this.quiet && notices.iter().any(|n| n.error && !shown(n)) {
+                    this.compile_task = None;
+                    return;
+                }
                 // Squiggles under the reported token (hover shows the message).
                 this.editor.update(cx, |e, cx| {
                     let text = e.text().clone();

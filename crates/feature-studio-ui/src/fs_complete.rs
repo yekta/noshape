@@ -683,8 +683,8 @@ pub struct Completions {
     showing: std::rc::Rc<std::cell::Cell<bool>>,
 }
 
-/// How long after a keystroke the list first shows.
-pub const LIST_DELAY: std::time::Duration = std::time::Duration::from_millis(250);
+/// How long after a keystroke the list first shows (live fsvs-feel-1118: 232 ms median, 225 min).
+pub const LIST_DELAY: std::time::Duration = std::time::Duration::from_millis(230);
 
 /// The list's rows at `offset`: outside every function the snippets and keywords (live 2331), inside std's names.
 fn completion_items(text: &gpui_kit::component::input::Rope, offset: usize) -> Vec<gpui_kit::component::input::lsp_types::CompletionItem> {

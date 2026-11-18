@@ -2779,10 +2779,10 @@ fn rc_resize_handles() -> impl IntoElement {
         })
 }
 
-/// A ReleaseDialog's modal. While the workflow lightbox is open, Esc
-/// closes only the lightbox (bundle: preventEscapeFromClosingDialog).
-fn release_dialog_modal(dialog: gpui_kit::component::dialog::Dialog, view: &Entity<ReleaseDialog>, cx: &App) -> gpui_kit::component::dialog::Dialog {
-    release_modal(dialog).keyboard(view.read(cx).workflow.is_none()).child(view.clone()).child(rc_resize_handles())
+/// A ReleaseDialog's modal. Esc never closes it, in a field or not; Close does (live docs-versions-release-1118,
+/// bundle: preventEscapeFromClosingDialog). The workflow lightbox takes its own Esc.
+fn release_dialog_modal(dialog: gpui_kit::component::dialog::Dialog, view: &Entity<ReleaseDialog>) -> gpui_kit::component::dialog::Dialog {
+    release_modal(dialog).keyboard(false).child(view.clone()).child(rc_resize_handles())
 }
 
 /// Open "Create Release candidate" for items (parts list or versions panel).
@@ -2806,12 +2806,12 @@ pub fn open_review(doc: Entity<DocModel>, package: &Package, window: &mut Window
         d.package = Some(package);
         d
     });
-    window.open_dialog(cx, move |dialog, _, cx| release_dialog_modal(dialog, &view, cx));
+    window.open_dialog(cx, move |dialog, _, _| release_dialog_modal(dialog, &view));
 }
 
 fn open(doc: Entity<DocModel>, mode: Mode, items: Vec<ReleaseItem>, name: String, notes: String, window: &mut Window, cx: &mut App) {
     let view = cx.new(|cx| ReleaseDialog::new(doc, mode, items, name, notes, window, cx));
-    window.open_dialog(cx, move |dialog, _, cx| release_dialog_modal(dialog, &view, cx));
+    window.open_dialog(cx, move |dialog, _, _| release_dialog_modal(dialog, &view));
 }
 
 /// A saved draft from the Release drafts panel: "Review Release", editable.
@@ -2827,7 +2827,7 @@ pub fn open_draft(doc: Entity<DocModel>, draft: &Package, window: &mut Window, c
         d.comments = draft.comments.clone();
         d
     });
-    window.open_dialog(cx, move |dialog, _, cx| release_dialog_modal(dialog, &view, cx));
+    window.open_dialog(cx, move |dialog, _, _| release_dialog_modal(dialog, &view));
 }
 
 /// A submitted candidate from the Release drafts panel: Review Release, read-only; its approver (the local user) can
@@ -2842,7 +2842,7 @@ pub fn open_candidate(doc: Entity<DocModel>, candidate: &Package, window: &mut W
         d.comments = candidate.comments.clone();
         d
     });
-    window.open_dialog(cx, move |dialog, _, cx| release_dialog_modal(dialog, &view, cx));
+    window.open_dialog(cx, move |dialog, _, _| release_dialog_modal(dialog, &view));
 }
 
 /// The left panel "Release drafts" (help releasedraftspanel.png): one row
