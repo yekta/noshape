@@ -665,6 +665,16 @@ impl PartStudioView {
         let pal = p();
         let is_part = matches!(e.target, EditTarget::Parts(..));
         let (title, faces) = self.appearance_heading(&e.target, cx);
+        // The field's chips (live parts-list-1118 e2: "Face of Extrude 2" with its ×).
+        let chips: Vec<(Option<Reference>, String)> = match &e.target {
+            EditTarget::Faces(refs, _) => {
+                let label = self.labeler(cx);
+                refs.iter().map(|r| (Some(r.clone()), label(r))).collect()
+            }
+            EditTarget::Feature(f, _) => self.studio(cx).and_then(|s| s.feature(*f)).map(|x| vec![(None, x.name.clone())]).unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        let e = self.ui.appearance_edit.as_ref()?;
         let changed = e.acceptable();
         let rgb = e.rgb;
         let alpha = 1.0 - e.transparency;
@@ -841,9 +851,18 @@ impl PartStudioView {
                 // Live: beside an open right panel at the top (part-studio/173),
                 // else at the graphics area's bottom left like Material
                 // (dom/cursor-rows.json: from the part menu, x 241 y 647).
-                .map(|d| if self.right_panel.is_some() { d.top(px(3.)).right(px(4.)) } else { d.left_0().bottom_0() })
+                // A face or feature appearance is a feature-style dialog in the feature dialogs' place, 401 px tall (live
+                // parts-list-1118 e2: 220 x 401 at (246, 79)).
+                .map(|d| match (self.right_panel.is_some(), faces.is_some()) {
+                    (true, _) => d.top(px(3.)).right(px(4.)),
+                    (false, true) => {
+                        let at = super::behaviors::feature_dialog_pos();
+                        d.left(at.x).top(at.y)
+                    }
+                    (false, false) => d.left_0().bottom_0(),
+                })
                 .w(px(220.))
-                .h(px(if faces.is_some() { 431. } else { 400. }))
+                .h(px(if faces.is_some() { 401. } else { 400. }))
                 .bg(with_alpha(gpui_kit::rgb(0xffffff), 0.95))
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .text_color(pal.text)
@@ -872,7 +891,7 @@ impl PartStudioView {
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel_appearance(cx))),
                         ),
                 )
-                .when_some(faces, |d, label| {
+                .when(faces.is_some(), |d| {
                     d.child(
                         div().px(px(3.)).pt(px(5.)).child(
                             v_flex()
@@ -886,7 +905,23 @@ impl PartStudioView {
                                 .bg(pal.row_hover)
                                 .cursor_pointer()
                                 .child(div().pt(px(7.)).text_size(px(10.)).line_height(px(9.)).text_color(pal.text_muted).child("Faces or features"))
-                                .child(div().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).child(label))
+                                .children(chips.into_iter().enumerate().map(|(i, (r, text))| {
+                                    h_flex()
+                                        .h(px(18.))
+                                        .text_size(px(13.33))
+                                        .text_color(gpui_kit::rgb(0x555555))
+                                        .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(text)))
+                                        .when_some(r, |d, r| {
+                                            d.child(div().id(("ap-chip-x", i)).px(px(3.)).text_color(gpui_kit::rgb(0x777777)).child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                                cx.stop_propagation();
+                                                if let Some(EditTarget::Faces(f, _)) = this.ui.appearance_edit.as_mut().map(|e| &mut e.target) {
+                                                    f.retain(|x| *x != r);
+                                                }
+                                                this.apply_appearance(false, cx);
+                                                cx.notify();
+                                            })))
+                                        })
+                                }))
                                 // A click takes the selected faces.
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     let sel = this.selected_faces();

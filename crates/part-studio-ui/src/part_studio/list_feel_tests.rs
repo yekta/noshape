@@ -523,6 +523,57 @@ fn rows() -> Vec<Row> {
             l.release(cx, from);
             expect(d, false, "dragging")
         } },
+        Row { id: "Parts list / Rename: whole name selected, Esc cancels, Enter commits", live: "row menu › Rename: an inline box with 'Part 2' all selected; Esc keeps the old name; 'Foo' + Enter renames (live2 parts-list-1118)", gap: false, check: |l, cx| {
+            let part_rename = |l: &List, cx: &mut TestAppContext| {
+                l.right_click(cx, "part:Part 2");
+                let at = l.bounds(cx, "menu:Rename").expect("no Rename row").center();
+                l.press(cx, at, MouseButton::Left, NONE, 1);
+            };
+            let parts = |cx: &mut TestAppContext| cx.update(|cx| l.view.read(cx).display.bodies.iter().map(|b| b.name.clone()).collect::<Vec<_>>());
+            part_rename(l, cx);
+            let input = cx.update(|cx| l.view.read(cx).ui.part_renaming.as_ref().map(|(_, st, _)| (st.read(cx).value().to_string(), st.read(cx).selected_range().len())));
+            l.keys(cx, "x escape");
+            let esc = (cx.update(|cx| l.view.read(cx).ui.part_renaming.is_some()), parts(cx));
+            part_rename(l, cx);
+            l.keys(cx, "F o o enter");
+            let entered = (cx.update(|cx| l.view.read(cx).ui.part_renaming.is_some()), parts(cx));
+            let three = |b: &str| names(&["Part 1", b, "Part 3"]);
+            expect((input, esc, entered), (Some(("Part 2".to_string(), 6)), (false, three("Part 2")), (false, three("Foo"))), "(input, after x + Esc, after Foo + Enter)")
+        } },
+        Row { id: "Parts list / a click away commits a rename", live: "'Bar' then a click in the graphics renames the part (live2 parts-list-1118)", gap: false, check: |l, cx| {
+            l.right_click(cx, "part:Part 2");
+            let at = l.bounds(cx, "menu:Rename").ok_or("no Rename row")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            l.keys(cx, "B a r");
+            let at = l.canvas(cx);
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            let parts = cx.update(|cx| l.view.read(cx).display.bodies.iter().map(|b| b.name.clone()).collect::<Vec<_>>());
+            expect((cx.update(|cx| l.view.read(cx).ui.part_renaming.is_some()), parts), (false, names(&["Part 1", "Bar", "Part 3"])), "(still renaming, names)")
+        } },
+        Row { id: "Parts list / Shift+N renames a selected part, F2 nothing", live: "Shift+N on the selected Part 1 row opens the same box; F2 opens nothing (live2 parts-list-1118)", gap: false, check: |l, cx| {
+            l.click(cx, "part:Part 1", NONE);
+            l.keys(cx, "f2");
+            let f2 = cx.update(|cx| l.view.read(cx).ui.part_renaming.is_some());
+            l.keys(cx, "shift-n");
+            let value = cx.update(|cx| l.view.read(cx).ui.part_renaming.as_ref().map(|(_, st, _)| st.read(cx).value().to_string()));
+            expect((f2, value), (false, Some("Part 1".to_string())), "(renaming after F2, the box after Shift+N)")
+        } },
+        Row { id: "Parts list / a part hovered in the graphics leaves its row as is", live: "Part 2 outlined in the graphics, its row gets no hover or related tint: the link runs list -> graphics only (live2 parts-list-1118 c1)", gap: false, check: |l, cx| {
+            cx.update(|cx| {
+                l.view.update(cx, |v, cx| {
+                    let face = v.display.bodies.iter().find(|b| b.name == "Part 2").and_then(|b| b.face_refs.first().cloned());
+                    v.hover = face;
+                    v.refresh_scene(false, cx);
+                })
+            });
+            draw(cx, l.window);
+            let flags = cx.update(|cx| {
+                let v = l.view.read(cx);
+                let b = v.display.bodies.iter().find(|b| b.name == "Part 2").cloned();
+                (v.hover.is_some(), b.map(|b| v.part_row_flags(&b, cx)))
+            });
+            expect(flags, (true, Some((false, false))), "(hovered, Part 2's row (selected, related))")
+        } },
         Row { id: "rollback bar / its whole row grabs", live: "a drag from the row's top edge (outside the 7 px bar) onto Extrude 1's bottom half rolls back to after Extrude 1", gap: false, check: |l, cx| {
             let h = f32::from(l.bounds(cx, "feature:Extrude 1").ok_or("no row")?.size.height);
             let (from, to) = (l.at_y(cx, "rollback", 2.), l.at_y(cx, "feature:Extrude 1", h - 6.));

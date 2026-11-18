@@ -2069,6 +2069,52 @@ fn section_planes_keep_their_numbers(cx: &mut TestAppContext) {
     .unwrap();
 }
 
+/// Live2 sketch-entry-1118: with "Orient normal to sketch on edit" on, editing Sketch 1 from iso turns the view to its
+/// normal; ✗ leaves the view there (it doesn't go back to iso).
+#[gpui::test]
+fn orient_on_edit_turns_to_the_sketch_and_exit_keeps_the_view(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "orient-on-edit", Some(block));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // The viewport's animation clock, moved with the test's (a new view change is ignored while one runs, live).
+    let clock = std::rc::Rc::new(std::cell::Cell::new(std::time::Instant::now()));
+    let c = clock.clone();
+    cx.update(|cx| view.read(cx).viewport.clone().update(cx, |vp, _| vp.set_clock(move || c.get())));
+    let settle = |cx: &mut TestAppContext| {
+        for _ in 0..20 {
+            clock.set(clock.get() + std::time::Duration::from_millis(100));
+            cx.executor().advance_clock(std::time::Duration::from_millis(100));
+            draw(cx, window);
+        }
+    };
+    view.update(cx, |v, cx| {
+        v.view(noshape_render::StandardView::Isometric, cx);
+        v.ui.orient_on_edit = true;
+    });
+    settle(cx);
+    // Where the view is going (the viewport animates on its own clock): the animation's end, else the camera.
+    let forward = |cx: &mut TestAppContext| cx.update(|cx| {
+        let vp = view.read(cx).viewport.read(cx);
+        vp.animation().map_or(vp.camera, |(to, _)| to).forward()
+    });
+    let iso = forward(cx);
+    let sketch = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Sketch 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(sketch, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_some());
+    settle(cx);
+    let editing = forward(cx);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
+    settle(cx);
+    let after = forward(cx);
+    assert!(iso.distance(glam::DVec3::NEG_Z) > 0.5, "iso to start: {iso:?}");
+    assert!(editing.distance(glam::DVec3::NEG_Z) < 1e-6, "normal to Top while editing: {editing:?}");
+    assert!(after.distance(glam::DVec3::NEG_Z) < 1e-6, "still normal after ✗: {after:?}");
+}
+
 /// Live2 view-tools-1118: a section turned off comes back with the next Shift+X, its plane and offset as they were.
 #[gpui::test]
 fn shift_x_after_turning_off_restores_the_last_section(cx: &mut TestAppContext) {

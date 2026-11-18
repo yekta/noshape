@@ -2925,7 +2925,7 @@ impl PartStudioView {
             ed.save_options_if_changed();
         }
         self.leave_sketch(cx);
-        self.restore_after_sketch(cx);
+        self.end_sketch_orient();
         let Some(e) = self.edit.take() else { return };
         self.ui.sub_dialog = None;
         self.clear_context_note();
@@ -2990,7 +2990,7 @@ impl PartStudioView {
             self.canceled_edit = Some((feature, e.index, e.is_new, text));
         }
         self.leave_sketch(cx);
-        self.restore_after_sketch(cx);
+        self.end_sketch_orient();
         self.ui.query_hover = None;
         self.ui.sub_dialog = None;
         self.clear_context_note();
@@ -4708,6 +4708,13 @@ impl PartStudioView {
                     .border_1()
                     .border_color(gpui_kit::rgb(0x1651b0))
                     .bg(gpui_kit::rgb(0xffffff))
+                    // A press anywhere else blurs the input, which commits (live2 parts-list-1118: "Bar", then a click away).
+                    .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                        if this.ui.part_renaming.is_some() {
+                            let fh = this.focus.clone();
+                            window.focus(&fh, cx);
+                        }
+                    }))
                     .on_key_down(cx.listener(|this, ev: &KeyDownEvent, _, cx| {
                         if ev.keystroke.key == "escape" {
                             this.ui.part_renaming = None;

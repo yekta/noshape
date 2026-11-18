@@ -436,7 +436,16 @@ impl PartStudioView {
                         .child(crate::ui::glyph("drawing-tool-caret", 12., pal.text))
                         // Closed, the search stays in the tree, unseen, keeping the keyboard after a pick (live
                         // material-library-pick-abs-cancel: a field, its text empty); typing opens the list.
-                        .child(div().absolute().size_0().overflow_hidden().child(Input::new(&search).appearance(false)))
+                        // Esc there cancels the dialog unapplied (live2 parts-list-1118 f4).
+                        .child(div().absolute().size_0().overflow_hidden().child(Input::new(&search).appearance(false)).capture_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                            if ev.keystroke.key != "escape" {
+                                return;
+                            }
+                            this.ui.material_panel = None;
+                            window.focus(&this.focus, cx);
+                            cx.stop_propagation();
+                            cx.notify();
+                        })))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let rows = this.material_rows(cx);
                             if let Some(m) = &mut this.ui.material_panel {

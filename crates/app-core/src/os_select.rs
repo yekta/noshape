@@ -145,6 +145,14 @@ impl OsSelect {
         self.search.is_some()
     }
 
+    /// While open: the highlighted item's label and whether the search box has the keyboard.
+    pub fn open_state(&self, window: &Window, cx: &App) -> Option<(SharedString, bool)> {
+        let st = self.search.as_ref()?;
+        let m = self.matches();
+        let label = m.get(self.highlight.min(m.len().saturating_sub(1))).and_then(|(i, _)| self.items.get(*i)).map(|(_, l)| l.clone())?;
+        Some((label, st.read(cx).focus_handle(cx).is_focused(window)))
+    }
+
     /// Items matching the query, each with the byte range of the match.
     fn matches(&self) -> Vec<(usize, Option<std::ops::Range<usize>>)> {
         let q = self.query.trim().to_lowercase();

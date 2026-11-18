@@ -23,11 +23,14 @@ const TARGETS: [Target; 5] = [
     // Live psui/timings-1117 (software GL): pointerup → the selected face drawn 57–67 ms; held to one 60 Hz frame.
     Target { what: "click: the face selected and drawn", live: "57-67 ms", max_ms: 16.7 },
     // Live psui/timings-1117: double-click → the dialog 322–448 ms, its preview drawn 0.73–2.2 s; "speed: core edit
-    // commit": Enter → the preview's regeneration reply 0.2–0.3 s.
+    // commit": Enter → the preview's regeneration reply 0.2–0.3 s. Live ui-speed-1118 (medians of 10): the toolbar's
+    // Extrude dialog shown 221 ms, settled 1.3 s; the first preview after a face pick settled 2.0 s.
     Target { what: "dialog: Extrude 1 open on its preview", live: "322-448 ms (preview 0.7-2.2 s)", max_ms: 100.0 },
     // interaction-feel "preview timing while dragging (every ~0.4 s)".
     Target { what: "drag: a depth step's preview drawn", live: "~400 ms", max_ms: 100.0 },
-    // "speed: core edit commit": ✓ → the new tessellation 0.31–0.35 s.
+    // "speed: core edit commit": ✓ → the new tessellation 0.31–0.35 s. Live ui-speed-1118: ✓ → regeneration shown
+    // 107 ms, settled 1.1 s; sketch enter / exit and undo settled 0.9–1.3 s; a tab switch's list 1.5–1.7 s; a
+    // document opened: the part shaded 7.6 s, the feature list 11.4 s.
     Target { what: "commit: the part redrawn after ✓", live: "310-350 ms", max_ms: 155.0 },
 ];
 

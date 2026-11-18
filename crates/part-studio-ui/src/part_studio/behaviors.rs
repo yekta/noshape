@@ -644,11 +644,10 @@ pub struct UiState {
     /// Recently started tools, newest first (Search tools with no query).
     pub recent_tools: Vec<&'static str>,
     /// Camera menu "Orient normal to sketch on edit" and its state: an
-    /// orientation is pending until the sketch editor opens; `oriented`
-    /// restores the previous view when the sketch closes.
+    /// orientation is pending until the sketch editor opens; closing the
+    /// sketch leaves the view as it is.
     pub orient_on_edit: bool,
     pub orient_pending: bool,
-    pub oriented: bool,
     /// Values of REMEMBER_PREVIOUS_VALUE parameters from the last accepted
     /// feature of each type (Onshape defaults new features to them).
     /// Remembered values committed this session, per feature type (see app-core feature_settings).
@@ -989,7 +988,6 @@ impl UiState {
             recent_tools: Vec::new(),
             orient_on_edit: false,
             orient_pending: false,
-            oriented: false,
             remembered: Default::default(),
             default_geometry_collapsed: false,
             selected_folder: None,
@@ -4334,17 +4332,14 @@ impl PartStudioView {
     pub(super) fn orient_for_sketch(&mut self, cx: &mut Context<Self>) {
         if self.ui.orient_pending && self.sketch.is_some() {
             self.ui.orient_pending = false;
-            self.ui.oriented = true;
             self.view_normal(cx);
         }
     }
 
-    /// When a sketch closes: return to the view before orienting.
-    pub(super) fn restore_after_sketch(&mut self, cx: &mut Context<Self>) {
+    /// When a sketch closes the view stays where it is, normal to the sketch after an orient (live2 sketch-entry-1118:
+    /// ✗ leaves the view normal, it doesn't go back to the iso it came from).
+    pub(super) fn end_sketch_orient(&mut self) {
         self.ui.orient_pending = false;
-        if std::mem::take(&mut self.ui.oriented) {
-            self.previous_view(cx);
-        }
     }
 
     // ------------------------------------------------------------ remembered values

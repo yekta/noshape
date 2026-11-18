@@ -429,6 +429,151 @@ fn rows() -> Vec<Row> {
             let typed = state(cx).1;
             expect((picked, typed), ((Some("Acetal (Delrin)".to_string()), false, true, String::new()), true), "(the material, the list open, the search focused, its text) after Enter; the list after typing")
         } },
+        Row { id: "Material / Down and Enter pick the next match, no preview, Esc discards", live: "'alum': Down moves from Alumina Oxide to Aluminum, Enter picks it; the part's look stays; Esc closes the dialog unapplied (live2 parts-list-1118 f2-f4)", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-material-down");
+            let color = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.bodies.first().map(|b| b.color));
+            let before = color(cx);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let b = v.display.bodies.first().map(|b| b.id.clone()).unwrap();
+                v.open_material_panel(vec![b], w, cx);
+            }))
+            .unwrap();
+            draw(cx, window);
+            let at = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("mat-picker").ok_or("no picker")?.center();
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at, Modifiers::default());
+            draw(cx, window);
+            keys(cx, window, &["a", "l", "u", "m"]);
+            let first = cx.update(|cx| view.read(cx).material_row_names(cx).first().cloned());
+            keys(cx, window, &["down", "enter"]);
+            draw(cx, window);
+            let picked = cx.update(|cx| view.read(cx).ui.material_panel.as_ref().and_then(|m| m.picked_name()));
+            let look = color(cx) == before;
+            keys(cx, window, &["escape"]);
+            let after = cx.update(|cx| {
+                let v = view.read(cx);
+                let b = v.display.bodies.first().map(|b| b.id.clone()).unwrap();
+                (v.ui.material_panel.is_some(), v.studio(cx).and_then(|s| s.part_properties.get(&b)).and_then(|p| p.material.clone()))
+            });
+            expect((first, picked, look, after), (Some("Alumina Oxide".to_string()), Some("Aluminum".to_string()), true, (false, None)), "(first match, picked, the part's look kept, (panel open, material) after Esc)")
+        } },
+        Row { id: "Appearance / a face's: a feature-style dialog that recolours the face at once, no feature row", live: "Add appearance to face… opens 'Face appearance 1', 220 x 401 in the feature dialogs' place, chip 'Face of Extrude 1'; a swatch recolours only that face at once; ✓ keeps it; the feature list stays as it was (live2 parts-list-1118 e1-e4)", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-face-appearance");
+            let features = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).map(|s| s.features.len()));
+            let before = features(cx);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                let face = v.display.bodies[0].face_refs[0].clone();
+                v.selection = vec![face.clone()];
+                v.edit_appearance(crate::part_studio::appearance::EditTarget::Faces(vec![face], None), w, cx);
+            }))
+            .unwrap();
+            draw(cx, window);
+            let panel = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("appearance-editor").ok_or("no dialog")?;
+            let origin = cx.update(|cx| view.read(cx).viewport.read(cx).origin());
+            let place = (panel.origin - origin) == crate::part_studio::behaviors::feature_dialog_pos();
+            let size = (f32::from(panel.size.width).round(), f32::from(panel.size.height).round());
+            let state = cx.update(|cx| view.read(cx).appearance_dialog_state(cx)).ok_or("no state")?;
+            let (title, chips) = (state["title"].as_str().map(str::to_string), state["fields"][0]["items"].clone());
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.set_edit_color([255, 0, 0], w, cx))).unwrap();
+            draw(cx, window);
+            // The first face's vertices red, another face's left to the part colour (alpha 0).
+            let colors = cx.update(|cx| view.update(cx, |v, cx| {
+                let b = &v.display.bodies[0];
+                let (first, other) = (b.mesh.face_ranges[0].0 as usize, b.mesh.face_ranges[1].0 as usize);
+                let (i0, i1) = (b.mesh.indices[first] as usize, b.mesh.indices[other] as usize);
+                let id = b.id.clone();
+                v.vertex_colors(cx).and_then(|m| m.get(&id).map(|c| (c[i0], c[i1][3])))
+            }));
+            cx.update(|cx| view.update(cx, |v, cx| v.accept_appearance(cx)));
+            draw(cx, window);
+            let after = (features(cx), cx.update(|cx| view.read(cx).studio(cx).map(|s| s.appearances.len())), cx.update(|cx| view.read(cx).ui.appearance_edit.is_some()));
+            expect(
+                (place, size, title, chips, colors, after),
+                (true, (220., 401.), Some("Face appearance 1".to_string()), serde_json::json!(["Face of Extrude 1"]), Some(([255, 0, 0, 255], 0)), (before, Some(1), false)),
+                "(in the feature dialogs' place, size, title, chips, (the face's colour, another face's alpha) after a red swatch, (features, appearances, open) after ✓)",
+            )
+        } },
+        Row { id: "keys / on opening the first selection field has the keyboard", live: "a new Extrude, a new Fillet and Extrude 1 opened for edit: 'Faces and sketch regions to extrude' / 'Entities to fillet' focused, no number field (live2 dialog-keys-1118)", gap: false, check: |cx| {
+            let mut got = Vec::new();
+            for feature in ["extrude", "fillet"] {
+                let (window, view) = block(cx, &format!("dlg-open-focus-{feature}"));
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature(feature, w, cx))).unwrap();
+                draw(cx, window);
+                let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).ok_or("no dialog")?;
+                got.push(cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap());
+            }
+            let (window, _view, dialog) = edit_extrude(cx, "dlg-open-focus-edit");
+            got.push(cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap());
+            expect(got, vec![Some("q:entities".to_string()); 3], "the focused control: new Extrude, new Fillet, Extrude 1 edited")
+        } },
+        Row { id: "keys / Tab from Depth, then out of the dialog; Shift+Tab back", live: "Depth -> its ± -> Direction, Starting offset, Symmetric, Draft, Second end position -> the help link -> out of the dialog; End type, the selection field, the tabs and ✓ / ✗ skipped; Shift+Tab walks it back (live2 dialog-keys-1118 b1)", gap: false, check: |cx| {
+            let (window, _view, dialog) = edit_extrude(cx, "dlg-tab-depth");
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+            draw(cx, window);
+            let focused = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap();
+            let mut forward = Vec::new();
+            for _ in 0..8 {
+                keys(cx, window, &["tab"]);
+                forward.push(focused(cx));
+            }
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+            for _ in 0..7 {
+                keys(cx, window, &["tab"]);
+            }
+            let mut back = Vec::new();
+            for _ in 0..7 {
+                keys(cx, window, &["shift-tab"]);
+                back.push(focused(cx));
+            }
+            let stops = ["tol:depth", "cb:hasExtrudeDirection", "cb:startOffset", "cb:symmetric", "cb:hasDraft", "cb:hasSecondDirection", "help"];
+            let want_forward: Vec<Option<String>> = stops.iter().map(|s| Some(s.to_string())).chain([None]).collect();
+            let want_back: Vec<Option<String>> = stops.iter().rev().skip(1).map(|s| Some(s.to_string())).chain([Some("in:depth".to_string())]).collect();
+            expect((forward, back), (want_forward, want_back), "(the focus after each Tab from Depth, after each Shift+Tab from the help link)")
+        } },
+        Row { id: "keys / Space toggles a focused checkbox", live: "Symmetric focused by Tab: Space on, Space off, the preview following (live2 dialog-keys-1118 c1)", gap: false, check: |cx| {
+            let (window, _view, dialog) = edit_extrude(cx, "dlg-space");
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+            draw(cx, window);
+            for _ in 0..8 {
+                if cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap().as_deref() == Some("cb:symmetric") {
+                    break;
+                }
+                keys(cx, window, &["tab"]);
+            }
+            let symmetric = |cx: &mut TestAppContext| cx.update(|cx| matches!(dialog.read(cx).feature.params.get("symmetric"), Some(noshape_model::params::ParamValue::Bool(true))));
+            // GPUI clicks a focused element on Space's release.
+            let space = |cx: &mut TestAppContext| {
+                keys(cx, window, &["space"]);
+                gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::KeyUpEvent { keystroke: gpui_kit::Keystroke::parse("space").unwrap() });
+                draw(cx, window);
+            };
+            space(cx);
+            let on = symmetric(cx);
+            space(cx);
+            expect((on, symmetric(cx)), (true, false), "(Symmetric after one Space, after two)")
+        } },
+        Row { id: "keys / a dropdown: its search box focused, Down moves, Esc changes nothing", live: "End type clicked: the list with a focused search box; Down, Down: Blind -> Up to next -> Up to face highlighted; Esc closes it, Blind kept (live2 dialog-keys-1118 c2-c3)", gap: false, check: |cx| {
+            let (window, _view, dialog) = edit_extrude(cx, "dlg-dropdown");
+            let at = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("os-select:sel-endBound").ok_or("no End type")?.center();
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at, Modifiers::default());
+            draw(cx, window);
+            let select = cx.update(|cx| dialog.read(cx).select("endBound")).ok_or("no select")?;
+            let state = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| select.read(cx).open_state(w, cx).map(|(l, f)| (l.to_string(), f))).unwrap();
+            let opened = state(cx);
+            keys(cx, window, &["down", "down"]);
+            let moved = state(cx);
+            keys(cx, window, &["escape"]);
+            let after = (state(cx), cx.update(|cx| dialog.read(cx).feature.params.enum_("endBound").to_string()));
+            expect((opened, moved, after), (Some(("Blind".to_string(), true)), Some(("Up to face".to_string(), true)), (None, "BLIND".to_string())), "(highlighted, search focused) opened, after Down Down; (open, End type) after Esc")
+        } },
+        Row { id: "keys / Ctrl+Enter in a value field is Enter", live: "the dialog stays open with the value applied, as plain Enter (live2 dialog-keys-1118)", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "dlg-ctrl-enter");
+            cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+            draw(cx, window);
+            keys(cx, window, &["1", "2", "ctrl-enter"]);
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let depth = cx.update(|cx| dialog.read(cx).feature.params.expr("depth").map(|e| e.text.clone()));
+            expect((cx.update(|cx| view.read(cx).edit.is_some()), depth), (true, Some("12 mm".to_string())), "(dialog open, Depth)")
+        } },
         Row { id: "fields / an empty click changes nothing", live: "a click on empty background leaves the box's entries and the dialog as they are (live feature-dialogs-1117)", gap: false, check: |cx| {
             let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-empty-click")?;
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {

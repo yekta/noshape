@@ -134,6 +134,34 @@ fn rows() -> Vec<Row> {
             }
             expect(got, vec!["11 mm".to_string(), "9 mm".into(), "20 mm".into(), "11 mm".into()], "Depth after Up, Down, Shift+Up, Alt+Up from 10")
         } },
+        Row { id: "arrow keys: Ctrl a tenth, another unit stepped in the workspace's, typed text not at all", live: "10 mm Ctrl+Up 10.1 mm; a committed '1 in' Up '26.4 mm'; '1 in' typed, not Entered: Up changes nothing (live2 dialog-keys-1118)", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "fl-arrows-units");
+            type_in(cx, window, &dialog, "depth", "10", &["enter", "ctrl-up"]);
+            let tenth = depth(cx, window, &view);
+            type_in(cx, window, &dialog, "depth", "1 in", &["enter", "up"]);
+            let inch = depth(cx, window, &view);
+            type_in(cx, window, &dialog, "depth", "1 in", &["up"]);
+            let typed = depth(cx, window, &view);
+            expect((tenth.as_str(), inch.as_str(), typed.as_str()), ("10.1 mm", "26.4 mm", "1 in"), "(10 Ctrl+Up, '1 in' Enter Up, '1 in' Up)")
+        } },
+        Row { id: "invalid: '5+' fine while typed, pink with a red title on Enter", live: "no error while typing '5+'; Enter: the box pink, the title red, so after blur too (live2 dialog-keys-1118 a1-a2)", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "fl-five-plus");
+            type_in(cx, window, &dialog, "depth", "5+", &[]);
+            let typing = field(cx, window, &view, "Depth").ok_or("no Depth")?.1;
+            keys(cx, window, &["enter"]);
+            let title = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap()["dialog"]["titleState"].as_str().map(str::to_string);
+            let entered = (field(cx, window, &view, "Depth").ok_or("no Depth")?.1, title(cx));
+            blur(cx, window, &view);
+            let blurred = (field(cx, window, &view, "Depth").ok_or("no Depth")?.1, title(cx));
+            let error = ("error".to_string(), Some("error".to_string()));
+            expect((typing.as_str(), entered, blurred), ("ok", error.clone(), error), "(the field while typing, (field, title) after Enter, after blur)")
+        } },
+        Row { id: "unknown variable: '#zz' + Enter opens Create variable", live: "'#zz' (no such variable) + Enter opens the Create variable popup (live2 dialog-keys-1118 a3)", gap: false, check: |cx| {
+            let (window, _view, dialog) = edit_extrude(cx, "fl-unknown-var");
+            type_in(cx, window, &dialog, "depth", "#zz", &["enter"]);
+            draw(cx, window);
+            expect(gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("create-variable").is_some(), true, "Create variable open")
+        } },
         Row { id: "autocomplete: units and functions by what's typed", live: "Depth '1 m': m, max( x , y ), min( x , y ), mm; '1 i': in, isInteger( x ); '#': New variable…; Draft angle '5 m': max, min", gap: false, check: |cx| {
             let (window, _view, dialog) = edit_extrude(cx, "fl-complete");
             let list = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).ui_list()).map(|l| l["detail"].as_array().map(|r| r.iter().filter_map(|x| x.as_str().map(str::to_string)).collect::<Vec<_>>()).unwrap_or_default()).unwrap_or_default();

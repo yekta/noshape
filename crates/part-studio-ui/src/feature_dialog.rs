@@ -1428,6 +1428,12 @@ impl FeatureDialog {
         sel
     }
 
+    /// The dropdown of parameter `path`.
+    #[cfg(test)]
+    pub(crate) fn select(&self, path: &str) -> Option<Entity<crate::os_select::OsSelect>> {
+        self.selects.get(path).cloned()
+    }
+
     pub fn selected_refs(&self) -> Vec<Reference> {
         let mut out = Vec::new();
         for s in &self.ty.params {

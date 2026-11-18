@@ -631,6 +631,10 @@ mod tests {
         assert_eq!(s("10 mm", true, false, true).as_deref(), Some("10.1 mm"));
         assert_eq!(s("10 mm", true, true, true).as_deref(), Some("11 mm"));
         assert_eq!(s("10+5", true, false, false), None);
+        // A value in another unit steps one workspace unit and is rewritten in it (live2 dialog-keys-1118: "1 in" ↑ 26.4 mm).
+        assert_eq!(s("1 in", true, false, false).as_deref(), Some("26.4 mm"));
+        assert_eq!(s("1 in", true, true, false).as_deref(), Some("35.4 mm"));
+        assert_eq!(s("1 in", true, false, true).as_deref(), Some("25.5 mm"));
         let a = step_text("5 deg", true, StepMods { shift: true, ctrl: false }, &Stepping { dim: Dim::ANGLE, prefs: &p, scope: &EmptyScope, integer: false, range: (None, None) });
         assert_eq!(a.as_deref(), Some("15 deg"));
         let count = Stepping { dim: Dim::UNITLESS, prefs: &p, scope: &EmptyScope, integer: true, range: (Some(1.), None) };

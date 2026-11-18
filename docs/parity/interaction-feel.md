@@ -58,6 +58,7 @@ two zooms, A 0.2754 / B 0.2316 mm/px; where they differ both are given).
 
 | Item | Live | Ours (where) | Test | Status |
 |---|---|---|---|---|
+| "Orient normal to sketch on edit" (live2 sketch-entry-1118) | editing a sketch from iso turns the view to its normal; ✗ leaves it there | turned, then ✗ went back to the view before; now it stays | sketch_ui_tests `orient_on_edit_turns_to_the_sketch_and_exit_keeps_the_view` | = (fixed) |
 | A line's end snaps onto a line | ≤ 7 px, not 8 | 7.5 px (`INFERENCE_PX`) | inference tests; GPUI `a_line_ends_on_the_hovered_point_at_scale_1/2` | = |
 | …onto a point / a centre | a 15 px square: 7 px straight out, 9–10 diagonally (catalogue); onto a centre: COINCIDENT, not CONCENTRIC | the square on screen | matrix | = |
 | …onto a midpoint | ±5–7 px along the line | 6 px (`MIDPOINT_REACH`) | scene `a_snapped_point_or_midpoint_gets_the_square_and_a_curve_none` | = |
@@ -391,6 +392,8 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | A drag off the list | the drop line stays at its last spot; released over the canvas: nothing | the line went with the pointer's row (drawn by `drag_over`); now from the drop slot | = (fixed) |
 | Folders: sideways | every 19 px sideways in the slot steps a level: a last child's bottom half 19 px left drops after the folder, outside | no levels; now 19 px a level from where the pointer came onto the slot (`LIST_LEVEL_PX`) | = (fixed) |
 | Multi-part Properties… | one "2 selected" dialog, both parts listed, Name "Multiple values", shared fields editable (live 08:18, 2962) | the first part's Properties; now live's dialog (`open_parts_properties`; list `several_parts_share_one_properties_dialog`) | = (fixed 11-13) |
+| Parts list rename (live2 parts-list-1118) | row menu › Rename: the whole name selected; Esc cancels, Enter commits, a click away commits; Shift+N on a selected part renames, F2 nothing | the same, but a click away left the box open; now it commits (`on_mouse_down_out`, as the feature rename) | = (fixed) |
+| A part hovered in the graphics (live2 parts-list-1118 c1) | its row gets no hover or related tint (list → graphics only) | the same | = (new) |
 | Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); an empty new folder's caret (live featurelist-gaps 11-16: shown, collapsed, on "New folder (0)"); the insertion line (live featurelist-gaps: rgb(22, 81, 176), 2 px, the row's width, a ~6 px ring filled rgb(202, 216, 237) at its left end, centred on the boundary above the hovered row in its upper half, below in its lower half; ours the same, the ring's fill was white) | – | – |
 
 ## Measure (matrix)
@@ -650,7 +653,7 @@ dialog the workspace takes Ctrl+Z, so the document's own undo stands in for it t
 live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). part-studio-ui
 `dialogs::the_dialogs_matrix_matches_live` (T1, no GPU) on the block start, and `manipulators::snap_tests`.
 
-**Matched: 23 / 23** (11-17 22:59 UTC: 3 rows added from live's feature-dialogs-1117, all matched as they were).
+**Matched: 31 / 31** (11-18 02:17 UTC: live2 parts-list-1118 and dialog-keys-1118 rows, 2 fixed; 23 / 23 at 11-17 22:59 UTC).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -677,6 +680,11 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | Material on opening | 280 × 368 at the graphics area's bottom; nothing picked ('- None -') | the same | = |
 | Material: a picked row | the list closes, the search keeps the keyboard with its text cleared; typing opens the list again; "No material assigned" stays under the open list (material-search-acetal-ok, material-library-pick-abs-cancel) | the keyboard went nowhere and the line hid while the list was open; now as live (the search stays in the tree, unseen) | = (fixed) |
 | Material's search and Esc | filters as you type ("steel": 38 rows; live's read counted its highlighted first row twice), the first highlighted; Esc closes the list only, a second Esc the dialog | the second Esc did nothing (the keyboard was left on the closed list's search); now it cancels | = (fixed) |
+| Material keys (live2 parts-list-1118 f2-f4) | "alum": Down from Alumina Oxide to Aluminum, Enter picks it, the part's look unchanged; Esc then closes the dialog unapplied | Esc after a pick did nothing (the keyboard on the closed list's hidden search); now it cancels | = (fixed) |
+| Add appearance to face… (live2 parts-list-1118 e1-e4) | "Face appearance 1", 220 × 401 in the feature dialogs' place; "Faces or features" with the chip "Face of Extrude 2" and its ×; a swatch recolours only that face at once; ✓ keeps it, no feature row | 431 px at the graphics' bottom left, "1 face" in the field; now as live | = (fixed) |
+| Keyboard on opening (live2 dialog-keys-1118) | a new Extrude / Fillet and an edited Extrude focus their first selection field | the same | = (new) |
+| Tab from Depth (live2 dialog-keys-1118 b1) | ± → Direction → Starting offset → Symmetric → Draft → Second end position → help → out of the dialog; End type, the selection field, the tabs and ✓ / ✗ skipped; Shift+Tab back | the same | = (new) |
+| Space, dropdown keys, Ctrl+Enter (live2 dialog-keys-1118 c1-c3) | Space toggles a focused checkbox; End type clicked: a focused search box, Down moves the highlight, Esc closes it unchanged; Ctrl+Enter in a field is Enter | the same | = (new) |
 | An empty click with a box active | the box's entries and the dialog stay as they are (no deselect, no close; live feature-dialogs-1117) | the same | = |
 | Radius focused, an edge clicked | the Entities box stays active: the edge is added and the keyboard leaves Radius | the same | = |
 | Boolean Subtract | picks stay in Tools (no auto-advance to Targets); a click on Targets makes it active | the same | = |
@@ -688,7 +696,7 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft angle). part-studio-ui
 `fields::the_fields_matrix_matches_live` (T1, no GPU) on the block start.
 
-**Matched: 14 / 14** (11-16 00:47 UTC: live's fields-gaps rows added (wheel, Tab after a bare "#", Create variable's place), 2 fixed; 11 / 11 at 11-15 20:35 UTC with the open list row; 10 / 10 at 20:06 UTC with the right press row; 9 / 9 at 11-14 00:33 UTC; 6 / 9 at the first run).
+**Matched: 17 / 17** (11-18 02:17 UTC: live2 dialog-keys-1118 rows, all as ours; 14 / 14 at 11-16 00:47 UTC: live's fields-gaps rows added (wheel, Tab after a bare "#", Create variable's place), 2 fixed; 11 / 11 at 11-15 20:35 UTC with the open list row; 10 / 10 at 20:06 UTC with the right press row; 9 / 9 at 11-14 00:33 UTC; 6 / 9 at the first run).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -706,6 +714,9 @@ live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft an
 | Wheel over the focused field (live fields-gaps 11-16) | +1 mm per notch, −1 down, Shift ×10, Ctrl ×0.1 | the same | = |
 | Tab after a bare "#" (live fields-gaps) | only New variable…, nothing highlighted (with a name typed, "#nope", it is highlighted: live extrude-depth-new-variable); Tab closes the list, the field keeps "#", the keyboard moves on | New variable… highlighted, Tab opened Create variable; now as live (`VarCompletion::highlighted`) | = (fixed) |
 | Create variable's place (live fields-gaps) | top-left ~4 px right of the field's right end, top level with the field's | 107 px right of the field's left, 12 px above its top; now as live | = (fixed) |
+| Arrow keys, more (live2 dialog-keys-1118) | Ctrl+Up +0.1; a committed "1 in" Up "26.4 mm" (a workspace unit, rewritten in it); typed text not yet Entered: arrows do nothing | the same | = (new) |
+| "5+" (live2 dialog-keys-1118 a1-a2) | no error while typing; Enter: the box pink, the title red, so after blur too | the same | = (new) |
+| An unknown variable (live2 dialog-keys-1118 a3) | "#zz" + Enter opens Create variable | the same | = (new) |
 | Not yet in the matrix | Ctrl+Up ×0.1 (an existing test), the wheel over a focused field, the "#" list's New variable… and its popover, Tab taking the highlighted entry | – | – |
 
 ## Feedback (matrix, Part Studio rows)

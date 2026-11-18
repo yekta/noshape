@@ -120,21 +120,35 @@ docs/DECISIONS.md (read first; it wins over anything here).
   500 / 250 / 125 ms animations, part rows toggle on Ctrl or Cmd; live2's (b) Ctrl-only box deselect (ours Ctrl or
   Cmd; live's Cmd unverified): left.
 
-## 11-18 01:4x
+## 11-18 02:17
 - Landed today: feature-list rows, graphics menus over a selection, measure angles toward middles (confirmed by live2's
-  first-wedge pairs 11-18) + Mass button / `[`, spinner as live, rollback bar per live2 rb-followup, viewport-offset test
-  (not reproduced: latency), hovered part outline 2 device px (310cbd9b), config row ids A0, the selected part's look
-  (queued ~01:15: tint on its faces directly, edges half amber, #FFC04C 2 device px band through parts, state BAND).
-- Queued 01:4x: frame timer on the executor clock (nav matrix "double middle click" flaked on vibe2: the below-20-fps
-  jump fired from wall-clock frame intervals; lead P1).
-- In the worktree, waiting on a vibex6 lavapipe run (load 53): sketch_hover::sketch_lines_and_points_light_as_live (GPU
-  pixel test: line 2 px / band 9 device px / point disc 11 px, all as live2 hl-pixels-1118), dialogs matrix row "Esc
-  with the button held cancels" (24 / 24), interaction-feel rows (manipulators as live manip-feel-1118: all six already
-  ours). Land them once vibex6 passes (or land and watch vibe2).
-- Highlight pixel parity (lead P0) done: part hover / select / face + part / sketch line / point all as live2's
-  hl-pixels-1118 columns (scene `edge_and_face_highlights_look_as_live`, the sketch test above).
+  first-wedge pairs) + Mass button / `[`, spinner as live, rollback bar per live2 rb-followup, viewport-offset test
+  (not reproduced: latency), hovered part outline 2 device px (310cbd9b).
+- Landed 01:56 as 9d0348df: config ids A0, the selected part look (BAND state, #FFC04C 2 device px band), frame timer on
+  the executor clock (the nav-matrix flake that turned main red 01:43), sketch pixel test, dialogs row, docs. On vibe2:
+  1bc482bc landed 02:08 as 386abe78 (hidden part row menu, Shift+X restores the last section). 6208c7f2 had failed on
+  vibe2's corrupted land-slot1 incremental dir (infra).
+- Lead P0 02:0x (main RED 01:43 on the nav matrix; CI 44210027702 at 00:42 failed it on macOS + Windows and
+  the_first_pick_at_rest… on macOS): nav is the wall-clock frame timer, fixed by f2b77bda (landed 9d0348df). The
+  first-pick test passes on the Mac (1.1 s) and Linux; marked T2 (9a557d65, queued 02:03) to fix after the 05:00 cut:
+  on CI's macOS runner no pick answer came in 30 s with the test clock held (suspect: a pick held behind a frame job
+  that can't submit, `worker.rs` "hold them while a newer frame is still waiting").
+- Live's UI speed table (behaviours "UI speed of everyday actions", ui-speed-1118) is in latency_tests' TARGETS comments.
+- In the worktree (testing on vibex6): live2 parts-list-1118 + dialog-keys-1118.
+  - Face appearance editor: a feature-style dialog in the feature dialogs' place, 401 px, chips with × ("Face of
+    Extrude 1"); was 431 px at the graphics' bottom left with "1 face".
+  - Part rename commits on a press anywhere else (on_mouse_down_out, as the feature rename).
+  - Material: with the list closed (after a pick) Esc cancels the dialog.
+  - Rows: list matrix (part rename keys, Shift+N / F2, graphics hover leaves the row), dialogs matrix (face appearance,
+    material Down/Enter, focus on opening, Tab from Depth and out / Shift+Tab, Space on a checkbox, End type dropdown
+    keys, Ctrl+Enter), fields matrix (Ctrl+Up, '1 in' Up 26.4 mm, typed text not stepped, '5+', '#zz' + Enter);
+    quantity_field unit test for the inch steps. `OsSelect::open_state` (app-core) for the dropdown row.
+  - Orient normal to sketch on edit: ✗ leaves the view normal (live2 sketch-entry-1118), was the view before; test.
 
 ## Next queue
+0. live2 sketch-entry-1118 rows not yet checked (skasm has the same data): Shift+S with a plane / face selected starts
+   on it, empty field otherwise; a new sketch hides / greys nothing; editing rolls later rows back + "Final"; another
+   row clicked while sketching does nothing. Then the first-pick T2 after the 05:00 cut.
 1. qa P2 HOVER-LEAVES-WINDOW: a face hovered just before the pointer leaves the window stays outlined. GPUI clears
    element hover on X11's LeaveNotify (MouseExited) and the viewport clears its hover there; not reproduced yet. Rig:
    /root/psui-scratch/offset/leave.sh (block doc ~/tmp/psui/off/b.noshape on vibex6 :665).
