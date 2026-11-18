@@ -549,7 +549,15 @@ impl GFace {
                         if ds < 0.0 && (at0 || at1) {
                             q0.x = r * (th0 + TAU);
                         }
-                        let Some(x1) = onto(q0.x + ds) else { return Err(Decline("an arc across a cylinder's seam")) };
+                        // (Its end vertex on the seam where its circle lies a little off the axis, its sweep from
+                        // its own centre then past the seam by up to twice that: at the seam (c2-wire-clip-imported's
+                        // hole rims 5 um off a pin's axis, 10 um past its seam).)
+                        let off_axis = (k.c - *o - *a * (k.c - *o).dot(*a)).length() + (k.r - r).abs();
+                        let (lo, hi) = (r * th0, r * (th0 + TAU));
+                        let end = self.to2(p1).x;
+                        let side = if ds < 0.0 { lo } else { hi };
+                        let at_seam = (end - lo).abs().min((end - hi).abs()) <= near.max(reach) && (q0.x + ds - side).abs() <= 2.0 * off_axis + slack;
+                        let Some(x1) = onto(q0.x + ds).or(at_seam.then_some(side)) else { return Err(Decline("an arc across a cylinder's seam")) };
                         // (At its circle's own height, not its vertex's: two circles 0.1 mm apart between the same two
                         // tolerant vertices of a Shell slab, two curves, not one.)
                         let Surf::Cyl { flip, .. } = self.s else { unreachable!() };
