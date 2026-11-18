@@ -1,26 +1,23 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 02:10 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 03:55 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18
-- b6f5e810: snap onto another sketch's point / model vertex = one Coincident, no use glyph (qa SKSNAP-SHIFT-ICON);
-  joint row's flat edges (`flat_view_side_edge`); Flange flip row test.
-- 0fda4de5: a double-clicked face's sketch drawn through the part as an edited one (qa SELFEEL-DBLCLICK-FACE-SKETCH);
-  Extend picks a line's nearer end, which follows the pointer and stops on a crossing curve; offset arrow drag adds to
-  the press-time offset (live sketch-tools-1118; tangent arc, spline Enter, fillet reach, trim drag already as live).
+- b6f5e810: snap onto another sketch's point / model vertex = one Coincident, no use glyph; joint row's flat edges.
+- 0fda4de5: double-clicked face's sketch drawn through the part; Extend nearer end; offset arrow drag.
+- 9c015658 (03:39): Rip -> Bend unfold failure (host `Unfolded::clashes`: a second bend path placing a wall elsewhere ->
+  no flat, `cannot_unfold`, WARNING SHEET_METAL_COULD_NOT_UNFOLD, bend kept, yellow toast; a consistent loop such as
+  qa4 S1's split plate still unfolds); Corner / Bend relief boxes (`SM_CORNER`); offset arrow zoom step;
+  NOSHAPE_SNAP_TRACE; " radian" label; copy/paste test. SKSNAP-REACH closed not a bug by qa.
 
-## Queued (fbecd909, 02:50; fc4e19fb failed on the land server's link flake, re-queued)
-- Rip -> Bend unfold failure (host `bends_close_a_loop` per part -> no flat, `cannot_unfold`, WARNING
-  SHEET_METAL_COULD_NOT_UNFOLD with the bend kept: std's defineFeature rolls an ERROR back; the table's yellow toast);
-  Corner / Bend relief boxes take planar faces with the walls muted (`SM_CORNER`); ui_parity "part 0". A/B over the 13
-  sheet metal parity docs (vibex6 ~/agents/skasm-keep/sm-unfold-{a,b}.log): identical, 153/159 both.
-- Offset arrow step by the manipulators' zoom rule (live2 triad-step-1118).
-- NOSHAPE_SNAP_TRACE: each sketch pointer move's model snap and inference in continuous viewport px.
-- live REQUESTS 11-18 02:30: the failure row's colour (warning vs error) and Corner taking a rip side face.
-- SKSNAP-REACH: proposed not a bug to qa (trace: we measure from the pointer pixel's centre as live's 1x1 pick; P at
-  x 1145.937 makes qa's "7 px" 7.585; the edge alone lights at its 7 px step; with P woken the end goes onto the edge
-  at P's height, combined). Rig: vibex6 ~/tmp/skasm/sk (sks.sh, reach.py; starts.json = repo + qa's merged).
+## In flight
+- Sticky snap target (live getInference lastInferenceTarget): `SketchEditor::snap_target` + `Inference::targets`;
+  scene test `the_line_snapped_to_last_stays_over_a_point_by_it`; feel row. live REQUESTS 11-18 03:46 asks for the
+  real-pointer check (a line slid into its own end).
+- Solver: a circle / ellipse Coincident with a held point translates with its size kept (live coincident.json);
+  test `a_curve_onto_a_held_point_moves_whole_with_its_size_kept` (onshape_ux.rs).
+- Open live REQUESTS 11-18 02:30: the unfold row's colour; Corner taking a rip side face (then the corner disc).
 
 ## Next, in order
 0. USER P0 (lead 11-17): interaction feel. sm-feel-1117 left: Corner / Bend relief taking a rip's side face +

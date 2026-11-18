@@ -587,6 +587,9 @@ pub struct SketchEditor {
     chain_end: Option<EntityId>,
     pub cursor: Option<DVec2>,
     pub inference: Option<Inference>,
+    /// The entity the last freshly chosen snap was on: kept while it is still under the pointer (live's getInference
+    /// lastInferenceTarget; not cleared when nothing is under the pointer).
+    snap_target: std::cell::Cell<Option<EntityId>>,
     pub external_snap: Option<ExternalSnap>,
     /// The centres of the model's circular edges in the sketch's plane (the view fills it once a sketch is open).
     pub model_centres: std::sync::OnceLock<Vec<(DVec2, noshape_model::reference::Reference)>>,
@@ -1380,6 +1383,7 @@ impl SketchEditor {
             chain_end: None,
             cursor: None,
             inference: None,
+            snap_target: std::cell::Cell::new(None),
             external_snap: None,
             model_centres: std::sync::OnceLock::new(),
             model_lines: std::sync::OnceLock::new(),
@@ -1527,6 +1531,7 @@ impl SketchEditor {
         self.chain_end = None;
         self.picks.clear();
         self.inference = None;
+        self.snap_target.set(None);
         self.external_snap = None;
         self.fillet_session = None;
         self.pending_corner = None;
@@ -1786,6 +1791,15 @@ impl SketchEditor {
                 best = Some(on.clone());
             }
         }
+        // Live's getInference: the target snapped to last stays while anything under the pointer is on it, ahead of a
+        // stronger snap there (WT@9146346 lastInferenceTarget: a point square over its line's band keeps the line).
+        let held_target = self.snap_target.get().filter(|_| !self.exact_inference);
+        if let Some(t) = held_target
+            && best.as_ref().is_some_and(|b| !b.targets().any(|x| x == t))
+            && let Some(on) = all.iter().find(|i| i.targets().any(|x| x == t))
+        {
+            best = Some(on.clone());
+        }
         // Elliptical arc: the end snaps to the construction ellipse's axis points.
         if self.tool == Tool::EllipticalArc
             && self.clicks.len() == 3
@@ -1813,6 +1827,12 @@ impl SketchEditor {
             && let Some(kept) = self.held_snap(sk, p, &ctx, prev)
         {
             best = Some(kept);
+        }
+        if let Some(b) = &best
+            && held_target.is_none_or(|t| !b.targets().any(|x| x == t))
+            && let Some(t) = b.targets().next()
+        {
+            self.snap_target.set(Some(t));
         }
         best
     }
@@ -11304,6 +11324,26 @@ mod tests {
         ed.tool_down(&mut d, empty, None, false, false);
         ed.tool_up(&mut d, empty);
         assert!(ed.selected_constraints.is_empty() && ed.selection.is_empty(), "an empty click deselects");
+    }
+
+    /// Live's getInference (WT@9146346 lastInferenceTarget): where a point's square overlaps a line's band, the line
+    /// snapped to last stays lit; coming in from elsewhere, the point (points over curves).
+    #[test]
+    fn the_line_snapped_to_last_stays_over_a_point_by_it() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        let line = d.sketch.add_line(v(-0.02, 0.0), v(0.02, 0.0));
+        let point = d.sketch.add_point(v(0.004, 12.0 * PX));
+        click(&mut ed, &mut d, v(-0.013, -0.031));
+        let lit = |ed: &mut SketchEditor, d: &mut SketchData, q: DVec2| {
+            ed.pointer_move(d, q, false, false);
+            ed.inference.as_ref().map(|i| (i.kind, i.entity))
+        };
+        let both = v(0.004, 6.0 * PX);
+        assert_eq!(lit(&mut ed, &mut d, v(0.004, 0.01)), None, "nothing");
+        assert_eq!(lit(&mut ed, &mut d, both), Some((InferenceKind::Endpoint, Some(point))), "from elsewhere: the point");
+        assert_eq!(lit(&mut ed, &mut d, v(-0.01, 2.0 * PX)), Some((InferenceKind::OnCurve, Some(line))), "on the line");
+        assert_eq!(lit(&mut ed, &mut d, both), Some((InferenceKind::OnCurve, Some(line))), "along it into the point's square: the line stays");
+        assert_eq!(lit(&mut ed, &mut d, v(0.004, 11.0 * PX)), Some((InferenceKind::Endpoint, Some(point))), "off the line's band: the point");
     }
 
     /// Live (11-17 sketch-snap-1117): a snap lights at 7 px and holds until the pointer is 9–10 px out (a point; a

@@ -159,6 +159,15 @@ impl AutoConstraint {
             ConcentricTo(c) => ConstraintKind::Concentric { a: new_point, b: c },
         })
     }
+
+    /// The sketch entity the constraint ties to, if any.
+    pub fn target(&self) -> Option<EntityId> {
+        use AutoConstraint::*;
+        match *self {
+            CoincidentPoint(e) | OnCurve(e) | MidpointOf(e) | HorizontalWith(e) | VerticalWith(e) | PerpendicularTo(e) | ParallelTo(e) | TangentTo(e) | QuadrantOf(e, _) | ConcentricTo(e) => Some(e),
+            HorizontalLine | VerticalLine => None,
+        }
+    }
 }
 
 /// A snapping candidate.
@@ -176,6 +185,14 @@ pub struct Inference {
     pub distance: f64,
     /// Lower is better.
     pub priority: u8,
+}
+
+impl Inference {
+    /// The entities the inference snaps to: its own and those of its constraints (a crossing has both curves'), as
+    /// live's getTargets.
+    pub fn targets(&self) -> impl Iterator<Item = EntityId> + '_ {
+        self.entity.into_iter().chain(self.constraints.iter().filter_map(AutoConstraint::target))
+    }
 }
 
 /// Whether a constraint holds line `l`'s direction: its own Horizontal /
