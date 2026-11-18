@@ -694,7 +694,7 @@ point gets no coincident (= live). Ending on a point / midpoint: COINCIDENT (sha
   3: "—" under the line's middle, "|" beside it, coincident / midpoint glyphs above-left of the end).
   qa 11-18 00:31 (green 0f7610c83, Show constraints ticked, sk/run4): "—", "|", coincident and midpoint glyphs stay after each line
   as live; it was Show constraints off in our start. The model-edge end shows none here: re-check with SKSNAP-MODEL-EDGE (085fa6af1).
-- [x] not a bug (qa + skasm 02:20: 7.5 px from the pointer pixel's centre as live's pick; the targets sit at sub-pixel positions, so step 7 is 7.6-7.8 px away; edge swept alone lights at 6, midpoint 7, sk/ss3) **P2 SKSNAP-REACH (skasm)**: a point lights at 5 px along x (live 6-7) and a circle centre at 4 px (live 5-8).
+- [x] not a bug (qa + skasm 02:50: 7.5 px from the pointer pixel's centre as live's pick; the targets sit at sub-pixel positions, so step 7 is 7.6-7.8 px away; edge swept alone lights at 6, midpoint 7, sk/ss3) **P2 SKSNAP-REACH (skasm)**: a point lights at 5 px along x (live 6-7) and a circle centre at 4 px (live 5-8).
   qa 01:46 on 5076e98c (vibex8, sk/sw6, sw7, hv7): circle centre 6 px (in live's band); still short: point 5 px along x / y (live
   6-7), a model edge 5 px (live 7), the alignment band ±5 (live ±6-7); lines as before (end 7, middle 5, off-end 6).
   Slow steps (skasm: our radius 7.5 px; the light comes late on llvmpipe): 0.8 s and 2.2 s per step both light at 6 px (point x / y /
