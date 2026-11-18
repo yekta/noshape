@@ -4,58 +4,41 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-18 01:55 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
+Updated 11-18 03:00 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
 (NOSHAPE_GATE_HOST=vibe2); Mac for crate tests, probes and speed numbers (NOSHAPE_RB_HOST=mac; vibex8 runs ~x10 slower at
 load 26); land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs on vibex7 ~/lead-private (hat8, hat15,
 hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree from a computed pid (lead 21:06):
 `systemctl stop <unit>`; kill only own pids > 1.
 
 ## In flight
-- Gate unit bool-gate-934a (vibe2) -> /root/bool-hat-scratch/chain-934af8abb.out, then unit bool-udoc-934a ->
-  udoc-934af8abb.out (4 private docs). Then: list relabelled / seam cases per condition (c), knurls ours-only, g++-13,
-  land, tell dx (2108c2b7-2f48-43a7-87a0-3f652e3cda6d), core, blend.
-  Branch bool-shared2 (bool-hat) on main f6274d94e, 11 commits:
-  1. e61278b1d usd: op_unify keeps USD's merge whose volume change fits in the merged faces' tolerant edges (sum of
-     tol^2 x length, capped at 1e-8 of the volume, only where every face USD made of two or more is on an elementary
-     surface). infento 1dc32b Boolean 4 Part 4 232/632/400 -> 216/600/384 as live. Grooves cd1c58431ab4a62c 9 -> 8.
-  2. 8a9351e4b shared: solids' Booleans no longer decline "a shared shape OCCT may keep or remake" (Modified where
-     OCCT, by rounding, says Kept). Lead 11-17 conditions: (a) model suite identical end to end, (b) hats/dock SAME,
-     (c) replay differs only in those labels, listed by case ("shared shapes relabelled"; "seam placement only"),
-     (d) T1 split_names::a_shared_edge_of_split_pieces_keeps_its_name_through_a_boolean. Sheets keep the decline.
-  3. a1d7ca0b4 + 65befe285: NURBS piece boxes (Ctx::nurbs_box) for vertex search / intervals_on / split test.
-  4. 51ee7c1cb unify room summed most tolerant edge first. infento Boolean 4 with 1-4: 751 -> 189 ms (live 135).
-  5. 0b17fee66 par_map_by: a worker stopped by its own stop state declines "cancelled" (dx's boolean.rs:5058 abort).
-  6. 26ce2dffa fuse_glued: a mirrored plane's normal is against its axis.
-  7. b11d72be6 gap(): arcs meeting end to start, rounded a little past (4e-15 rad), leave no gap (pulleys' rim read a
-     186 deg gap; its 23-groove Circular pattern 1 cut declined "an arc across a cylinder's seam" to OCCT, 254 ms).
-     T1 tests::arcs_meeting_end_to_start_leave_no_gap_between_them; case bf1b3ffd3777f210 in tests/data/brep.
-  8. 29bcd92a8 pattern copies check their source curves' clearance once per (face, canonical pair) (Ctx::from_clear);
-     seam_cuts samples only spans whose hull may reach the seam. Pulleys' 23-tool cut on the Mac 44 -> 28 ms (OCCT 32).
-  9. 07ce00475 moved section curves keep their source's span-length table (NurbsCurve::moved).
-  10. 934af8abb fuse_glued: two mirror images placed by a location aren't fused glued (07ce's gate FAIL, crate test
-     boolean_groups::a_located_curved_side_and_its_mirror_image_unify_into_one_face).
-  cf-surface-pattern 385 vs 386 edges (condition (a)): its 18 recorded Booleans are identical branch vs main, history
-  too (vibex8 ~/tmp/bool/sp-ops-934a, sp-ops-dbgft; dbgft is main f824d120 + debug, a newer base): the gate's
-  same-base pair decides.
-- a04711 (asm-isaac-ball) Extrude 4 cut non-manifold (OCCT path; core's case vibex8 ~/tmp/core/a04rec/ad565563c0275193).
-  Branch bool-rounded f88eb782e: again on text-round-tripped copies when the result is non-manifold, kept when manifold
-  and volume possible, history mapped back. LEAD: DON'T LAND until Part 3 = live's 9/22/15 and Extrude 5 = 213.95 mm3.
-  Real run (bool-valid, 01:40): volume + area = live's, counts 8/17/11: live keeps um topology there (edges 1.1, 3.5,
-  3.7 um; faces 0.05, 0.84, 0.87 mm2: live.jsonl bodies JPD at index 7). Dump of ours (DBGRC / DBGMEM, box around
-  Part 3) in vibex8 ~/tmp/bool/a04-box.log. Rounded retry fires 6x in the doc (0.8 s); the rest of its 19.9 s (live
-  1.93) is fillets on parts already off from Extrude 1 (asm's Part 1 8/16/8 vs 9/19/10). Repro: models
-  vibex8 ~/agents/asm-keep/ma04, binary ~/tmp/bool/ops-dbgnm (bool-valid: main + DBGFT/DBGNM prints + rounded patch +
-  asm's ef18dc749/b8d2d867e; scratch, reset after).
-- c2-fan-blade-sweep Boolean 2 (lead 11-18: mine): case 3e8c1e09636d4fd7 (vibex8 ~/tmp/bool/fan-rec, Mac
-  ~/noshape-host/bool-keep/fan; bool-hat .fan.sh / .fan2.sh). Mac: ours declines "a non-manifold result" in 36 ms,
-  OCCT 185 (live's feature 364). Each tool's offset thread face (arg 1 F19, arg 2 F19: Geom_OffsetSurface, r 4.0002
-  on the bosses' r 4 holes) keeps one piece (flipped) whose neighbours are dropped: tangent-coincident offset face
-  vs the hole wall. DBG_NM dump at boolean.rs "a non-manifold result" (bool-hat, uncommitted: remove before commits).
-- 850efe (asm): Extrude 5 fuse slivers (ours declines "an ellipse ending nearly at an axis"; OCCT 44 vs 36 faces)
-  -> Fillet 2 invalid -> minutes-long OCCT cuts. Blend told. Decision asked: refuse invalid Boolean arguments / a
-  time budget.
-- e54410 (asm) feature 45 Extrude 22: live merges coplanar faces 2 um apart; capture requested in live/REQUESTS.md
-  "bool (2026-11-17 22:22 UTC, P1": merge distance. Decision after the capture.
+- GATE unit bool-gate-8ba7c6dcc: starts 04:01 on vibex7 (vibe2's and vibex8's slots hours deep; lead 11-18: run
+  wherever starts first) -> /root/bool-hat-scratch/chain-8ba7c6dcc.out. Then private docs (udoc-ab8.sh 8ba7c6dcc),
+  list relabelled / seam cases per condition (c), knurls ours-only, land, tell dx (2108c2b7-2f48-43a7-87a0-3f652e3cda6d),
+  core, blend, asm. Branch bool-shared2 (bool-hat) on main f6274d94e, 12 commits, all g++-13 OK:
+  1-10. as before: e61278b1d usd room; 8a9351e4b shared shapes (lead conditions (a) suite identical, (b) hats/dock
+     SAME, (c) replay label-only by case, (d) split_names T1); a1d7ca0b4 + 65befe285 NURBS piece boxes; 51ee7c1cb unify
+     room order; 0b17fee66 par_map_by cancel; 26ce2dffa fuse_glued mirror normal; b11d72be6 gap() (pulleys seam
+     decline); 29bcd92a8 pattern clearance once + seam_cuts hull spans; 07ce00475 moved curves keep span lengths;
+     934af8abb located mirror images not fused glued.
+  11. 26dcc8ec7 (was f88eb782e) a04711 Extrude 4: non-manifold cut retried on text-round-tripped copies (lead 11-18:
+     land; commit body names live's JT6 sliver, P3 A04711-TOOL-SLIVER in TICKETS).
+  12. 8ba7c6dcc strips (lead 11-18: match live's 1e-5): drop_strip_faces / collapse_short_edges / without_strips on
+     every op_boolean path; unify keeps merges whose pieces lie on the merged surface (pieces_within, 1e-7) within 1e-8
+     of the volume. e54410 Extrude 22 14 faces as live; 850efe Extrude 5 36 as live, doc 300 s -> 1.7 s, 12/18.
+     Not matched: q-union-merge's overlap variant (face coincidence, not a strip). 850efe Extrude 6 33 vs 28 (live
+     merges with 2e-6 of volume change: not ours to take). Kernel T1 496/496 on the Mac.
+  cf-surface-pattern 385 vs 386 edges: its Booleans identical branch vs main (the gate's same-base pair decides).
+- a04711 notes: Part 3 = live's faces / volume / area but 8/17/11 vs 9/22/15 (live's 10 um JT6 sliver; the rounded
+  retry's other firings, Extrude 23 / 27, are rejected and stay errors). The doc's 19.9 s vs live 1.93: fillets on
+  parts off from Extrude 1 (asm's). Repro vibex8 ~/agents/asm-keep/ma04; dumps ~/tmp/bool/a04-box.log.
+- c2-fan-blade-sweep Boolean 2: tangent contact (offset thread face r 4.0002 on the r 4 holes): stays OCCT's (lead
+  11-18, ruling 11-15). Mac: our decline 36 ms, OCCT 185. Case vibex8 ~/tmp/bool/fan-rec 3e8c1e09636d4fd7.
+- 850efe: cases Mac ~/noshape-host/bool-keep/m85 (Extrude 5 110173579c7126ff, Extrude 6 cc1019ddbd364035), vibex8
+  ~/tmp/bool/m85acc. Blend told of the invalid Fillet 2 earlier; with 8ba7 Fillet 2 gets live's Extrude 5.
+- e54410: cases Mac ~/noshape-host/bool-keep/me5 (Extrude 22 6dc4464f40a8b0b2, Extrude 17 10c21d285eec6c3a). Live's
+  merge distance: live/bool/q-union-merge (behaviours.md "bool (11-17 22:22)").
+- Scratch in bool-hat (not to commit): crates/kernel/tests/all.rs (xprobe), xprobe.rs, .*.sh; the fan DBG_NM diff in
+  /root/bool-scratch/dbg-nm-fan.diff. bool-valid: debug branch, reset to origin/main after.
 - DECISION ASKED (lead, 22:00): every Boolean's check as made_valid (made / changed faces + shells) instead of
   BRepCheck of the whole result: pulleys' 5-tool cut 13.1 -> 6.2 ms (OCCT 8.2), 4-tool 7.1 -> 3.7.
 - Validity in the gate: tools/bool/gate-host.py (landed 3b8bfba0) reads blend's NOSHAPE_PARITY_VALIDITY CHECK lines
