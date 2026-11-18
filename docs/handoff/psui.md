@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-18 07:55 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-18 11:25 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,22 +33,24 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
+## P0 dock tab return (lead 11-18, must be in the 17:00 cut)
+
+- qa: the dock's return to an open tab "settles" ~820 ms vs 0.4.53 ~140–190 (lat-steps.py: last frame before a 450 ms
+  gap). Same-run A/Bs (qa's and mine, vibex7, load ~20) are bimodal for every build, 0.4.53 too: ~200 or ~800 ms,
+  by whether a pair of late frames (~600 and ~750 ms after the click, in 0.4.53 as well) comes within 450 ms.
+- Since 2219c4373 (v0.4.54) the hover card (shown 400 ms into qa's 500 ms rest) builds its scene from the open view's
+  display at once: scene build 55–128 ms + upload + a 1248×728 render (~0.6 s llvmpipe) right at the click.
+  Fix in the worktree (tab_thumbs.rs): the whole picture job waits `PICTURE_WAIT` 250 ms, a click on the tab in that
+  time drops it; 1× supersample on a software GPU. Test a_clicked_tabs_card_picture_redraws_nothing (rendering GPU,
+  `deliver_frames`).
+- Open: what draws the late pair in every build (diagnostic: /root/psui-scratch/tab/diag.py adds `NOSHAPE_DIAG=1`
+  notify / refresh callers to vendored gpui; never land it). Scripts: /root/psui-scratch/tab/ (tabab.sh rounds,
+  lat-steps.py, frames-after.py, cap.sh); vibex7 ~/tmp/psui (apps/, priv/dock.noshape: delete when done).
+- Parked: press-interval patch (/root/psui-scratch/press-interval.patch: feature-row double-click by X server times);
+  must also check no other press came between the two row clicks before landing.
+
 ## In flight
 
-- Landed 11-16 (to 07:42): flat bend dash / hover / click, pattern labels, 2D manipulator and its boxes, snaps spline
-  rows, woken model edges, failed-feature part highlight, circular pattern handle + clockwise, view cube hover map,
-  tooltip fade-out (vendored gpui div.rs / window.rs, 150 ms). Details: archive.
-- Landed 08:35: 6741b373, the user's toolbar P1 (lead 07:13). Icons' light faces opaque white (`data-face` white
-  underlays; `data-face="themed"` turn #333 in dark; assets.rs `dark_icon`; test `icons_with_faces_are_opaque_inside`,
-  `SEE_THROUGH` allowlist of 18 where live is see-through too). Buttons as live2's toolbar-states + live's addendum:
-  pressed #EAEAEA + inset, active hovered flat #DFDFDF (sketch group #CECECE), ⌄ hover tool #EAEAEA / arrow #D7D7D7,
-  ⌄ open #D7D7D7 + inset, search highlight border 2 px. Vendored gpui-component Button: `pressed_inset`, `flat_hover`.
-- Landed 12:42 (99dea19f): box shadows blur as CSS (`BoxShadow::blur_sigma`, vendor/gpui-pre/NOSHAPE.md, test
-  `ui::tests::box_shadow_blur_is_css`), halved call sites back to CSS, toolbar lists and tooltips with live's shadows;
-  hole-table / drawing-hole-table, configuration, import-foreign icons. Crops /root/psui-scratch/shadows.
-- Landed: d75fd4d1 (free-click readouts within one screen pixel on the sketch plane, doubled for two-click
-  measures; `pixel_on_plane`; README), b752d3ad (toolbar dropdowns 180 px, icon 2 px in, rows with chips 35 px).
-- Landed df0f2ae0: the manipulator's arrows grabbed along their shafts (qa's sketch-entity-copy-paste regression).
 - Full psui run 11-16 16:00 (vibex6 full1116): 1009 / 1021. Mine fixed with this land: sketch readouts of two points /
   a point and a line ("Min dist") and two circles (Center / Max / Min dist), sketch-key-symmetric / -midpoint /
   -concentric-two-circles match. Left, others': bend / jog / tab "Face of …" labels and bend-relief related rows
@@ -73,7 +75,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
   58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2
   79ae5cdb-42a4-4025-b43a-da61a4f92ad7 (from 11-17; 3b9b1e66 stopped), bool 0f798808-e854-4e83-bbd0-22ae5a1a0578, qa
-  132756b3-e48d-4b9f-8a0e-3d4f23629c8b. Old ids stopped.
+  132756b3-e48d-4b9f-8a0e-3d4f23629c8b, core e8af89fe-d460-49b3-b0bb-9572da230fed, blend
+  0672fa20-964d-4fde-a19c-c5b4363729ba (both from 11-18 10:50). Old ids stopped.
 - skasm's sheet metal colour fix (`Context::reuse_colours_from`) lands after their suite: then recheck our flat view
   colours with fb5 sm-click.json.
 - Rerun 11-16: boundary-surface, end-caps, circular click-commit, context-create-version-update, routing match.
