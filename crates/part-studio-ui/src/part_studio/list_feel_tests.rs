@@ -402,6 +402,21 @@ fn rows() -> Vec<Row> {
             wait_until(cx, l.window, |cx| part1_hidden(cx) == Some(true));
             expect((cx.update(|cx| part1_hidden(cx)), l.selected(cx)), (Some(true), names(&[])), "Part 1 hidden, selected")
         } },
+        Row { id: "keys / Y and Shift+Y: the part goes and comes back with the key, not the regeneration", live: "Y: the Parts row at 0.5 at 73 ms, the part gone at 436 ms; Shift+Y back at 108 / 562 ms (ps-feel2-1118; ours waited for the regeneration: 269 / 669 ms on live2's lane)", gap: false, check: |l, cx| {
+            l.click(cx, "part:Part 1", NONE);
+            // Read in the same update as the key's handler: before any regeneration could come back.
+            let part1 = |v: &PartStudioView| v.display.bodies.iter().find(|b| b.name == "Part 1").map(|b| (b.id.clone(), b.hidden));
+            let hidden = cx.update(|cx| l.view.update(cx, |v, cx| {
+                v.hide_hovered_or_selected(cx);
+                part1(v)
+            }));
+            let Some((id, _)) = hidden.clone() else { return Err("no Part 1".into()) };
+            let shown = cx.update(|cx| l.view.update(cx, |v, cx| {
+                v.set_visibility(&[Reference::Body(id.clone())], false, cx);
+                part1(v).map(|p| p.1)
+            }));
+            expect((hidden.map(|p| p.1), shown), (Some(true), Some(false)), "Part 1 hidden at Y, shown at Shift+Y")
+        } },
         Row { id: "rename / Rename in the menu: inline, all selected", live: "an input over the row, the whole name selected; Escape cancels", gap: false, check: |l, cx| {
             l.right_click(cx, "feature:Extrude 1");
             let at = l.bounds(cx, "menu:Rename").ok_or("no Rename row")?.center();

@@ -2598,11 +2598,12 @@ impl PartStudioView {
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, noshape_ops::studio::visibility_description(hidden), cx, |ps| noshape_ops::studio::set_visibility(ps, &t, hidden));
         });
-        let (feats, defaults) = (&t.features, &t.defaults);
+        let (feats, defaults, bodies) = (&t.features, &t.defaults, &t.bodies);
         // Default geometry is shown from the regeneration's display, which a
         // visibility change doesn't regenerate: update it here (it stayed
-        // drawn after Hide, user bug v0.4.0).
-        if !defaults.is_empty() || !feats.is_empty() {
+        // drawn after Hide, user bug v0.4.0). Parts too, in the next frame rather than the regeneration's (live2
+        // ps-feel2-1118: Y dims the row at 73 ms, the part gone at 436; ours waited for it: 269 / 669 ms).
+        if !defaults.is_empty() || !feats.is_empty() || !bodies.is_empty() {
             // A FeatureScript feature's plane is drawn while both it and its feature are shown (live 11-02).
             let (own, hidden_features): (Vec<Reference>, Vec<FeatureId>) = self.studio(cx).map(|s| (s.hidden_defaults.clone(), s.features.iter().filter(|f| f.hidden).map(|f| f.id).collect())).unwrap_or_default();
             let display = std::sync::Arc::make_mut(&mut self.display);
@@ -2616,6 +2617,11 @@ impl PartStudioView {
             for sk in &mut display.sketches {
                 if feats.contains(&sk.feature) {
                     sk.hidden = hidden;
+                }
+            }
+            for b in &mut display.bodies {
+                if bodies.contains(&b.id) {
+                    b.hidden = hidden;
                 }
             }
             if defaults.contains(&Reference::Origin) {
