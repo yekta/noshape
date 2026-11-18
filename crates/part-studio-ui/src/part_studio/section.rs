@@ -129,6 +129,10 @@ impl PartStudioView {
             let refs = self.selection.clone();
             self.ui.section = self.planes_for(&refs, cx);
         }
+        // Live (live2 view-tools-1118): turned off, then Shift+X with nothing selected: the last plane and its offset.
+        if self.ui.section.is_empty() && self.selection.is_empty() {
+            self.ui.section = self.ui.section_last.clone();
+        }
         if self.ui.section.is_empty() {
             self.message = Some((noshape_model::display::FeatureStatus::Info, SELECT_SECTION_PLANE.into()));
         }
@@ -151,6 +155,7 @@ impl PartStudioView {
     /// "Turn off section view" (also with the dialog open).
     pub(super) fn turn_off_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.end_section_dialog(false, window, cx);
+        self.remember_section();
         self.ui.section.clear();
         self.ui.section_parts = None;
         self.ui.cap_hover = None;
@@ -169,11 +174,19 @@ impl PartStudioView {
             return;
         }
         if !self.ui.section.is_empty() {
+            self.remember_section();
             self.ui.section.clear();
             self.ui.section_parts = None;
             self.apply_section(window, cx);
         } else {
             self.open_section_dialog(window, cx);
+        }
+    }
+
+    /// The planes being turned off, for the next Shift+X.
+    fn remember_section(&mut self) {
+        if !self.ui.section.is_empty() {
+            self.ui.section_last = self.ui.section.clone();
         }
     }
 

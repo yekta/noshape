@@ -371,6 +371,8 @@ pub struct UiState {
     pub var_tables: std::collections::HashMap<noshape_model::document::TabId, AnyView>,
     /// Section view planes (Shift+X).
     pub section: Vec<super::section::SectionPlane>,
+    /// The section planes last turned off: Shift+X brings them back, offset and all (live2 view-tools-1118).
+    pub section_last: Vec<super::section::SectionPlane>,
     /// Section view dialog, and the parts excluded (false) or the only ones
     /// included (true) in the cut.
     pub section_dialog: Option<super::section::SectionDialog>,
@@ -855,6 +857,7 @@ impl UiState {
             add_features: None,
             var_tables: Default::default(),
             section: Vec::new(),
+            section_last: Vec::new(),
             section_dialog: None,
             section_offset_edit: None,
             section_rot: None,

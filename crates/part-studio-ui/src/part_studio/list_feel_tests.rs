@@ -433,6 +433,18 @@ fn rows() -> Vec<Row> {
             l.right_click(cx, "part:Part 2");
             expect(l.menu(cx), names(&["Properties…", "Assign material for 2 parts…", "Edit appearance for 2 parts…", "Check interference for 2 parts…", "Boolean", "Copy 2 items", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Export…", "Delete"]), "rows")
         } },
+        Row { id: "menu / a hidden part", live: "… Show, Show all parts, Isolate… (no Hide other / all parts; live2 view-tools-1118)", gap: false, check: |l, cx| {
+            let hidden = |cx: &gpui_kit::App| l.view.read(cx).display.bodies.iter().find(|b| b.name == "Part 1").map(|b| b.hidden);
+            l.right_click(cx, "part:Part 1");
+            let at = l.bounds(cx, "menu:Hide").ok_or("no Hide row")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            wait_until(cx, l.window, |cx| hidden(cx) == Some(true));
+            l.right_click(cx, "part:Part 1");
+            let menu = l.menu(cx);
+            let pos = |t: &str| menu.iter().position(|m| m == t);
+            let ok = pos("Show").zip(pos("Show all parts")).zip(pos("Isolate…")).is_some_and(|((a, b), c)| b == a + 1 && c == b + 1) && pos("Hide other parts").is_none();
+            expect(ok, true, &format!("rows {menu:?}"))
+        } },
         Row { id: "menu / the Top plane row", live: "Rename | New sketch… | Offset plane… | Size to Part Studio | Hide | Hide other planes | Hide all planes | Section view… | Zoom to selection | View normal to | Show dependencies… (Add comment: cloud; live ctx-menus-1117 row-top-plane)", gap: false, check: |l, cx| {
             l.right_click(cx, "feature:Top");
             expect(l.menu(cx), names(&["Rename", "New sketch…", "Offset plane…", "Size to Part Studio", "Hide", "Hide other planes", "Hide all planes", "Section view…", "Zoom to selection", "View normal to", "Show dependencies…"]), "rows")

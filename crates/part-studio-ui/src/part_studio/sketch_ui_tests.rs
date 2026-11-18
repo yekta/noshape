@@ -2069,6 +2069,27 @@ fn section_planes_keep_their_numbers(cx: &mut TestAppContext) {
     .unwrap();
 }
 
+/// Live2 view-tools-1118: a section turned off comes back with the next Shift+X, its plane and offset as they were.
+#[gpui::test]
+fn shift_x_after_turning_off_restores_the_last_section(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "section-restore");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection.clear();
+            v.section_through(Reference::Plane(DatumPlane::Front), w, cx);
+            v.ui.section[0].offset = 0.0123;
+            v.end_section_dialog(true, w, cx);
+            v.turn_off_section(w, cx);
+            assert!(v.ui.section.is_empty(), "turned off");
+            v.toggle_section(w, cx);
+            let back: Vec<(String, f64)> = v.ui.section.iter().map(|p| (p.label.clone(), p.offset)).collect();
+            assert_eq!(back.len(), 1, "the plane back: {back:?}");
+            assert!((back[0].1 - 0.0123).abs() < 1e-12 && v.ui.section_dialog.is_some(), "its offset, the dialog open: {back:?}");
+        })
+    })
+    .unwrap();
+}
+
 /// Live 11-02: every section plane's manipulator is shown while the dialog is open, and dragging another plane's
 /// arrow moves that plane.
 #[gpui::test]

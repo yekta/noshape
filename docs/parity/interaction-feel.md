@@ -443,6 +443,14 @@ nothing; Esc with the button held cancels the whole dialog (dialogs matrix, new 
 a planar handle drags both of its axes, the other handles fade to faint grey while dragging, the moved parts' old
 place shows as a faded ghost with the selection outline (triad.rs, behaviors `transform_ghost`). All as live.
 
+View tools (live2 view-tools-1118): Shift+Y shows the selected hidden parts only (ours already: `show_hidden`, the
+action named ShowAll; nothing selected, only a hidden part under the pointer); a hidden part's row menu has Show, Show
+all parts (no Hide other / all parts: fixed); the empty-space menu Show all, Show all parts (as ours); render mode and
+Perspective switch in one step, a named view's restore animates (ours 500 ms; live's 3 frames over ~240 ms on a slow
+lane); Section view: the arrow's value box, "Select default plane", the dialog's caps 80 % toward #FFC685 (E9C698 on
+the blue block, EBBD8A on the grey cylinder, as ours); Turn off then Shift+X brings the last plane and offset back
+(fixed: `section_last`; `shift_x_after_turning_off_restores_the_last_section`).
+
 ## Navigation (matrix)
 
 live2's navigation.json (Linux Chrome, the account's default mouse mapping): wheel, right / middle / Ctrl+right /

@@ -4899,9 +4899,13 @@ impl PartStudioView {
                         let t: Vec<Reference> = targets(this, &b5).into_iter().map(Reference::Body).collect();
                         this.set_visibility(&t, !hidden, cx);
                     })).icon_name(if hidden { "eye" } else { "eye-off" }));
+                // Live (live2 view-tools-1118): a hidden part's menu has Show all parts after Show instead.
+                if hidden {
+                    m = m.item(item("Show all parts", Box::new(|this, _, cx| this.show_all_parts(cx))));
+                }
                 // Live (qa5 MENU1, part-studio/1624): with several parts,
                 // Hide other parts and Hide all parts follow.
-                if several_parts && solid_part {
+                if several_parts && solid_part && !hidden {
                     let keep = b.clone();
                     m = m
                         .item(item(&crate::i18n::template("Hide other __label__", &[("label", "parts")]), Box::new(move |this, _, cx| {
