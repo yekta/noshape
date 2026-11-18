@@ -206,8 +206,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - bool: knife Mirror 1 128 / 220 / 140 ms (0.4.53 / 0.4.55 / 35baa32f): bool's 846aace6a says fixed; check in the next valid nightly.
 - Agent ids changed 11-17 09:25 / 10:35 (psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2
   e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios 58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6,
-  live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7 (11-17 13:2x); bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core e8af89fe-d460-49b3-b0bb-9572da230fed (11-18 10:50),
-  blend 0672fa20-964d-4fde-a19c-c5b4363729ba (11-18 10:50), dx 2108c2b7-2f48-43a7-87a0-3f652e3cda6d (11-17 18:4x)). No qa script holds agent ids.
+  live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7 (11-17 13:2x); bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core d30002ca-d013-4435-b7d9-7da9cb564cec (11-18 20:0x),
+  blend de66e481-56e2-4005-a5d3-9fa897ca5fde (11-18 20:0x), dx 2108c2b7-2f48-43a7-87a0-3f652e3cda6d (11-17 18:4x)). No qa script holds agent ids.
 - QUIT-ABORT-DOCK: verified fixed (80e16e42d); guarded by the nightly and rel-published.
 
 ## Expected userdocs differences (not regressions)
