@@ -703,6 +703,9 @@ spur-gear) are under the bar on the Mac. Data qa-scratch/speed/corpus-0.4.58.jso
 - [ ] **P0 SPUR-GEAR-REGRESSION (bisecting)**: cf-spur-gear v0.4.58 -> v0.4.59 +23-28 %, same-host alternating A/B: the Mac 464 (458-480) ->
   569 (566-585) ms, 5 runs; vibex7 1940 -> 2484 ms median, 7 runs, parts the same; the time is in the four Spur Gear custom features
   (+11 to +36 ms each on the Mac). git bisect over v0.4.58..515102325 running (qa-sg-bisect, speed/sg-bisect.log).
+  studios 20:2x (Mac `sample`, release CLIs): only in a cold process (10 warm copies in one batch are even); the time is in our Boolean:
+  brep::boolean_with's OnceLock::get_or_init of free-form faces' sample grids (free::cached_grid, a process-wide LRU) built or waited
+  on inside rayon work (5 -> 177 samples, workers 50 -> 1028); candidates bool2's 13:52 batch (33f8c2fd4 .. fc3754783).
 
 ## User-flow timings vs live (qa 18:2x; live: behaviours "qa (11-18 ~18:00, user-flow feel)" + ui-speed-1118, 10 rounds, settled ms)
 Ours: green 87edba24 on vibe2 (load 18-44: hints; 2 rounds, settle range), qa-scratch/flow (frame log, lat-steps.py). The valid run is
