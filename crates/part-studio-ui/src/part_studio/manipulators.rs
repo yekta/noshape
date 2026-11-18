@@ -748,6 +748,11 @@ impl PartStudioView {
                 let (o, d) = ray(self, *position, cx);
                 let Some(t) = Self::axis_param(&a, o, d) else { return true };
                 if a.param == super::section::SECTION_PARAM {
+                    // Nothing for the first 5 px (live section-1118: the box from 10 px).
+                    if self.ui.section_press.is_some_and(|q| q.distance(*position) < 5.0) {
+                        return true;
+                    }
+                    self.ui.section_press = None;
                     self.drag_section_arrow(t - m.grab_offset, window, cx);
                     return true;
                 }

@@ -407,6 +407,22 @@ fn mass_opens_over_the_lists_right_part(cx: &mut TestAppContext) {
     assert_eq!((f32::from(area.left() - dialog.left()), f32::from(dialog.top() - area.top())), (32.0, 3.0), "(px over the list, px under the toolbar)");
 }
 
+/// Live (10-27, section-1118): the Section view dialog opens at (396, 179): 150 px right of and 100 px below the feature
+/// dialogs' spot (246, 79), 3 px under the toolbar; not docked there.
+#[gpui::test]
+fn the_section_dialog_opens_right_of_and_below_the_feature_dialogs_spot(cx: &mut TestAppContext) {
+    let b = Bench::open(cx, "section-place", 1.0);
+    cx.update_window(b.window, |_, w, cx| b.view.update(cx, |v, cx| {
+        v.selection.clear();
+        v.toggle_section(w, cx);
+    }))
+    .unwrap();
+    draw(cx, b.window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(b.window, cx);
+    let (dialog, area) = (vcx.debug_bounds("section-dialog-place").expect("the Section view dialog"), vcx.debug_bounds("viewport-area").expect("the graphics area"));
+    assert_eq!((f32::from(dialog.left() - area.left()), f32::from(dialog.top() - area.top())), (150.0, 103.0), "(px right of, px under the graphics' corner)");
+}
+
 /// Live (behaviours "number and unit display rules", 11-18): a click on a Mass properties value shows it at the unit's
 /// highest precision (mm 5, mm³ 8), a second click as before (3).
 #[gpui::test]

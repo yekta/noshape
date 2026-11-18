@@ -360,6 +360,7 @@ impl PartStudioView {
             }
         }
         self.ui.section_rot = None;
+        self.ui.section_box = self.ui.section_drag0.is_some() || self.ui.section_box;
         self.apply_section(window, cx);
         if self.ui.section_box {
             self.open_section_box(window, cx);
@@ -551,18 +552,18 @@ impl PartStudioView {
         if self.ui.section_offset_edit.is_some() {
             return None;
         }
-        let (anchor, _) = self.section_box_anchor(cx)?;
+        let (anchor, _, offset) = self.section_box_anchor(cx)?;
         let text = self.section_value_text(cx)?;
         let pal = p();
-        let b = crate::overlay_labels::ValueBox { text: &text, text_size: 13.33, text_color: pal.text.into(), background: gpui_kit::rgb(0xffffff).into(), border: Some(gpui_kit::rgb(0x1651b0).into()), pad_x: 3., offset: [BOX_DX, BOX_DY] };
+        let b = crate::overlay_labels::ValueBox { text: &text, text_size: 13.33, text_color: pal.text.into(), background: gpui_kit::rgb(0xffffff).into(), border: Some(gpui_kit::rgb(0x1651b0).into()), pad_x: 3., offset };
         crate::overlay_labels::value_box(window, cx, &b, anchor)
     }
 
     /// The offset box beside the section arrow (live: e.g. "-0.91 in").
     pub(super) fn render_section_value(&self, cx: &App) -> Option<AnyElement> {
-        let (_, s) = self.section_box_anchor(cx)?;
+        let (_, s, off) = self.section_box_anchor(cx)?;
         let text = self.section_value_text(cx)?;
-        Some(section_box(s).flex().items_center().justify_end().px(px(3.)).text_size(px(13.33)).text_color(p().text).child(text).into_any_element())
+        Some(section_box(s, off).flex().items_center().justify_end().px(px(3.)).text_size(px(13.33)).text_color(p().text).child(text).into_any_element())
     }
 
     /// The offset box as a field (qa5 AN3; live: the arrow's value box takes
@@ -570,9 +571,9 @@ impl PartStudioView {
     /// an input there. Enter or leaving it moves the plane; the click never
     /// reaches the graphics (it would pick the plane under it).
     pub(super) fn section_value_field(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (_, s) = self.section_box_anchor(cx)?;
+        let (_, s, off) = self.section_box_anchor(cx)?;
         let text = self.section_value_text(cx)?;
-        let at = section_box(s).occlude();
+        let at = section_box(s, off).occlude();
         if let Some((input, _)) = &self.ui.section_offset_edit {
             let field = gpui_kit::component::input::Input::new(input).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right);
             return Some(
@@ -660,13 +661,10 @@ impl PartStudioView {
 }
 
 /// The value box (live asm/2370–2371: an `os-canvas-text-edit` 75×26 with a
-/// 1 px #1651b0 border, its corner 40 px right of the rotate glyph's centre
-/// and 25 px above it; the value right-aligned).
-const BOX_DX: f32 = 40.;
-const BOX_DY: f32 = -25.;
-
-fn section_box(anchor: glam::DVec2) -> Div {
-    div().absolute().left(px(anchor.x as f32 + BOX_DX)).top(px(anchor.y as f32 + BOX_DY)).w(px(75.)).h(px(26.)).border_1().border_color(gpui_kit::rgb(0x1651b0)).bg(gpui_kit::rgb(0xffffff))
+/// 1 px #1651b0 border, the value right-aligned), its corner `off` from the
+/// anchor (`section_box_anchor`).
+fn section_box(anchor: glam::DVec2, off: [f32; 2]) -> Div {
+    div().absolute().left(px(anchor.x as f32 + off[0])).top(px(anchor.y as f32 + off[1])).w(px(75.)).h(px(26.)).border_1().border_color(gpui_kit::rgb(0x1651b0)).bg(gpui_kit::rgb(0xffffff))
 }
 
 /// Parameter name marking the section arrow among the manipulators.

@@ -7214,7 +7214,10 @@ impl PartStudioView {
         }
         overlay.extend(self.render_context_menu(cx));
         overlay.extend(self.render_flat_select_other(cx));
-        overlay.extend(self.render_section_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-section"))));
+        // Live (10-27, 11-18 section-1118): the Section view dialog opens at (396, 179), 150 px right of and 100 px below
+        // the feature dialogs' spot, not docked there.
+        let section_at = behaviors::feature_dialog_pos() + point(px(150.), px(100.));
+        overlay.extend(self.render_section_panel(cx).map(|e| div().absolute().left(section_at.x).top(section_at.y).size_full().debug_selector(|| "section-dialog-place".into()).child(crate::ui::moved_panel(e, self.ui.panels.get("ps-section"))).into_any_element()));
         // Value boxes at model points are drawn in the 3D frame
         // (NOSHAPE_GPUI_LABELS: as GPUI elements, for comparing).
         // The offset box takes a typed value (its click target / field).

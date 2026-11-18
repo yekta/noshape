@@ -110,7 +110,7 @@ pub(super) fn deg_text(deg: f64) -> String {
 }
 
 impl SectionManip {
-    fn tip(&self) -> DVec3 {
+    pub(super) fn tip(&self) -> DVec3 {
         self.arrow.base + self.arrow.dir * self.arrow.length
     }
 
@@ -148,10 +148,17 @@ impl SectionManip {
 impl PartStudioView {
     /// The rotate glyph's centre in the viewport, where the value box sits
     /// (live asm/2370–2371: 40 px right of it, its bottom level with it).
-    pub(super) fn section_box_anchor(&self, cx: &App) -> Option<(DVec3, DVec2)> {
+    /// Where the value box sits: (its 3D anchor, that on screen, the box corner's offset from it in px). An arrow drag's
+    /// box hangs below right of the arrow head the pointer holds (live section-1118: 22–30 px right, 32–39 below);
+    /// a ring's by the rotate glyph (live asm/2370: 40 right, 25 above).
+    pub(super) fn section_box_anchor(&self, cx: &App) -> Option<(DVec3, DVec2, [f32; 2])> {
         let s = self.section_manip()?;
-        let c = s.ring_center(self.section_wpp(s.tip(), cx)?);
-        Some((c, self.viewport.read(cx).project(c)?))
+        let (c, off) = if self.ui.section_drag0.is_some() && self.ui.section_rot.is_none() {
+            (s.tip(), [26.0, 35.0])
+        } else {
+            (s.ring_center(self.section_wpp(s.tip(), cx)?), [40.0, -25.0])
+        };
+        Some((c, self.viewport.read(cx).project(c)?, off))
     }
 
     /// World size of a screen pixel at `p`.
@@ -244,7 +251,9 @@ impl PartStudioView {
                 SectionHandle::Arrow => {
                     self.ui.section_rot = None;
                     self.ui.section_offset_edit = None;
-                    self.ui.section_box = true;
+                    // The box comes with the first move past the dead zone (`drag_section_arrow`).
+                    self.ui.section_box = false;
+                    self.ui.section_press = Some(*position);
                     self.ui.section_drag0 = self.ui.section_dialog.as_ref().and_then(|d| self.ui.section.get(d.active)).map(|p| p.offset);
                     None
                 }

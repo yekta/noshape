@@ -408,6 +408,8 @@ pub struct UiState {
     /// drag started (the box reads the distance from it).
     pub section_box: bool,
     pub section_drag0: Option<f64>,
+    /// Where the section arrow was pressed: its drag waits 5 px (live section-1118).
+    pub section_press: Option<glam::DVec2>,
     pub section_hover: Option<super::section_manip::SectionHandle>,
     /// Another section plane's handle under the cursor (its index).
     pub section_hover_other: Option<(usize, super::section_manip::SectionHandle)>,
@@ -900,6 +902,7 @@ impl UiState {
             section_snap_pos: None,
             section_box: false,
             section_drag0: None,
+            section_press: None,
             section_hover: None,
             section_hover_other: None,
             section_parts: None,
