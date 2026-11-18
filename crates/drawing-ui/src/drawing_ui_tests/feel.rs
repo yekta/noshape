@@ -1091,7 +1091,13 @@ fn a_toolbar_tools_help_shows_after_3_s_under_the_toolbar(cx: &mut TestAppContex
     };
     cx.executor().advance_clock(std::time::Duration::from_millis(440));
     assert_eq!(read(cx), None, "no tooltip at 440 ms");
+    // The editor redraws when it shows (read on its next frame, not on some later one).
+    let notified = std::rc::Rc::new(std::cell::Cell::new(false));
+    let seen = notified.clone();
+    let _watch = cx.update(|cx| cx.observe(&editor, move |_, _| seen.set(true)));
     cx.executor().advance_clock(std::time::Duration::from_millis(20));
+    cx.run_until_parked();
+    assert!(notified.get(), "redrawn at 450 ms");
     assert!(read(cx).is_some_and(|t| t.starts_with("Projected view (p) / Projected view (p) ")), "the tooltip at 460 ms");
     cx.executor().advance_clock(std::time::Duration::from_millis(2440));
     draw(cx, window);

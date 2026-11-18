@@ -400,9 +400,12 @@ impl DrawingEditor {
         }
         let timer = cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(TIP_DELAY).await;
-            let _ = this.update(cx, |this, _| {
+            // Redrawn now: the tooltip is read as the editor draws, which the kit's tooltip alone doesn't start (qa
+            // DRW-TOOLBAR-TOOLTIP-DELAY: read at 0.59–0.69 s, the next unrelated frame).
+            let _ = this.update(cx, |this, cx| {
                 if let Some(h) = this.help_hover.as_mut().filter(|h| h.tip == tip) {
                     h.tip_shown = true;
+                    cx.notify();
                 }
             });
             if help(tip).is_none() {
