@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-18 16:45)
+# QA handoff (agent qa; current state only, updated 2026-11-18 23:00)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -62,8 +62,13 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 - **v0.4.57** published check done 11-17 21:44: clean, baseline 0.4.57. Next: the 05:00 cut (qa-cut-0415).
 
 ## Next (in this order)
-00. **v0.4.57 published, checked clean 21:44**; compat baseline 0.4.57. Spot-check rows 9-16 done 21:45 (pass; TICKETS). Next
-   release: rows 17-24 (uh/sc.sh start|shot|stop + uh/rows.sh drive the released app on vibex6 :664).
+00. **11-18 23:00 state.** Spur-gear P0 = bool's afe2cbe90 (11 runs: f634e46ad 0.989, afe2cbe90 1.186, 779b86694 1.312 vs
+   v0.4.58; bool told); qa-sg-fixwait re-times the first green with a bool/bool2 grid|fold|spur|afe2cbe|strip|revert commit.
+   Live's session replay (qa-scratch/session: mksession.py -> out/session-s1..s4.json, session.sh <app> <out> [:disp], env SEGS,
+   START=<doc> to begin from a saved copy; steps.py; runs in vibe2 ~/tmp/qa/session devN): rows interaction-feel "session-1118"
+   (skasm origin click + iso placement, core PATTERN-AFTER-INSERTED-CHAMFER P1). Next: 14a-c drawing segment (s5). Night:
+   qa-flow-night / qa-big-night / qa-flow2-night then qa-session-night (session-night.sh, vibex7 :677, v0.4.59 app copied to
+   ~/qa-rel/0.4.59/noshape 22:45) -> compare with SCRIPT.md first/settled (≥100 ms and ≥2x only; box steps' settle is the caret).
 0a. **Validity (lead 11-17 ruling)**: one source, blend's cfd943d5 (queued; bool's invalid_solids withdrawn, don't read it):
    with NOSHAPE_PARITY_VALIDITY=1 (bin/suites-models.sh exports it) models.log prints per feature "CHECK <doc> feature <k>:
    <part> valid <true|false> raw f/e/v; ..." (PartState.check, query parts' "check"; not in report.json). suites-diff.py
