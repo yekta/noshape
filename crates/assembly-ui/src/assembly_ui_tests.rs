@@ -1239,6 +1239,51 @@ fn q_in_an_edited_revolute_turns_the_free_part_a_quarter(cx: &mut TestAppContext
     assert!(d.dot(want).abs() > 1.0 - 1e-9, "a quarter turn about the connectors' Z: {d:?} vs {want:?}");
 }
 
+/// Live mate-keys-1118: A in a freshly edited Revolute turns the free part 180° about the connector's Y, diag(−1, 1, −1)
+/// on pin-block (not about X: a flip alone).
+#[gpui::test]
+fn a_in_an_edited_revolute_turns_the_free_part_over_about_y(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "edit-a");
+    let settle = |cx: &mut TestAppContext| {
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+        cx.run_until_parked();
+    };
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Revolute, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            v.accept_mate(w, cx);
+        });
+    })
+    .unwrap();
+    settle(cx);
+    let turn = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let p = v.result.solved.placement(instance(v, "Part 2 <1>", cx)).unwrap();
+            glam::DQuat::from_xyzw(p.rotation[0], p.rotation[1], p.rotation[2], p.rotation[3])
+        })
+    };
+    let before = turn(cx);
+    let y = cx
+        .update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let m = v.assembly(cx).unwrap().mates.iter().find(|m| m.name == "Revolute 1").expect("Revolute 1").clone();
+                v.edit_mate(m.id, w, cx);
+                v.result.connector_world(&m.b, &v.units(cx)).unwrap().y()
+            })
+        })
+        .unwrap();
+    settle(cx);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.flip_or_reorient(true, w, cx))).unwrap();
+    settle(cx);
+    let d = turn(cx) * before.inverse();
+    let want = glam::DQuat::from_axis_angle(y, std::f64::consts::PI);
+    assert!(d.dot(want).abs() > 1.0 - 1e-6, "A: 180° about the connector's Y {y:?}: {d:?}");
+}
+
 /// Live extras-1118 n0/n1: ticking a driver mate's DOF applies at once: the first makes "Named position 1" and edits
 /// it, with the blue bubble "Revolute 1 Rz added to named positions"; the ✓ only closes the selector.
 #[gpui::test]

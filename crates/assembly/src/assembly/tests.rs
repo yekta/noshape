@@ -1655,7 +1655,8 @@ fn an_edited_revolutes_q_and_a_turn_the_free_part_as_live() {
     let (r2, _) = edit(&mut asm, true, 2);
     assert!(r2.abs_diff_eq(glam::DMat3::from_diagonal(DVec3::new(-1.0, -1.0, 1.0)), 1e-6), "Q twice: 180°: {r2:?}");
     let (ra, ta) = edit(&mut asm, false, 0);
-    // (Live turns it about the connector's Y, diag(−1, 1, −1); ours about X: the pin is round, the open item in asm's handoff.)
+    // (A flip alone turns it about the connector's X; live's A is about Y, diag(−1, 1, −1): the mate dialog also turns the
+    // held free angle half a turn, assembly-ui's a_in_an_edited_revolute_turns_the_free_part_over_about_y.)
     assert!((ra * DVec3::Z).z < -0.999, "A: turned over: {ra:?}");
     assert!((ta.z - 0.02).abs() < 1e-9, "A: mirrored about the hole's mid-plane: {ta:?}");
 }

@@ -850,7 +850,18 @@ impl AssemblyView {
             self.refresh_snap_preview(cx);
             return;
         }
-        if let Some(d) = self.mate.as_ref().map(|m| m.dialog.clone()) {
+        if let Some(s) = &self.mate {
+            let d = s.dialog.clone();
+            // A on an edited mate free to turn about its Z: live turns the free part 180° about the connector's Y
+            // (mate-keys-1118, pin-block's Revolute), which is the flip (about X) and half that free turn.
+            if flip
+                && !s.solve_all
+                && let Some(id) = s.editing
+                && noshape_model::assembly::eval::mate_dofs(d.read(cx).mate_type).iter().any(|(ix, _)| *ix == 0)
+                && let Some(v) = Arc::make_mut(&mut self.result).solved.mate_values.get_mut(&id)
+            {
+                v[0] = (v[0] + 2.0 * std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI;
+            }
             d.update(cx, |d, cx| if flip { d.flip(cx) } else { d.reorient(cx) });
             return;
         }
