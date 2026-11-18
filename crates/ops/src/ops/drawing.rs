@@ -449,6 +449,14 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if !v.breaks.is_empty() {
                 j["breaks"] = json!(v.breaks.len());
             }
+            // A section view's Exclude from cut: its parts by name (drawing_edit_section takes them back).
+            if !v.exclude_from_cut.is_empty() {
+                let parts = match &v.kind {
+                    noshape_model::drawing::ViewKind::Section { parent, .. } => noshape_model::drawing::views::view_source(&m.drawing.sheets[m.sheet], *parent).and_then(|(k, _)| m.sources.get(&k)).map(|s| s.parts.clone()).unwrap_or_default(),
+                    _ => Vec::new(),
+                };
+                j["exclude_from_cut"] = v.exclude_from_cut.iter().map(|b| parts.iter().find(|p| p.body.as_ref() == Some(b)).map(|p| json!(p.name)).unwrap_or_else(|| json!(crate::refs::body_id(b)))).collect();
+            }
             // A section line placed on a model point follows it (live 1625).
             if v.cut_anchor.is_some() {
                 j["line_follows_point"] = json!(true);

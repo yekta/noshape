@@ -2226,6 +2226,7 @@ impl DrawingEditor {
             .children(self.render_zoom_window())
             .children(self.render_shortcut_toolbar(cx))
             .children(self.render_measure())
+            .child(self.render_measure_button(cx))
             .children(self.render_sheet_props(cx))
             .children(self.render_drawing_props(cx))
             .children(self.render_regenerating())

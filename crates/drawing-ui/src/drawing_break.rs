@@ -111,13 +111,16 @@ impl DrawingEditor {
         // The panel as live's recorder reads it (live2's drw-break-view): its tabs, the line types, Gap distance and
         // its unit.
         let unit = if self.drawing.units_mm { "mm" } else { "in" };
+        let style = STYLES.iter().find(|s| s.1 == d.style).map(|s| s.0).unwrap_or("Zig zag");
         crate::ui_script::note_dialog(|| {
-            let mut text = vec!["Break view"];
+            // (The line types are the Break line type select's options: read by recorders before 2026-11-17.3 only.)
+            let mut text = crate::drawing_panels::PanelText::default();
+            text.text("Break view");
             if tabs {
-                text.extend(["Vertical", "Horizontal"]);
+                text.texts(["Vertical", "Horizontal"]);
             }
-            text.extend(["Zig zag", "Small zig zag", "Curve", "Straight", "Gap distance", unit]);
-            serde_json::json!({ "kind": "drawing-panel", "title": "Break view", "text": text })
+            text.options(STYLES.iter().map(|s| s.0)).texts(["Gap distance", unit]);
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Break view", "fields": [{ "label": "Break line type", "kind": "select", "value": style }] }), text.0)
         });
         let pal = p();
         let tab = |id: &'static str, label: &'static str, on: bool, v: bool, cx: &mut Context<Self>| {

@@ -535,6 +535,14 @@ impl DrawingEditor {
         if self.hatch_dlg.is_some() {
             selection.clear();
         }
+        // A selected table, by its kind's name (" 2" for a second of a kind): live2's recorder from 2026-11-18.1 reads
+        // its tan outline (the six drw-bom-* retakes); older ones don't (marked `*`).
+        for s in &self.selection {
+            let Sel::Table(id) = s else { continue };
+            let Some(t) = sheet.table(*id) else { continue };
+            let n = sheet.tables.iter().take_while(|x| x.id != *id).filter(|x| x.type_name() == t.type_name()).count();
+            selection.push(("TABLE*".into(), if n == 0 { t.type_name().to_string() } else { format!("{} {}", t.type_name(), n + 1) }));
+        }
         selection.sort();
         selection.dedup();
         // (A marked one goes when the same is read anyway.)
@@ -543,6 +551,7 @@ impl DrawingEditor {
         let selection: Vec<Value> = selection
             .into_iter()
             .map(|(k, o)| match (k.strip_suffix('+'), k.strip_suffix('-')) {
+                _ if k.ends_with('*') => json!({ "kind": k.trim_end_matches('*'), "owner": o, "since": "2026-11-18.1" }),
                 (Some(k), _) => json!({ "kind": k, "owner": o, "new": true }),
                 (_, Some(k)) => json!({ "kind": k, "owner": o, "old": true }),
                 _ => json!({ "kind": k, "owner": o }),

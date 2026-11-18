@@ -27,6 +27,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("drawing_mbd", &[r##"{"drawing": "Drawing 1"}"##, r##"{"drawing": "Drawing 1", "show": "Datum A"}"##]),
     ("drawing_switch_sheet", &[r##"{"drawing": "Part 1 Drawing 1", "step": "next"}"##, r##"{"drawing": "Part 1 Drawing 1", "sheet": "Sheet2"}"##]),
     ("drawing_sheets_panel", &[r##"{"drawing": "Part 1 Drawing 1"}"##]),
+    ("drawing_edit_section", &[r##"{"drawing": "Assembly 1 Drawing 1", "view": 5, "exclude": ["Part 2"]}"##, r##"{"drawing": "Part 1 Drawing 1", "view": 5, "depth": 10}"##]),
     // document / tab
     ("document_create", &[r##"{"path": "/tmp/bracket.noshape", "length_unit": "mm"}"##]),
     ("document_open", &[r##"{"path": "/tmp/bracket.noshape"}"##]),

@@ -395,20 +395,24 @@ impl DrawingEditor {
                 .into_any_element(),
         });
         crate::ui_script::note_dialog(|| {
-            let mut text: Vec<String> = vec!["Sheet properties".into()];
+            // (The selects' options are read by recorders before 2026-11-17.3 only; later ones read their values.)
+            let mut text = crate::drawing_panels::PanelText::default();
+            text.text("Sheet properties");
             if sheet.imported.as_ref().is_some_and(|m| m.model) {
-                text.extend(["Size".into(), "Letter (8.50 x 11.00 Inches)".into()]);
-            } else {
-                text.extend(["Scale".into(), "Format".into()]);
-                text.extend(format_items.iter().map(|i| i.0.clone()));
-                if sheet.dwt.is_none() {
-                    text.push("Size".into());
-                    text.extend(size_items.iter().map(|i| i.0.clone()));
-                }
-                text.push("Reference".into());
-                text.extend(ref_items.iter().map(|i| i.0.clone()));
+                text.texts(["Size", "Letter (8.50 x 11.00 Inches)"]);
+                return crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Sheet properties" }), text.0);
             }
-            serde_json::json!({ "kind": "drawing-panel", "title": "Sheet properties", "text": text })
+            let on = |items: &[(String, bool, Act)]| items.iter().find(|i| i.1).map(|i| i.0.clone()).unwrap_or_default();
+            let select = |label: &str, value: String| serde_json::json!({ "label": label, "kind": "select", "value": value });
+            let mut fields = vec![select("Format", format_label.clone())];
+            text.texts(["Scale", "Format"]).options(format_items.iter().map(|i| i.0.clone()));
+            if sheet.dwt.is_none() {
+                text.text("Size").options(size_items.iter().map(|i| i.0.clone()));
+                fields.push(select("Size", on(&size_items)));
+            }
+            text.text("Reference").options(ref_items.iter().map(|i| i.0.clone()));
+            fields.push(select("Reference", on(&ref_items)));
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Sheet properties", "fields": fields }), text.0)
         });
         Some(
             v_flex()
@@ -475,7 +479,8 @@ impl DrawingEditor {
                     v_flex()
                         .p(px(3.))
                         .child(row("Scale", scale_field, None))
-                        .child(row("Format", dropdown("sp-format", format_label, format_items).into_any_element(), Some(dwt)))
+                        // (Live2 drw-sheet-properties-custom-zones s4: the Format list's tooltip.)
+                        .child(row("Format", div().id("sp-format-tip").tooltip(crate::ui::tooltip("Select a DWT")).child(dropdown("sp-format", format_label, format_items)).into_any_element(), Some(dwt)))
                         // A DWT fixes the size (live z2 (1)): no Size row.
                         .when(sheet.dwt.is_none(), |d| d.child(row("Size", dropdown("sp-size", size_label, size_items).into_any_element(), None)))
                         .children(custom_rows)

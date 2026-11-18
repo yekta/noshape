@@ -1121,7 +1121,9 @@ impl DrawingEditor {
         rows.push(row("View simplification", select("vp-simp", eff.name().into(), simp_items, true)));
         if !crate::drawing_insert::simplification_text(eff, true).is_empty() && props.simplification.is_some() {
             // Live (dom asb-d-view-properties): "Threshold" and its tooltip.
-            rows.push(row("Threshold", div().id("vp-simp-threshold").tooltip(crate::ui::tooltip("Simplification threshold: Features below this value will be simplified")).child(field(&props.simp_value)).into_any_element()));
+            // (Its unit beside it, as Insert view's: live2 drw-view-properties-simplification-absolute s4 "Threshold", "in".)
+            let unit = crate::drawing_insert::simplification_text(eff, self.drawing.units_mm).split_once(' ').map(|(_, u)| u.to_string()).unwrap_or_default();
+            rows.push(row("Threshold", h_flex().id("vp-simp-threshold").gap(px(4.)).tooltip(crate::ui::tooltip("Simplification threshold: Features below this value will be simplified")).child(div().flex_1().child(field(&props.simp_value))).child(div().text_size(px(13.33)).child(unit)).into_any_element()));
         }
         // The panel's texts as live's recorder reads them (dom asbv-view-properties-right-projected: labels and each
         // list's options).
@@ -1193,22 +1195,38 @@ impl DrawingEditor {
                     t.texts(["Named view".to_string(), n.clone()]);
                 }
                 t.text("View orientation");
+                // (A child view's orientation is a fixed value, not read by recorders since 2026-11-17.3: live2
+                // drw-view-properties-synchronize-breaks s9.)
                 match props.orientation {
                     Some(_) => t.options(ORIENTATIONS.iter().map(|(_, n)| n.to_string())),
-                    None => t.text(default_view_name(&self.drawing, sheet, &v)),
+                    None => t.options([default_view_name(&self.drawing, sheet, &v)]),
                 };
+                // Assemblies: the two selects (live2 drw-view-properties-simplification-absolute s2).
+                if is_asm && source_tab.is_some() {
+                    t.texts(["Explode/Position", "Display state"]);
+                }
                 t.text("Scale");
                 if has_parent {
                     t.texts(["Suppress alignment with parent", "Synchronize breaks from parent"]);
                 }
                 t.texts(["Rotation angle", "Tangent edges"]).options(["Hidden", "Solid", "Phantom"]).text("View render mode").options(["Best performance", "Best quality"]).text("View simplification");
                 t.options(crate::drawing_insert::simplification_choices(eff).into_iter().map(|c| c.name().to_string()));
+                if props.simplification.is_some()
+                    && let Some((_, unit)) = crate::drawing_insert::simplification_text(eff, self.drawing.units_mm).split_once(' ')
+                {
+                    t.texts(["Threshold", unit]);
+                }
                 t.text("Sheet");
                 let sheets = self.drawing.sheets.iter().map(|s| s.name.clone());
                 if several_sheets { t.options(sheets) } else { t.texts(sheets) };
                 t.text("Name");
                 // Past the old recorders' 30 lines (live drw-view-properties, recorder .5).
-                t.texts(["View label", "Scale label", "Show sketch appearances", "Show annotations from model", "BOM table reference"]).options([bom.clone()]);
+                t.texts(["View label", "Scale label", "Show sketch appearances"]);
+                // (No Show annotations from model on an assembly's view: live2 drw-view-properties-simplification-absolute.)
+                if !is_asm {
+                    t.text("Show annotations from model");
+                }
+                t.text("BOM table reference").options([bom.clone()]);
                 if !is_asm {
                     t.text("Cut list table reference").options([cut.clone()]);
                 }
@@ -1233,7 +1251,9 @@ impl DrawingEditor {
             });
         }
         rows.push(check("vp-sketch-app", "Show sketch appearances", props.sketch_appearances, |p, on| p.sketch_appearances = on, cx));
-        rows.push(check("vp-model-ann", "Show annotations from model", props.model_annotations, |p, on| p.model_annotations = on, cx));
+        if !is_asm {
+            rows.push(check("vp-model-ann", "Show annotations from model", props.model_annotations, |p, on| p.model_annotations = on, cx));
+        }
         rows.push(row("BOM table reference", select("vp-bom", bom, bom_items, bom_on && multi.is_none())));
         if !is_asm {
             rows.push(row("Cut list table reference", select("vp-cut", cut, cut_items, cut_on && multi.is_none())));

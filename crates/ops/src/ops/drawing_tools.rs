@@ -96,6 +96,26 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "edit_section",
+            summary: "Edit section…: a section view's id, Show cut geometry only, direction, depth and Exclude from cut",
+            description: "A section view's menu › Edit section…: what isn't given stays. `cut_only` Show cut geometry only (off while a depth is set, as the dialog); `flip` Opposite direction; `depth` Section depth Blind in model mm (0 clears it); `exclude` the parts excluded from the cut (names as drawing_get's `exclude_from_cut` lists them, or `body:…`; assembly views only, as the dialog's Exclude from cut; [] unticks it).",
+            fields: with(
+                common(),
+                vec![
+                    view_id("view", "The section view (drawing_get)."),
+                    opt("label", json!({ "type": "string" }), "Section id."),
+                    opt("cut_only", json!({ "type": "boolean" }), "Show cut geometry only."),
+                    opt("flip", json!({ "type": "boolean" }), "Opposite direction."),
+                    opt("depth", json!({ "type": "number", "minimum": 0 }), "Section depth, Blind (model mm; 0 clears it)."),
+                    opt("exclude", json!({ "type": "array", "items": { "type": "string" } }), "Exclude from cut: the parts (names or `body:…`); [] unticks it."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: edit_section,
+        },
+        Op {
+            group: "drawing",
             verb: "jogged_section_view",
             summary: "Jogged section view (an orthogonal cutting line through several points)",
             description: "The Jogged section view tool: clicks `points` (sheet mm, at least 2) on the parent view; each one continues the cutting line horizontally or vertically (in the view's frame) toward it, and finishing (Enter) extends both ends past the view. The section goes to `position`, projected from the first segment. One edit (\"Section view\").",
@@ -998,6 +1018,67 @@ fn section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut t = t;
     t.d.sheets[t.sheet].views.push(v);
     done(od, t, "Section view", "view", id.0)
+}
+
+/// A boolean argument if given.
+fn opt_bool(a: &Args, name: &str) -> Result<Option<bool>, OpError> {
+    a.get(name).map(|_| a.bool_or(name, false)).transpose()
+}
+
+fn edit_section(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let t = target(od, a)?;
+    let id = view_arg(&t, a, "view")?;
+    let sheet = &t.d.sheets[t.sheet];
+    let ViewKind::Section { parent, .. } = sheet.view(id).map(|v| v.kind.clone()).expect("the view") else {
+        return Err(OpError::param("view", "not a section view (Edit section… is on a section view's menu)"));
+    };
+    let exclude = match a.opt_array("exclude")? {
+        None => None,
+        Some(list) => {
+            let src = noshape_model::drawing::views::view_source(sheet, parent).and_then(|(k, _)| t.m.sources.get(&k));
+            if !src.is_some_and(|s| s.assembly) && !list.is_empty() {
+                return Err(OpError::param("exclude", "Exclude from cut is for assembly views"));
+            }
+            let parts = src.map(|s| s.parts.as_slice()).unwrap_or_default();
+            let mut out = Vec::new();
+            for (i, b) in list.iter().enumerate() {
+                let s = b.as_str().unwrap_or_default();
+                let body = match refs::parse_str(s) {
+                    Some(noshape_model::reference::Reference::Body(b)) => Some(b),
+                    _ => parts.iter().find(|p| p.name == s).and_then(|p| p.body.clone()),
+                };
+                let Some(body) = body else {
+                    return Err(OpError::param(&format!("exclude[{i}]"), &format!("no part `{s}` in the view; its parts: {}", parts.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", "))));
+                };
+                out.push(body);
+            }
+            Some(out)
+        }
+    };
+    let (label, cut_only, flip, depth) = (a.opt_str("label")?.map(str::trim).filter(|l| !l.is_empty()).map(str::to_string), opt_bool(a, "cut_only")?, opt_bool(a, "flip")?, a.opt_f64("depth")?);
+    let mut t = t;
+    let v = t.d.sheets[t.sheet].view_mut(id).expect("the view");
+    if let (Some(l), ViewKind::Section { label, .. }) = (label, &mut v.kind) {
+        *label = l;
+    }
+    if let Some(f) = flip {
+        v.flip = f;
+    }
+    if let Some(d) = depth {
+        (v.section_depth, v.section_depth_ref, v.section_depth_offset) = ((d > 0.0).then_some(d / 1000.0), None, None);
+    }
+    if let Some(c) = cut_only {
+        v.cut_only = c;
+    }
+    // (Show cut geometry only goes while Section depth is on, as the dialog.)
+    if v.section_depth.is_some() || v.section_depth_ref.is_some() {
+        v.cut_only = false;
+    }
+    if let Some(x) = exclude {
+        v.exclude_from_cut = x;
+    }
+    done(od, t, "Edit section", "view", id.0)
 }
 
 fn detail_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

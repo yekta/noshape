@@ -279,6 +279,11 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
         if let Some(b) = name.strip_prefix("dropdown:").and_then(|d| noshape_app_core::ui_script::bounds_of(&format!("button:{d}"))) {
             return Ok(b.center());
         }
+        // A toolbar button live's runner names as a tool that ours marks as a button (the shared Undo / Redo: live2
+        // drw-toolbar-tips-view-showhide).
+        if let Some(b) = name.strip_prefix("tool:").and_then(|d| noshape_app_core::ui_script::bounds_of(&format!("button:{d}"))) {
+            return Ok(b.center());
+        }
         // A list row by the start of its text, as live's runner falls back to ("Assembly" for "Assembly 2 <1>"), when only
         // one row starts with it and a space.
         for kind in ["instance:", "feature:"] {

@@ -58,6 +58,10 @@ pub struct VariableStudioView {
     col_drag: Option<(usize, f32)>,
     /// A row being dragged: the gap it would drop into and that gap's y in the table (px).
     row_drop: Option<(usize, f32)>,
+    /// An invalid name Enter left in the add row, marked pink NAME_ERROR_DELAY after it while the text stays (live
+    /// fsvs-feel-1118: class parameter-error 526 ms after Enter, never while typing); the timer that marks it.
+    name_error: Option<String>,
+    name_error_timer: Option<Task<()>>,
     /// Enter added a variable from the Name row: focus the next (empty)
     /// Name row once it's rebuilt, as Onshape does.
     focus_add_row: bool,
@@ -175,6 +179,8 @@ impl VariableStudioView {
             inserted_views: HashMap::new(),
             collapse_seen: collapse_generation(tab),
             col_drag: None,
+            name_error: None,
+            name_error_timer: None,
             row_drop: None,
             focus_add_row: false,
             cell_focus: HashMap::new(),
@@ -744,6 +750,9 @@ fn rows_within(clip: Option<RowsClip>, margin: f32) -> (usize, usize) {
 }
 
 /// A name typed in the add row that can't be a variable's ("10", "1x", "10 +"): drawn red as it is typed.
+/// How long after Enter an invalid name turns pink (live fsvs-feel-1118: 526 ms, the median of 10).
+const NAME_ERROR_DELAY: std::time::Duration = std::time::Duration::from_millis(526);
+
 fn invalid_name(typed: &str) -> bool {
     let name = typed.trim().trim_start_matches('#');
     !name.is_empty() && !noshape_model::variable_table::is_identifier(name)
@@ -1417,8 +1426,20 @@ impl VariableStudioView {
         let add_units = units;
         let new_name = self.cell("new".into(), String::new(), window, cx, move |this, val, cx| {
             let name = val.trim().trim_start_matches('#').to_string();
-            // Live: an invalid name isn't added and stays in the cell (vs-add-variable-invalid).
+            // Live: an invalid name isn't added and stays in the cell (vs-add-variable-invalid), marked pink a moment
+            // after Enter.
             if !noshape_model::variable_table::is_identifier(&name) {
+                if !name.is_empty() {
+                    let typed = val.clone();
+                    this.name_error_timer = Some(cx.spawn(async move |this, cx| {
+                        cx.background_executor().timer(NAME_ERROR_DELAY).await;
+                        this.update(cx, |this, cx| {
+                            this.name_error = Some(typed);
+                            cx.notify();
+                        })
+                        .ok();
+                    }));
+                }
                 return;
             }
             this.inputs.remove("new");
@@ -1429,9 +1450,9 @@ impl VariableStudioView {
                 this.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(noshape_ops::variable_studio::RENAMED_MESSAGE.into())));
             }
         });
-        // Live (vs-fs-feel-1117): an invalid name is red as it is typed (red border, pink fill) and Enter adds nothing;
-        // Esc throws the text away, after an Enter too.
-        let name_bad = invalid_name(&new_name.read(cx).value());
+        // Enter adds nothing for an invalid name; NAME_ERROR_DELAY later the cell turns pink (red border, pink fill) while
+        // the text stays as entered (lead 11-18 on live fsvs-feel-1118: not while typing). Esc throws the text away.
+        let name_bad = self.name_error.as_deref().is_some_and(|t| *t == *new_name.read(cx).value() && invalid_name(t));
         let esc_name = new_name.clone();
         let add_cell = cell_div(0)
             .when(name_bad, |d| d.bg(p().error_fill).border_1().border_color(p().error))

@@ -39,6 +39,11 @@ pub struct SectionEdit {
     pub offset: Option<(Entity<InputState>, Subscription)>,
     pub offset_value: Option<f64>,
     pub offset_flip: bool,
+    /// ☑ Exclude from cut (assembly views) and its Excluded parts; the field takes the clicks while `exclude_picking`
+    /// (live2 drw-section-exclude-from-cut s10-s21).
+    pub exclude_on: bool,
+    pub exclude: Vec<noshape_model::BodyId>,
+    pub exclude_picking: bool,
 }
 
 impl DrawingEditor {
@@ -47,7 +52,7 @@ impl DrawingEditor {
         let Some(v) = sheet.view(view) else { return };
         let ViewKind::Section { parent, label: text, .. } = &v.kind else { return };
         let (parent, text, cut_only, depth, flip) = (*parent, text.clone(), v.cut_only, v.section_depth, v.flip);
-        let (depth_ref, offset) = (v.section_depth_ref.clone(), v.section_depth_offset);
+        let (depth_ref, offset, exclude) = (v.section_depth_ref.clone(), v.section_depth_offset, v.exclude_from_cut.clone());
         let Some(cuts) = sheet.section_cuts(view) else { return };
         let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text.clone()));
         let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
@@ -60,7 +65,7 @@ impl DrawingEditor {
             }
         });
         let up_to = depth_ref.is_some();
-        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only, depth: None, depth_value: None, label: (st, sub), label_text: text, flip, up_to, depth_ref, picking: false, offset: None, offset_value: None, offset_flip: offset.is_some_and(|o| o < 0.0) });
+        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only, depth: None, depth_value: None, label: (st, sub), label_text: text, flip, up_to, depth_ref, picking: false, offset: None, offset_value: None, offset_flip: offset.is_some_and(|o| o < 0.0), exclude_on: !exclude.is_empty(), exclude, exclude_picking: false });
         if depth.is_some() || up_to {
             self.toggle_edit_depth(depth, window, cx);
             if let Some(e) = &mut self.section_edit {
@@ -153,6 +158,7 @@ impl DrawingEditor {
             {
                 label.clone_from(&e.label_text);
             }
+            v.exclude_from_cut = if e.exclude_on { e.exclude.clone() } else { Vec::new() };
             (v.section_depth, v.section_depth_ref, v.section_depth_offset) = match (&e.depth, e.up_to) {
                 (None, _) => (None, None, None),
                 (Some(_), false) => (e.depth_value, None, None),
@@ -174,6 +180,22 @@ impl DrawingEditor {
     /// of the parent view adds it. True when used.
     pub fn section_edit_click(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(e) = &self.section_edit else { return false };
+        // Excluded parts takes the click: the part whose edge is under it, in or out.
+        if e.exclude_picking {
+            if let Some(body) = self.edge_body_at(self.cursor)
+                && let Some(e) = &mut self.section_edit
+            {
+                match e.exclude.iter().position(|b| *b == body) {
+                    Some(i) => {
+                        e.exclude.remove(i);
+                    }
+                    None => e.exclude.push(body),
+                }
+                self.preview_section_edit(cx);
+            }
+            cx.notify();
+            return true;
+        }
         // Up to entity's field takes the click: the point the depth runs to.
         if e.picking {
             let r = self.snap_at(self.cursor).and_then(|p| p.r);
@@ -241,9 +263,20 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// A part's name in `view`'s source ("Part 2"), for the Excluded parts chips.
+    fn part_name_in(&self, view: ViewId, body: &noshape_model::BodyId) -> String {
+        noshape_model::drawing::views::view_source(self.current_sheet(), view)
+            .and_then(|(k, _)| self.sources.get(&k))
+            .and_then(|s| s.parts.iter().find(|p| p.body.as_ref() == Some(body)).map(|p| p.name.clone()))
+            .unwrap_or_else(|| "Part".into())
+    }
+
     pub fn render_section_edit(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let e = self.section_edit.as_ref()?;
         let pal = p();
+        let assembly = noshape_model::drawing::views::view_source(self.current_sheet(), e.parent).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly);
+        let (exclude_on, exclude_picking) = (e.exclude_on, e.exclude_picking);
+        let excluded: Vec<(usize, String)> = e.exclude.iter().enumerate().map(|(i, b)| (i, self.part_name_in(e.parent, b))).collect();
         let label = e.label.0.clone();
         let (cut_only, flip, up_to, picking, has_ref, offset_flip) = (e.cut_only, e.flip, e.up_to, e.picking, e.depth_ref.is_some(), e.offset_flip);
         let depth = e.depth.as_ref().map(|(st, _)| st.clone());
@@ -268,6 +301,16 @@ impl DrawingEditor {
                     fields.push(serde_json::json!({ "label": "Offset", "kind": "checkbox", "value": offset.is_some() }));
                 } else {
                     t.text("Depth");
+                }
+            }
+            if assembly {
+                t.text("Exclude from cut");
+                fields.push(serde_json::json!({ "label": "Exclude from cut", "kind": "checkbox", "value": exclude_on }));
+                if exclude_on {
+                    t.text("Excluded parts");
+                    for (_, name) in &excluded {
+                        t.texts([name.clone(), "×".into()]);
+                    }
                 }
             }
             crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Section view", "fields": fields }), t.0)
@@ -409,6 +452,73 @@ impl DrawingEditor {
                                     cx.notify();
                                 })))
                             }),
+                    )
+                })
+                .when(assembly, |p| {
+                    p.child(div().px(px(10.)).pt(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("se-exclude-on").label("Exclude from cut").checked(exclude_on).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        if let Some(e) = &mut this.section_edit {
+                            // Ticked, its Excluded parts field takes the clicks; unticked, nothing is excluded.
+                            (e.exclude_on, e.exclude_picking) = (*v, *v);
+                            if !*v {
+                                e.exclude.clear();
+                            }
+                        }
+                        this.preview_section_edit(cx);
+                        cx.notify();
+                    }))))
+                })
+                .when(assembly && exclude_on, |p| {
+                    let chips: Vec<AnyElement> = excluded
+                        .iter()
+                        .map(|(i, name)| {
+                            let i = *i;
+                            h_flex()
+                                .px(px(4.))
+                                .gap(px(4.))
+                                .bg(gpui_kit::rgb(0xe6e6e6))
+                                .text_size(px(12.))
+                                .child(name.clone())
+                                .child(
+                                    div()
+                                        .id(("se-exclude-x", i))
+                                        .cursor_pointer()
+                                        .tooltip(crate::ui::tooltip(&format!("Delete {name}")))
+                                        .child("×")
+                                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                            if let Some(e) = &mut this.section_edit
+                                                && i < e.exclude.len()
+                                            {
+                                                e.exclude.remove(i);
+                                            }
+                                            this.preview_section_edit(cx);
+                                            cx.notify();
+                                        })),
+                                )
+                                .into_any_element()
+                        })
+                        .collect();
+                    p.child(div().px(px(10.)).pt(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("Excluded parts")).child(
+                        div()
+                            .id("se-exclude")
+                            .mx(px(10.))
+                            .my(px(3.))
+                            .min_h(px(26.))
+                            .p(px(3.))
+                            .flex()
+                            .flex_wrap()
+                            .gap(px(4.))
+                            .border_1()
+                            .border_color(if exclude_picking { pal.accent } else { gpui_kit::rgb(0xd3d7d9) })
+                            .when(exclude_picking, |d| d.bg(gpui_kit::rgb(0xe8f1fb)))
+                            .cursor_pointer()
+                            .tooltip(crate::ui::tooltip("Select parts to exclude from cut"))
+                            .children(chips)
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                if let Some(e) = &mut this.section_edit {
+                                    e.exclude_picking = !e.exclude_picking;
+                                }
+                                cx.notify();
+                            })),
                     )
                 })
                 .into_any_element(),

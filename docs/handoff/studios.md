@@ -9,35 +9,35 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 07:25 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 08:24 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
 tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh`; drawing runs vibex8.
-- Landed 11-18: e55271ab as 882a3ecd 01:57 (leader right-click / nodes, Cell panels, reader emulation, documents Ctrl
-  or Cmd, VS name / units / error looks, view drag / Esc / 200 ms double-click / box, history change bar + full-id
-  row keys, config row click).
-- Queued on vibe2 03:30 as bfc56d3e (6 commits): configurations: the active row's failing value pink, "›" + ± number
-  cells, row ids A0 (qa CFGFEEL P2/P3); history: "⌄ N changes", grey 30 px change rows without time, their tooltip
-  "<name>: Change by <user> at <time>", one scroll container with the Name | Modified header pinned and the legend
-  at the end (qa HISTFEEL P2s); custom features: title tooltip appends " A parameter value is not valid." when the
-  error names fields; a linked custom feature behind a newer version: blue row indicator "Change version of linked
-  document" -> Reference manager, row menu Update linked document… / Open linked document, the Reference manager and
-  document_update_references move it (the app's dialog now uses ops' workspace_update, no copy). Checks: ver-* +
-  hist* 135/136 (723/723 states), workspace / merge takes 45/45, config-* takes, ops e2e 227, feel tests per item.
-  Also in it: workspaces (see the rows below), fractional units and pick constants, Create Drawing options, 24 h time.
-- Still differing (drawings): local fixes in verification: ordinate Reset ordinate on a value's text (drw-ordinate-
-  value-rclick), Section view's Exclude from cut a checkbox shown once the parent view is picked, ticked: Excluded
-  parts (drw-section-exclude-from-cut), Adjust linestyle (Thickness on its first value until an edge is picked, then
-  the edge's; reader: placeholder after chips, Revert, fields). Next: Edit section… has no Exclude from cut at all
-  (live s7-s21: the checkbox, Excluded parts chips "Part 2 ×", tooltips "Select parts to exclude from cut" /
-  "Delete Part 2"): model + panel + op; drw-view-adjust-linestyle-dashed-dotted s4: the Edges field's tooltip exists,
-  the hover pixel misses our field (layout). Left: drw-ordinate-add-to-group s7, sheet properties custom zones, replicate region panel (2 takes),
-  detail-id label position, synchronize-breaks Gap distance, simplification-absolute BOM row name, projected-from-
-  section text, toolbar Undo tip take, drw-gtol-type-list s5 / drw-hatch-panel s29 (list highlight). Not targets:
-  drw-revision-table-delete s8 (live still draws the deleted table 1 s later: server latency; resting-pointer hover
-  varies), drw-note-editor (retake asked: type → ✓).
+- Landed 11-18: 882a3ecd 01:57, 781eac7c 03:47 (config / history / workspaces / custom features / pick constants /
+  number formats), 37ecb60c (table look), d2eb5c15 (reader 1 px for hovered annotations), b5c4ccc4 (duplicate
+  workspace names, ruling in DECISIONS; BOM cell click + Cell panel; BOM split under; live2's new takes). Queued:
+  ffeb42c5 07:42 (ISO value on the pointer, placed BOM selected, Reset ordinate, section Exclude checkbox, linestyle).
+- Local, in verification (run9): Variable Studio invalid name pink 526 ms after Enter, not while typing (lead 11-18
+  on live fsvs-feel-1118; live2's 11-17 take said while typing: superseded); Edit section… Exclude from cut (checkbox,
+  Excluded parts chips "Part 2 ×", tooltips; op drawing_edit_section: label, cut_only, flip, depth, exclude by part
+  name or body id; drawing_get `exclude_from_cut`; e2e); section / detail views' menus without Explode/Position and
+  Display state; drawing Measure button bottom right ("Measure ([)"), Sheets tab tooltip "Sheets (ctrl+s)";
+  Replicate region reader, first Esc → "Select closed profile", Place starts unselected; readers: Break view,
+  Sheet properties (fields; Format tooltip "Select a DWT"), View properties (child orientation as option, assembly
+  Explode/Position + Display state rows, no Show annotations from model on assemblies, Threshold + unit); a selected
+  table read as TABLE "<kind> table" for recorders from 2026-11-18.1 (live2's six BOM retakes, not landed yet: then
+  check the order beside EDGE Isometric and drop `placed_table` if they read TABLE from the placing click); ui_script
+  `tool:` falls back to `button:` (Undo / Redo). Left: section / detail
+  label position (views agree; the label's distance below the view's centre differs per view, live vs ours: 11.7 /
+  10.1, 22.4 / 20.1, 19.6 / 20.1, detail 50.0 / 47.6: live's gap isn't from our geometry bottom; needs each view's
+  extents), drw-ordinate-add-to-group s7 (resting-pointer hover after the menu), sheet properties custom zones,
+  replicate region panel (2 takes), synchronize-breaks Gap distance, simplification-absolute BOM row name, projected-
+  from-section text, toolbar Undo tip take, drw-gtol-type-list s5 / drw-hatch-panel s29 (list highlight), Adjust
+  linestyle Edges tooltip (hover pixel misses our field). Not targets: drw-revision-table-delete s8 (server latency),
+  drw-inspection-table-iso-scrolled s2 (live's first click is on Front's top edge, live's weld take: same pixel; the
+  reader's count, not the pick), drw-note-editor (retake asked: type → ✓).
 - Full drawing run drw1118b on vibex8 (build of bfc56d3e; ~/agents/studios-keep/drw1118b): 317/341 (drw1118a
   288/334). Its one regression, drw-dimension-radius s4 (the reader counted a hovered dimension's leader at 2 px), is
   fixed by the reader counting a hovered annotation's lines at 1 px (d2eb5c15). New live2 takes, local: dprops footer

@@ -336,6 +336,21 @@ impl DrawingEditor {
     }
 
     /// The Measure results panel (bottom left of the drawing area).
+    /// The Measure button at the drawing's bottom right (live keys-1118 hov-measure: "Measure ([)"), pressed while
+    /// Measure is on.
+    pub fn render_measure_button(&self, cx: &mut Context<Self>) -> AnyElement {
+        div()
+            .id("dr-measure")
+            .debug_selector(|| "dr-measure".into())
+            .absolute()
+            .right_0()
+            .bottom_0()
+            .occlude()
+            .tooltip(crate::ui::tooltip("Measure ([)"))
+            .child(crate::ui::icon_button("dr-measure-btn", "measure", 30., self.measure.is_some(), cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_measure(cx))))
+            .into_any_element()
+    }
+
     pub fn render_measure(&self) -> Option<AnyElement> {
         let picks = self.measure.as_ref()?;
         let pal = p();

@@ -272,6 +272,12 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
+        // Region…'s first Esc puts its rectangle tool down (the field then asks for a closed profile); the next closes it.
+        if let Some(crate::drawing_replicate::ReplicateDlg::Create { center, rect: None, select: select @ false, .. }) = &mut self.replicate_dlg {
+            (*select, *center) = (true, None);
+            cx.notify();
+            return;
+        }
         if self.replicate_dlg.is_some() {
             self.close_replicate(false, cx);
             return;

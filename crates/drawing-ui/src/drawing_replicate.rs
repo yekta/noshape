@@ -22,8 +22,9 @@ pub use noshape_scene::drawing_tools::replicate::Replication;
 
 /// The Replicate region dialog.
 pub enum ReplicateDlg {
-    /// Region…: draw the rectangle on `view` (center, then a corner).
-    Create { view: ViewId, center: Option<[f64; 2]>, rect: Option<[[f64; 2]; 2]> },
+    /// Region…: draw the rectangle on `view` (center, then a corner). `select`: Esc put the rectangle tool down, the
+    /// field asks for a closed profile (live2 drw-view-replicate-region s6, as the Detail view dialog's).
+    Create { view: ViewId, center: Option<[f64; 2]>, rect: Option<[[f64; 2]; 2]>, select: bool },
     /// Replicate annotations with a region: place the box on `view`.
     Place { view: ViewId, at: Option<[f64; 2]> },
 }
@@ -41,7 +42,7 @@ impl DrawingEditor {
                 vec![
                     MenuEntry::item("View", move |t, _, cx| t.select_for_replication(id, None, cx)),
                     MenuEntry::item("Region...", move |t, _, cx| {
-                        t.replicate_dlg = Some(ReplicateDlg::Create { view: id, center: None, rect: None });
+                        t.replicate_dlg = Some(ReplicateDlg::Create { view: id, center: None, rect: None, select: false });
                         t.tool = Tool::Select;
                         // Its dialog starts with nothing selected (live2 drw-view-replicate-region).
                         t.selection.clear();
@@ -75,6 +76,8 @@ impl DrawingEditor {
         if r.region.is_some() {
             self.replicate_dlg = Some(ReplicateDlg::Place { view, at: None });
             self.tool = Tool::Select;
+            // As Region…'s dialog, it starts with nothing selected (live2 drw-view-replicate-region-place s17).
+            self.selection.clear();
             cx.notify();
         } else {
             self.replicate_into(view, None, cx);
@@ -108,8 +111,8 @@ impl DrawingEditor {
         let c = self.cursor;
         match &mut self.replicate_dlg {
             None => return false,
-            Some(ReplicateDlg::Create { center, rect, .. }) => {
-                if rect.is_some() {
+            Some(ReplicateDlg::Create { center, rect, select, .. }) => {
+                if rect.is_some() || *select {
                     return true;
                 }
                 match *center {
@@ -206,11 +209,17 @@ impl DrawingEditor {
         let d = self.replicate_dlg.as_ref()?;
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
-        let (ready, placing, profile) = match d {
-            ReplicateDlg::Create { rect, .. } => (rect.is_some(), false, rect.is_some()),
+        let (ready, placing, select) = match d {
+            ReplicateDlg::Create { rect, select, .. } => (rect.is_some(), false, *select),
             ReplicateDlg::Place { at, .. } => (at.is_some(), true, false),
         };
-        let prompt = if placing { "Place rectangle" } else { "Create rectangle" };
+        // A rectangle drawn or placed: the field holds it (live2 drw-view-replicate-region-place s12, s19).
+        let profile = ready;
+        let prompt = if placing { "Place rectangle" } else if select { "Select closed profile" } else { "Create rectangle" };
+        crate::ui_script::note_dialog(|| {
+            let text: Vec<&str> = if profile { vec!["Replicate region", "Edit closed profile", "Profile", "×"] } else { vec!["Replicate region", prompt] };
+            serde_json::json!({ "kind": "drawing-panel", "title": "Replicate region", "text": text })
+        });
         let field = div()
             .id("rr-field")
             // Live drawing-replicate-region-dialog: the field's tooltip.
@@ -226,9 +235,10 @@ impl DrawingEditor {
                 if profile {
                     e.py(px(3.)).child(div().text_size(px(10.)).text_color(gpui_kit::rgb(0x5c6670)).child("Edit closed profile")).child(
                         h_flex().h(px(22.)).text_size(px(13.)).child(div().flex_1().child("Profile")).child(div().id("rr-profile-x").px(px(4.)).text_color(gpui_kit::rgb(0x9a9a9a)).cursor_pointer().child("×").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            if let Some(ReplicateDlg::Create { center, rect, .. }) = &mut this.replicate_dlg {
-                                *center = None;
-                                *rect = None;
+                            match &mut this.replicate_dlg {
+                                Some(ReplicateDlg::Create { center, rect, .. }) => (*center, *rect) = (None, None),
+                                Some(ReplicateDlg::Place { at, .. }) => *at = None,
+                                None => {}
                             }
                             cx.notify();
                         }))),

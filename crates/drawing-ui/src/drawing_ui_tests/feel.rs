@@ -681,6 +681,20 @@ fn the_bom_tool_places_on_one_click_and_keeps_the_table_selected(cx: &mut TestAp
     assert_eq!(after_esc, vec![Sel::Table(placed.0)], "Esc keeps it selected");
 }
 
+/// Live keys-1118 (hov-measure): the drawing's bottom right has a Measure button, "Measure ([)"; it turns Measure on
+/// and off as `[` does.
+#[gpui::test]
+fn the_measure_button_turns_measure_on_and_off(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "feel-measure-button");
+    real_sheet(cx, window, &editor);
+    let on = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).measure.is_some());
+    assert!(!on(cx));
+    super::press(cx, window, "dr-measure");
+    assert!(on(cx), "pressed: Measure on");
+    super::press(cx, window, "dr-measure");
+    assert!(!on(cx), "again: off");
+}
+
 /// Live2 feel/drawing.json D5: a dimension's text moves from 5 px of drag (4 px is a click, which selects it); no hold
 /// needed.
 #[gpui::test]

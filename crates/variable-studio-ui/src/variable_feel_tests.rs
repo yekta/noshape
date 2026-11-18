@@ -82,22 +82,33 @@ fn names(cx: &mut TestAppContext, view: &Entity<VariableStudioView>) -> Vec<Stri
     cx.update(|cx| view.read(cx).studio(cx).map(|s| s.variables.iter().map(|v| v.name.clone()).collect()).unwrap_or_default())
 }
 
-/// Live vs-fs-feel-1117 (qa VSFEEL-NAME-RED): an invalid name is red as it is typed; Enter adds nothing and keeps the
-/// text in the cell; Esc then throws it away.
+/// Live fsvs-feel-1118 (lead 11-18): an invalid name isn't marked while it is typed; Enter adds nothing, keeps the text,
+/// and 526 ms later the cell turns pink; typing on or Esc (which throws the text away) unmarks it.
 #[gpui::test]
-fn an_invalid_name_is_red_while_typed_enter_adds_nothing_and_esc_drops_it(cx: &mut TestAppContext) {
+fn an_invalid_name_turns_pink_526_ms_after_enter_not_while_typed(cx: &mut TestAppContext) {
     for (typed, bad) in [("10", true), ("1x", true), ("10 +", true), ("w2", false), ("#w2", false), ("", false)] {
         assert_eq!(invalid_name(typed), bad, "{typed:?}");
     }
-    let (window, view) = studio(cx, "name-red");
-    keys(cx, window, &["1", "x"]);
-    assert_eq!(add_row_text(cx, &view), "1x");
-    assert!(invalid_name(&add_row_text(cx, &view)), "drawn red while typed");
+    let (window, view) = studio(cx, "name-pink");
+    let marked = |cx: &mut TestAppContext| {
+        let text = add_row_text(cx, &view);
+        cx.update(|cx| view.read(cx).name_error.clone().is_some_and(|t| t == text))
+    };
+    keys(cx, window, &["1", "2"]);
+    assert_eq!(add_row_text(cx, &view), "12");
+    assert!(!marked(cx), "not while typed");
     keys(cx, window, &["enter"]);
     assert_eq!(names(cx, &view), ["w"], "Enter adds nothing");
-    assert_eq!(add_row_text(cx, &view), "1x", "the text stays in the cell");
+    assert_eq!(add_row_text(cx, &view), "12", "the text stays in the cell");
+    cx.executor().advance_clock(std::time::Duration::from_millis(400));
+    draw(cx, window);
+    assert!(!marked(cx), "400 ms after Enter: not yet");
+    cx.executor().advance_clock(std::time::Duration::from_millis(200));
+    draw(cx, window);
+    assert!(marked(cx), "600 ms after Enter: pink");
     keys(cx, window, &["escape"]);
     assert_eq!(add_row_text(cx, &view), "", "Esc throws the text away");
+    assert!(!marked(cx));
     assert_eq!(names(cx, &view), ["w"]);
 }
 

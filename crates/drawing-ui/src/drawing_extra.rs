@@ -578,7 +578,6 @@ impl DrawingEditor {
     /// open); drawn under the dialogs.
     pub fn sheets_toggle(&self, left: f32, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let open = self.sheets_open;
         div()
             .absolute()
             .top_0()
@@ -602,7 +601,8 @@ impl DrawingEditor {
                     .cursor_pointer()
                     .hover(|d| d.bg(pal.panel_hover))
                     .child(crate::assets::icon("sheet", 20., cx))
-                    .tooltip(crate::ui::tooltip(if open { "Collapse the Sheets panel" } else { "Show the Sheets panel" }))
+                    // Live's tooltip, open or not (live keys-1118 hov-sheets).
+                    .tooltip(crate::ui::tooltip("Sheets (ctrl+s)"))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.toggle_sheets_panel(cx);
                     })),
@@ -1831,7 +1831,8 @@ impl DrawingEditor {
                         out.push(MenuEntry::Submenu("Configuration".into(), cfg_entries));
                     }
                 }
-                Some(TabContent::Assembly(asm)) => {
+                // (None on a section or detail view's menu: live2 drw-section-exclude-from-cut s6.)
+                Some(TabContent::Assembly(asm)) if !matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Detail { .. }) => {
                     // Live drawing/1109: Explode/Position ▸ Default | explodes |
                     // positions, Display state ▸ Show all | states; the current
                     // one greyed. A child view gets its own choice.
@@ -1841,8 +1842,7 @@ impl DrawingEditor {
                         Some((None, Some(p))) => AsmPosition::Position(p),
                         _ => AsmPosition::Default,
                     };
-                    // Section and detail views always follow their parent (help H:view_context_menu).
-                    let target = if matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Detail { .. }) { rid } else { id };
+                    let target = id;
                     let is_root = rid == target;
                     let mut ex = Vec::new();
                     let mut last_group = 0;

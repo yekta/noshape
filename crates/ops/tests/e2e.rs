@@ -5859,6 +5859,34 @@ fn drawing_table_menu_edits() {
     assert_eq!(e.param.as_deref(), Some("row"), "{e:?}");
 }
 
+/// Edit section… of an assembly section view: Exclude from cut takes parts by name (live2 drw-section-exclude-from-cut
+/// s10-s21), drawing_get lists them, [] unticks it; a Part Studio's view has none; Show cut geometry only goes while a
+/// depth is set.
+#[test]
+fn drawing_edit_section_excludes_parts_from_the_cut() {
+    let mut ctx = Ctx::new();
+    two_part_assembly(&mut ctx, "drawing_edit_section.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Assembly 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let views = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"].as_array().unwrap().clone();
+    let base = views(&mut ctx).into_iter().find(|v| v["kind"] == "base").unwrap();
+    let (bx, by) = ((num(&base["bounds"]["min"][0]) + num(&base["bounds"]["max"][0])) / 2.0, (num(&base["bounds"]["min"][1]) + num(&base["bounds"]["max"][1])) / 2.0);
+    let s = call(&mut ctx, "drawing_section_view", json!({ "drawing": tab, "parent": base["id"], "point": [bx, by], "position": [bx + 150.0, by] }));
+    let sid = s["view"].clone();
+    let e = try_call(&mut ctx, "drawing_edit_section", json!({ "drawing": tab, "view": sid, "exclude": ["nope"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("exclude[0]"), "{}", e.to_json());
+    let part = e.message.rsplit(", ").next().unwrap().rsplit(": ").next().unwrap().to_string();
+    call(&mut ctx, "drawing_edit_section", json!({ "drawing": tab, "view": sid, "exclude": [part] }));
+    let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert!(last.ends_with("Edit section"), "{last}");
+    let sv = |ctx: &mut Ctx| views(ctx).into_iter().find(|v| v["id"] == sid).unwrap();
+    assert_eq!(sv(&mut ctx)["exclude_from_cut"], json!([part]));
+    call(&mut ctx, "drawing_edit_section", json!({ "drawing": tab, "view": sid, "exclude": [] }));
+    assert!(sv(&mut ctx)["exclude_from_cut"].is_null());
+    let e = try_call(&mut ctx, "drawing_edit_section", json!({ "drawing": tab, "view": base["id"], "cut_only": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"), "{}", e.to_json());
+}
+
 /// A Part Studio with two parts (a block with a hole and a pin) inserted
 /// in an assembly ("Assembly 1"): their instance ids.
 fn two_part_assembly(ctx: &mut Ctx, file: &str) -> (String, String) {

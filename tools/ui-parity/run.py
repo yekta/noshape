@@ -744,6 +744,10 @@ def recorder_form(b, live):
             if not isinstance(x, dict):
                 return True
             n, o = x.pop("new", False), x.pop("old", False)
+            # Read only by recorders from that version on (`since`: a selected table, live2 2026-11-18.1).
+            since = x.pop("since", None)
+            if since and not (m is not None and (m.group(1), int(m.group(2))) >= tuple([since.split(".")[0], int(since.split(".")[1])])):
+                return False
             return not (n and not new) and not (o and new)
         sel[:] = [x for x in sel if kept(x)]
     d = (b or {}).get("dialog")
@@ -1422,6 +1426,11 @@ def compare(live, ours, whole_document=True):
                 d["text"] = [re.sub(r"\bstart \S+ asm( Copy \d+)?\b", "start asm", t) if isinstance(t, str) else t for t in d["text"]]
                 # Live's start studio is named after its start document ("start block Copy 1", live2 drw-custom-table-*).
                 d["text"] = [re.sub(r"^start [\w-]+( Copy \d+)?$", "Part Studio 1", t) if isinstance(t, str) else t for t in d["text"]]
+                # A select's value naming it too (Sheet properties › Reference "start block Copy 1 Part 1", live2
+                # drw-sheet-properties-custom-zones).
+                for fld in d.get("fields") or []:
+                    if isinstance(fld, dict) and isinstance(fld.get("value"), str):
+                        fld["value"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)? ", "Part Studio 1 ", fld["value"])
                 if d.get("title") in ("View properties", "BOM table properties", "Cut list table properties", "Custom table properties", "Image properties") and len(d["text"]) > 2 and d["text"][1] in ("Document", "Document:"):
                     d["text"][2] = "<document>"
             dr = side.get("drawing")
@@ -1444,6 +1453,9 @@ def compare(live, ours, whole_document=True):
             lst = side.get("list")
             if isinstance(lst, dict) and isinstance(lst.get("rows"), list):
                 lst["rows"] = [re.sub(r"\bstart (?!asm\b)[\w-]+( Copy \d+)?(?= \.\.\.$|$)", "Part Studio 1", r) if isinstance(r, str) else r for r in lst["rows"]]
+                # An assembly's, as the dialogs' texts ("Insert BOM for start pin-block asm Copy 1 ...", ours "... start
+                # pin-block-asm-drawing asm ...": live2 drw-view-properties-simplification-absolute).
+                lst["rows"] = [re.sub(r"\bstart \S+ asm( Copy \d+)?\b", "start asm", r) if isinstance(r, str) else r for r in lst["rows"]]
         # Live's pixel reader lists what is drawn selected in its own scan order ([Top, Detail] for a detail view and its
         # boundary in the parent, drw-view-rotate-*): compared as a set.
         for side in (a, b):
