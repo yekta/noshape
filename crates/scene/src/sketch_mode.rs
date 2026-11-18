@@ -11744,6 +11744,31 @@ mod tests {
         assert!(c.end_point().x < c.start_point().x, "negative length flips the line");
     }
 
+    /// Live2 sk-feel2-1118: a new dimension's label has no inference to another dimension's text or line: swept 1 px at
+    /// a time across it, it follows the pointer 1:1; placed 3 px off it, it stays there.
+    #[test]
+    fn a_new_dimensions_label_snaps_to_no_other_dimension() {
+        let (mut ed, mut d) = editor(Tool::Dimension);
+        let a = d.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
+        let b = d.sketch.add_line(v(0.04, 0.01), v(0.06, 0.01));
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        click(&mut ed, &mut d, v(0.02, 0.015));
+        ed.dim_edit = None;
+        let first = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Length { curve, .. } if curve == a)).unwrap().id;
+        assert_eq!(d.dimension_labels.get(&first.0), Some(&[0.02, 0.015]));
+        click(&mut ed, &mut d, v(0.05, 0.01));
+        for k in -4..=4 {
+            let at = v(0.05, 0.015 + k as f64 * PX);
+            ed.pointer_move(&mut d, at, false, false);
+            let (_, pos, _) = ed.dimension_preview(&d).expect("the preview");
+            assert!((pos - at).length() < 1e-12, "{k} px: the label at {pos:?}, the pointer at {at:?}");
+        }
+        let off = v(0.05, 0.015 + 3.0 * PX);
+        click(&mut ed, &mut d, off);
+        let second = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Length { curve, .. } if curve == b)).unwrap().id;
+        assert_eq!(d.dimension_labels.get(&second.0), Some(&[off.x, off.y]), "placed 3 px off the first one's line, it stays");
+    }
+
     /// Live 1853 addendum: `q` with nothing selected turns construction on,
     /// Escape out of the Line tool turns it off; `q` on a selected line makes
     /// it construction and the next line too; the Construction button shows
