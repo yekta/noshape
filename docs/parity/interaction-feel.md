@@ -1441,10 +1441,10 @@ live (`ctrl_cmd`, `shared_keys_follow_lives_list_per_os`) =. Feature-dialog widt
 
 | Key (state) | Live | Ours | Status |
 |---|---|---|---|
-| A view key with the pointer resting on the model (Shift+1/2/3/4/5/6, Shift+Z, Ctrl+Shift+Down/Right) | whatever comes under the resting pointer lights after the view moves (a plane's or the part's orange outline, an edge) | nothing lights until the pointer moves | ≠ [psui] |
+| A view key with the pointer resting on the model (Shift+1/2/3/4/5/6, Shift+Z, Ctrl+Shift+Down/Right) | whatever comes under the resting pointer lights after the view moves (a plane's or the part's orange outline, an edge) | nothing lights until the pointer moves | ≠ [psui] (retaken with a clean config and a 1 px move after launch: still unlit; a 3 px move after the key lights the Front plane, r-front2*.png) |
 | Shift+T Make transparent (Part 1 selected) | the dialog; the part drawn as a pale see-through ghost, its row no longer selected | the dialog; the part stays selected, see-through orange, its row highlighted | ≠ [psui] |
 | Delete / Backspace (Part 1 selected) | the Delete part 1 dialog; the part drawn as a see-through ghost with orange edges | the same dialog; the part drawn solid, tan | ≠ [psui] |
-| Shift+X Section view | the dialog at the list's side like other feature dialogs (top left ~ (396, 192)) | the dialog low on the left (~ (336, 620)) | ≠ [psui] |
+| Shift+X Section view | the dialog at the list's side (~ (396, 192)) | the same with a clean config dir (the low-left spot was a 11-04 panel_positions.json "section" entry on this machine) | = (withdrawn 11-18 23:58) |
 | Shift+Y Show selected parts (Part 1 selected) | the selection cleared | Part 1 stays selected | ≠ [psui] (live's studio had Part 1 hidden first; to retake from one state) |
 
 ## Fix queue (biggest feel impact first)
