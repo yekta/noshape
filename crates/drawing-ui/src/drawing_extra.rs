@@ -1246,11 +1246,14 @@ impl DrawingEditor {
                     let gid = a.id;
                     match group {
                         None => self.edit_sheet("Ordinate dimension", cx, |s| s.annotations.push(a)),
-                        Some(_) => self.edit_sheet("Add to ordinate group", cx, |s| {
-                            if let Some(x) = s.annotations.iter_mut().find(|x| x.id == gid) {
-                                *x = a;
-                            }
-                        }),
+                        Some(_) => {
+                            self.ordinate_added = true;
+                            self.edit_sheet("Add to ordinate group", cx, |s| {
+                                if let Some(x) = s.annotations.iter_mut().find(|x| x.id == gid) {
+                                    *x = a;
+                                }
+                            })
+                        }
                     }
                     self.tool = Tool::Ordinate { origin: Some(o), horizontal: Some(h), group: Some(gid) };
                 }

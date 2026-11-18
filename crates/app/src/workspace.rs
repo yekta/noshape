@@ -115,6 +115,11 @@ impl Focusable for Workspace {
     }
 }
 
+thread_local! {
+    /// The Versions and history flyout is open: a new document's window opens with it (live keeps it across documents).
+    pub(crate) static HISTORY_OPEN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 impl Workspace {
     pub fn new(doc: Entity<DocModel>, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let subs = vec![cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
@@ -176,6 +181,12 @@ impl Workspace {
             }
         }));
         this.refresh_behind(true, cx);
+        // Live (behaviours 11-18 Preferences › Units effects): the Versions and history flyout left open in one document
+        // is open on entering another.
+        if HISTORY_OPEN.get() {
+            let doc = this.doc.clone();
+            this.history = Some(cx.new(|cx| HistoryPanel::new(doc, window, cx)));
+        }
         noshape_render::perf::milestone("workspace: behind refreshed");
         this.sync_tabs(window, cx);
         noshape_render::perf::milestone("workspace: tabs synced");
@@ -1137,6 +1148,7 @@ impl Workspace {
                                 move |_, wi, cx| {
                                     w3.update(cx, |t, cx| {
                                         t.history = None;
+                                        HISTORY_OPEN.set(false);
                                         cx.notify();
                                     });
                                     dd::copy_version(d5.clone(), mv, wi, cx)
@@ -1441,6 +1453,7 @@ impl Workspace {
         self.doc_panel = None;
         if !same {
             self.history = None;
+            HISTORY_OPEN.set(false);
             self.release_drafts = None;
             self.tab_manager = None;
             let close = |this: &mut Self, cx: &mut Context<Self>| {
@@ -1475,6 +1488,7 @@ impl Workspace {
         self.doc_panel = None;
         if !open {
             self.history = None;
+            HISTORY_OPEN.set(false);
             self.release_drafts = None;
             self.tab_manager = None;
             let (doc, tab) = (self.doc.clone(), self.active);
@@ -1515,6 +1529,7 @@ impl Workspace {
         if self.release_drafts.take().is_none() {
             let doc = self.doc.clone();
             self.history = None;
+            HISTORY_OPEN.set(false);
             self.doc_panel = None;
             self.release_drafts = Some(cx.new(|cx| crate::release_dialog::ReleaseDraftsPanel::new(doc, cx)));
         }
@@ -1528,13 +1543,20 @@ impl Workspace {
         }
     }
 
-    fn toggle_history(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// The Versions and history flyout is open.
+    #[cfg(test)]
+    pub(crate) fn history_open(&self) -> bool {
+        self.history.is_some()
+    }
+
+    pub(crate) fn toggle_history(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.release_drafts = None;
         self.doc_panel = None;
         if self.history.take().is_none() {
             let doc = self.doc.clone();
             self.history = Some(cx.new(|cx| HistoryPanel::new(doc, window, cx)));
         }
+        HISTORY_OPEN.set(self.history.is_some());
         cx.notify();
     }
 
@@ -2710,6 +2732,14 @@ impl Workspace {
     fn run_shortcut(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         if id == "general:Create version" {
             crate::history_panel::open_create_version(self.doc.clone(), window, cx);
+            return;
+        }
+        // The active tab's Release… (its parts in a Part Studio), with managed workflows on as the menus have it.
+        if id == "general:Create release" {
+            if let Some(tab) = self.active.filter(|_| noshape_ops::release_settings::managed_workflows()) {
+                let items = crate::release_dialog::tab_items(self.doc.read(cx), tab);
+                crate::release_dialog::open_release_candidate(self.doc.clone(), items, window, cx);
+            }
             return;
         }
         match self.active.and_then(|a| self.views.get(&a)) {

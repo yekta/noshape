@@ -1899,7 +1899,7 @@ impl DrawingEditor {
                 _ => None,
             })
             .collect();
-        let dwt = Button::new("dp-dwt").ghost().small().w(px(26.)).h(px(26.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("dwt-template"), 20., cx)).tooltip("Select a DWT").os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
+        let dwt = Button::new("dp-dwt").ghost().small().w(px(26.)).h(px(26.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("dwt-template"), 20., cx)).os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
             for (name, data) in &tabs {
                 let (e, name, data) = (ed.clone(), name.clone(), data.clone());
                 m = m.item(crate::os_menu::OsMenuItem::new(name.clone()).on_click(move |_, _, cx| {
@@ -1946,7 +1946,7 @@ impl DrawingEditor {
                             .into_any_element(),
                         None => div().flex_1().h(px(26.)).pl(px(14.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x666666)).child("Update properties from a template...").into_any_element(),
                     })
-                    .child(dwt),
+                    .child(div().id("dp-dwt-tip").tooltip(crate::ui::tooltip("Select a DWT")).child(dwt)),
             )
             .child(
                 h_flex()

@@ -407,7 +407,7 @@ impl Render for WorkspaceUnits {
             // Length and angle (the units expressions use) first in their groups, in Onshape's lists.
             if g == 0 {
                 let lu = LENGTH_UNITS_SHOWN.iter().position(|u| *u == d.length).unwrap_or(0);
-                let (dl, dc) = dec(d.length_precision, 6);
+                let (dl, dc) = dec(d.length_precision, d.length.display_decimals());
                 let unit = self.select("Length default unit".into(), 210., LENGTH_UNITS_SHOWN.iter().map(|u| u.name().to_string()).collect(), lu, |p, i| p.length = LENGTH_UNITS_SHOWN[i], cx);
                 let decimals = self.select("Length display decimals".into(), 100., dl, dc, |p, i| p.length_precision = i as u8, cx);
                 groups[0].push(self.row("wu-row-length", "Length default unit".into(), unit, decimals));

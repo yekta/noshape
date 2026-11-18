@@ -647,12 +647,26 @@ impl DrawingEditor {
                 text.push("Sheet".into());
                 text.extend(self.drawing.sheets.iter().map(|s| s.name.clone()));
             }
-            if bom {
-                text.extend(["Template", "Follow assembly", "Onshape Default BOM", "BOM type", "Flattened", "Structured - Top level", "Structured - Multi level"].map(String::from));
+            if !bom {
+                text.extend(["Order", "Top to bottom", "Bottom to top", "Select fixed corner"].map(String::from));
+                text.retain(|t| !t.is_empty());
+                return serde_json::json!({ "kind": "drawing-panel", "title": title, "text": text });
             }
-            text.extend(["Order", "Top to bottom", "Bottom to top", "Select fixed corner"].map(String::from));
-            text.retain(|t| !t.is_empty());
-            serde_json::json!({ "kind": "drawing-panel", "title": title, "text": text })
+            // A BOM's selects as live2's 2026-11-18.1 recorder reads them (the six drw-bom-* retakes): their options for
+            // recorders before 2026-11-17.3 only, the values as fields ("Use existing" the source, unlabelled in BOM table
+            // properties, whose Sheet select reads "").
+            let source_at = text.iter().position(|t| *t == source_label).filter(|_| !editing);
+            let mut lines = crate::drawing_panels::PanelText(text.into_iter().enumerate().map(|(i, t)| (t, Some(i) == source_at)).collect());
+            lines.text("Template").options(["Follow assembly", "Onshape Default BOM"]).text("BOM type").options(["Flattened", "Structured - Top level", "Structured - Multi level"]).text("Order").options(["Top to bottom", "Bottom to top"]).text("Select fixed corner");
+            let template = if d.default_template { "Onshape Default BOM" } else { "Follow assembly" };
+            let order = if d.bottom_to_top { "Bottom to top" } else { "Top to bottom" };
+            let field = |label: &str, value: &str| serde_json::json!({ "label": label, "kind": "select", "value": value });
+            let fields = if editing {
+                vec![field("", ""), field("", template), field("", &type_label), field("", order)]
+            } else {
+                vec![field("Use existing", &source_label), field("Template", template), field("BOM type", &type_label), field("Order", order)]
+            };
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": title, "fields": fields }), lines.0)
         });
         Some(
             v_flex()

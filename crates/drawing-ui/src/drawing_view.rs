@@ -530,6 +530,8 @@ pub struct DrawingEditor {
     /// The ordinate group Add to ordinate dimension group is adding to, and its values as they were (live lists
     /// those until the tool ends).
     pub ordinate_extending: Option<(u64, String)>,
+    /// Add to ordinate dimension group has added a value since the menu (the reader lights the view from then on).
+    pub ordinate_added: bool,
     pub move_sheet: Option<crate::drawing_move_sheet::MoveSheetDlg>,
     pub table_props: Option<crate::drawing_move_sheet::TablePropsDlg>,
     pub linestyle: Option<crate::drawing_linestyle::LinestyleDlg>,
@@ -814,6 +816,7 @@ impl DrawingEditor {
             sheets_ref_hover: None,
             sheets_ref_menu_at: None,
             ordinate_extending: None,
+            ordinate_added: false,
             move_sheet: None,
             table_props: None,
             linestyle: None,

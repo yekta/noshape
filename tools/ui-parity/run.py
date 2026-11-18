@@ -503,7 +503,10 @@ def normalize_live(state):
     # with the separators as "" rows and a check flag a row; ours leaves separators out and has no checks there. A table
     # cell's menu is its "NoteContextMenus" (live2 drw-hole-table-cell-rmb), the Note editor's lists "NoteContextMenus…"
     # (drw-note-panel-dropdowns: "NoteContextMenusLineSpacing").
-    if isinstance(lst, dict) and (lst.get("name") == "RmbMenu" or str(lst.get("name") or "").startswith("NoteContextMenus")):
+    # (The 2026-11-18.1 recorder reads a drawing's Sheets-panel row menu, unnamed, with its separators too: live2
+    # drw-bom-row-replace.)
+    unnamed_seps = isinstance(lst, dict) and lst.get("name") is None and lst.get("kind") == "menu" and "" in (lst.get("rows") or [])
+    if isinstance(lst, dict) and (unnamed_seps or lst.get("name") == "RmbMenu" or str(lst.get("name") or "").startswith("NoteContextMenus")):
         rows = lst.get("rows") or []
         keep = [i for i, r in enumerate(rows) if r != ""]
         hl = lst.get("highlighted")
@@ -516,7 +519,9 @@ def normalize_live(state):
             lst.pop("checked", None)
     # A menu's name (recorder 2026-11-15.3: "Custom tables more", fs-tables-switch-to-studio): ours names none.
     if isinstance(lst, dict):
-        lst.pop("name", None)
+        # (A drawing panel's list: its hovered row is never read, `drawing_menu_hover`.)
+        if str(lst.pop("name", "")).endswith("_Menu"):
+            lst["hover_unread"] = True
     # Live's recorder from 2026-11-15.1 gives a menu's disabled rows as one flag per row (live
     # drw-hole-table-cell-format), before as the rows' indices (ours); the view cube's menus were always flags, on both
     # sides (camera-menu-*).
@@ -649,6 +654,14 @@ def cloud_menu(a, b):
     compared (the shorter menu may fit where live's had to move under the pointer)."""
     la, lb = (a or {}).get("list"), (b or {}).get("list")
     if isinstance(la, dict) and la.pop("moved", False) and isinstance(lb, dict):
+        lb["highlighted"] = la.get("highlighted")
+
+
+def drawing_menu_hover(a, b):
+    """A drawing panel's list (Graebert's "<control>_Menu"): live's recorder never reads its hovered row (32 of 32
+    readings -1, drw-gtol-type-list s5 after a drag down its rows), so ours' isn't compared."""
+    la, lb = (a or {}).get("list"), (b or {}).get("list")
+    if isinstance(la, dict) and la.pop("hover_unread", False) and isinstance(lb, dict):
         lb["highlighted"] = la.get("highlighted")
 
 
@@ -1430,6 +1443,8 @@ def compare(live, ours, whole_document=True):
                 # drw-sheet-properties-custom-zones).
                 for fld in d.get("fields") or []:
                     if isinstance(fld, dict) and isinstance(fld.get("value"), str):
+                        # (A BOM's source assembly, live's runner's copy of it: "Use existing", live2's drw-bom-* retakes.)
+                        fld["value"] = re.sub(r"\bstart \S+ asm( Copy \d+)?$", "start asm", fld["value"])
                         fld["value"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)? ", "Part Studio 1 ", fld["value"])
                 if d.get("title") in ("View properties", "BOM table properties", "Cut list table properties", "Custom table properties", "Image properties") and len(d["text"]) > 2 and d["text"][1] in ("Document", "Document:"):
                     d["text"][2] = "<document>"
@@ -1567,6 +1582,7 @@ def compare(live, ours, whole_document=True):
         placed_alike(a, b)
         click_placed_readouts(a, b, pixel)
         cloud_menu(a, b)
+        drawing_menu_hover(a, b)
         menu_badges(a, b)
         d = first_difference(a, b)
         if d is None:

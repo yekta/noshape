@@ -114,6 +114,7 @@ impl DrawingEditor {
         let mut out = vec![MenuEntry::item("Add to ordinate dimension group", move |t, _, cx| {
             let o = PickedPoint { view, p: origin, r: r.clone() };
             t.ordinate_extending = Some((id, t.ui_annotation_text(id).unwrap_or_default()));
+            t.ordinate_added = false;
             t.set_tool(Tool::Ordinate { origin: Some(o), horizontal: Some(horizontal), group: Some(id) }, cx)
         })];
         let a2 = a.clone();

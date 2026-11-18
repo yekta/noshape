@@ -87,6 +87,8 @@ pub const ENTRIES: &[Entry] = entries! {
     General "general" [
         ("Collapse all in list", N, N),
         ("Connection analysis", N, N),
+        // Unassigned (live 11-18 Preferences › Keyboard shortcuts); a customized key runs the active tab's Release….
+        ("Create release", N, N),
         // No default key (live2 2405: Ctrl+Alt+V does nothing); a customized one runs it (Workspace::run_shortcut).
         ("Create version", N, N),
         ("Curvature color map", N, N),

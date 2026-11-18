@@ -45,6 +45,12 @@ impl LengthUnit {
         }
     }
 
+    /// How many Display decimals options the unit offers ("0" … ): down to the last decimal whose step is at least
+    /// Onshape's 1e-8 m length tolerance (live: Millimeter to 0.12345, Inch to 0.123456).
+    pub fn display_decimals(self) -> usize {
+        ((self.meters() / 1e-8).log10() + 1e-9).floor() as usize + 1
+    }
+
     /// Canonical symbol used in expressions and display.
     pub const fn symbol(self) -> &'static str {
         match self {
@@ -335,6 +341,12 @@ impl UnitPrefs {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn length_display_decimals_stop_at_the_tolerance() {
+        let n: Vec<usize> = [LengthUnit::Millimeter, LengthUnit::Inch, LengthUnit::Centimeter, LengthUnit::Meter, LengthUnit::Foot, LengthUnit::Yard].map(|u| u.display_decimals()).to_vec();
+        assert_eq!(n, [6, 7, 7, 9, 8, 8]);
+    }
+
     use super::*;
 
     /// Live: a millimeter document still has Onshape's default (imperial)

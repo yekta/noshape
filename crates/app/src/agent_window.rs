@@ -41,6 +41,7 @@ impl Workspace {
             }
             R::CloseHistory => {
                 self.history = None;
+                crate::workspace::HISTORY_OPEN.set(false);
                 cx.notify();
             }
             R::Restore { to, name } => noshape_history_ui::open_restore(self.doc.clone(), to, name, window, cx),

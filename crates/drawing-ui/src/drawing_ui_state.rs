@@ -398,8 +398,9 @@ impl DrawingEditor {
             Tool::BrokenOut { parent: Some(v), done: true, .. } => selection.push(("EDGE".into(), self.ui_view_name(*v))),
             // The hole a Hole/thread callout is being placed for (live drw-hole-callout-palette).
             Tool::HoleCallout { circle: Some((v, ..)) } => selection.push(("EDGE".into(), self.ui_view_name(*v))),
-            // An ordinate's datum and its values while the tool runs (live2 drw-ordinate-rclick).
-            Tool::Ordinate { origin: Some(o), .. } => selection.push(("EDGE".into(), self.ui_view_name(o.view))),
+            // An ordinate's datum and its values while the tool runs (live2 drw-ordinate-rclick); Add to ordinate
+            // dimension group lights nothing until its first new value (live2 drw-ordinate-add-to-group s7).
+            Tool::Ordinate { origin: Some(o), group, .. } if self.ordinate_added || !self.ordinate_extending.as_ref().is_some_and(|(g, _)| Some(*g) == *group) => selection.push(("EDGE".into(), self.ui_view_name(o.view))),
             _ => {}
         }
         // The edge an Edge condition symbol is put on (drw-edge-condition).
@@ -452,7 +453,7 @@ impl DrawingEditor {
                 let Some(p) = b.picks.get(pick as usize) else { return false };
                 self.selection.iter().any(|s| match (s, p) {
                     // A table with cells picked is orange only in them (live2 drw-revision-cell-*: no view's box reads it).
-                    // (One just placed reads nothing until it's pressed: live2 drw-bom-table s2.)
+                    // (One just placed reads nothing for recorders before 2026-11-18.1 (live2 drw-bom-table s2); see `placed`.)
                     (Sel::Table(a), PickTarget::Table(t)) => a == t && self.cell_sel.is_none_or(|c| c.table != *a) && self.placed_table != Some(*a),
                     (Sel::Hatch(a), PickTarget::Hatch(t)) => a == t,
                     (Sel::Annotation(a), PickTarget::Annotation(t)) => a == t && thin(*a) == thin_ones && tan != Some(Sel::Annotation(*a)),
@@ -490,6 +491,22 @@ impl DrawingEditor {
                 }
                 if px > 60.0 {
                     selection.push(("EDGE".into(), self.ui_view_name(v.id)));
+                    continue;
+                }
+                // A table just placed: the 2026-11-18.1 recorder reads its view's box under it too (live2's six
+                // drw-bom-* retakes: EDGE Isometric with TABLE from the placing click), older ones nothing (drw-bom-table).
+                let placed = |pick: u32| self.placed_table.is_some_and(|id| self.selection.contains(&Sel::Table(id)) && matches!(b.picks.get(pick as usize), Some(PickTarget::Table(t)) if *t == id));
+                let mut placed_px = 0.0;
+                for l in b.geometry.lines.iter().filter(|l| placed(l.pick)) {
+                    for w in l.points.windows(2) {
+                        placed_px += len_in(w[0], w[1]) * self.zoom * 2.0;
+                    }
+                }
+                for t in b.geometry.texts.iter().filter(|t| placed(t.pick) && inside(t.pos)) {
+                    placed_px += t.text.chars().count() as f64 * t.height * self.zoom * 1.5;
+                }
+                if px + placed_px > 60.0 && placed_px > 0.0 {
+                    selection.push(("EDGE*".into(), self.ui_view_name(v.id)));
                     continue;
                 }
                 for l in b.geometry.lines.iter().filter(|l| lit_as(l.pick, true)) {
@@ -535,10 +552,14 @@ impl DrawingEditor {
         if self.hatch_dlg.is_some() {
             selection.clear();
         }
-        // A selected table, by its kind's name (" 2" for a second of a kind): live2's recorder from 2026-11-18.1 reads
-        // its tan outline (the six drw-bom-* retakes); older ones don't (marked `*`).
+        // A table just placed, by its kind's name (" 2" for a second of a kind): live2's recorder from 2026-11-18.1 reads
+        // its tan outline from the placing click, through Esc, not once it's right-clicked (the six drw-bom-* retakes);
+        // older ones don't (marked `*`).
         for s in &self.selection {
             let Sel::Table(id) = s else { continue };
+            if self.placed_table != Some(*id) {
+                continue;
+            }
             let Some(t) = sheet.table(*id) else { continue };
             let n = sheet.tables.iter().take_while(|x| x.id != *id).filter(|x| x.type_name() == t.type_name()).count();
             selection.push(("TABLE*".into(), if n == 0 { t.type_name().to_string() } else { format!("{} {}", t.type_name(), n + 1) }));

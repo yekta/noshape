@@ -101,7 +101,9 @@ impl DrawingEditor {
         type Set = std::rc::Rc<dyn Fn(&mut LinestyleDlg)>;
         let select = |id: &'static str, label: String, w: f32, items: Vec<(String, bool, Set)>| {
             let ed = ed.clone();
-            Button::new(id).label(label).ghost().xsmall().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
+            // (Found by the shown value, as live's runner names a select: `dropdown: Solid`.)
+            let shown = label.clone();
+            Button::new(id).label(label).map(move |b| crate::ui_script::mark(b, move || format!("dropdown:{shown}"))).ghost().xsmall().w(px(w)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.)).os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut m, _, _| {
                 for (l, on, f) in &items {
                     let (e, f) = (ed.clone(), f.clone());
                     m = m.item(crate::os_menu::OsMenuItem::new(l.clone()).checked(*on).on_click(move |_, _, cx| {
@@ -182,12 +184,16 @@ impl DrawingEditor {
                         .child(div().id("ls-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::drawing_chrome::ok_check(16.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_linestyle(true, cx))))
                         .child(div().id("ls-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_linestyle(false, cx)))),
                 )
-                .child(div().px(px(10.)).pt(px(4.)).text_size(px(12.)).child("Edges"))
+                // Live drawing-adjust-linestyle: the tooltip over the label and the field (live2's hover 5 px above the
+                // label's text reads it, drw-view-adjust-linestyle-dashed-dotted s4).
                 .child(
                     div()
-                        .id("ls-edges")
-                        // Live drawing-adjust-linestyle: the field's tooltip.
+                        .id("ls-edges-row")
                         .tooltip(crate::ui::tooltip("Select required edges to change their style"))
+                        .child(div().px(px(10.)).pt(px(4.)).text_size(px(12.)).child("Edges"))
+                        .child(
+                    div()
+                        .id("ls-edges")
                         .mx(px(10.))
                         .min_h(px(30.))
                         .p(px(4.))
@@ -198,6 +204,7 @@ impl DrawingEditor {
                         .border_color(gpui_kit::rgb(0xabcbff))
                         .when(empty, |b| b.child(div().text_size(px(12.)).italic().text_color(pal.text_muted).child("Select edges in a view to change linestyle")))
                         .children(chips),
+                        ),
                 )
                 .child(row("Linestyle", select("ls-pattern", d.pattern.name().into(), 150., patterns).into_any_element()))
                 .child(row("Dashes", div().w(px(150.)).when(solid, |b| b.opacity(0.4)).child(Input::new(&d.dashes).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small()).into_any_element()))

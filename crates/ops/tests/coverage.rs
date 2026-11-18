@@ -314,3 +314,13 @@ fn every_help_link_names_a_guide_section() {
     assert!(seen > 10, "found {seen} help links");
     assert!(bad.is_empty(), "help links to sections the guide doesn't have:\n{}", bad.join("\n"));
 }
+
+/// Live 11-18 (Preferences › Keyboard shortcuts, General): "Create release", Unassigned, before "Create version".
+#[test]
+fn the_general_shortcuts_list_create_release_unassigned() {
+    use noshape_ops::shortcuts::{ENTRIES, Tab};
+    let general: Vec<(&str, Option<&str>)> = ENTRIES.iter().filter(|e| e.tab == Tab::General).map(|e| (e.name, e.default)).collect();
+    let at = general.iter().position(|(n, _)| *n == "Create release").expect("Create release listed");
+    assert_eq!(general[at].1, None, "Unassigned");
+    assert_eq!(general[at + 1].0, "Create version");
+}

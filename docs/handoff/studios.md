@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 09:00 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 10:24 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -17,37 +17,38 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE
 tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh`; drawing runs vibex8.
 - Landed 11-18: 882a3ecd, 781eac7c, 37ecb60c, d2eb5c15, b5c4ccc4 (duplicate workspace names, BOM cell panel, BOM
   split), 4beed1be (ISO value on the pointer, placed BOM selected, Reset ordinate, section Exclude checkbox, linestyle).
-- Queued a584ed06 08:47: Variable Studio invalid name pink 526 ms after Enter (live fsvs-feel-1118); Edit section…
+- Landed dfe045ad 09:11: Variable Studio invalid name pink 526 ms after Enter (live fsvs-feel-1118); Edit section…
   Exclude from cut (op drawing_edit_section + e2e, drawing_get `exclude_from_cut`); section / detail menus without
   Explode/Position, Display state; Measure button bottom right; Sheets tab tooltip; Replicate region reader; panel
   readers (Break view, Sheet properties, View properties); a selected table read as TABLE for recorders ≥ 2026-11-18.1
   (when live2's BOM retakes land: check TABLE's order beside EDGE Isometric, drop `placed_table`'s reader rule if
   they read TABLE from the placing click).
-- Local, to land: the Release dialog ignores Esc (Close closes; Enter never submits, notes take a new line) per live
-  docs-versions-release-1118; Feature Studio: a new error shows 1891 ms after the last key (never while typing), a
-  fixed one goes at 275 ms, the completion list at 230 ms (live fsvs-feel-1118); tests.
+- Landed 49cfe99b 09:12: the Release dialog ignores Esc (real-app check on vibex6 Xvfb: xdotool "abc" Return "xyz"
+  lands as two lines, Esc leaves it open; the unit test's dropped letters are the harness), Feature Studio error /
+  completion timings.
+- Queued (10:2x): Preferences (live 11-18): shortcut "Create release" (Unassigned; a key opens the active tab's
+  Release…), Length Display decimals per unit (list to the last decimal ≥ 1e-8 m: mm 0.12345, in 0.123456; Workspace
+  units too), the Versions flyout's open state carries to the next document (thread-local flag); live2's BOM retakes:
+  the BOM panel read as fields + options, a placed table reads TABLE + EDGE <view> (recorder ≥ 2026-11-18.1) until
+  right-clicked; Add to ordinate dimension group reads nothing until its first click; tooltips: Adjust linestyle's on
+  the Edges label + field, Select a DWT through ours (the kit's Button tooltip isn't read); Sheet properties / Adjust
+  linestyle selects marked `dropdown:<value>`; runner: Graebert `*_Menu` lists' hover not compared (never read), an
+  unnamed menu's "" separators, "start X asm Copy n" field values. run12: BOM / ordinate / linestyle / gtol 12/13;
+  run10: rel, ver, prefs, docs-pref all match.
+- Open: drw-bom-table-properties s7 (Esc in BOM table properties: today's retake deselects, the old take kept it;
+  asked live2 10:24); drw-sheet-properties-custom-zones s5 (Size › Custom shows Zones fields in live: ours lacks them);
+  drw-hatch-panel s31 (Pattern list covers its field; asked live2 09:23).
 - Checked against live 08:4x, already as live: documents search on Enter only; version row menu (View in repair,
   Restore to Main…, Releases only with candidates; Copy link web-only); Restore strategy dialog; Create version (V<n>
   focused, Enter creates, Esc closes); Branch (B<n> selected, Enter creates and opens).
 - Drawing items left: section / detail label position (live's distance below the view centre differs per view:
-  11.7 / 10.1, 22.4 / 20.1, 19.6 / 20.1, detail 50.0 / 47.6; needs each view's extents); toolbar help popovers
-  (Update, Projected view read "title / title description" in live; asked in REQUESTS 08:56); drw-ordinate-add-to-
-  group s7; custom-zones Format and Adjust linestyle Edges tooltips (live's hover pixel misses our field);
+  11.7 / 10.1, 22.4 / 20.1, 19.6 / 20.1, detail 50.0 / 47.6; DXFs asked of live2, REQUESTS 09:03); toolbar help popovers
+  (Update, Projected view read "title / title description" in live; asked in REQUESTS 08:56);
   drw-gtol-type-list s5 / drw-hatch-panel s29 (list highlight). Not targets: replicate-region-place s21 (live's
   toast comes ~9.75 s after ✓, server time; ours at once, gone by the 12 s read), drw-revision-table-delete s8,
   drw-inspection-table-iso-scrolled s2 (reader count), drw-note-editor (retake asked).
-- Full drawing run drw1118b on vibex8 (build of bfc56d3e; ~/agents/studios-keep/drw1118b): 317/341 (drw1118a
-  288/334). Its one regression, drw-dimension-radius s4 (the reader counted a hovered dimension's leader at 2 px), is
-  fixed by the reader counting a hovered annotation's lines at 1 px (d2eb5c15). New live2 takes, local: dprops footer
-  (runner: the footer goes with the header reading), hole-table / inspection-table select options marked as options,
-  a note with a leader reads its alignment buttons greyed, the hole table's title red + tooltip with no view, a note
-  quoting the lane's "(1)" tab name (runner), the empty sheet's menu with one note selected = the note's (drw-note-
-  copy-paste s8; Paste lands where its row is clicked, so the 13 mm came from Paste's row, now live's): landed b5c4ccc4.
-  drw-note-editor s5: live's typed keys missed its editor (recorder artifact). drw-inspection-table-iso-scrolled: not
-  the pixel mapping (live's weld take puts Front's top edge at 825,295, ours the same); an ISO dimension's value lands
-  centred on the pointer in live, ours had the line there (value 2.1 mm over): local fix in pending.rs, test.
-  drw-inspection-table-iso-scrolled s2 left: px clicks on the ISO A4 portrait sheet land 2.1 mm apart from live's
-  (dimension 237.8 vs 239.9), so live's first click took no edge; needs live's sheet-to-pixel at open.
+- Full drawing run drw1118b on vibex8 (~/agents/studios-keep/drw1118b): 317/341; its fixes landed (d2eb5c15,
+  b5c4ccc4, 4beed1be). Next full run on main after the local batch.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell

@@ -19,8 +19,6 @@ use std::rc::Rc;
 /// Unit select 226 px, decimals select 150 px, both 34 px (live 916–950).
 const UNIT_W: f32 = 226.;
 const DEC_W: f32 = 150.;
-/// Live: Length 7 decimals options here (the Workspace units dialog has 6).
-const LENGTH_DECIMALS: usize = 7;
 const ANGLE_DECIMALS: usize = 7;
 
 /// How a pick (the option's index) changes the draft.
@@ -80,8 +78,8 @@ impl UnitsPrefsView {
         };
         let length = (
             "Length default unit".to_string(),
-            Choice { id: "u-length", width: UNIT_W, options: LENGTH_UNITS_SHOWN.iter().map(|l| l.name().to_string()).collect(), at: LENGTH_UNITS_SHOWN.iter().position(|l| *l == u.length).unwrap_or(0), set: Rc::new(|e, i| e.units.length = LENGTH_UNITS_SHOWN[i]) },
-            Choice { id: "d-length", width: DEC_W, options: Self::decimals(LENGTH_DECIMALS), at: (u.length_precision as usize).min(LENGTH_DECIMALS - 1), set: Rc::new(|e, i| e.units.length_precision = i as u8) },
+            Choice { id: "u-length", width: UNIT_W, options: LENGTH_UNITS_SHOWN.iter().map(|l| l.name().to_string()).collect(), at: LENGTH_UNITS_SHOWN.iter().position(|l| *l == u.length).unwrap_or(0), set: Rc::new(|e, i| e.set_length_unit(LENGTH_UNITS_SHOWN[i])) },
+            Choice { id: "d-length", width: DEC_W, options: Self::decimals(u.length.display_decimals()), at: (u.length_precision as usize).min(u.length.display_decimals() - 1), set: Rc::new(|e, i| e.units.length_precision = i as u8) },
         );
         let angle = (
             "Angle default unit".to_string(),
@@ -395,14 +393,35 @@ mod tests {
                 "Energy default unit"
             ]
         );
-        // Live's decimals counts: 7 7 7 7 8 9 9 9 8 9 9.
+        // Live's decimals counts with Length in Millimeter (behaviours 215): 6 7 7 7 8 9 9 9 8 9 9.
         let counts: Vec<usize> = rows.iter().map(|r| r.2.options.len()).collect();
-        assert_eq!(counts, [7, 7, 7, 7, 8, 9, 9, 9, 8, 9, 9]);
+        assert_eq!(counts, [6, 7, 7, 7, 8, 9, 9, 9, 8, 9, 9]);
+    }
+
+    /// Live 11-18 Preferences › Units: Display decimals is kept per unit; Length in Inch shows Inch's own 0.123 and a list
+    /// to 0.123456, Millimeter's ends at 0.12345.
+    #[test]
+    fn length_decimals_are_kept_per_unit() {
+        let mut v = UnitsPrefsView::new();
+        v.edited = UserUnits::default();
+        v.edited.units.length_precision = 5;
+        let length = |v: &UnitsPrefsView| {
+            let rows = v.rows();
+            (rows[0].2.options.last().cloned().unwrap_or_default(), rows[0].2.at)
+        };
+        assert_eq!(length(&v), ("0.12345".to_string(), 5), "Millimeter at 0.12345");
+        v.edited.set_length_unit(noshape_units::LengthUnit::Inch);
+        assert_eq!(length(&v), ("0.123456".to_string(), 3), "Inch shows its own 0.123");
+        v.edited.units.length_precision = 6;
+        v.edited.set_length_unit(noshape_units::LengthUnit::Millimeter);
+        assert_eq!(length(&v), ("0.12345".to_string(), 5), "back to Millimeter's 0.12345");
+        v.edited.set_length_unit(noshape_units::LengthUnit::Inch);
+        assert_eq!(length(&v).1, 6, "and Inch's 0.123456");
     }
 
     #[test]
     fn prefs_round_trip() {
-        let u = UserUnits { units: UnitPrefs::imperial(), time_24h: true, comma_decimal: true };
+        let u = UserUnits { units: UnitPrefs::imperial(), time_24h: true, comma_decimal: true, ..Default::default() };
         let t = serde_json::to_string(&u).unwrap_or_default();
         assert_eq!(serde_json::from_str::<UserUnits>(&t).ok(), Some(u));
         assert_eq!(serde_json::from_str::<UserUnits>("{}").ok(), Some(UserUnits::default()));

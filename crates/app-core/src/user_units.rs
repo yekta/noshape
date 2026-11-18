@@ -19,6 +19,30 @@ pub struct UserUnits {
     pub time_24h: bool,
     /// Decimal format › Use comma as decimal separator.
     pub comma_decimal: bool,
+    /// Each length unit's Display decimals, in `LengthUnit::ALL` order (live: stored per unit; switching Length to Inch
+    /// shows Inch's own). The current unit's is `units.length_precision`.
+    pub length_decimals: LengthDecimals,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct LengthDecimals(pub [u8; 7]);
+
+impl Default for LengthDecimals {
+    /// Onshape's 0.123 for every unit.
+    fn default() -> Self {
+        LengthDecimals([3; 7])
+    }
+}
+
+impl UserUnits {
+    /// Length default unit `unit`: the current unit's decimals kept, `unit`'s own shown (within its list).
+    pub fn set_length_unit(&mut self, unit: noshape_units::LengthUnit) {
+        let at = |u: noshape_units::LengthUnit| noshape_units::LengthUnit::ALL.iter().position(|x| *x == u).unwrap_or(0);
+        self.length_decimals.0[at(self.units.length)] = self.units.length_precision;
+        self.units.length = unit;
+        self.units.length_precision = self.length_decimals.0[at(unit)].min(unit.display_decimals() as u8 - 1);
+    }
 }
 
 fn path() -> std::path::PathBuf {

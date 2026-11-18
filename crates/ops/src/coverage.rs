@@ -25,6 +25,7 @@ pub use Cover::*;
 pub const SHORTCUTS: &[(&str, Cover)] = &[
     ("general:Collapse all in list", Op("ui_list")),
     ("general:Connection analysis", Op("analysis_connection")),
+    ("general:Create release", Op("release_create")),
     ("general:Create version", Op("history_create_version")),
     ("general:Curvature color map", Op("analysis_curvature_map")),
     ("general:Curve/surface analysis", Op("analysis_curvature")),

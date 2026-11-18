@@ -179,3 +179,19 @@ fn a_clicked_tabs_card_picture_redraws_nothing(cx: &mut TestAppContext) {
     let clicked = (asked, notified.get(), state(cx).1);
     assert_eq!((shown, clicked), ((true, 1, 1), (true, 0, 1)), "((asked, redraws, kept) for a card left showing, the same for one whose tab was clicked)");
 }
+
+/// Live 11-18 (behaviours "Preferences › Units effects"): the Versions and history flyout opened in one document is open
+/// on entering another; closed, the next one opens without it.
+#[gpui::test]
+fn the_versions_flyouts_open_state_carries_over_to_the_next_document(cx: &mut TestAppContext) {
+    let (w1, ws1, _) = workspace(cx, "hist-carry-1");
+    assert!(!cx.update(|cx| ws1.read(cx).history_open()), "closed at first");
+    cx.update_window(w1, |_, window, cx| ws1.update(cx, |ws, cx| ws.toggle_history(window, cx))).unwrap();
+    draw(cx, w1);
+    let (w2, ws2, _) = workspace(cx, "hist-carry-2");
+    assert!(cx.update(|cx| ws2.read(cx).history_open()), "open in the next document");
+    cx.update_window(w2, |_, window, cx| ws2.update(cx, |ws, cx| ws.toggle_history(window, cx))).unwrap();
+    draw(cx, w2);
+    let (_, ws3, _) = workspace(cx, "hist-carry-3");
+    assert!(!cx.update(|cx| ws3.read(cx).history_open()), "closed there, closed in the one after");
+}

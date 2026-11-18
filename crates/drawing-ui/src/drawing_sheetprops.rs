@@ -202,8 +202,11 @@ impl DrawingEditor {
         let ed = cx.entity();
         let dropdown = |id: &'static str, current: String, items: Vec<(String, bool, Act)>| {
             let ed = ed.clone();
+            // (Found by the shown value, as live's runner names a select: `dropdown: A`, drw-sheet-properties-custom-zones.)
+            let shown = current.clone();
             Button::new(id)
                 .label(current)
+                .map(move |b| crate::ui_script::mark(b, move || format!("dropdown:{shown}")))
                 .ghost()
                 .small()
                 .w_full()
@@ -261,7 +264,9 @@ impl DrawingEditor {
             }
             None => ("Custom".to_string(), vec![("Custom".to_string(), true, noop)]),
         };
-        let dwt = Button::new("sp-dwt")
+        // The tooltip on a wrapper: ours is what the ui-parity state reads (live2 drw-sheet-properties-custom-zones s4
+        // hovers this button).
+        let dwt = div().id("sp-dwt-tip").tooltip(crate::ui::tooltip("Select a DWT")).child(Button::new("sp-dwt")
             .ghost()
             .small()
             .w(px(26.))
@@ -271,8 +276,7 @@ impl DrawingEditor {
             .border_color(gpui_kit::rgb(0xd3d7d9))
             .rounded(px(0.))
             .child(crate::assets::icon(&crate::assets::icon_path("title-block"), 18., cx))
-            .tooltip("Select a DWT")
-            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.select_dwt(si, window, cx)))
+            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.select_dwt(si, window, cx))))
             .into_any_element();
         // Size: Onshape lists the standard's sizes (A, A Portrait, B, C, D;
         // A4, A4 Portrait, A3 … A0), then Custom (live 825).
