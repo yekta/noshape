@@ -921,6 +921,8 @@ impl Workspace {
         let name = doc.name();
         let read_only = doc.session.read_only();
         let viewing_version = doc.session.viewing_version();
+        // A history change shows the version it is listed under ("V3", live history-feel-1117), else its workspace.
+        let change_version = doc.session.viewing_change().and_then(|_| doc.session.viewing_change_version());
         // The current branch (Onshape shows the workspace name, e.g. "Main").
         let branch_name = doc.session.shown_workspace_name();
         let protected = doc.session.is_protected();
@@ -1031,12 +1033,11 @@ impl Workspace {
                     // branch's place and no banner (its view-only bar is in the toolbar row).
                     // A protected workspace: a lock before its name (live wp-929).
                     .when(protected && viewing_version.is_none(), |d| d.child(div().flex_none().mt(px(6.)).child(crate::assets::icon("lock", 14., cx))))
-                    .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).cursor_text().map(|d| noshape_app_core::ui_script::mark(d, || "navbar:workspace".into())).child(match &viewing_version {
+                    .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).cursor_text().map(|d| noshape_app_core::ui_script::mark(d, || "navbar:workspace".into())).child(match viewing_version.as_ref().or(change_version.as_ref()) {
                         // Version and workspace names are the user's; a history entry keeps the workspace's.
                         Some(v) => crate::ui::user_text(v.clone()).into_any_element(),
                         None => crate::ui::user_text(branch_name).into_any_element(),
                     }))
-                    .when(read_only && viewing_version.is_none(), |d| d.child(div().ml_2().px_2().rounded(px(2.)).bg(pal.warning).text_xs().text_color(pal.text).child("VIEWING HISTORY")))
                     .child(div().flex_1())
                     .children(self.render_notices_button(cx))
                     .child(self.render_bell(cx))

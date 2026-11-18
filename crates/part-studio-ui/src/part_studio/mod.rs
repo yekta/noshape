@@ -3287,7 +3287,11 @@ impl PartStudioView {
         // Live (navigation/301): a version replaces the toolbar with its
         // view-only bar.
         if let Some(version) = self.doc.read(cx).session.viewing_version() {
-            return self.render_version_bar(&version, cx);
+            return self.render_version_bar(format!("Versions are view only. Viewing {version}."), None, cx);
+        }
+        // A history change: "History changes are view only. Viewing …" with Restore to Main (live history-feel-1117).
+        if let Some(change) = self.doc.read(cx).session.viewing_change() {
+            return self.render_version_bar(format!("History changes are view only. Viewing {change}"), Some(change), cx);
         }
         // Live 10-27: paused regeneration leaves only Undo / Redo, with the
         // banner centred over the bar.
@@ -3620,11 +3624,13 @@ impl PartStudioView {
     /// rounded at the bottom: "Versions are view only. Viewing V1." (14 px /
     /// 600, #333), an outline [⊞ Custom features], a small blue [Return to
     /// Main] and (?).
-    fn render_version_bar(&mut self, version: &str, cx: &mut Context<Self>) -> AnyElement {
+    /// A viewed change (`change`, its description): [Restore to Main] [Return to Main] after the text, no Custom
+    /// features or (?).
+    fn render_version_bar(&mut self, text: String, change: Option<String>, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let branch = {
+        let (branch, viewing) = {
             let s = &self.doc.read(cx).session;
-            s.store.branch(s.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into())
+            (s.store.branch(s.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()), s.viewing)
         };
         let names: Vec<&'static str> = self.doc.read(cx).custom_features().feature_types().iter().map(|t| t.name).collect();
         let has_custom = !names.is_empty();
@@ -3659,7 +3665,27 @@ impl PartStudioView {
                 crate::os_menu::open(e.position(), menu, window, cx);
             });
         // Only with custom features to add (live2 2405 (e): none in the version, no button at all).
-        let custom_btn = has_custom.then(|| crate::ui::with_tooltip("tt-vb-custom", "Add custom features in this version to your toolbar.", custom_btn));
+        let custom_btn = (has_custom && change.is_none()).then(|| crate::ui::with_tooltip("tt-vb-custom", "Add custom features in this version to your toolbar.", custom_btn));
+        let restore = change.zip(viewing).map(|(name, to)| {
+            let doc = self.doc.clone();
+            div()
+                .id("vb-restore")
+                .map(|d| crate::ui_script::mark(d, || format!("button:Restore to {branch}")))
+                .h(px(24.))
+                .px(px(8.))
+                .flex()
+                .items_center()
+                .rounded(px(3.))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xaaaaaa))
+                .bg(gpui_kit::rgb(0xffffff))
+                .cursor_pointer()
+                .hover(|d| d.bg(pal.row_hover))
+                .text_size(px(12.))
+                .child(format!("Restore to {branch}"))
+                .on_click(move |_, _, cx| doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Ui(noshape_ops::UiRequest::Restore { to, name: name.clone() }))))
+        });
+        let is_version = restore.is_none();
         let back = div()
             .id("vb-return")
             .map(|d| crate::ui_script::mark(d, || format!("button:Return to {branch}")))
@@ -3696,7 +3722,6 @@ impl PartStudioView {
             .font_weight(FontWeight::BOLD)
             .child(crate::ui::glyph("help-dot", 17.8, crate::theme::help_dot(0x999999)))
             .on_click(|_, _, cx| noshape_app_core::help::open("Versions and workspaces", cx));
-        let text = format!("Versions are view only. Viewing {version}.");
         crate::ui::toolbar()
             .id("part-studio-version-bar")
             .justify_center()
@@ -3710,8 +3735,9 @@ impl PartStudioView {
                     .rounded_b(px(10.))
                     .child(crate::ui::with_tooltip("tt-vb-text", text.clone(), div().id("vb-text").text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(gpui_kit::rgb(0x333333)).child(text)))
                     .children(custom_btn)
+                    .children(restore)
                     .child(back)
-                    .child(help),
+                    .when(is_version, |d| d.child(help)),
             )
             .into_any_element()
     }

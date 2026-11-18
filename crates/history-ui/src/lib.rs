@@ -16,4 +16,6 @@ pub mod compare_mode;
 pub mod history_hooks;
 pub mod history_panel;
 mod merge_dialog;
+/// Restore to <workspace>… from outside the panel (a viewed change's bar).
+pub use merge_dialog::open_restore;
 pub mod version_properties;

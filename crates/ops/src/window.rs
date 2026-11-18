@@ -43,6 +43,8 @@ pub enum UiRequest {
     ReloadToolbars,
     /// The Versions and history panel closed (a version's Return to Main, live ver-view-version-return).
     CloseHistory,
+    /// Restore the workspace to a history point (a viewed change's Restore to Main): the restore dialog.
+    Restore { to: MicroversionId, name: String },
 }
 
 /// A list change as the list's menus make it.
@@ -300,7 +302,7 @@ impl WindowState {
             UiRequest::Compare(c) => self.compare = c.clone(),
             UiRequest::Repair(r) => self.repair = r.clone(),
             // view_camera, view_display, ui_select and ui_list keep their state themselves.
-            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } | UiRequest::Select { .. } | UiRequest::List { .. } | UiRequest::ReloadToolbars | UiRequest::CloseHistory => {}
+            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } | UiRequest::Select { .. } | UiRequest::List { .. } | UiRequest::ReloadToolbars | UiRequest::CloseHistory | UiRequest::Restore { .. } => {}
         }
     }
 }

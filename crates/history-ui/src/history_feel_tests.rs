@@ -20,6 +20,11 @@ fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
 
 /// Main with V1 and V2, a change before each.
 fn panel(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<HistoryPanel>, Entity<DocModel>) {
+    panel_with(cx, name, 1)
+}
+
+/// Main with V1 and V2, `edits` changes before each.
+fn panel_with(cx: &mut TestAppContext, name: &str, edits: usize) -> (AnyWindowHandle, Entity<HistoryPanel>, Entity<DocModel>) {
     cx.update(gpui_kit::init);
     let dir = std::env::temp_dir().join(format!("noshape-history-feel-{name}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -31,7 +36,9 @@ fn panel(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Histor
     let mut call = |tool: &str, args: serde_json::Value| noshape_ops::registry::run(&mut ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
     call("document_create", json!({ "path": path.to_str().unwrap() }));
     for k in 1..=2 {
-        call("variable_create", json!({ "name": format!("v{k}"), "value": format!("{k} mm") }));
+        for e in 0..edits {
+            call("variable_create", json!({ "name": format!("v{k}_{e}"), "value": format!("{k} mm") }));
+        }
         call("history_create_version", json!({ "name": format!("V{k}") }));
     }
     let session = crate::session::Session::open(&path).unwrap();
@@ -127,21 +134,26 @@ fn compare_from_a_version_rows_menu_starts_at_once_against_the_workspace(cx: &mu
     assert_eq!(cx.update(|cx| doc.read(cx).session.viewing_version()), None, "the workspace stays open");
 }
 
-/// Live history-feel-1117 (qa HISTFEEL-CHANGE-CLICK): a click on a change row under an expanded version opens that
-/// change.
+/// Live history-feel-1117 (qa HISTFEEL-CHANGE-CLICK): a click on a change row under an expanded version (not the
+/// version's own point) opens that change.
 #[gpui::test]
-fn a_click_on_a_change_row_opens_that_change(cx: &mut TestAppContext) {
-    let (window, view, doc) = panel(cx, "change-click");
+fn a_click_on_a_change_row_under_a_version_opens_that_change(cx: &mut TestAppContext) {
+    let (window, view, doc) = panel_with(cx, "change-click", 3);
     let changes = bounds(cx, window, "hist-changes V2");
     click(cx, window, changes.center(), 1);
     assert_eq!(cx.update(|cx| view.read(cx).expanded.len()), 1, "V2's changes listed");
-    let name = cx.update(|cx| {
+    // V2's second change: the one before its own point.
+    let (mv, name) = cx.update(|cx| {
         let s = &doc.read(cx).session;
-        let g = s.store.graph().expect("the graph");
         let v2 = s.store.list_versions().expect("versions").into_iter().find(|v| v.name == "V2").expect("V2");
-        g.microversions.iter().find(|m| m.id == v2.microversion).map(|m| m.description.clone()).expect("V2's change")
+        let m = s.store.microversion(v2.microversion).expect("V2's point");
+        let prev = s.store.microversion(m.parents[0]).expect("the change before");
+        (prev.id, prev.description)
     });
-    let row = bounds(cx, window, Box::leak(format!("hist-change {name}").into_boxed_str()));
-    click(cx, window, point(row.origin.x + px(170.), row.center().y), 1);
-    assert!(cx.update(|cx| doc.read(cx).session.viewing.is_some()), "the change opened");
+    // (The three changes share a description: the row is found by its key.)
+    let _ = name;
+    let row = bounds(cx, window, Box::leak(format!("hist-change c{mv}").into_boxed_str()));
+    VisualTestContext::from_window(window, cx).simulate_mouse_move(point(row.origin.x + px(240.), row.center().y), None, Modifiers::default());
+    click(cx, window, point(row.origin.x + px(240.), row.center().y), 1);
+    assert_eq!(cx.update(|cx| doc.read(cx).session.viewing), Some(mv), "that change opened");
 }

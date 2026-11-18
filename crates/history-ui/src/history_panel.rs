@@ -558,11 +558,11 @@ fn build_rows(graph: &VersionGraph, lanes: &[BranchId]) -> Vec<Row> {
     let live_branch = |b: BranchId| graph.branches.iter().any(|x| x.id == b && !x.deleted);
     for m in graph.microversions.iter().filter(|m| m.parents.len() >= 2 && live_branch(m.branch)) {
         if shown.insert(m.id) {
-            rows.push(Row { kind: RowKind::Merge, mv: m.id, lane: lane_of(m.id), time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("m{}", m.id.short()), changes: vec![] });
+            rows.push(Row { kind: RowKind::Merge, mv: m.id, lane: lane_of(m.id), time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("m{}", m.id), changes: vec![] });
         }
         let src = m.parents[1];
         if let Some(s) = info.get(&src).filter(|s| live_branch(s.branch)) && shown.insert(src) {
-            rows.push(Row { kind: RowKind::Merged, mv: src, lane: lane_of(src), time: s.created, name: s.description.clone(), author: s.author.clone(), key: format!("s{}", src.short()), changes: vec![] });
+            rows.push(Row { kind: RowKind::Merged, mv: src, lane: lane_of(src), time: s.created, name: s.description.clone(), author: s.author.clone(), key: format!("s{}", src), changes: vec![] });
         }
     }
     let rank = |k: RowKind| match k {
@@ -1093,7 +1093,7 @@ impl Render for HistoryPanel {
             found.sort_by_key(|m| std::cmp::Reverse(m.seq));
             for m in found {
                 let lane = lanes.iter().position(|b| *b == m.branch).unwrap_or(0);
-                let c = Row { kind: RowKind::Change, mv: m.id, lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", m.id.short()), changes: vec![] };
+                let c = Row { kind: RowKind::Change, mv: m.id, lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", m.id), changes: vec![] };
                 placed.push(Placed { row: Rc::new(c), y, change: true });
                 y += CHANGE_H;
             }
@@ -1112,7 +1112,7 @@ impl Render for HistoryPanel {
                 let limit = CHANGES_PAGE + self.more_changes.get(&r.key).copied().unwrap_or(0);
                 for mv in changes.iter().take(limit) {
                     let Some(m) = info.get(mv) else { continue };
-                    let c = Row { kind: RowKind::Change, mv: *mv, lane: r.lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", mv.short()), changes: vec![] };
+                    let c = Row { kind: RowKind::Change, mv: *mv, lane: r.lane, time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("c{}", mv), changes: vec![] };
                     placed.push(Placed { row: Rc::new(c), y, change: true });
                     y += CHANGE_H;
                 }
@@ -1306,6 +1306,7 @@ impl Render for HistoryPanel {
         let picking = crate::compare_mode::picking(&self.doc, cx);
         let repair_picking = crate::repair_mode::picking(&self.doc, cx);
         // Repair is offered from a Part Studio (live rp-900).
+        let viewing_point = self.doc.read(cx).session.viewing.is_some();
         let repair_here = {
             let s = &self.doc.read(cx).session;
             s.active_tab.and_then(|t| s.doc.tab(t)).is_some_and(|t| matches!(t.content, TabContent::PartStudio(_)))
@@ -1410,7 +1411,7 @@ impl Render for HistoryPanel {
             let (v, d, cur) = (view.clone(), doc.clone(), current_name.clone());
             let row_packages = if r.kind == RowKind::Version { listed_at.get(&mv).cloned().unwrap_or_default() } else { Vec::new() };
             let row = if pl.change {
-                let selector = format!("hist-change {}", r.name);
+                let selector = format!("hist-change {}", r.key);
                 h_flex()
                     .id(SharedString::from(format!("hist-{}", r.key)))
                     .map(|d| crate::ui_script::mark(d, || format!("history_row:{}", r.name)))
@@ -1711,7 +1712,8 @@ impl Render for HistoryPanel {
                     // Release management: a candidate with the active tab's objects
                     // (Release__typical_release_workflow).
                     // (None with managed workflows off: live2 2026-11-14.)
-                    .when(noshape_ops::release_settings::managed_workflows(), |d| d.child(crate::ui::icon_button("hist-release", "release-create", 30., false, cx).tooltip("Create release candidate").map(|d| crate::ui_script::mark(d, || "button:Create release candidate".into())).on_click({
+                    // Viewing a history point the header keeps only compare and × (live history-feel-1117).
+                    .when(noshape_ops::release_settings::managed_workflows() && !viewing_point, |d| d.child(crate::ui::icon_button("hist-release", "release-create", 30., false, cx).tooltip("Create release candidate").map(|d| crate::ui_script::mark(d, || "button:Create release candidate".into())).on_click({
                         let doc = self.doc.clone();
                         move |_, window, cx| {
                             let tab = doc.read(cx).session.active_tab;
@@ -1721,7 +1723,7 @@ impl Render for HistoryPanel {
                             crate::release_dialog::open_release_candidate(doc.clone(), items, window, cx)
                         }
                     })))
-                    .child(crate::ui::icon_button("hist-create-version", "version", 30., false, cx).tooltip("Create version…").map(|d| crate::ui_script::mark(d, || "button:Create version…".into())).on_click(move |_, window, cx| open_create_version(doc2.clone(), window, cx)))
+                    .when(!viewing_point, |d| d.child(crate::ui::icon_button("hist-create-version", "version", 30., false, cx).tooltip("Create version…").map(|d| crate::ui_script::mark(d, || "button:Create version…".into())).on_click(move |_, window, cx| open_create_version(doc2.clone(), window, cx))))
                     // Help "Comparing": pick two history entries (blue, then red).
                     .child(crate::ui::icon_button("hist-compare", "compare", 30., crate::compare_mode::picking(&self.doc, cx), cx).tooltip("Compare history entries").map(|d| crate::ui_script::mark(d, || "button:Compare history entries".into())).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if crate::repair_mode::picking(&this.doc, cx) {
@@ -1731,7 +1733,7 @@ impl Render for HistoryPanel {
                         cx.notify();
                     })))
                     // Live rp-900/901: "Repair" (Part Studios): pick a history entry to repair from.
-                    .when(repair_here, |d| {
+                    .when(repair_here && !viewing_point, |d| {
                         let doc = self.doc.clone();
                         d.child(crate::ui::icon_button("hist-repair", "repair", 30., repair_picking, cx).tooltip("Repair").map(|d| crate::ui_script::mark(d, || "button:Repair".into())).on_click(move |_, _, cx| {
                             if crate::compare_mode::picking(&doc, cx) {

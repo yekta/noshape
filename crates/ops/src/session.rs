@@ -303,6 +303,31 @@ impl Session {
         graph.microversions.iter().find(|m| m.id == mv && m.parents.is_empty()).map(|_| "Start".to_string())
     }
 
+    /// The history change being viewed (a point that is no version, nor Start): its description ("Part Studio 1 ::
+    /// Insert feature : Extrude 2", live: "History changes are view only. Viewing …").
+    pub fn viewing_change(&self) -> Option<String> {
+        let mv = self.viewing?;
+        if self.viewing_version().is_some() {
+            return None;
+        }
+        self.store.microversion(mv).ok().map(|m| m.description)
+    }
+
+    /// The version a viewed change is listed under: the first one after it on its workspace (live history-feel-1117:
+    /// a change under V3 shows "V3" in the navbar); none after the workspace's last version.
+    pub fn viewing_change_version(&self) -> Option<String> {
+        let m = self.store.microversion(self.viewing?).ok()?;
+        let mut later: Vec<(i64, String)> = self
+            .store
+            .list_versions()
+            .ok()?
+            .into_iter()
+            .filter_map(|v| self.store.microversion(v.microversion).ok().filter(|x| x.branch == m.branch && x.seq > m.seq).map(|x| (x.seq, v.name)))
+            .collect();
+        later.sort();
+        later.into_iter().next().map(|(_, n)| n)
+    }
+
     /// Onshape's workspace protection: the branch takes no model edits (tab
     /// content, tabs, settings, restore, undo / redo); versions, branches and
     /// merges into it are still allowed.
