@@ -69,7 +69,7 @@ pub struct Workspace {
     /// Tab manager (Alt+T), docked left like Onshape's.
     tab_manager: Option<(Entity<crate::tab_manager::TabManager>, Subscription)>,
     /// Pictures for the tab hover card.
-    tab_thumbs: Entity<crate::tab_thumbs::TabThumbs>,
+    pub(crate) tab_thumbs: Entity<crate::tab_thumbs::TabThumbs>,
     /// The pointer is over the navbar, which shows Onshape's selection-count
     /// cursor too (`.navbar` gets the canvas's selection cursor).
     navbar_hovered: bool,
@@ -433,6 +433,8 @@ impl Workspace {
             crate::compare_mode::tab_opened(&self.doc, tab, cx);
         }
         self.active = Some(tab);
+        // Its hover card's picture, if one is being made, is shown by nothing now (qa DOCK-TAB-SWITCH-TRAILING-FRAMES).
+        self.tab_thumbs.update(cx, |t, _| t.activated(tab));
         // The tab bar shows the folder the tab is in.
         let folder = self.doc.read(cx).session.doc.parent_of(tab);
         if self.open_folder.is_some() || folder.is_some() {
@@ -1769,6 +1771,7 @@ impl Workspace {
             strip = strip.child(
                 h_flex()
                     .id(SharedString::from(format!("tab-{id}")))
+                    .debug_selector(move || format!("doc-tab-{id}"))
                     .relative()
                     .flex_none()
                     // Live (computed .os-tab-bar-tab: flex 1 0 auto, min-width

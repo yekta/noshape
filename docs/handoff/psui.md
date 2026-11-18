@@ -135,6 +135,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (1 + distance)·(1 − coverage) after priority, pick radius rounded, drag / menu / hover thresholds in device px, the
   menu's summed move path, the dragged angle's 0.4·(1 + level/3) deviation; 24-hour times without a leading zero
   (live2 prefs-1118).
+- DOCK-TAB-SWITCH-TRAILING-FRAMES (lead P0, qa bisect: first slow 0.4.54): qa's driver rests the pointer 500 ms on the
+  inactive tab, so its hover card shows and starts the tab's picture just before the click; the picture finishing
+  ~0.5 s later notified TabThumbs and redrew (frames at ~550 / ~700 ms after every return). Activating a tab now keeps
+  its in-progress picture quietly (`TabThumbs::activated`); workspace test a_clicked_tabs_card_picture_redraws_nothing
+  (fails without it). Not reproduced with xdotool (no 500 ms rest). qa to rerun the dock flow on the landed build.
 - Pointer offset with skasm (02:2x): measured on vibex6 Xvfb (reach.sh, nav trace): X pointer → viewport +0.01 px,
   origin whole (246, 76) at 1919×1079 and 1440×900; the block's edges drawn in the column of their projection. No
   app offset; skasm owns the reach rule (qa's integer-pixel distances vs our continuous < 7.5).

@@ -22,6 +22,7 @@ fn workspace(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Wo
     static HOOKS: std::sync::Once = std::sync::Once::new();
     HOOKS.call_once(|| {
         crate::register_part_studio_hooks();
+        crate::register_assembly_hooks();
         crate::register_variable_hooks();
         crate::register_preferences_hooks();
     });
@@ -137,4 +138,44 @@ fn a_shortcut_works_with_the_focus_on_the_top_bar(cx: &mut TestAppContext) {
     settle(cx, &|cx| !dialog(cx).is_null());
     let d = dialog(cx);
     assert!(d["title"].as_str().is_some_and(|t| t.starts_with("Extrude")), "Extrude's dialog: {d}");
+}
+
+/// qa DOCK-TAB-SWITCH-TRAILING-FRAMES (since 0.4.54): the pointer rests on an inactive Part Studio tab until its hover
+/// card shows (which starts the tab's picture), then clicks it. The card goes with the click, but the picture finishing
+/// ~0.5 s later redrew the window: frames until ~700 ms after every return to an open tab. Activating the tab now keeps
+/// that picture quietly; a card left showing still gets its picture drawn.
+#[gpui::test]
+fn a_clicked_tabs_card_picture_redraws_nothing(cx: &mut TestAppContext) {
+    let (w, ws, [studio, ..]) = workspace(cx, "tab-card");
+    let thumbs = ws.read_with(cx, |ws, _| ws.tab_thumbs.clone());
+    let notified = std::rc::Rc::new(std::cell::Cell::new(0));
+    let n = notified.clone();
+    let _watch = cx.update(|cx| cx.observe(&thumbs, move |_, _| n.set(n.get() + 1)));
+    let state = |cx: &mut TestAppContext| thumbs.read_with(cx, |t, _| t.state());
+    // What the card asks for when it shows; made on the GPU's own thread.
+    let ask = |cx: &mut TestAppContext| {
+        thumbs.update(cx, |t, cx| {
+            t.forget();
+            t.request(studio, cx);
+        });
+        state(cx).0
+    };
+    let made = |cx: &mut TestAppContext| {
+        let t = std::time::Instant::now();
+        while state(cx).0 && t.elapsed() < std::time::Duration::from_secs(60) {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            draw(cx, w);
+        }
+        draw(cx, w);
+    };
+    // A card left showing: its picture redraws.
+    let asked = ask(cx);
+    made(cx);
+    let shown = (asked, notified.replace(0), state(cx).1);
+    // The tab clicked (activated) while its picture is made.
+    let asked = ask(cx);
+    cx.update_window(w, |_, window, cx| ws.update(cx, |ws, cx| ws.activate(studio, window, cx))).unwrap();
+    made(cx);
+    let clicked = (asked, notified.get(), state(cx).1);
+    assert_eq!((shown, clicked), ((true, 1, 1), (true, 0, 1)), "((asked, redraws, kept) for a card left showing, the same for one whose tab was clicked)");
 }

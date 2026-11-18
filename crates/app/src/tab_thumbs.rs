@@ -24,11 +24,38 @@ pub struct TabThumbs {
     evaluator: Arc<parking_lot::Mutex<noshape_model::assembly::eval::AssemblyEvaluator>>,
     /// Part Studios not open in a view (incremental across pictures).
     regen: Arc<parking_lot::Mutex<noshape_model::regen::Regenerator>>,
+    /// Tabs activated while their card's picture was being made: it is kept but redraws nothing when done (a card
+    /// shown just before its tab's click went with the click; its picture finishing ~0.5 s later drew frames after
+    /// every return to an open tab, qa DOCK-TAB-SWITCH-TRAILING-FRAMES).
+    quiet: std::collections::HashSet<TabId>,
+    /// The tab whose picture is being made.
+    making: Option<TabId>,
 }
 
 impl TabThumbs {
     pub fn new(doc: Entity<DocModel>) -> Self {
-        Self { doc, images: HashMap::new(), made_for: HashMap::new(), busy: false, queued: Vec::new(), evaluator: Default::default(), regen: Default::default() }
+        Self { doc, images: HashMap::new(), made_for: HashMap::new(), busy: false, queued: Vec::new(), evaluator: Default::default(), regen: Default::default(), quiet: Default::default(), making: None }
+    }
+
+    /// `tab` became the active one: no card shows its picture now.
+    pub fn activated(&mut self, tab: TabId) {
+        self.queued.retain(|t| *t != tab);
+        if self.making == Some(tab) {
+            self.quiet.insert(tab);
+        }
+    }
+
+    /// Whether a picture is being made, and how many are kept.
+    #[cfg(test)]
+    pub(crate) fn state(&self) -> (bool, usize) {
+        (self.busy, self.made_for.len())
+    }
+
+    /// Every picture made again at its next request.
+    #[cfg(test)]
+    pub(crate) fn forget(&mut self) {
+        self.made_for.clear();
+        self.images.clear();
     }
 
     /// The tab's picture: `None` while it is being made, `Some(None)` when
@@ -44,6 +71,7 @@ impl TabThumbs {
     /// Make (or remake) `tab`'s picture if its content changed.
     pub fn request(&mut self, tab: TabId, cx: &mut Context<Self>) {
         use std::hash::{Hash as _, Hasher as _};
+        self.quiet.remove(&tab);
         if self.busy {
             if !self.queued.contains(&tab) {
                 self.queued.push(tab);
@@ -67,6 +95,7 @@ impl TabThumbs {
             return;
         }
         self.busy = true;
+        self.making = Some(tab);
         let versions = self.doc.read(cx).session.pinned_documents();
         let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
         let evaluator = self.evaluator.clone();
@@ -129,6 +158,7 @@ impl TabThumbs {
                 .await;
             let _ = this.update(cx, |this: &mut Self, cx| {
                 this.busy = false;
+                this.making = None;
                 // Stopped for a view's regeneration: made again at the next hover.
                 if let Some(picture) = picture {
                     this.made_for.insert(tab, hash);
@@ -136,11 +166,14 @@ impl TabThumbs {
                 }
                 // The next queued tab that needs a picture (an unchanged one
                 // or one without any returns at once).
+                let quiet = this.quiet.remove(&tab);
                 while !this.busy && !this.queued.is_empty() {
                     let next = this.queued.remove(0);
                     this.request(next, cx);
                 }
-                cx.notify();
+                if !quiet {
+                    cx.notify();
+                }
             });
         })
         .detach();
