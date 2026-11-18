@@ -307,7 +307,9 @@ pub struct Viewport {
     pointer_inside: bool,
     /// Submitted but not yet presented frames (seq, submit time,
     /// interactive), oldest first.
-    in_flight: VecDeque<(u64, Instant, bool)>,
+    /// Frames submitted, not presented yet: their sequence number, when (wall clock), interactive, and when on the
+    /// executor's clock (the frame timer's: a test's frames take what its clock says, not the host's load).
+    in_flight: VecDeque<(u64, Instant, bool, Instant)>,
     /// Frames count as interactive until then (a camera change, Onshape's
     /// `setUserIsAdjustingCamera`), and their timing (no rotation inertia
     /// below 20 fps).
@@ -996,7 +998,7 @@ impl Viewport {
             return;
         }
         // A frame that never comes back must not block the viewport forever.
-        while self.in_flight.front().is_some_and(|(_, t, _)| t.elapsed() > Duration::from_secs(3)) {
+        while self.in_flight.front().is_some_and(|(_, t, _, _)| t.elapsed() > Duration::from_secs(3)) {
             self.in_flight.pop_front();
         }
         if self.in_flight.len() < self.gpu.frames_in_flight() {
@@ -1394,7 +1396,8 @@ impl Viewport {
             self.schedule_full_detail(cx);
         }
         // Timing two consecutive frames: draw the next one at once.
-        let force_next = interactive && self.frame_timer.draw_start(now);
+        let clock = cx.background_executor().now();
+        let force_next = interactive && self.frame_timer.draw_start(clock);
         let layout = std::mem::take(&mut self.pick_dirty) | (self.last_submitted_view != Some(view));
         let pick = layout | std::mem::take(&mut self.pick_hover_dirty);
         self.last_submitted_view = Some(view);
@@ -1420,7 +1423,7 @@ impl Viewport {
         {
             b.click_submit_ms.push(t.elapsed().as_secs_f32() * 1000.0);
         }
-        self.in_flight.push_back((self.seq, now, interactive));
+        self.in_flight.push_back((self.seq, now, interactive, clock));
         noshape_render::perf::frame_milestone(self.seq, "submitted");
         self.gpu.submit(RenderJob {
             target: self.target_id,
@@ -1503,12 +1506,12 @@ impl Viewport {
     fn present(&mut self, seq: u64, result: Result<(Frame, FrameImage), String>, window: &mut Window, cx: &mut Context<Self>) {
         noshape_render::perf::frame_milestone(seq, "back on the UI thread");
         // Frames up to `seq` are done (older ones may have been coalesced away).
-        while self.in_flight.front().is_some_and(|(s, _, _)| *s <= seq) {
-            let (s, t, interactive) = self.in_flight.pop_front().expect("front");
+        while self.in_flight.front().is_some_and(|(s, _, _, _)| *s <= seq) {
+            let (s, t, interactive, clock) = self.in_flight.pop_front().expect("front");
             if s == seq {
                 noshape_render::perf::record("v.submit_to_present", t.elapsed());
                 if interactive {
-                    self.frame_timer.draw_end(t.elapsed());
+                    self.frame_timer.draw_end(cx.background_executor().now().saturating_duration_since(clock));
                 }
             }
         }
