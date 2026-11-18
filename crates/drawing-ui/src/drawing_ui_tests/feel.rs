@@ -813,6 +813,58 @@ fn esc_in_hatch_region_ends_its_profile_tool_first_then_closes_the_panel(cx: &mu
     assert_eq!(state(cx), (false, false), "the second closes the panel");
 }
 
+/// Live2 hatch-list-1118: the Pattern list opens 1 px under its field, 2 px wider, 30 px rows, as tall as its rows up to
+/// 341 px and then scrolls (ANSI's 9 rows 272 px, General's 31 at 341).
+#[gpui::test]
+fn the_hatch_pattern_list_opens_under_its_field_and_scrolls_past_341_px(cx: &mut TestAppContext) {
+    for (standard, height) in [(0, 272.), (2, 341.)] {
+        let (window, editor) = drawing(cx, &format!("feel-hatch-list-{standard}"));
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_hatch_dialog(None, w, cx))).unwrap();
+        cx.update(|cx| {
+            editor.update(cx, |e, cx| {
+                if let Some(d) = &mut e.hatch_dlg {
+                    d.standard = standard;
+                }
+                cx.notify();
+            })
+        });
+        draw(cx, window);
+        let field = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("hd-pattern-field").expect("the Pattern field");
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(field.center(), Modifiers::default());
+        draw(cx, window);
+        // (The bounds inside its 1 px border.)
+        let list = cx.update(|cx| crate::os_menu::open_bounds(cx)).expect("the list open").dilate(px(1.));
+        assert!((f32::from(list.top() - field.bottom()) - 1.).abs() < 0.5 && (list.left() - field.left()).abs() < px(0.5), "1 px under the field: {list:?} / {field:?}");
+        assert!((f32::from(list.size.width) - 190.).abs() < 0.5, "190 px wide: {list:?}");
+        assert!((f32::from(list.size.height) - height).abs() < 0.5, "standard {standard}: {height} px tall: {list:?}");
+    }
+}
+
+/// Live2 toolbar-help-1118: a toolbar tool's help shows about 3.1 s after the pointer rests on it, 400 px wide at the
+/// editor's left edge just under the toolbar, and goes when the pointer leaves; Undo has none.
+#[gpui::test]
+fn a_toolbar_tools_help_shows_after_3_s_under_the_toolbar(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "feel-tool-help");
+    let shown = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("tool-help");
+    cx.update(|cx| editor.update(cx, |e, cx| e.tool_hover("Projected view (p)", true, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_millis(2900));
+    draw(cx, window);
+    assert!(shown(cx).is_none(), "not yet at 2.9 s");
+    cx.executor().advance_clock(std::time::Duration::from_millis(300));
+    draw(cx, window);
+    // (The editor fills the test window.)
+    let b = shown(cx).expect("shown by 3.2 s");
+    assert_eq!((b.left(), b.top(), b.size.width), (px(0.), px(crate::ui::TOOLBAR_H + 1.), px(400.)), "{b:?}");
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Projected view Test help. First step. Second step."));
+    cx.update(|cx| editor.update(cx, |e, cx| e.tool_hover("Projected view (p)", false, cx)));
+    draw(cx, window);
+    assert!(shown(cx).is_none(), "gone when the pointer leaves");
+    cx.update(|cx| editor.update(cx, |e, cx| e.tool_hover("Undo (ctrl+z)", true, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_millis(4000));
+    draw(cx, window);
+    assert!(shown(cx).is_none(), "Undo has none");
+}
+
 /// Live2 drw-centermark (behaviours "studios (11-17, P0 drawing feel)"): a hole's centre mark lights from its circle, its
 /// centre or an arm (its view not framed), its circle light blue, its grips shown; hovering the view alone shows none;
 /// with the view selected the grips show and the circle is the view's orange; a press on the circle drags the view.

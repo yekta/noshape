@@ -71,7 +71,8 @@ impl TbTool {
     fn render(self, ed: &Entity<DrawingEditor>, cx: &mut Context<DrawingEditor>) -> AnyElement {
         // Named by its tooltip without the shortcut, for the ui-parity driver (tests/ui-parity: `{"tool": "Note"}`).
         let tip = self.tip;
-        crate::ui_script::wrap(self.render_button(ed, cx), || format!("tool:{}", tip.split(" (").next().unwrap_or(tip)))
+        let button = div().id(SharedString::from(format!("tbh-{}", self.id))).flex_none().on_hover(cx.listener(move |this, on: &bool, _, cx| this.tool_hover(tip, *on, cx))).child(self.render_button(ed, cx));
+        crate::ui_script::wrap(button.into_any_element(), || format!("tool:{}", tip.split(" (").next().unwrap_or(tip)))
     }
 
     fn render_button(self, ed: &Entity<DrawingEditor>, cx: &mut Context<DrawingEditor>) -> AnyElement {
@@ -299,7 +300,7 @@ impl DrawingEditor {
             .child(sep())
             .child(crate::ui_script::wrap(
                 // Onshape: the update button is highlighted (#fcda7f, #fab601 border) when out of date.
-                crate::ui::tool_button("dr-update", "drawing-update", false, cx)
+                div().id("tbh-dr-update").flex_none().on_hover(cx.listener(|this, on: &bool, _, cx| this.tool_hover("Update from this workspace (ctrl+q)", *on, cx))).child(crate::ui::tool_button("dr-update", "drawing-update", false, cx)
                     .w(px(CELL))
                     .h(px(CELL))
                     .when(out_of_date, |b| b.bg(gpui_kit::rgb(0xfcda7f)).border_2().border_color(gpui_kit::rgb(0xfab601)))
@@ -309,7 +310,7 @@ impl DrawingEditor {
                         if !up_to_date {
                             this.update_drawing(cx)
                         }
-                    }))
+                    })))
                     .into_any_element(),
                 || "tool:Update from this workspace".into(),
             ));

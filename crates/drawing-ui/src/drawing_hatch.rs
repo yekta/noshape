@@ -510,7 +510,7 @@ impl DrawingEditor {
             let ed = ed.clone();
             // (Found by the shown pattern, as live's select: `dropdown: None` on General.)
             let shown = pat.to_string();
-            let field = div().id("hd-pattern-field").map(move |d| crate::ui_script::mark(d, move || format!("dropdown:{shown}")));
+            let field = div().id("hd-pattern-field").debug_selector(|| "hd-pattern-field".into()).map(move |d| crate::ui_script::mark(d, move || format!("dropdown:{shown}")));
             let btn = Button::new("hd-pattern")
                 .ghost()
                 .xsmall()
@@ -521,7 +521,9 @@ impl DrawingEditor {
                 .dropdown_caret(true)
                 .child(h_flex().gap(px(4.)).when(!none, |h| h.child(crate::ui::glyph(&hatch_pat::icon_name(standard, pattern), 16., ink))).child(div().text_size(px(11.5)).text_color(ink).child(pat)))
                 .os_dropdown_menu("hd-pattern-dd", true, move |mut m, _, _| {
-                    m = m.select_list(188.);
+                    // 2 px wider than the field, 30 px rows, 1 px under it, at most 341 px tall, then it scrolls; low in the
+                    // window it opens above the field (live2 hatch-list-1118).
+                    m = m.select_list(190.).truncate_labels().row_height(30.).max_height(341., 1.);
                     // Edit hatch section...: General starts with None (live (4)).
                     if section_mode && standard == 2 {
                         let e = ed.clone();

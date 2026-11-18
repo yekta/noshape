@@ -219,6 +219,8 @@ pub struct OsMenu {
     plain: bool,
     /// Feature Studio snippet menus: 33 px rows, 14 px `#333` text 14 px in.
     snippets: bool,
+    /// The list's tallest height, past it the rows scroll, and its gap under the field (`max_height`).
+    max_height: Option<(f32, f32)>,
     /// Onshape's select lists (e.g. Variable type): this width, 26 px rows,
     /// 14 px `#666` text 10 px in; the hovered (else the checked) row is
     /// `#1651b0` with white text.
@@ -283,7 +285,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, flip: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, sep_margin: 0., text_inset: None, text_px: None, camera: false, on_escape: None, after_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, moved: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, flip: None, plain: false, snippets: false, max_height: None, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, sep_margin: 0., text_inset: None, text_px: None, camera: false, on_escape: None, after_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, moved: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -400,6 +402,18 @@ impl OsMenu {
     pub fn snippet_list(mut self) -> Self {
         self.snippets = true;
         self
+    }
+
+    /// At most `h` px tall, then the rows scroll, `gap` px under the field (a drawing panel's Graebert list, live2
+    /// hatch-list-1118: 341 px, 1 px). One that doesn't fit below opens above the field rather than over it.
+    pub fn max_height(mut self, h: f32, gap: f32) -> Self {
+        self.max_height = Some((h, gap));
+        self
+    }
+
+    /// The gap under its field set by [`Self::max_height`].
+    pub fn field_gap(&self) -> f32 {
+        self.max_height.map_or(0., |(_, gap)| gap)
     }
 
     /// Icon-less list style (13 px text, 17 px inset), as on the documents page.
@@ -628,6 +642,7 @@ impl Render for OsMenu {
         // In dropdowns a ✓ takes the icon place too (documents Folders sort menu).
         let any_check = self.items.iter().any(|i| matches!(i, OsMenuItem::Item { checked: true, .. }));
         let snippets = self.snippets;
+        let max_height = self.max_height;
         let sep_margin = self.sep_margin;
         let (row_h, icon_x, icon_sz, text_x, text_sz): (f32, f32, f32, f32, f32) = if snippets {
             (33., 4., 18., 14., 14.)
@@ -888,7 +903,11 @@ impl Render for OsMenu {
             .when(native, |d| d.shadow(Vec::new()).py(px(1.)).border_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0x858585 } else { 0x767676 })))
             .text_color(pal.text)
             // Live (fs-compact-snippet-menu): the compact toolbar's snippet list is a 675 px box that scrolls.
-            .map(|d| if snippets { d.child(div().id("snippet-scroll").max_h(px(671.)).overflow_y_scroll().children(rows)) } else { d.children(rows) })
+            .map(|d| match (snippets, max_height) {
+                (true, _) => d.child(div().id("snippet-scroll").max_h(px(671.)).overflow_y_scroll().children(rows)),
+                (false, Some((h, _))) => d.child(div().id("menu-scroll").max_h(px(h - 2.)).overflow_y_scroll().children(rows)),
+                _ => d.children(rows),
+            })
             .child(canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
             // A `<select>`'s list closes when the wheel turns outside it (Chrome; the page scrolls on, and the list
             // stayed behind over another field: PREFS-SELECT-LIST-DETACH). Inside, a long list scrolls.

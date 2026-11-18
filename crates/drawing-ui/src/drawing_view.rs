@@ -532,6 +532,8 @@ pub struct DrawingEditor {
     pub ordinate_extending: Option<(u64, String)>,
     /// Add to ordinate dimension group has added a value since the menu (the reader lights the view from then on).
     pub ordinate_added: bool,
+    /// The toolbar tool under the pointer, for its help popover ([`crate::drawing_help`]).
+    pub help_hover: Option<crate::drawing_help::HelpHover>,
     pub move_sheet: Option<crate::drawing_move_sheet::MoveSheetDlg>,
     pub table_props: Option<crate::drawing_move_sheet::TablePropsDlg>,
     pub linestyle: Option<crate::drawing_linestyle::LinestyleDlg>,
@@ -817,6 +819,7 @@ impl DrawingEditor {
             sheets_ref_menu_at: None,
             ordinate_extending: None,
             ordinate_added: false,
+            help_hover: None,
             move_sheet: None,
             table_props: None,
             linestyle: None,
@@ -2288,6 +2291,7 @@ impl DrawingEditor {
             .on_pinch(cx.listener(Self::on_pinch));
         v_flex()
             .size_full()
+            .relative()
             .bg(pal.app_bg)
             .key_context("Drawing")
             .track_focus(&self.focus)
@@ -2343,6 +2347,7 @@ impl DrawingEditor {
                 let canvas_el = canvas_el.h_full().min_w_0().border_t_1().border_color(pal.border);
                 gpui_kit::component::h_flex().flex_1().min_h_0().relative().children(sheet_bar).child(canvas_el)
             })
+            .children(self.render_tool_help())
             .into_any_element()
     }
 }

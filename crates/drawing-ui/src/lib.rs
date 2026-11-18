@@ -35,6 +35,7 @@ pub mod drawing_export;
 pub mod drawing_extra;
 pub mod drawing_gdt;
 pub mod drawing_hatch;
+pub mod drawing_help;
 pub mod drawing_hide_edges;
 pub mod drawing_hide_parts;
 pub mod drawing_hooks;

@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 11:40 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 11:43 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -26,18 +26,19 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
 - Landed 49cfe99b 09:12: the Release dialog ignores Esc (real-app check on vibex6 Xvfb: xdotool "abc" Return "xyz"
   lands as two lines, Esc leaves it open; the unit test's dropped letters are the harness), Feature Studio error /
   completion timings.
-- In 64680c1d (from the 10:2x / 10:4x batches): Preferences (shortcut "Create release", Length decimals per unit,
+- Landed 64680c1d as 1e21f28e 11:19: Preferences (shortcut "Create release", Length decimals per unit,
   the Versions flyout's open state carried over); live2's BOM retakes (BOM panel fields, TABLE + EDGE <view> until
   right-clicked); ordinate add-to-group reads nothing until its first click; linestyle / DWT tooltips; selects marked
   `dropdown:<value>`; runner: Graebert `*_Menu` hover not compared, unnamed "" separators, "start X asm Copy n";
   Sheet properties › Custom fields read as live. run12 12/13, run13 custom-zones 12/12, run10 all match.
   Also in it: VS value tooltip over its cell; Derived's panel takes the first Esc / Enter; stacked fractions; merge
   preview "Last change by <user> at <time>".
-- Local, to land: Custom's zones are the standard's (ANSI 4 x 4, ISO 6 x 4; live2 custom-zones-1118; e2e, test);
-  drw-bom-table-properties s7 excluded (live2 bomprops-1118: live keeps the table selected after Esc / ✕ / ✓, the
-  recorder's empty selection is a reader miss; ours keeps it); PICKBOX 7 for the detail loop hover and the hole
-  table's X-direction pick, GRIPSIZE 6 for a leader anchor drag (they had 5; feel test); a test that an open custom
-  feature dialog keeps its labels after a Feature Studio commit (live custom-feature-1118: ours already).
+- Landed ba9f9050 as 9f629e6f 11:38: Custom's zones per standard, s7 excluded, PICKBOX / GRIPSIZE picks, the custom-dialog test.
+- Local, to land: the hatch Pattern list as live2 hatch-list-1118 (1 px under the field, 190 px, 30 px rows, at most
+  341 px then it scrolls, above the field when low; OsMenu::max_height; feel test; run14 drw-hatch-* all match); the
+  drawing toolbar help popover (live2 toolbar-help-1118: 3.1 s, 400 px at the frame's left under the toolbar, title
+  bar #cfdbe5, numbered steps, gone on leave, none for Undo / Redo; drawing_help.rs; feel test). Its texts table is
+  EMPTY: decision asked of the lead (copy live's 50 texts from help-popovers.json, or write our own).
 - Queued 64680c1d 11:07 (5 commits: Preferences, Custom zones, VS tooltip / Derived Esc, the shortcut-count fix,
   stacked fractions + merge Edited tooltip).
 - Open: drw-hatch-panel s31 (Pattern list covers its field; asked live2 09:23).

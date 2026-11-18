@@ -728,8 +728,9 @@ pub trait OsDropdownExt: IntoElement + Sized {
             OPEN_DROPDOWNS.with(|o| o.borrow_mut().insert(key.clone(), menu.downgrade()));
             // Near the window's right edge the menu aligns to the button's right.
             let (x, anchor) = if b.right() + px(260.) > window.viewport_size().width { (b.right(), Anchor::TopRight) } else { (b.origin.x, Anchor::TopLeft) };
+            let gap = px(menu.read(cx).field_gap());
             menu.update(cx, |m, _| m.set_flip(point(x, b.top())));
-            crate::os_menu::open_anchored(point(x, b.bottom()), anchor, menu, window, cx);
+            crate::os_menu::open_anchored(point(x, b.bottom() + gap), anchor, menu, window, cx);
         });
         let on_key = open.clone();
         // A click on the button while its own menu is open only closes it (live2 drw-hcallout-fit, drw-hatch-panel: a
