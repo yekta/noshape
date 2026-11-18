@@ -47,17 +47,17 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
 - P0 HEAVY-ASM-SOFTWARE-FRAME (qa, xDev): cause = angle display mesh density: 7.76 M tris (SCHUNK Gehaeuse 355 faces
   1.17 M, 7 mm bearing 67k, _787261002 691k ×5); chord mesh 1.05 M; headless render 15–18 s -> 2.95 s (vibex8
   ~/tmp/asm/perf, probe /root/tmp/render.rs.main). Handed to psui 11-18 12:3x; assembly side doesn't scale it.
-- Snap retake (snap-diag-1118) + Display states focus QUEUED 679e306e (undoes a9f670ef's pick rectangle).
+- Triad grab-point fix re-QUEUED 3ab78c25 (worktree asm-triad; 05b77104 failed on a test-file conflict).
 - Suite pair main vs 28-commit stack (lead: land on the light 20 if none worse): ~/agents/asm-keep/pairlist.sh <tag>
   <dirs>: vibe2 tag a (9: clamp … keyboard), vibex8 tag b (10: linear-limits … welding-config) -> pair/{mainbase,stack}
   -<tag>.log, done-<tag>; bjr-config done (BOM 20->22/23). Heavy 4 (xdev, isaac, infento, scissor) tag c tonight 02:00
   on vibe2 (night.sh).
-- suspension and scissor-lift 4ce5c7 corpora mix microversions: refetch asked of live2 (REQUESTS 13:42).
+- suspension + scissor-lift refetched 11-18 14:11. scissor Top <3>: 4ce5c7 derives fed22d's RpJH, which fed22d's failing
+  fillets / holes / move faces never build: model side, lead asked (vibe2 ~/agents/asm-keep/trace-scissor.out).
 - Thread ids (11-18 lead): core e8af89fe-d460-49b3-b0bb-9572da230fed, blend 0672fa20-964d-4fde-a19c-c5b4363729ba,
   qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b (old core 6692ae35 / blend 0e6e9942 stopped: never message them).
-- Solver reorient fix QUEUED from worktree asm-solver (ce07890bb; c28 A/B: none of 10 worse, scissor-lift 214/242);
-  snap pick rectangle QUEUED e2c20cb2.
-- LANDED 11-18: asm-feel3 52c050e1, asm-views2 916b2d59, qa's save switch b2473af7 (file sent to qa).
+- LANDED 11-18: asm-feel3 52c050e1, asm-views2 916b2d59, qa's save switch b2473af7, solver reorient d9fce0c0,
+  snap retake + Display states c7d388e8.
 - scissor-lift: Fastened 35 (Sub 6ed9b2 > T8 Leadscrew edge centre, align face, ↔ Sub aa9534 > Output Coupler edge
   centre) now resolves (main: b end unresolved) but our X turns 45° (live X a (0,1,0), b (0,0,-1)): leadscrew and
   coupler turned. Trace with each OK mate's end angles: ops-c25 vibex7 one/sc25.log (slot).
@@ -155,7 +155,7 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
    two lines of unequal length; our solver mirrors endpoints, live the lines -> undone edits, washer stays M5 1.0 mm ->
    skasm (sent 14:05). bjr OPG006 Description: set by 5e35bf's custom "Wire clip 1", whose imported FS c5f922…/3c1eea…
    isn't in the corpus -> REQUESTS 13:55 live2. robot-relations REV-21-1650: live's 6 sheet bodies vs our one solid
-   (DECISIONS 11-17), so ×6 merged: as ruled. suspension / scissor-lift: refetch (REQUESTS 13:42). isaac Helical:
+   (DECISIONS 11-17), so ×6 merged: as ruled. suspension / scissor-lift: refetched 14:11. isaac Helical:
    custom GearLabFeature not registered ("unknown feature type") -> FS owner via lead. infento Wheellock: studio
    f0eedd (Sketch 7 ANGLE undone 81 mm, fillets) -> model side. welding "Part 2"/"Part 6" merged in sub 0eadef: tracing
    (vibex8 ~/agents/asm-keep/trace-welding.out; one.sh <bin> <asm dir> <out> = one traced assembly via slot).
