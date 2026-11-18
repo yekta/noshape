@@ -128,6 +128,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    actions", live/psui/ui-speed-1118/table.md): open document 12231 ms settled, tab switch 2291-2733, enter sketch 1291 (dialog 226),
    exit 889, undo 903-1011, open Extrude 1320 (dialog 221), first preview 2004, commit 1115, rollback drop 918-1094, context menu 117,
    Mass dialog 161. Use it with the nightly / release-build timings.
+0o. **Compat loop vs the window (02:53)**: compat-loop started a run on vibex7 at 02:41 (green 85abf64a), inside the nightly window;
+   stopped, own userdocs.py killed, loop restarted with a 02:00-04:05 skip. Tonight's latency rows overlapped it 02:41-02:53: read
+   them as possibly loaded. Green 08597f71a has core's 55fc929c: faces-pattern-slots comes from the loop after 04:05 / cut-check 04:15.
+   SKSNAP-REACH closed not a bug (02:50, sub-pixel targets).
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
