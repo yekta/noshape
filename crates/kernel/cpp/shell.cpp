@@ -3278,9 +3278,9 @@ bool newton_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& 
 // The foot of P on `S` held to its bounds, near uv: newton_foot, else where it would leave the surface, the foot on
 // that bound (Newton along it, the other parameter held), where the distance grows inward from it (a point past the
 // surface's end: an edge joining a face past its bound, c2-rings-loft's Shell 1).
-bool bounded_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& uv)
+bool bounded_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& uv, bool newton_tried)
 {
-  if (newton_foot(S, P, uv))
+  if (!newton_tried && newton_foot(S, P, uv))
     return true;
   double U0, U1, V0, V1;
   S->Bounds(U0, U1, V0, V1);
@@ -3355,7 +3355,15 @@ gp_Pnt2d foot(const Surf& s, const gp_XYZ& x)
   if (s.has_hint && newton_foot(s.base, x, uv))
     return uv;
   if (s.has_hint)
+  {
+    // (Newton held to the bound it leaves by (a point past the surface's end), taken within two walls of x: a foot
+    // farther off may stand for a nearer one elsewhere, OCCT's global search's. OCCT's for all of them was a fifth of
+    // c2-impeller-loft's Shell Gehäuse.)
+    gp_Pnt2d b = s.hint;
+    if (bounded_foot(s.base, x, b, true) && s.base->Value(b.X(), b.Y()).XYZ().Subtracted(x).Modulus() <= 2 * std::abs(s.d))
+      return b;
     return s.sas->NextValueOfUV(s.hint, gp_Pnt(x), 1e-12);
+  }
   if (s.own[1] > s.own[0] && s.own[3] > s.own[2])
   {
     if (!s.grid)

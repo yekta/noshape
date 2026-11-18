@@ -50,7 +50,7 @@ struct OffsetRun
 };
 
 bool     newton_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& uv, bool* past = nullptr);
-bool     bounded_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& uv);
+bool     bounded_foot(const occ::handle<Geom_Surface>& S, const gp_XYZ& P, gp_Pnt2d& uv, bool newton_tried = false);
 gp_Pnt2d foot(const Surf& s, const gp_XYZ& x);
 double   eval(const Surf& s, const gp_XYZ& x);
 double   eval_grad(const Surf& s, const gp_XYZ& x, gp_XYZ& g);
