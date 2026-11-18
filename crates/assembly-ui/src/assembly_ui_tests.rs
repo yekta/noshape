@@ -1850,3 +1850,64 @@ fn a_fixed_instances_drag_drops_the_no_drop_cursor_at_the_release(cx: &mut TestA
         assert_eq!(v.result.solved.placement(instance(v, "Part 1 <1>", cx)), before, "nothing moved");
     });
 }
+
+/// Live insert-sort-1118: Insert › Other documents lists Documents newest first by default; a Sort menu pick re-sorts
+/// them (names case-insensitive, Modified by by author) and is remembered across a restart; Esc closes the menu, not the
+/// dialog.
+#[gpui::test]
+fn other_documents_sort_by_their_menu_and_remember_it(cx: &mut TestAppContext) {
+    use noshape_ops::prefs::{DocumentSort, FolderSort, InsertMemory};
+    let doc = |name: &str, modified: i64, by: &str| crate::library::DocEntry {
+        path: std::path::PathBuf::from(format!("/nowhere/{name}.noshape")),
+        name: name.into(),
+        modified,
+        modified_by: by.into(),
+        owner: by.into(),
+        description: String::new(),
+        workspace: "Main".into(),
+        thumbnail: None,
+        recent_rank: None,
+        broken: false,
+        trashed: false,
+    };
+    let docs = vec![doc("bracket", 2, "Zoe"), doc("Axle", 1, "amir"), doc("cover", 3, "Bea")];
+    let order = |sort: DocumentSort| {
+        let mut d = docs.clone();
+        super::panels::sort_documents(&mut d, sort);
+        d.iter().map(|d| d.name.clone()).collect::<Vec<_>>()
+    };
+    assert_eq!(DocumentSort::default(), DocumentSort::ModifiedNewest, "live's default");
+    assert_eq!(order(DocumentSort::ModifiedNewest), ["cover", "bracket", "Axle"]);
+    assert_eq!(order(DocumentSort::ModifiedOldest), ["Axle", "bracket", "cover"]);
+    assert_eq!(order(DocumentSort::NameAsc), ["Axle", "bracket", "cover"]);
+    assert_eq!(order(DocumentSort::NameDesc), ["cover", "bracket", "Axle"]);
+    assert_eq!(order(DocumentSort::ModifiedByAsc), ["Axle", "cover", "bracket"]);
+    assert_eq!(order(DocumentSort::ModifiedByDesc), ["bracket", "cover", "Axle"]);
+    let mut dirs = vec![std::path::PathBuf::from("/x/beta"), std::path::PathBuf::from("/x/Alpha")];
+    super::panels::sort_folders(&mut dirs, FolderSort::NameAsc);
+    assert_eq!(dirs[0].file_name().unwrap(), "Alpha");
+    assert_eq!(FolderSort::ALL.map(|s| s.label()), ["Name: A → Z", "Name: Z → A", "Last modified"]);
+
+    let (window, view) = pattern_assembly(cx, "insert-sort");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.toggle_insert(w, cx);
+            v.ui.insert_source = 1;
+            v.ui.insert_memory = Some(InsertMemory::default());
+            v.ui.insert_other_cat = Some(2);
+            v.ui.insert_other_docs = Some(docs.clone());
+            v.ui.insert_sort_menu = Some(1);
+            let _ = v.render_insert_other(cx);
+            v.pick_insert_sort(1, 0);
+            assert_eq!(v.ui.insert_sort_menu, None, "a pick closes the menu");
+            assert_eq!(v.insert_memory().documents, DocumentSort::NameAsc);
+            assert_eq!(InsertMemory::load().documents, DocumentSort::NameAsc, "remembered across a restart");
+            assert_eq!(InsertMemory::load().category, Some(2), "and the location");
+            v.ui.insert_sort_menu = Some(1);
+            v.on_cancel(&crate::actions::Cancel, w, cx);
+            assert!(v.ui.insert_sort_menu.is_none() && v.insert_open, "Esc: the menu closes, the dialog stays");
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+}

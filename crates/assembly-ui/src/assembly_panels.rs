@@ -4475,6 +4475,76 @@ impl AssemblyView {
 
     /// Scan the local document library (background) for the Other
     /// documents lists; once per Insert session.
+    /// Insert › Other documents' remembered sorts and location (loaded on first use).
+    pub(super) fn insert_memory(&mut self) -> &mut noshape_ops::prefs::InsertMemory {
+        self.ui.insert_memory.get_or_insert_with(noshape_ops::prefs::InsertMemory::load)
+    }
+
+    /// Change what Other documents remembers, saved when it changes.
+    fn remember_insert(&mut self, change: impl FnOnce(&mut noshape_ops::prefs::InsertMemory)) {
+        let m = self.insert_memory();
+        let before = m.clone();
+        change(m);
+        if *m != before {
+            m.save();
+        }
+    }
+
+    /// A section's Sort menu (live insert-sort-1118): 183 px under its button, right-aligned to it, 27 px rows of
+    /// 14 px `#555`, the current sort on `#b2ddf6` with a check. A pick re-sorts and is remembered.
+    fn render_insert_sort_menu(&mut self, ix: usize, memory: &noshape_ops::prefs::InsertMemory, cx: &mut Context<Self>) -> AnyElement {
+        use noshape_ops::prefs::{DocumentSort, FolderSort};
+        let pal = p();
+        let b = self.ui.insert_sort_anchor[ix].get();
+        let rows: Vec<(&'static str, bool)> = match ix {
+            0 => FolderSort::ALL.iter().map(|s| (s.label(), *s == memory.folders)).collect(),
+            _ => DocumentSort::ALL.iter().map(|s| (s.label(), *s == memory.documents)).collect(),
+        };
+        let mut list = v_flex()
+            .id("ins-other-sort-menu")
+            .occlude()
+            .w(px(183.))
+            .py(px(4.))
+            .bg(pal.panel)
+            .border_1()
+            .border_color(rgb(0xd7d7d7))
+            .rounded(px(3.))
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(6.)), blur_radius: px(12.), spread_radius: px(0.), inset: false }])
+            .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                this.ui.insert_sort_menu = None;
+                cx.notify();
+            }));
+        for (k, (label, on)) in rows.into_iter().enumerate() {
+            list = list.child(
+                h_flex()
+                    .id(SharedString::from(format!("ins-other-sort-{ix}-{k}")))
+                    .h(px(27.))
+                    .text_size(px(14.))
+                    .text_color(rgb(0x555555))
+                    .cursor_pointer()
+                    .when(on, |d| d.bg(rgb(0xb2ddf6)))
+                    .when(!on, |d| d.hover(|d| d.bg(pal.row_hover)))
+                    .child(div().w(px(28.)).flex_none().flex().justify_center().children(on.then(|| crate::assets::icon(&icon_path("menu-check"), 14., cx))))
+                    .child(label)
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.pick_insert_sort(ix, k);
+                        cx.notify();
+                    })),
+            );
+        }
+        deferred(anchored().position(point(b.right() - px(183.), b.bottom() + px(1.))).child(list)).with_priority(1).into_any_element()
+    }
+
+    /// Row `k` of section `ix`'s Sort menu (0 Folders, 1 Documents): that sort, remembered; the menu closes.
+    pub(super) fn pick_insert_sort(&mut self, ix: usize, k: usize) {
+        use noshape_ops::prefs::{DocumentSort, FolderSort};
+        self.remember_insert(|m| match ix {
+            0 => m.folders = FolderSort::ALL.get(k).copied().unwrap_or_default(),
+            _ => m.documents = DocumentSort::ALL.get(k).copied().unwrap_or_default(),
+        });
+        self.ui.insert_sort_menu = None;
+    }
+
     fn ensure_other_docs(&mut self, cx: &mut Context<Self>) {
         if self.ui.insert_other_docs.is_some() {
             return;
@@ -4615,6 +4685,21 @@ impl AssemblyView {
     pub(super) fn render_insert_other(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let blue = rgb(0x1651b0);
+        // The last location, as remembered across closing the app (live insert-sort-1118: Other documents reopens where
+        // it was after a reload), then kept as it changes.
+        if self.ui.insert_memory.is_none() {
+            let m = self.insert_memory().clone();
+            if self.ui.insert_other_cat.is_none() && self.ui.insert_other_query.is_none() && self.ui.insert_other_doc.is_none() {
+                self.ui.insert_other_cat = m.category.filter(|c| *c < OTHER_SOURCES.len());
+                self.ui.insert_other_dir = m.folder.filter(|d| self.ui.insert_other_cat == Some(0) && d.is_dir());
+                self.sync_other_placeholder(cx);
+            }
+        }
+        let (at_cat, at_dir) = (self.ui.insert_other_cat, self.ui.insert_other_dir.clone());
+        self.remember_insert(|m| {
+            m.category = at_cat;
+            m.folder = at_dir;
+        });
         if (self.ui.insert_other_cat.is_some() || self.ui.insert_other_query.is_some()) && self.ui.insert_other_docs.is_none() {
             self.ensure_other_docs(cx);
         }
@@ -4948,26 +5033,73 @@ impl AssemblyView {
         let loading = self.ui.insert_other_docs.as_ref().is_none_or(|d| d.is_empty()) && self.ui.insert_other_versions.is_empty();
         let mut docs: Vec<crate::library::DocEntry> = self.ui.insert_other_docs.clone().unwrap_or_default().into_iter().filter(|d| !d.trashed && !d.broken && d.path != me).collect();
         let q = query.as_ref().map(|q| q.to_lowercase());
+        let memory = self.insert_memory().clone();
         match (cat, &q) {
             // Local documents are all the user's own; nothing is shared or public.
             (Some(3 | 4), _) => docs.clear(),
-            (Some(1), _) => {
-                docs.retain(|d| d.recent_rank.is_some());
-                docs.sort_by_key(|d| d.recent_rank);
-            }
+            (Some(1), _) => docs.retain(|d| d.recent_rank.is_some()),
             (_, Some(q)) => docs.retain(|d| d.name.to_lowercase().contains(q.as_str())),
-            _ => docs.sort_by_key(|d| std::cmp::Reverse(d.modified)),
+            _ => {}
         }
-        // Owned by me (live 611): the folders first (folder outline + bold
-        // name; a click opens one), then the documents at that level.
+        // A location's list (not search results) in live's sections, each with its Sort menu (live insert-sort-1118).
+        if q.is_none() {
+            sort_documents(&mut docs, memory.documents);
+        } else {
+            docs.sort_by_key(|d| std::cmp::Reverse(d.modified));
+        }
+        let menu = self.ui.insert_sort_menu;
+        let closed = self.ui.insert_sections_closed;
+        let section = |ix: usize, title: &'static str, icon: AnyElement, cx: &mut Context<Self>| {
+            let probe = self.ui.insert_sort_anchor[ix].clone();
+            h_flex()
+                .h(px(36.))
+                .pl(px(8.))
+                .pr(px(6.))
+                .gap(px(6.))
+                .child(
+                    div()
+                        .id(SharedString::from(format!("ins-other-sec-{ix}")))
+                        .cursor_pointer()
+                        .child(crate::ui::glyph(if closed[ix] { "chevron-right" } else { "chevron-down" }, 12., pal.text))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            this.ui.insert_sections_closed[ix] = !this.ui.insert_sections_closed[ix];
+                            cx.notify();
+                        })),
+                )
+                .child(icon)
+                .child(div().flex_1().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title))
+                .child(
+                    div()
+                        .id(SharedString::from(format!("ins-other-sort-{ix}")))
+                        .relative()
+                        .size(px(28.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(3.))
+                        .cursor_pointer()
+                        .when(menu == Some(ix), |d| d.bg(rgb(0xdef1fb)).border_1().border_color(rgb(0x90cef1)))
+                        .when(menu != Some(ix), |d| d.hover(|d| d.bg(rgb(0xeaeaea))))
+                        .tooltip(crate::ui::tooltip("Sort"))
+                        .child(crate::assets::icon(&icon_path("tm-sort"), 20., cx))
+                        .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            this.ui.insert_sort_menu = if this.ui.insert_sort_menu == Some(ix) { None } else { Some(ix) };
+                            cx.notify();
+                        })),
+                )
+        };
+        // Owned by me (live 611; insert-sort-1118's company location): Folders (a click opens one), then the documents
+        // at that level.
         if cat == Some(0) && q.is_none() {
             let root = docs_root();
             let outside: Vec<std::path::PathBuf> = crate::assembly_hooks::watched_folders().into_iter().map(|f| canon_dir(&f)).filter(|f| !f.starts_with(&root) && f.is_dir()).collect();
             let here = self.ui.insert_other_dir.clone();
-            let dirs: Vec<std::path::PathBuf> = match &here {
+            let mut dirs: Vec<std::path::PathBuf> = match &here {
                 Some(dir) => crate::assembly_hooks::subfolders(dir),
                 None => crate::assembly_hooks::subfolders(&root).into_iter().chain(outside.iter().cloned()).collect(),
             };
+            sort_folders(&mut dirs, memory.folders);
             docs.retain(|d| {
                 let f = canon_dir(d.folder());
                 match &here {
@@ -4977,12 +5109,17 @@ impl AssemblyView {
                     None => f == root || (!f.starts_with(&root) && !outside.iter().any(|o| f.starts_with(o))),
                 }
             });
-            for (i, dir) in dirs.into_iter().enumerate() {
+            col = col.child(section(0, "Folders", crate::ui::glyph("folder", 18., pal.text).into_any_element(), cx));
+            if !closed[0] && dirs.is_empty() {
+                // (Live: a grey folder picture over "No folders found.")
+                col = col.child(v_flex().h(px(150.)).items_center().justify_center().gap(px(16.)).child(crate::ui::glyph("folder", 80., rgb(0xdddddd))).child(div().text_size(px(13.33)).text_color(pal.text).child("No folders found.")));
+            }
+            for (i, dir) in dirs.into_iter().enumerate().filter(|_| !closed[0]) {
                 let name = dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                 col = col.child(
                     h_flex()
                         .id(SharedString::from(format!("ins-other-dir-{i}")))
-                        .h(px(51.))
+                        .h(px(52.))
                         .pl(px(2.))
                         .cursor_pointer()
                         .hover(|d| d.bg(pal.panel_hover))
@@ -4995,7 +5132,16 @@ impl AssemblyView {
                 );
             }
         }
-        if docs.is_empty() && !loading {
+        if q.is_none() {
+            col = col.child(section(1, "Documents", crate::assets::icon(&icon_path("document"), 18., cx).into_any_element(), cx));
+            if closed[1] {
+                docs.clear();
+            }
+        }
+        if let Some(ix) = menu.filter(|_| q.is_none()) {
+            col = col.child(self.render_insert_sort_menu(ix, &memory, cx));
+        }
+        if docs.is_empty() && !loading && !(q.is_none() && closed[1]) {
             col = col.child(div().pl(px(10.)).h(px(28.)).flex().items_center().text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("No documents found"));
         }
         for (i, d) in docs.into_iter().enumerate() {
@@ -5017,7 +5163,7 @@ impl AssemblyView {
             col = col.child(
                 h_flex()
                     .id(SharedString::from(format!("ins-other-doc-{i}")))
-                    .h(px(51.))
+                    .h(px(52.))
                     .pl(px(2.))
                     .cursor_pointer()
                     .hover(|d| d.bg(pal.panel_hover))
@@ -5170,5 +5316,33 @@ pub(super) fn replicate_scope_field(scope: noshape_model::assembly::ReplicateSco
         ReplicateScope::IndividualFaces => "Individual faces to match",
         ReplicateScope::EdgesOnFace => "Faces to find match in",
         _ => "Parts to find match in",
+    }
+}
+
+/// Other documents' Documents in `sort`'s order (names and authors case-insensitive; ties newest first).
+pub(super) fn sort_documents(docs: &mut [crate::library::DocEntry], sort: noshape_ops::prefs::DocumentSort) {
+    use noshape_ops::prefs::DocumentSort::*;
+    docs.sort_by(|a, b| {
+        let newest = b.modified.cmp(&a.modified);
+        let (name, by) = (a.name.to_lowercase().cmp(&b.name.to_lowercase()), a.modified_by.to_lowercase().cmp(&b.modified_by.to_lowercase()));
+        match sort {
+            NameAsc => name.then(newest),
+            NameDesc => name.reverse().then(newest),
+            ModifiedNewest => newest,
+            ModifiedOldest => newest.reverse(),
+            ModifiedByAsc => by.then(newest),
+            ModifiedByDesc => by.reverse().then(newest),
+        }
+    });
+}
+
+/// Other documents' Folders in `sort`'s order (Last modified: the newest first).
+pub(super) fn sort_folders(dirs: &mut [std::path::PathBuf], sort: noshape_ops::prefs::FolderSort) {
+    use noshape_ops::prefs::FolderSort::*;
+    let name = |p: &std::path::PathBuf| p.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+    match sort {
+        NameAsc => dirs.sort_by_cached_key(name),
+        NameDesc => dirs.sort_by_cached_key(|p| std::cmp::Reverse(name(p))),
+        LastModified => dirs.sort_by_cached_key(|p| std::cmp::Reverse(std::fs::metadata(p).and_then(|m| m.modified()).ok())),
     }
 }

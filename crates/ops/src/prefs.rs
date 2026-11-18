@@ -366,6 +366,83 @@ impl LibraryFolders {
     }
 }
 
+/// Insert › Other documents' Documents sort (live insert-sort-1118: Modified: Newest first by default).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DocumentSort {
+    NameAsc,
+    NameDesc,
+    #[default]
+    ModifiedNewest,
+    ModifiedOldest,
+    ModifiedByAsc,
+    ModifiedByDesc,
+}
+
+impl DocumentSort {
+    pub const ALL: [DocumentSort; 6] = [Self::NameAsc, Self::NameDesc, Self::ModifiedNewest, Self::ModifiedOldest, Self::ModifiedByAsc, Self::ModifiedByDesc];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::NameAsc => "Name: A → Z",
+            Self::NameDesc => "Name: Z → A",
+            Self::ModifiedNewest => "Modified: Newest first",
+            Self::ModifiedOldest => "Modified: Oldest first",
+            Self::ModifiedByAsc => "Modified by: A → Z",
+            Self::ModifiedByDesc => "Modified by: Z → A",
+        }
+    }
+}
+
+/// Insert › Other documents' Folders sort (live insert-sort-1118: Last modified by default).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FolderSort {
+    NameAsc,
+    NameDesc,
+    #[default]
+    LastModified,
+}
+
+impl FolderSort {
+    pub const ALL: [FolderSort; 3] = [Self::NameAsc, Self::NameDesc, Self::LastModified];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::NameAsc => "Name: A → Z",
+            Self::NameDesc => "Name: Z → A",
+            Self::LastModified => "Last modified",
+        }
+    }
+}
+
+/// Insert › Other documents' sorts and last location (insert_documents.json): live keeps both across closing the
+/// dialog and a reload (insert-sort-1118).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct InsertMemory {
+    #[serde(default)]
+    pub documents: DocumentSort,
+    #[serde(default)]
+    pub folders: FolderSort,
+    /// The category open (0 Owned by me … 4 Public) and the folder browsed in it.
+    #[serde(default)]
+    pub category: Option<usize>,
+    #[serde(default)]
+    pub folder: Option<std::path::PathBuf>,
+}
+
+impl InsertMemory {
+    fn path() -> std::path::PathBuf {
+        noshape_scene::config_dir().join("insert_documents.json")
+    }
+
+    pub fn load() -> Self {
+        std::fs::read(Self::path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+    }
+
+    pub fn save(&self) {
+        let _ = std::fs::write(Self::path(), serde_json::to_vec_pretty(self).unwrap_or_default());
+    }
+}
+
 /// Insert › Standard content's remembered picks (standard_content.json; live keeps them per account, behaviours "psui
 /// (2422 / 13:40)"): the last spec, each level's last child (a Standard its Category, a Category its Class, a Class its
 /// Component) and each component's last spec, kept as soon as a picker changes.

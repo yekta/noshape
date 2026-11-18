@@ -389,6 +389,12 @@ pub struct AsmUi {
     /// The opened document (kept when the dialog closes: Onshape reopens
     /// the last document and version).
     pub insert_other_doc: Option<super::panels::OtherDoc>,
+    /// Its sorts and last location as remembered (loaded on first use; live insert-sort-1118 keeps them across a
+    /// reload), the sort menu open (0 Folders, 1 Documents) with its button's bounds, and the sections collapsed.
+    pub insert_memory: Option<noshape_ops::prefs::InsertMemory>,
+    pub insert_sort_menu: Option<usize>,
+    pub insert_sort_anchor: [std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>; 2],
+    pub insert_sections_closed: [bool; 2],
     /// Dragging a fixed instance (live 562): the cursor position for the fix
     /// glyph and the `no-drop` cursor; nothing moves, no message.
     pub fixed_drag: Option<DVec2>,

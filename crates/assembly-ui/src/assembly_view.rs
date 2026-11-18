@@ -7057,6 +7057,11 @@ impl AssemblyView {
             cx.notify();
             return;
         }
+        // Insert › Other documents' Sort menu (live insert-sort-1118: Esc closes it, the dialog stays).
+        if self.ui.insert_sort_menu.take().is_some() {
+            cx.notify();
+            return;
+        }
         // ☰ › Print…'s panel first (live studios 2349: Esc closes it).
         if self.print.take().is_some() {
             window.focus(&self.focus, cx);
