@@ -609,10 +609,18 @@ impl PartStudioView {
             edge_snap(r, &pts, cursor, &|q| to_screen(frame.to_world(q)))
         };
         match r {
-            Reference::Vertex(_) => {
-                let b = self.display.bodies.iter().find(|b| b.vertex_refs.contains(r))?;
-                let i = b.vertex_refs.iter().position(|x| x == r)?;
-                point(world(b.mesh.vertices.get(i)?))
+            // The vertex's own point (the mesh keeps an f32 copy: 34.749999642 for 34.75 mm, the user's hat15b).
+            Reference::Vertex(n) => {
+                let exact = self.context.as_ref().and_then(|c| {
+                    let (bi, vi) = *c.bodies.find_untracked(noshape_model::regen::context::LookupKind::Vertex, n).first()?;
+                    c.bodies[bi].shape.sub_shape(noshape_kernel::ShapeType::Vertex, vi).ok()?.vertex_point().ok()
+                });
+                let shown = || {
+                    let b = self.display.bodies.iter().find(|b| b.vertex_refs.contains(r))?;
+                    let i = b.vertex_refs.iter().position(|x| x == r)?;
+                    Some(world(b.mesh.vertices.get(i)?))
+                };
+                point(exact.or_else(shown)?)
             }
             Reference::Edge(_) => {
                 let b = self.display.bodies.iter().find(|b| b.edge_refs.contains(r))?;

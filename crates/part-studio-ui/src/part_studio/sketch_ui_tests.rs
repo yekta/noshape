@@ -1465,6 +1465,36 @@ fn another_sketchs_point_snaps_from_its_square(cx: &mut TestAppContext) {
     assert_eq!((coincident, used, uses), (1, 0, 0), "(a Coincident to the point, used points, use glyphs)");
 }
 
+/// lead 11-18 (the user's hat15b, Sketch 1: its used point stored 1.07 mm off the vertex it names): a model vertex on the
+/// sketch plane snaps to the vertex's own point, not the display mesh's f32 copy of it (34.749999642 for 34.75 mm), and
+/// the point the click stores is that point.
+#[gpui::test]
+fn a_model_vertex_snaps_to_its_exact_point(cx: &mut TestAppContext) {
+    let (window, view, _top, _bottom) = block_part(cx, "model-vertex-exact");
+    let (_window, view) = sketch_in(cx, window, view, Tool::Line);
+    // A corner of the block on the sketch plane, its exact point and its name.
+    let (r, exact) = cx.update(|cx| {
+        let v = view.read(cx);
+        let frame = v.sketch.as_ref().unwrap().frame;
+        let c = v.context.as_ref().unwrap();
+        let b = c.bodies.iter().find(|b| b.vertices.len() == 8).expect("the block");
+        b.vertices
+            .iter()
+            .enumerate()
+            .filter_map(|(i, n)| Some((Reference::Vertex((**n).clone()), b.shape.sub_shape(noshape_kernel::ShapeType::Vertex, i).ok()?.vertex_point().ok()?)))
+            .find(|(_, w)| (frame.to_world(frame.to_local(*w)) - *w).length() < 1e-9)
+            .map(|(r, w)| (r, frame.to_local(w)))
+            .expect("a corner on the plane")
+    });
+    let snap = cx.update(|cx| {
+        let v = view.read(cx);
+        let wpp = v.sketch.as_ref().unwrap().world_per_px;
+        v.model_snap_of(&r, exact + DVec2::new(3.0 * wpp, 2.0 * wpp), v.viewport.read(cx))
+    });
+    let Some(crate::sketch_mode::ExternalSnap::Vertex { position, .. }) = snap else { panic!("a vertex snap: {snap:?}") };
+    assert!((position - exact).length() < 1e-12, "the vertex's own point: {position} vs {exact}");
+}
+
 /// qa 11-17 SKSNAP-MODEL-EDGE (live 11-17 sketch-snap-1117 rows 1, 3): in a new sketch on Top under a block, the
 /// block's edge on the plane takes a line's end 2 px off it (COINCIDENT with the edge used) and offers its midpoint at
 /// its middle, with no hover of it (in a normal view the block's top edge is drawn over it and is the one lit).
