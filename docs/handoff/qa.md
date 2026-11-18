@@ -99,6 +99,13 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    00:24 after its old grep fired on 0f7610c83 without it), skasm 085fa6af1/fe7ac8832/b8234063a snaps (sweep.py / hv.py; glyphs.py
    SHOWC=1 = Show constraints ticked, gbatch.sh -> sk/run4; first run 00:30 on 0f7610c83), skasm a3974c745 + 59cad3c05 (Flange broad
    face; joint-row hover: fl/joint*.sh, sm.sh; mitred corner = no joint row, as live), psui 591643fc4 (= 2234f511: rollback bar: fl2.py onto-top / back-to-end + bar right-click; face + edge menu: menu.sh; rename click in graphics).
+0j. **History feel (lead 00:28)**: TICKETS "Versions and history panel" (2 P1 + 3 P2 studios). qa-scratch/hi: his.sh start <doc>|shot|
+   stop (:670, docs in vibex6 ~/tmp/qa/hi/docs), the document built by CLI batch (b.jsonl pattern; region id from sketch get).
+   Owed: psui 8d2e0056's green: bar released over Default geometry lands at the top, bar #b8b8b8 away / (200,217,226) hovered,
+   "Roll to end" menu kept; measure angles toward the entities' middles (behaviours "Part Studio measure readouts", 33.69 / 123.69 /
+   56.31 / 146.31); the Mass button leaves its panel open; `[` over Mass opens Measure empty; the spinner (900 ms delay, 50 px box).
+   Selection re-run 00:57 on 591643fc: RELATED-STAYS / HIDDEN-SKETCH-HOVER / PLANE-DEFAULT-GEOMETRY verified; DBLCLICK-FACE-SKETCH
+   still open (sent to skasm 01:03). 05:00 must-carry also: core P0 FACES-PATTERN-SLOTS (grep fix / revert of 2c51590b0, 215c12d6b).
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
