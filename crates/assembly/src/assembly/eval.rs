@@ -94,10 +94,10 @@ pub struct PartOccurrence {
     pub mirrored: bool,
     /// External reference key for parts inserted from another document.
     pub external: Option<String>,
-    /// Part of a flexible subassembly: (child instance of the subassembly,
-    /// body coordinates -> child coordinates). Its transform follows the
-    /// child's solved placement inside the subassembly.
-    pub flex: Option<(InstanceId, DMat4)>,
+    /// Part of a flexible subassembly: (path from the top-level subassembly instance to the child it rides on, a
+    /// child of a flexible subassembly inside it at any depth; body coordinates -> child coordinates). Its transform
+    /// follows the child's solved placement.
+    pub flex: Option<(Vec<InstanceId>, DMat4)>,
 }
 
 impl PartOccurrence {
@@ -216,12 +216,12 @@ pub struct SolveOptions {
     /// 1..3 = Tx/Ty/Tz, target); the mate's other degrees of freedom stay
     /// free (Animate, Apply limit position). The mate's limits are ignored.
     pub hold_values: Vec<(MateId, usize, f64)>,
-    /// Starting placements of flexible subassembly children (relative to
-    /// their subassembly instance), overriding the stored ones.
-    pub nested_start: Option<HashMap<(InstanceId, InstanceId), Placement>>,
-    /// Drags of flexible subassembly children: ((subassembly, child), point in
-    /// child coordinates, world target).
-    pub nested_drags: Vec<((InstanceId, InstanceId), DVec3, DVec3)>,
+    /// Starting placements of flexible subassembly children by path (relative to the top-level subassembly
+    /// instance), overriding the stored ones.
+    pub nested_start: Option<HashMap<Vec<InstanceId>, Placement>>,
+    /// Drags of flexible subassembly children: (path from the top-level subassembly instance, point in child
+    /// coordinates, world target).
+    pub nested_drags: Vec<(Vec<InstanceId>, DVec3, DVec3)>,
     /// Solve only this mate (a mate being defined, before Solve): Onshape
     /// "does not continually calculate all mates and their positions until
     /// the Mate feature is accepted" (help: Mates). Other mates and
@@ -246,18 +246,19 @@ pub struct Solved {
     pub mate_frames: HashMap<MateId, (Frame, Frame)>,
     pub mate_values: HashMap<MateId, [f64; 4]>,
     pub relation_ok: HashMap<MateId, bool>,
-    /// Flexible subassembly children: (subassembly, child) -> placement in the subassembly.
-    pub nested: HashMap<(InstanceId, InstanceId), Placement>,
+    /// Flexible subassembly children, by path from the top-level subassembly instance (deeper through flexible
+    /// subassemblies inside it) -> placement relative to that instance.
+    pub nested: HashMap<Vec<InstanceId>, Placement>,
 }
 
 impl Solved {
     pub fn placement(&self, id: InstanceId) -> Option<Placement> {
         self.placements.iter().find(|(i, _)| *i == id).map(|(_, p)| *p)
     }
-    /// World frame of a flexible subassembly child (None for other instances).
-    pub fn nested_world(&self, sub: InstanceId, child: InstanceId) -> Option<Frame> {
-        let q = self.nested.get(&(sub, child))?;
-        Some(placement_to_frame(&self.placement(sub)?).mul(&placement_to_frame(q)))
+    /// World frame of a flexible subassembly child by its path (None for other instances).
+    pub fn nested_world(&self, path: &[InstanceId]) -> Option<Frame> {
+        let q = self.nested.get(path)?;
+        Some(placement_to_frame(&self.placement(*path.first()?)?).mul(&placement_to_frame(q)))
     }
 }
 
@@ -273,16 +274,18 @@ struct LeafInstance {
     hidden: bool,
     mirrored: bool,
     external: Option<String>,
-    /// Flexible subassembly part: (child of the subassembly, leaf -> child coordinates).
-    flex: Option<(InstanceId, DMat4)>,
+    /// Flexible subassembly part: (path of the child it rides on from this level's subassembly instance, leaf ->
+    /// child coordinates).
+    flex: Option<(Vec<InstanceId>, DMat4)>,
 }
 
 /// Where a connector lives: a top-level instance or a child of a flexible
 /// subassembly (top-level subassembly instance, child).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum Owner {
     Top(InstanceId),
-    Nested(InstanceId, InstanceId),
+    /// The path from the top-level subassembly instance.
+    Nested(Vec<InstanceId>),
 }
 
 /// Prepared solver problem (instance graph + resolved connector frames).
@@ -315,12 +318,15 @@ pub struct Prepared {
     /// Flexible subassemblies: (subassembly instance, child) -> (solver body,
     /// child frame in body coordinates). Children fixed in the subassembly
     /// ride on the subassembly instance's body.
-    nested_body_of: HashMap<(InstanceId, InstanceId), (usize, Frame)>,
+    nested_body_of: HashMap<Vec<InstanceId>, (usize, Frame)>,
     /// Children with their own solver body: (body, subassembly instance,
     /// child, stored placement of the child in the subassembly).
-    nested_bodies: Vec<(usize, InstanceId, InstanceId, Frame)>,
-    /// Assembly mate connectors owned by a flexible subassembly child.
-    connector_child: HashMap<MateId, InstanceId>,
+    nested_bodies: Vec<(usize, Vec<InstanceId>, Frame)>,
+    /// Assembly mate connectors owned by a flexible subassembly child (its path).
+    connector_child: HashMap<MateId, Vec<InstanceId>>,
+    /// This assembly's flexible levels for an assembly above (a flexible subassembly instance, and the flexible ones
+    /// inside it): path from this assembly's instance, content.
+    flex_levels: Vec<(Vec<InstanceId>, Assembly)>,
     /// Top-level instances that are flexible subassemblies.
     pub flexible: HashSet<InstanceId>,
     /// The mates' residuals and values between solves of this preparation
@@ -500,9 +506,9 @@ impl Prepared {
 
     /// Does this child of a flexible subassembly move on its own (not fixed
     /// in the subassembly)?
-    pub fn is_flexible_child(&self, sub: InstanceId, child: InstanceId) -> bool {
-        self.nested_bodies.iter().any(|(_, s, c, _)| *s == sub && *c == child)
-            || self.nested_body_of.get(&(sub, child)).is_some_and(|(b, _)| self.body_of.get(&sub).is_none_or(|(sb, _)| sb != b))
+    pub fn is_flexible_child(&self, path: &[InstanceId]) -> bool {
+        let Some(top) = path.first() else { return false };
+        self.nested_bodies.iter().any(|(_, p, _)| p[..] == *path) || self.nested_body_of.get(path).is_some_and(|(b, _)| self.body_of.get(top).is_none_or(|(sb, _)| sb != b))
     }
 
     /// Solve for a named position: its placements as the start, its stored
@@ -636,12 +642,13 @@ impl Prepared {
             .map(|(i, id)| SolverBody { pose: if *id == InstanceId::ORIGIN { Frame::default() } else { pose_of(*id, stored[id]) }, fixed: self.fixed[i] || opts.hold.iter().any(|h| self.body_of.get(h).is_some_and(|(b, _)| *b == i)) })
             .collect();
         // Flexible subassembly children: world pose = subassembly pose * child placement.
-        for (b, sid, child, q0) in &self.nested_bodies {
-            let ps = stored.get(sid).map(|p| pose_of(*sid, p)).unwrap_or_default();
-            let q = opts.nested_start.as_ref().and_then(|n| n.get(&(*sid, *child))).map(placement_to_frame).unwrap_or(*q0);
+        for (b, key, q0) in &self.nested_bodies {
+            let sid = key[0];
+            let ps = stored.get(&sid).map(|p| pose_of(sid, p)).unwrap_or_default();
+            let q = opts.nested_start.as_ref().and_then(|n| n.get(key)).map(placement_to_frame).unwrap_or(*q0);
             bodies[*b].pose = ps.mul(&q);
             // Holding the subassembly holds its parts.
-            if opts.hold.contains(sid) {
+            if opts.hold.contains(&sid) {
                 bodies[*b].fixed = true;
             }
         }
@@ -652,8 +659,8 @@ impl Prepared {
             }
             let cur = stored.get(id).map(|s| pose_of(*id, s)).unwrap_or_default();
             let delta = placement_to_frame(p).mul(&cur.inverse());
-            for (b, sid, _, _) in &self.nested_bodies {
-                if sid == id && !bodies[*b].fixed {
+            for (b, key, _) in &self.nested_bodies {
+                if key[0] == *id && !bodies[*b].fixed {
                     bodies[*b].pose = delta.mul(&bodies[*b].pose);
                 }
             }
@@ -807,13 +814,13 @@ impl Prepared {
                 out.instance_dof.insert(*id, if self.fixed[b] { 0 } else { r.body_dof.get(b).copied().unwrap_or(6) });
             }
         }
-        for ((sid, child), (b, off)) in &self.nested_body_of {
-            let Some(&(sb, soff)) = self.body_of.get(sid) else { continue };
+        for (key, (b, off)) in &self.nested_body_of {
+            let Some(&(sb, soff)) = self.body_of.get(&key[0]) else { continue };
             let ps = poses[sb].mul(&soff);
-            out.nested.insert((*sid, *child), frame_to_placement(&ps.inverse().mul(&poses[*b].mul(off))));
+            out.nested.insert(key.clone(), frame_to_placement(&ps.inverse().mul(&poses[*b].mul(off))));
         }
-        for (b, sid, _, _) in &self.nested_bodies {
-            if let Some(d) = out.instance_dof.get_mut(sid) {
+        for (b, key, _) in &self.nested_bodies {
+            if let Some(d) = out.instance_dof.get_mut(&key[0]) {
                 *d += r.body_dof.get(*b).copied().unwrap_or(0);
             }
         }
@@ -889,7 +896,7 @@ impl AssemblyResult {
         let place: HashMap<InstanceId, DMat4> = self.solved.placements.iter().map(|(id, p)| (*id, frame_matrix(&placement_to_frame(p)))).collect();
         for o in &mut self.occurrences {
             let top = place.get(&o.top()).copied().unwrap_or(DMat4::IDENTITY);
-            o.transform = match o.flex.and_then(|(c, rest)| self.solved.nested.get(&(o.path[0], c)).map(|q| (q.to_dmat4(), rest))) {
+            o.transform = match o.flex.as_ref().and_then(|(key, rest)| self.solved.nested.get(key).map(|q| (q.to_dmat4(), *rest))) {
                 Some((q, rest)) => top * q * rest,
                 None => top * o.inner,
             };
@@ -906,7 +913,7 @@ impl AssemblyResult {
         }
         let inst: HashMap<InstanceId, Frame> = self.solved.placements.iter().map(|(id, p)| (*id, placement_to_frame(p))).collect();
         for c in &mut self.connectors {
-            let owner = match c.child.and_then(|ch| self.solved.nested_world(c.owner, ch)) {
+            let owner = match c.child.and_then(|ch| self.solved.nested_world(&[c.owner, ch])) {
                 Some(f) => f,
                 None if c.owner == InstanceId::ORIGIN => Frame::default(),
                 None => inst.get(&c.owner).copied().unwrap_or_default(),
@@ -1107,7 +1114,10 @@ type MirrorKey = (TabId, String, BodyId, [u64; 6]);
 
 /// Where a subassembly's evaluation goes: its node, the leaves, the
 /// prepared solve and the flexible subassemblies of the parent.
-type SubassemblyOut<'a> = (&'a mut InstanceNode, &'a mut Vec<LeafInstance>, &'a mut Prepared, &'a mut Vec<(InstanceId, Assembly, HashMap<InstanceId, Frame>)>);
+/// A flexible level for the solve: (path from the top-level subassembly instance to the subassembly instance, its
+/// content, its children's start frames relative to the top-level instance).
+type FlexLevel = (Vec<InstanceId>, Assembly, HashMap<InstanceId, Frame>);
+type SubassemblyOut<'a> = (&'a mut InstanceNode, &'a mut Vec<LeafInstance>, &'a mut Prepared, &'a mut Vec<FlexLevel>);
 
 /// A regenerated external Part Studio: (its tab in the pinned document, result).
 pub type ExternalStudio = (TabId, Arc<RegenResult>);
@@ -2353,7 +2363,7 @@ impl AssemblyEvaluator {
                     context: leaf.regen.context.clone(),
                     mirrored: leaf.mirrored,
                     external: leaf.external.clone(),
-                    flex: leaf.flex,
+                    flex: leaf.flex.clone(),
                 });
             }
         }
@@ -2411,7 +2421,7 @@ impl AssemblyEvaluator {
             .map(|c| {
                 let resolved = prepared.connectors.iter().find(|(id, _, _)| *id == c.id);
                 let message = prepared.failed_connectors.iter().find(|(id, _)| *id == c.id).map(|(_, m)| m.clone());
-                ConnectorStatus { id: c.id, owner: resolved.map(|r| r.1).unwrap_or(c.on.instance), child: prepared.connector_child.get(&c.id).copied(), local: resolved.map(|r| r.2), frame: None, message }
+                ConnectorStatus { id: c.id, owner: resolved.map(|r| r.1).unwrap_or(c.on.instance), child: prepared.connector_child.get(&c.id).and_then(|k| k.get(1)).copied(), local: resolved.map(|r| r.2), frame: None, message }
             })
             .collect();
         let mut nodes = nodes;
@@ -2545,24 +2555,42 @@ impl AssemblyEvaluator {
         };
         let (sub_leaves, sub_nodes, sub_prep, solved) = (done.0.clone(), done.1.clone(), &done.2, &done.3);
         // Flexible (Onshape's default): its mates and relations join this
-        // assembly's solve. Subassemblies with patterns, tangent mates or
-        // nested flexible subassemblies stay rigid.
-        let flexible = inst.lock.is_flexible()
-            && !suppressed
-            && sub.patterns.is_empty()
-            && !sub.mates.iter().any(|m| m.mate_type == MateType::Tangent && !m.suppressed)
-            && sub_prep.flexible.is_empty();
+        // assembly's solve, with those of the flexible subassemblies inside it.
+        // Subassemblies with patterns or tangent mates stay rigid.
+        let flexible = inst.lock.is_flexible() && !suppressed && sub.patterns.is_empty() && !sub.mates.iter().any(|m| m.mate_type == MateType::Tangent && !m.suppressed);
         node.rigid = solved.instance_dof.values().all(|d| *d == 0) && sub.fixed_instances().len() == 1 && sub_prep.failed_mates.is_empty();
         let place: HashMap<InstanceId, DMat4> = solved.placements.iter().map(|(id, p)| (*id, frame_matrix(&placement_to_frame(p)))).collect();
         if flexible {
             prepared.flexible.insert(inst.id);
-            flex_subs.push((inst.id, sub.clone(), solved.placements.iter().map(|(id, p)| (*id, placement_to_frame(p))).collect()));
+            let in_sub: HashMap<InstanceId, Frame> = solved.placements.iter().map(|(id, p)| (*id, placement_to_frame(p))).collect();
+            flex_subs.push((vec![inst.id], sub.clone(), in_sub.clone()));
+            prepared.flex_levels.push((vec![inst.id], sub.clone()));
+            // The flexible ones inside it: their children start where its own solve has them.
+            for (path, content) in &sub_prep.flex_levels {
+                let Some(holder) = in_sub.get(&path[0]) else { continue };
+                let q: HashMap<InstanceId, Frame> = content
+                    .instances
+                    .iter()
+                    .filter_map(|i| {
+                        let mut key = path.clone();
+                        key.push(i.id);
+                        Some((i.id, holder.mul(&placement_to_frame(solved.nested.get(&key)?))))
+                    })
+                    .collect();
+                let mut full = vec![inst.id];
+                full.extend(path.iter().copied());
+                flex_subs.push((full.clone(), content.clone(), q));
+                prepared.flex_levels.push((full, content.clone()));
+            }
         }
         for mut l in sub_leaves {
             let top = place.get(&l.path[0]).copied().unwrap_or(DMat4::IDENTITY);
-            if flexible {
-                l.flex = Some((l.path[0], l.inner));
-            }
+            l.flex = match l.flex.take() {
+                // Riding on a child of a flexible subassembly inside it: the same child, by the path from here.
+                Some((key, rest)) if flexible => Some((std::iter::once(inst.id).chain(key).collect(), rest)),
+                None if flexible => Some((vec![inst.id, l.path[0]], l.inner)),
+                _ => None,
+            };
             l.inner = top * l.inner;
             let mut path = vec![inst.id];
             path.extend(l.path.iter().copied());
@@ -2600,7 +2628,7 @@ impl AssemblyEvaluator {
         let mut nodes = Vec::new();
         let mut prepared = Prepared::default();
         // Flexible subassemblies: (instance, content, stored child placements in the subassembly).
-        let mut flex_subs: Vec<(InstanceId, Assembly, HashMap<InstanceId, Frame>)> = Vec::new();
+        let mut flex_subs: Vec<FlexLevel> = Vec::new();
         // Copies of a suppressed pattern (or of a suppressed seed) are inactive.
         let mut inactive: HashSet<InstanceId> = asm.instances.iter().filter(|i| i.suppressed).map(|i| i.id).collect();
         for p in &asm.patterns {
@@ -2842,8 +2870,13 @@ impl AssemblyEvaluator {
         }
         // Flexible subassembly children: own bodies, except those fixed in the
         // subassembly (and their groups), which ride on the subassembly's body.
-        for (sid, sub, q) in &flex_subs {
-            let Some(&(sbody, _)) = assigned.get(sid) else { continue };
+        for (prefix, sub, q) in &flex_subs {
+            let sid = &prefix[0];
+            // The body its children ride on: the top-level instance's, or a nested subassembly instance's (its start
+            // frame relative to the top-level instance: riders' offsets are taken from it).
+            let holder = if prefix.len() == 1 { assigned.get(sid).map(|(b, _)| (*b, Frame::default())) } else { prepared.nested_body_of.get(prefix).map(|(b, _)| (*b, prepared.nested_bodies.iter().find(|(x, ..)| x == b).map(|e| e.2).unwrap_or_default())) };
+            let Some((sbody, base)) = holder else { continue };
+            let key_of = |c: InstanceId| -> Vec<InstanceId> { prefix.iter().copied().chain(std::iter::once(c)).collect() };
             let sub_active: Vec<&super::Instance> = sub.instances.iter().filter(|i| !i.suppressed && q.contains_key(&i.id)).collect();
             let mut done: HashSet<InstanceId> = HashSet::new();
             for g in sub.groups.iter().filter(|g| !g.suppressed) {
@@ -2857,12 +2890,12 @@ impl AssemblyEvaluator {
                     let b = prepared.reps.len();
                     prepared.reps.push(*sid);
                     prepared.fixed.push(false);
-                    prepared.nested_bodies.push((b, *sid, rep.id, rep_q));
+                    prepared.nested_bodies.push((b, key_of(rep.id), rep_q));
                     b
                 };
                 for m in &members {
-                    let off = if on_sub { q[&m.id] } else { rep_q.inverse().mul(&q[&m.id]) };
-                    prepared.nested_body_of.insert((*sid, m.id), (body, off));
+                    let off = if on_sub { base.inverse().mul(&q[&m.id]) } else { rep_q.inverse().mul(&q[&m.id]) };
+                    prepared.nested_body_of.insert(key_of(m.id), (body, off));
                     done.insert(m.id);
                 }
             }
@@ -2871,21 +2904,21 @@ impl AssemblyEvaluator {
                     continue;
                 }
                 if i.fixed {
-                    prepared.nested_body_of.insert((*sid, i.id), (sbody, q[&i.id]));
+                    prepared.nested_body_of.insert(key_of(i.id), (sbody, base.inverse().mul(&q[&i.id])));
                 } else {
                     let b = prepared.reps.len();
                     prepared.reps.push(*sid);
-                    prepared.fixed.push(asm.occurrence(&[*sid, i.id]).fixed);
-                    prepared.nested_bodies.push((b, *sid, i.id, q[&i.id]));
-                    prepared.nested_body_of.insert((*sid, i.id), (b, Frame::default()));
+                    prepared.fixed.push(asm.occurrence(&key_of(i.id)).fixed);
+                    prepared.nested_bodies.push((b, key_of(i.id), q[&i.id]));
+                    prepared.nested_body_of.insert(key_of(i.id), (b, Frame::default()));
                 }
             }
             // Nothing rides on the subassembly's own frame (no part fixed in it,
             // nothing mated to its origin): the frame is bookkeeping only and
-            // adds no degrees of freedom.
-            let on_frame = prepared.nested_body_of.iter().any(|((s2, _), (b, _))| s2 == sid && *b == sbody);
+            // adds no degrees of freedom. (A nested one's, when it has a body of its own.)
+            let on_frame = prepared.nested_body_of.iter().any(|(k, (b, _))| k.len() == prefix.len() + 1 && k.starts_with(prefix) && *b == sbody);
             let origin_used = sub.mates.iter().any(|m| !m.suppressed && m.connectors().any(|c| c.is_origin())) || sub.connectors.iter().any(|c| c.on.is_origin());
-            let shared = assigned.iter().filter(|(_, (b, _))| *b == sbody).count() > 1;
+            let shared = if prefix.len() == 1 { assigned.iter().filter(|(_, (b, _))| *b == sbody).count() > 1 } else { !prepared.nested_bodies.iter().any(|(b, k, _)| *b == sbody && k == prefix) };
             if !on_frame && !origin_used && !shared {
                 prepared.fixed[sbody] = true;
             }
@@ -2927,15 +2960,15 @@ impl AssemblyEvaluator {
             // Live E15: the instance is there but its part is gone.
             let leaf = leaf_of.get(full.as_slice()).copied().ok_or(if asm.instance(c.instance).is_some() { MATE_INSTANCE_LOST } else { "Instance no longer exists" })?;
             let f = memo.resolve(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate cannot resolve mate connectors.")?;
-            Ok(match leaf.flex {
-                Some((child, rest)) => (Owner::Nested(c.instance, child), matrix_frame(&rest).mul(&f)),
+            Ok(match &leaf.flex {
+                Some((key, rest)) => (Owner::Nested(key.clone()), matrix_frame(rest).mul(&f)),
                 None => (Owner::Top(c.instance), matrix_frame(&leaf.inner).mul(&f)),
             })
         };
-        let owner_body = |o: Owner, body_of: &HashMap<InstanceId, (usize, Frame)>, nested: &HashMap<(InstanceId, InstanceId), (usize, Frame)>| -> Option<(usize, Frame)> {
+        let owner_body = |o: &Owner, body_of: &HashMap<InstanceId, (usize, Frame)>, nested: &HashMap<Vec<InstanceId>, (usize, Frame)>| -> Option<(usize, Frame)> {
             match o {
-                Owner::Top(id) => body_of.get(&id).copied(),
-                Owner::Nested(s, c) => nested.get(&(s, c)).copied(),
+                Owner::Top(id) => body_of.get(id).copied(),
+                Owner::Nested(key) => nested.get(key).copied(),
             }
         };
         for mc in &asm.connectors {
@@ -2978,8 +3011,9 @@ impl AssemblyEvaluator {
                     }
                     let top = match owner {
                         Owner::Top(id) => id,
-                        Owner::Nested(sid, child) => {
-                            prepared.connector_child.insert(mc.id, child);
+                        Owner::Nested(key) => {
+                            let sid = key[0];
+                            prepared.connector_child.insert(mc.id, key);
                             sid
                         }
                     };
@@ -2999,7 +3033,7 @@ impl AssemblyEvaluator {
                     }
                     let (_, owner, f) = prepared.connectors.iter().find(|(x, _, _)| *x == id).ok_or("Mate connector was deleted or is suppressed")?;
                     match prepared.connector_child.get(&id) {
-                        Some(child) => (Owner::Nested(*owner, *child), *f),
+                        Some(key) => (Owner::Nested(key.clone()), *f),
                         None => (Owner::Top(*owner), *f),
                     }
                 }
@@ -3012,7 +3046,7 @@ impl AssemblyEvaluator {
                 f = f.mul(&Frame::new(DVec3::ZERO, quarter_rot(c.rotate_quarters)));
             }
             f = f.mul(&implicit_move(c, &units));
-            let (bi, off) = owner_body(owner, &prepared.body_of, &prepared.nested_body_of).ok_or("Instance no longer exists")?;
+            let (bi, off) = owner_body(&owner, &prepared.body_of, &prepared.nested_body_of).ok_or("Instance no longer exists")?;
             Ok((bi, off.mul(&f)))
         };
 
@@ -3094,22 +3128,23 @@ impl AssemblyEvaluator {
         // ---------------------------------------------------- flexible subassembly mates
         // Solved together with this assembly's (ids outside the assembly's range).
         let mut synth = 1u64 << 62;
-        for (sid, sub, _) in &flex_subs {
+        for (prefix, sub, _) in &flex_subs {
             // The subassembly's mates by their ids in this solve (for its relations).
             let mut synth_of: HashMap<MateId, MateId> = HashMap::new();
-            let sbody = prepared.body_of.get(sid).copied();
+            let sbody = if prefix.len() == 1 { prepared.body_of.get(&prefix[0]).copied() } else { prepared.nested_body_of.get(prefix).copied() };
             let entity = |c: &MateConnectorRef| -> Result<(usize, Frame), String> {
                 if c.instance == InstanceId::ORIGIN {
                     // The subassembly's origin is its instance frame.
                     return sbody.ok_or_else(|| "Subassembly is suppressed".to_string());
                 }
-                let mut full = vec![*sid, c.instance];
+                let mut full = prefix.clone();
+                full.push(c.instance);
                 full.extend(c.path.iter().copied());
                 let leaf = leaf_of.get(full.as_slice()).copied().ok_or("Instance no longer exists")?;
-                let rest = leaf.flex.map(|f| f.1).unwrap_or(DMat4::IDENTITY);
+                let (key, rest) = leaf.flex.as_ref().ok_or("Instance no longer exists")?;
                 let f = memo.resolve(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate cannot resolve mate connectors.")?;
-                let (b, off) = *prepared.nested_body_of.get(&(*sid, c.instance)).ok_or("Instance no longer exists")?;
-                Ok((b, off.mul(&matrix_frame(&rest)).mul(&f)))
+                let (b, off) = *prepared.nested_body_of.get(key).ok_or("Instance no longer exists")?;
+                Ok((b, off.mul(&matrix_frame(rest)).mul(&f)))
             };
             let sub_resolve = |c: &MateConnectorRef| -> Result<(usize, Frame), String> {
                 let (b, mut f) = match c.connector {
@@ -3339,9 +3374,9 @@ impl AssemblyEvaluator {
                 // A flexible subassembly's copy: each child with a body of its
                 // own follows the seed's same child (live 1754: the copies
                 // keep the seed's positions inside; any copy's Arm turns them all).
-                let children: Vec<(InstanceId, (usize, Frame))> = prepared.nested_body_of.iter().filter(|((sid, _), _)| *sid == g.seed).map(|((_, c), v)| (*c, *v)).collect();
+                let children: Vec<(InstanceId, (usize, Frame))> = prepared.nested_body_of.iter().filter(|(k, _)| k.len() == 2 && k[0] == g.seed).map(|(k, v)| (k[1], *v)).collect();
                 for (child, (scb, scoff)) in children {
-                    let Some(&(gcb, gcoff)) = prepared.nested_body_of.get(&(g.instance, child)) else { continue };
+                    let Some(&(gcb, gcoff)) = prepared.nested_body_of.get(&[g.instance, child][..]) else { continue };
                     if gcb == gb || scb == gcb {
                         continue;
                     }
@@ -3414,10 +3449,10 @@ impl AssemblyEvaluator {
                 r => r.clone(),
             };
             let g = tangent_geometry(&leaf.regen.context, leaf.body.as_ref(), &entity, units).ok_or("Tangent mate geometry not supported (use planes, cylinders, cones, spheres, tori, straight or circular edges, or vertices)")?;
-            let (bi, to_body) = match leaf.flex {
-                Some((child, rest)) => {
-                    let (bi, off) = *prepared.nested_body_of.get(&(c.instance, child)).ok_or("Instance no longer exists")?;
-                    (bi, off.mul(&matrix_frame(&rest)))
+            let (bi, to_body) = match &leaf.flex {
+                Some((key, rest)) => {
+                    let (bi, off) = *prepared.nested_body_of.get(key).ok_or("Instance no longer exists")?;
+                    (bi, off.mul(&matrix_frame(rest)))
                 }
                 None => {
                     let (bi, off) = *prepared.body_of.get(&c.instance).ok_or("Instance no longer exists")?;
@@ -3460,7 +3495,7 @@ type FollowMaker<'a> = dyn Fn(u64, InstanceId, InstanceId) -> Option<(usize, Fra
 fn prepared_pose(stored: &HashMap<InstanceId, Frame>, prepared: &Prepared, body: usize) -> Frame {
     let rep = stored.get(&prepared.reps[body]).copied().unwrap_or_default();
     match prepared.nested_bodies.iter().find(|(b, ..)| *b == body) {
-        Some((_, _, _, q)) => rep.mul(q),
+        Some((_, _, q)) => rep.mul(q),
         None => rep,
     }
 }

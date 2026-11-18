@@ -43,7 +43,7 @@ struct Snapshot {
     instance_dof: Vec<(InstanceId, usize)>,
     mate_ok: Vec<(MateId, bool)>,
     relation_ok: Vec<(MateId, bool)>,
-    nested: Vec<((InstanceId, InstanceId), Placement)>,
+    nested: Vec<(Vec<InstanceId>, Placement)>,
     explode_trails: Vec<(DVec3, DVec3)>,
 }
 
@@ -69,7 +69,7 @@ struct Occurrence {
     local_bounds: Option<(DVec3, DVec3)>,
     mirrored: bool,
     external: Option<String>,
-    flex: Option<(InstanceId, DMat4)>,
+    flex: Option<(Vec<InstanceId>, DMat4)>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -168,7 +168,7 @@ impl Snapshot {
                 local_bounds: o.local_bounds,
                 mirrored: o.mirrored,
                 external: o.external.clone(),
-                flex: o.flex,
+                flex: o.flex.clone(),
             })
             .collect();
         let status = |id, ok, inactive, message: &Option<String>, values| Status { id, ok, inactive, message: message.clone(), values };
@@ -187,7 +187,7 @@ impl Snapshot {
             instance_dof: s.instance_dof.iter().map(|(k, v)| (*k, *v)).collect(),
             mate_ok: s.mate_ok.iter().map(|(k, v)| (*k, *v)).collect(),
             relation_ok: s.relation_ok.iter().map(|(k, v)| (*k, *v)).collect(),
-            nested: s.nested.iter().map(|(k, v)| (*k, *v)).collect(),
+            nested: s.nested.iter().map(|(k, v)| (k.clone(), *v)).collect(),
             explode_trails: r.explode_trails.clone(),
         }
     }
@@ -248,7 +248,8 @@ impl Snapshot {
 
 /// The cache key of the assembly as evaluated (its configuration applied) with its exploded view.
 fn key(doc: &noshape_model::Document, tab: TabId, asm: &Assembly, explode: Option<usize>) -> Option<String> {
-    cache::key(doc, &("assembly", tab, asm, explode))
+    // ("assembly2": flexible children by path since 11-18.)
+    cache::key(doc, &("assembly2", tab, asm, explode))
 }
 
 impl AssemblyView {

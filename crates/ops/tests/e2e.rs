@@ -8619,6 +8619,48 @@ fn a_flexible_subassembly_instances_part_moves_in_its_parent_only() {
     assert!(near(&in_a1, [0.0, 0.0, 0.0]), "Assembly 1 itself untouched: {in_a1:?}");
 }
 
+/// Flexible subassemblies inside a flexible subassembly join the top solve (live: asm-bjr-config's Sub 8c440a in each
+/// Sub c1e15f): a mate in Assembly 1 to a part two levels down moves that part alone; its unmated neighbours, in its
+/// subassembly and one level up, stay where they are (a rigid middle level carried them along).
+#[test]
+fn a_mate_moves_a_part_of_a_flexible_subassembly_inside_a_flexible_one() {
+    let mut ctx = Ctx::new();
+    let path = scratch("nested-flex-mate.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }, { "tool": "circle", "points": [[70, 10], [75, 10]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 2" }));
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Mid" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Mid", "source": "Sub" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Mid", "source": "Part Studio 1", "part": "Part 2" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Mid" }));
+    call(&mut ctx, "assembly_set_state", json!({ "tab": "Assembly 1", "instances": ["Part 1 <1>"], "fixed": true }));
+    let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0].clone();
+    let top = face(&mut ctx, "Part 1 <1>", 1.0)["id"].as_str().unwrap().to_string();
+    let deep = "Mid <1> > Sub <1> > Part 1 <1>";
+    let bottom = face(&mut ctx, deep, -1.0)["id"].clone();
+    let m = call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": deep, "entity": bottom }, "b": { "instance": "Part 1 <1>", "entity": top } }));
+    assert_eq!(m["mate_ok"], true, "{m}");
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    let z = |p: &str| list["occurrences"].as_array().unwrap().iter().find(|o| o["path"] == p).map(|o| num(&o["translation"][2])).unwrap_or_else(|| panic!("no occurrence {p}: {list}"));
+    assert!((z(deep) - 10.0).abs() < 1e-6, "the mated part on the block: {}", z(deep));
+    assert!(z("Mid <1> > Sub <1> > Part 2 <1>").abs() < 1e-6, "its neighbour in Sub stays: {}", z("Mid <1> > Sub <1> > Part 2 <1>"));
+    assert!(z("Mid <1> > Part 2 <1>").abs() < 1e-6, "Mid's own part stays: {}", z("Mid <1> > Part 2 <1>"));
+    // Committed: the part's place is kept in Assembly 1 for that occurrence, Mid and Sub untouched.
+    let mid = call(&mut ctx, "assembly_list", json!({ "tab": "Mid" }));
+    let in_mid = mid["occurrences"].as_array().unwrap().iter().find(|o| o["path"] == "Sub <1> > Part 1 <1>").map(|o| num(&o["translation"][2])).unwrap();
+    assert!(in_mid.abs() < 1e-6, "Mid itself untouched: {in_mid}");
+    call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    let again = list["occurrences"].as_array().unwrap().iter().find(|o| o["path"] == deep).map(|o| num(&o["translation"][2])).unwrap();
+    assert!((again - 10.0).abs() < 1e-6, "reopened: {again}");
+}
+
 /// A mate to a part inside a subassembly, as the app makes one: the part named by its occurrence path
 /// ("Sub <1> > Part 1 <1>", Onshape's notation) in assembly_entities, assembly_connectors and assembly_mate. The top
 /// block's top face Fastened to the nested block's bottom face lifts the subassembly onto it.

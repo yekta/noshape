@@ -255,8 +255,9 @@ struct DragState {
     triad_preview: Option<Frame>,
     /// Explode step editing: the drag builds a step instead of moving instances.
     explode: bool,
-    /// Free drag of a part of a flexible subassembly (the subassembly's child).
-    nested: Option<InstanceId>,
+    /// Free drag of a part of a flexible subassembly (the path of the child dragged, from the top-level instance;
+    /// deeper through flexible subassemblies inside it).
+    nested: Option<Vec<InstanceId>>,
     /// The target (and `value`) the last solve was started for: a repeated
     /// pointer position isn't solved again.
     solved: Option<(DVec3, f64)>,
@@ -3277,20 +3278,20 @@ impl AssemblyView {
                 let Some(t) = under else { return };
                 let top = t.path[0];
                 // A part of a flexible subassembly is dragged on its own (Onshape).
-                let nested = (t.path.len() > 1 && self.result.prepared.is_flexible_child(top, t.path[1])).then(|| t.path[1]);
+                let nested = (2..=t.path.len()).rev().map(|n| t.path[..n].to_vec()).find(|p| self.result.prepared.is_flexible_child(p));
                 let (origin, dir) = self.viewport.read(cx).ray(*position);
                 // Grab point: where the pointer meets the part (live 3d.json part_drag: a Revolute pin turns by its
                 // lever arm from the axis), else the closest point on the ray to the instance's bounds centre.
-                let hit = self.ray_hit(*position, |path| path[0] == top && nested.is_none_or(|c| path.get(1) == Some(&c)), cx);
-                let center = match nested {
-                    Some(c) => self.result.occurrences.iter().filter(|o| o.path.len() > 1 && o.path[0] == top && o.path[1] == c).filter_map(|o| o.world_bounds()).fold(None, |acc: Option<(DVec3, DVec3)>, (a, b)| Some(acc.map(|(x, y)| (x.min(a), y.max(b))).unwrap_or((a, b)))),
+                let hit = self.ray_hit(*position, |path| path[0] == top && nested.as_ref().is_none_or(|k| path.starts_with(k)), cx);
+                let center = match &nested {
+                    Some(k) => self.result.occurrences.iter().filter(|o| o.path.starts_with(k)).filter_map(|o| o.world_bounds()).fold(None, |acc: Option<(DVec3, DVec3)>, (a, b)| Some(acc.map(|(x, y)| (x.min(a), y.max(b))).unwrap_or((a, b)))),
                     None => self.result.instance_bounds(top),
                 }
                 .map(|(a, b)| (a + b) * 0.5)
                 .unwrap_or(DVec3::ZERO);
                 let grab = hit.unwrap_or_else(|| origin + dir * (center - origin).dot(dir));
-                let pose = match nested {
-                    Some(c) => self.result.solved.nested_world(top, c).unwrap_or_default(),
+                let pose = match &nested {
+                    Some(k) => self.result.solved.nested_world(k).unwrap_or_default(),
                     None => self.result.solved.placement(top).map(|p| placement_to_frame(&p)).unwrap_or_default(),
                 };
                 let local = pose.inverse().transform_point(grab);
@@ -3845,8 +3846,8 @@ impl AssemblyView {
                 SolveOptions { drags, drag_view: Some(d.plane_normal), start: Some(d.origin.clone()), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() }
             }
             // (The pointer's ray, along the view: live asm drag probes.)
-            _ => match d.nested {
-                Some(c) => SolveOptions { nested_drags: vec![((d.top, c), d.local, target)], drag_view: Some(d.plane_normal), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
+            _ => match &d.nested {
+                Some(k) => SolveOptions { nested_drags: vec![(k.clone(), d.local, target)], drag_view: Some(d.plane_normal), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
                 None => SolveOptions { drags: vec![(d.top, d.local, target)], drag_view: Some(d.plane_normal), start: Some(d.origin.clone()), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
             },
         };

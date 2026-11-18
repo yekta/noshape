@@ -1034,7 +1034,7 @@ fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             };
             let (child_name, own) = own.ok_or_else(|| OpError::param("instance", "no such instance in the subassembly"))?;
             let top_m = top.placement.to_dmat4();
-            let start = top.nested.iter().find(|(c, _)| *c == child).map(|(_, q)| *q).or_else(|| result.solved.nested.get(&(sub, child)).copied()).unwrap_or(own);
+            let start = top.nested.iter().find(|(c, _)| *c == child).map(|(_, q)| *q).or_else(|| result.solved.nested.get(&[sub, child][..]).copied()).unwrap_or(own);
             let world_rotation = rotation.unwrap_or_else(|| Placement::from_dmat4(&(top_m * start.to_dmat4())).rotation);
             let world = Placement { translation: xyz, rotation: world_rotation };
             let q = Placement::from_dmat4(&(top_m.inverse() * world.to_dmat4()));

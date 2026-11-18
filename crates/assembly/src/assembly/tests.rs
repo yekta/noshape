@@ -2892,10 +2892,10 @@ fn a_flexible_subassembly_keeps_its_relations() {
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!(res.prepared.flexible.contains(&InstanceId(5)), "a relation no longer makes it rigid");
     assert_eq!(res.solved.dof, 1, "two sliders and their relation: one freedom in all");
-    let z = |s: &eval::Solved, child: u64| s.nested_world(InstanceId(5), InstanceId(child)).unwrap().origin.z;
+    let z = |s: &eval::Solved, child: u64| s.nested_world(&[InstanceId(5), InstanceId(child)]).unwrap().origin.z;
     let (z2, z3) = (z(&res.solved, 2), z(&res.solved, 3));
     // Drag block 2 up 10 mm from the parent: block 3 follows 20 mm.
-    let s = res.prepared.solve(&SolveOptions { nested_drags: vec![((InstanceId(5), InstanceId(2)), DVec3::ZERO, DVec3::new(0.0, 0.0, z2 + 0.01))], ..Default::default() });
+    let s = res.prepared.solve(&SolveOptions { nested_drags: vec![(vec![InstanceId(5), InstanceId(2)], DVec3::ZERO, DVec3::new(0.0, 0.0, z2 + 0.01))], ..Default::default() });
     let (d2, d3) = (z(&s, 2) - z2, z(&s, 3) - z3);
     assert!(d2.abs() > 1e-3, "block 2 moved: {d2}");
     assert!((d3.abs() - 2.0 * d2.abs()).abs() < 1e-4, "block 3 moves twice as far: {d2} / {d3}");
@@ -2930,14 +2930,14 @@ fn flexible_subassembly_moves_in_parent_and_locks() {
     assert_eq!(res.solved.instance_dof.get(&InstanceId(5)).copied(), Some(1), "the slider inside stays free in the parent");
     let z_of = |res: &eval::AssemblyResult, s: &eval::Solved| {
         let _ = res;
-        s.nested_world(InstanceId(5), InstanceId(2)).unwrap().origin.z
+        s.nested_world(&[InstanceId(5), InstanceId(2)]).unwrap().origin.z
     };
     // Starts where the subassembly has it (5 mm above block 1's top, block 1 on the base).
     assert!((z_of(&res, &res.solved) - 0.025).abs() < 1e-6, "{}", z_of(&res, &res.solved));
     // Drag block 2 of the subassembly upward: it slides, nothing else moves.
-    let s = res.prepared.solve(&SolveOptions { nested_drags: vec![((InstanceId(5), InstanceId(2)), DVec3::new(0.02, 0.01, 0.0), DVec3::new(0.0, 0.0, 0.05))], ..Default::default() });
+    let s = res.prepared.solve(&SolveOptions { nested_drags: vec![(vec![InstanceId(5), InstanceId(2)], DVec3::new(0.02, 0.01, 0.0), DVec3::new(0.0, 0.0, 0.05))], ..Default::default() });
     assert!((z_of(&res, &s) - 0.05).abs() < 1e-3, "{}", z_of(&res, &s));
-    let w = s.nested_world(InstanceId(5), InstanceId(2)).unwrap().origin;
+    let w = s.nested_world(&[InstanceId(5), InstanceId(2)]).unwrap().origin;
     assert!(w.x.abs() < 1e-6 && w.y.abs() < 1e-6, "slides along Z only: {w:?}");
     assert!((DVec3::from(s.placement(InstanceId(5)).unwrap().translation) - DVec3::new(0.0, 0.0, 0.01)).length() < 1e-6, "subassembly frame stays on the base");
     // The display follows the nested placement.
@@ -2946,7 +2946,7 @@ fn flexible_subassembly_moves_in_parent_and_locks() {
     let upper = r2.occurrences.iter().find(|o| o.path == vec![InstanceId(5), InstanceId(2)]).unwrap();
     assert!((upper.transform.transform_point3(DVec3::ZERO).z - 0.05).abs() < 1e-3);
     // Stored nested positions are used next time.
-    asm.instances[1].nested = s.nested.iter().filter(|((sid, _), _)| *sid == InstanceId(5)).map(|((_, c), p)| (*c, *p)).collect();
+    asm.instances[1].nested = s.nested.iter().filter(|(k, _)| k.len() == 2 && k[0] == InstanceId(5)).map(|(k, p)| (k[1], *p)).collect();
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!((z_of(&res, &res.solved) - 0.05).abs() < 1e-3);
     // Locked at the current position: one rigid body, no DOF.
@@ -6760,12 +6760,12 @@ fn a_patterned_flexible_subassembly_follows_its_seed() {
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates);
     let turn = |s: &eval::Solved, sub: InstanceId| {
-        let q = s.nested.get(&(sub, InstanceId(2))).unwrap().rotation;
+        let q = s.nested.get(&[sub, InstanceId(2)][..]).unwrap().rotation;
         (DQuat::from_xyzw(q[0], q[1], q[2], q[3]) * DVec3::X).truncate().angle_to(glam::DVec2::X)
     };
     let all = |s: &eval::Solved| [InstanceId(5), copies[0], copies[1]].map(|id| turn(s, id));
     // Drag a corner of copy 3's turning block round: every block 2 turns alike.
-    let s = res.prepared.solve(&SolveOptions { nested_drags: vec![((copies[1], InstanceId(2)), DVec3::new(0.04, 0.02, 0.01), DVec3::new(0.1, 0.06, 0.03))], ..Default::default() });
+    let s = res.prepared.solve(&SolveOptions { nested_drags: vec![(vec![copies[1], InstanceId(2)], DVec3::new(0.04, 0.02, 0.01), DVec3::new(0.1, 0.06, 0.03))], ..Default::default() });
     let t = all(&s);
     assert!(t[0].abs() > 0.05, "the seed's block turned: {t:?}");
     assert!((t[0] - t[1]).abs() < 1e-6 && (t[0] - t[2]).abs() < 1e-6, "every copy turned with it: {t:?}");

@@ -22,9 +22,18 @@ pub fn fold_solved(a: &mut Assembly, result: &AssemblyResult) {
             i.placement = *p;
             // Flexible subassemblies keep their parts' positions here.
             if flexible.contains(id) {
-                let mut n: Vec<(InstanceId, Placement)> = solved.nested.iter().filter(|((s, _), _)| s == id).map(|((_, c), q)| (*c, *q)).collect();
+                let mut n: Vec<(InstanceId, Placement)> = solved.nested.iter().filter(|(k, _)| k.len() == 2 && k[0] == *id).map(|(k, q)| (k[1], *q)).collect();
                 n.sort_by_key(|(c, _)| *c);
                 i.nested = n;
+                // Deeper, in flexible subassemblies inside it: relative to the subassembly instance holding each.
+                for (k, q) in solved.nested.iter().filter(|(k, _)| k.len() > 2 && k[0] == *id) {
+                    let Some(holder) = solved.nested.get(&k[..k.len() - 1]) else { continue };
+                    let rel = Placement::from_dmat4(&(holder.to_dmat4().inverse() * q.to_dmat4()));
+                    let key = k[1..].to_vec();
+                    i.nested_deep.retain(|(p, _)| *p != key);
+                    i.nested_deep.push((key, rel));
+                }
+                i.nested_deep.sort_by(|a, b| a.0.cmp(&b.0));
             }
         }
     }
