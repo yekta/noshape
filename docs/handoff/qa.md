@@ -164,10 +164,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Compat upload fixed 07:45: compat-check.sh snapshots the green, scp to noshape.new + mv (an scp onto the busy binary failed
    and cfc031fa's run used cafe3c2a's app: its file is renamed cfc031fa.stale-binary.txt when done). qa-wait-67eb's vibex7 load
    check was never true (ssh quoting); fixed 07:30, still waits for load < 2.
-0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
-   + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
-   nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
-   SELFEEL-PART-ROW: psui reads it as screen lag (a real-event GPUI test passes): re-check in the quiet window.
 0b. **LOADED runs (lead 21:50)**: speed / timing at load > 16 (2 x 8 cores) don't count. suites-diff.py prints "LOADED: …" first,
    skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
    the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.
