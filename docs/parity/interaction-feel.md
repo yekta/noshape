@@ -1423,7 +1423,7 @@ before / +1.5 s and ours before / +1.5 s for each key). Mac: drawing Ctrl+S / Q 
 | H Show mates mode (asm) | the toolbar button turns on and the Revolute's glyph (a pale square with the mate icon) shows at the mate | the button turns on, no glyph | ≠ [asm] |
 | Y Hide (asm, the block selected) | the block hidden, its edges still drawn in yellow while it stays selected | the block gone entirely | ≠ [asm] |
 | Shift+I / Shift+T Isolate, Make transparent (asm, a face selected) | the dialog; the face no longer highlighted | the same dialog; the face stays orange | ≠ [asm] |
-| Shift+arrows (drawing: Coarse rotate) | pan the sheet (Shift+Down moves it down about a quarter screen, Shift+Left to the right) | nothing | ≠ [studios] |
+| Shift+arrows (drawing: Coarse rotate) | pan the sheet 187 px a press on a 1919 × 1079 window (Shift+Down moves it down, Shift+Left left; measured on the full-size shots, live2 correction 11-18: "to the right" was wrong) | nothing | ≠ [studios] |
 | Shift+N Rename (drawing, a view selected, Sheets panel closed) | nothing visible (with the panel open: the view's row becomes a Rename box with ✓ ✕) | opens the View properties panel | ≠ [studios] |
 | [ Show measure (drawing, a view selected) | the Measure panel at the top left ("Select entities to measure"), the selection cleared | a bubble "Measure: select points, straight edges or circles ×" at the top and a "Measure" box at the bottom left; the selection kept | ≠ [studios] |
 | Space Clear selection (drawing, a view selected) | the selection cleared | the view stays selected | ≠ [studios] |
