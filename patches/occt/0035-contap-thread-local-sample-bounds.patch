@@ -1,0 +1,13 @@
+--- a/src/ModelingAlgorithms/TKHLR/Contap/Contap_HContTool.cxx	2026-11-18 22:20:52.962333373 +0000
++++ b/src/ModelingAlgorithms/TKHLR/Contap/Contap_HContTool.cxx	2026-11-18 22:20:52.983243648 +0000
+@@ -21,7 +21,9 @@
+ #include <gp_Pnt.hxx>
+ #include <gp_Pnt2d.hxx>
+ 
+-static double uinf, vinf, usup, vsup;
++// noshape (patch 0035): one set of sample bounds per thread. NbSamplePoints stores the surface's bounds for
++// SamplePoint; shared, two threads' outline tracing (parallel drawing views) read each other's bounds.
++static thread_local double uinf, vinf, usup, vsup;
+ 
+ int Contap_HContTool::NbSamplesV(const occ::handle<Adaptor3d_Surface>& S,
+                                  const double,

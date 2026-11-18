@@ -480,7 +480,10 @@ TopoDS_Shape faceted(const TopoDS_Shape& owner, bool solid, MeshFacets& m)
 {
   BRep_Builder                                     B;
   std::map<std::array<long long, 3>, TopoDS_Vertex> verts;
-  std::map<std::pair<const void*, const void*>, TopoDS_Edge> edges;
+  std::map<std::pair<int, int>, TopoDS_Edge>        edges;
+  // Each vertex's creation order: an edge runs from the older vertex (never by address, which differs run to run and
+  // flipped mesh edges in drawings, c2-hex-bookcase-derived).
+  std::map<const void*, int> order;
   auto vertex = [&](const gp_Pnt& p) {
     const std::array<long long, 3> k{std::llround(p.X() * 1e9), std::llround(p.Y() * 1e9), std::llround(p.Z() * 1e9)};
     auto it = verts.find(k);
@@ -488,16 +491,17 @@ TopoDS_Shape faceted(const TopoDS_Shape& owner, bool solid, MeshFacets& m)
       return it->second;
     TopoDS_Vertex v;
     B.MakeVertex(v, p, 1e-7);
+    order.emplace(v.TShape().get(), (int)order.size());
     return verts[k] = v;
   };
   auto edge = [&](const TopoDS_Vertex& u, const TopoDS_Vertex& v) {
-    const void* pu = u.TShape().get();
-    const void* pv = v.TShape().get();
-    const auto  k  = pu < pv ? std::make_pair(pu, pv) : std::make_pair(pv, pu);
-    auto        it = edges.find(k);
+    const int  iu = order.at(u.TShape().get());
+    const int  iv = order.at(v.TShape().get());
+    const auto k  = iu < iv ? std::make_pair(iu, iv) : std::make_pair(iv, iu);
+    auto       it = edges.find(k);
     if (it == edges.end())
-      it = edges.emplace(k, BRepBuilderAPI_MakeEdge(pu < pv ? u : v, pu < pv ? v : u).Edge()).first;
-    return pu < pv ? it->second : TopoDS::Edge(it->second.Reversed());
+      it = edges.emplace(k, BRepBuilderAPI_MakeEdge(iu < iv ? u : v, iu < iv ? v : u).Edge()).first;
+    return iu < iv ? it->second : TopoDS::Edge(it->second.Reversed());
   };
   std::vector<std::pair<TopoDS_Face, TopoDS_Face>> faces; // (source, face)
   bool                                             brep = false;

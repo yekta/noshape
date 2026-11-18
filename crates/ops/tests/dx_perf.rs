@@ -164,6 +164,79 @@ fn timed_bracket_drawing_four_views() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A corpus model by name (`read_model`'s features, live states and refs), or an assembly corpus studio as
+/// `<assembly>/studios/<element>` (its files copied under `tmp` with the names a corpus model's have).
+fn corpus_model(models: &std::path::Path, name: &str, tmp: &std::path::Path) -> Option<(Value, Vec<Value>, String)> {
+    let dir = match name.split_once("/studios/") {
+        Some((asm, element)) => {
+            let d = tmp.join(element);
+            std::fs::create_dir_all(&d).ok()?;
+            for (from, to) in [("json", "features.json"), ("live.jsonl", "live.jsonl"), ("refs.jsonl", "refs.jsonl"), ("sketches.json", "sketches.json")] {
+                let _ = std::fs::copy(models.join(asm).join("studios").join(format!("{element}.{from}")), d.join(to));
+            }
+            d
+        }
+        None => models.join(name),
+    };
+    crate::parity::read_model(&dir)
+}
+
+/// Every view's hidden-line edges and model edges of the corpus parts' suggested-views drawings, written exactly
+/// (`{:?}`) to `NOSHAPE_VIEWS_DUMP/<model>.txt`: two builds' dumps compared show whether a kernel change (an OCCT
+/// patch) changes any drawing. NOSHAPE_VIEWS_MODELS: the models (default: the exchange suite's drawings and the
+/// heaviest parts).
+#[test]
+#[ignore = "T2: the corpus is on the build hosts only"]
+fn dump_corpus_drawing_views() {
+    use std::fmt::Write;
+    let models = std::path::PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into()));
+    let out = std::path::PathBuf::from(std::env::var("NOSHAPE_VIEWS_DUMP").expect("NOSHAPE_VIEWS_DUMP: the dump directory"));
+    std::fs::create_dir_all(&out).unwrap();
+    let list = std::env::var("NOSHAPE_VIEWS_MODELS").unwrap_or_else(|_| {
+        "c2-bottle-split,c2-duct-multipart,c2-extension-spring,c2-hex-bookcase-derived,c2-housing-draft,c2-rings-loft,c2-sm-louver,c2-variable-fillet-faceblend,cf-snap-hook,clamp-guillem,c2-impeller-loft,cf-surface-pattern,cf-straight-spline,cf-fill-pattern,cf-drive-train-generator,cf-spur-gear,c2-fan-blade-sweep".into()
+    });
+    let tmp = std::env::temp_dir().join(format!("noshape-dx-views-dump-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    for name in list.split(',') {
+        let Some((features, live, refs)) = corpus_model(&models, name, &tmp) else {
+            eprintln!("{name}: no corpus model");
+            continue;
+        };
+        let mut ctx = Ctx::new();
+        let path = tmp.join(format!("{}.noshape", name.replace('/', "-")));
+        let drawing = {
+            let mut t = noshape_ops::parity::Translator::open(&mut ctx, &path, &features, noshape_ops::parity::live_refs(&live, &refs)).unwrap_or_else(|e| panic!("{name}: {e}"));
+            for k in 0..t.len() {
+                t.step(k);
+            }
+            let d = t.call("drawing_create", json!({ "source": "Part Studio 1", "template": "ANSI_A_INCH.dwt", "suggested_views": true })).unwrap_or_else(|e| panic!("{name}: {e}"));
+            d["drawing"].as_str().unwrap().to_string()
+        };
+        let od = ctx.doc(None).unwrap();
+        let tab = od.doc().tabs.iter().find(|t| t.name == drawing).map(|t| t.id).unwrap();
+        let d = noshape_ops::drawing::drawing_of(od.doc(), tab).cloned().unwrap();
+        let m = noshape_ops::drawing::SheetModel::build(od, tab, d, 0, &[]);
+        let mut ids: Vec<_> = m.geoms.keys().copied().collect();
+        ids.sort();
+        let mut text = String::new();
+        let mut edges = 0;
+        for id in ids {
+            let g = &m.geoms[&id];
+            edges += g.edges.len();
+            let _ = writeln!(text, "view {id:?}: {} edges, {} model edges", g.edges.len(), g.model_edges.len());
+            for e in &g.edges {
+                let _ = writeln!(text, "{e:?}");
+            }
+            for e in &g.model_edges {
+                let _ = writeln!(text, "{e:?}");
+            }
+        }
+        std::fs::write(out.join(format!("{}.txt", name.replace('/', "-"))), &text).unwrap();
+        eprintln!("{name}: {} views, {edges} edges", m.geoms.len());
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
 /// Drawing views of the heaviest corpus parts (lead 11-18: users wait on them), placed as a user does: Create drawing
 /// (No views), Insert view Front, then Top, Right and Isometric projected from it, each timed from the call to its view
 /// drawn (no kept view: each run starts cold); then the last solid feature suppressed, the drawing's Update timed to its
@@ -180,20 +253,8 @@ fn timed_corpus_drawing_views() {
     let ms = |t: Instant| t.elapsed().as_secs_f64() * 1000.0;
     let call_once = |t: &mut noshape_ops::parity::Translator, tool: &str, args: Value| t.call(tool, args).unwrap_or_else(|e| panic!("{tool}: {e}"));
     for name in list.split(',') {
-        // An assembly corpus studio: its files under the names a corpus model's have.
-        let dir = match name.split_once("/studios/") {
-            Some((asm, element)) => {
-                let d = tmp.join(element);
-                std::fs::create_dir_all(&d).unwrap();
-                for (from, to) in [("json", "features.json"), ("live.jsonl", "live.jsonl"), ("refs.jsonl", "refs.jsonl"), ("sketches.json", "sketches.json")] {
-                    let _ = std::fs::copy(models.join(asm).join("studios").join(format!("{element}.{from}")), d.join(to));
-                }
-                d
-            }
-            None => models.join(name),
-        };
-        let Some((features, live, refs)) = crate::parity::read_model(&dir) else {
-            eprintln!("{name}: no corpus model at {}", dir.display());
+        let Some((features, live, refs)) = corpus_model(&models, name, &tmp) else {
+            eprintln!("{name}: no corpus model");
             continue;
         };
         let mut ctx = Ctx::new();
