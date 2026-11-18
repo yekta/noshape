@@ -3996,6 +3996,9 @@ impl AssemblyView {
             self.start_mate_inner(MateType::Fastened, window, cx);
             self.deliver_connector(src, window, cx);
             self.deliver_connector(dst, window, cx);
+            if let Some(m) = &self.mate {
+                m.dialog.update(cx, |d, _| d.forget_picks());
+            }
         }
         self.schedule_eval(window, cx);
         cx.notify();

@@ -373,6 +373,13 @@ impl MateDialog {
         [self.a.clone(), self.b.clone(), self.c.clone(), self.d.clone()]
     }
 
+    /// Drop the pick history: picks the dialog opened with are no Undo step (live snapmode-1118: Ctrl+Z in the Fastened
+    /// a snap drop opened does nothing).
+    pub fn forget_picks(&mut self) {
+        self.picks_undo.clear();
+        self.picks_redo.clear();
+    }
+
     /// Whether Undo / Redo have a pick to act on.
     pub fn pick_history(&self) -> (bool, bool) {
         (!self.picks_undo.is_empty(), !self.picks_redo.is_empty())

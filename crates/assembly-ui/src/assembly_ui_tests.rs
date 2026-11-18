@@ -1297,7 +1297,7 @@ fn a_snap_mode_drag_keeps_its_move_through_esc_and_stays_in_snap_mode(cx: &mut T
 
 /// Live snapmode-1118: a snap-mode drag of the pin's top-face connector onto the block's top-face centre lands it there
 /// with the frames aligned (the tops flush, the pin sunk in), opens an uncommitted Fastened dialog with both
-/// connectors, and Esc closes it with no mate, the pin staying where it snapped.
+/// connectors (Ctrl+Z in it does nothing), and Esc closes it with no mate, the pin staying where it snapped.
 #[gpui::test]
 fn a_snap_mode_drag_lands_aligned_and_opens_an_uncommitted_fastened(cx: &mut TestAppContext) {
     use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
@@ -1326,6 +1326,9 @@ fn a_snap_mode_drag_lands_aligned_and_opens_an_uncommitted_fastened(cx: &mut Tes
             assert!(d.mate_type() == MateType::Fastened && d.connectors_complete());
             assert_eq!(v.assembly(cx).unwrap().mates.len(), mates, "nothing committed");
             assert!(v.snap.is_some(), "snap mode stays on");
+            let slots = v.mate.as_ref().unwrap().dialog.read(cx).slots();
+            v.mate_undo(false, cx);
+            assert_eq!(v.mate.as_ref().unwrap().dialog.read(cx).slots(), slots, "Ctrl+Z does nothing");
             v.on_cancel(&crate::actions::Cancel, w, cx);
             assert!(v.mate.is_none());
             assert_eq!(v.assembly(cx).unwrap().mates.len(), mates, "no mate");
