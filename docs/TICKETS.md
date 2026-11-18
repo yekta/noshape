@@ -650,6 +650,12 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 ## Interaction feel: live2's "Ours" cells, batch 6 (sm-form row 1288; live2 13:09, green)
 - [x] (dropped qa 13:10: a remembered value; live2's fresh config had none yet, after one Form ours opens with Circle emboss as live; row 1288 = in 792d2e7b8) **P1 FORM-DEFAULT-STUDIO (skasm)**: the sheet-metal Form dialog opens with "Form Part Studio" empty; live's opens with Circle emboss. The rest matches.
 
+## Interaction feel: live2's "Ours" cells, batch 7 (studios rows 1294-1297: 3 equal, 1 not; live2 13:2x, green 9021eeb7a)
+- [ ] **P1 DRW-TOOLBAR-TOOLTIP-DELAY (studios)**: a drawing toolbar button's title tooltip appears 0.70 s after the hover; live's at
+  ~0.47 s. (studios told by live2.)
+- Equal to live (live2): 1294, 1296, 1297. live2 next: the non-P0 "?" rows (ui-speed 1088-1093, prefs, numfmt, 1199, 1236, 893,
+  1114, 1163); snap-diag 1303 stays qa's (Snap reach, on hold for asm).
+
 ## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:10, green cafe3c2af, vibex8 Xvfb, real pointer)
 Sessions opened without the UI runner (stable view): asm-feel (Part 1 40x30x10, Part 3 20x20x5), block-fillet, hole-plate-drawing.
 Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png (vibex8 ~/agents/qa-keep/feel-1118/).
