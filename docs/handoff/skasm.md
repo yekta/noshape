@@ -4,22 +4,22 @@ Updated 2026-11-18 02:10 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18
-- b6f5e810 (01:01): snap onto another sketch's point / model vertex = one Coincident, no use glyph (qa
-  SKSNAP-SHIFT-ICON, live2 use-glyph-1118); joint row's flat edges (`flat_view_side_edge`); Flange flip row test.
-- 4a4f7e0e (queued 01:25): a double-clicked face's sketch drawn through the part as an edited one (qa
-  SELFEEL-DBLCLICK-FACE-SKETCH; GPU test on two-blocks Part 2). qa told.
+- b6f5e810: snap onto another sketch's point / model vertex = one Coincident, no use glyph (qa SKSNAP-SHIFT-ICON);
+  joint row's flat edges (`flat_view_side_edge`); Flange flip row test.
+- 0fda4de5: a double-clicked face's sketch drawn through the part as an edited one (qa SELFEEL-DBLCLICK-FACE-SKETCH);
+  Extend picks a line's nearer end, which follows the pointer and stops on a crossing curve; offset arrow drag adds to
+  the press-time offset (live sketch-tools-1118; tangent arc, spline Enter, fillet reach, trim drag already as live).
 
-## Unlanded (worktree /root/projects/noshape-wt/skasm, branch agent/skasm), uncommitted
-- Rip -> Bend unfold failure (live sm-feel-1117): host `bends_close_a_loop` per part -> no flat
-  (`SheetMetalData::cannot_unfold`, flat_pattern errs) and a WARNING SHEET_METAL_COULD_NOT_UNFOLD on the feature (std's
-  defineFeature aborts on an ERROR, so the bend wouldn't stay; hole.fs reads it as a warning; the toast is yellow);
-  native modify_joint the same; the panel's yellow toast after a joint edit; ui_parity "part 0" selector; test
-  sm::a_corner_rip_made_a_bend_cannot_unfold_as_lives. live2 said "red": recheck the colour with live. A/B on the 16
-  sheet metal parity docs running: vibex7 ~/agents/skasm-keep/ops-{a,b} (smab7.sh), then smrun-like compare.
-- Sketch tools (live 11-18 sketch-tools-1118): Extend picks the nearer line end, the end follows the pointer and
-  stops on a crossing curve (`extend_end`, `extend_target`); Offset arrow drag adds to the press-time offset on 0.1 mm
-  steps; tests (scene) extend_picks_the_nearer_end..., enter_leaves_a_spline..., offset_preview_arrow_and_repeat.
-  Tangent arc, Spline Enter, fillet reach, trim drag already as live. Feel rows written.
+## Committed, not landed (branch agent/skasm)
+- 1286bcbcf: Rip -> Bend unfold failure (host `bends_close_a_loop` per part -> no flat, `cannot_unfold`, WARNING
+  SHEET_METAL_COULD_NOT_UNFOLD with the bend kept: std's defineFeature rolls an ERROR back; the table's yellow toast);
+  Corner / Bend relief boxes take planar faces with the walls muted (`SM_CORNER`); ui_parity "part 0"; tests. Waits
+  for the A/B over the 16 sheet metal parity docs: vibex8 slot (queued behind qa's suites), binaries
+  ~/agents/skasm-keep/ops-{a,b} there, logs sm-unfold-{a,b}.log; compare "features match" and DIFF lines, then land.
+- 5ad88311e: offset arrow step by the manipulators' zoom rule (live2 triad-step-1118).
+- live REQUESTS 11-18 02:30: the failure row's colour (warning vs error) and Corner taking a rip side face.
+- SKSNAP-REACH (P2): qa's slow sweep lights at 6 px, never 7; headless 7.0 lights (test extended): ~1 px between the X
+  pointer and our viewport coordinates; psui measuring the app side (lead: dig together, may be hat15b's offset).
 
 ## Next, in order
 0. USER P0 (lead 11-17): interaction feel. sm-feel-1117 left: Corner / Bend relief taking a rip's side face +
