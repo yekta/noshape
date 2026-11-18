@@ -1641,7 +1641,7 @@ impl ReleaseDialog {
     fn submit_button(&self, fields_ok: bool, cx: &mut Context<Self>) -> Stateful<Div> {
         let has = !self.approvers.is_empty();
         release_button_colored("rel-submit", "Submit", 0x1651b0, 0x8ba8d7, fields_ok && has)
-            .when(!has, |d| d.tooltip(crate::ui::tooltip("Submit requires Approvers")))
+            .when(!has, |d| d.tooltip(crate::ui::bold_tooltip(SUBMIT_REQUIRES_APPROVERS, SUBMIT_REQUIRES_BOLD)))
             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                 if !this.approvers.is_empty() && this.submit(cx) {
                     window.close_dialog(cx);
@@ -1726,6 +1726,9 @@ const COL_REVISION: f32 = 140.;
 const COL_STATE: f32 = 140.;
 const COL_PART_NUMBER: f32 = 150.;
 const GRID: u32 = 0xdddddd;
+/// Live's tooltip on Submit and the footer's ? without approvers, "Submit" and "Approvers" bold.
+const SUBMIT_REQUIRES_APPROVERS: &str = "Submit requires Approvers";
+const SUBMIT_REQUIRES_BOLD: &[std::ops::Range<usize>] = &[0..6, 16..25];
 /// An item row's bands (background, text): Bootstrap's alert-warning, alert-danger and alert-info.
 /// Live2 errors-1118 (`alert alert-warning`): bg rgb(255,248,230), text rgb(51,51,51), border rgb(252,218,127).
 const BAND_WARNING: (u32, u32) = (0xfff8e6, 0x333333);
@@ -2391,7 +2394,7 @@ impl Render for ReleaseDialog {
             h_flex()
                 .gap(px(4.))
                 .child(div().text_size(px(14.)).text_color(pal.text).child("A field required by one or more actions is empty"))
-                .child(div().id("rel-required-help").child(crate::ui::glyph("help-outline", 20., gpui_kit::rgb(0x6ba5da))).when(self.approvers.is_empty(), |d| d.tooltip(crate::ui::tooltip("Submit requires Approvers"))))
+                .child(div().id("rel-required-help").child(crate::ui::glyph("help-outline", 20., gpui_kit::rgb(0x6ba5da))).when(self.approvers.is_empty(), |d| d.tooltip(crate::ui::bold_tooltip(SUBMIT_REQUIRES_APPROVERS, SUBMIT_REQUIRES_BOLD))))
         });
         let button = |id: &'static str, text: &'static str, bg: u32, enabled: bool| {
             div()

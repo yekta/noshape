@@ -142,6 +142,14 @@ pub fn tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) 
     move |window, cx| styled_tooltip(Tooltip::new(text.clone()), text.clone(), window, cx)
 }
 
+/// [`tooltip`] with some words bold (byte ranges of `text`), as live's "**Submit** requires **Approvers**".
+pub fn bold_tooltip(text: &'static str, bold: &'static [std::ops::Range<usize>]) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
+    move |window, cx| {
+        let words = move |_: &mut Window, _: &mut App| StyledText::new(text).with_highlights(bold.iter().map(|r| (r.clone(), FontWeight::BOLD.into())));
+        styled_tooltip(Tooltip::element(words), text.into(), window, cx)
+    }
+}
+
 /// [`tooltip`] for user-authored text (a part's or a tab's name): drawn
 /// as is in every UI language (see [`user_text`]).
 pub fn user_tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {

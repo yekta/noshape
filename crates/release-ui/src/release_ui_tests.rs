@@ -280,3 +280,10 @@ fn a_part_of_a_failing_part_studio_gets_the_regeneration_errors_notice(cx: &mut 
         assert!(!notice.blocks());
     });
 }
+
+/// Live2 errors-1118: the footer's ? and Submit say "Submit requires Approvers" with "Submit" and "Approvers" bold.
+#[test]
+fn submit_requires_approvers_bolds_submit_and_approvers() {
+    let bold: Vec<&str> = super::SUBMIT_REQUIRES_BOLD.iter().map(|r| &super::SUBMIT_REQUIRES_APPROVERS[r.clone()]).collect();
+    assert_eq!(bold, ["Submit", "Approvers"]);
+}
