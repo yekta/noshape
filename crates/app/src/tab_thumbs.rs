@@ -28,13 +28,24 @@ pub struct TabThumbs {
     /// shown just before its tab's click went with the click; its picture finishing ~0.5 s later drew frames after
     /// every return to an open tab, qa DOCK-TAB-SWITCH-TRAILING-FRAMES).
     quiet: std::collections::HashSet<TabId>,
-    /// The tab whose picture is being made.
+    /// The tab whose picture is being made, and the flag that drops it (set when the tab is activated in its
+    /// `PICTURE_WAIT`).
     making: Option<TabId>,
+    dropped: Arc<std::sync::atomic::AtomicBool>,
+    /// Pictures made (not dropped).
+    #[cfg(test)]
+    renders: usize,
 }
+
+/// How long a card's picture waits after it was asked for before it is made: a click on the tab in that time drops it
+/// (its scene's upload and render held the clicked tab's own frames back, ~0.6 s on a software GPU: qa
+/// DOCK-TAB-SWITCH-TRAILING-FRAMES, the dock's return to an open tab settling at ~800 ms).
+pub const PICTURE_WAIT: std::time::Duration = std::time::Duration::from_millis(250);
 
 impl TabThumbs {
     pub fn new(doc: Entity<DocModel>) -> Self {
-        Self { doc, images: HashMap::new(), made_for: HashMap::new(), busy: false, queued: Vec::new(), evaluator: Default::default(), regen: Default::default(), quiet: Default::default(), making: None }
+        Self { doc, images: HashMap::new(), made_for: HashMap::new(), busy: false, queued: Vec::new(), evaluator: Default::default(), regen: Default::default(), quiet: Default::default(), making: None, dropped: Default::default(), #[cfg(test)]
+            renders: 0 }
     }
 
     /// `tab` became the active one: no card shows its picture now.
@@ -42,13 +53,14 @@ impl TabThumbs {
         self.queued.retain(|t| *t != tab);
         if self.making == Some(tab) {
             self.quiet.insert(tab);
+            self.dropped.store(true, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
-    /// Whether a picture is being made, and how many are kept.
+    /// Whether a picture is being made, how many are kept, and how many went to the GPU.
     #[cfg(test)]
-    pub(crate) fn state(&self) -> (bool, usize) {
-        (self.busy, self.made_for.len())
+    pub(crate) fn state(&self) -> (bool, usize, usize) {
+        (self.busy, self.made_for.len(), self.renders)
     }
 
     /// Every picture made again at its next request.
@@ -96,6 +108,8 @@ impl TabThumbs {
         }
         self.busy = true;
         self.making = Some(tab);
+        let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        self.dropped = dropped.clone();
         let versions = self.doc.read(cx).session.pinned_documents();
         let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
         let evaluator = self.evaluator.clone();
@@ -121,6 +135,13 @@ impl TabThumbs {
             _ => None,
         };
         cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(PICTURE_WAIT).await;
+            if dropped.load(std::sync::atomic::Ordering::Relaxed) {
+                let _ = this.update(cx, |this: &mut Self, cx| this.made(tab, hash, None, cx));
+                return;
+            }
+            #[cfg(test)]
+            let _ = this.update(cx, |this: &mut Self, _| this.renders += 1);
             let picture = cx
                 .background_spawn(async move {
                     // `None`: stopped (made again later); `Some(None)`: nothing to draw.
@@ -152,31 +173,36 @@ impl TabThumbs {
                     let Some((lo, hi)) = scene.bounds() else { return Some(None) };
                     let (w, h) = CARD_PICTURE;
                     let camera = crate::start_thumbnail::fit_camera(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64);
-                    let Ok(png) = gpu.render_png(Arc::new(scene), camera, crate::start_thumbnail::thumbnail_style(), w, h).await else { return Some(None) };
+                    // A software GPU (one frame in flight) renders it at its size, lines as thick (a quarter of the
+                    // pixels: ~0.6 s of the GPU at 2x on the dock, which every frame after it waits for).
+                    let (ss, scale) = if gpu.frames_in_flight() == 1 { (1, 2.0) } else { (2, 1.0) };
+                    let Ok(png) = gpu.render_png_supersampled(Arc::new(scene), camera, crate::start_thumbnail::thumbnail_style(), (w, h), ss, scale).await else { return Some(None) };
                     Some(crate::tab_manager::decode(&png))
                 })
                 .await;
-            let _ = this.update(cx, |this: &mut Self, cx| {
-                this.busy = false;
-                this.making = None;
-                // Stopped for a view's regeneration: made again at the next hover.
-                if let Some(picture) = picture {
-                    this.made_for.insert(tab, hash);
-                    this.images.insert(tab, picture);
-                }
-                // The next queued tab that needs a picture (an unchanged one
-                // or one without any returns at once).
-                let quiet = this.quiet.remove(&tab);
-                while !this.busy && !this.queued.is_empty() {
-                    let next = this.queued.remove(0);
-                    this.request(next, cx);
-                }
-                if !quiet {
-                    cx.notify();
-                }
-            });
+            let _ = this.update(cx, |this: &mut Self, cx| this.made(tab, hash, picture, cx));
         })
         .detach();
+    }
+
+    /// `tab`'s picture finished (`None`: stopped for a view's regeneration or dropped for its tab's click, made again
+    /// at the next hover); the next queued tab's starts.
+    fn made(&mut self, tab: TabId, hash: u64, picture: Option<Option<Arc<RenderImage>>>, cx: &mut Context<Self>) {
+        self.busy = false;
+        self.making = None;
+        if let Some(picture) = picture {
+            self.made_for.insert(tab, hash);
+            self.images.insert(tab, picture);
+        }
+        // The next queued tab that needs a picture (an unchanged one or one without any returns at once).
+        let quiet = self.quiet.remove(&tab);
+        while !self.busy && !self.queued.is_empty() {
+            let next = self.queued.remove(0);
+            self.request(next, cx);
+        }
+        if !quiet {
+            cx.notify();
+        }
     }
 }
 

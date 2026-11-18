@@ -14,7 +14,7 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Value {
     registry::run(ctx, op, &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value
 }
 
-/// A new document (its Part Studio 1) and Variable Studios A, B and C in a workspace, opened in that order (C active,
+/// A new document (its Part Studio 1 with a block) and Variable Studios A, B and C in a workspace, opened in that order (C active,
 /// B the previous one).
 fn workspace(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Workspace>, [TabId; 4]) {
     cx.update(gpui_kit::init);
@@ -37,6 +37,11 @@ fn workspace(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Wo
     {
         let mut ctx = Ctx::new();
         call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        // A block in Part Studio 1 (its tab card has a picture to render).
+        call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+        call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "corner_rectangle", "points": [[0, 0], [20, 10]] }));
+        let region = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" }))["regions"][0]["id"].as_str().unwrap().to_string();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm" } }));
         for name in ["A", "B", "C"] {
             call(&mut ctx, "tab_create", json!({ "kind": "variablestudio", "name": name }));
         }
@@ -142,11 +147,19 @@ fn a_shortcut_works_with_the_focus_on_the_top_bar(cx: &mut TestAppContext) {
 
 /// qa DOCK-TAB-SWITCH-TRAILING-FRAMES (since 0.4.54): the pointer rests on an inactive Part Studio tab until its hover
 /// card shows (which starts the tab's picture), then clicks it. The card goes with the click, but the picture finishing
-/// ~0.5 s later redrew the window: frames until ~700 ms after every return to an open tab. Activating the tab now keeps
-/// that picture quietly; a card left showing still gets its picture drawn.
+/// ~0.5 s later redrew the window: frames until ~700 ms after every return to an open tab; and its render, already on
+/// the GPU, held the clicked tab's first frame back (~0.6 s on a software GPU). The render now waits `PICTURE_WAIT`
+/// and a click on the tab in that time drops it; a card left showing still gets its picture drawn.
 #[gpui::test]
 fn a_clicked_tabs_card_picture_redraws_nothing(cx: &mut TestAppContext) {
     let (w, ws, [studio, ..]) = workspace(cx, "tab-card");
+    // The picture's frame comes back (handed over on this thread).
+    let _lock = noshape_ops::doc::gpu_lock();
+    let gpu = match crate::gpu::Gpu::headless_rendering() {
+        Ok(gpu) => gpu,
+        Err(e) => return eprintln!("tab card picture test skipped (no GPU): {e}"),
+    };
+    cx.update(|cx| cx.set_global(crate::gpu::GpuGlobal(gpu.clone())));
     let thumbs = ws.read_with(cx, |ws, _| ws.tab_thumbs.clone());
     let notified = std::rc::Rc::new(std::cell::Cell::new(0));
     let n = notified.clone();
@@ -164,20 +177,27 @@ fn a_clicked_tabs_card_picture_redraws_nothing(cx: &mut TestAppContext) {
         let t = std::time::Instant::now();
         while state(cx).0 && t.elapsed() < std::time::Duration::from_secs(60) {
             std::thread::sleep(std::time::Duration::from_millis(10));
+            gpu.deliver_frames();
+            cx.executor().advance_clock(std::time::Duration::from_millis(50));
             draw(cx, w);
         }
         draw(cx, w);
     };
-    // A card left showing: its picture redraws.
-    let asked = ask(cx);
-    made(cx);
-    let shown = (asked, notified.replace(0), state(cx).1);
-    // The tab clicked (activated) while its picture is made.
+    // A card left showing: its picture goes to the GPU and redraws (asked again until the studio's part is there).
+    let t = std::time::Instant::now();
+    let mut asked = false;
+    while state(cx).2 == 0 && t.elapsed() < std::time::Duration::from_secs(60) {
+        asked = ask(cx);
+        made(cx);
+    }
+    let shown = (asked, notified.replace(0) > 0, state(cx).1, state(cx).2);
+    // The tab clicked (activated) while its picture is made: no redraw, and its render never goes to the GPU (the
+    // clicked tab's own frame waited ~0.6 s behind it on a software GPU, qa's dock).
     let asked = ask(cx);
     cx.update_window(w, |_, window, cx| ws.update(cx, |ws, cx| ws.activate(studio, window, cx))).unwrap();
     made(cx);
-    let clicked = (asked, notified.get(), state(cx).1);
-    assert_eq!((shown, clicked), ((true, 1, 1), (true, 0, 1)), "((asked, redraws, kept) for a card left showing, the same for one whose tab was clicked)");
+    let clicked = (asked, notified.get() > 0, state(cx).1, state(cx).2);
+    assert_eq!((shown, clicked), ((true, true, 1, 1), (true, false, 0, 1)), "((asked, redrawn, kept, GPU renders) for a card left showing, the same for one whose tab was clicked)");
 }
 
 /// Live 11-18 (behaviours "Preferences › Units effects"): the Versions and history flyout opened in one document is open
