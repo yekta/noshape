@@ -1394,6 +1394,36 @@ Fillet opens at 3 mm (qa-scratch/session/fillet-mem.json), =. Final part: ours 3
 | 14b: after the front view and one projected view (below), further clicks right and diagonal place nothing | ≠ [studios]: the continuation stays in Projected view; clicks at the diagonals place two Isometric views (live2's place-1118 P rows: a P-started projected view does go isometric past 22.5°, so this is the Insert view continuation only) | missing |
 | 11: roll back to Extrude 2, insert Chamfer 1 (the hole's top edge, 1 mm), roll to the end: everything rebuilds (Linear pattern 1 = a Feature pattern of Extrude 2, 3 × 20 mm) | ≠ [core]: Linear pattern 1 fails "Could not create all instances as entered. Try selecting "Reapply features" option."; with Chamfer 1 suppressed it rebuilds (29378.70 mm³). TICKETS PATTERN-AFTER-INSERTED-CHAMFER | missing |
 
+### shortcuts-1118 (assembly + drawing default keys, live2 11-18 23:32) [asm, studios]
+
+Every key of live's `assembly` (56) and `drawing` (55) maps (live/keys-1118/linux/capture.json; the Mac map is the same
+keys) pressed in live and in ours in the same state: an automated pass over all keys, then each key with a difference
+redone from a fresh state (live page reloaded on a fresh lane copy, ours relaunched). Ours: green faf73238b (the
+assembly pass) and f09f8eca8 (the drawing pass and every redo). Evidence live/keys-1118/live2/ (vp-asm, vp-drw: live
+before / +1.5 s and ours before / +1.5 s for each key). Mac: drawing Ctrl+S / Q / M stay Control on a Mac, and
+⌘C / ⌘V and Ctrl+C / Ctrl+V both copy and paste (live's Mac sheet); ours binds the same (`drawing_keys::control_key`,
+`ctrl_cmd`) = (checked in the code; no app is run on the Mac).
+
+| Key (scope) | Live | Ours | Status |
+|---|---|---|---|
+| Shift+R View in high quality (asm) | a blue banner at the top "Viewing in high quality. Performance can decrease. [Disable]" | nothing visible | ≠ [asm] |
+| W Zoom to window (asm) | a blue bubble "Drag to create zoom bounding box. ×" | nothing visible | ≠ [asm] |
+| W Zoom to window (drawing) | no bubble | a bubble "Zoom window: drag a box around the area to zoom to ×" | ≠ [studios] |
+| N View normal to (asm, a block face selected) | the view turns normal to the face (the Right view of the block) | nothing | ≠ [asm] |
+| Ctrl+C (asm, Part 1 selected) | no toast | a bubble "Copied Part 1 <1> ×" | ≠ [asm] |
+| Ctrl+V after Ctrl+C (asm) | the copy comes in beside the original, see-through, following the pointer to be placed | the copy pasted in place on the original, selected (orange) | ≠ [asm] |
+| Shift+S Snap mode (asm) | the toolbar button turns on; no bubble; a selection stays | the button turns on, a yellow bubble "Snap mode: click a face or mate connector on the instance to move" with a button, and the selection is cleared | ≠ [asm] |
+| Shift+P Hide all construction (asm) | hides the assembly's origin (its dot goes, the Origin row greys) | nothing (and ours draws the origin as a red/green/blue triad where live shows a ⊙ dot) | ≠ [asm] |
+| H Show mates mode (asm) | the toolbar button turns on and the Revolute's glyph (a pale square with the mate icon) shows at the mate | the button turns on, no glyph | ≠ [asm] |
+| Y Hide (asm, the block selected) | the block hidden, its edges still drawn in yellow while it stays selected | the block gone entirely | ≠ [asm] |
+| Shift+I / Shift+T Isolate, Make transparent (asm, a face selected) | the dialog; the face no longer highlighted | the same dialog; the face stays orange | ≠ [asm] |
+| Shift+arrows (drawing: Coarse rotate) | pan the sheet (Shift+Down moves it down about a quarter screen, Shift+Left to the right) | nothing | ≠ [studios] |
+| Shift+N Rename (drawing, a view selected, Sheets panel closed) | nothing visible (with the panel open: the view's row becomes a Rename box with ✓ ✕) | opens the View properties panel | ≠ [studios] |
+| [ Show measure (drawing, a view selected) | the Measure panel at the top left ("Select entities to measure"), the selection cleared | a bubble "Measure: select points, straight edges or circles ×" at the top and a "Measure" box at the bottom left; the selection kept | ≠ [studios] |
+| Space Clear selection (drawing, a view selected) | the selection cleared | the view stays selected | ≠ [studios] |
+| Ctrl+S Sheets (drawing) | the Sheets panel opens over the left; the sheet stays where it is | the panel opens and the sheet re-fits smaller | ≠ [studios] |
+| The rest: asm 1–7 views, arrows, Ctrl/Ctrl+Shift arrows, Z / Shift+Z / F, I Insert, M Mate, Ctrl+M Mate connector, Shift+V Named views, Shift+X Section, ` Select other, J, K, S, Delete / Backspace; drawing D, Shift+D/R/H, Ctrl+M, L, C, G, R, M, H, V, I, Shift+L, B, T, N, P, S, Z / Shift+Z, F, arrows, Ctrl+arrows, Ctrl+Shift+arrows, Page Up/Down, Home, End, Shift+Q, Ctrl+Q, Ctrl+C / Ctrl+V (a view: the copy pasted beside it), Delete / Backspace | the same | the same | = |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
