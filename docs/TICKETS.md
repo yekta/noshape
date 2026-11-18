@@ -688,6 +688,9 @@ per-feature rows below are owners' leads, not gaps (superseded 18:2x).**
 8 of 127 over the bar; nothing smaller is a gap. Median (range) vs live, top 3 features (Mac ms):
 - [ ] **P1 SPEED-IMPELLER (blend / bool / core, already with them)**: c2-impeller-loft 13485 (12436-13900) vs 2509 ms (5.4x): Fillet 3 4897,
   Delete face 2 2170, Extrude Bohrungssitz Ansaugflansch 1335.
+  Opening it (qa 19:5x, release app of 125e4d41, vibex7 load 4-6, NOSHAPE_PERF): cold (no stored results) last frame 32.7 s, of which the
+  full regeneration 30.4 s, meshing 0.6 s (Part 1 0.5 s), document load 0.15 s; reopened with stored results 1.5 / 2.6 s. Live 25.5 s
+  (SwiftShader upper bound): 1.3x, under the open bar; the time is this regeneration (the Mac rebuild is 13.5 s).
 - [ ] **P1 SPEED-STANDOFFS (bool)**: c2-config-parts-standoffs 2701 (2619-2727) vs 176 (15.3x): Revolve 2 1152, Boolean 2 900, Boolean 1 621.
 - [ ] **P1 SPEED-WIRE-CLIP (bool)**: c2-wire-clip-imported 2054 (2042-2056) vs 297 (6.9x): Boolean 2 1489, Move face 1 413, Import 1 122.
 - [ ] **P1 SPEED-GAMMA (bool)**: c2-gamma-imported 1754 (1719-1796) vs 246 (7.1x): Boolean 2 1255, Move face 1 353, Import 1 102.
