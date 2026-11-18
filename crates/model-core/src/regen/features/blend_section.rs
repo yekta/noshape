@@ -851,22 +851,35 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
 }
 
 /// How far a face reaches from `p` along `u` (in it, perpendicular to the edge), up to `setback`: infinite where it
-/// reaches the setback; else its far edge, found by halving.
+/// reaches the setback; else its far edge, within the face's tolerance there. A probe past the face is nearest to that
+/// edge, so its nearest point's distance along `u` is the next guess: exact where the edge runs along the blended one
+/// (a flange's rim, three probes), halving where the guesses stall.
 fn face_reach(face: &Shape, p: DVec3, u: DVec3, setback: f64, scale: f64) -> FResult<f64> {
-    let on = |t: f64| -> FResult<bool> { Ok(k::distance(&k::make_vertex(p + u * t)?, face)?.distance <= (scale * 1e-7).max(t * 1e-4)) };
-    if on(setback)? {
+    let tol = |t: f64| (scale * 1e-7).max(t * 1e-4);
+    let probe = |t: f64| -> FResult<(bool, f64)> {
+        let d = k::distance(&k::make_vertex(p + u * t)?, face)?;
+        Ok((d.distance <= tol(t), (d.point_b - p).dot(u)))
+    };
+    let (on, mut guess) = probe(setback)?;
+    if on {
         return Ok(f64::INFINITY);
     }
-    let (mut lo, mut hi) = (0.0, setback);
-    for _ in 0..40 {
-        let mid = 0.5 * (lo + hi);
-        if on(mid)? {
-            lo = mid;
-        } else {
-            hi = mid;
-        }
-        if hi - lo < scale * 1e-9 {
+    let (mut lo, mut hi, mut stepped) = (0.0, setback, false);
+    for _ in 0..60 {
+        if hi - lo <= 2.0 * tol(lo) + scale * 1e-9 {
             break;
+        }
+        let t = if guess > lo && guess < hi { guess } else { 0.5 * (lo + hi) };
+        let (on, next) = probe(t)?;
+        if on {
+            lo = t;
+            // (Just past it once, then halving: a far edge slanting across `u` leaves the guesses short.)
+            guess = if stepped { f64::NAN } else { t + 2.0 * tol(t) };
+            stepped = true;
+        } else {
+            hi = t;
+            guess = next;
+            stepped = false;
         }
     }
     Ok(lo)
