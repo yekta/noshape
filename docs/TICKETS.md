@@ -935,6 +935,10 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   7c60d5ea8: 105929.52 mm3, live 105929.03), Part 1 10 parts 95574 mm3 (0.4.58 95842; follows Fillet 4). hats / the dock SAME. Dock tab
   return (125e4d41 release build, vibex7 load 16-22): tab drawn 164 vs v0.4.53 134 ms, no trailing frames (all <= 208; 0.4.53 806 / 730).
   CI 44311059310 Windows Test success. Open, not blocking: P0 FORM-PREVIEW-SLOWER (live2, skasm); 51510232's corpus section still running.
+- The dock's 20.6 -> 24.5 s in 51510232's compat (lead 17:2x) is not a regression (qa 17:34, vibex7 load 9-14): all 7 Part Studios,
+  v0.4.58 release CLI vs 515102325's release CLI, 5 alternating runs x 2 passes: 6124 vs 6251 ms, then 4869 vs 4790 ms; no feature
+  > 10 % and > 30 ms slower in both passes; statuses and parts the same. Compat times compare the release CLI with the watcher's
+  non-release green app on a loaded host: they are not speed numbers.
 - No other open release blocker at 06:25. v0.4.58 = 9c015658 + docs (qa GO 04:46); its published check runs when release.yml publishes.
 - Re-checks owed on the candidate: the dock tab return at vibex7 load < 2 (qa-wait-67eb: fff088e5 green vs 0.4.53), the hover flow
   (uh/uh2.sh, release check 4), user documents + f197 + tickets vs 0.4.58 (cut-check at 16:15).
