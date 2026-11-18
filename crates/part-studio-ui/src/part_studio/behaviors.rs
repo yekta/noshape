@@ -1807,30 +1807,29 @@ impl PartStudioView {
     pub(super) fn start_part_rename(&mut self, body: BodyId, window: &mut Window, cx: &mut Context<Self>) {
         let name = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
-        let b2 = body.clone();
-        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| match ev {
-            InputEvent::PressEnter { .. } | InputEvent::Blur => {
-                if this.ui.part_renaming.take().is_none() {
-                    return;
-                }
-                let text = st.read(cx).value().trim().to_string();
-                // Only a change (Esc then a click elsewhere recorded the unchanged name).
-                let old = this.display.body(&b2).map(|b| b.name.clone()).unwrap_or_default();
-                if !text.is_empty() && text != old {
-                    let b = b2.clone();
-                    this.doc.update(cx, |doc, cx| {
-                        doc.edit_studio(this.tab, &noshape_ops::studio::rename_part_description(&text), cx, |ps| noshape_ops::studio::rename_part(ps, &b, &text));
-                    });
-                }
-                cx.notify();
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, _, ev: &InputEvent, _, cx| {
+            if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                this.commit_part_rename(cx);
             }
-            _ => {}
         });
         st.update(cx, |s, cx| {
             s.focus(window, cx);
             s.select_all(window, cx);
         });
         self.ui.part_renaming = Some((body, st, sub));
+        cx.notify();
+    }
+
+    /// The part rename box's text applied (Enter, blur, a press elsewhere); an unchanged or empty name changes nothing.
+    pub(super) fn commit_part_rename(&mut self, cx: &mut Context<Self>) {
+        let Some((body, st, _)) = self.ui.part_renaming.take() else { return };
+        let text = st.read(cx).value().trim().to_string();
+        let old = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
+        if !text.is_empty() && text != old {
+            self.doc.update(cx, |doc, cx| {
+                doc.edit_studio(self.tab, &noshape_ops::studio::rename_part_description(&text), cx, |ps| noshape_ops::studio::rename_part(ps, &body, &text));
+            });
+        }
         cx.notify();
     }
 

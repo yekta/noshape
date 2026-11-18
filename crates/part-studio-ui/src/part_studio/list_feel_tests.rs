@@ -574,6 +574,30 @@ fn rows() -> Vec<Row> {
             });
             expect(flags, (true, Some((false, false))), "(hovered, Part 2's row (selected, related))")
         } },
+        Row { id: "sketching / later rows grey and the Parts list follows, ✗ brings them back", live: "Sketch 2 edited: Extrude 2 and the rows after it grey italic (not computed), Parts (2) -> Parts (1); ✗ brings everything back (live2 sketch-entry-1118 e1)", gap: false, check: |l, cx| {
+            l.double_click(cx, "feature:Sketch 2");
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).sketch.is_some());
+            draw(cx, l.window);
+            let greyed = |cx: &mut TestAppContext| cx.update(|cx| {
+                let v = l.view.read(cx);
+                v.studio(cx).map(|s| s.features.iter().enumerate().filter(|(i, _)| *i >= v.row_ctx.rollback).map(|(_, f)| f.name.clone()).collect::<Vec<_>>()).unwrap_or_default()
+            });
+            let parts = |cx: &mut TestAppContext| cx.update(|cx| l.view.read(cx).display.bodies.len());
+            let editing = (l.editing(cx), greyed(cx), parts(cx));
+            cx.update_window(l.window, |_, w, cx| l.view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).display.bodies.len() == 3);
+            draw(cx, l.window);
+            let after = (l.editing(cx), greyed(cx), parts(cx));
+            expect((editing, after), ((Some("Sketch 2".to_string()), names(&["Extrude 2", "Plane 1", "Sketch 3", "Extrude 3"]), 1), (None, names(&[]), 3)), "(editing, grey rows, parts) while Sketch 2 is edited, after ✗")
+        } },
+        Row { id: "sketching / another row clicked does nothing", live: "Extrude 1 clicked while Sketch 2 is edited: the sketch stays open, nothing selected, no dialog (live2 sketch-entry-1118)", gap: false, check: |l, cx| {
+            l.double_click(cx, "feature:Sketch 2");
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).sketch.is_some());
+            draw(cx, l.window);
+            l.click(cx, "feature:Extrude 1", NONE);
+            let after = (l.editing(cx), cx.update(|cx| l.view.read(cx).sketch.is_some()), l.selected(cx));
+            expect(after, (Some("Sketch 2".to_string()), true, names(&[])), "(editing, sketch open, selected) after the click")
+        } },
         Row { id: "rollback bar / its whole row grabs", live: "a drag from the row's top edge (outside the 7 px bar) onto Extrude 1's bottom half rolls back to after Extrude 1", gap: false, check: |l, cx| {
             let h = f32::from(l.bounds(cx, "feature:Extrude 1").ok_or("no row")?.size.height);
             let (from, to) = (l.at_y(cx, "rollback", 2.), l.at_y(cx, "feature:Extrude 1", h - 6.));

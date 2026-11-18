@@ -98,27 +98,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Landed 11-17 09:54: 498b96a8 (leak fixes + NOSHAPE_SOAK + spawn_guard allow).
 - The Mac's one build slot can hold a test 10+ min: for a quick single test use NOSHAPE_RB_HOST=vibex6.
 
-## State 11-18 00:2x (lead's P0 queue after compaction)
-
-- USER-HOVER-STAYS-LIT: latest-wins (5e498ffb) verified by qa on green 7187ac75 (uh3 ×3, 0.7 / 1.5 / 3 s shots: every
-  1.5 / 3 s shot right, one 0.7 s shot trailed; qa-scratch/uh/g5e/lit.txt). Closed on my side.
-- the_first_pick_at_rest… flaked under load (skasm): it now waits for the GPU's answer with the test clock held
-  (landed c5959e26; 4 / 4 on vibex6 at load 24–36).
-- Landed 0f7610c8 (23:51): below 20 fps a view jumps, "Where used for Part 1…" own group, handoff.
-- Queued 2234f511 (00:2x): feature list as live2 featurelist-feel + qa's 3 P2s (rollback bar: stays over Default
-  geometry rows, blue-grey only while rolled back, menu "Roll to end"); rename commits on any press outside; face + edge
-  graphics menu = live ctx-menus-1117; list matrix 76 / 76 (new rows: bar held / released / above first / menu,
-  refused reorder red, rename Enter / click / F2, renamed tooltip, suppress / Unsuppress, dialog place, undo steps
-  (rename, Hide; selection and Shift+5 none), Cmd+click on parts); sketch_ui_tests graphics_menus_over_a_selection_as_live.
-- Asked live2 (00:0x): the bar released over the collapsed Default geometry header (10-24 capture said: to the top; ours
-  still does that for the header); confirm the blue-grey with the pointer away.
-- Main RED 23:53 on asm's a_mate_glyph_wins… (assembly_feel_tests.rs:233, click → selected_mate None). It failed on
-  core's land and mine before; no commit since the last green touches assembly-ui or app-core; passes 3 / 3 on the
-  Mac. A load flake for asm (its settle() exits on hover_settled; the click may beat the overlay hover).
-- Already live's (no change): undo / redo keys (app-core actions tests), Ctrl+Z in a dialog field
-  (undo_does_nothing_while_a_dialog_control_has_the_keyboard), wheel 2^(1/12) = ×1.0595 a notch about the pointer,
-  500 / 250 / 125 ms animations, part rows toggle on Ctrl or Cmd; live2's (b) Ctrl-only box deselect (ours Ctrl or
-  Cmd; live's Cmd unverified): left.
+## State 11-18 00:2x (summary)
+- Closed: USER-HOVER-STAYS-LIT (qa verified on 7187ac75); feature-list batch, undo/redo keys, wheel / animation times,
+  part rows Ctrl or Cmd all as live. Left: live2's (b) Ctrl-only box deselect (ours Ctrl or Cmd; live's Cmd unverified).
 
 ## 11-18 02:17
 - Landed today: feature-list rows, graphics menus over a selection, measure angles toward middles (confirmed by live2's
@@ -144,11 +126,17 @@ docs/DECISIONS.md (read first; it wins over anything here).
     keys, Ctrl+Enter), fields matrix (Ctrl+Up, '1 in' Up 26.4 mm, typed text not stepped, '5+', '#zz' + Enter);
     quantity_field unit test for the inch steps. `OsSelect::open_state` (app-core) for the dropdown row.
   - Orient normal to sketch on edit: ✗ leaves the view normal (live2 sketch-entry-1118), was the view before; test.
+  - While sketching a feature-row click selects nothing; list rows for the grey rows / Parts count while editing.
+  - 34fe22c9 FAILED on vibe2 (02:23): the dropdown row and the part click-away rename passed alone on vibex6 but not
+    in the full parallel run. OsSelect bound its keys under a process-wide Once (only the first test app got ↑ / ↓ /
+    Esc): now once per App (a global). The part rename commits directly on a press elsewhere (`commit_part_rename`).
+- Pointer offset with skasm (02:2x): measured on vibex6 Xvfb (reach.sh, nav trace): X pointer → viewport +0.01 px,
+  origin whole (246, 76) at 1919×1079 and 1440×900; the block's edges drawn in the column of their projection. No
+  app offset; skasm owns the reach rule (qa's integer-pixel distances vs our continuous < 7.5).
 
 ## Next queue
-0. live2 sketch-entry-1118 rows not yet checked (skasm has the same data): Shift+S with a plane / face selected starts
-   on it, empty field otherwise; a new sketch hides / greys nothing; editing rolls later rows back + "Final"; another
-   row clicked while sketching does nothing. Then the first-pick T2 after the 05:00 cut.
+0. The first-pick T2 after the 05:00 cut. (live2 sketch-entry-1118: skasm checked Shift+S, no dimming, Final; mine
+   the list rows, done in the worktree.)
 1. qa P2 HOVER-LEAVES-WINDOW: a face hovered just before the pointer leaves the window stays outlined. GPUI clears
    element hover on X11's LeaveNotify (MouseExited) and the viewport clears its hover there; not reproduced yet. Rig:
    /root/psui-scratch/offset/leave.sh (block doc ~/tmp/psui/off/b.noshape on vibex6 :665).

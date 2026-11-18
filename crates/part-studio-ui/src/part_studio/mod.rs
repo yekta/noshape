@@ -4711,6 +4711,7 @@ impl PartStudioView {
                     // A press anywhere else blurs the input, which commits (live2 parts-list-1118: "Bar", then a click away).
                     .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, window, cx| {
                         if this.ui.part_renaming.is_some() {
+                            this.commit_part_rename(cx);
                             let fh = this.focus.clone();
                             window.focus(&fh, cx);
                         }
@@ -6085,6 +6086,11 @@ impl PartStudioView {
                     }
                     window.focus(&this.ui.list_focus, cx);
                     cx.notify();
+                    return;
+                }
+                // While sketching a row the sketch can't take selects nothing (live2 sketch-entry-1118: Extrude 1
+                // clicked, nothing happens).
+                if this.sketch.is_some() {
                     return;
                 }
                 this.click_feature(id, ev.modifiers().shift, cx);

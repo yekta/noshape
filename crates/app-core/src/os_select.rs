@@ -45,17 +45,23 @@ actions!(os_select, [SelectUp, SelectDown, SelectDismiss]);
 
 /// Keys of an open select, bound in its own key context so they win over the
 /// dialog's (Esc = cancel the dialog) and the window's (arrows = rotate the view).
+/// Once per app (a process-wide once left every later test app without them).
 fn bind_keys(cx: &mut App) {
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| {
-        // Also on the search input itself: bindings matched at a deeper context
-        // run first, and "FeatureDialog > Input" binds Esc to Cancel there; ours
-        // are added later, so they win at the same depth.
-        for ctx in ["OsSelect", "OsSelect > Input"] {
-            cx.bind_keys([KeyBinding::new("up", SelectUp, Some(ctx)), KeyBinding::new("down", SelectDown, Some(ctx)), KeyBinding::new("escape", SelectDismiss, Some(ctx))]);
-        }
-    });
+    if cx.has_global::<KeysBound>() {
+        return;
+    }
+    cx.set_global(KeysBound);
+    // Also on the search input itself: bindings matched at a deeper context
+    // run first, and "FeatureDialog > Input" binds Esc to Cancel there; ours
+    // are added later, so they win at the same depth.
+    for ctx in ["OsSelect", "OsSelect > Input"] {
+        cx.bind_keys([KeyBinding::new("up", SelectUp, Some(ctx)), KeyBinding::new("down", SelectDown, Some(ctx)), KeyBinding::new("escape", SelectDismiss, Some(ctx))]);
+    }
 }
+
+struct KeysBound;
+
+impl Global for KeysBound {}
 
 pub enum OsSelectEvent {
     Picked(SharedString),

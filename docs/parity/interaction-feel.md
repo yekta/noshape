@@ -394,6 +394,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Multi-part Properties… | one "2 selected" dialog, both parts listed, Name "Multiple values", shared fields editable (live 08:18, 2962) | the first part's Properties; now live's dialog (`open_parts_properties`; list `several_parts_share_one_properties_dialog`) | = (fixed 11-13) |
 | Parts list rename (live2 parts-list-1118) | row menu › Rename: the whole name selected; Esc cancels, Enter commits, a click away commits; Shift+N on a selected part renames, F2 nothing | the same, but a click away left the box open; now it commits (`on_mouse_down_out`, as the feature rename) | = (fixed) |
 | A part hovered in the graphics (live2 parts-list-1118 c1) | its row gets no hover or related tint (list → graphics only) | the same | = (new) |
+| While a sketch is edited (live2 sketch-entry-1118) | the rows after it grey italic, Parts (2) -> Parts (1), ✗ brings them back; another feature row clicked does nothing | the rows and parts the same; a row click selected the feature; now nothing | = (fixed) |
 | Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); an empty new folder's caret (live featurelist-gaps 11-16: shown, collapsed, on "New folder (0)"); the insertion line (live featurelist-gaps: rgb(22, 81, 176), 2 px, the row's width, a ~6 px ring filled rgb(202, 216, 237) at its left end, centred on the boundary above the hovered row in its upper half, below in its lower half; ours the same, the ring's fill was white) | – | – |
 
 ## Measure (matrix)
