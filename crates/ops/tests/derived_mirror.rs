@@ -56,6 +56,7 @@ fn derived_copy_is_the_mirror_image() {
         suppressed: false,
         lock: SubassemblyLock::Flexible,
         nested: Vec::new(),
+        nested_deep: Vec::new(),
         best_tessellation: false,
         reference_designator: None,
         unsuppressed_if: None,

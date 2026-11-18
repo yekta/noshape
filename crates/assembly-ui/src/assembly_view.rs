@@ -1811,7 +1811,7 @@ impl AssemblyView {
         let id = self.edit_insert(&format!("Insert : {name}"), cx, |a| {
             let id = InstanceId(a.next_id());
             let n = a.next_instance_name(&name);
-            a.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: tab, config: config.clone() }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
+            a.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: tab, config: config.clone() }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), nested_deep: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
             id
         });
         if let Some(id) = id {

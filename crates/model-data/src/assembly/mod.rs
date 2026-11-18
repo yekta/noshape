@@ -146,6 +146,11 @@ pub struct Instance {
     /// subassembly's own.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nested: Vec<(InstanceId, Placement)>,
+    /// Flexible subassemblies inside it: positions in this assembly of their instances, by path below this
+    /// instance's own (the subassembly instance in it first), each relative to the subassembly instance holding it
+    /// (live keeps one per occurrence: asm-bjr-config's Sub 8c440a in each Sub c1e15f).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nested_deep: Vec<(Vec<InstanceId>, Placement)>,
     /// "Use best available tessellation": the instance's parts are drawn
     /// with the finest tessellation.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -161,7 +166,7 @@ pub struct Instance {
 
 impl Instance {
     pub fn new(id: InstanceId, name: String, source: InstanceSource, placement: Placement) -> Self {
-        Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None }
+        Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), nested_deep: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None }
     }
 }
 
@@ -1542,7 +1547,7 @@ impl Assembly {
             let Some(src) = self.instance(seed).cloned() else { continue };
             let nid = InstanceId(self.next_id());
             let name = self.next_instance_name(Self::base_name(&src.name));
-            self.instances.push(Instance { id: nid, name, source: src.source.clone(), placement: placement.unwrap_or(src.placement), fixed: false, hidden: src.hidden, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: src.best_tessellation, reference_designator: None, unsuppressed_if: src.unsuppressed_if.clone() });
+            self.instances.push(Instance { id: nid, name, source: src.source.clone(), placement: placement.unwrap_or(src.placement), fixed: false, hidden: src.hidden, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), nested_deep: Vec::new(), best_tessellation: src.best_tessellation, reference_designator: None, unsuppressed_if: src.unsuppressed_if.clone() });
             let mut mate_id = None;
             if let (Some(sm), Some(t)) = (&seed_mate, &target) {
                 let mid = MateId(self.next_id());

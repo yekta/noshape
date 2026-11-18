@@ -9577,6 +9577,26 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             res.differences.push(format!("{tab} › {name}: not moved to live's place: {e}"));
         }
     }
+    // Deeper ones (a flexible subassembly inside a flexible subassembly instance) in this assembly too, one place per
+    // occurrence as live keeps them (asm-bjr-config: Sub 8c440a's grub screws differ in Sub c1e15f <2> and <3>; the
+    // tab of Sub c1e15f holds one for all), shallowest first so their holders are in place.
+    let mut deep: Vec<Vec<String>> = occurrences.iter().map(|o| ids(&o["path"])).filter(|p| p.len() > 2).collect();
+    deep.sort_by_key(Vec::len);
+    for p in deep {
+        let mut level = String::new();
+        let mut names = Vec::new();
+        for id in &p {
+            let Some(n) = ours.get(&(level.clone(), id.clone())) else { break };
+            names.push(n.clone());
+            let Some(e) = element_at(&level, std::slice::from_ref(id)) else { break };
+            level = e;
+        }
+        let (true, Some(m)) = (names.len() == p.len(), transform_of(&p).and_then(|m| mat(&m))) else { continue };
+        let name = names.join(" > ");
+        if let Err(e) = placer.place("Assembly 1", &name, &row_major(m)) {
+            trace(&format!("{name}: not placed per occurrence: {e}"));
+        }
+    }
     trace("comparing");
     // Compared with live: each occurrence's place (a top-level instance by its placement, a part inside a
     // subassembly by assembly_list's occurrences; a subassembly inside another is placed by its parts), each mate's

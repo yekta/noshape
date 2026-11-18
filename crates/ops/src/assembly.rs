@@ -57,7 +57,7 @@ pub fn insert_part(a: &mut Assembly, studio: TabId, studio_name: &str, part: Opt
     let step = size.map(|d| d / 8.0).unwrap_or(glam::DVec3::new(0.05 / 8.0, 0.0, 0.0));
     let placement = Placement { translation: (step * same).into(), rotation: [0.0, 0.0, 0.0, 1.0] };
     let name = a.next_instance_name(&base);
-    a.instances.push(Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
+    a.instances.push(Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), nested_deep: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
     id
 }
 

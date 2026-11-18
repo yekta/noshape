@@ -69,6 +69,7 @@ pub fn add_demo_assembly(doc: &mut Document) {
         suppressed: false,
         lock: SubassemblyLock::Flexible,
         nested: Vec::new(),
+        nested_deep: Vec::new(),
         best_tessellation: false,
         reference_designator: None,
         unsuppressed_if: None,

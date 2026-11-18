@@ -8571,7 +8571,8 @@ fn suggested_views_scale_to_the_exact_extent() {
 
 /// A part of a flexible subassembly instance moved in its parent (assembly_transform with the occurrence path, as the
 /// parity translator places live's per-instance positions): that instance's part moves, the subassembly's other
-/// instance and the subassembly itself don't; a locked instance's parts and deeper paths are refused by name.
+/// instance and the subassembly itself don't; a path that names no occurrence is refused by name; three levels deep, one
+/// occurrence's part moves alone.
 #[test]
 fn a_flexible_subassembly_instances_part_moves_in_its_parent_only() {
     let mut ctx = Ctx::new();
@@ -8603,6 +8604,19 @@ fn a_flexible_subassembly_instances_part_moves_in_its_parent_only() {
     let at = |p: &str| -> Vec<f64> { top["occurrences"].as_array().unwrap().iter().find(|o| o["path"] == p).map(|o| (0..3).map(|i| num(&o["translation"][i])).collect()).unwrap_or_else(|| panic!("no occurrence {p}: {top}")) };
     assert!(near(&at("Assembly 1 <1> > Sub <2> > Part 1 <1>"), [30.0, 120.0, 5.0]), "moved in Top: {:?}", at("Assembly 1 <1> > Sub <2> > Part 1 <1>"));
     assert!(near(&at("Assembly 1 <1> > Sub <1> > Part 1 <1>"), [0.0, 0.0, 0.0]), "the other instance in Top: {:?}", at("Assembly 1 <1> > Sub <1> > Part 1 <1>"));
+    // Three levels: a part of Sub inside one of two Assembly 1 instances moves in Top for that occurrence alone (live
+    // keeps one place per occurrence: asm-bjr-config's grub screws in Sub c1e15f <2> and <3>).
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Top", "source": "Assembly 1" }));
+    call(&mut ctx, "assembly_transform", json!({ "tab": "Top", "instance": "Assembly 1 <2>", "translation": ["200 mm", "0 mm", "0 mm"] }));
+    call(&mut ctx, "assembly_transform", json!({ "tab": "Top", "instance": "Assembly 1 <2> > Sub <1> > Part 1 <1>", "translation": ["210 mm", "-50 mm", "0 mm"] }));
+    let top = call(&mut ctx, "assembly_list", json!({ "tab": "Top" }));
+    let at = |p: &str| -> Vec<f64> { top["occurrences"].as_array().unwrap().iter().find(|o| o["path"] == p).map(|o| (0..3).map(|i| num(&o["translation"][i])).collect()).unwrap_or_else(|| panic!("no occurrence {p}: {top}")) };
+    assert!(near(&at("Assembly 1 <2> > Sub <1> > Part 1 <1>"), [210.0, -50.0, 0.0]), "moved in Assembly 1 <2>: {:?}", at("Assembly 1 <2> > Sub <1> > Part 1 <1>"));
+    assert!(near(&at("Assembly 1 <2> > Sub <2> > Part 1 <1>"), [230.0, 120.0, 5.0]), "its other Sub as Assembly 1 has it: {:?}", at("Assembly 1 <2> > Sub <2> > Part 1 <1>"));
+    assert!(near(&at("Assembly 1 <1> > Sub <1> > Part 1 <1>"), [0.0, 0.0, 0.0]), "Assembly 1 <1>'s stays: {:?}", at("Assembly 1 <1> > Sub <1> > Part 1 <1>"));
+    let a1 = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    let in_a1 = a1["occurrences"].as_array().unwrap().iter().find(|o| o["path"] == "Sub <1> > Part 1 <1>").map(|o| (0..3).map(|i| num(&o["translation"][i])).collect::<Vec<_>>()).unwrap();
+    assert!(near(&in_a1, [0.0, 0.0, 0.0]), "Assembly 1 itself untouched: {in_a1:?}");
 }
 
 /// A mate to a part inside a subassembly, as the app makes one: the part named by its occurrence path

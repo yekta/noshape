@@ -1173,6 +1173,9 @@ pub struct AssemblyEvaluator {
     /// (a1000's 69 instances of one Sub each ran the analysis after a
     /// regeneration). Empty outside `evaluate`.
     subs_dof: HashMap<u64, (usize, HashMap<InstanceId, usize>)>,
+    /// While a subassembly's content is prepared: the positions an occurrence above stores for instances inside
+    /// it (`Instance::nested_deep`), by path from that content's instances.
+    deep: Vec<(Vec<InstanceId>, Placement)>,
     /// Mate connector frames of parts (see [`ConnectorMemo`]).
     connectors: ConnectorMemo,
     /// The sources' regeneration options made once for the current `evaluate` (making them clones the document and
@@ -2460,6 +2463,13 @@ impl AssemblyEvaluator {
             node.error = Some("Circular assembly reference".into());
             return;
         }
+        // Positions an occurrence above stores for this one's instances win over its own (live keeps one per
+        // occurrence); the deeper ones go on to its subassemblies.
+        let from_above: Vec<(Vec<InstanceId>, Placement)> = self.deep.iter().filter(|(p, _)| p.first() == Some(&inst.id) && p.len() > 1).map(|(p, q)| (p[1..].to_vec(), *q)).collect();
+        let above: Vec<(InstanceId, Placement)> = from_above.iter().filter(|(p, _)| p.len() == 1).map(|(p, q)| (p[0], *q)).collect();
+        let nested: Vec<(InstanceId, Placement)> = above.iter().copied().chain(inst.nested.iter().filter(|(c, _)| !above.iter().any(|(d, _)| d == c)).copied()).collect();
+        let above: Vec<(Vec<InstanceId>, Placement)> = from_above.into_iter().filter(|(p, _)| p.len() > 1).collect();
+        let deeper: Vec<(Vec<InstanceId>, Placement)> = above.iter().cloned().chain(inst.nested_deep.iter().filter(|(p, _)| !above.iter().any(|(d, _)| d == p)).cloned()).collect();
         // Another instance of the same subassembly (tab, configuration,
         // lock, stored positions) in this evaluation: the same preparation
         // and solve.
@@ -2473,7 +2483,7 @@ impl AssemblyEvaluator {
             }
             format!("{:?}", inst.lock).hash(&mut h);
             if with_positions {
-                format!("{:?}", inst.nested).hash(&mut h);
+                format!("{nested:?}{deeper:?}").hash(&mut h);
             }
             h.finish()
         };
@@ -2484,12 +2494,14 @@ impl AssemblyEvaluator {
             Some(done) => done,
             None => {
                 visited.push(visit);
+                let above = std::mem::replace(&mut self.deep, deeper.clone());
                 let (sub_leaves, sub_nodes, sub_prep) = self.prepare_inner(doc, sub, visited);
+                self.deep = above;
                 visited.pop();
                 // Positions of the subassembly's instances: its named position
                 // (Lock/follow position to), else solved from the positions
                 // stored in this assembly for them.
-                let start: HashMap<InstanceId, Placement> = sub_prep.instances.iter().map(|(id, p)| (*id, inst.nested.iter().find(|(c, _)| c == id).map(|(_, q)| *q).unwrap_or(*p))).collect();
+                let start: HashMap<InstanceId, Placement> = sub_prep.instances.iter().map(|(id, p)| (*id, nested.iter().find(|(c, _)| c == id).map(|(_, q)| *q).unwrap_or(*p))).collect();
                 let skip_dof = known_dof.is_some();
                 let mut solved = match &inst.lock {
                     super::SubassemblyLock::Named(n) => match sub.named_positions.iter().find(|np| &np.name == n) {

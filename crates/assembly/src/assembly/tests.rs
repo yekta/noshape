@@ -116,6 +116,7 @@ fn part_instance(id: u64, name: &str, studio: TabId, body: BodyId, at: DVec3, fi
         suppressed: false,
         lock: SubassemblyLock::Flexible,
         nested: Vec::new(),
+        nested_deep: Vec::new(),
         best_tessellation: false,
         reference_designator: None,
         unsuppressed_if: None,
@@ -528,6 +529,7 @@ fn sub_assembly_and_nested_mate() {
                 suppressed: false,
                 lock: SubassemblyLock::Flexible,
                 nested: Vec::new(),
+                nested_deep: Vec::new(),
                 best_tessellation: false,
                 reference_designator: None,
                 unsuppressed_if: None,
@@ -2283,7 +2285,7 @@ fn instances_from_other_documents() {
     let mut asm = Assembly {
         instances: vec![
             part_instance(1, "Block <1>", f.studios[0], body, DVec3::ZERO, true),
-            Instance { id: InstanceId(2), name: "Part 1 <1>".into(), source: InstanceSource::External { key: "ext:v1".into(), body: Some(ebody), config: ConfigValues::default() }, placement: Placement { translation: [0.1, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] }, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None },
+            Instance { id: InstanceId(2), name: "Part 1 <1>".into(), source: InstanceSource::External { key: "ext:v1".into(), body: Some(ebody), config: ConfigValues::default() }, placement: Placement { translation: [0.1, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] }, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), nested_deep: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None },
         ],
         mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
         ..Default::default()
