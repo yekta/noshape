@@ -1195,10 +1195,10 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Configuration table: name + Tab in the add row adds the row, the selection jumps to the first row's Name cell | ? | missing |
 | Typing on a selected configuration cell replaces it (no Enter first); Return commits and moves down; Esc restores the old text; Down / Up move the selection (Down from the last row: the add row) | ? | missing |
 | A row name: a click selects the cell, a double-click edits the name inline (no switch), Esc cancels | ? | missing |
-| The default first row's menu: Switch to "…" · Duplicate row · Move down · Delete row (no Set as default, no Move up) | ? | missing |
+| A configuration row's menu (corrected 08:55: the earlier row was taken with another row current): the current row has no Switch to and no Delete row, the default row no Set as default, the first no Move up, the last no Move down; the default row can be deleted while another is current | ? | missing |
 | Switching configuration (dropdown pick or the row menu's Switch to): the model changes in one frame ~1.0 s after the click; both lists stay as they are, no spinner; the dropdown takes Down + Return | ? | missing |
 | Y: the Parts row to opacity 0.5 at 73 ms, the part gone at 436 ms; Shift+Y back: 108 / 562 ms | ? | missing |
-| Shift+I with a part selected: the Isolate dialog at (248, 79) 220 × 196 and the other parts translucent (1.4 s); nothing selected: the part under the pointer; the lists don't change; Esc closes it and ends isolate | ? | missing |
+| Shift+I with a part selected: the Isolate dialog at (248, 79) 220 × 196 and the other parts translucent (1.4 s); the selection cleared (a Parts row or a face alike; 08:55); nothing selected: the part under the pointer; the lists don't change; Esc closes it and ends isolate | ? | missing |
 | Suppress from the row menu: the row italic, struck through, opacity 0.5 at 208 ms; Parts (N−1) at 332 ms; its consumed sketch turns black; the parts left renumber (Part 1, Part 2); the part gone at ~2.0 s. Unsuppress: 141 / 234 ms, graphics 1.0 s | ? | missing |
 | Two features suppressed from one menu: one step, Ctrl+Z restores both | ? | missing |
 | Rollback bar drag: starts after 6–9 px; the drop line snaps to the gaps between rows, switching at each row's middle; nothing regenerates while held (10 s) | = (the line and "nothing until release": the list matrix) | list matrix "rollback bar / while held nothing moves or greys" (the 6–9 px start: missing) |
@@ -1210,6 +1210,30 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 |---|---|---|
 | Offset arrow dragged back across the curve: the value goes through 0 and the preview jumps to the other side, the arrow flipping; the value shown has no sign; no stop at 0 or at the opposite edge; release keeps the preview, Enter commits with the palette ("24.8 mm") | ? | missing |
 | A dimension label placed level with another dimension: follows the pointer 1:1 across it, no snap, no alignment line (sketch dimensions have no text inference; drawings do, D4) | ? | missing |
+
+### asm-feel3-1118 (instance / mate list, Insert, mate connector dots, live2 11-18 09:00) [asm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Instance row hover → its outline in the graphics 1.07–1.25 s on live2's software-GL lane (the graphics' own hover 0.86 s there: the list adds ~0.2–0.4 s) | ? | missing |
+| Mate row double-click opens its edit dialog | ? | missing |
+| Mate Suppress / Unsuppress from the row menu: the row italic struck through at 198 ms / plain at 150 ms | ? | missing |
+| Mate rename (menu): the whole name selected; Esc cancels; Enter, Tab and a graphics click commit; F2 and Shift+N do nothing | ? | missing |
+| Instance row drag starts after 8 px; the ghost 5 px below the pointer; the drop line switches at a row's middle; the drop reorders, Ctrl+Z restores | ? | missing (drag look and the drop: the Instance list table) |
+| Insert (I): the shell at 363 ms, the list at 633 ms, the search not focused; filtering 353 ms after the last key; a Part Studio row inserts all its parts ("Inserted: 2"); the preview 1.1–1.8 s after the click, a graphics click places it (1.2 s) | ? | missing |
+| Mate connector tool: a hovered face's boundary, white dots at its vertices, edge midpoints and centre; no dot in reach: the triad at the face's centroid | ? | missing |
+| Mate connector dot reach: a square of about ±48 px (Chebyshev; diagonal kept at (25, 46), lost at (26, 48); off an edge midpoint kept at (47, 40), lost at (49, 42)) | ? | missing |
+
+### chips-expr-1118 (dialog chips, expressions, the #variable list, live2 11-18 09:00) [psui]
+
+| Finding | Ours | Test |
+|---|---|---|
+| A chip hovered: its tooltip with its name to the right; that entity yellow-green, the others still orange | ? | dialogs matrix "a field's row hovered" (the tooltip: missing) |
+| A chip's × hovered: red, tooltip "Delete Edge of Extrude 1"; a click removes that chip | ? | missing |
+| A click on a chip's body changes nothing; Delete and Backspace then do nothing | ? | dialogs matrix "a field's row clicked" (the keys: missing) |
+| A bare expression keeps its form with the default unit: "10+5" → "(10+5) mm", "(10+5)/3" → "((10+5)/3) mm"; "25.4mm" → "25.4 mm"; "1 in", "10 mm + 1 in", "2*#wall" as typed; "7 xyz" kept, pink (invalid) | ? | missing |
+| "#" opens the variable list on the next frame: the matching variables (icon, name, grey value) and "New variable…", the first highlighted; it filters per key; a plain letter opens it too | ? | missing |
+| Enter on "New variable…": the "Create variable" panel beside the dialog, the name prefilled from the typed text; its Enter adds "#wa = <the field's value>" before the feature | ? | missing |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
