@@ -4485,3 +4485,15 @@ skasm meanwhile; I'll list what I change here before landing.
   (both volume 0, the sheet's box nearer); our own Curve 2 wire is > 13 mm off live's box: that is the real first
   difference (skasm's translator / Sketch 5). T1 parity::a_wire_pairs_with_our_wire_before_a_sheet_beside_it. If pm/pt
   shows only expected report changes: land, tell skasm (18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6).
+
+
+## Moved from the handoff 11-18 21:10
+- c2-surf-workshop-split Boundary surface 1 (6/12, parked): 2x2 profiles, defaults; ours 3803.55 mm², live 3762.61
+  (+1.1 %). It goes through k::fill_surface (op_fill) but not its plate: a Coons branch for 4 G0 edges placed first
+  changed nothing (edge count != 4 or Coons declined; not chased). Experimental coons_fill saved in
+  /root/core-scratch/features-coons.cpp (full file, not a patch).
+- c2-hunting-knife Revolve 1 (46/52, parked): HANDLE 10/27/18, live 10/27/19. Our ring between the handle's B-spline
+  face and the dome's sphere is two equal 41 mm edges (vertices at (119.65, 0, 2.99): the B-spline's seam end, and
+  (104.36, 0, -27.20): the sphere seam's end), both hidden by the seam-join rule. Live's ring RvBB (81.385 mm) has its
+  arc-length midpoint exactly on the first, so live keeps one vertex, at the sphere seam's end. Rule unknown (a
+  Parasolid sphere has no seam); a live capture of a dome revolved onto a swept handle would settle it.

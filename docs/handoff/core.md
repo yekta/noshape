@@ -1,11 +1,39 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-18 18:10 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-18 21:10 UTC (new thread 20:05 after the account limit; ids: see How to run). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight
+- **LANDED 11-18:** up-to-next nearest-first 0a9645a56, welding NEW extrude 168f5bdb3, shown-edge joins 81deb44af +
+  T1 5c36379c6, Delete face errors when a face stays 67a475987 (impeller Delete face 2 Ok -> Error on purpose, qa told).
+- **Delete face onto (core-p0 branch core-delface, 4 WIP commits on ce74247af, NOT landed):** a planar face deleted
+  onto its one non-"along" neighbour T (FaceTweak move_onto T's surface, B-spline extended by the face's box diagonal
+  as OCCT), then onto_overlaps: where the new edge runs on along T's edge with the same neighbour (impeller housing
+  bulges 0.68 mm past the flange end) the two become one edge, the face and T rebuilt as one face on the extended
+  surface (edges of unknown sense turned to chain). Impeller face 24: valid, 95977.85 vs OCCT 95977.84 mm3 (kernel
+  measure), ~0.2 s vs OCCT 5 s. T1 kernel features::a_flanges_end_is_deleted_onto_the_housing_below_it (repo's
+  impeller-delete-face-2.brep face 27: 34 faces, 96645.148). g++-13 clean. Compat A/B vibex7 ~/tmp/core/imp/ab-df.out
+  (cli-dfb base vs cli-dfn): land when only intended rows move; squash the 4 commits first.
+- **Volume measure warning:** on impeller parts OCCT's plain Gauss VolumeProperties is ~1.2 % off (input 97755.8 vs
+  mesh-converged ~96555, kernel props 95977.8 after the delete ~= mesh): the old "OCCT 97123.4" targets were plain
+  Gauss. Compare with kernel props (replay prints them) or vibex7 ~/tmp/core/imp/mvol (mesh).
+- **Face 30 (x=5 groove floor, cone 37 + boss cylinder 34 + rib notch B-splines 17/18/29/31):** OCCT can't delete it
+  even unbounded (UnableToRemoveTheFeature). Needs cone and cylinder run on to meet (~x 10.4) through the rib faces.
+  Our input to Delete face 2 isn't live's (44 vs 65 faces: walls held). Decision asked of the lead (build now or after
+  the input matches).
+- **Rib in parallel (core-sj branch core-ribpar on ce74247af, uncommitted):** each profile's rib (slab cut against the
+  part) on rayon, in order; parting-line Rib 1 / 2 make 25 op_boolean each (1.2-1.4 s on loaded vibex7). CLI cli-rib
+  building; A/B vs cli-dfb next.
+- **Loft path sections (core-cache, uncommitted, with probe timers):** loft.path_sections 718 of op_loft 827 ms on
+  loft-paths-guides Loft 3 (2 calls: loft_impl rebuilds without natural ends). WIP: thread_local memo of the last call +
+  the plane sections cut in parallel (NonDestructive). CLI cli-lt2; then move to a clean branch without the timers.
+- **qa speed backlog (TICKETS a3ff6d481) routed to bool 21:00:** sprockets Circular pattern 1 op_boolean 422/499 ms,
+  loft-paths Mirror 1 op_boolean 1120/1136 + Loft 3's 942, parting-line Rib's fuses. Nuts waits on bool2. Split 3
+  op_split 1.45 s (OCCT splitter section edges 729) not started. Profiler: vibex7 ~/tmp/core/sp.sh <cli> <doc> "<feature>".
+- **live 11-18 21:00, feature-dialog pick rows (Shell, Hole, Revolve; behaviours "feel (feature dialogs) 11-18, batch
+  2", live/feel/dialogs-1118/):** UI, not modelling: passed to the lead to route (psui).
 - **Walls (core-rw branch core-walls2, d010a6d78 = 27b7836e0 re-applied, HELD with bool):** with them Move face 2
   turns Ok, Delete face 2 48 faces / 95977.8 mm3 (main 37 / 96246.4), then Extrude Bohrungssitz Ansaugflansch's Add
   (OCCT fuse 1 object 65 faces + 9 seat prisms, all valid) comes out INVALID 1992 mm3 / 55 faces, accepted (16 parts).
@@ -13,25 +41,8 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   96485.5 mm3 / 98 faces. bool's op_boolean (619037c8c, bool-hat) loses it too and now refuses a union that lost its
   body (retry fuzzy, else error); bool looks for the trigger (asked: NOSHAPE_BOP_PAIRS_PARALLEL=0). Re-land walls when
   the fuse is whole + compat-on.sh clean. Case vibex7 ~/tmp/core/imp/rec47/51a35c85013e91e7.brep, probe ./fz.
-- **Up to next nearest-first split: a5639251 CHECKING (18:03)** (core-p0 branch core-upnext): op_prism_until splits by
-  the 8 nearest faces ahead first, more while the kept piece reaches the end or a face left out could meet it.
-  fan-blade Extrude 8 118-163 -> 24-44 ms; compat A/B (vibex7 compat-ab.sh cli-unb vs cli-un) ALL-SAME; g++-13 clean;
-  T1 engine::extrude_up_to_next_before_a_row_of_parts.
-- **Pairtype LANDED 11efefb72**; skasm told.
-- **Speed list (qa 11-18 17:xx), routed:** impeller Extrude impellerraum 807 ms (OCCT edge-face 363), Extrude Bohrungssitz
-  Ansaugflansch 3366 ms, motor-mount-jack Extrude 2 (Rust sections_ahead 25 ms) -> bool. Flansch (vorne) verbreitern
-  9 ms on main (qa's 601 predates 6e19556b). fan-blade Derived 1 127 ms is outside the kernel (not looked at).
-- **Delete face 2 (3988 ms, live 10.5):** OCCT defeaturing face 24 (x=6 plate end, 4 plane neighbours + housing
-  B-spline 36) 2.7 s, face 30 (x=5, B-spline/cylinder/cone neighbours) 1.9 s. Face 24's removal trims INWARD to the
-  housing's extension (97755.8 -> 97123.4 mm3): an outward prism fill (brepq/cap.cpp) is wrong. Needs the local rebuild;
-  input still differs from live (Move face 2). Dumps vibex7 ~/tmp/core/imp/dd2/defeature-36, probes df2 / lr2 / cap.
 - **Pair 7 (e9caeead0 offset_planes) REGRESSES:** c2-sm-hem-plus / cf-sheet-metal-hem Derived 1 loses a part (26/72/48
   -> 14/36/24), cf-mortise-and-tenon Mortise Tenon 2 19 -> 10 faces. Not landable as is.
-- **Tweak with 0.4.58 names: LANDED 6e19556b (16:34)**; main green e24a63d15.
-- **Shown edges (bool 11-18): 059e271f2 + T1 56e296b14 (core-sj branch core-shownjoin):** parting-line Split 3
-  13/34/24 = live; T1 boolean_groups::sections_between_faces_with_no_seam_keep_their_vertices (zstd 113 KB). Lead: land
-  on pair 9 (on vibe2 since 17:36 under slot: sjb main 88b8437d4 vs sjn; vibe2 ~/tmp/core/p9-cmp.out, p9.done) when
-  only parting-line changes. g++-13 kernel build: core-sj .g13.sh on vibex7 (~/tmp/core/g13.log).
 - **c2-housing-draft (dx's DXF rows):** model = live at every feature up to Rotieren 1 (lengths; live measures circles
   polygonally, 96.093 vs 2pi r 96.133). Rotieren 1's torus exact (R 15.2, r 20.72); only difference: 8 floor lines
   0.144 / 0.337 mm where the torus is within 0.24 um of z=0 (r 15.2-15.3): ours split the side edges there (7.941 +
@@ -39,8 +50,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   (dx). Scripts /root/core-scratch/hdcmp2.sh, brepq/tor.cpp.
 - **surf-intro-simple Loft 1 (skasm): de3b6e082 (core-loft, held):** surface loft takes sketch regions (T1 4/12/8 on
   squares). skasm saw 1 face on the real doc: check against live 4/12/8 once skasm's translator lands, then land.
-- **Impeller Delete face 2 speed (lead, next):** 6968 ms on qa's copy: group 1 4.4 s OCCT defeature, group 2 hits the
-  300 K work bound (2.2 s) then the region fallback; live ~12 ms. Needs the local rebuild (brepq/lr2.cpp).
 - **qa 11-18 rollback-step list (speed):** fan-blade Extrude 8 120 vs 10, Derived 1 160 vs 51; motor-mount-jack
   Extrude 2 72-133 vs 9; bottle-split Revolve 2 / Split 1 50 / 17 vs 6.5 / 3; rings-loft patterns (live/qa/rbstep-1118).
 - **Flansch verbreitern (core-rp branch flansch, on e9caeead0, uncommitted):** offset_planes takes linear extrusions too
@@ -144,15 +153,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   one per wall (6 faces; ours 10: a face per path edge). **Committed b173dc5bb (core-oc, NOT in the vibex7 pair):
   join_collinear_lines joins a sweep path's lines along one line into one edge (first piece's source)**: Main pipe's
   faces = live (only its box differs, the take-back). T1 features_a::a_sweep_along_collinear_lines_has_one_side_face.
-- c2-surf-workshop-split Boundary surface 1 (6/12, parked): 2x2 profiles, defaults; ours 3803.55 mm², live 3762.61
-  (+1.1 %). It goes through k::fill_surface (op_fill) but not its plate: a Coons branch for 4 G0 edges placed first
-  changed nothing (edge count != 4 or Coons declined; not chased). Experimental coons_fill saved in
-  /root/core-scratch/features-coons.cpp (full file, not a patch).
-- c2-hunting-knife Revolve 1 (46/52, parked): HANDLE 10/27/18, live 10/27/19. Our ring between the handle's B-spline
-  face and the dome's sphere is two equal 41 mm edges (vertices at (119.65, 0, 2.99): the B-spline's seam end, and
-  (104.36, 0, -27.20): the sphere seam's end), both hidden by the seam-join rule. Live's ring RvBB (81.385 mm) has its
-  arc-length midpoint exactly on the first, so live keeps one vertex, at the sphere seam's end. Rule unknown (a
-  Parasolid sphere has no seam); a live capture of a dome revolved onto a swept handle would settle it.
 - c2-fan-blade-sweep Boolean 2 (48/53, parked; lead: core's): Subtract with Offset 0.2 mm on 6 picked tool faces
   (11 per tool after the pattern copies: the sweep's free-form thread flanks among them). basic.rs offsets only analytic
   faces (else the tool as is), so ours removes 54.7 mm³ less (56/139/84 vs live 56/143/88). OCCT's offset_faces on them,
