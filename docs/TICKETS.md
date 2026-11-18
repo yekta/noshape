@@ -617,7 +617,7 @@ animate ~550-690 ms from the first frame to the last (500 ms + a frame on this d
   block-fillet).
 - Joint rows (skasm's route: Bend A's row menu › "Convert Bend A to rip"): "Modify joint 1" added, Joint A | Rip ▾ | Edge joint ▾ under
   Other joints; Type offers Bend, Rip (= live); Rip -> Bend puts it back in Bends as "Bend A" within 1 s, flat view redrawn, but the
-  list keeps one "Modify joint 1" (live adds a Modify joint per change; skasm to confirm). Hovering the Joint A row lights nothing in
+  list keeps one "Modify joint 1" (as live: behaviours "ui (10-24 b)", a second edit of the same joint changes Modify joint 1; skasm 11-18). Hovering the Joint A row lights nothing in
   either view (live: the rip in 3D and both edges in the flat): skasm's f90cf944 (land queue) adds it, with SMFEEL-FLANGE-BROAD-FACE.
   qa 01:25 on 5076e98c (59cad3c05): the Joint A row hovered lights the rip's face along the wall's bottom in 3D (fl/re5/r01.png).
 - Not judged: hover per box in the Sheet metal model dialog (our start is a Thicken model, live's a Convert).
