@@ -9775,18 +9775,26 @@ fn compare_bom(placer: &mut Translator, asm: &Value, sub_names: &HashMap<String,
     let mut left = keyed(&our_rows);
     let mut order = Vec::new();
     let mut shown = 0;
+    let failed = failed_pattern_instances(asm);
     for (i, row) in keyed(&live_rows).into_iter().enumerate() {
-        match left.iter().position(|r| *r == row) {
-            Some(j) => {
-                res.bom_matching += 1;
-                order.push(our_rows.iter().position(|r| *r == row.1).unwrap_or(j));
-                left.remove(j);
-            }
-            None if shown < 3 => {
-                shown += 1;
-                res.differences.push(format!("BOM row {} (under {:?}): live {:?}, not in ours", i + 1, row.0, row.1));
-            }
-            None => {}
+        if let Some(j) = left.iter().position(|r| *r == row) {
+            res.bom_matching += 1;
+            order.push(our_rows.iter().position(|r| *r == row.1).unwrap_or(j));
+            left.remove(j);
+            continue;
+        }
+        // Live leaves the instances of a pattern it can't compute out of its BOM; ours places them (lead 11-18:
+        // asm-pattern-std's Linear pattern 5, its direction lost, AR-HR-482-D600 ×2 in live, ×3 in ours).
+        let extra = failed.get(&row.1.1).copied().unwrap_or(0.0);
+        let short = |(parent, r): &(String, Row)| *parent == row.0 && r.2 == row.1.2 + extra && (&r.0, &r.1, &r.3, &r.4, &r.5) == (&row.1.0, &row.1.1, &row.1.3, &row.1.4, &row.1.5);
+        if let Some(j) = left.iter().position(short).filter(|_| extra > 0.0) {
+            res.bom_matching += 1;
+            res.live_defects.push(format!("BOM {:?}: ×{}, live ×{} without the instances of its failed pattern", row.1.1, left[j].1.2, row.1.2));
+            order.push(our_rows.iter().position(|r| *r == left[j].1).unwrap_or(j));
+            left.remove(j);
+        } else if shown < 3 {
+            shown += 1;
+            res.differences.push(format!("BOM row {} (under {:?}): live {:?}, not in ours", i + 1, row.0, row.1));
         }
     }
     for (parent, r) in left.iter().take(3) {
@@ -9798,6 +9806,35 @@ fn compare_bom(placer: &mut Translator, asm: &Value, sub_names: &HashMap<String,
     if order.windows(2).any(|w| w[0] > w[1]) {
         res.differences.push("BOM: the matching rows in another order than live's".into());
     }
+}
+
+/// How many instances of each part (its BOM name, the instance name without " <n>") the patterns live has in ERROR
+/// made, at the top level and in the subassemblies (`mate-messages.json`'s latest status, else the fetch's).
+fn failed_pattern_instances(asm: &Value) -> HashMap<String, f64> {
+    let mut counts = HashMap::new();
+    let levels = std::iter::once((&asm["rootAssembly"], None)).chain(asm["subAssemblies"].as_array().into_iter().flatten().map(|s| (s, s["elementId"].as_str())));
+    for (level, element) in levels {
+        let names: HashMap<&str, &str> = level["instances"].as_array().into_iter().flatten().filter_map(|i| Some((i["id"].as_str()?, i["name"].as_str()?))).collect();
+        for p in level["patterns"].as_array().into_iter().flatten() {
+            let Some(id) = p["id"].as_str() else { continue };
+            let msg = match element {
+                Some(e) => &asm["liveMateMessages"][e][id],
+                None => &asm["liveMateMessages"][id],
+            };
+            let states = match element {
+                Some(e) => &asm["subAssemblyFeatures"][e]["featureStates"][id],
+                None => &asm["features"]["featureStates"][id],
+            };
+            if msg["liveStatusNow"].as_str().or(msg["status"].as_str()).or(states["featureStatus"].as_str()) != Some("ERROR") {
+                continue;
+            }
+            for i in p["seedToPatternInstances"].as_object().into_iter().flat_map(|m| m.values()).filter_map(Value::as_array).flatten() {
+                let Some(n) = i.as_str().and_then(|i| names.get(i)) else { continue };
+                *counts.entry(n.rsplit_once(" <").map_or(*n, |(base, _)| base).to_string()).or_insert(0.0) += 1.0;
+            }
+        }
+    }
+    counts
 }
 
 /// A sketch pattern instance id the sketch doesn't list (`<seed>.<group>.<i>.<k>`, `.center` for its centre): the

@@ -3872,6 +3872,17 @@ fn an_assembly_is_rebuilt_as_lives() {
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-bom3.noshape"), &with_bom, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
     assert_eq!((r.bom_matching, r.bom_rows), (0, 1), "{r:?}");
     assert!(r.differences.iter().any(|d| d.starts_with("BOM row 1 ")), "{r:?}");
+    // Part 1 <2> an instance of a pattern live can't compute: live's BOM leaves it out, ours counts it (a live
+    // defect, asm-pattern-std's Linear pattern 5); with the pattern OK, ×1 against ours' ×2 stays a difference.
+    with_bom["liveBom"] = bom(1);
+    with_bom["rootAssembly"]["patterns"] = json!([{ "id": "PAT1", "name": "Linear pattern 1", "seedToPatternInstances": { "IA": ["IB"] } }]);
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-bom-pattern-ok.noshape"), &with_bom, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert_eq!((r.bom_matching, r.live_defects.len()), (0, 0), "{r:?}");
+    with_bom["liveMateMessages"] = json!({ "PAT1": { "name": "Linear pattern 1", "status": "ERROR", "message": "Linear pattern 1 has error: Failed to compute pattern direction." } });
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-bom-pattern.noshape"), &with_bom, &[("E1".into(), off_studio.clone(), off_parts.clone())]);
+    assert_eq!((r.bom_matching, r.bom_rows, r.live_defects.len()), (1, 1, 1), "{r:?}");
+    with_bom["rootAssembly"]["patterns"] = Value::Null;
+    with_bom["liveMateMessages"] = Value::Null;
     // The properties the user set on the part (live's metadata): its row's part number, description and material.
     let prop = |name: &str, value: Value| json!({ "name": name, "value": value, "propertySource": 3 });
     let mut with_meta = off_studio.clone();
