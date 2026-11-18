@@ -1655,3 +1655,55 @@ fn a_placed_bom_tables_corner_snaps_to_the_frames_corner_within_10_px(cx: &mut T
         });
     }
 }
+
+/// Live2 place-1118: Crop view (Spline): the profile being drawn is black and open through the points to the pointer,
+/// with a red ✕ and a pink inference line on the first point; it closes onto the first point at 5 and 3 px, not at 8,
+/// and a click there ends it.
+#[gpui::test]
+fn a_crop_spline_is_drawn_open_and_closes_within_6_px_of_its_first_point(cx: &mut TestAppContext) {
+    use noshape_model::drawing::ViewKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-crop-spline");
+    real_sheet(cx, window, &editor);
+    let pl = cx.update(|cx| {
+        let e = editor.read(cx);
+        let v = e.current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).map(|v| v.id).expect("a base view");
+        e.placement(v).expect("placed")
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.start_crop(cx)));
+    draw(cx, window);
+    let at = |u: f64, v: f64| [pl.min[0] + (pl.max[0] - pl.min[0]) * u, pl.min[1] + (pl.max[1] - pl.min[1]) * v];
+    let first = at(0.3, 0.6);
+    for p in [first, at(0.7, 0.65), at(0.6, 0.3)] {
+        click_sheet(cx, window, &editor, p);
+    }
+    let look = |cx: &mut TestAppContext, p: [f64; 2]| {
+        cx.update_window(window, |_, _, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = p;
+                e.hover_snap = None;
+                e.update_preview(cx);
+            })
+        })
+        .unwrap();
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let curve = e.overlay.tinted.iter().find(|(_, rgb, _)| *rgb == [0, 0, 0, 255]).map(|(pts, _, _)| pts.clone()).expect("the black profile");
+            let (a, b) = (curve[0], curve[curve.len() - 1]);
+            ((a[0] - b[0]).hypot(a[1] - b[1]) < 1e-9, !e.overlay.crosses.is_empty() && !e.overlay.infer.is_empty())
+        })
+    };
+    let px = |cx: &mut TestAppContext, d: f64| {
+        let mm = cx.update(|cx| editor.read(cx).tol_mm(d));
+        [first[0] + mm, first[1]]
+    };
+    let far = at(0.4, 0.2);
+    assert_eq!(look(cx, far), (false, true), "open to the pointer, the ✕ and its line on the first point");
+    for (d, closed) in [(12.0, false), (8.0, false), (5.0, true), (3.0, true)] {
+        let p = px(cx, d);
+        assert_eq!(look(cx, p).0, closed, "{d} px from the first point");
+    }
+    let p = px(cx, 3.0);
+    click_sheet(cx, window, &editor, p);
+    assert!(cx.update(|cx| editor.read(cx).crop_dlg.as_ref().is_some_and(|d| d.pending.is_some())), "the click on the first point ends it");
+}

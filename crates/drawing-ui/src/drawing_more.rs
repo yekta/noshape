@@ -31,6 +31,37 @@ fn len(a: [f64; 2]) -> f64 {
 const AREAS: [&str; 3] = ["Point", "Circle", "Rectangle"];
 const SCOPES: [&str; 4] = ["Cell", "Row", "Column", "Table"];
 
+/// How near (px) the pointer closes a crop profile onto its first point (live2 place-1118).
+pub(crate) const CROP_CLOSE_REACH_PX: f64 = 6.0;
+
+/// An open smooth curve through `pts` (Catmull-Rom, the ends' tangents along their first and last spans), `k` samples
+/// per span.
+fn open_spline(pts: &[[f64; 2]], k: usize) -> Vec<[f64; 2]> {
+    if pts.len() < 3 {
+        return pts.to_vec();
+    }
+    let n = pts.len();
+    let at = |i: isize| -> [f64; 2] {
+        match i {
+            -1 => [2.0 * pts[0][0] - pts[1][0], 2.0 * pts[0][1] - pts[1][1]],
+            i if i as usize >= n => [2.0 * pts[n - 1][0] - pts[n - 2][0], 2.0 * pts[n - 1][1] - pts[n - 2][1]],
+            i => pts[i as usize],
+        }
+    };
+    let mut out = Vec::with_capacity((n - 1) * k + 1);
+    for i in 0..n - 1 {
+        let (p0, p1, p2, p3) = (at(i as isize - 1), at(i as isize), at(i as isize + 1), at(i as isize + 2));
+        let b = [p1, [p1[0] + (p2[0] - p0[0]) / 6.0, p1[1] + (p2[1] - p0[1]) / 6.0], [p2[0] - (p3[0] - p1[0]) / 6.0, p2[1] - (p3[1] - p1[1]) / 6.0], p2];
+        for s in 0..k {
+            let t = s as f64 / k as f64;
+            let w = [(1.0 - t).powi(3), 3.0 * t * (1.0 - t).powi(2), 3.0 * t * t * (1.0 - t), t * t * t];
+            out.push([(0..4).map(|j| w[j] * b[j][0]).sum(), (0..4).map(|j| w[j] * b[j][1]).sum()]);
+        }
+    }
+    out.push(pts[n - 1]);
+    out
+}
+
 impl DrawingEditor {
     // ------------------------------------------------------------ prompts
 
@@ -104,14 +135,11 @@ impl DrawingEditor {
             }
         }
         match &self.tool {
-            Tool::BrokenOut { parent: Some(pid), points, .. } | Tool::CropPoly { parent: Some(pid), points, .. } if !points.is_empty() => {
+            Tool::CropPoly { parent: Some(pid), points, spline } if !points.is_empty() => self.crop_drawing_overlay(overlay, *pid, points, *spline, c),
+            Tool::BrokenOut { parent: Some(pid), points, .. } if !points.is_empty() => {
                 let Some(pl) = self.placement(*pid) else { return };
                 use noshape_model::drawing::cad_objects::SplineKnots;
-                let spline = match self.tool {
-                    Tool::BrokenOut { .. } => Some(SplineKnots::Centripetal),
-                    Tool::CropPoly { spline: true, .. } => Some(SplineKnots::ChordLength),
-                    _ => None,
-                };
+                let spline = Some(SplineKnots::Centripetal);
                 let done = matches!(self.tool, Tool::BrokenOut { done: true, .. });
                 let mut pts = points.clone();
                 if !done {
@@ -148,7 +176,27 @@ impl DrawingEditor {
         // The click as the profile tool snaps it (the first point snapped onto an edge the same way: live
         // drw-crop-spline closes on the click that made it).
         let snapped = self.pk().profile_point(c, Some(view)).map(|pp| pl.to_sheet(pp.p)).unwrap_or(c);
-        [c, snapped].iter().any(|q| (f[0] - q[0]).hypot(f[1] - q[1]) * self.zoom <= 8.0)
+        // A crop profile closes within 6 px of its first point (live2 place-1118: at 5 and 3 px, not at 8).
+        let reach = if matches!(self.tool, Tool::CropPoly { .. }) { CROP_CLOSE_REACH_PX } else { 8.0 };
+        [c, snapped].iter().any(|q| (f[0] - q[0]).hypot(f[1] - q[1]) * self.zoom <= reach)
+    }
+
+    /// The crop profile being drawn (live2 place-1118): black, open through the points to the pointer, the closed loop
+    /// once the pointer is on the first point; a red ✕ on the first point with a pink dotted inference line.
+    fn crop_drawing_overlay(&self, overlay: &mut Overlay, view: ViewId, points: &[[f64; 2]], spline: bool, c: [f64; 2]) {
+        use noshape_model::drawing::cad_objects::SplineKnots;
+        let Some(pl) = self.placement(view) else { return };
+        let knots = spline.then_some(SplineKnots::ChordLength);
+        if points.len() >= 3 && self.on_first_point(view, points, c) {
+            overlay.tinted.push((self.profile_on_sheet(view, points, knots), [0, 0, 0, 255], 1.0));
+            return;
+        }
+        let mut pts: Vec<[f64; 2]> = points.iter().map(|p| pl.to_sheet(*p)).collect();
+        pts.push(c);
+        overlay.tinted.push((if spline { open_spline(&pts, 12) } else { pts }, [0, 0, 0, 255], 1.0));
+        let first = pl.to_sheet(points[0]);
+        overlay.crosses.push((first, self.tol_mm(5.0)));
+        overlay.infer.push(([first[0] - self.tol_mm(96.0), first[1]], first));
     }
 
     pub fn more_tool_click(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
