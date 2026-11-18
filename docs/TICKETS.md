@@ -697,6 +697,8 @@ point gets no coincident (= live). Ending on a point / midpoint: COINCIDENT (sha
 - [ ] **P2 SKSNAP-REACH (skasm)**: a point lights at 5 px along x (live 6-7) and a circle centre at 4 px (live 5-8).
   qa 01:46 on 5076e98c (vibex8, sk/sw6, sw7, hv7): circle centre 6 px (in live's band); still short: point 5 px along x / y (live
   6-7), a model edge 5 px (live 7), the alignment band ±5 (live ±6-7); lines as before (end 7, middle 5, off-end 6).
+  Slow steps (skasm: our radius 7.5 px; the light comes late on llvmpipe): 0.8 s and 2.2 s per step both light at 6 px (point x / y /
+  diagonal, edge, alignment; edge midpoint 7 at 0.8 s), never at 7 (sk/ss1, ss2, hs1, hs2).
 - [ ] b6f5e810 (skasm 01:33: one Coincident, no use glyph, per live2 use-glyph-1118; re-check on its green) **P2 SKSNAP-SHIFT-ICON (skasm)**: with Shift held near the point a black cube icon shows by the pointer (live: nothing).
 - Not run: a local point beating an external one 1 px apart.
 

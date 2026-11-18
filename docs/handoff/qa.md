@@ -124,6 +124,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    the compat loop, then the must-carry line is satisfied (cut-must.txt pins 55fc929c). Snap sweeps now run on vibex8 (~/tmp/qa/sk,
    batch.sh python3 sweep.py <out> [targets]; hv.py <out> - al = alignment rows; ana.py's Y test misses the thin dashed line: look).
    Measure angles: pass (live2's first-wedge capture: 56.31 for slope + x=40). Face+edge menu (591643fc) not re-run yet.
+0n. **Speed report reference**: live's UI speed of everyday actions (behaviours "psui + qa (lead 11-18): UI speed of everyday
+   actions", live/psui/ui-speed-1118/table.md): open document 12231 ms settled, tab switch 2291-2733, enter sketch 1291 (dialog 226),
+   exit 889, undo 903-1011, open Extrude 1320 (dialog 221), first preview 2004, commit 1115, rollback drop 918-1094, context menu 117,
+   Mass dialog 161. Use it with the nightly / release-build timings.
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
