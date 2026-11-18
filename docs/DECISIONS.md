@@ -127,3 +127,7 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   longer help Onshape authors) keep live's title, numbered steps (same count and order), facts and UI names, written
   in our own words; never live's paragraphs copied verbatim (Onshape's authored content). Short UI labels and
   tooltips stay word for word, as parity requires.
+- 11-18 (lead) A corpus document whose imported Feature Studio live won't serve (403, not public, no public copy) may
+  keep that import as an empty module marked `"stub": true` with the reason, if no feature of the document uses
+  anything from it (asm-bjr-config's "Packing"). If a feature uses it, the document leaves the suite with the reason
+  recorded.
