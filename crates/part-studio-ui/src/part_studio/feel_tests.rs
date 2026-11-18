@@ -587,8 +587,9 @@ fn a_box_drag_lights_nothing_and_selects_at_release(cx: &mut TestAppContext) {
         gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, Some(gpui_kit::MouseButton::Left), Modifiers::default());
         // (A person's slow drag: frames and picks come back between moves.)
         pointer.frames(cx, &view);
+        // (The first move may light what it ends over, the box waiting a move: live's first-move rule, the test above.)
         let got = lit(cx);
-        if got.is_some() {
+        if got.is_some() && i > 1 {
             wrong.push(format!("box drag step {i} at {p:?}: lit {got:?}"));
         }
     }
