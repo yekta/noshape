@@ -160,6 +160,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    SNAPMODE-REACH (70 vs 57 px), P1 SNAPMODE-RELEASE-DIALOG; psui P1 ROW-DBLCLICK-DISTANCE. Runner-built docs reopened without the
    runner (vibex8 ~/tmp/qa/fl/docs: asm-feel, hole-plate-drawing): stable views. Drivers qa-scratch/af/snapm2.py, hv2/rowk.py, hv2/drw.py.
    qa-wait-33c5 re-runs FEEL-FL-AUTOSCROLL-DROP on psui's 33c57541 green.
+0y. **Dock tab return P0 (lead 09:00)**: fff088e5 didn't fix v0.4.54's regression (09:01 same-run: v0.4.53 settle A / B-again
+   137 / 189 ms, release build of 80a64725 829 / 813; speed/tab-80a64725.txt, sent to psui). bin/tabrel.sh <sha> [nobuild]
+   (release build on vibe2, tabab vs v0.4.53 on vibex7, lock speed/tabrel.lock); unit qa-tabwatch runs it on the green of every
+   psui commit whose subject mentions a tab / hover card (seen list speed/tabwatch.seen). cut-must.txt has a "pending:DOCK-TAB-RETURN"
+   line (always HOLD): replace it with subject:<text>|<label> once a candidate brings settle to v0.4.53's. qa-wait-67eb retired.
+   rel-pub-all.sh's alert now names each compat section.
 0x. **Speed sweep (lead 07:45, done 08:53)**: bin/speed-sweep.sh <sha> (SKIP_BUILD=1 reuses vibe2 ~/agents/qa-speed/target, 7.9 GB):
    release build on vibe2, corpus A/B there + user docs / dock tab on vibex7, ab-feat2.py two passes, bin/speed-sum.py <dir> pass|ud.
    80a64725 vs v0.4.57: no regression (TICKETS 364fac560). A/Bs ran outside the slots at nice 10 (both slots queued ~2 h).
