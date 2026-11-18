@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 17:50 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 18:18 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -32,10 +32,14 @@ regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete w
 ## Next
 - core: asm-welding-config studio 9c7704 Sketch 9 region 109.56 vs live 105.68 mm² (prepared on vibe2:
   ~/tmp/skasm/cfgm/wc-9c7704; run cfg.sh with its models dir).
-- live2 sm-1118: convert-to-rip right after a Radius edit added no second Modify joint (live folds it into the last
-  one); check ours. live sktools-1118: a Trim pass ~1 px by a chain's corner isn't a crossing; check ours.
-- Form Location(s): live's second button is Flip direction (OPPOSITE_DIRECTION shown inline on Location(s)), not a
-  sketch: check where ours shows Flip direction.
+- live2 sm-1118: Convert to rip right after a Radius edit adds no second Modify joint in live; ours adds Modify joint 2.
+  Tried 18:3x reusing the bend's own Modify joint: after its regeneration the bend's faces are renamed, so neither its
+  stored entity nor `label_owners` / `Bend::feature` lead back to it (the same gap would make a second Radius edit
+  add Modify joint 2). Needs the stored entity resolved through the history; not landed. live sktools-1118: a Trim pass ~1 px by a chain's corner isn't a crossing; check ours.
+- Form Location(s): live's second button is Flip direction; ours has it there too (schema `flipDirection` follows
+  `locations`, a trailing flip): row corrected to =.
+- live dimbox-1118: our dimension box opens on the OS double-click; asked live (REQUESTS 18:05) whether a click on an
+  already-selected label opens it after any gap. Palette parts (grip, chevron, field, tolerance, ✓, ✗) present.
 - Handed: surf-intro-simple Loft 1 (core), surf-intro-examples Fill 1 overshoot (lead to route).
 
 ## Waiting on live (REQUESTS)
