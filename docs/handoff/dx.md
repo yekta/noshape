@@ -147,13 +147,12 @@ Open, ranked:
      DWG 0.16 / DXF 0.22 / PNG 1.05 s (7.2-18.3 s).
    - imports: NIST STEP 4.15 / x_t 2.16 s (38.7 / 24.5 s); live big asm STEP 2.8 / x_t 1.7 / IGES 7.1 s (33.5 / 12.9 /
      69.3 s); exchange suite 173/174 at or under live's.
-   - Open: c2-rings-loft live.x_t "import" 17 s (live 8.6). Read 4.9 -> 2.6 s (xt_read.cpp tube() at 10 nm, Parasolid's
-     precision: 102 stations, was 204; branch dx-tube bf5094af8; A/B over the 21 live.x_t (vibex8 ~/agents/dx-keep/xtab): 20 identical, rings-loft
-     same counts, Extruded ring volume +0.00056 mm³ (1.3e-6, live's band ±3), import 39 -> 29 s: lead asked 12:4x). Left: query_parts ~13.5 s/pass on the
-     two blend tubes (156 edges each); their pcurves (ShapeFix FixAddPCurve projection) carry ~84 knots per edge (STEP's
-     15), so face_moments' Green integral runs 50.8k pieces (STEP 8.7k). Grouping C2 knots (common.cpp) broke gear
-     volumes (cf-part-draft Spur Gear -0.36 %): reverted. Decision asked of the lead 11-18 11:0x: integrate the inner
-     integral along the shorter direction (core's props) or find the dense pcurves' source in the reader.
+   - c2-rings-loft live.x_t import 17.5 -> 7.9 s (live 8.6; STEP 2.7): tube at 10 nm (f91b8d66) and intersection curves
+     fit to 10 nm segment by segment (aad79780, queued fbf75841; blend faces' pcurves 13.7k -> 4.6k knots, STEP 2.4k).
+     Left vs STEP: ShapeFix projects every pcurve with >= 23 knots and our 11-point curves with 45; STEP's edges are
+     single cubic spans with ~10 um tolerances (ours 10 nm). Next lever if needed: pcurves on the tube from on_both's
+     (u, v) at the 3D curve's parameters instead of ShapeFix's projection. A/B tool: vibex8 ~/agents/dx-keep/xtab
+     (run.sh, ~/tmp/dx/xtcmp.py), dump patch idea in /root/dx-scratch.
 1. Exchange m5 (vibex8 06:0x): imports 114/130, live imports ours 46/48, ours reads ours 148/154, DXF 1/10 (duct).
    DXF rows left follow model differences: faceblend full-round fillet edges B-spline in live (blend told 06:1x),
    extension-spring Fillet 1 10/24/16 vs 11/27/18 (blend), rings-loft walls, hex mesh outline splits (live's breaks
