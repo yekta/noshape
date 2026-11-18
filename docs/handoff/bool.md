@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-18 07:13 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
+Updated 11-18 07:44 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
 (NOSHAPE_GATE_HOST=vibe2); Mac for crate tests, probes and speed numbers (NOSHAPE_RB_HOST=mac; vibex8 runs ~x10 slower at
 load 26); land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs on vibex7 ~/lead-private (hat8, hat15,
 hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree from a computed pid (lead 21:06):
@@ -14,15 +14,15 @@ hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree 
 - LANDING 7378bd2c (queued 06:05, alone off main): Shell's drop_clear_offset_pairs shared one FClass2d across
   threads; NCollection_Sequence::Value writes its node cache, torn -> SIGSEGV (rings-loft Shell 1 crashed 2 of 10 runs
   on the Mac, on main since 3bba9d430 11-15). One task per face now: 20/20 clean, Shell 1 217 ms as before.
-- GATE unit bool-gate-c0a72a695 on vibex7 (started 06:53) -> /root/bool-hat-scratch/chain-c0a72a695.out: the 13 below
+- GATE unit bool-gate-5e89c7e7b on vibe2 (07:43; vibex7's slot held it 50 min) -> /root/bool-hat-scratch/chain-5e89c7e7b.out:
+  the 13 below + 17. 5d7ea16fd offset fit cache + 18. 5e89c7e7b volume_possible's cut lower bound (v >= va - vt) and
   + 14. 05e180ea5 the Shell race fix (as 7378bd2c) + 15. 4d499486d NurbsCurve::param_of keeps its sample points per span
   run (rings-loft 51-slot cut 331fd52c 246 -> 211 ms Mac, same result) + 16. c0a72a695 Shell's add_pcurve keeps a
   surface's ShapeAnalysis_Surface per thread (impeller Shell Gehäuse 235 -> 199 ms, same result). Then private docs
   (udoc-ab8.sh c0a72a695), list relabelled / seam cases per condition (c), knurls ours-only, land, tell dx (2108c2b7-2f48-43a7-87a0-3f652e3cda6d),
   core, blend, asm. Branch bool-shared2 (bool-hat) on main f6274d94e, 13 commits, all g++-13 OK:
-  NOT gated yet, on top in bool-hat: 5d7ea16fd offset_as_bspline keeps its last 32 fits (impeller Boolean 2 55 -> 35,
-  Boolean 3 41 -> 21 ms Mac; doc's fits 587 -> 330 ms; kernel T1 496/496): land after the stack (branch it, reset
-  bool-hat to c0a72a695 for the land, cherry-pick back), next gate.
+  17. offset_as_bspline keeps its last 32 fits (impeller Boolean 2 55 -> 35, Boolean 3 41 -> 21 ms Mac; doc's fits
+  587 -> 330 ms; kernel T1 496/496).
   1-10. as before: e61278b1d usd room; 8a9351e4b shared shapes (lead conditions (a) suite identical, (b) hats/dock
      SAME, (c) replay label-only by case, (d) split_names T1); a1d7ca0b4 + 65befe285 NURBS piece boxes; 51ee7c1cb unify
      room order; 0b17fee66 par_map_by cancel; 26ce2dffa fuse_glued mirror normal; b11d72be6 gap() (pulleys seam
@@ -49,6 +49,10 @@ hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree 
   one OCCT offset x extrusion section 135 ms of it, OCCT's walk + tolerance PSO), Boolean 1 (unify 66: usd.check 38 =
   made_valid decision, usd.volume 27 borderline-only), knife Split 4 (project_along 41). Cases Mac
   ~/noshape-host/bool-keep/{imprec,impdump,rlrec2}.
+- core's nut thread cut (c2-config-parts-nuts Sweep 1, vibex8 ~/agents/core-keep/nuts/nutcut{0,}.bin, Mac
+  ~/noshape-host/bool-keep/nuts): the thread's crest lies on the bore (coincident, same side): ours declines, OCCT's
+  wrong ((a) default options 121.40 mm3 valid, below object - tool = 131.99, main the same; (b) 157.7 invalid). Asked
+  core 07:40 for a tool whose crest reaches into the hole; then take the cut, check live's 135.268 mm3 / 29 faces.
 - c2-fan-blade-sweep Boolean 2: bool2 takes it into ours (lead 11-18; bool2 in brep boolean.rs / free.rs only); when it
   does, I narrow or remove offset_grazes_a_circle (check rings-loft, sp-1113).
 - P0 c2-fan-blade-sweep Boolean 2: our attempt fixed in 13. OCCT's 186 ms (Mac) is offset-surface evaluation; B-spline
