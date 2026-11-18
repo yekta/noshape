@@ -200,14 +200,11 @@ fn branches_crud() {
     let feat = doc.create_branch(root, "feature").unwrap();
     assert_eq!(doc.head(feat).unwrap(), root);
     assert_eq!(doc.branch(feat).unwrap().created_from, Some(root));
-    assert!(matches!(
-        doc.create_branch(root, "feature"),
-        Err(StoreError::BranchNameTaken(_))
-    ));
-    assert!(matches!(
-        doc.create_branch(root, "Main"),
-        Err(StoreError::BranchNameTaken(_))
-    ));
+    // Two live workspaces may share a name, as in Onshape (live2 ws-1118 b2).
+    let twin = doc.create_branch(root, "Main").unwrap();
+    assert_ne!(twin, doc.default_branch().unwrap());
+    assert_eq!(doc.branch_by_name("Main").unwrap().unwrap().id, doc.default_branch().unwrap());
+    doc.delete_branch(twin).unwrap();
     assert!(matches!(
         doc.create_branch(root, "  "),
         Err(StoreError::EmptyName)
@@ -220,10 +217,6 @@ fn branches_crud() {
     doc.rename_branch(feat, " Feature 1 ").unwrap();
     assert_eq!(doc.branch(feat).unwrap().name, "Feature 1");
     doc.rename_branch(feat, "Feature 1").unwrap(); // same name is fine
-    assert!(matches!(
-        doc.rename_branch(feat, "Main"),
-        Err(StoreError::BranchNameTaken(_))
-    ));
     assert_eq!(doc.branch_by_name("Feature 1").unwrap().unwrap().id, feat);
     assert_eq!(
         doc.list_branches()
@@ -1308,4 +1301,22 @@ fn idle_checkpoint_cost() {
         let (cp_time, cp_ok) = cp.join().unwrap();
         eprintln!("idle checkpoint {mb} MB (log {:.1} MB): fold {:.1} ms; a commit during the next checkpoint ({:.1} ms, ok {cp_ok}) took {:.1} ms", wal as f64 / 1e6, fold.as_secs_f64() * 1e3, cp_time.as_secs_f64() * 1e3, commit.as_secs_f64() * 1e3);
     }
+}
+
+#[test]
+fn an_older_file_takes_a_second_workspace_of_the_same_name() {
+    let dir = TempDir::new();
+    let root = {
+        let (doc, main) = new_doc(&dir);
+        doc.head(main).unwrap()
+    };
+    // Files written before 11-18 refused a second live "Main" with a unique index.
+    {
+        let c = rusqlite::Connection::open(dir.file("doc.noshape")).unwrap();
+        c.execute_batch("CREATE UNIQUE INDEX branches_live_name ON branches(name) WHERE deleted = 0").unwrap();
+    }
+    let mut doc = Document::open(dir.file("doc.noshape")).unwrap();
+    let twin = doc.create_branch(root, "Main").unwrap();
+    assert_eq!(doc.list_branches().unwrap().iter().filter(|b| b.name == "Main").count(), 2);
+    assert_ne!(doc.branch_by_name("Main").unwrap().unwrap().id, twin);
 }

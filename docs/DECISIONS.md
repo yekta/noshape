@@ -32,6 +32,9 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   A row passes when every live vertex is within live's chord tolerance of ours and the mean deviation |ΔV|/area is
   ≤ 0.01 mm (a tenth of Medium's 0.12 mm chord), watertight.
 
+- 11-18 Duplicate workspace names are allowed, as live. The store keys workspaces by id; ops take a workspace (`branch`)
+  by id, or by name when it is unique; an ambiguous name is an error naming the parameter and listing the matching ids.
+
 ## Geometry and speed
 - 11-07 Every crates/brep or Boolean change passes bool's gate: every corpus + parity56 at 0 OCCT differences.
 - 11-14 A faster path lands only if results are identical end to end (topology and feature status in every suite

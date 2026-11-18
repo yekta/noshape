@@ -1259,12 +1259,12 @@ impl Document {
             .ok_or(StoreError::UnknownBranch(id))
     }
 
-    /// Live branch by name.
+    /// A live branch by name (the oldest when several share it).
     pub fn branch_by_name(&self, name: &str) -> Result<Option<BranchInfo>> {
         Ok(self
             .conn()?
             .prepare_cached(&format!(
-                "SELECT {BRANCH_COLS} FROM branches WHERE name = ?1 AND deleted = 0"
+                "SELECT {BRANCH_COLS} FROM branches WHERE name = ?1 AND deleted = 0 ORDER BY created, rowid LIMIT 1"
             ))?
             .query_row([name], branch_from_row)
             .optional()?)
@@ -1275,9 +1275,6 @@ impl Document {
         self.writable()?;
         let name = check_name(name)?;
         self.microversion(from)?;
-        if self.branch_by_name(name)?.is_some() {
-            return Err(StoreError::BranchNameTaken(name.to_string()));
-        }
         let id = BranchId::generate();
         self.conn()?.execute(
             "INSERT INTO branches (id, name, head, created, created_from, is_default)
@@ -1291,11 +1288,6 @@ impl Document {
         self.writable()?;
         let name = check_name(name)?;
         self.head(id)?;
-        if let Some(other) = self.branch_by_name(name)?
-            && other.id != id
-        {
-            return Err(StoreError::BranchNameTaken(name.to_string()));
-        }
         self.conn()?.execute(
             "UPDATE branches SET name = ?1 WHERE id = ?2",
             params![name, id],
@@ -1326,11 +1318,6 @@ impl Document {
         let b = self.branch(id)?;
         if !b.deleted {
             return Ok(());
-        }
-        if let Some(other) = self.branch_by_name(&b.name)?
-            && other.id != id
-        {
-            return Err(StoreError::BranchNameTaken(b.name));
         }
         self.conn()?
             .execute("UPDATE branches SET deleted = 0 WHERE id = ?1", [id])?;

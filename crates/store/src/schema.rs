@@ -49,7 +49,6 @@ CREATE TABLE branches (
     is_default   INTEGER NOT NULL DEFAULT 0,
     deleted      INTEGER NOT NULL DEFAULT 0
 );
-CREATE UNIQUE INDEX branches_live_name ON branches(name) WHERE deleted = 0;
 CREATE TABLE versions (
     seq          INTEGER PRIMARY KEY AUTOINCREMENT,
     id           BLOB NOT NULL UNIQUE,
@@ -114,6 +113,11 @@ pub(crate) fn check_and_migrate(conn: &mut Connection, writable: bool) -> Result
             return Err(StoreError::ReadOnly);
         }
         migrate(conn, version)?;
+    }
+    // Two live workspaces may share a name, as in Onshape (lead 11-18): the unique index of older files goes, with
+    // no version bump so older releases still open them.
+    if writable {
+        conn.execute_batch("DROP INDEX IF EXISTS branches_live_name")?;
     }
     Ok(())
 }

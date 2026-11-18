@@ -1009,6 +1009,25 @@ fn deleting_the_current_workspace_lands_on_its_version() {
     call(&mut ctx, "history_switch_branch", json!({ "branch": "B1" }));
 }
 
+/// Two workspaces may share a name, as in Onshape (live ws-1118 b2, lead 11-18): a name finds one only when it is
+/// unique; otherwise the error names `branch` and lists the matching ids, and an id always works.
+#[test]
+fn two_workspaces_may_share_a_name() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "twin-workspaces.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[0, 0], [5, 0]] }));
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let a = call(&mut ctx, "history_create_branch", json!({ "name": "B1", "version": "V1" }))["branch"].as_str().unwrap().to_string();
+    let b = call(&mut ctx, "history_create_branch", json!({ "name": "B1", "version": "V1" }))["branch"].as_str().unwrap().to_string();
+    assert_ne!(a, b);
+    let e = try_call(&mut ctx, "history_switch_branch", json!({ "branch": "B1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("branch"), "{}", e.to_json());
+    assert!(e.message.contains(&a) && e.message.contains(&b), "{}", e.to_json());
+    assert_eq!(call(&mut ctx, "history_switch_branch", json!({ "branch": b }))["branch"], b.as_str());
+    call(&mut ctx, "history_delete_branch", json!({ "branch": a }));
+    assert_eq!(call(&mut ctx, "history_switch_branch", json!({ "branch": "B1" }))["branch"], b.as_str());
+}
+
 /// A Hole's size given through the API is used as given, the schema default's 5 mm too, with or without a Standard's
 /// size or tableSynced: where it differs from the Standard's the hole is overridden as live's are, with Onshape's
 /// "Parameters have been overridden. Check input." (lead 11-15; the model suite's live holes). A Standard's size with

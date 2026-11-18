@@ -6118,7 +6118,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `version` | string |  | Version name or id. |
-| `branch` | string |  | Branch (workspace) name or id. |
+| `branch` | string |  | Branch (workspace) id, or its name when no other workspace has it. |
 | `name` | string |  | New name. |
 | `description` | string |  | New description (empty clears it). |
 

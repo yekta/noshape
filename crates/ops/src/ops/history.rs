@@ -62,7 +62,7 @@ pub fn ops() -> Vec<Op> {
             verb: "version_properties",
             summary: "A version's or workspace's Properties… (name and description)",
             description: "The Versions and history panel's row menu › Properties…: renames `version` or `branch` (a workspace) and sets its description. Not an undoable edit (as in the app).",
-            fields: vec![doc_field(), opt("version", s(), "Version name or id."), opt("branch", s(), "Branch (workspace) name or id."), opt("name", s(), "New name."), opt("description", s(), "New description (empty clears it).")],
+            fields: vec![doc_field(), opt("version", s(), "Version name or id."), opt("branch", s(), "Branch (workspace) id, or its name when no other workspace has it."), opt("name", s(), "New name."), opt("description", s(), "New description (empty clears it).")],
             mutates: true,
             destructive: false,
             run: version_properties,
@@ -201,7 +201,21 @@ fn create_version(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 pub(super) fn branch_id(od: &crate::OpenDoc, key: &str) -> Result<noshape_store::BranchId, OpError> {
     let list = od.session.store.list_branches().map_err(|e| OpError::new("io", e.to_string()))?;
-    list.iter().find(|b| b.id.to_string() == key || b.name == key).map(|b| b.id).ok_or_else(|| OpError::not_found(format!("no branch `{key}`; branches: {}", list.iter().map(|b| b.name.clone()).collect::<Vec<_>>().join(", "))).with_param("branch"))
+    pick_branch(&list, key, ("branch", "branches")).map(|b| b.id)
+}
+
+/// The workspace of `list` whose id is `key`, or whose name is when no other shares it: workspaces may share a name,
+/// as in Onshape (lead 11-18). `what` names one in the error, `all` the list ("branch", "branches").
+fn pick_branch<'a>(list: &'a [noshape_store::BranchInfo], key: &str, (what, all): (&str, &str)) -> Result<&'a noshape_store::BranchInfo, OpError> {
+    if let Some(b) = list.iter().find(|b| b.id.to_string() == key) {
+        return Ok(b);
+    }
+    let named: Vec<_> = list.iter().filter(|b| b.name == key).collect();
+    match named[..] {
+        [b] => Ok(b),
+        [] => Err(OpError::not_found(format!("no {what} `{key}`; {all}: {}", list.iter().map(|b| b.name.clone()).collect::<Vec<_>>().join(", "))).with_param("branch")),
+        _ => Err(OpError::invalid(format!("{} workspaces are named `{key}`: give one's id ({})", named.len(), named.iter().map(|b| b.id.to_string()).collect::<Vec<_>>().join(", "))).with_param("branch")),
+    }
 }
 
 fn create_branch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
@@ -236,7 +250,7 @@ fn restore_branch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let key = a.str("branch")?;
     let deleted: Vec<noshape_store::BranchInfo> = od.session.store.graph().map_err(|e| OpError::new("io", e.to_string()))?.branches.into_iter().filter(|b| b.deleted).collect();
-    let b = deleted.iter().find(|b| b.id.to_string() == key || b.name == key).ok_or_else(|| OpError::not_found(format!("no deleted workspace `{key}`; deleted: {}", deleted.iter().map(|b| b.name.clone()).collect::<Vec<_>>().join(", "))).with_param("branch"))?;
+    let b = pick_branch(&deleted, key, ("deleted workspace", "deleted"))?;
     od.session.store.restore_branch(b.id).map_err(|e| OpError::invalid(e.to_string()).with_param("branch"))?;
     Ok(json!({ "restored": b.name, "branch": b.id.to_string() }).into())
 }

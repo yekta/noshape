@@ -21,8 +21,6 @@ pub enum StoreError {
     UnknownBranch(BranchId),
     #[error("unknown version {0}")]
     UnknownVersion(VersionId),
-    #[error("a branch named `{0}` already exists")]
-    BranchNameTaken(String),
     #[error("name must not be empty")]
     EmptyName,
     #[error("the default branch cannot be deleted")]
