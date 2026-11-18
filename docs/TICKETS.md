@@ -664,14 +664,14 @@ centroid connector, axis points on the cylinder; Fastened flow: chip on the 1st 
 at once (by 0.3 s) as a see-through ghost with ✓ green and the floating toolbar, A flips it on top, one Esc closes with no mate and
 Part 3 back, Enter commits Fastened 1 (Part 3 at (-90, 5, 5) mm = the picked centroids); a selected row (178,221,246) fills the
 part amber (239,182,72 / 192,146,57) with the white triad; graphics hover leaves the list; a graphics click turns its row blue.
-- [ ] **P0 ASMFEEL-CONNECTOR-REACH (asm)**: in a mate tool the connector stays at the face centroid until the pointer is on the edge
+- [x] 9ee7a6fa **verified 8b4812511** (qa 06:35, vibex8: the connector jumps to the corner at 45 px, at 50 still on the centroid; 0.65 s steps, within a step of pick lag; was ~10 px) **P0 ASMFEEL-CONNECTOR-REACH (asm)**: in a mate tool the connector stays at the face centroid until the pointer is on the edge
   (~10 px) or the vertex (5 px); live jumps it to the corner / edge-midpoint dot within 50 px (not at 60).
-- [ ] **P0 ASMFEEL-DRAG-GROUP (asm)**: grabbing Part 2 (Slider to Part 1, Part 3 fastened to Part 1) and dragging 140 px right / 50 up
+- [x] 9ee7a6fa **verified 8b4812511** (qa 06:35: Part 2 dragged: all three move (5.55, 3.76) mm, Part 2 also 2.48 mm along the slider) **P0 ASMFEEL-DRAG-GROUP (asm)**: grabbing Part 2 (Slider to Part 1, Part 3 fastened to Part 1) and dragging 140 px right / 50 up
   slides only Part 2 (z -10 -> -7.24 mm); Part 1 and Part 3 stay. Live: the whole connected set translates with it, the slider
   taking only the along-axis part.
-- [ ] **P1 ASMFEEL-DRAG-ROTATES (asm)**: grabbing the fastened Part 1 / Part 3 and dragging 150 left / 80 down moves all three
+- [x] 9ee7a6fa **verified 8b4812511** (qa 06:35: no rotation on any part; Part 2 keeps z) **P1 ASMFEEL-DRAG-ROTATES (asm)**: grabbing the fastened Part 1 / Part 3 and dragging 150 left / 80 down moves all three
   (Part 2 keeps its z: the slider absorbs it, as live) but turns each 0.54°; live: orientation never changes.
-- [ ] **P1 ASMFEEL-ROW-HOVER (asm)**: hovering an instance row fills the part tan; live outlines it (row (222,241,251) and its tooltip
+- [x] 9ee7a6fa **verified 8b4812511** (qa 06:35: the hovered row's part outlined, no fill) **P1 ASMFEEL-ROW-HOVER (asm)**: hovering an instance row fills the part tan; live outlines it (row (222,241,251) and its tooltip
   as live).
 - Not judged: Q's 90° (a square part looks the same; transform not read), the first-change time (0.3 s shot already moved).
 
