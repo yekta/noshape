@@ -199,6 +199,8 @@ pub struct Translator<'a> {
     /// Those sketches' source tabs, where ours reads their geometry.
     sketch_tabs: HashMap<String, String>,
     first_move: Option<String>,
+    /// Live's feature states (features.json `featureStates`): the sketches live warns about.
+    live_states: Value,
     /// The sub-feature whose parameters are being translated: live's refs name them `subFeature:<id>.<parameter>`.
     sub_feature: Option<String>,
     /// Onshape Feature Studio element id → our Feature Studio tab id.
@@ -475,7 +477,7 @@ impl<'a> Translator<'a> {
                 config_defaults.entry(k.to_string()).or_insert_with(|| v.to_string());
             }
         }
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, sub_feature: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -4856,11 +4858,15 @@ impl<'a> Translator<'a> {
                 self.silhouettes.insert((oid.clone(), l.to_string()));
             }
         }
+        let live_warns = self.live_states[oid.as_str()]["featureStatus"] == "WARNING";
         let projected: HashMap<String, (String, Value)> = f["constraints"]
             .as_array()
             .into_iter()
             .flatten()
             .filter(|c| matches!(c["constraintType"].as_str(), Some("PROJECTED" | "SILHOUETTED" | "INTERSECTED")))
+            // Not a Use whose model geometry live's sketch no longer finds (its query empty, the sketch WARNING): drawn
+            // where it is stored and pinned to nothing (`constraints`), as live's (asm-welding-config 9c7704's Sketch 8).
+            .filter(|c| !(live_warns && c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "externalSecond" && p["queries"].as_array().is_some_and(|qs| !qs.is_empty() && qs.iter().all(empty_live_query)))))
             .filter_map(|c| {
                 // (A silhouette: its curve and the curved face it outlines.)
                 let params = c["parameters"].as_array()?;
@@ -5633,7 +5639,21 @@ impl<'a> Translator<'a> {
                     let orphan = par("externalSecond").or(par("externalFace")).is_none_or(|p| p["queries"].as_array().is_none_or(|q| q.iter().all(|q| self.self_made(k, q))));
                     let used = |l: &str| self.used.contains(&(oid.to_string(), l.to_string()));
                     let made = local.is_some_and(|l| used(l) || l.strip_suffix(".start").or_else(|| l.strip_suffix(".end")).is_some_and(used));
-                    if !made && !orphan {
+                    // A Use whose model geometry live's sketch no longer finds (its query empty): one of its points to a
+                    // reference that resolves to nothing, so the sketch warns as live's (asm-welding-config 9c7704's
+                    // Sketch 8: "Some external references are missing.").
+                    let gone = par("externalSecond").or(par("externalFace")).is_some_and(|p| p["queries"].as_array().is_some_and(|qs| !qs.is_empty() && qs.iter().all(empty_live_query)));
+                    let point = local.and_then(|l| ["start", "center", "end"].iter().find_map(|e| self.sketch_entities.get(&(oid.to_string(), format!("{l}.{e}")))).or_else(|| self.sketch_entities.get(&(oid.to_string(), l.to_string())))).cloned();
+                    let pinned = gone && !made && point.is_some_and(|point| {
+                        let mut args = json!({ "sketch": id, "entity": point });
+                        if let Some(tab) = &self.tab {
+                            args["tab"] = json!(tab);
+                        }
+                        self.sketch_cache.clear();
+                        self.query_cache.clear();
+                        crate::ops::pin_to_missing_reference(self.ctx, &args).is_ok()
+                    });
+                    if !made && !orphan && !pinned {
                         *missed.entry(format!("{ty} (not used: its model geometry not found)")).or_default() += 1;
                     }
                     continue;
