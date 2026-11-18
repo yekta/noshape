@@ -201,6 +201,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Mate axes | X/Y/Z 50 px at the connector (screen size) | the same (`ScreenTriads`, camera geometry) | `mate_axes_stay_50_px_at_any_zoom` | = |
 | Floating toolbar | grip, type, flip, reorient, Solve, ✓, ✗ | the same (`render_mate_hud`) | ui-parity asm-fastened-two-faces | = |
 | Toolbar's place | top left ~12 px right of and 14 px below the second pick (live2 18:20) | the same (`render_mate_hud`) | – | = |
+| Toolbar's grip (live2 place-1118) | a press-drag on the top grip moves the toolbar with the pointer; it stays where released; Esc ×2 still cancels the mate | the same (green 548d795fb, pin-block: dragged (−300, +400), stayed, Esc ×2 cancelled) | – | = |
 | Type switch | connectors, Offset, flip and reorient kept; the name follows the type; offset fields follow it | the same (`set_type`, `offset_axes`) | – | = |
 | Connector chip | Click to edit: the Mate connector sub-dialog beside (Realign adds the axis fields) | the same | – | = |
 | ▶ preview | 90 frames out and back from the mate's zero (a turn, ¼ of the view's width) | the same (asm 43736c55, e9941770) | asm's tests | = |
