@@ -607,8 +607,8 @@ Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png
 - [x] 5de8e450 (verified qa 07:54 on green 80a64725: release opens an uncommitted Fastened 1 with both connectors and the floating Fastened bar; Escape leaves Mate features (0), the part where it snapped) **P1 FEEL-SNAPMODE-RELEASE-DIALOG (asm)**: the release snaps the part but opens nothing (Mate features (0), no dialog, no
   heads-up toolbar). Live opens the mate dialog "Fastened 1" with both connectors and the heads-up toolbar, uncommitted (features 0);
   Escape closes it with no mate and the part stays.
-- [ ] (qa 09:29 on green 83922ad8 = 850ae7f32: 80 px / 200 ms now opens (live too); 80 px / 330 ms still opens nothing (live opens within ~370-400 ms); 150 px / 200 ms now opens (live: 120 px didn't); same spot opens, 450 ms doesn't, as live; qa-scratch/hv2/rk2) **P1 FEEL-ROW-DBLCLICK-DISTANCE (psui)**: two clicks 80 px apart along the Extrude 1 row, 200 or 330 ms apart, open nothing.
-  Live opens the dialog for two clicks on the same row within ~370-400 ms at any distance along it (30 and 80 px did, 120 px didn't).
+- [ ] (qa 09:29 on green 83922ad8 = 850ae7f32: 80 px / 200 ms now opens (live too); 80 px / 330 ms still opens nothing (live opens within ~370-400 ms); 150 px / 200 ms opens, as live (live2 08:2x: 80-163 px along the row opened, off the row didn't; live's "120 px didn't" was a stray, behaviours line 43576; our 150 px click stayed on the row, x 710 of 527-726); same spot opens, 450 ms doesn't, as live; qa-scratch/hv2/rk2) **P1 FEEL-ROW-DBLCLICK-DISTANCE (psui)**: two clicks 80 px apart along the Extrude 1 row, 200 or 330 ms apart, open nothing.
+  Live opens the dialog for two clicks on the same row within ~370-400 ms at any distance along it (30 and 80 px did; the 120 px miss was a stray: any distance along the row).
 
 ## Interaction feel vs live2's 11-18 06:0x numbers (qa 06:55, green cafe3c2af, vibex8 Xvfb at load 8-14, real xdotool pointer; llvmpipe)
 Method: the block (block-fillet) and a sketch-only document, fast sweeps of 4 moves 8 ms apart, one screen crop d ms after the stop per
