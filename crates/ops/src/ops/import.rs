@@ -13,7 +13,7 @@ pub fn ops() -> Vec<Op> {
         group: "import",
         verb: "files",
         summary: "Import CAD or mesh files (STEP, IGES, Parasolid, ACIS, JT, Rhino, SolidWorks/Inventor/NX/Solid Edge parts and assembly zips, STL, OBJ, 3MF, glTF); other files as file tabs",
-        description: "The Import dialog: each file becomes a Part Studio with an Import feature (or all of them one Part Studio with `combine`); a native assembly zip becomes an Assembly and its Part Studio. The files are kept as file tabs in a \"CAD Imports\" folder unless `keep_files` is false. One edit (\"Import <files>\"). Any other file (an image, PDF, text, Markdown, CSV, DXF / DWG…) becomes a file tab, one edit each (\"Import <file>\"), as the app's + › Import…. Returns the new tabs and the imported parts. The window then shows the first new tab (`first`), and tools without `tab` act on it.",
+        description: "The Import dialog: each file becomes a Part Studio with an Import feature (or all of them one Part Studio with `combine`); a native assembly zip becomes an Assembly and its Part Studio. The files are kept as file tabs in a \"CAD Imports\" folder unless `keep_files` is false. One edit (\"Import <files>\"). Any other file (an image, PDF, text, Markdown, CSV, DXF / DWG…) becomes a file tab, one edit each (\"Import <file>\"), as the app's + › Import…. Returns the new tabs and the imported parts (`first`: the first new tab). The window stays on its tab, as live's.",
         fields: vec![
             doc_field(),
             req("files", json!({ "type": "array", "items": { "type": "string" }, "minItems": 1 }), "Paths of the files."),
@@ -59,11 +59,8 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         stored.push(json!({ "id": id.to_string(), "name": file, "kind": "File" }));
         last = Some(id);
     }
-    // Only other files: the window shows the last one (the app's).
+    // Only other files (live doc-plus-import-png: the open tab stays).
     if paths.is_empty() {
-        if let Some(t) = last {
-            super::show(ctx, a.opt_str("doc")?, crate::UiRequest::ActivateTab(t))?;
-        }
         return Ok(json!({ "tabs": stored, "parts": [], "first": last.map(|t| t.to_string()) }).into());
     }
     let mut c = ImportChoice::defaults(&paths);
@@ -127,10 +124,6 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if !errors.is_empty() {
         out["errors"] = json!(errors);
     }
-    // The window opens the import's first tab, as the app does: tools
-    // without `tab` then work on it.
-    if let Some(t) = first {
-        super::show(ctx, a.opt_str("doc")?, crate::UiRequest::ActivateTab(t))?;
-    }
+    // The window stays on its tab, as live's Import (studios + dx 11-18 import feel: the new tabs go after it).
     Ok(out.into())
 }

@@ -7321,11 +7321,12 @@ fn step_assembly_same_named_parts_get_distinct_instances() {
     let step = scratch("distinct_instances.step");
     call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "STEP", "file": step.to_str().unwrap() }));
     call(&mut ctx, "document_create", json!({ "path": scratch("same_names_import.noshape").to_str().unwrap() }));
+    let before = call(&mut ctx, "ui_state", json!({}))["active_tab"]["name"].clone();
     let imp = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
     let asm = imp["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly").unwrap()["name"].as_str().unwrap().to_string();
-    // The import is the window's tab: tools without `tab` work on it.
-    let l = call(&mut ctx, "assembly_list", json!({}));
-    assert_eq!(call(&mut ctx, "ui_state", json!({}))["active_tab"]["name"], json!(asm));
+    // The window stays on its tab, as live's Import.
+    assert_eq!(call(&mut ctx, "ui_state", json!({}))["active_tab"]["name"], before);
+    let l = call(&mut ctx, "assembly_list", json!({ "tab": asm }));
     let mut names: Vec<&str> = l["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap()).collect();
     names.sort();
     assert_eq!(names, ["Part 1 <1>", "Part 1 <2>"], "{l}");
