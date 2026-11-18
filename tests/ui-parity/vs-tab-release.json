@@ -4,6 +4,12 @@
  "area": "psui",
  "source": "universe variable-studio (psui 11-08, studios' coverage list)",
  "start": "vs-vars",
+ "excluded": [
+  {
+   "from_step": 3,
+   "why": "Live's take is the Free plan's upgrade modal (Release… on an account without release management), which Esc closes. With managed workflows on, the Create Release candidate dialog ignores Esc and only Close closes it (live docs-versions-release-1118), as ours."
+  }
+ ],
  "steps": [
   {
    "do": "rclick",

@@ -134,7 +134,9 @@ fn a_new_error_shows_1891_ms_after_the_last_key_and_its_fix_clears_at_275_ms(cx:
     draw(cx, window);
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
     pause(cx, window, 2000);
-    let error = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).notices.iter().any(|n| n.error));
+    // Drawn (squiggle, gutter) and counted (live's recorder reads the count right after the typing).
+    let error = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).shown.iter().any(|n| n.error));
+    let counted = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).notices.iter().any(|n| n.error));
     let squiggles = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).editor.read(cx).diagnostics().map_or(0, |d| d.len()));
     assert!(!error(cx), "the new studio has no error");
     let clean = squiggles(cx);
@@ -149,6 +151,7 @@ fn a_new_error_shows_1891_ms_after_the_last_key_and_its_fix_clears_at_275_ms(cx:
         pause(cx, window, 10);
     }
     assert!(!error(cx), "none 1.8 s after the last key");
+    assert!(counted(cx), "but counted");
     assert_eq!(squiggles(cx), clean, "no squiggle 1.8 s after the last key");
     pause(cx, window, 150);
     assert!(error(cx), "the error shows by 1.95 s");

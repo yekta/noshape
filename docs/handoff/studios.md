@@ -17,13 +17,6 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE
 tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh`; drawing runs vibex8.
 - Landed 11-18: 882a3ecd, 781eac7c, 37ecb60c, d2eb5c15, b5c4ccc4 (duplicate workspace names, BOM cell panel, BOM
   split), 4beed1be (ISO value on the pointer, placed BOM selected, Reset ordinate, section Exclude checkbox, linestyle).
-- Landed dfe045ad 09:11 (VS invalid name 526 ms, Edit section Exclude from cut, menus, readers), 49cfe99b, 64680c1d,
-  ba9f9050, e6e0224d, 55beaa52: details in git log.
-- Help popover texts (55beaa52): 45 tools in our own words, live's titles / step counts / facts (DECISIONS 11-18;
-  steps inferred from live's flattened text: first sentence the intro, the rest numbered; prose-only where the
-  popover height fits); the popover hides the title tooltip (vendored gpui-component `tooltip::hide_tooltip`).
-- Landed 1db85fba + 7f7172ce as 708cf617 14:37: toolbar tooltips 450 ms, read "title / title help"; Edit detail…
-  keeps the parent's circle lit; Show/hide auto centermarks only with circles; runner late-frame rule.
 - Landing (2eb64993 + the next commit): Select on a view's edge selects the view; Edit detail… × → "Select closed
   profile" (tooltip, own field id), Esc closes, also from the View label field; no tool read while editing; section
   label gap by cut (horizontal 5.81 mm, vertical 3.02; live2 sec-label-1118, residuals 0.65 / 0.5 unexplained); Edit
@@ -151,14 +144,9 @@ Paused agents are not messaged (DECISIONS 11-17).
 ## Open (no owner action possible yet)
 - live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;
   the take matches.
-- Projected view preview: ours snaps at 22.5° both ways. Live2's coarse sweep put the side/iso boundary at 25-30°
-  (250 px) and 20-25° (400 px), and top at 20-25° from vertical. Left as is until a finer sweep.
 - Assembly "?" rows: a list row's tooltip (live2 ~70 ms), a selected instance's outline through other parts in
   explode mode, a Revolute-constrained drag's grab point.
-- Release gap list (archive 11-12 07:33), re-audited 11-17: done 1 (approvals), 2 (drafts, approve / reject, comment,
-  obsolete, settings, require_note), 8 (Go back), 9 (revision table Copy), 10 (unreleased suffix), 11 (part number in
-  another pending candidate). Still absent: "Release all configurations", the outdated associated drawing warning.
-  Neither is in the versions universe (167/167): only with a live capture.
+- Release gap list: all done (Release all configurations…, the outdated associated drawing: 11-18).
 
 ## Next, in order
 See "In flight" and "Lead's queue (11-17)".
@@ -179,7 +167,9 @@ NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh bash -c 'cargo build -p noshape; cp $CA
 ```
 An rb.sh build to vibex6 deletes untracked takes there: put them back after it.
 
-ui-parity on vibex6 (≤2 apps while its load is ≥16; heavy runs always through `~/bin/slot <cmd>`):
+ui-parity (lead 11-18: vibex6 is main's watcher, runs go to vibe2 or vibex7 through `~/bin/slot`, one run per 8-core
+host; vibex7 has ~/tmp/studios/uip-mine.sh <out> <shards> <display> <prefix>… and the app at ~/tmp/studios/noshape-uip,
+built by /root/studios-scratch/r28.sh). Older notes for vibex6:
 - Sync: `rsync -a tools/ui-parity/ tests/ui-parity/` to `vibex6:agents/studios/src/…`. The app binary is
   `~/tmp/studios/noshape` there (build above).
 - Run: `setsid nohup ~/bin/slot bash ~/agents/studios-keep/shards-names.sh ~/tmp/studios/noshape <out> <names file>
@@ -191,7 +181,7 @@ ui-parity on vibex6 (≤2 apps while its load is ≥16; heavy runs always throug
 
 Land:
 ```
-NOSHAPE_LAND_QUEUE_HOST=vibex7 tools/tiers/land.sh [--no-precheck]
+NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh [--no-precheck]
 ```
 It runs a clippy -D warnings precheck (or run clippy on the least-loaded vibexN and pass --no-precheck). Status: `tools/tiers/land.sh --status`.
 

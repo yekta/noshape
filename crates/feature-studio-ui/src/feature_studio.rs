@@ -581,8 +581,10 @@ pub struct FeatureStudioView {
     editor: Entity<EditorState>,
     /// Text as last saved to / loaded from the document.
     synced: String,
-    /// Notices of the saved text (`studio_notices`), shown as squiggles.
+    /// Notices of the text (`studio_notices`), counted at once (live's recorder reads 1 right after the typing).
     notices: Vec<Notice>,
+    /// The notices drawn in the editor (squiggles, gutter marks): a new error waits for [`ERROR_DELAY`].
+    shown: Vec<Notice>,
     save_task: Option<Task<()>>,
     /// The typed text's check ([`CHECK_DELAY`]).
     check_task: Option<Task<()>>,
@@ -654,7 +656,7 @@ impl FeatureStudioView {
             notices: self.notices.len(),
             // Live's reader counts the marked gutter cells and Ace's squiggle tooltip, which reuses their class (live2
             // fs-squiggle-hover-gutter: 1 → 2 while hovering uipUnknown).
-            notice_lines: self.notices.iter().filter(|n| n.line > 0).map(|n| n.line).collect::<std::collections::BTreeSet<_>>().len()
+            notice_lines: self.shown.iter().filter(|n| n.line > 0).map(|n| n.line).collect::<std::collections::BTreeSet<_>>().len()
                 + usize::from(self.hover_at.is_some() && ed.hovered_diagnostic().is_some()),
             // The rows Ace draws: the 8 shown and the next (live fs-ac-fn-std-list reads 9 of 11).
             completion: menu.open.then(|| menu.items.iter().take(ACE_DRAWN_ROWS).map(|i| i.label.clone()).collect()),
@@ -746,7 +748,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, check_task: None, quiet: false, error_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), shown: Vec::new(), save_task: None, check_task: None, quiet: false, error_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, _subs: subs };
         this.recompile(source, cx);
         // std's names, read for the completion list off the UI thread before the first key needs them.
         cx.background_spawn(async {
@@ -843,7 +845,7 @@ impl FeatureStudioView {
     fn go_to_notice(&mut self, back: bool, window: &mut Window, cx: &mut Context<Self>) {
         let here = self.editor.read(cx).cursor_position();
         let here = (here.line as usize + 1, here.character as usize + 1);
-        let mut places: Vec<(usize, usize)> = self.notices.iter().filter(|n| n.line > 0).map(|n| (n.line, n.column.max(1))).collect();
+        let mut places: Vec<(usize, usize)> = self.shown.iter().filter(|n| n.line > 0).map(|n| (n.line, n.column.max(1))).collect();
         places.sort();
         places.dedup();
         let next = if back { places.iter().rev().find(|p| **p < here).or(places.last()) } else { places.iter().find(|p| **p > here).or(places.first()) };
@@ -1265,9 +1267,13 @@ impl FeatureStudioView {
         self.compile_task = Some(cx.spawn(async move |this, cx| {
             let notices = cx.background_spawn(async move { studio_notices(&imports, tab, &src) }).await;
             let _ = this.update(cx, |this: &mut Self, cx| {
-                let shown = |n: &Notice| this.notices.iter().any(|o| o.error && o.line == n.line && o.message == n.message);
+                let shown = |n: &Notice| this.shown.iter().any(|o| o.error && o.line == n.line && o.message == n.message);
                 if this.quiet && notices.iter().any(|n| n.error && !shown(n)) {
+                    // Counted now, drawn after ERROR_DELAY.
+                    this.notices = notices;
                     this.compile_task = None;
+                    cx.emit(FeatureStudioEvent::NoticesChanged);
+                    cx.notify();
                     return;
                 }
                 // Squiggles under the reported token (hover shows the message).
@@ -1292,6 +1298,7 @@ impl FeatureStudioView {
                     }
                     cx.notify();
                 });
+                this.shown = notices.clone();
                 this.notices = notices;
                 this.compile_task = None;
                 cx.emit(FeatureStudioEvent::NoticesChanged);

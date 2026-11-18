@@ -654,6 +654,51 @@ fn a_vertical_sections_cut_is_fixed_only_on_an_inference_point(cx: &mut TestAppC
     assert_eq!(state(cx), (true, true, true), "on an edge's midpoint: the cut fixed");
 }
 
+/// Live2 place-1118: a projected view is the orthographic one within 22.5° of the parent's axes, locked to its row
+/// (only the pointer's x moves it), and the isometric past that, on the pointer: dx 173 px: dy 60 locked, 80 iso; dx
+/// 373 px: 140 locked, 160 iso.
+#[gpui::test]
+fn a_projected_view_locks_within_22_5_degrees_and_turns_isometric_past(cx: &mut TestAppContext) {
+    use noshape_model::drawing::ViewKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-projected-lock");
+    real_sheet(cx, window, &editor);
+    let (base, centre, mm_per_px) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let v = e.current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).expect("a base view");
+        let (a, b) = (e.sheet_to_local([0.0, 0.0]), e.sheet_to_local([100.0, 0.0]));
+        (v.id, v.position, 100.0 / (b[0] - a[0]).abs())
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Projected { parent: Some(base) }, cx)));
+    let at = |cx: &mut TestAppContext, dx: f64, dy: f64| {
+        let p = [centre[0] + dx * mm_per_px, centre[1] + dy * mm_per_px];
+        cx.update_window(window, |_, _, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = p;
+                e.update_preview(cx);
+            })
+        })
+        .unwrap();
+        let v = cx.update(|cx| editor.read(cx).pending_view()).expect("the view previewed");
+        let Some(dir) = (match v.kind {
+            ViewKind::Projected { direction, .. } => direction,
+            _ => None,
+        }) else {
+            panic!("a projected view")
+        };
+        (dir[0] != 0.0 && dir[1] != 0.0, v.position, p)
+    };
+    for (dx, dy, iso) in [(173.0, 60.0, false), (173.0, 80.0, true), (373.0, 140.0, false), (373.0, 160.0, true)] {
+        let (got_iso, pos, p) = at(cx, dx, dy);
+        assert_eq!(got_iso, iso, "dx {dx} px, dy {dy} px: isometric {got_iso}");
+        if iso {
+            assert!((pos[0] - p[0]).abs() < 1e-6 && (pos[1] - p[1]).abs() < 1e-6, "the isometric on the pointer: {pos:?} vs {p:?}");
+        } else {
+            assert!((pos[1] - centre[1]).abs() < 1e-6 && (pos[0] - p[0]).abs() < 1e-6, "locked to the parent's row, x on the pointer: {pos:?}");
+        }
+    }
+}
+
 /// Live drawing-sysvars.json: a tool picks within Graebert's PICKBOX, 7 px (ours had 5): the Dimension tool lights an
 /// edge 6 px off it, not 9 px off.
 #[gpui::test]
