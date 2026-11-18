@@ -1936,6 +1936,7 @@ impl PartStudioView {
             return vec![crate::ui::moved_panel(
                 v_flex()
                     .id("mass-dialog")
+                    .debug_selector(|| "mass-dialog".into())
                     .occlude()
                     .child(crate::ui::panel_probe("ps-mass"))
                     .absolute()

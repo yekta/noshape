@@ -7191,8 +7191,10 @@ impl PartStudioView {
         // Live (sketch/01, part-studio/230, 234): also while a sketch or a
         // feature dialog is open.
         overlay.push(self.render_evaluation_tools(cx));
-        // Live (part-studio/82): the Measure panel covers those buttons.
-        overlay.extend(self.render_measure_panel(cx));
+        // Live (part-studio/82): the Measure panel covers those buttons. (Mass properties is drawn over the list: render.)
+        if !self.show_mass {
+            overlay.extend(self.render_measure_panel(cx));
+        }
         overlay.extend(self.render_context_menu(cx));
         overlay.extend(self.render_flat_select_other(cx));
         overlay.extend(self.render_section_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-section"))));
@@ -7286,6 +7288,11 @@ impl Render for PartStudioView {
         }
         let right = self.render_right_panel(window, cx);
         let tb_panel = self.render_toolbar_customize_panel(window, cx);
+        // Mass properties over the list's right part (live measure-mass-1118: x 214, the graphics at 246), so outside the
+        // graphics area, which clips.
+        let list_w = if self.ui.list_collapsed { 0.0 } else { crate::ui::left_panel_w(self.tab) };
+        let mass: Vec<AnyElement> = if self.show_mass { self.render_measure_panel(cx) } else { Vec::new() };
+        let mass = mass.into_iter().map(|e| div().absolute().top_0().left(px((list_w - 32.0).max(0.0))).size_0().child(e).into_any_element());
         let appearance_editor = self.render_appearance_editor(window, cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-appearance")));
         let in_sketch = self.sketch.is_some();
         let root = v_flex()
@@ -7625,6 +7632,7 @@ impl Render for PartStudioView {
                 h_flex()
                     .flex_1()
                     .min_h_0()
+                    .relative()
                     .on_drag_move(cx.listener(|this, e: &DragMoveEvent<crate::ui::LeftSplitDrag>, _, cx| {
                         if crate::ui::drag_left_panel(e, this.tab) {
                             cx.notify();
@@ -7751,7 +7759,8 @@ impl Render for PartStudioView {
                     // Versions and history › View in repair (repair_mode.rs, live
                     // rp-906): the 567 px Repair panel right of the graphics, its view-only graphics (repair_view.rs).
                     .children(crate::part_studio_hooks::repair_panel(&self.doc, self.repair_view.clone().map(|v| v.into_any_element()), cx))
-                    .children(right),
+                    .children(right)
+                    .children(mass),
             )
             .children(tb_panel);
         self.with_sketch_actions(root, cx)

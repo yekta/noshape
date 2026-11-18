@@ -391,6 +391,22 @@ fn mass_stays_open_and_bracket_opens_an_empty_measure(cx: &mut TestAppContext) {
     assert_eq!(state, (false, true, 0), "(Mass open, Measure open, selected) after [");
 }
 
+/// Live2 measure-mass-1118 (qa FEEL-MASS-PANEL-PLACE): Mass properties opens over the list's right part, 32 px left of
+/// the graphics area (x 214 against 246), 3 px under the toolbar; it was clipped to the graphics area, under the list.
+#[gpui::test]
+fn mass_opens_over_the_lists_right_part(cx: &mut TestAppContext) {
+    let b = Bench::open(cx, "mass-place", 1.0);
+    let part = b.reference(cx, E::Part("Part 2")).unwrap();
+    cx.update(|cx| b.view.update(cx, |v, cx| {
+        v.selection = vec![part.clone()];
+        v.open_mass(cx);
+    }));
+    draw(cx, b.window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(b.window, cx);
+    let (dialog, area) = (vcx.debug_bounds("mass-dialog").expect("the Mass dialog"), vcx.debug_bounds("viewport-area").expect("the graphics area"));
+    assert_eq!((f32::from(area.left() - dialog.left()), f32::from(dialog.top() - area.top())), (32.0, 3.0), "(px over the list, px under the toolbar)");
+}
+
 /// Live (behaviours "number and unit display rules", 11-18): a click on a Mass properties value shows it at the unit's
 /// highest precision (mm 5, mm³ 8), a second click as before (3).
 #[gpui::test]
