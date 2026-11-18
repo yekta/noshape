@@ -583,13 +583,13 @@ run (import takes ~60-100 ms), lit = the light-orange outline; feature list: 45 
 - 3D slow approach (2 px / 16 ms): follows the pointer, lit at rest; no stale hover at rest after leaving (1.2 s). Pass.
 - Selection latency: ours face 216 / plane 153 / row 163 / box 218 ms (v0.4.57 release, polled crops) vs live's 964 / 955 / 693 / 15321
   with the same method (software). Ours faster on every row. Pass.
-- [ ] **P1 FEEL-FAST-OFF-CLEAR (psui)**: after a fast move off a lit face (4 moves in 32 ms) the outline is still drawn in a crop taken
+- [ ] (psui 06:57: cleared at the second fast move event; the 0-40 ms is the cleared frame's latency, a scene rebuild before present: psui's perf item) **P1 FEEL-FAST-OFF-CLEAR (psui)**: after a fast move off a lit face (4 moves in 32 ms) the outline is still drawn in a crop taken
   ~0-40 ms after the stop (2/2 runs, and 3/3 in r1), gone by the crop ending 157 ms. Live clears it during the move (the first fast
   move runs a remove-only pick, behaviours "hover timing with no tool").
-- [ ] **P1 FEEL-SKETCH-TOOL-PICK (psui)**: on a sketch line, a fast sweep in lights it at the same time with the Line tool active as with
+- [ ] (psui 06:57: cafe3c2af picks at once in any sketch state; the 600-800 ms is pick + frame latency on llvmpipe. psui's next land makes it live's rule, pause with no tool / every move with a tool; re-run then, Line still slow = a perf ticket) **P1 FEEL-SKETCH-TOOL-PICK (psui)**: on a sketch line, a fast sweep in lights it at the same time with the Line tool active as with
   no tool: unlit at 450 ms, lit from 600-800 ms in both (2 runs each, same session, load 14). Live: with a sketch tool every move picks
   at once (lit 17-28 ms after the move); with no tool ~270 ms. Check tool_captures_left for the Line tool (behaviours, same section).
-- [ ] **P0 FEEL-FL-AUTOSCROLL-DROP (psui)**: Sketch 2 dragged to 20 px above the feature list's bottom and held still 1 s: the list
+- [ ] 33c57541 (psui 06:57: fixed, landed 06:48, after cafe3c2af; qa-wait-33c5 re-runs it on its first green) **P0 FEEL-FL-AUTOSCROLL-DROP (psui)**: Sketch 2 dragged to 20 px above the feature list's bottom and held still 1 s: the list
   scrolls and the insertion line scrolls with the rows (between Sketch 11 and 12), as live; released without moving, Sketch 2 lands
   after Sketch 23 (the row under the pointer by then). Live drops it at the line (behaviours "feature-list drag autoscroll":
   after Sketch 16 in its run). Sheet tickets/fl-autoscroll-drop.png (vibex8 ~/agents/qa-keep/feel-1118/).
