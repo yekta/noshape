@@ -282,9 +282,9 @@ fn convert_to_rip(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let data = &mj.data;
     let (bends, _) = rows(od, tab, &r, &mj)?;
     let bend = pick_bend(&bends, a)?;
-    let face = sm::bend_face(&data.bends[bend]).ok_or_else(|| OpError::invalid("the bend has no faces").with_param("bend"))?;
+    sm::bend_face(&data.bends[bend]).ok_or_else(|| OpError::invalid("the bend has no faces").with_param("bend"))?;
     edit_studio(od, tab, sm::CONVERT_TO_RIP, |ps| {
-        sm::convert_to_rip(ps, model, face, &units);
+        sm::convert_to_rip(ps, model, data, bend, &units);
         Ok(())
     })?;
     Ok(json!({ "regeneration": regen_report(od, tab)? }).into())

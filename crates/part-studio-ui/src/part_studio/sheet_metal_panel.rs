@@ -14,7 +14,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::reference::{BodyId, FeatureId, Reference};
 use noshape_model::sheetmetal::SheetMetalData;
-use noshape_ops::sheetmetal::{RIP_STYLES, RipEdit, bend_faces, bend_row_order, insert_joint_edit, joint_edit_index, joint_rows, plain};
+use noshape_ops::sheetmetal::{RIP_STYLES, RipEdit, bend_faces, bend_row_order, joint_rows, plain};
 use std::sync::Arc;
 
 /// os-splitter-container: the tables' default share and the two minimums
@@ -603,7 +603,9 @@ impl PartStudioView {
         let up = |_: usize| None;
         let (bends, _) = joint_rows(&data, &up, &order);
         let Some(name) = bends.get(row).map(|r| r.name.clone()) else { return };
-        let Some(face) = data.bends.get(row).and_then(|b| b.inner_faces.first().or(b.outer_faces.first())).map(|n| noshape_model::reference::Reference::Face((**n).clone())) else { return };
+        if data.bends.get(row).and_then(noshape_ops::sheetmetal::bend_face).is_none() {
+            return;
+        }
         let order = bend_row_order(&data, &self.sm_stored_order(model, cx));
         let pos = order.iter().position(|&i| i == row).unwrap_or(0);
         let (first, last) = (pos == 0, pos + 1 >= order.len());
@@ -624,12 +626,10 @@ impl PartStudioView {
                 m = m.separator();
             }
             let v = view.clone();
-            let face = face.clone();
             m.item(OsMenuItem::new(format!("Convert {name} to rip")).on_click(move |_, _, cx| {
-                let face = face.clone();
                 v.update(cx, |this, cx| {
                     this.close_context_menu(cx);
-                    this.sm_convert_to_rip(model, face, cx);
+                    this.sm_convert_to_rip(model, row, cx);
                 })
             }))
         });
@@ -639,79 +639,37 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// "Convert … to rip": a Modify joint of the bend, Rip / Edge joint
-    /// (live "ui (10-24 b)").
-    fn sm_convert_to_rip(&mut self, model: FeatureId, face: noshape_model::reference::Reference, cx: &mut Context<Self>) {
-        use noshape_model::params::ParamValue;
+    /// "Convert … to rip": the bend's Modify joint set to Rip / Edge joint
+    /// (noshape_ops::sheetmetal::convert_to_rip).
+    fn sm_convert_to_rip(&mut self, model: FeatureId, bend: usize, cx: &mut Context<Self>) {
+        let Some(data) = self.sm_model_data(model) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
-        self.edit_config("Convert joint to rip.", cx, |ps| {
-            let Some(mut f) = ps.new_feature("sheetMetalJoint", &units) else { return };
-            f.params.set("entity", ParamValue::Query(vec![face]));
-            f.params.set("jointType", ParamValue::Enum("RIP".into()));
-            f.params.set("jointStyle", ParamValue::Enum("EDGE".into()));
-            let at = joint_edit_index(ps, model);
-            insert_joint_edit(ps, f, at);
-        });
+        let Some(mut copy) = self.studio(cx).cloned() else { return };
+        if noshape_ops::sheetmetal::convert_to_rip(&mut copy, model, &data, bend, &units) {
+            self.edit_config(noshape_ops::sheetmetal::CONVERT_TO_RIP, cx, |ps| *ps = copy);
+        }
         self.selection.clear();
         cx.notify();
     }
 
-    /// Apply an edited Bends cell: live adds a "Modify joint N" for that bend
-    /// with the value overridden ("3" + Tab on Bend B's radius → Modify
-    /// joint 1, radius 3 mm) at the rollback bar or before the model's
-    /// Finish; a second edit of the bend changes that Modify joint (live "ui
-    /// (10-24 b)"). A bare number is in the document's unit.
+    /// Apply an edited Bends cell: the bend's Modify joint
+    /// (noshape_ops::sheetmetal::edit_bend). A bare number is in the
+    /// document's unit.
     fn sm_apply_edit(&mut self, row: usize, col: usize, text: String, cx: &mut Context<Self>) {
-        use noshape_model::params::ParamValue;
-        use noshape_units::ExprValue;
         // Tab commits, then the field's blur would again: apply once.
         if self.ui.sm_edit != Some((row, col)) {
             return;
         }
         self.ui.sm_edit = None;
-        let text = text.trim().to_string();
         let models = self.sheet_metal_models(cx);
         let Some(model) = self.sheet_metal_context(&models) else { return };
         let Some(data) = self.sm_model_data(model) else { return };
-        let Some(face) = data.bends.get(row).and_then(|b| b.inner_faces.first().or(b.outer_faces.first())).map(|n| noshape_model::reference::Reference::Face((**n).clone())) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
-        let current = if col == 2 { plain(data.bends[row].radius / units.si_factor(noshape_units::Dim::LENGTH)) } else { plain(data.bends[row].k_factor) };
-        if text.is_empty() || text == current {
-            cx.notify();
-            return;
+        let field = if col == 2 { noshape_ops::sheetmetal::BendField::Radius } else { noshape_ops::sheetmetal::BendField::KFactor };
+        let Some(mut copy) = self.studio(cx).cloned() else { return };
+        if noshape_ops::sheetmetal::edit_bend(&mut copy, model, &data, row, field, &text, &units) {
+            self.edit_config(noshape_ops::sheetmetal::MODIFY_JOINT, cx, |ps| *ps = copy);
         }
-        let bare = text.parse::<f64>().is_ok();
-        let value = if col == 2 && bare { format!("{text} {}", units.length.symbol()) } else { text };
-        let faces = bend_faces(&data.bends[row]);
-        let set = move |p: &mut noshape_model::params::ParamValues| {
-            if col == 2 {
-                p.set("useDefaultRadius", ParamValue::Bool(false));
-                p.set("radius", ParamValue::Expr(ExprValue::new(&value)));
-            } else {
-                p.set("useDefaultKFactor", ParamValue::Bool(false));
-                p.set("bendCalculationType", ParamValue::Enum("K_FACTOR".into()));
-                p.set("kFactor", ParamValue::Expr(ExprValue::new(&value)));
-            }
-        };
-        self.edit_config("Modify joint", cx, |ps| {
-            let at = joint_edit_index(ps, model);
-            let from = ps.features.iter().position(|f| f.id == model).map_or(0, |i| i + 1);
-            let is_this_bend = |f: &noshape_model::partstudio::Feature| {
-                f.type_id == "sheetMetalJoint"
-                    && !f.suppressed
-                    && matches!(f.params.0.get("jointType"), Some(ParamValue::Enum(t)) if t == "BEND")
-                    && matches!(f.params.0.get("entity"), Some(ParamValue::Query(q)) if q.iter().any(|r| faces.contains(r)))
-            };
-            if let Some(i) = (from..at.min(ps.features.len())).rev().find(|&i| is_this_bend(&ps.features[i])) {
-                set(&mut ps.features[i].params);
-                return;
-            }
-            let Some(mut f) = ps.new_feature("sheetMetalJoint", &units) else { return };
-            f.params.set("entity", ParamValue::Query(vec![face]));
-            f.params.set("jointType", ParamValue::Enum("BEND".into()));
-            set(&mut f.params);
-            insert_joint_edit(ps, f, at);
-        });
         cx.notify();
     }
 

@@ -2314,7 +2314,9 @@ impl PartStudioView {
                 }
                 self.select_other_pointer(*position, cx);
                 // The GPU's pick stands while the pointer moves along or off a sketch line: held to the reach again.
+                // (Not while a box is drawn: it lights nothing.)
                 if self.sketch.is_none()
+                    && !vp.read(cx).box_drag()
                     && let Some((gpu, resolved)) = self.ui.shown_sketch_gpu_hover
                     && self.shown_sketch_hover_id(gpu, cx) != resolved
                 {

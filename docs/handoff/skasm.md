@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 18:46 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 19:13 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -29,6 +29,17 @@ A Use whose live query is empty in a sketch live WARNs about: drawn as stored, p
 as live's; welding-config 9c7704 Sketch 8, 21 -> 22/37). Gated on live's `featureStates` (hunting-knife's empty-query
 Uses are OK in live: unchanged).
 
+## In flight 19:13 (lead's order after compaction 2)
+- Trim past a chain's corner (live sktools-1118): ours = (a ~1 px miss isn't a crossing); scene test + feel row.
+- Convert to rip / a second Radius edit reuse the bend's Modify joint: `sheetmetal::bend_joint_edit` finds the Modify
+  joint its faces are named by once it rebuilt the bend (creator = the joint's id; the joint's entity names a face of
+  the feature in std's joint id "F<maker>.<n>"). The panel now calls ops' edit_bend / convert_to_rip (no copy).
+  e2e `a_bends_second_edit_and_its_rip_reuse_its_modify_joint`.
+- Box drag: the shown-sketch hover re-resolve skips while a box is drawn (psui's 45f2d798 fixed the main red).
+- 53ff668c failed on main's box-drag red (not mine); its docs go again with the next land.
+- Dimension box (live dimbox-1118 answered 19:2x): only a double-click opens it; a slow second click deselects, a drag
+  keeps it selected: ours the same; scene test + feel row.
+
 ## Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
 regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).
 
@@ -36,12 +47,6 @@ regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete w
 - welding-config 9c7704 after core's Extrude 8 fix: Sketch 12 (2 PROJECTED not found), Sketch 13 (DIAMETER "Sketch
   could not be solved"); repro vibe2 ~/tmp/skasm/cfgm/wc-9c7704 + cfg.sh.
 - Midpoint / quadrant snaps as alignment sources (live feel retaken 11-18).
-- live sktools-1118: a Trim pass ~1 px by a chain's corner isn't a crossing in live; check ours.
-- Convert to rip after a Radius edit (see below); dimension box second click (REQUESTS 18:05).
-- live2 sm-1118: Convert to rip right after a Radius edit adds no second Modify joint in live; ours adds Modify joint 2.
-  Tried 18:3x reusing the bend's own Modify joint: after its regeneration the bend's faces are renamed, so neither its
-  stored entity nor `label_owners` / `Bend::feature` lead back to it (the same gap would make a second Radius edit
-  add Modify joint 2). Needs the stored entity resolved through the history; not landed.
 - Handed: surf-intro-simple Loft 1 (core), surf-intro-examples Fill 1 overshoot (lead to route), welding-config
   Extrude 8 (core, fixing), manualblend Sweep 2 area / Move boundary (core).
 - Form speed P0 binaries /root/skasm-scratch/apps: delete (done).

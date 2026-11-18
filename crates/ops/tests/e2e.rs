@@ -1603,6 +1603,37 @@ fn sheet_metal_table_ops() {
     assert_eq!(table(&mut ctx), (vec!["Bend A 3 90 0.45 Up".to_string()], vec!["Joint B Edge joint".to_string()]));
 }
 
+/// A bend's later edits reuse its Modify joint once that has rebuilt it (live "ui (10-24 b)": a second Radius edit
+/// changes Modify joint 1; live2 sm-1118: Convert to rip right after a Radius edit adds no Modify joint 2).
+#[test]
+fn a_bends_second_edit_and_its_rip_reuse_its_modify_joint() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "sheet-metal-reuse.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "2 mm", "radius": "2 mm" } }));
+    for (dir, near) in [([1, 0, 0], [30, 0, 2]), ([0, 1, 0], [0, 20, 2])] {
+        let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": dir, "near": near, "limit": 1 }))["edges"][0]["id"].clone();
+        call(&mut ctx, "feature_add", json!({ "type": "sheetMetalFlange", "params": { "edges": [e], "distance": "20 mm" } }));
+    }
+    let joints = |ctx: &mut Ctx| -> Vec<(String, String)> {
+        let list = call(ctx, "feature_list", json!({}));
+        list["features"].as_array().unwrap().iter().filter(|f| f["type"] == "sheetMetalJoint").map(|f| {
+            let g = call(ctx, "feature_get", json!({ "feature": f["id"] }));
+            (g["params"]["jointType"].as_str().unwrap_or_default().to_string(), g["params"]["radius"].as_str().unwrap_or_default().to_string())
+        }).collect()
+    };
+    call(&mut ctx, "sheetmetal_edit_bend", json!({ "bend": "Bend A", "radius": 3 }));
+    call(&mut ctx, "sheetmetal_edit_bend", json!({ "bend": "Bend B", "radius": 5 }));
+    call(&mut ctx, "sheetmetal_edit_bend", json!({ "bend": "Bend A", "radius": 4 }));
+    let s = |a: &str, b: &str| (a.to_string(), b.to_string());
+    assert_eq!(joints(&mut ctx), vec![s("BEND", "4 mm"), s("BEND", "5 mm")]);
+    call(&mut ctx, "sheetmetal_convert_to_rip", json!({ "bend": "Bend A" }));
+    let j = joints(&mut ctx);
+    assert_eq!((j.len(), j[0].0.as_str(), j[1].0.as_str()), (2, "RIP", "BEND"), "{j:?}");
+    let t = call(&mut ctx, "sheetmetal_table", json!({}));
+    assert_eq!((t["bends"].as_array().unwrap().len(), t["joints"].as_array().unwrap().len()), (1, 1), "{t}");
+}
+
 /// An Other joints row's Style ▾ / Type ▾ (live "ui (10-24 a)" (5e, 5f)): a plate with one flange, its bend
 /// converted to a rip; the style pick and then Bend change that rip's own Modify joint.
 #[test]

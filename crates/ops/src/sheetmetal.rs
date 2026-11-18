@@ -177,7 +177,6 @@ pub fn edit_bend(ps: &mut PartStudio, model: FeatureId, data: &SheetMetalData, b
     }
     let bare = text.parse::<f64>().is_ok();
     let value = if field == BendField::Radius && bare { format!("{text} {}", units.length.symbol()) } else { text };
-    let faces = bend_faces(b);
     let set = |p: &mut ParamValues| match field {
         BendField::Radius => {
             p.set("useDefaultRadius", ParamValue::Bool(false));
@@ -190,14 +189,7 @@ pub fn edit_bend(ps: &mut PartStudio, model: FeatureId, data: &SheetMetalData, b
         }
     };
     let at = joint_edit_index(ps, model);
-    let from = ps.features.iter().position(|f| f.id == model).map_or(0, |i| i + 1);
-    let is_this_bend = |f: &Feature| {
-        f.type_id == "sheetMetalJoint"
-            && !f.suppressed
-            && matches!(f.params.0.get("jointType"), Some(ParamValue::Enum(t)) if t == "BEND")
-            && matches!(f.params.0.get("entity"), Some(ParamValue::Query(q)) if q.iter().any(|r| faces.contains(r)))
-    };
-    if let Some(i) = (from..at.min(ps.features.len())).rev().find(|&i| is_this_bend(&ps.features[i])) {
+    if let Some(i) = bend_joint_edit(ps, model, b, at) {
         set(&mut ps.features[i].params);
         return true;
     }
@@ -212,16 +204,49 @@ pub fn edit_bend(ps: &mut PartStudio, model: FeatureId, data: &SheetMetalData, b
 /// The history text of [`convert_to_rip`].
 pub const CONVERT_TO_RIP: &str = "Convert joint to rip.";
 
-/// A Bends row's "Convert … to rip": a Modify joint of the bend, Rip / Edge
-/// joint (live "ui (10-24 b)").
-pub fn convert_to_rip(ps: &mut PartStudio, model: FeatureId, face: Reference, units: &UnitPrefs) -> bool {
+/// A Bends row's "Convert … to rip": the bend's Modify joint set to Rip /
+/// Edge joint, a new one when it has none (live "ui (10-24 b)"; live2
+/// sm-1118: right after a Radius edit, Modify joint 1 becomes the rip).
+pub fn convert_to_rip(ps: &mut PartStudio, model: FeatureId, data: &SheetMetalData, bend: usize, units: &UnitPrefs) -> bool {
+    let Some(b) = data.bends.get(bend) else { return false };
+    let Some(face) = bend_face(b) else { return false };
+    let set = |p: &mut ParamValues| {
+        p.set("jointType", ParamValue::Enum("RIP".into()));
+        p.set("jointStyle", ParamValue::Enum("EDGE".into()));
+    };
+    let at = joint_edit_index(ps, model);
+    if let Some(i) = bend_joint_edit(ps, model, b, at) {
+        set(&mut ps.features[i].params);
+        return true;
+    }
     let Some(mut f) = ps.new_feature("sheetMetalJoint", units) else { return false };
     f.params.set("entity", ParamValue::Query(vec![face]));
-    f.params.set("jointType", ParamValue::Enum("RIP".into()));
-    f.params.set("jointStyle", ParamValue::Enum("EDGE".into()));
-    let at = joint_edit_index(ps, model);
+    set(&mut f.params);
     insert_joint_edit(ps, f, at);
     true
+}
+
+/// The feature that made a joint, from std's joint id ("F<feature>.<n>").
+fn joint_maker(joint: Option<&str>) -> Option<FeatureId> {
+    joint.and_then(|j| j.strip_prefix('F')?.split('.').next()).and_then(|h| u64::from_str_radix(h, 16).ok()).map(FeatureId)
+}
+
+/// The bend's own Modify joint (Bend) between the model and `at`: one naming
+/// a face of the bend, or the one its faces are named by once it has
+/// regenerated (it rebuilt the bend), naming a face of the feature that made
+/// the bend.
+fn bend_joint_edit(ps: &PartStudio, model: FeatureId, b: &Bend, at: usize) -> Option<usize> {
+    let faces = bend_faces(b);
+    let rebuilt_by: Vec<FeatureId> = faces.iter().filter_map(|r| r.depends_on()).collect();
+    let maker = joint_maker(b.joint.as_deref());
+    let from = ps.features.iter().position(|f| f.id == model).map_or(0, |i| i + 1);
+    let own = |f: &Feature| {
+        f.type_id == "sheetMetalJoint"
+            && !f.suppressed
+            && matches!(f.params.0.get("jointType"), Some(ParamValue::Enum(t)) if t == "BEND")
+            && matches!(f.params.0.get("entity"), Some(ParamValue::Query(q)) if q.iter().any(|r| faces.contains(r) || (rebuilt_by.contains(&f.id) && (maker.is_none() || r.depends_on() == maker))))
+    };
+    (from..at.min(ps.features.len())).rev().find(|&i| own(&ps.features[i]))
 }
 
 /// The Other joints Style ▾ choices: (label, std's jointStyle) (live "ui
@@ -264,7 +289,7 @@ pub fn edit_rip(ps: &mut PartStudio, model: FeatureId, data: &SheetMetalData, ri
     // that made the bend), and that Modify joint names a face of it.
     let at = joint_edit_index(ps, model);
     let from = ps.features.iter().position(|f| f.id == model).map_or(0, |i| i + 1);
-    let maker = r.joint.as_deref().and_then(|j| j.strip_prefix('F')?.split('.').next()).and_then(|h| u64::from_str_radix(h, 16).ok()).map(FeatureId);
+    let maker = joint_maker(r.joint.as_deref());
     let own = |f: &Feature| {
         f.type_id == "sheetMetalJoint"
             && !f.suppressed

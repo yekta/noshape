@@ -11990,6 +11990,54 @@ mod tests {
         assert_eq!(alive, vec![false, true, false, true]);
     }
 
+    /// Live (behaviours "feel (new rows) 11-18: a sketch dimension's edit box, second click and drag"): a second
+    /// single click on a selected dimension's label deselects it (only a double-click opens the box); a 20 px drag of
+    /// the selected label moves it and keeps it selected.
+    #[test]
+    fn a_selected_labels_second_click_deselects_and_its_drag_keeps_it() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let line = d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
+        let cid = d.sketch.add_constraint(ConstraintKind::Length { curve: line, value: 0.03 }).unwrap();
+        let at = v(0.015, 0.004);
+        d.dimension_labels.insert(cid.0, [at.x, at.y]);
+        let press = |ed: &mut SketchEditor, d: &mut SketchData, to: DVec2| {
+            ed.pressed_label = Some((cid, false, true));
+            ed.tool_down(d, at, None, false, false);
+            ed.tool_drag(d, to);
+            ed.tool_up(d, to);
+        };
+        press(&mut ed, &mut d, at);
+        assert_eq!(ed.selected_constraints, vec![cid]);
+        press(&mut ed, &mut d, at);
+        assert!(ed.selected_constraints.is_empty(), "the second click deselects");
+        press(&mut ed, &mut d, at);
+        let to = at + v(20.0 * PX, 0.0);
+        press(&mut ed, &mut d, to);
+        assert_eq!(ed.selected_constraints, vec![cid], "a drag keeps it selected");
+        assert_eq!(d.dimension_labels.get(&cid.0), Some(&[to.x, to.y]));
+    }
+
+    /// Live (behaviours "feel (Sketch tools) retaken 11-18", sktools-1118 st-trim-all): a line passing ~1 px by a
+    /// chain's corner doesn't cross there; a click near its free end trims it up to its crossing with the next segment.
+    #[test]
+    fn a_trim_past_a_chains_corner_goes_to_the_next_crossing() {
+        let (mut ed, mut d) = editor(Tool::Trim);
+        let px = |x: f64, y: f64| v(x * PX, -y * PX);
+        let pts: Vec<EntityId> = [(500.0, 650.0), (600.0, 650.0), (650.0, 560.0), (750.0, 600.0)].iter().map(|(x, y)| d.sketch.add_point(px(*x, *y))).collect();
+        for w in pts.windows(2) {
+            d.sketch.add_line_between(w[0], w[1]).unwrap();
+        }
+        let line = d.sketch.add_line(px(480.0, 760.0), px(700.0, 560.0));
+        let y_at = |x: f64| 760.0 - (x - 480.0) * 200.0 / 220.0;
+        click(&mut ed, &mut d, px(540.0, y_at(540.0)));
+        let c = d.sketch.curve(line).expect("the piece past the third segment stays");
+        let (s, e) = (c.start_point() / PX, c.end_point() / PX);
+        let (lo, hi) = if s.x < e.x { (s, e) } else { (e, s) };
+        assert!((hi - v(700.0, -560.0)).length() < 1e-6, "{hi:?}");
+        assert!(lo.x > 680.0 && lo.x < 690.0, "it starts at the third segment's crossing, not by the corner: {lo:?}");
+        assert_eq!(count(&d, EntityKind::Line), 4);
+    }
+
     #[test]
     fn polygon_sides_typed_and_midpoint_line() {
         let (mut ed, mut d) = editor(Tool::Polygon);
