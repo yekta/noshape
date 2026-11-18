@@ -101,7 +101,7 @@ impl PartStudioView {
             self.flash_info("Export failed: the released version is no longer in the document".into(), cx);
             return;
         };
-        self.flash_info("Exporting…".into(), cx);
+        self.export_preparing(&name, cx);
         let tab = self.tab;
         let several = bodies.len() > 1;
         let parts = cx.background_spawn(async move { noshape_ops::export::version_parts(doc, tab, &bodies) });
@@ -115,34 +115,41 @@ impl PartStudioView {
         .detach();
     }
 
-    /// Save `parts` as the dialog's Options say: to a file the user picks, or stored in a new tab.
+    /// Live (live2 export-feel-1118): a blue bubble while the export is prepared, named by the file name without
+    /// its extension ("l2 exp - Part 1 is being prepared…"), shown about 5 s.
+    fn export_preparing(&mut self, name: &str, cx: &mut Context<Self>) {
+        self.flash_info(format!("{name} is being prepared for export. You will receive a notification with its status."), cx);
+    }
+
+    /// Save `parts` as the dialog's Options say: to a file the user picks, or stored in a new tab. The result goes to
+    /// the Notifications bell, "<name> was exported successfully." without the file's extension (live2
+    /// export-feel-1118: "l2 exp was exported successfully."; a drawing's names its ".pdf").
     fn save_parts_export(&mut self, s: ExportSettings, name: String, parts: Vec<(String, k::Shape, [f32; 4])>, several: bool, window: &mut Window, cx: &mut Context<Self>) {
         let name = if name.is_empty() { self.studio_name(cx) } else { name };
         // The saved file's own extension (OBJ downloads a .zip, as live).
         let ext = s.file_ext(several);
+        let notify = move |name: &str, done: anyhow::Result<()>, cx: &mut App| match done {
+            Ok(()) => crate::notifications::push(cx, "Export completed", format!("{name} was exported successfully."), false),
+            Err(e) => crate::notifications::push(cx, "Export failed", format!("{name} could not be exported: {e:#}"), true),
+        };
         // Options › Store file in a new tab: no download.
         if s.options == 2 {
-            let msg = match store_export(&self.doc, self.tab, &format!("{name}.{ext}"), |p| write_export(&s, p, parts), cx) {
-                Ok(file) => format!("Stored {file}"),
-                Err(e) => format!("Export failed: {e:#}"),
-            };
-            self.flash_info(msg, cx);
+            self.export_preparing(&name, cx);
+            let done = store_export(&self.doc, self.tab, &format!("{name}.{ext}"), |p| write_export(&s, p, parts), cx).map(|_| ());
+            notify(&name, done, cx);
             return;
         }
         let view = cx.entity();
         crate::file_dialogs::request_save_path("Export", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
             view.update(cx, |this, cx| {
-                let msg = match write_export(&s, &path, parts) {
-                    Ok(p) => {
-                        // Download and store file in a new tab.
-                        if s.options == 1 {
-                            store_written(&this.doc, this.tab, &p, cx);
-                        }
-                        format!("Exported {}", p.display())
+                this.export_preparing(&name, cx);
+                let done = write_export(&s, &path, parts).map(|p| {
+                    // Download and store file in a new tab.
+                    if s.options == 1 {
+                        store_written(&this.doc, this.tab, &p, cx);
                     }
-                    Err(e) => format!("Export failed: {e:#}"),
-                };
-                this.flash_info(msg, cx);
+                });
+                notify(&name, done, cx);
             });
         });
     }

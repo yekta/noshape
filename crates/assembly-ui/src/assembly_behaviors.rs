@@ -5950,31 +5950,35 @@ impl AssemblyView {
             // The saved file's own extension (OBJ downloads a .zip, as live).
             let ext = s.file_ext(true);
             let file = format!("{name}.{ext}");
+            // Live (live2 export-feel-1118, as a drawing's): a blue bubble while the export is prepared, then the
+            // result in the Notifications bell, "<name> was exported successfully." without the extension.
+            let preparing = format!("{name} is being prepared for export. You will receive a notification with its status.");
+            let notify = move |name: &str, done: anyhow::Result<()>, cx: &mut App| match done {
+                Ok(()) => crate::notifications::push(cx, "Export completed", format!("{name} was exported successfully."), false),
+                Err(e) => crate::notifications::push(cx, "Export failed", format!("{name} could not be exported: {e:#}"), true),
+            };
             // Options › Store file in a new tab: no download.
             if s.options == 2 {
                 v.update(cx, |this, cx| {
+                    this.message = Some((false, preparing));
                     let asm = this.export_assembly(ids.as_deref(), s.hidden, cx);
-                    this.message = Some(match crate::assembly_hooks::store_export(&this.doc, this.tab, &file, |p| noshape_ops::export::write_assembly_export(&s, p, &asm), cx) {
-                        Ok(f) => (false, format!("Stored {f}")),
-                        Err(e) => (true, format!("Export failed: {e:#}")),
-                    });
+                    let done = crate::assembly_hooks::store_export(&this.doc, this.tab, &file, |p| noshape_ops::export::write_assembly_export(&s, p, &asm), cx).map(|_| ());
+                    notify(&name, done, cx);
                     cx.notify();
                 });
                 return;
             }
             crate::file_dialogs::request_save_path("Export", file, ext, window, cx, move |path, cx| {
                 v.update(cx, |this, cx| {
+                    this.message = Some((false, preparing));
                     let asm = this.export_assembly(ids.as_deref(), s.hidden, cx);
-                    this.message = Some(match noshape_ops::export::write_assembly_export(&s, &path, &asm) {
-                        Ok(p) => {
-                            // Download and store file in a new tab.
-                            if s.options == 1 {
-                                crate::assembly_hooks::store_written(&this.doc, this.tab, &p, cx);
-                            }
-                            (false, format!("Exported {}", p.display()))
+                    let done = noshape_ops::export::write_assembly_export(&s, &path, &asm).map(|p| {
+                        // Download and store file in a new tab.
+                        if s.options == 1 {
+                            crate::assembly_hooks::store_written(&this.doc, this.tab, &p, cx);
                         }
-                        Err(e) => (true, format!("Export failed: {e:#}")),
                     });
+                    notify(&name, done, cx);
                     cx.notify();
                 });
             });
