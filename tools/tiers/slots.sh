@@ -45,6 +45,8 @@ prune_land_target() {
   for d in $(ls -dtr "$HOME"/target-land-* 2>/dev/null); do
     [ "$(df -BG --output=avail / | tail -1 | tr -dc 0-9)" -ge 60 ] && break
     [ "$d" = "$t" ] && continue
+    # (The slots' own dirs stay: a sibling's cargo can sit between steps, unseen; vibe2 11-18 04:44 lost slot2 mid-check.)
+    [[ "$d" == "$HOME"/target-land-slot[0-9]* ]] && continue
     busy=0; for p in $(pgrep -x cargo); do tr '\0' '\n' < /proc/$p/environ 2>/dev/null | grep -qx "CARGO_TARGET_DIR=$d" && busy=1; done
     [ $busy = 0 ] && rm -rf "$d" && echo "== removed $d (idle; disk below 60 GB free)"
   done
