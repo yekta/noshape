@@ -1291,10 +1291,10 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 
 | Finding | Ours | Test |
 |---|---|---|
-| BOM table properties closed by Esc, ✕ or ✓: the table stays selected (grips, tan outline) | ? | ui-parity drw-bom-table-properties (reader) |
-| Drawing toolbar: the title tooltip at ~0.47 s, then the help popover at ~3.1 s (400 px wide at the frame's left, 37 px down, title bar + text, stays while resting); every tool but Undo / Redo has one | ? | missing (ours has none) |
-| Hatch Pattern list: under the field (1 px), its width + 2, 30 px rows, at most 341 px then scrolls; opens upward when the field is low; a second click on the field closes it and keeps the value | ? | ui-parity drw-hatch-panel |
-| Sheet properties › Custom: zones 4 × 4 (ANSI) / 6 × 4 (ISO) whatever the size before; width / height fields take the previous size's dimensions | ? | ui-parity drw-sheet-properties-custom-zones |
+| BOM table properties closed by Esc, ✕ or ✓: the table stays selected (grips, tan outline) | = (green e503ca2f, live2 ours-1118 drawing, start pin-block-asm-drawing: a placed BOM, right-click › BOM table properties…, closed by Esc, ✓ and ✕: grips and tan outline stay each time) | ui-parity drw-bom-table-properties (reader) |
+| Drawing toolbar: the title tooltip at ~0.47 s, then the help popover at ~3.1 s (400 px wide at the frame's left, 37 px down, title bar + text, stays while resting); every tool but Undo / Redo has one | ≠ (green e503ca2f, live2 ours-1118 drawing, start pin-block-asm-drawing, Note tool): the 400 px help popover at the frame's left at 3.23 s (title bar + steps, =); but the title tooltip at 0.70 s, live ~0.47 s | missing (ours has none) |
+| Hatch Pattern list: under the field (1 px), its width + 2, 30 px rows, at most 341 px then scrolls; opens upward when the field is low; a second click on the field closes it and keeps the value | = (green e503ca2f, live2 ours-1118 drawing, start pin-block-asm-drawing, Hatch region: under the field, its width + ~2, 30 px rows; ANSI's 9 rows fit, ISO's list stops at ~340 px and scrolls; a second click on the field closes it, the value kept; the upward case not tried) | ui-parity drw-hatch-panel |
+| Sheet properties › Custom: zones 4 × 4 (ANSI) / 6 × 4 (ISO) whatever the size before; width / height fields take the previous size's dimensions | = (green e503ca2f, live2 ours-1118 drawing, start pin-block-asm-drawing, ANSI A → Custom: zones 4 × 4, width / height 11 in × 8.5 in; ISO not tried) | ui-parity drw-sheet-properties-custom-zones |
 
 ### snap-diag-1118 (assembly Snap mode reach by direction, live2 11-18 11:40) [asm]
 
