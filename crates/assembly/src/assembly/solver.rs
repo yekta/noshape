@@ -1154,6 +1154,11 @@ fn solve_oriented(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
         }
     }
     if !drags.is_empty()
+        && let Some(r) = drag_free_group(bodies, mates, relations, drags, dof, memo)
+    {
+        return r;
+    }
+    if !drags.is_empty()
         && let Some(r) = solve_dragged_only(bodies, mates, relations, drags, dof, memo)
     {
         return r;
@@ -1188,6 +1193,64 @@ pub fn solve_placed(bodies: &mut [SolverBody], mates: &[SolverMate], relations: 
         }
     }
     if dof { solve_with(bodies, mates, relations, &[], true) } else { r }
+}
+
+/// A drag whose part's mated group holds nothing fixed (live asm/feel-1117 d2): the group moves without turning, the
+/// dragged part following the pointer and every other part moving the least its mates allow: a Fastened partner the
+/// whole way, a part on a Slider all but the slide's own direction. A fixed part anywhere in the group, a pattern's
+/// copies or several drags: None (the drag moves only along the part's own freedom, live's drag probes with A fixed).
+fn drag_free_group(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, memo: Option<&std::cell::RefCell<MateMemo>>) -> Option<SolveResult> {
+    if drags.len() != 1 {
+        return None;
+    }
+    let driven = Driven::new(bodies, mates);
+    if driven.is_driven.iter().any(|d| *d) {
+        return None;
+    }
+    let (groups, _) = group_terms(bodies, mates, relations, drags, false, &driven);
+    let (free, terms) = groups.into_iter().find(|(_, ts)| ts.iter().any(|t| matches!(t, Term::Drag(_))))?;
+    let held = |t: &Term| matches!(t, Term::Mate(_) | Term::Relation(_));
+    let probe = Problem { bodies, mates, relations, drags, driven: &driven, terms: Vec::new(), scale: 1.0 };
+    if !terms.iter().any(held) || terms.iter().filter(|t| held(t)).any(|t| term_bodies(&probe, *t).iter().any(|&b| bodies[b].fixed)) {
+        return None;
+    }
+    let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+    let scale = characteristic_length(&poses, mates).max(1e-3);
+    let problem = Problem { bodies, mates, relations, drags, driven: &driven, terms: terms.clone(), scale };
+    let mut res = Vec::new();
+    residuals(&problem, &poses, &mut res);
+    let jac = jacobian(&problem, &poses, &free, &res, scale, 1e-7);
+    // Moves only (each body's first three columns): among the moves that keep the mates' rows as they are (their null
+    // space), the least one that reaches the drag (or comes nearest it).
+    let cols: Vec<usize> = (0..free.len()).flat_map(|k| k * 6..k * 6 + 3).collect();
+    let j = jac.select_columns(cols.iter());
+    let drag_rows = res.len() - 3;
+    let (jm, jd) = (j.rows(0, drag_rows), j.rows(drag_rows, 3) / DRAG_WEIGHT);
+    let rd = DVector::from_column_slice(&res[drag_rows..]) / DRAG_WEIGHT;
+    let eig = (jm.transpose() * jm).symmetric_eigen();
+    let top = eig.eigenvalues.iter().fold(0.0f64, |m, v| m.max(v.abs())).max(1e-30);
+    let keep: Vec<usize> = (0..eig.eigenvalues.len()).filter(|&i| eig.eigenvalues[i].abs() <= 1e-10 * top).collect();
+    if keep.is_empty() {
+        return None;
+    }
+    let null = eig.eigenvectors.select_columns(keep.iter());
+    let y = (&jd * &null).pseudo_inverse(1e-12).ok()? * (-rd);
+    let x = null * y;
+    let mut trial: Vec<SolverBody> = bodies.to_vec();
+    for (k, &b) in free.iter().enumerate() {
+        trial[b].pose.origin += DVec3::new(x[3 * k], x[3 * k + 1], x[3 * k + 2]) * scale;
+    }
+    // Its mates as they were (a mate whose residual isn't linear in the moves, a Tangent: the general path).
+    let moved: Vec<Frame> = trial.iter().map(|b| b.pose).collect();
+    let mut after = Vec::new();
+    residuals(&problem, &moved, &mut after);
+    if after[..drag_rows].iter().zip(&res[..drag_rows]).any(|(a, b)| (a - b).abs() > 1e-9) {
+        return None;
+    }
+    for (b, t) in bodies.iter_mut().zip(&trial) {
+        b.pose = t.pose;
+    }
+    Some(solve_inner(bodies, mates, relations, &[], dof, true, memo))
 }
 
 /// Least change first (live DRAG-RUNAWAY: dragging the top cube of a Planar
@@ -2412,6 +2475,39 @@ mod tests {
         let o = bodies[1].pose.origin;
         assert!(o.x.abs() < 1e-6 && o.y.abs() < 1e-6, "{o:?}");
         assert!((o.z - 0.05).abs() < 1e-3, "{o:?}");
+    }
+
+    /// Live asm/feel-1117 d2, nothing fixed: Part 3 Fastened to Part 1, Part 2 on a Slider along Y on Part 1. Dragging
+    /// Part 2 by (9.1, 7.7, 3.6) mm slides it 7.7 along Y and carries Parts 1 and 3 (9.1, 0, 3.6); dragging Part 3 by
+    /// (−9.2, −9.2, −5.8) carries Part 1 the whole way and Part 2 all but the slide's Y. Nothing turns.
+    #[test]
+    fn a_drag_with_nothing_fixed_moves_the_mated_group_without_turning() {
+        let mm = 1e-3;
+        let setup = || {
+            let bodies = vec![body(DVec3::ZERO, false), body(DVec3::new(0.0, 10.0 * mm, 0.0), false), body(DVec3::new(30.0 * mm, 0.0, 10.0 * mm), false)];
+            let along_y = Frame::from_axes(DVec3::ZERO, DVec3::Y, DVec3::X);
+            let mates = vec![
+                mate(MateType::Fastened, 2, Frame::from_axes(DVec3::ZERO, DVec3::NEG_Z, DVec3::X), 0, Frame::from_axes(DVec3::new(30.0 * mm, 0.0, 10.0 * mm), DVec3::Z, DVec3::X)),
+                mate(MateType::Slider, 1, along_y, 0, along_y),
+            ];
+            (bodies, mates)
+        };
+        for (dragged, by, moves) in [
+            (1, DVec3::new(9.1, 7.7, 3.6), [DVec3::new(9.1, 0.0, 3.6), DVec3::new(9.1, 7.7, 3.6), DVec3::new(9.1, 0.0, 3.6)]),
+            (2, DVec3::new(-9.2, -9.2, -5.8), [DVec3::new(-9.2, -9.2, -5.8), DVec3::new(-9.2, 0.0, -5.8), DVec3::new(-9.2, -9.2, -5.8)]),
+        ] {
+            let (mut bodies, mates) = setup();
+            assert!(solve(&mut bodies, &mates, &[], &[]).converged);
+            let before: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+            let lp = DVec3::new(1.0, 2.0, 3.0) * mm;
+            let drags = vec![DragTarget { body: dragged, local_point: lp, target: before[dragged].transform_point(lp) + by * mm, along: None }];
+            assert!(solve_with(&mut bodies, &mates, &[], &drags, false).converged);
+            for (i, m) in moves.iter().enumerate() {
+                let moved = bodies[i].pose.origin - before[i].origin;
+                assert!((moved - *m * mm).length() < 1e-6, "drag of {dragged}: body {i} moved {:?} mm, live {m:?}", moved / mm);
+                assert!(bodies[i].pose.rotation.angle_between(before[i].rotation) < 1e-9, "drag of {dragged}: body {i} turned");
+            }
+        }
     }
 
     /// The six everyday mates (Onshape: Fastened 0 DOF; Revolute rotate Z;
