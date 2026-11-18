@@ -6,7 +6,6 @@
 use super::*;
 
 #[gpui::test]
-#[ignore = "T2: the stored-export tab assert fails on main's watcher and in the land queue (11-18 04:19); dx re-enables it with the fix"]
 fn a_stored_export_says_it_is_prepared_and_rings_the_bell(cx: &mut TestAppContext) {
     let start = serde_json::json!({ "units": "mm", "features": [
         { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
@@ -23,7 +22,9 @@ fn a_stored_export_says_it_is_prepared_and_rings_the_bell(cx: &mut TestAppContex
     let (tabs, studio) = cx.update(|cx| {
         let v = view.read(cx);
         let d = v.doc.read(cx);
-        (d.session.doc.tabs.iter().map(|t| t.name.clone()).collect::<Vec<_>>(), d.session.doc.tabs.iter().position(|t| t.id == v.tab))
+        // In the tab bar's order (the document's tab list is in the order tabs were made).
+        let ordered = d.session.doc.ordered_tabs();
+        (ordered.iter().map(|t| t.name.clone()).collect::<Vec<_>>(), ordered.iter().position(|t| t.id == v.tab))
     });
     let studio = studio.expect("the Part Studio's tab");
     assert_eq!(tabs.get(studio + 1).map(String::as_str), Some("l2 exp - Part 1.stl"), "{tabs:?}");
