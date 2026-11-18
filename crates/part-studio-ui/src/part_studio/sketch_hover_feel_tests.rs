@@ -329,3 +329,110 @@ fn the_pointer_lights_the_line_under_it_whatever_the_window_and_list(cx: &mut Te
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// The presented frame's sRGB pixels (device px, BGRA in the image) and its width, after the scene settles.
+fn settled_frame(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>) -> (Vec<u8>, usize) {
+    let vp = cx.update(|cx| view.read(cx).viewport.clone());
+    let pointer = Pointer::new(cx, window, view);
+    pointer.frames(cx, view);
+    cx.update(|cx| vp.update(cx, |v, _| v.record_frames(true)));
+    let t = std::time::Instant::now();
+    while cx.update(|cx| vp.read(cx).recorded_frames().len()) < 2 && t.elapsed() < std::time::Duration::from_secs(15) {
+        cx.update(|cx| vp.update(cx, |v, cx| v.request_frame(cx)));
+        cx.update(|cx| view.read(cx).gpu.deliver_frames());
+        draw(cx, window);
+        cx.executor().advance_clock(std::time::Duration::from_millis(20));
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let img = cx.update(|cx| vp.read(cx).recorded_frames()).last().cloned().expect("a presented frame");
+    cx.update(|cx| vp.update(cx, |v, _| v.record_frames(false)));
+    let (w, h) = (img.size(0).width.0 as usize, img.size(0).height.0 as usize);
+    let px = img.as_bytes(0).map(|b| b.to_vec()).unwrap_or_default();
+    if let Ok(dir) = std::env::var("NOSHAPE_TEST_OUT") {
+        static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let png = noshape_scene::png::encode_png(px.clone(), w as u32, h as u32, w as u32, h as u32).unwrap();
+        std::fs::write(format!("{dir}/sketch-hl-{n}.png"), png).unwrap();
+    }
+    (px, w)
+}
+
+/// live2 hl-pixels-1118 (sketch mode, an active rectangle, normal to it), at 1× and 2×: a line ≈ 2 px blue (4 device px
+/// at 2×); hovered a 5 px band (9 device px) holding an opaque #FFC685 rim; selected the same band in #FFA90A; a
+/// point hovered an ~11–12 px disc with an #FFC685 rim, selected #FFA90A. (`NOSHAPE_TEST_OUT=<dir>` keeps the frames.)
+#[gpui::test]
+fn sketch_lines_and_points_light_as_live(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    const HOVER: [u8; 3] = [0xFF, 0xC6, 0x85];
+    const SELECT: [u8; 3] = [0xFF, 0xA9, 0x0A];
+    let mut wrong = Vec::new();
+    for scale in [1.0f32, 2.0] {
+        let (window, view) = sketch_with(cx, &format!("sketch-hl-{scale}"), Tool::CornerRect);
+        cx.update_window(window, |_, w, _| w.set_scale_factor(scale)).unwrap();
+        click(cx, window, &view, (500., 300.));
+        click(cx, window, &view, (650., 400.));
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+        // Normal to the sketch: its lines horizontal and vertical on screen.
+        keys(cx, window, &["n"]);
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).viewport.read(cx).animation().is_none());
+        let lines = lines_on_screen(cx, &view);
+        let (_, a, b) = *lines.iter().max_by(|x, y| (x.1.y + x.2.y).total_cmp(&(y.1.y + y.2.y))).unwrap();
+        let mid = (a + b) * 0.5;
+        let corner = if a.x < b.x { a } else { b };
+        let (s, k) = (scale as f64, scale as usize);
+        // sRGB pixels through `at`: down a column, or along a row.
+        let cut = |px: &[u8], w: usize, at: DVec2, horizontal: bool| -> Vec<[u8; 3]> {
+            let (cx0, cy0) = ((at.x * s).round() as i64, (at.y * s).round() as i64);
+            let n = (12.0 * s) as i64;
+            (-n..=n)
+                .map(|d| {
+                    let (x, y) = if horizontal { (cx0 + d, cy0) } else { (cx0, cy0 + d) };
+                    let o = (y as usize * w + x as usize) * 4;
+                    [px[o + 2], px[o + 1], px[o]]
+                })
+                .collect()
+        };
+        let show = |c: &[[u8; 3]]| c.iter().map(|c| format!("{:02X}{:02X}{:02X}", c[0], c[1], c[2])).collect::<Vec<_>>().join(" ");
+        let away = mid + DVec2::new(40.0, 120.0);
+        let pointer = Pointer::new(cx, window, &view);
+        pointer.move_to(cx, &view, away);
+        let (px, w) = settled_frame(cx, window, &view);
+        let rest = cut(&px, w, mid + DVec2::new(20.0, 0.0), false);
+        let blue = rest.iter().filter(|c| c[0] < 0x80 && c[2] > 0xC0).count();
+        if !(k..=2 * k + 1).contains(&blue) {
+            wrong.push(format!("{scale}x line at rest: {blue} blue px: {}", show(&rest)));
+        }
+        let band = |col: &[[u8; 3]], colour: [u8; 3], what: &str, wrong: &mut Vec<String>| {
+            let lit: Vec<usize> = (0..col.len()).filter(|&i| col[i] != rest[i]).collect();
+            let width = lit.last().zip(lit.first()).map_or(0, |(b, a)| b - a + 1);
+            if !(4 * k..=6 * k + 1).contains(&width) || !col.contains(&colour) {
+                wrong.push(format!("{scale}x line {what}: a {width} px band: {}", show(col)));
+            }
+        };
+        pointer.move_to(cx, &view, mid);
+        let (px, w) = settled_frame(cx, window, &view);
+        band(&cut(&px, w, mid + DVec2::new(20.0, 0.0), false), HOVER, "hovered", &mut wrong);
+        pointer.click(cx, &view, mid);
+        pointer.move_to(cx, &view, away);
+        let (px, w) = settled_frame(cx, window, &view);
+        band(&cut(&px, w, mid + DVec2::new(20.0, 0.0), false), SELECT, "selected", &mut wrong);
+        // The point's disc: from its rim on the left (away from the lines) to the one on the right.
+        let disc = |row: &[[u8; 3]], colour: [u8; 3], what: &str, wrong: &mut Vec<String>| {
+            let rim: Vec<usize> = (0..row.len()).filter(|&i| row[i] == colour).collect();
+            let width = rim.last().zip(rim.first()).map_or(0, |(b, a)| b - a + 1) as f64 / s;
+            if !(9.5..=12.5).contains(&width) {
+                wrong.push(format!("{scale}x point {what}: a {width:.1} px disc: {}", show(row)));
+            }
+        };
+        pointer.move_to(cx, &view, corner);
+        let (px, w) = settled_frame(cx, window, &view);
+        disc(&cut(&px, w, corner, true), HOVER, "hovered", &mut wrong);
+        pointer.click(cx, &view, corner);
+        pointer.move_to(cx, &view, away);
+        let (px, w) = settled_frame(cx, window, &view);
+        disc(&cut(&px, w, corner, true), SELECT, "selected", &mut wrong);
+        cx.update_window(window, |_, w, _| w.remove_window()).unwrap();
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}

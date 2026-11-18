@@ -120,24 +120,26 @@ docs/DECISIONS.md (read first; it wins over anything here).
   500 / 250 / 125 ms animations, part rows toggle on Ctrl or Cmd; live2's (b) Ctrl-only box deselect (ours Ctrl or
   Cmd; live's Cmd unverified): left.
 
-## 11-18 00:4x
-- Landed 591643fc / 403bbe0b: feature-list rows, graphics menus over a selection. Queued 8d2e0056: measure angles toward
-  middles + Mass button / `[` (live2 measure-mass-1118), spinner as live (900 ms, 50 px box, 1.1 s turn), rollback bar
-  back to live2's rb-followup (over Default geometry → top; blue-grey only hovered; qa told), viewport offset test.
-- VIEWPORT OFFSET (skasm, lead P0): not reproduced on green. hat15b (copy on vibex6, deleted), 1440 × 900, list at its
-  end, Sketch 1, n, 14 wheel steps: the line under the pointer lights and a click selects it. ±10 px is the reach (and the
-  screw hole's rim). The perceived offset is latency: at load 27 on llvmpipe the highlight shows 1.2–2.2 s after the
-  rest, so a moving pointer sees what it left. Test sketch_hover::the_pointer_lights_the_line_under_it_whatever_the_window_and_list.
-  Rig: /root/psui-scratch/offset (run.sh / step*.sh, DOC=… for another document; vibex6 :665).
+## 11-18 01:4x
+- Landed today: feature-list rows, graphics menus over a selection, measure angles toward middles (confirmed by live2's
+  first-wedge pairs 11-18) + Mass button / `[`, spinner as live, rollback bar per live2 rb-followup, viewport-offset test
+  (not reproduced: latency), hovered part outline 2 device px (310cbd9b), config row ids A0, the selected part's look
+  (queued ~01:15: tint on its faces directly, edges half amber, #FFC04C 2 device px band through parts, state BAND).
+- Queued 01:4x: frame timer on the executor clock (nav matrix "double middle click" flaked on vibe2: the below-20-fps
+  jump fired from wall-clock frame intervals; lead P1).
+- In the worktree, waiting on a vibex6 lavapipe run (load 53): sketch_hover::sketch_lines_and_points_light_as_live (GPU
+  pixel test: line 2 px / band 9 device px / point disc 11 px, all as live2 hl-pixels-1118), dialogs matrix row "Esc
+  with the button held cancels" (24 / 24), interaction-feel rows (manipulators as live manip-feel-1118: all six already
+  ours). Land them once vibex6 passes (or land and watch vibe2).
+- Highlight pixel parity (lead P0) done: part hover / select / face + part / sketch line / point all as live2's
+  hl-pixels-1118 columns (scene `edge_and_face_highlights_look_as_live`, the sketch test above).
 
 ## Next queue
-1. Lead 11-18: pixel parity of hover / select highlights vs live crops (face fill, edge colour / width hover vs select,
-   silhouettes, hidden edges, selected part amber, sketch entity hover / select). live's numbers: behaviours
-   "EDGE-HIGHLIGHT-LOOK" (10-27); scene tests/edge_looks.rs already checks the edge band and faces; next: selected part
-   amber, silhouettes / hidden edges at hover, sketch entity hover / select widths; ask live2 for crops it lacks.
-2. qa P2 HOVER-LEAVES-WINDOW: a face hovered just before the pointer leaves the window stays outlined.
-3. live2's (b): box deselect with Ctrl only (ours Ctrl or Cmd; live's Cmd unverified): left.
-4. Menus vs ctx-menus-1117 menus-sk.json (sketch mode).
+1. qa P2 HOVER-LEAVES-WINDOW: a face hovered just before the pointer leaves the window stays outlined. GPUI clears
+   element hover on X11's LeaveNotify (MouseExited) and the viewport clears its hover there; not reproduced yet. Rig:
+   /root/psui-scratch/offset/leave.sh (block doc ~/tmp/psui/off/b.noshape on vibex6 :665).
+2. live2's (b): box deselect with Ctrl only (ours Ctrl or Cmd; live's Cmd unverified): left.
+3. Menus vs ctx-menus-1117 menus-sk.json (sketch mode).
 
 ## Current order (lead 11-17 ~14:05)
 

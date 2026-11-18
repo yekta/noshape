@@ -422,7 +422,7 @@ entities found with `query_entities` by a point on them); `MEASURE_ROW=<part of 
 
 Added 11-18 (live2 measure-mass-1118; part-studio-ui `measure::measure_pairs_on_lives_wedges_and_cylinder`, 22 pairs
 on live's own studio, all as live): two faces or two edges read the angle between the directions from where they meet
-toward each one's middle (a sloped face and y = 0: 33.690°, was 146.310°); a cylinder and a face across it read
+toward each one's middle (a sloped face and y = 0: 33.690°, was 146.310°; confirmed by live2 on the first wedge 11-18: its sloped face and x = 40 read 56.310°, where π − the normals' angle would give 123.690°); a cylinder and a face across it read
 "Perp axes angle" alone (was with Max / Min dist); a circle and its face keep the distances after "Face tangent angle".
 Mass properties (`mass_stays_open_and_bracket_opens_an_empty_measure`): its button again leaves it open (was a toggle);
 `[` over it opens Measure empty, the parts deselected (the selection was kept).
@@ -434,6 +434,14 @@ Configurations (live2 cfg-1118): a second row named like another is accepted, st
 (`a_duplicate_configuration_name_and_a_bad_value_wait_for_their_row`). Already as live: the 712 px docked panel, the
 feature list's Configuration box, the row menu (Switch to / Set as default / Duplicate row / Move up / Move down /
 Delete row), a row click doesn't switch, switching greys no rows.
+
+Manipulators (live manip-feel-1118 and live2's 11-13 "feel (feature dialogs): manipulators"; checked 11-18): a plain
+click on Extrude's arrow flips the direction (dialogs matrix); mid-drag nothing under the pointer lights (the viewport
+asks no hover pick during a tool drag, and the handle hides geometry hover); the Depth field keeps the keyboard with its
+text selected during and after the drag (`focus_field_selected`); only Shift changes a drag (no step), Ctrl and Alt
+nothing; Esc with the button held cancels the whole dialog (dialogs matrix, new row); Transform › Translate by XYZ:
+a planar handle drags both of its axes, the other handles fade to faint grey while dragging, the moved parts' old
+place shows as a faded ghost with the selection outline (triad.rs, behaviors `transform_ghost`). All as live.
 
 ## Navigation (matrix)
 
@@ -537,7 +545,7 @@ beside it, times its slope (/root/psui-scratch/chrome/ink.py, ink2.py on screens
 | A whole part hovered (its Parts-list row; lead 11-18 pixel parity) | no tint, its edges as at rest, its silhouette outline #FFC685 2 device px at any ratio (live's overlay looks at the ±1 device px neighbours, unscaled; face hover measured 2 device px at DPR 1 and 2) | 2 px at 1×, 4 device px at 2× (the band's reach scaled with the ratio); now 1 at any ratio | = (fixed) | scene `edge_and_face_highlights_look_as_live` |
 | A whole part selected (live2 hl-pixels-1118) | lit #FFC04C, no specular, #FFC04C over it at 50 %: top F2B648, front CD9A3D; its internal edges the plain dark edge under the tint (9D772F at 1×, 806026 = half #FFC04C at 2×); its silhouette a #FFC04C outline, 2 device px at any ratio, through the parts in front | top F0B648, front CB9A3D; internal edges were #FFA90A face borders (its faces were passed as selected faces) and the outline 3.5 px at 1× / 7 at 2× (pushed-out back faces); now the part's faces take the tint directly, its edges half amber, and the outline is the hover band's mechanism over the part's mask (state BAND) | = (fixed) | scene `edge_and_face_highlights_look_as_live` |
 | A face selected with its part | the face E5A222 with its #FFA90A border, the part's silhouette #FFC04C | the same | = | the same test |
-| Sketch entities (live2 hl-pixels-1118) | a line ≈2 px blue (4 device px at 2×); hovered a 5 px band (9 device px) with an opaque #FFC685 rim and a 0.78 core, selected the same in #FFA90A; a point ~5–6 px, hovered an ~11–12 CSS px disc with an #FFC685 rim and the dot inside, selected the same in #FFA90A | to compare next | ? | – |
+| Sketch entities (live2 hl-pixels-1118) | a line ≈2 px blue (4 device px at 2×); hovered a 5 px band (9 device px) with an opaque #FFC685 rim and a 0.78 core, selected the same in #FFA90A; a point ~5–6 px (ACTIVE_SKETCH_POINT_SIZE 6; a Point entity 8), hovered an ~11–12 CSS px disc with an #FFC685 rim and the dot inside, selected the same in #FFA90A | line 2 px (4 device px), its band 6 px at 1× (one rim falls between rows) and 9 device px at 2×; the corner dot 6.7 px (under-defined); the disc 10–11 px (21 device px) | = | part-studio-ui `sketch_hover::sketch_lines_and_points_light_as_live` (GPU) |
 | Not compared | filtered-out entities (no selection filter in the Part Studio for live's account); a selected feature's related part (part-studio/110 compared when the feature list was done) | – | – | – |
 
 Seen on the way: live's start "block" sketch shows all four rectangle lines blue (the rectangle not tied to the

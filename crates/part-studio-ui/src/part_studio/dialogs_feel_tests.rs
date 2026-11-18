@@ -144,6 +144,38 @@ fn rows() -> Vec<Row> {
             let after = state(cx);
             expect((after.0 != before.0, after.1 == before.1, cx.update(|cx| view.read(cx).edit.is_some())), (true, true, true), "flipped, depth kept, dialog open")
         } },
+        Row { id: "manipulators / Esc with the button held cancels the dialog", live: "live manip-feel-1118 (5): Escape while dragging the depth arrow closes the whole dialog, the feature as it was", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "dlg-arrow-esc");
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let vp = cx.update(|cx| view.read(cx).viewport.clone());
+            let (at, along) = cx
+                .update(|cx| {
+                    let vp = vp.read(cx);
+                    let &(a, b, _) = vp.manipulators.first()?;
+                    let (a, b) = (vp.project(a)?, vp.project(b)?);
+                    let mid = (a + b) * 0.5;
+                    let o = vp.origin();
+                    Some((gpui_kit::point(o.x + px(mid.x as f32), o.y + px(mid.y as f32)), (b - a).normalize_or_zero()))
+                })
+                .ok_or("no arrow")?;
+            let depth = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).and_then(|s| s.features.iter().find(|f| f.name == "Extrude 1").and_then(|f| f.params.expr("depth").map(|e| e.text.clone()))));
+            let before = depth(cx);
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
+            vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+            for k in 1..=6 {
+                let p = gpui_kit::point(at.x + px((along.x * 8.0 * k as f64) as f32), at.y + px((along.y * 8.0 * k as f64) as f32));
+                vcx.simulate_event(gpui_kit::MouseMoveEvent { position: p, pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: Modifiers::default() });
+            }
+            draw(cx, window);
+            let dragged = cx.update(|cx| dialog.read(cx).feature.params.expr("depth").map(|e| e.text.clone())) != before;
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+            draw(cx, window);
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let open = cx.update(|cx| view.read(cx).edit.is_some());
+            expect((dragged, open, depth(cx) == before), (true, false, true), "(the drag changed Depth, the dialog open after Esc, Extrude 1 as before)")
+        } },
         Row { id: "drag / the length step follows the zoom", live: "10^(round(log10(100 px in the unit)) − 2): 0.1 mm at 0.25 mm/px, 1 mm at 0.414", gap: false, check: |_| {
             let mm = 0.001;
             expect(((linear_step(0.25 * mm, mm) / mm * 1e6).round() / 1e6, (linear_step(0.414 * mm, mm) / mm * 1e6).round() / 1e6), (0.1, 1.0), "steps (mm)")
