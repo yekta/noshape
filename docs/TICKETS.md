@@ -699,7 +699,11 @@ tonight's 02:00 window on vibex7 with v0.4.59 (qa-flow-night, 5 rounds). No row 
 only.** Whole-document rebuilds, ours = release build of 80a64725 on vibe2 at nice 10, load ~20 (two passes, the range), live = step
 sum: counts (>= 100 ms and >= 2x) only if a Mac re-time agrees (DECISIONS 11-16; blend's Mac fillet times were 3-5x below these):
 cf-snap-hook 983-987 vs 276 ms; c2-fan-blade-sweep 1825-2000 vs 916; motor-mount-jack 199-382 vs 52; learning-center-michael 311-738
-vs 95; cf-spur-gear 1913-2343 vs 720; c2-rings-loft 2539-3701 vs 1405 (1.8-2.6x). Below the bar (< 100 ms apart): c2-tpd-fillet-variable
+vs 95; cf-spur-gear 1913-2343 vs 720; c2-rings-loft 2539-3701 vs 1405 (1.8-2.6x).
+**Mac re-time 19:02 (v0.4.58 release CLI, 10 runs, nice 19, Mac load 7-9 with a build in the other slot): none holds, no tickets.**
+Median (range) vs live: cf-snap-hook 365 (334-408) vs 276 (1.3x, +89 ms); c2-fan-blade-sweep 861 (796-951) vs 916 (faster);
+motor-mount-jack 89 (71-101) vs 52 (+37 ms); learning-center-michael 163 (139-169) vs 95 (+68 ms); cf-spur-gear 776 (750-829) vs 720
+(1.1x). qa-scratch/speed/out-0.4.58.jsonl; v0.4.59 re-runs when its macOS build publishes (qa-mac-spd). Below the bar (< 100 ms apart): c2-tpd-fillet-variable
 142-169 vs 55, c2-helical-sweep 126-129 vs 40, c2-bottle-split 98-126 vs 47, c2-variable-fillet-faceblend 131-146 vs 42.
 Ours: release build of 80a64725 (qa's 08:53 sweep, vibe2 at nice 10, loaded: hints), two passes; live: step ms (≈ its full-regen
 per-feature time). Each owner re-times on the Mac (DECISIONS 11-16) before and after a fix.
