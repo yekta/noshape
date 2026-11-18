@@ -559,7 +559,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
-## Sheet metal, right-click menus and navigation vs live's 11-17 captures (qa 00:33, green 7187ac751, vibex6 Xvfb, real pointer and keys)
+## Sheet metal, right-click menus and navigation vs live's 11-17 captures (qa 00:16, green 7187ac751, vibex6 Xvfb, real pointer and keys)
 Documents sm-box (plate + Flange 1 / 2, mitred corner) and block-fillet (qa-scratch/fl: sm.sh, menu.sh, anim.sh; sheets
 tickets/sm-menu-sheet.png, vibex6 ~/agents/qa-keep/sm-menu-nav/).
 Pass, sheet metal: Flange lights rim edges and the corner's thin side face (filled orange), never a plane; its dialog is live's row for
