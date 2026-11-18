@@ -7,9 +7,8 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
 ## State (2026-11-17 09:25 UTC, restarted after the 11-16 pause)
 
 ### Committed on branch, NOT landed (worktree /root/projects/noshape-wt/asm, branch asm-partorigin)
-- 11-18 ~11:00: the 28 code commits below rebased onto main (conflicts: core's joint rule in region_profile_with, the
-  model runner's volume bands, LiveRef.center); testing on vibex8, then land. b8d2d867e held (bool's 8ba7c6dcc first;
-  old branch kept as asm-partorigin-old).
+- 11-18 ~11:00: the 28 code commits below rebased onto main, + 5ef547724 (BOM scorer, after the pair's binary); pair
+  split vibe2/vibex8, then land. b8d2d867e held (bool's 8ba7c6dcc first; old branch asm-partorigin-old).
 1. Mate connector on a mesh part's node (refgeom.rs origin_csys: MeshPoint as a vertex, world axes). corexy studios
    4a6a96 / 6d4503 / d8befc. Test features_b::a_mate_connector_on_a_mesh_node.
 2. Feature pattern of a Boolean subtraction (pattern.rs boolean_tool_faces; core handed it over).
@@ -150,12 +149,16 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   live's 332112, a studio tail). Its Extrude 12 (17 faces vs live 14, same volume): not the Boolean (bool, OCCT-only too) -> core 11-17 (repro vibex8 ~/agents/asm-keep/mps).
 
 ### Next, in order
-0. live2 truth for the suite's first differences (behaviours "asm (lead 11-18 ~13:32)", live/asm/truth-1118/): all
-   ours. scissor-lift: "Top <3>" (RVKD, 4ce5c7f4) not inserted; isaac: "Helical 1M 13T <1>" (JHD) missing, Revolute
-   12 OK; infento: "Wheellock ring 8-42 <3>" (RADD), Planar 10 OK; rack-pinion Planar 2 OK; bjr: grub <4> placement,
-   OPG006 Description; pinslot washer z 30.987 (ours 31.286, configured std part); suspension: "Cap <2>" with empty
-   partId gets no occurrence / BOM row (ours a "Cap" row); robot-relations REV-21-1650 6 rows ×1 unmerged;
-   pattern-std row 8 AR-HR-482-D600 ×2 Steel A36; welding-config top <2> placement, "Part 2" in rows 4/15/22/29.
+0. live2 truth (behaviours "asm (lead 11-18 ~13:32)", live/asm/truth-1118/), worked 11-18 14:07:
+   pattern-std BOM: live's Linear pattern 5 is ERROR (direction lost) and live's BOM drops its instances; scorer counts
+   that as a live defect (5ef547724, on the stack). pinslot washer 0.2985 mm: std studio 26bb0b's Sketch 1 MIRROR of
+   two lines of unequal length; our solver mirrors endpoints, live the lines -> undone edits, washer stays M5 1.0 mm ->
+   skasm (sent 14:05). bjr OPG006 Description: set by 5e35bf's custom "Wire clip 1", whose imported FS c5f922…/3c1eea…
+   isn't in the corpus -> REQUESTS 13:55 live2. robot-relations REV-21-1650: live's 6 sheet bodies vs our one solid
+   (DECISIONS 11-17), so ×6 merged: as ruled. suspension / scissor-lift: refetch (REQUESTS 13:42). isaac Helical:
+   custom GearLabFeature not registered ("unknown feature type") -> FS owner via lead. infento Wheellock: studio
+   f0eedd (Sketch 7 ANGLE undone 81 mm, fillets) -> model side. welding "Part 2"/"Part 6" merged in sub 0eadef: tracing
+   (vibex8 ~/agents/asm-keep/trace-welding.out; one.sh <bin> <asm dir> <out> = one traced assembly via slot).
 2. Lost mates still mine: tvc (c10 on vibex8: 11/12 mates, 26/26 BOM; alike-volume parts now settled by their mate
    connectors, 62043ea70). Left: Cylindrical 1's edge on ".2_Peça <1>" is on no SG90 body of ours; endcheck/find_ent in vibex8 ~/tmp/asm),
    xdev-subs (c16: 262/266 occurrences, BOM 74/74 and no extra rows). 59e7fd03d: a nested flexible subassembly
