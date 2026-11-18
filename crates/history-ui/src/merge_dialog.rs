@@ -90,6 +90,28 @@ struct Row {
     mergeable: bool,
     /// Changes in separate branches can't be merged for this tab type (ⓘ).
     unmergeable_type: bool,
+    /// Each side's last change to the tab (author, time): an Edited cell's tooltip.
+    ours_last: Option<(String, i64)>,
+    theirs_last: Option<(String, i64)>,
+}
+
+/// The newest change from `head` back to `base` (first parents) that touched `blob`: its author and time (live
+/// ws-1118: an Edited cell's tooltip "Last change by <user> at 2:30 AM Today").
+fn last_change(store: &noshape_store::Document, head: MicroversionId, base: MicroversionId, blob: &str) -> Option<(String, i64)> {
+    let base_seq = store.microversion(base).ok()?.seq;
+    let mut mv = head;
+    while mv != base {
+        let info = store.microversion(mv).ok()?;
+        if info.seq <= base_seq {
+            return None;
+        }
+        let parent = *info.parents.first()?;
+        if store.diff(parent, mv).ok()?.iter().any(|c| c.name == blob) {
+            return Some((info.author, info.created));
+        }
+        mv = parent;
+    }
+    None
 }
 
 impl Row {
@@ -189,7 +211,9 @@ fn plan(doc: &Entity<DocModel>, source: Side, source_name: String, restore: bool
         // Live (qa5 DOC2, mg-903): an edited Part Studio / Assembly offers
         // "Merge changes from both" (not a created or deleted tab).
         let edited_only = [oc, tc].iter().all(|c| matches!(c, Change::None | Change::Edited));
-        changed.push(Row { blob: n, name: tab.name, icon, ours: oc, theirs: tc, mergeable: kind_merges && edited_only && !restore, unmergeable_type: drawing && both });
+        let last = |c: Change, head: MicroversionId| if c == Change::Edited { last_change(store, head, base, &n) } else { None };
+        let (ours_last, theirs_last) = (last(oc, ours), last(tc, from));
+        changed.push(Row { blob: n, name: tab.name, icon, ours: oc, theirs: tc, mergeable: kind_merges && edited_only && !restore, unmergeable_type: drawing && both, ours_last, theirs_last });
     }
     let branch_name = |b: BranchId| store.branch(b).map(|x| x.name).unwrap_or_default();
     // Lanes as the graph orders branches: the default first, then by creation.
@@ -396,8 +420,13 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
             .child(div().w(px(171.)).flex_none().pt(px(2.)).text_size(px(18.)).line_height(px(27.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(if plan.restore { "Overall restore strategy" } else { "Overall merge strategy" }))
             .child(h_flex().w(px(656.)).h(px(80.)).border_1().border_color(rgb(0xcccccc)).children(cards.iter().map(|s| card(*s))));
         // The table.
-        let change_cell = |c: Change, kept: Option<bool>| {
-            let cell = h_flex().w(px(COL_CHANGE)).flex_none().gap(px(4.)).text_size(px(13.)).text_color(pal.text);
+        let change_cell = |c: Change, kept: Option<bool>, id: String, last: &Option<(String, i64)>| {
+            let cell = h_flex().id(SharedString::from(id)).w(px(COL_CHANGE)).flex_none().gap(px(4.)).text_size(px(13.)).text_color(pal.text);
+            // An Edited cell's tooltip: who changed the tab last on that side, and when (live ws-1118).
+            let cell = match last {
+                Some((who, at)) => cell.tooltip(crate::ui::user_tooltip(format!("Last change by {who} at {}", crate::start_library::format_history_time(*at)))),
+                None => cell,
+            };
             match (c, kept) {
                 (Change::None, _) => cell.pl(px(20.)).child(div().italic().child("No changes")),
                 // The tab won't exist after the merge.
@@ -508,8 +537,8 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                             d.child(crate::ui_script::mark(div().id(SharedString::from(format!("merge-info-{i}"))), || format!("button:{WHY}")).flex_none().tooltip(crate::ui::tooltip(crate::i18n::tr(WHY))).child(crate::ui::glyph("info", 14., rgb(0x4d8ccf))))
                         }),
                 )
-                .child(change_cell(r.ours, kept(true)))
-                .when(!plan.restore, |d| d.child(change_cell(r.theirs, kept(false))))
+                .child(change_cell(r.ours, kept(true), format!("merge-ours-{i}"), &r.ours_last))
+                .when(!plan.restore, |d| d.child(change_cell(r.theirs, kept(false), format!("merge-theirs-{i}"), &r.theirs_last)))
                 .child(select)
                 .into_any_element()
         });
@@ -655,4 +684,37 @@ fn revert(doc: &Entity<DocModel>, before: MicroversionId, cx: &mut App) {
         Ok(()) => d.reloaded(cx),
         Err(e) => cx.emit(DocEvent::Error(format!("{e:#}"))),
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    /// Live ws-1118: an Edited cell says who changed the tab last on that side, and when: the newest change since the
+    /// merge base that touched the tab, none for a tab it didn't touch.
+    #[test]
+    fn the_last_change_to_a_tab_is_the_newest_that_touched_it() {
+        let dir = std::env::temp_dir().join(format!("noshape-merge-last-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("last.noshape");
+        for ext in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+        }
+        let mut ctx = noshape_ops::Ctx::new();
+        let mut call = |tool: &str, args: serde_json::Value| noshape_ops::registry::run(&mut ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call("document_create", json!({ "path": path.to_str().unwrap() }));
+        call("tab_create", json!({ "kind": "variablestudio", "name": "Vars" }));
+        call("history_create_version", json!({ "name": "V1" }));
+        call("variable_create", json!({ "name": "a", "value": "1 mm" }));
+        call("variable_create", json!({ "name": "b", "value": "2 mm" }));
+        let s = crate::session::Session::open(&path).unwrap();
+        let store = &s.store;
+        let base = store.list_versions().unwrap().into_iter().find(|v| v.name == "V1").unwrap().microversion;
+        let head = s.head().unwrap();
+        let blob = |name: &str| noshape_model::document::Document::blob_name(s.doc.tabs.iter().find(|t| t.name == name).unwrap().id);
+        let newest = store.microversion(head).unwrap();
+        assert_eq!(super::last_change(store, head, base, &blob("Part Studio 1")), Some((newest.author, newest.created)), "the second variable");
+        assert_eq!(super::last_change(store, head, base, &blob("Vars")), None, "not touched since V1");
+        assert_eq!(super::last_change(store, base, base, &blob("Part Studio 1")), None, "nothing since the base");
+    }
 }

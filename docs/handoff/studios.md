@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 10:52 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 11:07 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -40,6 +40,9 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   op drawing_sheet the same, e2e. custom-zones 12/12.
 - Local, to land: VS value tooltip centred over the cell (qa VSFEEL, test); Derived's Select Part Studio panel: the
   first Esc / Enter close only the panel (live docs-import-feel-1118; dialogs matrix row).
+- Local, to land: drawings draw an Inches fractional / Feet and inches value's fraction stacked (live numfmt-1118:
+  full height, rule through the whole number's middle; test); merge preview Edited cells' tooltip "Last change by
+  <user> at <time>" (newest change since the base touching the tab; test).
 - Open: drw-bom-table-properties s7 (Esc in BOM table properties: today's retake deselects, the old take kept it;
   asked live2 10:24); drw-hatch-panel s31 (Pattern list covers its field; asked live2 09:23).
 - Checked against live 08:4x, already as live: documents search on Enter only; version row menu (View in repair,
@@ -79,8 +82,8 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   experiment" §3; live/psui/numfmt-1118/). Done locally: tools pick within PICKBOX 7 px (hover_at, hovered_edge_sel,
   centermark_point, section edge), grips GRIPSIZE 6 px (detail circle resize, aux indicator); fractional inches round
   to the precision (digits = power of two, drawing 0.123 = 1/8": "2 3/4"), feet and inches `1'-2 1/4"`, the fractional
-  precision list 0" … 1/256", an explicit unit's button bare ("ft in"). Left: the fraction drawn stacked (ours
-  inline); jog / leader / hole-table / attach picks still 5 px (not named by live: ask if they are getIntersected too);
+  precision list 0" … 1/256", an explicit unit's button bare ("ft in"). Fraction stacked: done 11-18 (the reader joins its
+  pieces "2 3 4": no take reads one yet); jog / leader / hole-table / attach picks still 5 px (not named by live: ask if they are getIntersected too);
   24 h time H:mm done (history rows keep the time on older days).
 - live2 workspaces (behaviours "studios (lead 11-18 ~02:23, feel): workspaces", live/studios/ws-1118/). Done locally:
   Delete on every non-default workspace row (current too, none on the default), deleting the one you're in lands
@@ -89,8 +92,8 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   characters." with Create off, default name from the live workspaces; a Merge deletes what the source deleted even if
   the target edited it (model-core merge.rs); navbar workspace name's tooltip. Duplicate names (lead 11-18,
   DECISIONS): local, the store's unique index dropped on a writable open (no version bump), ops' `branch` by id or a
-  unique name, an ambiguous name lists the ids. Left: merge preview "Edited" tooltip
-  "Last change by <user> at <time>" (needs the last microversion per tab per side); switch's centred "Loading
+  unique name, an ambiguous name lists the ids. Merge preview "Edited" tooltip "Last change by
+  <user> at <time>": done 11-18; switch's centred "Loading
   workspace…" spinner (ours switches at once: not a target unless slow); Create workspace and edit properties ->
   Properties modal fields (Name *, Description, Category "Onshape Workspace" greyed, Apply / Save greyed, Close):
   ours already (version_properties).

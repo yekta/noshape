@@ -769,6 +769,9 @@ pub enum GripKind {
     Jog,
 }
 
+/// The gap (text heights) between a value's whole number and its stacked fraction (live numfmt-1118: 1–2 px at 12 px).
+const FRACTION_GAP: f64 = 0.12;
+
 impl SheetGeometry {
     pub fn new(width: f64, height: f64) -> Self {
         Self { width, height, ..Default::default() }
@@ -3106,9 +3109,44 @@ impl SheetGeometry {
         }
     }
 
+    /// Width (mm) of a dimension label's value, its fraction stacked when it has one.
+    pub fn dim_main_width(&self, t: &DimText, h: f64) -> f64 {
+        match t.fraction.then(|| super::format::split_fraction(&t.main)).flatten() {
+            Some((before, num, den, after)) => {
+                let wb = font::text_width(before, h);
+                wb + if before.is_empty() { 0.0 } else { FRACTION_GAP * h } + font::text_width(num, h).max(font::text_width(den, h)) + font::text_width(after, h)
+            }
+            None => font::text_width(&t.main, h),
+        }
+    }
+
+    /// The value at `[x, base]` (its baseline's start) in label coordinates (`loc`), its fraction stacked: numerator and denominator
+    /// at the text's height either side of a rule through the middle of the whole number (live numfmt-1118: 2 px
+    /// either side of the rule at a 12 px text height, 1–2 px after the whole number).
+    fn dim_main(&mut self, t: &DimText, [x, base]: [f64; 2], h: f64, angle: f64, loc: &dyn Fn(f64, f64) -> [f64; 2], pick: u32) {
+        let Some((before, num, den, after)) = t.fraction.then(|| super::format::split_fraction(&t.main)).flatten() else {
+            self.texts.push(Text2 { pos: loc(x, base), height: h, text: t.main.clone(), angle, anchor: Anchor::BottomLeft, pick });
+            return;
+        };
+        if !before.is_empty() {
+            self.texts.push(Text2 { pos: loc(x, base), height: h, text: before.to_string(), angle, anchor: Anchor::BottomLeft, pick });
+        }
+        let xs = x + font::text_width(before, h) + if before.is_empty() { 0.0 } else { FRACTION_GAP * h };
+        let (wn, wd) = (font::text_width(num, h), font::text_width(den, h));
+        let w = wn.max(wd);
+        let rule = base + h * 0.5;
+        let gap = h / 6.0;
+        self.texts.push(Text2 { pos: loc(xs + (w - wn) / 2.0, rule + gap), height: h, text: num.to_string(), angle, anchor: Anchor::BottomLeft, pick });
+        self.texts.push(Text2 { pos: loc(xs + (w - wd) / 2.0, rule - gap - h), height: h, text: den.to_string(), angle, anchor: Anchor::BottomLeft, pick });
+        self.lines.push(Polyline2 { points: vec![loc(xs, rule), loc(xs + w, rule)], style: LineStyle::Thin, closed: false, pick });
+        if !after.is_empty() {
+            self.texts.push(Text2 { pos: loc(xs + w, base), height: h, text: after.to_string(), angle, anchor: Anchor::BottomLeft, pick });
+        }
+    }
+
     /// Width (mm) of a dimension label.
     pub fn dim_label_width(&self, t: &DimText, h: f64) -> f64 {
-        let wm = font::text_width(&t.main, h);
+        let wm = self.dim_main_width(t, h);
         match (&t.upper, &t.lower) {
             (Some(u), Some(l)) => wm + if t.main.is_empty() { 0.0 } else { 1.0 } + font::text_width(u, h * 0.65).max(font::text_width(l, h * 0.65)),
             _ => wm,
@@ -3136,9 +3174,9 @@ impl SheetGeometry {
         let stacked = t.upper.is_some() && t.lower.is_some();
         let base = if vcenter { if stacked && t.main.is_empty() { -h * 0.15 } else { -h / 2.0 } } else if stacked && t.main.is_empty() { h * 0.95 } else { 0.0 };
         let loc = |x: f64, y: f64| [at[0] + u[0] * x + v[0] * y, at[1] + u[1] * x + v[1] * y];
-        let wm = font::text_width(&t.main, h);
+        let wm = self.dim_main_width(t, h);
         if !t.main.is_empty() {
-            self.texts.push(Text2 { pos: loc(x0, base), height: h, text: t.main.clone(), angle, anchor: Anchor::BottomLeft, pick });
+            self.dim_main(t, [x0, base], h, angle, &loc, pick);
         }
         if let (Some(up), Some(lo)) = (&t.upper, &t.lower) {
             let xs = x0 + wm + if t.main.is_empty() { 0.0 } else { 1.0 };
@@ -3229,7 +3267,7 @@ impl SheetGeometry {
         // line (Text alignment Horizontal), inline (live asb 10-25 ISO).
         let inline = !self.style.iso || !along;
         let gap = match dual_straddles(text) {
-            Some(dual) if along => Some(font::text_width(&dual, h).max(font::text_width(&text.main, h)) / 2.0 + 0.65 * h),
+            Some(dual) if along => Some(font::text_width(&dual, h).max(self.dim_main_width(text, h)) / 2.0 + 0.65 * h),
             Some(_) => None,
             None if inline => {
                 // Horizontal text on a sloped line: its box's extent along it.
@@ -3255,18 +3293,18 @@ impl SheetGeometry {
         let iso_squeezed = !inline && !self.flip_arrows && 2.0 * a_len > dl;
         let iso_out = iso_squeezed && self.text_along.is_none();
         let jogged = (f.mid[0] - mid[0]) * dir[0] + (f.mid[1] - mid[1]) * dir[1];
-        let s_along = if iso_out { half_line + 2.0 * a_len + font::text_width(&text.main, h) / 2.0 } else { self.text_along.unwrap_or(0.0) + jogged };
+        let s_along = if iso_out { half_line + 2.0 * a_len + self.dim_main_width(text, h) / 2.0 } else { self.text_along.unwrap_or(0.0) + jogged };
         let c = [mid[0] + dir[0] * s_along, mid[1] + dir[1] * s_along];
         let outside = (s_along.abs() > half_line && self.text_along.is_some()) || iso_out;
         let squeezed = iso_squeezed || (inline && !self.flip_arrows && !outside && gap.is_some_and(|g| 2.0 * g + 2.0 * a_len > dl));
         if outside {
             // From the extension line on the value's side to its gap.
-            let g = gap.unwrap_or(font::text_width(&text.main, h) / 2.0 + 0.65 * h);
+            let g = gap.unwrap_or(self.dim_main_width(text, h) / 2.0 + 0.65 * h);
             let sign = s_along.signum();
             let from = [mid[0] + dir[0] * sign * half_line, mid[1] + dir[1] * sign * half_line];
             // ISO (text above the line): under the value to its far end
             // (live request 1679).
-            let reach = if inline { -g } else { font::text_width(&text.main, h) / 2.0 };
+            let reach = if inline { -g } else { self.dim_main_width(text, h) / 2.0 };
             let to = [c[0] + dir[0] * sign * reach, c[1] + dir[1] * sign * reach];
             if (to[0] - from[0]) * dir[0] * sign + (to[1] - from[1]) * dir[1] * sign > 0.0 {
                 self.lines.push(Polyline2 { points: vec![from, to], style: LineStyle::Thin, closed: false, pick });
@@ -4036,6 +4074,29 @@ mod tests {
             let x = main.pos[0] + (wm - wa) * want;
             assert!((above.pos[0] - x).abs() < 1e-9, "{just:?}: {} vs {x}", above.pos[0]);
         }
+    }
+
+    /// Inches fractional (live numfmt-1118): "2 3/4" is the whole number, then 3 over 4 at the text's height either side
+    /// of a rule through the whole number's middle, as wide as the wider; the label is that much narrower than inline.
+    #[test]
+    fn a_fractional_value_is_drawn_stacked() {
+        let t = DimText { main: "2 3/4".into(), fraction: true, ..Default::default() };
+        let mut g = SheetGeometry::new(200.0, 200.0);
+        let h = 3.0;
+        g.dim_label([100.0, 100.0], 0.0, 0.0, false, &t, h, 1);
+        let texts: Vec<(&str, [f64; 2], f64)> = g.texts.iter().map(|t| (t.text.as_str(), t.pos, t.height)).collect();
+        assert_eq!(texts.iter().map(|t| t.0).collect::<Vec<_>>(), ["2", "3", "4"]);
+        assert!(texts.iter().all(|t| t.2 == h), "all at the text's height");
+        let rule = g.lines.last().expect("the rule");
+        assert!((rule.points[0][1] - (100.0 + h / 2.0)).abs() < 1e-9, "through the whole number's middle");
+        let (num, den) = (texts[1].1, texts[2].1);
+        assert!(num[1] > rule.points[0][1] && den[1] + h < rule.points[0][1], "3 above the rule, 4 below");
+        assert!(rule.points[0][0] > 100.0 + font::text_width("2", h), "after the whole number");
+        assert!(g.dim_label_width(&t, h) < font::text_width("2 3/4", h), "narrower than inline");
+        let inline = DimText { main: "2 3/4".into(), ..Default::default() };
+        let mut g2 = SheetGeometry::new(200.0, 200.0);
+        g2.dim_label([100.0, 100.0], 0.0, 0.0, false, &inline, h, 1);
+        assert_eq!(g2.texts.len(), 1, "without the flag it stays one text");
     }
 
     /// Drawing properties › Inspection: Solid fill in its own colour (live's

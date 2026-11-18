@@ -24,6 +24,9 @@ pub struct DimText {
     /// A rule between the stacked `upper` and `lower` (fit classes
     /// "Stacked with line").
     pub rule: bool,
+    /// The value's fraction ("2 3/4", `1'-2 1/4"`) is drawn stacked (Inches fractional, Feet and inches; live
+    /// numfmt-1118); the text keeps it inline.
+    pub fraction: bool,
 }
 
 impl DimText {
@@ -194,6 +197,19 @@ pub fn split_stacked(s: &str) -> (&str, Option<(&str, &str)>, &str) {
     }
 }
 
+/// A value's inline fraction split for stacking: (before, numerator, denominator, after); "2 3/4" is ("2", "3", "4", "")
+/// and `1'-2 1/4"` ("1'-2", "1", "4", "\"").
+pub fn split_fraction(s: &str) -> Option<(&str, &str, &str, &str)> {
+    let slash = s.rfind('/')?;
+    let num_start = s[..slash].rfind(|c: char| !c.is_ascii_digit()).map_or(0, |i| i + 1);
+    let den_end = s[slash + 1..].find(|c: char| !c.is_ascii_digit()).map_or(s.len(), |i| slash + 1 + i);
+    let (num, den) = (&s[num_start..slash], &s[slash + 1..den_end]);
+    if num.is_empty() || den.is_empty() || !(num_start == 0 || s[..num_start].ends_with(' ')) {
+        return None;
+    }
+    Some((s[..num_start].trim_end(), num, den, &s[den_end..]))
+}
+
 /// One-line text of a label with a stacked part ("⌀6.35 H7 +0.015/−0 THRU").
 pub fn flatten_stacked(s: &str) -> String {
     match split_stacked(s) {
@@ -232,7 +248,8 @@ pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, sym
     let tol_num = |v: f64| num_with(v, true);
     let units = if f.show_units && !angular { format!(" {}", length_units(drawing, f).symbol()) } else { String::new() };
     let value_text = |v: f64| format!("{}{symbol}{}{units}{}", f.prefix, num(v), f.suffix);
-    let mut t = DimText { main: value_text(value), ..Default::default() };
+    let fraction = !angular && matches!(length_units(drawing, f), DimUnits::InchFraction | DimUnits::FeetInches);
+    let mut t = DimText { main: value_text(value), fraction, ..Default::default() };
     match &f.tolerance {
         Tolerance::None => {}
         // Live "60±0.1": no space before ±.
@@ -763,6 +780,11 @@ mod tests {
         // Live numfmt-1118: the drawing's 0.123 precision is 1/8"; feet and inches `1'-2 1/4"`.
         assert_eq!(dim_text(&d, &f(DimUnits::InchFraction), 0.0254 * 2.7, false, "").main, "2 3/4");
         assert_eq!(dim_text(&d, &f(DimUnits::InchFraction), 0.0254 * 14.25, false, "").main, "14 1/4");
+        assert_eq!(split_fraction("2 3/4"), Some(("2", "3", "4", "")));
+        assert_eq!(split_fraction("1/2"), Some(("", "1", "2", "")));
+        assert_eq!(split_fraction("1'-2 1/4\""), Some(("1'-2", "1", "4", "\"")));
+        assert_eq!(split_fraction("2.700"), None);
+        assert!(dim_text(&d, &f(DimUnits::InchFraction), 0.0254 * 2.7, false, "").fraction);
         let fine = DimFormat { units: Some(DimUnits::InchFraction), precision: Some(6), ..Default::default() };
         assert_eq!(dim_text(&d, &fine, 0.0254 * 2.7, false, "").main, "2 45/64");
         assert_eq!(dim_text(&d, &f(DimUnits::FeetInches), 0.0254 * 14.25, false, "").main, "1'-2 1/4\"");
