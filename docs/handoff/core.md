@@ -39,6 +39,11 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - **DRIVEN-PATTERN-SWEEP (P1, live 11-18 geo-1118/sweep1-loft-guide-driven-pattern.json):** c2-loft-guide-curves-driven-
   pattern matches to the end on our 11-18 binary (11/11, Sweep 1 66 ms; live: 3 faces, 0.0798489 mm3, profile 21.7°
   off normal, profileControl NONE). Nothing open unless someone reports a case.
+- **Live truth at the suite's first differences (live 11-18, for the restart):** behaviours.md "core + bool + skasm (lead
+  11-18): live truth at the model suite's first differences", per-face JSON live/suite-truth-1118/<doc>.json. Mine:
+  knifehandle Sweep 2 area, singularities Mirror 3 (one sheet), pipe Loft (>2-profile guides), cpcurves fit spline
+  end tangent = -n of plane JMC, Boundary surface 1, loft-paths Loft 3, rib-wrap Wrap 1, manualblend / mutualtrim
+  Sweeps, surf-workshop-fill Fill 1 (B-spline 21x22, 5910.87 vs ours 31625). Triage with the lead first.
 - **Fan-blade P0 (fix forward):** main after core-oc 1484 ms vs 0.4.56 730; Boolean 2 877 vs 122 (live 364). bool's
   b5b566884 drops the wasted Rust attempt; my lever: per-tool offsets' edges 52 + check 24 ms (NOSHAPE_OFFSET_DEBUG=1).
 - **Extrude 4 (impeller, 490 ms vs 41):** op_prism_until's split on one face, a -3 mm offset of a 117x10 bicubic B-spline
