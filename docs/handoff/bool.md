@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-18 11:26 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
+Updated 11-18 12:46 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
 (NOSHAPE_GATE_HOST=vibe2); Mac for crate tests, probes and speed numbers (NOSHAPE_RB_HOST=mac; vibex8 runs ~x10 slower at
 load 26); land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs on vibex7 ~/lead-private (hat8, hat15,
 hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree from a computed pid (lead 21:06):
@@ -14,11 +14,11 @@ hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree 
 - LANDING 7378bd2c (queued 06:05, alone off main): Shell's drop_clear_offset_pairs shared one FClass2d across
   threads; NCollection_Sequence::Value writes its node cache, torn -> SIGSEGV (rings-loft Shell 1 crashed 2 of 10 runs
   on the Mac, on main since 3bba9d430 11-15). One task per face now: 20/20 clean, Shell 1 217 ms as before.
-- GATE unit bool-gate-c390b06fa on vibex8 (lead 10:00: moved off vibe2's slot; restarted 11:19 with 19.) ->
-  /root/bool-hat-scratch/chain-c390b06fa.out: the 13 below + 17. 5d7ea16fd offset fit cache + 18. 5e89c7e7b
-  volume_possible's cut lower bound (v >= va - vt) + 19. c390b06fa project_along drops a tangent corner's sliver
-  (britatap Touch screen split 2/7/6 -> live 2/6/5, britatap 4 -> 8/22 features; T1 projection::a_line_projected_from_a_tangent_corner_is_one_curve_to_it). bool-hat
-  rebased onto main 11:3x (435e43579 top; the gated one kept as branch bool-stack-c390). And
+- GATE unit bool-gate-4cf4ce0ca on vibe2 (12:31; the 11:50 one failed: main's build SIGTERMed under blend's suite,
+  vibe2 at 5 GB free) -> /root/bool-hat-scratch/chain-4cf4ce0ca.out. bool-hat rebased on main 1e21f28e8: the 13 below +
+  14. Shell race fix (on main as 7b8bb249) + 15. param_of cache + 16. Shell add_pcurve analysis cache + 17. offset fit
+  cache + 18. volume_possible's cut lower bound + 19. project_along tangent-corner sliver (britatap) + 20. 4cf4ce0ca
+  Shell foot: bounded_foot within two walls before OCCT's global search (impeller Shell Gehäuse 199 -> 183 ms Mac). And
   + 14. 05e180ea5 the Shell race fix (as 7378bd2c) + 15. 4d499486d NurbsCurve::param_of keeps its sample points per span
   run (rings-loft 51-slot cut 331fd52c 246 -> 211 ms Mac, same result) + 16. c0a72a695 Shell's add_pcurve keeps a
   surface's ShapeAnalysis_Surface per thread (impeller Shell Gehäuse 235 -> 199 ms, same result). Then private docs
@@ -47,6 +47,16 @@ hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree 
 - a04711 notes: Part 3 = live's faces / volume / area but 8/17/11 vs 9/22/15 (live's 10 um JT6 sliver; the rounded
   retry's other firings, Extrude 23 / 27, are rejected and stay errors). The doc's 19.9 s vs live 1.93: fillets on
   parts off from Extrude 1 (asm's). Repro vibex8 ~/agents/asm-keep/ma04; dumps ~/tmp/bool/a04-box.log.
+- Re-timed on the Mac vs live's rbstep-1118 (lead 12:30: qa's list first): mine > 5x: impeller Extrude Bohrungssitz
+  Ansaugflansch (op_boolean 1050 of 1115 vs live 154.5: fuse 87647d5a, 9 ring bosses on the 48-face B-spline housing,
+  glue shift_checked; ours "a piece's point on another solid's face" (coincident faces), OCCT 930 ms of EF on the big
+  B-spline faces; OBB no help), Fillet 3's cut ed9c35dc (750 ms; ours "an edge on another argument's free-form face"),
+  Chamfer Stevenrohr (op_boolean 156 vs 16), fuse 23659e13 (340 ms; ours "a face lost"). local_boolean would take them
+  (only the faces the tools reach) but needs: < 200-face targets with free-form faces, several tools, reach tighter
+  than face boxes (no(5): the B-spline faces' boxes reach > 1/4). Knife Split 4 5x: project_along's plane sections
+  (OCCT 5-10 ms each, half ComputeTolReached3d PSO); the marcher declines the grind face (grid > 257 a way): parked
+  /root/bool-scratch/parked-own-plane-section.diff (identical results where it ran). Cases Mac ~/noshape-host/bool-keep/{imprec,kdump-p}.
+- parting-line Split 3: skasm's fix efd277131 landed (Draft 1 OK again): next.
 - qa 11-18 (5x live): impeller Shell Gehäuse (Mac 199 after 16.; left: CheckerSI 26 %, quad::foot / ProjectPointOnSurf
   Extrema grid scans per point, meshed copies 12 %), Flansch+Gehäuse 4d5e785f (ours 202 vs OCCT 3302; critical path
   one OCCT offset x extrusion section 135 ms of it, OCCT's walk + tolerance PSO), Boolean 1 (unify 66: usd.check 38 =
