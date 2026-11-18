@@ -2435,8 +2435,8 @@ impl PartStudioView {
                     }
                     _ => target,
                 };
-                let now = self.viewport.read(cx).now();
-                let dbl = target.as_ref().is_some_and(|t| self.edit.is_none() && self.is_double_click(&t.reference, now));
+                let (now, os_double) = self.viewport.update(cx, |vp, _| (vp.now(), vp.take_click_count() >= 2));
+                let dbl = target.as_ref().is_some_and(|t| self.edit.is_none() && self.is_double_click(&t.reference, now, os_double));
                 // A face double-clicked keeps its feature and sketch lit until the next click (live2 11-17 sel-feel 2:
                 // an empty click clears both sides).
                 if !dbl {

@@ -1727,8 +1727,10 @@ impl PartStudioView {
     }
 
     /// Double-click on a sketch in the graphics area opens it for editing.
-    pub(super) fn is_double_click(&mut self, r: &Reference, now: Instant) -> bool {
-        let dbl = self.ui.last_click.as_ref().is_some_and(|(prev, t)| prev == r && now.duration_since(*t) < Duration::from_millis(450));
+    /// `os_double`: the OS counted it a double-click (its own time and distance; our timer reads when the click is
+    /// handled, which a slow frame between the two delays: Windows CI's software GPU).
+    pub(super) fn is_double_click(&mut self, r: &Reference, now: Instant, os_double: bool) -> bool {
+        let dbl = self.ui.last_click.as_ref().is_some_and(|(prev, t)| prev == r && (os_double || now.duration_since(*t) < Duration::from_millis(450)));
         self.ui.last_click = if dbl { None } else { Some((r.clone(), now)) };
         dbl
     }

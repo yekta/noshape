@@ -141,7 +141,7 @@ enum TouchDrag {
 #[derive(Clone, Debug)]
 enum PickPurpose {
     Hover,
-    Click { position: DVec2, modifiers: Modifiers },
+    Click { position: DVec2, modifiers: Modifiers, click_count: usize },
     ContextMenu { position: DVec2, window_position: Point<Pixels> },
     Box { a: DVec2, b: DVec2, crossing: bool, modifiers: Modifiers },
     /// Visible-depth samples for the rotate centre (nothing under the cursor).
@@ -368,6 +368,9 @@ pub struct Viewport {
     exec: BackgroundExecutor,
     /// The last middle release that wasn't the second of a double click.
     middle_released: Option<Instant>,
+    /// The OS's click count of the click whose event is being emitted (2 for a double-click): a slow frame between
+    /// two clicks can't undo it as it does a timer read when the click is handled (Windows CI's software GPU).
+    left_click_count: usize,
     press_travel: f64,
     /// The press's summed move path (CSS px) and where it last was: the right-click menu's travel (live sums it).
     press_path: (f64, DVec2),
@@ -696,6 +699,7 @@ impl Viewport {
             clock: Rc::new(Instant::now),
             exec: cx.background_executor().clone(),
             middle_released: None,
+            left_click_count: 0,
             press_travel: 0.0,
             press_path: (0.0, DVec2::ZERO),
             last_pos: DVec2::ZERO,
@@ -834,6 +838,11 @@ impl Viewport {
     /// The time on its clock (real time, or the one a test set).
     pub fn now(&self) -> Instant {
         (self.clock)()
+    }
+
+    /// The OS's click count of the click being handled (taken once; 0 for a click not from the mouse).
+    pub fn take_click_count(&mut self) -> usize {
+        std::mem::take(&mut self.left_click_count)
     }
 
     pub fn set_clock(&mut self, clock: impl Fn() -> Instant + 'static) {
@@ -1314,8 +1323,9 @@ impl Viewport {
                     self.request_hover();
                 }
             }
-            PickPurpose::Click { position, modifiers } => {
+            PickPurpose::Click { position, modifiers, click_count } => {
                 let pick = pick_in(&buf, position, s);
+                self.left_click_count = click_count;
                 cx.emit(ViewportEvent::Click { pick, position, modifiers });
             }
             PickPurpose::ContextMenu { position, window_position } => {
@@ -2006,7 +2016,7 @@ impl Viewport {
         let p = DVec2::new(size.x * AT[k].0, size.y * AT[k].1);
         b.click = Some((Instant::now(), None));
         if !hover {
-            self.click_at(p, Modifiers::default(), cx);
+            self.click_at(p, Modifiers::default(), 1, cx);
             return true;
         }
         // Every other rest on empty space (a corner), so each one changes the highlight.
@@ -2493,7 +2503,7 @@ impl Viewport {
             // 3, every platform): a Ctrl+click opens the context menu on
             // release and leaves the selection as it is.
             Drag::Pending(MouseButton::Left) if e.modifiers.control => self.context_menu_at(p, e.position, cx),
-            Drag::Pending(MouseButton::Left) => self.click_at(p, e.modifiers, cx),
+            Drag::Pending(MouseButton::Left) => self.click_at(p, e.modifiers, e.click_count, cx),
             Drag::Pending(MouseButton::Right) if menu => self.context_menu_at(p, e.position, cx),
             Drag::Box => {
                 if let Some((a, b, crossing)) = self.box_rect.take() {
@@ -2507,12 +2517,16 @@ impl Viewport {
     }
 
     /// A click (left button, or a one-finger tap) at a viewport point.
-    fn click_at(&mut self, p: DVec2, modifiers: Modifiers, cx: &mut Context<Self>) {
+    /// `click_count`: the OS's (2 for a double-click), handed with the click's event however late its pick comes back.
+    fn click_at(&mut self, p: DVec2, modifiers: Modifiers, click_count: usize, cx: &mut Context<Self>) {
         match self.pick_at(p) {
-            Some(pick) => cx.emit(ViewportEvent::Click { pick, position: p, modifiers }),
+            Some(pick) => {
+                self.left_click_count = click_count;
+                cx.emit(ViewportEvent::Click { pick, position: p, modifiers })
+            }
             None => {
                 let (x, y) = self.device_px(p);
-                self.request_pick(PickRect::around(x, y, PICK_HALF), PickPurpose::Click { position: p, modifiers });
+                self.request_pick(PickRect::around(x, y, PICK_HALF), PickPurpose::Click { position: p, modifiers, click_count });
             }
         }
     }
@@ -2775,11 +2789,11 @@ impl Viewport {
                     // clicks once per tap that didn't; a two-finger tap opens
                     // the menu only if neither finger did (`isTwoFingerTap`).
                     match (fingers, count) {
-                        (1, 1) if exceeding == 0 => self.click_at(p, Modifiers::default(), cx),
+                        (1, 1) if exceeding == 0 => self.click_at(p, Modifiers::default(), 1, cx),
                         // A double tap is a double click (two clicks in a row).
                         (1, 2) => {
-                            for _ in exceeding..2 {
-                                self.click_at(p, Modifiers::default(), cx);
+                            for n in exceeding..2 {
+                                self.click_at(p, Modifiers::default(), n + 1, cx);
                             }
                         }
                         (2, 1) if exceeding == 0 => {
