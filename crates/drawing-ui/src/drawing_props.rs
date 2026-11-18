@@ -190,11 +190,15 @@ impl DrawingEditor {
             }
         }
         show.push(MenuEntry::item("Show/hide edges...", move |t, _, cx| t.open_hide_edges(id, cx)));
+        // Only a view with circles to mark (live2 drw-toolbar-tips-view-showhide: block-drawing's Front has none and no
+        // row; hole-plate's has it, drw-view-hide-auto-centermarks).
         let cl = v.show_centerlines;
-        show.push(MenuEntry::item(if cl { "Hide auto centermarks" } else { "Show auto centermarks" }, move |t, _, cx| t.edit_view("Centermarks", id, cx, |v| {
-            v.show_centerlines = !cl;
-            v.deleted_centermarks.clear();
-        })));
+        if self.geoms.get(&id).is_some_and(|g| !g.ends.is_empty() || !g.full_circles().is_empty()) {
+            show.push(MenuEntry::item(if cl { "Hide auto centermarks" } else { "Show auto centermarks" }, move |t, _, cx| t.edit_view("Centermarks", id, cx, |v| {
+                v.show_centerlines = !cl;
+                v.deleted_centermarks.clear();
+            })));
+        }
         // Automatic centerlines (help: holes, cylinders and spheres seen
         // from the side): only views that have such axes.
         if self.geoms.get(&id).is_some_and(|g| !g.axes.is_empty()) {

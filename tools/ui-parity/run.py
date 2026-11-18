@@ -827,14 +827,14 @@ def section_cut_point_read(a, b):
     da["selection"] = [x for x in da["selection"] if not (isinstance(x, dict) and x.get("kind") == "EDGE" and (picking or x.get("owner") in parents) and x.get("owner") not in ours)]
 
 
-def view_frame_late(a, b, step):
-    """A view clicked this step: live draws its dark frame 0.25-0.4 s after the click (live2 11-15), after its recorder
-    read the state, which then says EDGE for that view where ours says VIEW (drw-views-shift-select-properties,
-    drw-view-replicate-annotations)."""
-    on = (step or {}).get("on")
-    if (step or {}).get("do") not in ("click", "rclick") or not isinstance(on, dict) or not isinstance(on.get("view"), str):
+def view_frame_late(a, b, clicked):
+    """A view clicked this step, or by an earlier one with no pointer move since (`clicked`): live draws its dark frame
+    only after the click's read, by its next pointer move (live2 11-15: 0.25-0.4 s; drw-toolbar-tips-view-showhide: a
+    right-clicked view still EDGE after a 1 s wait, VIEW once the menu's row is hovered), so its recorder says EDGE
+    for that view where ours says VIEW (drw-views-shift-select-properties, drw-view-replicate-annotations)."""
+    if not isinstance(clicked, str):
         return
-    edge, view = {"kind": "EDGE", "owner": on["view"]}, {"kind": "VIEW", "owner": on["view"]}
+    edge, view = {"kind": "EDGE", "owner": clicked}, {"kind": "VIEW", "owner": clicked}
     la, lb = ((a or {}).get("drawing") or {}), ((b or {}).get("drawing") or {})
     if edge in (la.get("selection") or []) and isinstance(lb.get("selection"), list):
         lb["selection"] = sorted((edge if x == view else x for x in lb["selection"]), key=lambda x: (str(x.get("kind")), str(x.get("owner"))) if isinstance(x, dict) else ("", ""))
@@ -1235,6 +1235,17 @@ def compare(live, ours, whole_document=True):
             rest = False
         if rest:
             resting.add(f"step {s.get('step')}")
+    # The view a click or right-click is on, until a step moves the pointer (view_frame_late).
+    frame_late, clicked = {}, None
+    for s in steps:
+        do = s.get("do") if isinstance(s.get("do"), dict) else {}
+        on = do.get("on") if isinstance(do.get("on"), dict) else {}
+        if do.get("do") in ("click", "rclick"):
+            clicked = on.get("view") if isinstance(on.get("view"), str) else None
+        elif do.get("do") not in ("wait", "key", "type"):
+            clicked = None
+        if clicked:
+            frame_late[f"step {s.get('step')}"] = clicked
     free_clicks = any(isinstance((st.get("do") or {}).get("on"), dict) and "sketch_point" in st["do"]["on"] for st in steps)
     plane_normal = sketch_plane_normal(steps)
     native_open = False
@@ -1582,7 +1593,7 @@ def compare(live, ours, whole_document=True):
         select_unread(a, b, step)
         document_loading(a, b)
         hole_callout_export_text(a, b)
-        view_frame_late(a, b, step)
+        view_frame_late(a, b, frame_late.get(name))
         section_cut_point_read(a, b)
         placed_alike(a, b)
         click_placed_readouts(a, b, pixel)

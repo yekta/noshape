@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 12:34 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 13:51 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -17,37 +17,25 @@ Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE
 tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh`; drawing runs vibex8.
 - Landed 11-18: 882a3ecd, 781eac7c, 37ecb60c, d2eb5c15, b5c4ccc4 (duplicate workspace names, BOM cell panel, BOM
   split), 4beed1be (ISO value on the pointer, placed BOM selected, Reset ordinate, section Exclude checkbox, linestyle).
-- Landed dfe045ad 09:11: Variable Studio invalid name pink 526 ms after Enter (live fsvs-feel-1118); Edit section…
-  Exclude from cut (op drawing_edit_section + e2e, drawing_get `exclude_from_cut`); section / detail menus without
-  Explode/Position, Display state; Measure button bottom right; Sheets tab tooltip; Replicate region reader; panel
-  readers (Break view, Sheet properties, View properties); a selected table read as TABLE for recorders ≥ 2026-11-18.1
-  (when live2's BOM retakes land: check TABLE's order beside EDGE Isometric, drop `placed_table`'s reader rule if
-  they read TABLE from the placing click).
-- Landed 64680c1d as 1e21f28e 11:19: Preferences (shortcut "Create release", Length decimals per unit,
-  the Versions flyout's open state carried over); live2's BOM retakes (BOM panel fields, TABLE + EDGE <view> until
-  right-clicked); ordinate add-to-group reads nothing until its first click; linestyle / DWT tooltips; selects marked
-  `dropdown:<value>`; runner: Graebert `*_Menu` hover not compared, unnamed "" separators, "start X asm Copy n";
-  Sheet properties › Custom fields read as live. run12 12/13, run13 custom-zones 12/12, run10 all match.
-  Also in it: VS value tooltip over its cell; Derived's panel takes the first Esc / Enter; stacked fractions; merge
-  preview "Last change by <user> at <time>".
-- Landed ba9f9050 as 9f629e6f 11:38: Custom's zones per standard, s7 excluded, PICKBOX / GRIPSIZE picks, the custom-dialog test.
-- Landed e6e0224d as 8a968155 11:51: the hatch Pattern list as live2 hatch-list-1118 (OsMenu::max_height; run14
-  drw-hatch-* 130/130); the toolbar help popover mechanism (drawing_help.rs).
-- Local, to land: the help popover texts, 45 tools in our own words with live's titles / step counts / facts
-  (DECISIONS 11-18; live's text in help-popovers.json is cut at ~400 chars; steps inferred: first sentence the intro,
-  the rest numbered, prose-only for Update, Trim, Horizontal, Tangent arc, Format painter, the inspection tools, as
-  the popover heights fit); the popover hides the title tooltip (vendored gpui-component `tooltip::hide_tooltip`) and
-  its steps wrap; a detail's label 5.3 mm under its whole profile (circle / polygon box), centred, clipped border or
-  not (live2 labels-1118: 39.2 mm under a 2:1 r 33.9 circle's centre; test).
-- Queued c63dab06 / 4e2717b5 (12:0x–12:4x): section / auxiliary label 3.02 mm under the geometry; the ui-parity
-  driver finds {"tool": "Undo" / "Redo"} through the shared button marks (drw-toolbar-tips-view-showhide s1).
-  55beaa52 (help texts, popover over the tooltip, detail label under its profile) landed as d92fcab4.
-- drw-section-exclude-from-cut's 5.81 mm label gap: skipped (lead: an Esc-closed edit session isn't the rule).
-- live2's drw-bom-table / drw-note-editor retakes on main (185c4cafe): in the full run below.
-- Full drawing run drw1118c on vibex6 (~/agents/studios-keep/drw1118c, uip-mine.sh 2 shards, 12:4x; vibex8's slot was
-  held by qa's suite): the misses left from drw1118b's 24 are the next items, worst feel first. Of the 24, already
-  fixed since: ordinate s7 / value rclick, BOM, linestyle, gtol, Custom zones, hatch s29/s31, note copy-paste s8
-  (selection's menu on the empty sheet), replicate region reader, toolbar tips (driver).
+- Landed dfe045ad 09:11 (VS invalid name 526 ms, Edit section Exclude from cut, menus, readers), 49cfe99b, 64680c1d,
+  ba9f9050, e6e0224d, 55beaa52: details in git log.
+- Help popover texts (55beaa52): 45 tools in our own words, live's titles / step counts / facts (DECISIONS 11-18;
+  steps inferred from live's flattened text: first sentence the intro, the rest numbered; prose-only where the
+  popover height fits); the popover hides the title tooltip (vendored gpui-component `tooltip::hide_tooltip`).
+- Landed c63dab06 (section label 3.02 mm) as 350cceaa, 4e2717b5 (driver: tool:Undo / Redo) as 9e996a66.
+- Queued 1db85fba (13:5x): toolbar tooltips 450 ms (live2 ours-1118: live 0.47 s, ours 0.70 s on the kit's 500 ms)
+  and read "title / title help" as live's recorder (runner compares the title part); Edit detail… keeps the detail's
+  circle orange in its parent until another shape (drw-detail-id-profile-tips s7–s15, EDGE+ for 11-15+ recorders).
+- Local, testing (run17): Show/hide › Hide/Show auto centermarks only on a view with circles (block's Front none:
+  drw-toolbar-tips-view-showhide); runner: a clicked view's late dark frame holds until the pointer moves (s6 after a
+  1 s wait still EDGE live).
+- Full run drw1118c (vibex6, ~/agents/studios-keep/drw1118c): 333/341. Left: drw-detail-id-profile-tips s6 (live VIEW
+  Detail + EDGE Top on a right-click at the detail's centre, the plate's corner; ours picks an edge there: EDGE Detail);
+  drw-section-exclude-from-cut s4 / drw-view-properties-projected-from-section s4 (label 2.5 mm lower in live on the
+  pin-block assembly at placement: asked live2 13:5x for a plain assembly vs part section DXF); not targets:
+  inspection-table-iso-scrolled s2, revision-table-delete s8, replicate-region-place s21 (server toast).
+- live2's drw-bom-table / drw-note-editor retakes match (run16).
+- uip-mine.sh on vibex6 takes exact names too (`$p.json` and `$p-*.json`).
 - FS / VS timings (live fsvs-feel-1118) re-checked: every row as live (230 / 1891 / 275 / 526 ms; the add row's
   0.85 s first key is live's slowness).
 - Checked against live 08:4x, already as live: documents search on Enter only; version row menu (View in repair,
