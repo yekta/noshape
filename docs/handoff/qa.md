@@ -89,6 +89,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 0g. **Assembly feel (lead 23:20)**: live's asm feel rows on 16588aca3 -> TICKETS "Assembly feel", 2 P0 + 2 P1 to asm. qa-scratch/af:
    starts.json (asm-feel, asm-feel-mated), afs.sh (session :668), af.py groups hover / colours / mate-esc / mate-enter / drag-p2 /
    drag-p3, afrun.sh <scenario> <out> <groups> (state at the runner's end: instance transforms, mates). EMPTY must avoid the view cube.
+0h. **Feature list / document / VS-FS (lead 23:50)**: TICKETS "Feature list, document and Variable / Feature Studio feel" (3 P2 psui,
+   2 P1 + 1 P2 studios). qa-scratch/fl: build.sh (start documents built by the runner, then opened WITHOUT it: no 180 s watchdog),
+   fls.sh start <doc>|shot|stop (:669), fl2.py / fl3.sh / fl4.sh / vs*.sh / fs.sh. Hover re-run on 7187ac75 (5e498ffb): fixed (sent).
+   skasm 00:00: SKSNAP-MODEL-EDGE / ALIGN / REACH fixed (landing after da22ce56); SKSNAP-GLYPHS-AFTER: re-run glyphs.py with Show
+   constraints ticked (sketch dialog checkbox, screen (738, 352) in sks.sh's session). qa-wait-da22 re-runs sel-feel C2/C3/B1/D.
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
