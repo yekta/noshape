@@ -8640,6 +8640,33 @@ bool volume_possible(uint8_t op, const std::vector<TopoDS_Shape>& a, const std::
   }
 }
 
+// Whether a union `r` of `inputs` lost the biggest one's body: its box not holding that one's (boxes from the faces'
+// own bounds: a union's pieces of a face may box tighter, so only a sign), and its volume more than 5 % short of it.
+bool union_lost_a_body(const std::vector<TopoDS_Shape>& inputs, const TopoDS_Shape& r)
+{
+  Bnd_Box rb;
+  BRepBndLib::Add(r, rb, false);
+  bool held = !rb.IsVoid();
+  if (held)
+    rb.Enlarge(1e-6 * std::sqrt(rb.SquareExtent()));
+  for (const TopoDS_Shape& x : inputs)
+  {
+    Bnd_Box xb;
+    BRepBndLib::Add(x, xb, false);
+    double a0, b0, c0, a1, b1, c1;
+    if (xb.IsVoid())
+      continue;
+    xb.Get(a0, b0, c0, a1, b1, c1);
+    held = held && !rb.IsOut(gp_Pnt(a0, b0, c0)) && !rb.IsOut(gp_Pnt(a1, b1, c1));
+  }
+  if (held)
+    return false;
+  double big = 0;
+  for (const TopoDS_Shape& x : inputs)
+    big = std::max(big, volume_of(x));
+  return volume_of(r) < 0.95 * big;
+}
+
 bool all_solids(const std::vector<TopoDS_Shape>& l)
 {
   for (const TopoDS_Shape& x : l)
@@ -9894,6 +9921,37 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
       hist        = cancellable_history(inputs, *b2);
       res         = b2->Shape();
     }
+  }
+  // A union that lost an argument's body (core's walls on c2-impeller-loft: OCCT's exact fuse of the housing and its
+  // nine seats came back invalid, 2 cm³ of the housing's 96): its box no longer holding the biggest argument's (cheap),
+  // then its volume short of that argument's by more than OCCT's integration of free-form faces can miss (a percent and
+  // a half on that housing). Again with a fuzzy value, kept when valid and whole; else no result rather than a wrong one.
+  // (One with no solid at all is boolean_once's to try again glued.)
+  if (op == 0 && !scaled && facets.source.empty() && all_solids(inputs) && TopExp_Explorer(res, TopAbs_SOLID).More() && union_lost_a_body(inputs, res))
+  {
+    bool mended = false;
+    for (const double fz : {1e-7, 1e-6})
+    {
+      BoolOpts fuzzy = first;
+      fuzzy.glue     = 0;
+      fuzzy.fuzzy    = std::max(first.fuzzy, fz);
+      std::unique_ptr<BRepAlgoAPI_BooleanOperation> b2 = make();
+      b2->SetArguments(to_list(args.items));
+      b2->SetTools(to_list(tools.items));
+      apply_opts(*b2, fuzzy);
+      build_cancellable(*b2);
+      fail_if_cancelled();
+      if (b2->HasErrors() || !b2->IsDone() || union_lost_a_body(concat(args.items, tools.items), b2->Shape()) || !BRepCheck_Analyzer(b2->Shape()).IsValid())
+        continue;
+      t_bool_path = "occt_fuzzy";
+      inputs      = concat(args.items, tools.items);
+      hist        = cancellable_history(inputs, *b2);
+      res         = b2->Shape();
+      mended      = true;
+      break;
+    }
+    if (!mended)
+      fail_op("boolean failed: the union lost one of its parts");
   }
   if (opts.unify)
   {
