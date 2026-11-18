@@ -1,30 +1,25 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-17 23:28 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-18 03:01 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight
-- **LANDED f824d120 (11-17 23:26; 3 commits; first try failed on a flaky assembly-ui GPU feel test, re-queued as is):**
-  - knifehandle Move face 1/2 (live 16 / 14 ms; ours errored after 2 s): kernel op_tweak_faces / k::tweak_faces
-    (features.cpp class FaceTweak, a BRepTools_Modification: moved surfaces; moved/staying edges = GeomAPI_IntSS branch
-    nearest the moved old edge, oriented as it, unbounded/periodic ones trimmed to the new vertices; vertices = a
-    staying edge x the moved surface, else the new curves' closest points; pcurves GeomProjLib; BRepLib::SameParameter);
-    direct.rs `tweak()` before move_rigid in ROTATE's non-planar branch (kept only when valid, one solid). Move face 1's
-    mate connector on a sweep start-cap edge: Z along the sketch line start->end (refgeom.rs sketch_line_direction), as
-    live. Now 76 / 79 ms, 13241.65 / 10679.41 mm3 (live 13241.87 / 10679.73). Left: Fillet 3's 7th face upstream;
-    Chamfer 1 after them 9285.8 vs live 10423.8 mm3 (was 15664.7, also wrong). Probe brepq/tw2.cpp (+facetweak.inc).
-    Next: TRANSLATE's rigid branch through the tweak; Delete face 2.
-  - pulleys Circular pattern 1: the face tool's cap on a rim loop bordering several faces tries each neighbour's surface,
-    both wire directions (pattern.rs faces_tool `beside`). 12/22 -> 22/22. Speed: bool's (their 23-tool cut 26 ms Mac).
-  - revert of my c064b550a (path-loft smooth-side merge): loft-paths Mirror 1 back to live's volume (Loft 3 20 faces).
-  - Dropped from it (branch core-parting-dropped): parting-line sketch-curve parting edges + exact near curve: skasm's
-    translator fix 902915361 already gives 10/17 and Split 3's halves; mine changed nothing.
-  - Told bool (a04711 theirs to instrument), dx, bool2, lead.
-- **core-oc stack, pair queued in vibex7's slot (23:20, base3 vs oc, ~/tmp/core/p2-cmp.out):** 482163a60 offset volume check
-  adaptive (30 -> 8 ms a B-spline solid; fan-blade), 074b9b7ed sweep start cap on the profile's plane (GearLab 8f5622
-  363 -> 283 faces = live; T1 features_c::a_helical_sweeps_start_cap_merges_with_the_face_it_starts_on). g++-13 OK.
+- **core-oc (core-oc 62dc4ed59 + 8139e9f22 on main da0c6fb73): LAND ~05:30 (lead: hold past the 05:00 cut).** Adaptive
+  offset volume check (fan-blade) + sweep start cap on the profile's plane (GearLab 8f5622 363 -> 283 faces = live).
+  Pair base3 vs oc clean (1295 = 1295, 0 newly invalid, 0 CHECK changes). g++-13 OK. Rebase over main first.
+- **Pairs waiting (results then land each via vibe2, rebased):**
+  - vibe2 slot: pair3 nb vs nuts (~/tmp/core/p3-cmp.out): nuts Sweep 1, core-rp 56328dd0b (item 4 below).
+  - vibex8 slot: pair3 nb2 vs pc (~/tmp/core/p3-cmp.out): pulleys cap re-land GATED, core-rv aa714b30a on 55fc929c
+    (the new cap search only for Face patterns; Feature patterns as 0.4.57). Its CLI: faces-pattern-slots SAME vs
+    0.4.57 (qa's userdocs.py on vibex7 ~/tmp/qa), pulleys T1 passes.
+  - vibex8 slot: pair4 nb2 vs lp (~/tmp/core/p4-cmp.out): loft-paths, core-tw 4299fbd0f (item 4c).
+- **11-18 01:40 LANDED 55fc929c: revert of 2c51590b0** (P0: qa's faces-pattern-slots, 20 sketches "Select a sketch plane."
+  on 0f7610c8 vs 0.4.57; a Feature pattern of pockets went through the faces tool once the cap worked, renaming its
+  instance faces). f824d120 (11-17 23:26) landed knifehandle Move face (FaceTweak) + c064b550a's revert.
+- knifehandle left: Fillet 3 7/15/10 vs 6/12/8 -> Chamfer 1 wrong as Ok (9286 vs 10424 mm3): blend's (agreed 11-18 03:0x).
+  Sweep 2 area 18225.81 vs 18227.26 mm2 (mine, small). TRANSLATE's rigid branch through the tweak; Delete face 2.
 - **Impeller Extrude impellerraum split walls: DROPPED.** Live (behaviours.md, live/core/q-imprint-walls/README.md): the
   face's edges split the sketch's regions but Extrude never keeps walls split where they cross a curve = main.
   00279fbca (branch core-imprint-dropped) was wrong. impellerraum's missing faces (38 vs 59) come from its input (our 35
@@ -39,13 +34,29 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
      volume): offsets 2 x ~176 ms in parallel (edges 73, volume check 62 -> ~17 with adaptive GProp: core-oc 482163a60), noshape Boolean decline ~300 ms + OCCT ~1.3 s on the exact offset faces (bool's). B-spline
      approximation of the offsets: slower, dropped.
   2. pulleys Circular pattern 1 speed (273 ms unloaded vs live 23): bool took the Boolean (arc across a seam).
-  3. c2-loft-paths-guides: my c064b550a (path loft merges smooth sides: Loft 3 20 -> 17 faces, live 15) made Mirror 1's
-     fuse silently wrong (5269155 vs live 6325198 mm3; before it volume/area = live, 37 vs 27 faces). REVERTED in core-tw
-     (a01ada59c, with the stack). Loft 3's 5 extra faces (live has 4 tiny ~6.7 mm2 faces) want a merge that keeps the
-     mirror's fuse right; tell bool2 (their fuse case is moot after the revert).
-  4. dx (11-17 21:15, live's 18:0x retake): c2-config-parts-nuts Sweep 1 "non-manifold body" (23:00: bool's 43335ce3 on
-     main; my turn patch re-applied in core-rp, on/off run on vibex8 ~/tmp/core/nuts-{on,off}.log; the case below: the
-     crest strip one face over ~7 turns of the bore cylinder).
+  3. c2-loft-paths-guides: see 4c (centripetal path loft, pair waiting).
+  4. nuts Sweep 1 "non-manifold body" (dx 11-17 21:15): COMMITTED core-rp 56328dd0b on main 34d3c4c39 (pair nb vs nuts
+     building vibex7 00:4x): op_pipe_shell faces_on_cylinders (side faces exactly on a cylinder become it, a turn each,
+     cylinder_turns; circle fit from 3 well-spread lines: whole-turn strips start and end at one angle), solid_a.rs
+     helical_sweep_clear takes per-turn vertices (screw_off), common.cpp shown_topology seam within 1e-7 of a period.
+     ERROR -> OK at live's volume, 29/59/32 expected after the seam fix (was 30/61/34: root sliver's seam 3.2e-8 rad
+     off 2pi after the Rust Boolean), 3.8 s -> 0.8 s (Rust Boolean 0.5 s + unify check 0.25 s left, bool's).
+     T1 features_c::a_thread_cut_with_its_crest_on_the_bore_removes_the_thread (fails on main).
+  4a. blend 11-18 01:4x: c2-impeller-loft's -9425 mm3 starts at f33 Move face 1 (OFFSET, ERROR "Could not offset selected
+     faces as requested."): its Part 2 from f32 Extrude 6 (NEW from face JkK, 3° draft) is 4/4/0 vs live 21/57/38, from
+     f31 Extrude impellerraum 38/99/62 vs live 59/158/100 (adds 3 faces, live 20; Halter f29 is blend's, 4 faces short).
+     Repro NOSHAPE_PARITY_ONLY=c2-impeller-loft NOSHAPE_PARITY_DIFFERING=1.
+  4c. LOFT-PATHS-TOPOLOGY (qa P2): COMMITTED core-tw 4299fbd0f on main 0fda4de5a (pair binary lp = same on 55fc929c,
+     pair4 nb2 vs lp on vibex8): c064b550a's `|| along` merge again + ThruSections Approx_Centripetal for path lofts
+     (spaced by parameter the side ran 0.96 mm back past the first profile: probe brepq/ovs.cpp; Mirror 1's OCCT fuse
+     then dropped the loft). Loft 3 15/37/27 (live 15/33/23), Mirror 1 27/73/53 at live's volume, Extrude 3 33 faces.
+     C1 approximation of C0 merges not needed (WIP /root/core-scratch/loft-along-merge-c1-wip.patch, unused). Loft 4's
+     ERROR is on main too. T1 features_a::a_path_loft_of_two_slots_has_one_side_face (+ no overshoot).
+  4d. loft-paths Loft 4 ERROR (main too; live OK 34/86/60): its slot profile (101.6 mm long, in the path's plane)
+     reaches past the path's centre of curvature (90° arc, R ~41 mm): path_sections' MakePipeShell folds the far end
+     (its arc face squeezed into 7 mm) and every cut misses that face (3-edge open sections -> ThruSections fails).
+     Live's path sections can't be pipe cuts: carry each profile along the path with a frame instead. Debug patch
+     /root/core-scratch/loft4-debug.patch (NOSHAPE_LOFT_DEBUG section/pipe prints, NOSHAPE_LOFT_DUMP), probe brepq/secp.cpp.
   4b. asm a04711 Extrude 4 "non-manifold" (asm's c22): our op_boolean's OCCT path cuts Part 3 to 422.23 mm3 (13 faces,
      non-manifold) where plain BRepAlgoAPI_Cut on the recorded case gives live's 213.964: sent to bool 22:40 (case
      vibex8 ~/tmp/core/a04rec/ad565563c0275193, probe ~/tmp/core/probefan/cutp, src brepq/cutp.cpp).
@@ -93,7 +104,8 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   corners, 10293.9930 mm2, centre (50,50,7.5). Next after the impeller.
 - fan-blade Boolean 2: 56/139/84 with core-next (live 56/143/88): +2 edges +2 vertices per hole need live's x_t
   (now at /root/parity/models/c2-fan-blade-sweep/live-base.x_t, 11-17). Probe vibe5 (down 11-17) ~/tmp/core/probefan (src /root/core-scratch/brepq).
-- Worktrees: core-trace (core-pipe2; probe /root/core-scratch/probe-wip.patch), core-oc (00279fbca impeller), core-rv (7a174ae2), core-rp (pulleys traces), core-tw (tweak + parting draft), core-bis: docs
+- Worktrees: core-oc (oc stack), core-rp (nuts 56328dd0b), core-rv (pulleys gated aa714b30a), core-tw (loft-paths: 4299fbd0f on
+  main; HEAD = its 55fc929c cherry-pick 83a551850 for pair binary lp), core-bis2 (main base binaries), core-trace (core-pipe2), core-bis: docs
   lands + Mac timing (.mac.sh, .macdoc = qa's impeller copy).
 - rocker-enclosure-sm Extrude 2 (next): Sketch 4's four Use circles (PROJECTED, live's external edges at x 45-60 mm,
   not on our part) come out as two: Extrude 2 names one region twice and cuts 2 holes of 4. Sketch translation:
@@ -152,22 +164,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   Saved documents' part names are Part N, not live's.
 
 ## Waiting on others
-- **c2-config-parts-nuts Sweep 1 (14/17, parked again 11-17 02:55; mine per bool 01:3x).** The tool's crest strip is
-  a B-spline (1 x 11) exactly on the bore's cylinder (r 1.621113885844308 mm); OCCT intersects instead of seeing one
-  surface, and its Cut removes more than the tool. Rust Boolean declines. Live 135.268 mm3 (29/59/32), target
-  143.883, tool 11.888. WIP /root/core-scratch/sweep-cylinders-wip*.patch (op_pipe_shell faces_on_cylinders: strips
-  made exact cylinders, unwrapped pcurves; ShapeFix_Shape makes it valid). Probe (vibe5 (down 11-17) ~/tmp/core/probefan/nuts,
-  src /root/core-scratch/brepq/nuts.cpp, dumps ~/agents/core-keep/nm-nuts-cyl): with exact cylinders the cut is
-  still wrong (144.384 mm3, 18 non-manifold edges): each strip is ONE face spanning ~7 turns (u -21.3..23.6), which
-  OCCT's Booleans can't place points on (they project into one period). ShapeUpgrade can't split it
-  (SplitSurface::Init clamps a periodic range to one period); BRepAlgoAPI_Splitter by the seam half-plane gives 27
-  faces but no separate solids. 11-17 03:15: per-turn split DONE in WIP /root/core-scratch/sweep-cylinder-turns-wip.patch
-  (cylinder_turns: strips cut at u = 2 pi k, pcurves in [0, 2 pi], edges split via ReShape; wire reversed where the
-  cylinder's normal opposes the B-spline's: valid with no ShapeFix). The cut is still wrong (155.4 mm3, invalid;
-  TooSmallEdge, AcquiredSelfIntersection): the r 2.0 crest passes through the chamfer rims (r 2.0 at z 0 / 4.06).
-  bool 04:3x: fixed on bool's side (bool-nuts b6466ab04: a turn face's helices 2.6e-8 rad short of a full turn were
-  taken as its seam): valid cut, 42 faces, 135.267625 mm3 (live 135.268). After it lands (own gate): unpark the
-  exact-cylinder patch and compare the doc's volume with live (tool axes 2-5e-15 off z: make them exact).
 - c2-config-parts-standoffs Revolve 1 (13/32): Sketch 3 solved 4 x 22 mm, chamfers on the axis side; live 3 x 24 (Length),
   outer corners chamfered (sketches.json). Already in skasm's handoff (translator takes Sketch 3 back). Variables OK.
 - **c2-sm-rocker-enclosure-body 15/28 (stable now):** Extrude 6's pocket is ~2 mm off live's and differently shaped
