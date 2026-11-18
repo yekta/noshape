@@ -196,6 +196,22 @@ fn rows() -> Vec<Row> {
             s.frames(cx);
             expect(got, Some((false, true, true)), "(a wall face, a side face, an edge) lights")
         } },
+        Row { id: "bend relief / its box lights corners, edges and side faces, never a wall's faces", live: "Bend relief › Bend relief (and Corner › Corner): a rip's side face filled orange, rim / bend edges, a bend end's corner as an orange disc; the broad faces never (live 11-17 sm-feel-1117)", gap: false, check: |s, cx| {
+            cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| v.start_feature("sheetMetalBendRelief", w, cx))).unwrap();
+            s.frames(cx);
+            let got = cx.update(|cx| {
+                let v = s.view.read(cx);
+                let (ctx, built) = (v.context.as_ref()?, v.built.as_ref()?);
+                let prio = v.viewport.read(cx).pick_priority.clone();
+                let lit = |r: Reference| built.picks.ids_for(&r).first().is_some_and(|id| prio(*id) != i32::MIN);
+                let (b, sm) = ctx.bodies.iter().find_map(|b| Some((b, ctx.sheet_metal.get(&b.id)?)))?;
+                let (walls, sides): (Vec<_>, Vec<_>) = b.faces.iter().map(|n| (sm.wall_of_face(n).is_some(), lit(Reference::Face((**n).clone())))).partition(|x| x.0);
+                Some((walls.iter().any(|x| x.1), sides.iter().any(|x| x.1), b.edges.iter().any(|n| lit(Reference::Edge((**n).clone()))), b.vertices.iter().any(|n| lit(Reference::Vertex((**n).clone())))))
+            });
+            cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+            s.frames(cx);
+            expect(got, Some((false, true, true, true)), "(a wall face, a side face, an edge, a vertex) lights")
+        } },
         Row { id: "flat view / a click on a bend zone", live: "selects that bend in both views and its row in the Bends table", gap: false, check: |s, cx| {
             s.escape_all(cx);
             let fv = cx.update(|cx| s.view.read(cx).flat_view.clone()).ok_or("no flat view")?;
@@ -263,4 +279,43 @@ fn the_sheet_metal_matrix_matches_live(cx: &mut TestAppContext) {
     let matched = report.iter().filter(|l| l.starts_with('=')).count();
     eprintln!("sheet metal matrix: {matched} / {} rows match live\n{}", report.len(), report.join("\n"));
     assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md and the row's gap): {moved:?}");
+}
+
+/// Live 11-17 sm-feel-1117: an open box (a block converted, its top excluded, its bottom edges bends: four corner rips)
+/// whose Joint A goes Rip → Bend in the table can't unfold: "Modify joint 1" is added with the unfold failure (a warning:
+/// std's hole.fs reads it so), its bend kept in the 3D, a yellow toast "Sheet metal model cannot be unfolded.", and the
+/// flat view goes blank.
+#[gpui::test]
+fn a_corner_rip_made_a_bend_cannot_unfold_as_lives(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "20 mm" } },
+        { "type": "sheetMetalStart", "name": "Sheet metal model 1", "params": { "process": "CONVERT", "partToConvert": ["part 0"], "facesToExclude": ["face through [30, 20, 20]"],
+            "bends": ["edge through [30, 0, 0]", "edge through [60, 20, 0]", "edge through [30, 40, 0]", "edge through [0, 20, 0]"] } },
+    ] });
+    let (window, view) = part_studio_from(cx, "sm-unfold", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_panel(crate::part_studio::config_panel::RightPanel::SheetMetal, w, cx))).unwrap();
+    let s = Sm { window, view: view.clone() };
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    s.frames(cx);
+    let part = cx.update(|cx| view.read(cx).context.as_ref().and_then(|c| c.sheet_metal.iter().find(|(_, d)| d.rips.len() == 4).map(|(b, _)| b.clone()))).expect("one part with four corner rips");
+    let flat = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).context.as_ref().map(|c| noshape_model::sheetmetal::flat_pattern_for(c, &part).is_ok()));
+    assert_eq!(flat(cx), Some(true), "the box unfolds");
+    s.press(cx, "sm-joint-type-0", MouseButton::Left).unwrap();
+    s.press(cx, "menu:Bend", MouseButton::Left).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    s.frames(cx);
+    let msg = noshape_model::regen::features::sheetmetal_ops::CANNOT_UNFOLD;
+    let got = cx.update(|cx| {
+        let v = view.read(cx);
+        let joint = v.studio(cx).and_then(|st| st.features.iter().find(|f| f.type_id == "sheetMetalJoint").map(|f| (f.name.clone(), f.id)));
+        let state = joint.as_ref().and_then(|(_, id)| v.display.feature_state(*id)).map(|st| (st.status, st.message.clone()));
+        let bends = v.context.as_ref().and_then(|c| c.sheet_metal.get(&part)).map(|d| d.bends.len());
+        (joint.map(|j| j.0), state, bends, v.message.clone())
+    });
+    use noshape_model::display::FeatureStatus;
+    assert_eq!(got, (Some("Modify joint 1".into()), Some((FeatureStatus::Warning, Some(msg.into()))), Some(5), Some((FeatureStatus::Warning, msg.into()))), "(the joint, its state, the part's bends, the toast)");
+    assert_eq!(flat(cx), Some(false), "no flat");
 }

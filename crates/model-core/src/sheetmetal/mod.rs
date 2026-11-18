@@ -369,6 +369,10 @@ pub struct SheetMetalData {
     /// later feature leaves it unchanged; the plate edge a flange's boolean joins is Flange 1's).
     #[serde(default)]
     pub def_owners: Vec<(crate::reference::Reference, FeatureId)>,
+    /// A joint made a bend that closes a loop of walls: no flat (live: the flat view blank, "Sheet metal model cannot
+    /// be unfolded.").
+    #[serde(default)]
+    pub cannot_unfold: bool,
 }
 
 /// A sheet metal model's joints over all its parts: the Sheet metal table
@@ -459,7 +463,29 @@ impl SheetMetalData {
             marks: Vec::new(),
             label_owners: Vec::new(),
             def_owners: Vec::new(),
+            cannot_unfold: false,
         }
+    }
+
+    /// The bends join the walls round a loop: the sheet can't lie flat (live: "Sheet metal model cannot be unfolded.",
+    /// a box's corner rip made a bend).
+    pub fn bends_close_a_loop(&self) -> bool {
+        let mut root: Vec<usize> = (0..self.walls.len()).collect();
+        fn find(root: &mut [usize], mut i: usize) -> usize {
+            while root[i] != i {
+                root[i] = root[root[i]];
+                i = root[i];
+            }
+            i
+        }
+        self.bends.iter().filter_map(|b| Some((b.parent, b.child?))).any(|(a, b)| {
+            if a >= root.len() || b >= root.len() {
+                return false;
+            }
+            let (ra, rb) = (find(&mut root, a), find(&mut root, b));
+            root[ra] = rb;
+            ra == rb
+        })
     }
 
     /// Wall owning a face: (wall index, face is on the reference side).

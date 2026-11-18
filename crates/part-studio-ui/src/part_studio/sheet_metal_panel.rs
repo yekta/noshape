@@ -724,9 +724,23 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let Some(mut copy) = self.studio(cx).cloned() else { return };
         if noshape_ops::sheetmetal::edit_rip(&mut copy, model, &data, rip, edit, &units) {
+            let joints: Vec<FeatureId> = copy.features.iter().filter(|f| f.type_id == "sheetMetalJoint").map(|f| f.id).collect();
             self.edit_config(noshape_ops::sheetmetal::MODIFY_JOINT, cx, |ps| *ps = copy);
+            if self.ui.after_regen.is_none() {
+                self.ui.after_regen = Some(Box::new(move |this, _, cx| this.toast_cannot_unfold(&joints, cx)));
+            }
         }
         cx.notify();
+    }
+
+    /// Live 11-17 sm-feel-1117: a joint that leaves the model unable to unfold says so in a yellow toast.
+    fn toast_cannot_unfold(&mut self, joints: &[FeatureId], cx: &mut Context<Self>) {
+        use noshape_model::display::FeatureStatus;
+        let msg = noshape_model::regen::features::sheetmetal_ops::CANNOT_UNFOLD;
+        let failed = |j: &FeatureId| self.display.feature_state(*j).is_some_and(|s| s.status == FeatureStatus::Warning && s.message.as_deref() == Some(msg));
+        if joints.iter().any(failed) {
+            self.flash_for(FeatureStatus::Warning, msg.into(), std::time::Duration::from_secs(5), cx);
+        }
     }
 
     pub(super) fn render_sheet_metal_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
@@ -1025,7 +1039,7 @@ impl PartStudioView {
                 .border_l_1()
                 .border_color(grid)
                 .child(cell(140., head, true, r.name.clone().into(), Some((1, i, 0))))
-                .child(select_cell("Rip").id(("sm-joint-type", i)).os_dropdown_menu(SharedString::from(format!("sm-joint-type-{i}")), true, move |mut m, _, _| {
+                .child(select_cell("Rip").debug_selector(move || format!("sm-joint-type-{i}")).id(("sm-joint-type", i)).os_dropdown_menu(SharedString::from(format!("sm-joint-type-{i}")), true, move |mut m, _, _| {
                     for (label, edit) in [("Bend", Some(RipEdit::Bend)), ("Rip", None)] {
                         let v = v1.clone();
                         m = m.item(OsMenuItem::new(label).checked(edit.is_none()).on_click(move |_, _, cx| {

@@ -15,8 +15,12 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Result<Value, String> {
 /// A selection as the start names it: "Sketch 1 region 0" (the sketch's
 /// region by index), "edge through [20, 0, 10]" (also face / vertex; mm),
 /// "Sketch 1 edges" (all its curves: a Frame's path), "Sketch 2 circle centre at [20, 10]" (a circle's centre point,
-/// sketch mm: a Hole's location).
+/// sketch mm: a Hole's location), "part 0" (the studio's first part: a Convert's part).
 fn entity(ctx: &mut Ctx, name: &str) -> Result<Value, String> {
+    if let Some(i) = name.strip_prefix("part ").and_then(|n| n.parse::<usize>().ok()) {
+        let got = call(ctx, "query_parts", json!({}))?;
+        return got["parts"].get(i).and_then(|p| p["id"].as_str()).map(|id| json!(id)).ok_or_else(|| format!("`{name}`: no part {i}"));
+    }
     if let Some((sketch, at)) = name.split_once(" circle centre at ") {
         let at: [f64; 2] = serde_json::from_str(at).map_err(|e| format!("`{name}`: {e}"))?;
         let got = call(ctx, "sketch_get", json!({ "sketch": sketch }))?;
@@ -50,7 +54,7 @@ fn entity(ctx: &mut Ctx, name: &str) -> Result<Value, String> {
 /// Selections named in a feature's params, resolved to ours.
 fn resolve(ctx: &mut Ctx, v: &Value) -> Result<Value, String> {
     match v {
-        Value::Array(items) if items.iter().all(Value::is_string) && items.iter().any(|s| s.as_str().is_some_and(|s| s.contains(" region ") || s.contains(" through ") || s.ends_with(" edges") || s.contains(" circle centre at "))) => {
+        Value::Array(items) if items.iter().all(Value::is_string) && items.iter().any(|s| s.as_str().is_some_and(|s| s.contains(" region ") || s.contains(" through ") || s.ends_with(" edges") || s.contains(" circle centre at ") || s.starts_with("part "))) => {
             // ("Sketch 1 edges" stands for several.)
             let mut out = Vec::new();
             for s in items {

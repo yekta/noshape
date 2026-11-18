@@ -527,6 +527,7 @@ pub fn modify_joint(ev: &mut EvalCtx) -> FResult<()> {
     let Some(r) = ev.query("entity").first().cloned() else { return crate::regen::eval::err_at(&["entity"], "Select a joint from an active sheet metal model.") };
     let Some((bi, si, is_face)) = resolve_one(ev, &r) else { return crate::regen::eval::err_at(&["entity"], "Select a joint from an active sheet metal model.") };
     let mut data = (*active_data(ev, bi)?).clone();
+    let looped = data.bends_close_a_loop();
     let body = ev.ctx.bodies[bi].clone();
     let bend = if is_face {
         data.bend_of_face(&body.faces[si])
@@ -581,9 +582,18 @@ pub fn modify_joint(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
     }
+    // Live 11-17 sm-feel-1117 (a box's corner rip made a bend): a warning, the bend kept.
+    // (A closed profile's loop of bends was there before: not this joint's.)
+    data.cannot_unfold = data.bends_close_a_loop() && (data.cannot_unfold || !looped);
+    if data.cannot_unfold {
+        ev.warnings.push(CANNOT_UNFOLD.into());
+    }
     put_data(ev, bi, data);
     Ok(())
 }
+
+/// Live's message for a sheet metal model whose flat can't be made.
+pub const CANNOT_UNFOLD: &str = "Sheet metal model cannot be unfolded.";
 
 // ------------------------------------------------------------------ tab
 

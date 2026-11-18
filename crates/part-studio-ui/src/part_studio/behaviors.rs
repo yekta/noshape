@@ -21,6 +21,8 @@ use noshape_model::reference::{BodyId, FeatureId, Reference};
 
 /// Flange's and Hem's "Edges or side faces" box (model-data's sheet metal `SM_EDGES`).
 const SM_EDGES_FILTER: QueryFilter = QueryFilter(QueryFilter::EDGE.0 | QueryFilter::PLANAR_FACE.0);
+/// Corner's and Bend relief's box (model-data's `SM_CORNER`).
+const SM_CORNER_FILTER: QueryFilter = QueryFilter(QueryFilter::VERTEX.0 | QueryFilter::EDGE.0 | QueryFilter::PLANAR_FACE.0);
 use noshape_render::Camera;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -1526,10 +1528,11 @@ impl PartStudioView {
         let own_plane = self.sketch.as_ref().and(self.edit.as_ref()).and_then(|e| e.dialog.read(cx).feature.params.query("sketchPlane").first().cloned())
             .filter(|r| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }));
         let Some(built) = &self.built else { return };
-        // Live 11-17 sm-feel-1117: Flange's (and Hem's) "Edges or side faces" lights rim and bend edges and a rip's
-        // thin side face, never a wall's broad faces.
+        // Live 11-17 sm-feel-1117: Flange's (and Hem's) "Edges or side faces", Corner's and Bend relief's boxes light
+        // rim and bend edges and a rip's thin side face (the last two a bend end's corner too), never a wall's broad
+        // faces.
         let muted: Vec<u32> = match (self.active_field_filter(cx), &self.context) {
-            (Some(f), Some(ctx)) if f == SM_EDGES_FILTER => ctx
+            (Some(f), Some(ctx)) if f == SM_EDGES_FILTER || f == SM_CORNER_FILTER => ctx
                 .bodies
                 .iter()
                 .filter_map(|b| Some((b, ctx.sheet_metal.get(&b.id)?)))

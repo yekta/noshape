@@ -1446,6 +1446,9 @@ fn another_sketchs_point_snaps_from_its_square(cx: &mut TestAppContext) {
         cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().inference.as_ref().is_some_and(|i| (i.position - q).length() < 1e-7))
     };
     assert!(!at(cx, 12.0), "12 px off: free");
+    // Live 6-7 px (qa 11-18 SKSNAP-REACH): 7 px lights coming from outside.
+    assert!(at(cx, 7.0), "7 px along x: on the point");
+    assert!(!at(cx, 12.0), "12 px off: free again");
     assert!(at(cx, 6.5), "6.5 px along x: on the point");
     // Live 11-18 use-glyph: the click makes one Coincident to the point and uses nothing: no use glyph, the point not
     // drawn in this sketch.

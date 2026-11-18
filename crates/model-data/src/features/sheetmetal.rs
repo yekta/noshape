@@ -55,7 +55,9 @@ pub const ANGLE_CONTROL: &[(&str, &str)] =
 
 /// Side faces or linear edges of an active sheet metal model.
 const SM_EDGES: QueryFilter = QueryFilter(QueryFilter::EDGE.0 | QueryFilter::PLANAR_FACE.0);
-const SM_CORNER: QueryFilter = QueryFilter(QueryFilter::VERTEX.0 | QueryFilter::EDGE.0);
+/// Corner's and Bend relief's box: std's definition vertex or edge, so a rip's thin side face (its definition edge)
+/// too (live 11-17 sm-feel-1117: it lights filled orange; the walls' faces never, muted by the view).
+const SM_CORNER: QueryFilter = QueryFilter(QueryFilter::VERTEX.0 | QueryFilter::EDGE.0 | QueryFilter::PLANAR_FACE.0);
 const SM_BOUNDS: &[(&str, &str)] =
     &[("BLIND", "Blind"), ("UP_TO_NEXT", "Up to next"), ("UP_TO_SURFACE", "Up to face"), ("UP_TO_BODY", "Up to part"), ("UP_TO_VERTEX", "Up to vertex")];
 

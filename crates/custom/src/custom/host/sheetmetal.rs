@@ -2456,7 +2456,9 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let own: Vec<Strip> = strips.iter().filter(|s| p.members.contains(&s.wall_a)).cloned().collect();
                 let own_forms: Vec<FormShapes> = form_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
                 let own_cuts: Vec<(usize, Vec<Shape>)> = cut_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
-                let flat = flat_of(def, &topo, &walls, &own, &own_forms, &own_cuts);
+                // Bends joining the part's walls round a loop: no flat (live: "Sheet metal model cannot be unfolded.").
+                let looped = bends_close_a_loop(def, &topo, &p.members);
+                let flat = if looped { None } else { flat_of(def, &topo, &walls, &own, &own_forms, &own_cuts) };
                 // A centerline wire per bend, in the flat (live 2015: "Bend line 1", hidden), for std (pcbEnd).
                 let mut wires = Vec::new();
                 for line in flat.iter().flat_map(|f| f.bend_lines.iter().map(move |l| (f, l))) {
@@ -2468,7 +2470,8 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     push_body(ev, wid.clone(), BodyKind::Wire, shape, Vec::new());
                     wires.push((wid, strip.rolled.map_or(Def::Edge(strip.edge), Def::Face), l.up));
                 }
-                let data = sheet_data(def, &topo, &own, &p, flat.as_ref(), &others, &births);
+                let mut data = sheet_data(def, &topo, &own, &p, flat.as_ref(), &others, &births);
+                data.cannot_unfold = looped;
                 let id = def.previous.get(k).cloned().unwrap_or_else(|| {
                     fresh += 1;
                     BodyId { feature: ev.feature, index: fresh - 1 }
@@ -2510,6 +2513,13 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // Hole 1, Extrude 1, Fillet 1 (not its "use Corner break") and Mirror 1, each rebuilding that part), not over a
     // warning or error.
     let top: FsId = id.iter().take(1).cloned().collect();
+    // A part that can't unfold: a warning over the result, which stays (live sm-feel-1117: a box's corner rip made a
+    // bend, the yellow toast, the corner shown bent; std's hole.fs reads SHEET_METAL_COULD_NOT_UNFOLD as a warning).
+    let reported = st.status.get(&top).is_some_and(|v| v.get("statusType").as_str().is_some_and(|t| matches!(&*t, "ERROR" | "WARNING")));
+    if built.iter().any(|b| b.4.cannot_unfold) && !reported {
+        let message = super::std_enum("errorstringenum.gen.fs", "ErrorStringEnum", "SHEET_METAL_COULD_NOT_UNFOLD").unwrap_or_else(|| Value::str("SHEET_METAL_COULD_NOT_UNFOLD"));
+        st.status.insert(top.clone(), Value::map_from([("statusType", Value::str("WARNING")), ("statusEnum", message)]));
+    }
     let quiet = st.status.get(&top).is_none_or(|v| v.get("statusType").as_str().is_some_and(|t| &*t == "INFO"));
     if built.iter().any(|b| b.3.as_ref().is_some_and(|f| f.collides)) && quiet {
         let message = super::std_enum("errorstringenum.gen.fs", "ErrorStringEnum", "SHEET_METAL_SELF_INTERSECTING_FLAT").unwrap_or_else(|| Value::str("SHEET_METAL_SELF_INTERSECTING_FLAT"));
@@ -2913,6 +2923,22 @@ fn sketch_curves(s: &crate::regen::context::SketchResult) -> Vec<(Vec<DVec3>, bo
             (pts.len() >= 2).then(|| (pts.into_iter().map(|p| f.origin + f.x * p.x + f.y * p.y).collect(), !e.construction))
         })
         .collect()
+}
+
+/// The definition's bends join `members` (a part's walls) round a loop.
+fn bends_close_a_loop(def: &Definition, topo: &Topo, members: &[usize]) -> bool {
+    let mut root: BTreeMap<usize, usize> = BTreeMap::new();
+    fn find(root: &mut BTreeMap<usize, usize>, mut i: usize) -> usize {
+        while let Some(&r) = root.get(&i).filter(|r| **r != i) {
+            i = r;
+        }
+        i
+    }
+    def.bends.keys().filter_map(|e| topo.edge_faces.get(*e)).filter(|fs| fs.len() == 2).map(|fs| (fs[0] as usize, fs[1] as usize)).filter(|(a, b)| a != b && members.contains(a) && members.contains(b)).any(|(a, b)| {
+        let (ra, rb) = (find(&mut root, a), find(&mut root, b));
+        root.insert(ra, rb);
+        ra == rb
+    })
 }
 
 fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips: &[Strip], forms: &[FormShapes], cuts: &[(usize, Vec<Shape>)]) -> Option<crate::sheetmetal::FlatPattern> {

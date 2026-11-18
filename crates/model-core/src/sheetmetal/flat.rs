@@ -282,6 +282,9 @@ fn mat_transform(m: &DMat4) -> k::Transform {
 
 /// Unfold `body` using its sheet metal model.
 pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, String> {
+    if data.cannot_unfold {
+        return Err(crate::regen::features::sheetmetal_ops::CANNOT_UNFOLD.into());
+    }
     let t = data.thickness;
     let nw = data.walls.len();
     // Resolve wall faces in the current body.
