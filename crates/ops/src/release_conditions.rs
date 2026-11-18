@@ -61,13 +61,10 @@ pub fn condition_issues(session: &Session, items: &[ReleaseItem]) -> Vec<Vec<Iss
                         let result = noshape_model::regen::Regenerator::new().regenerate(ps, &values, &session.doc.settings.units, &noshape_model::regen::RegenOptions::default());
                         result.display.features.iter().any(|f| f.status == FeatureStatus::Error)
                     });
-                    // With the condition off live still notes it (live2 errors-1118: an amber band under the row).
+                    // Live2 errors-1118: the same words either way, red and blocking with the condition on, an amber notice
+                    // with it off.
                     if failed {
-                        if on[FEATURE_ERRORS] {
-                            prevented(&mut v, "The Part Studio feature list contains errors.");
-                        } else {
-                            v.push(Issue::Notice("Part belongs to a Part Studio that has regeneration errors".into()));
-                        }
+                        held(&mut v, on[FEATURE_ERRORS], "Part belongs to a Part Studio that has regeneration errors");
                     }
                     if ps.rollback.is_some_and(|r| r < ps.features.len()) {
                         held(&mut v, on[ROLLED_BACK], "Part belongs to a Part Studio with a Feature list that is in a rolled back state.");

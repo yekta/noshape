@@ -1730,7 +1730,9 @@ const GRID: u32 = 0xdddddd;
 /// Live2 errors-1118 (`alert alert-warning`): bg rgb(255,248,230), text rgb(51,51,51), border rgb(252,218,127).
 const BAND_WARNING: (u32, u32) = (0xfff8e6, 0x333333);
 const BAND_WARNING_BORDER: u32 = 0xfcda7f;
-const BAND_DANGER: (u32, u32) = (0xf2dede, 0xa94442);
+/// Live2 errors-1118 (`alert alert-danger`): bg rgb(249,235,236), text rgb(51,51,51), border rgb(245,223,225).
+const BAND_DANGER: (u32, u32) = (0xf9ebec, 0x333333);
+const BAND_DANGER_BORDER: u32 = 0xf5dfe1;
 const BAND_INFO: (u32, u32) = (0xd9edf7, INFO_BLUE);
 /// An item's INFO message (Bootstrap's alert-info text).
 const INFO_BLUE: u32 = 0x31708f;
@@ -2214,7 +2216,8 @@ impl Render for ReleaseDialog {
                     .rounded(px(3.))
                     .bg(gpui_kit::rgb(bg))
                     .when((bg, fg) == BAND_WARNING, |d| d.border_1().border_color(gpui_kit::rgb(BAND_WARNING_BORDER)).text_size(px(14.)))
-                    .when((bg, fg) != BAND_WARNING, |d| d.text_size(px(12.)))
+                    .when((bg, fg) == BAND_DANGER, |d| d.border_1().border_color(gpui_kit::rgb(BAND_DANGER_BORDER)).text_size(px(14.)))
+                    .when((bg, fg) != BAND_WARNING && (bg, fg) != BAND_DANGER, |d| d.text_size(px(12.)))
                     .text_color(gpui_kit::rgb(fg))
                     .child(text)
                     .into_any_element()
