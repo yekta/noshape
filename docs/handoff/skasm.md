@@ -37,8 +37,11 @@ Our solver keeps links' waist arcs on live's branch (probe /root/skasm-scratch/p
 
 ## Next, in order
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
-1. Sketch 5 of loft-paths-guides: 2 PIERCE rejected onto part edges (TRACE PIERCE ccftgSEZYLF300.pierce1/2: read the
-   error past the 300-char cut). Unfound PROJECTED (45): mostly qCompressed queries with no ids (hunting-knife Sketch
+1. loft-paths-guides now lists only Sketch 2's take-back and Sketch 4's 3 PROJECTED (Sketch 5's PIERCEs on its
+   Intersection's ends are skipped as the tool's own). The other PIERCE take-backs (09:20, sec.log) all sit behind an
+   upstream difference: surf-intro tail fins (Intersection face from the unbuilt Derived 1), manualblend Sketch 6 / 7
+   (sections on Sweep 2, wrong after Sketch 5's CONCENTRIC), pipe (core's Loft first), knifehandle (Sweep 2 first).
+   Unfound PROJECTED (45): mostly qCompressed queries with no ids (hunting-knife Sketch
    12, no feature lost); rocker-enclosure's wait on core's split-face fix.
 2. Suite 11-18 05:45 vibex8 (~/agents/skasm-keep/suite-0545.log): 88/126 docs, 1292/1585; untranslated sketch
    constraints 121 (45 PROJECTED model geometry not found, 24 PIERCE rejected: loft-paths-guides, surf-intro tail fin,

@@ -5502,8 +5502,23 @@ impl<'a> Translator<'a> {
     /// are skipped; the rest that fail or have no counterpart are counted.
     fn constraints(&mut self, k: usize, oid: &str, id: &str, f: &Value, problems: &mut Vec<String>) {
         let mut missed: std::collections::BTreeMap<String, usize> = Default::default();
+        // The curves live's Intersection made that ours made too (by Use with `intersect`).
+        let sections: Vec<&str> = f["constraints"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|c| c["constraintType"] == "INTERSECTED")
+            .filter_map(|c| c["parameters"].as_array()?.iter().find(|p| p["parameterId"] == "localCurve")?["value"].as_str())
+            .filter(|l| self.used.contains(&(oid.to_string(), l.to_string())))
+            .collect();
         for c in f["constraints"].as_array().into_iter().flatten() {
             let ty = c["constraintType"].as_str().unwrap_or("");
+            // A PIERCE on an end of such a curve is the Intersection's own: the end is where the face's boundary edge
+            // crosses the plane, ours there already (c2-loft-paths-guides' Sketch 5: refused on our fixed section).
+            let local = c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "localEntity").and_then(|p| p["value"].as_str());
+            if ty == "PIERCE" && local.and_then(|l| l.strip_suffix(".start").or_else(|| l.strip_suffix(".end"))).is_some_and(|l| sections.contains(&l)) {
+                continue;
+            }
             let ours = match ty {
                 "COINCIDENT" => "coincident",
                 "CONCENTRIC" => "concentric",
