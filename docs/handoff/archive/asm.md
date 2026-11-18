@@ -790,3 +790,16 @@ Where everything stood:
   vibe2 ~/agents/asm-keep/g2b.sh on a copy of the p08 snapshot -> p08/asm-c08b.log, p08/doneb. Merge on vibex8:
   asm-c08all.log; `python3 ../cmp.py asm-base08.log asm-c08all.log`. Gate 2's model phase was dropped: the validity
   pair below covers it (models base + check vs branch + check).
+- Lead 11-18 ruling: a mate live can't resolve (reference failure) fails in ours too. b55474f62: ends live marks red
+  (or "cannot resolve" alone) get an unresolved reference (mc:F0.0). pattern-std c26 (vibe2 one/ps26.log): 162/162
+  occ, 92/92 mates, 13/17 BOM (main 162 / 50 / 10). Only a live SOLVER failure on a solvable system may be solved by
+  ours, recorded in DECISIONS with evidence.
+- Lead ruling 11-15: don't copy live's unresolved-connector failure.
+
+### Found, not mine / waiting
+- Snap mode (live snapmode-1118): a570ea86 LANDED 06:58 (b5c4ccc4); 9b66ab17 QUEUED (aligned placement, API snap
+  flipped fastened, release opens an uncommitted Fastened dialog). On the branch, to land after it: fc3ecc3ae reach is
+  a 57 px square (max |dx|,|dy|; live's 50 px pick radius + dot), Ctrl+Z in the snap-opened dialog does nothing.
+  587cd164 landed as 80a647256; qa: dialog verified; REACH P1 on diagonals (TICKETS 7556969e3: 74 px at 45°, square
+  predicts 80.6): ours needs the pointer over the target part (raycast). Asked live2 (REQUESTS 07:56) for the diagonal
+  reach and whether an off-part pointer snaps; then match (live's pick rect ±50 px + 15 px dots).

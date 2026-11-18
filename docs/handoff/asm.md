@@ -39,22 +39,12 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   unresolved, Fastened 1 OK); (c) scissor-lift occ 214->212: Fastened 26/35 now resolve (live OK) but Sub aa9534 <1> >
   Output Coupler <1> 19 mm off and turned, Sub 6ed9b2 <1> > T8 Leadscrew <1> turned about its axis. Traces (ops-c23)
   on vibex7 after 04:00: ~/agents/asm-keep/tr2.sh -> one/ps23.log, one/sc23.log, one/tr2.done.
-- Lead 11-18 ruling: a mate live can't resolve (reference failure) fails in ours too. b55474f62: ends live marks red
-  (or "cannot resolve" alone) get an unresolved reference (mc:F0.0). pattern-std c26 (vibe2 one/ps26.log): 162/162
-  occ, 92/92 mates, 13/17 BOM (main 162 / 50 / 10). Only a live SOLVER failure on a solvable system may be solved by
-  ours, recorded in DECISIONS with evidence.
 - scissor-lift c26 (vibe2 one/sc26.log): 212/242 (Fastened 35, Z aligned, PLUS_Y). Mapping (traces): our flip_primary
   = NOT live's primaryAxisAlignment (true = Z opposed). Corpus raw frames (/root/asm-scratch/bin/reorient_stats.py):
   opposed PLUS_Y +90° (45), aligned PLUS_Y −90° (8); live2's Q on pin-block (aligned) agrees. So base_rotation(flip on)
   = Rz(−k·90°), flip off unchanged (c27 had it backwards; its A/B stopped unrun). c28 = that fix + edited mates hold
   their free values (Q/A turn the part, live mate-keys-1118). A/B: vibe2 ~/agents/asm-keep/ab28.sh -> ab27/c28.log vs
   ab27/c26.log (done28). Open: live's A on that Revolute turns about the connector's Y (diag(−1,1,−1)); ours about X.
-- Snap mode (live snapmode-1118): a570ea86 LANDED 06:58 (b5c4ccc4); 9b66ab17 QUEUED (aligned placement, API snap
-  flipped fastened, release opens an uncommitted Fastened dialog). On the branch, to land after it: fc3ecc3ae reach is
-  a 57 px square (max |dx|,|dy|; live's 50 px pick radius + dot), Ctrl+Z in the snap-opened dialog does nothing.
-  587cd164 landed as 80a647256; qa: dialog verified; REACH P1 on diagonals (TICKETS 7556969e3: 74 px at 45°, square
-  predicts 80.6): ours needs the pointer over the target part (raycast). Asked live2 (REQUESTS 07:56) for the diagonal
-  reach and whether an off-part pointer snaps; then match (live's pick rect ±50 px + 15 px dots).
 - P0 HEAVY-ASM-SOFTWARE-FRAME (qa, xDev): cause = angle display mesh density: 7.76 M tris (SCHUNK Gehaeuse 355 faces
   1.17 M, 7 mm bearing 67k, _787261002 691k ×5); chord mesh 1.05 M; headless render 15–18 s -> 2.95 s (vibex8
   ~/tmp/asm/perf, probe /root/tmp/render.rs.main). Handed to psui 11-18 12:3x; assembly side doesn't scale it.
@@ -110,9 +100,6 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   vibex6 ~/agents/asm-keep/m7b.
 - dx keeps infento (1dc32b, 74d3d6) and bjr-config (5d8bc1); tell dx before touching the derivedFrom /
   ORIGINAL_DEPENDENCY path in the translator.
-- Lead ruling 11-15: don't copy live's unresolved-connector failure.
-
-### Found, not mine / waiting
 - robot-relations 0c3466 Import 1: live makes 6 SHEET bodies (no solid), ours one invalid solid (28 free edges); dx took
   it to the lead as a decision (import an open shell as sheet pieces), tells me when it lands -> rerun robot-relations
   (BOM 35/42 rest).
@@ -159,7 +146,12 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   live's 332112, a studio tail). Its Extrude 12 (17 faces vs live 14, same volume): not the Boolean (bool, OCCT-only too) -> core 11-17 (repro vibex8 ~/agents/asm-keep/mps).
 
 ### Next, in order
-1. p01 results -> land the 6 (or fix forward per document that got worse).
+0. live2 truth for the suite's first differences (behaviours "asm (lead 11-18 ~13:32)", live/asm/truth-1118/): all
+   ours. scissor-lift: "Top <3>" (RVKD, 4ce5c7f4) not inserted; isaac: "Helical 1M 13T <1>" (JHD) missing, Revolute
+   12 OK; infento: "Wheellock ring 8-42 <3>" (RADD), Planar 10 OK; rack-pinion Planar 2 OK; bjr: grub <4> placement,
+   OPG006 Description; pinslot washer z 30.987 (ours 31.286, configured std part); suspension: "Cap <2>" with empty
+   partId gets no occurrence / BOM row (ours a "Cap" row); robot-relations REV-21-1650 6 rows ×1 unmerged;
+   pattern-std row 8 AR-HR-482-D600 ×2 Steel A36; welding-config top <2> placement, "Part 2" in rows 4/15/22/29.
 2. Lost mates still mine: tvc (c10 on vibex8: 11/12 mates, 26/26 BOM; alike-volume parts now settled by their mate
    connectors, 62043ea70). Left: Cylindrical 1's edge on ".2_Peça <1>" is on no SG90 body of ours; endcheck/find_ent in vibex8 ~/tmp/asm),
    xdev-subs (c16: 262/266 occurrences, BOM 74/74 and no extra rows). 59e7fd03d: a nested flexible subassembly
