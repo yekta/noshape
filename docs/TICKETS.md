@@ -575,7 +575,7 @@ Parts (1), cell bold; switching back clears at once and never greys rows (6 shot
 - [ ] **P3 CFGFEEL-DUP-ID (studios)**: CLI config add_option "A" twice gives the id "A_2"; live stores "A0" (FeatureScript ids).
 - Not judged: a row added after a parameter is configured shows an empty Depth cell in ours (live2 added its rows before configuring).
 
-## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:20, green cafe3c2af, vibex8 Xvfb, real pointer)
+## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:10, green cafe3c2af, vibex8 Xvfb, real pointer)
 Sessions opened without the UI runner (stable view): asm-feel (Part 1 40x30x10, Part 3 20x20x5), block-fillet, hole-plate-drawing.
 Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png (vibex8 ~/agents/qa-keep/feel-1118/).
 - Context menus: a feature row's menu is up while the right button is still held; the graphics menu only after the release. As live
