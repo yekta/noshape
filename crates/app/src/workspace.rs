@@ -1309,7 +1309,8 @@ impl Workspace {
         let (doc, after) = (self.doc.clone(), self.active);
         crate::files::request_open_paths("Import files", "All files", &["*"], window, cx, move |paths, cx| {
             let is = |p: &std::path::PathBuf, exts: &[&str]| p.extension().is_some_and(|e| exts.contains(&e.to_string_lossy().to_lowercase().as_str()));
-            let (cad, rest): (Vec<_>, Vec<_>) = paths.into_iter().partition(|p| is(p, IMPORT_EXTS));
+            // A bare assembly file goes to the dialog too (its "Upload only" variant, live upload-only-1118).
+            let (cad, rest): (Vec<_>, Vec<_>) = paths.into_iter().partition(|p| is(p, IMPORT_EXTS) || is(p, noshape_ops::import::BARE_ASSEMBLIES));
             let mut last = None;
             for p in rest {
                 let Ok(bytes) = std::fs::read(&p) else { continue };

@@ -26,6 +26,7 @@ pub fn ops() -> Vec<Op> {
             opt("join", json!({ "type": "boolean" }), "Join adjacent surfaces."),
             opt("iges_postprocessing", json!({ "type": "boolean" }), "IGES postprocessing (IGES files): their straight edges read as lines."),
             opt("keep_files", json!({ "type": "boolean", "default": true }), "Keep the files as file tabs in \"CAD Imports\"."),
+            opt("upload_only", json!({ "type": "boolean" }), "Upload only: every file kept as it is, as a file tab after the import's tab, nothing translated. A bare assembly file (.sldasm, .iam, .catproduct, .asm) needs it, as the dialog: Onshape needs a zip of the assembly and all of its references to translate it."),
             opt("after", s(), "Tab to put the new tabs after (default: the end)."),
         ],
         mutates: true,
@@ -47,9 +48,14 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(t) => Some(doc::find_tab(od.doc(), t).map_err(|e| e.with_param("after"))?),
         None => None,
     };
+    // A bare assembly file: the dialog's Import stays disabled until Upload only is ticked (live upload-only-1118).
+    let upload_only = a.bool_or("upload_only", false)?;
+    if import::has_bare_assembly(&paths) && !upload_only {
+        return Err(OpError::param("upload_only", &format!("{} Pass upload_only to keep the file as it is.", import::BARE_ASSEMBLY_NOTE)));
+    }
     // Other files (images, PDF, text, DXF / DWG…) become file tabs, one edit
     // each, as the app's "+ › Import…" (Onshape).
-    let cad_file = |p: &PathBuf| p.extension().is_some_and(|e| import::IMPORT_EXTS.contains(&e.to_string_lossy().to_lowercase().as_str()));
+    let cad_file = |p: &PathBuf| upload_only || p.extension().is_some_and(|e| import::IMPORT_EXTS.contains(&e.to_string_lossy().to_lowercase().as_str()));
     let (paths, other): (Vec<PathBuf>, Vec<PathBuf>) = paths.into_iter().partition(cad_file);
     let (mut stored, mut last) = (Vec::new(), None);
     for p in &other {
@@ -73,6 +79,7 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     c.join = a.bool_or("join", false)?;
     // As the dialog: only offered for IGES files.
     c.iges_post = a.bool_or("iges_postprocessing", false)? && import::offers_iges_postprocessing(&paths);
+    c.upload_only = upload_only;
     if let Some(u) = a.opt_str("mesh_unit")? {
         c.unit = MESH_UNITS.iter().position(|x| x.0.eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param("mesh_unit", "one of the listed units"))?;
     }

@@ -25,6 +25,17 @@ pub fn offers_material_density(paths: &[std::path::PathBuf]) -> bool {
     paths.iter().any(|p| p.extension().is_some_and(|e| MATERIAL_DENSITY_TYPES.contains(&e.to_string_lossy().to_lowercase().as_str())))
 }
 
+/// Assembly files Onshape can't translate on their own (it needs a zip of the assembly and every file it references): the
+/// Import dialog offers "Upload only" for them (live upload-only-1118).
+pub const BARE_ASSEMBLIES: &[&str] = &["iam", "catproduct", "sldasm", "asm"];
+/// The Import dialog's info box over "Upload only" (live upload-only-1118).
+pub const BARE_ASSEMBLY_NOTE: &str = "It looks like you want to import an assembly. Onshape needs a zip file containing the assembly and all of its references to process the import.";
+
+/// Whether any of `paths` is a bare assembly file ([`BARE_ASSEMBLIES`]): the dialog's "Upload only" variant.
+pub fn has_bare_assembly(paths: &[PathBuf]) -> bool {
+    paths.iter().any(|p| p.extension().is_some_and(|e| BARE_ASSEMBLIES.contains(&e.to_string_lossy().to_lowercase().as_str())))
+}
+
 /// Mesh files without units: Onshape asks for them (live G35, G35b).
 pub const MESH_FILES: &[&str] = &["stl", "obj"];
 /// The Units select, as Onshape lists units in its STL dialogs.
@@ -51,6 +62,8 @@ pub struct ImportChoice {
     pub join: bool,
     /// IGES files: "IGES postprocessing" (their straight edges read as lines).
     pub iges_post: bool,
+    /// "Upload only" (a bare assembly's dialog): the files kept as they are, as file tabs, nothing translated.
+    pub upload_only: bool,
 }
 
 impl ImportChoice {
@@ -452,6 +465,8 @@ pub struct ImportInputs {
     pvz: Vec<PvzAssembly>,
     assemblies: Vec<noshape_model::native_assembly::AssemblyZip>,
     files: Vec<FileTab>,
+    /// Upload only: the files as file tabs, after the import's tab (live upload-only-1118).
+    uploads: Vec<FileTab>,
     /// "a.step, b.zip": the history entry is "Import <label>".
     pub label: String,
 }
@@ -459,7 +474,7 @@ pub struct ImportInputs {
 impl ImportInputs {
     /// Nothing to add: no translation and no file tab.
     pub fn is_empty(&self) -> bool {
-        self.read.is_empty() && self.pvz.is_empty() && self.assemblies.is_empty() && self.files.is_empty()
+        self.read.is_empty() && self.pvz.is_empty() && self.assemblies.is_empty() && self.files.is_empty() && self.uploads.is_empty()
     }
 }
 
@@ -467,6 +482,17 @@ impl ImportInputs {
 /// that fail give "Import failed: <path>: <why>".
 pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units: &UnitPrefs) -> (ImportInputs, Vec<String>) {
     let mut errors = Vec::new();
+    if c.upload_only {
+        let mut uploads = Vec::new();
+        for path in paths {
+            match std::fs::read(path) {
+                Ok(bytes) => uploads.push(FileTab::new(&import_names(path).1, &bytes, noshape_model::file_tab::now())),
+                Err(e) => errors.push(format!("Import failed: {}: {e}", path.display())),
+            }
+        }
+        let label = paths.iter().map(|p| import_names(p).1).collect::<Vec<_>>().join(", ");
+        return (ImportInputs { read: Vec::new(), pvz: Vec::new(), assemblies: Vec::new(), files: Vec::new(), uploads, label }, errors);
+    }
     let mut read = Vec::new();
     // Native assemblies (a zip named like the root assembly; live G38).
     let mut assemblies = Vec::new();
@@ -543,7 +569,7 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
         label = paths.iter().map(|p| import_names(p).1).collect::<Vec<_>>().join(", ");
     }
     let files = if keep_files { paths.iter().filter_map(|p| Some(FileTab::new(&import_names(p).1, &std::fs::read(p).ok()?, noshape_model::file_tab::now()))).collect() } else { Vec::new() };
-    (ImportInputs { read, pvz, assemblies, files, label }, errors)
+    (ImportInputs { read, pvz, assemblies, files, uploads: Vec::new(), label }, errors)
 }
 
 /// The import's tabs added to `d` after `after`: returns the first new tab
@@ -551,6 +577,13 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
 pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Option<TabId>, units: &UnitPrefs) -> (Option<TabId>, Vec<String>) {
     let mut first = None;
     let mut errors = Vec::new();
+    // Upload only: each file as it is, right after the import's tab (live upload-only-1118).
+    let mut at = after;
+    for f in inputs.uploads {
+        let id = add_file_tab(d, f, None, at);
+        first.get_or_insert(id);
+        at = Some(id);
+    }
     // Onshape keeps the imported files in a "CAD Imports" folder.
     if !inputs.files.is_empty() {
         let folder = cad_imports_folder(d);
@@ -558,7 +591,6 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
             add_file_tab(d, f, Some(folder), None);
         }
     }
-    let mut at = after;
     for a in &inputs.assemblies {
         // Combine: one Part Studio, no Assembly (live G41 (5)).
         if c.combine {

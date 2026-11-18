@@ -262,3 +262,50 @@ fn an_import_translates_off_the_ui_thread_and_bubbles_as_live(cx: &mut TestAppCo
     assert!(doc.read_with(cx, |d, _| d.notice_link("broken.step uploaded but failed to translate.").is_some_and(|l| l.label == "Open document")));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live upload-only-1118: a bare assembly file (.sldasm) gets the Import dialog's info box with ☐ Upload only; Import
+/// (Enter) does nothing until Upload only is ticked, then keeps the file as it is, as a file tab right after the active
+/// tab (not in CAD Imports, nothing translated), the view staying, with "probe.sldasm has been imported." and its link.
+#[gpui::test]
+fn a_bare_assembly_is_uploaded_only_once_upload_only_is_ticked(cx: &mut TestAppContext) {
+    let (w, ws, [_, _, _, c]) = workspace(cx, "upload-only");
+    let dir = std::env::temp_dir().join(format!("noshape-workspace-upload-only-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let probe = dir.join("probe.sldasm");
+    std::fs::write(&probe, b"not translated").unwrap();
+    let doc = cx.update(|cx| ws.read(cx).doc.clone());
+    let tabs = |cx: &mut TestAppContext| doc.read_with(cx, |d, _| d.session.doc.ordered_tabs().iter().map(|t| t.name.clone()).collect::<Vec<_>>());
+    let before = tabs(cx);
+    // The dialog in a window of its own (the app's windows carry the dialogs' root; the test workspace's doesn't).
+    struct Blank;
+    impl gpui_kit::Render for Blank {
+        fn render(&mut self, _: &mut gpui_kit::Window, _: &mut gpui_kit::Context<Self>) -> impl gpui_kit::IntoElement {
+            gpui_kit::div()
+        }
+    }
+    let bounds = Bounds { origin: Point::default(), size: size(px(900.), px(700.)) };
+    let d: AnyWindowHandle = cx.update(|cx| gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |_, cx| cx.new(|_| Blank)).unwrap().0);
+    let open = |cx: &mut TestAppContext| cx.update_window(d, |_, window, cx| gpui_kit::component::WindowExt::has_active_dialog(window, cx)).unwrap();
+    cx.update_window(d, |_, window, cx| crate::import_dialog::open(doc.clone(), vec![probe.clone()], Some(c), true, window, cx)).unwrap();
+    draw(cx, d);
+    VisualTestContext::from_window(d, cx).simulate_keystrokes("enter");
+    draw(cx, d);
+    assert!(open(cx), "Import is disabled until Upload only is ticked");
+    assert_eq!(tabs(cx), before);
+    let mut vcx = VisualTestContext::from_window(d, cx);
+    let upload = vcx.debug_bounds("imp-upload").expect("the Upload only box").center();
+    vcx.simulate_click(upload, Modifiers::default());
+    draw(cx, d);
+    VisualTestContext::from_window(d, cx).simulate_keystrokes("enter");
+    cx.run_until_parked();
+    draw(cx, d);
+    draw(cx, w);
+    assert!(!open(cx), "Enter imports once Upload only is ticked");
+    let after = tabs(cx);
+    let at = after.iter().position(|n| n == "C").unwrap();
+    assert_eq!(after.get(at + 1).map(String::as_str), Some("probe.sldasm"), "the file right after the active tab: {after:?}");
+    assert_eq!(after.len(), before.len() + 1, "nothing else: no Part Studio, no CAD Imports copy: {after:?}");
+    assert_eq!(cx.update(|cx| ws.read(cx).active), Some(c), "the view stays");
+    assert!(doc.read_with(cx, |d, _| d.notice_link("probe.sldasm has been imported.").is_some_and(|l| l.label == "Open document")));
+    let _ = std::fs::remove_dir_all(&dir);
+}

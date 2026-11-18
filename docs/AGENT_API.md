@@ -7450,6 +7450,7 @@ Examples:
 | `join` | boolean |  | Join adjacent surfaces. |
 | `iges_postprocessing` | boolean |  | IGES postprocessing (IGES files): their straight edges read as lines. |
 | `keep_files` | boolean |  | Keep the files as file tabs in "CAD Imports". |
+| `upload_only` | boolean |  | Upload only: every file kept as it is, as a file tab after the import's tab, nothing translated. A bare assembly file (.sldasm, .iam, .catproduct, .asm) needs it, as the dialog: Onshape needs a zip of the assembly and all of its references to translate it. |
 | `after` | string |  | Tab to put the new tabs after (default: the end). |
 
 ### featurestudio

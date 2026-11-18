@@ -16,7 +16,11 @@
 //! them has Join adjacent surfaces. IGES adds ☐ IGES postprocessing after
 //! Join adjacent surfaces. A native assembly zip (live G38h): the tiles and
 //! the five checkboxes, no Units. Every import starts from these defaults:
-//! nothing is remembered (live2 feel/importexport.json).
+//! nothing is remembered (live2 feel/importexport.json). A bare assembly file
+//! (live upload-only-1118: .iam, .catproduct, .sldasm, .asm) gets live's info
+//! box ("It looks like you want to import an assembly…" + Learn more), ☐ Upload
+//! only and ☐ Import material density; Import stays disabled until Upload only
+//! is ticked, then keeps the files as they are, as file tabs after the active tab.
 
 use crate::doc_model::{DocEvent, DocModel};
 use crate::os_ui as os;
@@ -48,13 +52,15 @@ pub(crate) struct Choice {
     per_part: bool,
     /// IGES files: "IGES postprocessing".
     iges_post: bool,
+    /// A bare assembly's "Upload only".
+    upload_only: bool,
 }
 
 impl Choice {
     fn ops(self) -> noshape_ops::import::ImportChoice {
         // The composite part's box shows only on Import to a single document / this document.
         let composite = self.composite && !self.combine && !self.split;
-        noshape_ops::import::ImportChoice { combine: self.combine, appearances: self.appearances, density: self.density, y_up: self.y_up, unit: self.unit, composite, join: self.join, iges_post: self.iges_post }
+        noshape_ops::import::ImportChoice { combine: self.combine, appearances: self.appearances, density: self.density, y_up: self.y_up, unit: self.unit, composite, join: self.join, iges_post: self.iges_post, upload_only: self.upload_only }
     }
 }
 
@@ -111,6 +117,8 @@ fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut W
     let density = noshape_ops::import::offers_material_density(&paths);
     // IGES files: IGES postprocessing (live2 feel/importexport).
     let iges = noshape_ops::import::offers_iges_postprocessing(&paths);
+    // A bare assembly file: only Upload only and Import material density (live upload-only-1118).
+    let bare = !page && noshape_ops::import::has_bare_assembly(&paths);
     // The same starting choices every time (nothing is remembered: live2 feel/importexport); STL in Millimeter.
     let unit = noshape_ops::import::ImportChoice::defaults(&paths).unit;
     let choice = Rc::new(Cell::new(Choice { appearances: true, unit, ..Default::default() }));
@@ -156,6 +164,7 @@ fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut W
             noshape_app_core::ui_script::note_modal_field(|| serde_json::json!({ "label": format!("{label}{}", muted.unwrap_or("")), "kind": "checkbox", "value": on }));
             h_flex()
                 .id(id)
+                .debug_selector(move || id.to_string())
                 .map(|d| noshape_app_core::ui_script::mark(d, move || format!("checkbox:{label}")))
                 .w_full()
                 .items_start()
@@ -182,7 +191,9 @@ fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut W
                 .child({
                     let mut wrapper = text_system.line_wrapper(label_font.clone(), px(14.));
                     let text = format!("{label}{}", muted.unwrap_or(""));
-                    let fragments = [LineFragment::text(&text), LineFragment::element(px(TIP_GAP + TIP_SIZE), 1)];
+                    // (No ? without a tooltip: live's Upload only.)
+                    let tip_room = if tip.is_empty() { 0. } else { TIP_GAP + TIP_SIZE };
+                    let fragments = [LineFragment::text(&text), LineFragment::element(px(tip_room), 1)];
                     let breaks: Vec<usize> = wrapper.wrap_line(&fragments, px(label_width), IndentAdjustment::NoIndent).map(|b| b.ix).collect();
                     let mut lines = wrapped_lines(&text, label.len(), &breaks);
                     let last = lines.pop().unwrap_or_default();
@@ -204,7 +215,7 @@ fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut W
                                 .items_end()
                                 .gap(px(TIP_GAP))
                                 .when(!last.0.is_empty() || !last.1.is_empty(), |d| d.child(line(last)))
-                                .child(div().id(SharedString::from(format!("{id}-tip"))).mb(px(1.)).size(px(TIP_SIZE)).flex_none().rounded_full().border_1().border_color(rgb(0xcccccc)).flex().items_center().justify_center().text_size(px(11.)).text_color(rgb(0xaaaaaa)).child("?").tooltip(crate::ui::tooltip(tip))),
+                                .when(!tip.is_empty(), |d| d.child(div().id(SharedString::from(format!("{id}-tip"))).mb(px(1.)).size(px(TIP_SIZE)).flex_none().rounded_full().border_1().border_color(rgb(0xcccccc)).flex().items_center().justify_center().text_size(px(11.)).text_color(rgb(0xaaaaaa)).child("?").tooltip(crate::ui::tooltip(tip)))),
                         )
                 })
                 .on_click(move |_, window, _| {
@@ -224,7 +235,19 @@ fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut W
                     .pt(px(4.))
                     .pb(px(16.))
                     .gap(px(8.))
-                    .when(!native && !stl, |d| {
+                    .when(bare, |d| {
+                        d.child(
+                            // Live: help (cshid=importfiles).
+                            os::info_box_link("imp-learn", noshape_ops::import::BARE_ASSEMBLY_NOTE, "Learn more", |_, cx| noshape_app_core::help::open("Import and export", cx)),
+                        )
+                        .child(
+                            v_flex()
+                                .gap(px(13.))
+                                .child(check("imp-upload", "Upload only", None, "", c.upload_only, |c, v| c.upload_only = v, choice.clone()))
+                                .when(density, |d| d.child(check("imp-dens", "Import material density", None, "Material density defined on models will be imported.", c.density, |c, v| c.density = v, choice.clone()))),
+                        )
+                    })
+                    .when(!bare && !native && !stl, |d| {
                         d.child(
                             h_flex()
                                 .gap(px(14.))
@@ -234,7 +257,7 @@ fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut W
                         )
                     })
                     // Live document/77: the checkbox rows are 34 px apart.
-                    .child(v_flex().gap(px(13.)).when(!stl, |d| d.child(check("imp-app", "Import appearances", None, "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone())))
+                    .when(!bare, |d| d.child(v_flex().gap(px(13.)).when(!stl, |d| d.child(check("imp-app", "Import appearances", None, "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone())))
                     .when(density, |d| d.child(check("imp-dens", "Import material density", None, "Material density defined on models will be imported.", c.density, |c, v| c.density = v, choice.clone())))
                     .child(check("imp-yup", "Orient imported models with Y Axis Up", None, "Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.", c.y_up, |c, v| c.y_up = v, choice.clone()))
                     // The cards swap the list (live2 2403): Split has one document per part or assembly in the composite
@@ -242,9 +265,9 @@ fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut W
                     .when(c.split, |d| d.child(check("imp-per-part", "Create one document per part or assembly", Some("(not recommended)"), "Each part and assembly is given its own document. For large assemblies, this option can create a large number of documents that can be difficult to manage.", c.per_part, |c, v| c.per_part = v, choice.clone())))
                     .when(!c.combine && !c.split, |d| d.child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", None, "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone())))
                     .when(!mesh && join, |d| d.child(check("imp-join", "Join adjacent surfaces", None, "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone())))
-                    .when(iges, |d| d.child(check("imp-iges", "IGES postprocessing", None, "Repairs the translation of linear edges (slower).", c.iges_post, |c, v| c.iges_post = v, choice.clone()))))
+                    .when(iges, |d| d.child(check("imp-iges", "IGES postprocessing", None, "Repairs the translation of linear edges (slower).", c.iges_post, |c, v| c.iges_post = v, choice.clone())))))
                     // Live dom/dialog-import-stl.txt: "Units" (14 px / 600) over a 212 px select.
-                    .when(units_select, |d| {
+                    .when(units_select && !bare, |d| {
                         let ch = choice.clone();
                         d.child(
                             v_flex().gap(px(6.)).child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Units")).child(div().w(px(212.)).child(crate::os_ui::select_field(
@@ -257,9 +280,13 @@ fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut W
                     }),
             )
             // Live document/77: 13 px over the buttons, 10 under them.
-            .footer(os::modal_footer().pb(px(10.)).child(os::modal_ok(os::primary_button("ok", "Import"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            // A bare assembly's Import is disabled until Upload only is ticked (live upload-only-1118).
+            .footer(os::modal_footer().pb(px(10.)).child(os::modal_ok(div().when(bare && !c.upload_only, |d| d.opacity(0.4)).child(os::primary_button("ok", "Import")))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
                 let (c, on_ok) = (ch.get(), on_ok.clone());
+                if bare && !c.upload_only {
+                    return false;
+                }
                 window.defer(cx, move |window, cx| on_ok(c, window, cx));
                 true
             })
@@ -330,7 +357,7 @@ pub(crate) fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after
                     crate::notifications::push(cx, format!("Import {} failed", import_name(e).unwrap_or_default()), e.clone(), true);
                 }
                 // Live's bell entry: "Import <file>" with its steps done.
-                if errors.is_empty() && first.is_some() {
+                if errors.is_empty() && first.is_some() && !choice.upload_only {
                     for p in &paths {
                         let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
                         crate::notifications::push(cx, format!("Import {name}"), format!("Uploaded · Translated · Post-processing done · Created {name}"), false);

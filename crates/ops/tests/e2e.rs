@@ -9273,3 +9273,26 @@ fn a_slanted_torus_outline_is_a_dxf_spline() {
     // The base and the fillet's (tangent) rims are circles: ELLIPSEs seen at a slant.
     assert_eq!((count("ELLIPSE", "Visible"), count("ELLIPSE", "TANGENT_LINES")), (1, 2), "{kinds:?}");
 }
+
+/// Live upload-only-1118: a bare assembly file (.sldasm, .iam, .catproduct, .asm) can't be translated without the zip of
+/// its references: import_files refuses it in live's words unless `upload_only`, which keeps every file as it is, as a
+/// file tab right after `after` (nothing translated, no CAD Imports copy).
+#[test]
+fn a_bare_assembly_imports_only_as_an_upload() {
+    let mut ctx = Ctx::new();
+    let path = scratch("upload-only");
+    let _ = std::fs::remove_file(format!("{}.noshape", path.display()));
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let asm = scratch("probe.sldasm");
+    std::fs::write(&asm, b"not translated").unwrap();
+    let e = try_call(&mut ctx, "import_files", json!({ "files": [asm.to_str().unwrap()] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("upload_only"), "{e:?}");
+    assert!(e.message.starts_with("It looks like you want to import an assembly. Onshape needs a zip file"), "{e:?}");
+    let r = call(&mut ctx, "import_files", json!({ "files": [asm.to_str().unwrap()], "upload_only": true, "after": "Part Studio 1" }));
+    let info = call(&mut ctx, "document_info", json!({}));
+    let tabs = info["tabs"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    assert_eq!(&tabs[..2], ["Part Studio 1", "probe.sldasm"], "right after Part Studio 1: {tabs:?} {r}");
+    assert_eq!(tabs.iter().filter(|t| *t == "probe.sldasm").count(), 1, "no CAD Imports copy: {info}");
+    assert_eq!(r["parts"].as_array().map(Vec::len), Some(0), "{r}");
+    assert!(r["first"].is_string(), "{r}");
+}

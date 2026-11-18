@@ -270,6 +270,19 @@ pub fn info_box(text: impl Into<SharedString>) -> Div {
     crate::ui_script::mark_message(div().px(px(14.)).py(px(15.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child(text), || said)
 }
 
+/// [`info_box`] whose text ends in a bold, underlined link right after its last word (live upload-only-1118: "…to process
+/// the import.Learn more"); a click on the link calls `on_click`.
+pub fn info_box_link(id: impl Into<ElementId>, text: &str, link: &str, on_click: impl Fn(&mut Window, &mut App) + 'static) -> Div {
+    let pal = p();
+    let full = format!("{text}{link}");
+    let at = text.len()..full.len();
+    let style = HighlightStyle { font_weight: Some(FontWeight::SEMIBOLD), underline: Some(UnderlineStyle { thickness: px(1.), color: None, wavy: false }), ..Default::default() };
+    let styled = StyledText::new(full.clone()).with_highlights([(at.clone(), style)]);
+    let said = full.clone();
+    let text = InteractiveText::new(id, styled).on_click(vec![at], move |_, window, cx| on_click(window, cx));
+    crate::ui_script::mark_message(div().px(px(14.)).py(px(15.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child(text), || said)
+}
+
 /// Onshape's dialog checkbox row: 27 px, a 12 px box (1 px `#888`, radius
 /// 3; checked `#1651b0` with a white check) and a 13.33 px `#666` label
 /// (`#333` on hover). Add `.on_click`.
