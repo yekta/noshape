@@ -6813,10 +6813,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                             // between it and its curves' that are two tolerances clear of that boundary, all on one side.)
                             let pb = pieces[pi].loops.iter().flatten().map(|&(sg, _)| cx.c2_of(g, &sedges[sg].seg, 0, None)).collect::<R<Vec<C2>>>()?;
                             let bound = cx.bound(g)?;
-                            let mut sides = (false, false);
-                            let mut seen = |x: DVec2| if inside2(x, bound) { sides.0 = true } else { sides.1 = true };
+                            let mut clear: Vec<DVec2> = Vec::new();
                             if d > 2.0 * tol {
-                                seen(q);
+                                clear.push(q);
                             }
                             for c in &pb {
                                 for fr in [0.25, 0.5, 0.75] {
@@ -6824,11 +6823,25 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                                     for k in [0.3, 0.6, 0.9] {
                                         let x = q + (b - q) * k;
                                         if distance2(x, &pb) > 0.25 * tol && inside2(x, &pb) && cx.bound_distance(g, x)? > 2.0 * tol {
-                                            seen(x);
+                                            clear.push(x);
                                         }
                                     }
                                 }
                             }
+                            // (Too narrow for that (two holes' coaxial cylinders 8.75 um apart along the axis, the strip
+                            // between their ends 4.4 um from the face's boundary, tol 4.9 um: c2-wire-clip-imported's
+                            // stacked parts): by its own curves' points clear of that boundary by more than the tolerance.)
+                            if clear.is_empty() {
+                                for c in &pb {
+                                    for fr in [0.25, 0.5, 0.75] {
+                                        let b = c.at(c.at_fraction(fr));
+                                        if cx.bound_distance(g, b)? > tol {
+                                            clear.push(b);
+                                        }
+                                    }
+                                }
+                            }
+                            let sides = (clear.iter().any(|&x| inside2(x, bound)), clear.iter().any(|&x| !inside2(x, bound)));
                             if sides.0 == sides.1 {
                                 return Err(Decline("a piece's point near a coincident face's boundary"));
                             }
