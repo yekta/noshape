@@ -235,6 +235,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   host, deleted after; never in the repo or tickets.
 
 ## Hosts
+**11-18 08:00 (lead): ui-parity suite stages never on vibex7 (core / blend's build host; my shards held its slot 05:06-08:00):
+vibex8 (<= 3 apps, slot) or vibe2. qa-suites.sh UH defaults to vibex8 now. vibex7 keeps the 02:00-04:00 window, compat and
+the private-document runs. Binary uploads go to <path>.new + mv (an scp onto a busy binary fails).**
 **11-17 21:23: land queue on vibe2 (user's server; `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`); vibex7 drains its
 queued changes. land-footer lands through vibe2. No suites on vibe2. Private docs stay on vibex7 ~/lead-private.**
 **11-17 17:45: hosts renamed (user): vibex6 (watcher), vibex7 (land queue, ~/lead-private: hat8, hat15, hat15b, the dock),
