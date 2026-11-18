@@ -1504,10 +1504,12 @@ impl DrawingEditor {
         let shaded: Vec<(ViewId, std::ops::Range<usize>)> = built.geometry.view_edges.iter().filter(|(v, r)| !r.is_empty() && self.shaded.images.contains_key(v)).cloned().collect();
         let paper = self.model_bg.is_none();
         let ghost = self.placing_view().map(|id| ghost_picks(&built, id)).unwrap_or_default();
+        // A detail's preview is a lighter grey than a projected or section view's (live2 place-1118: 164 / 159).
+        let ghost_ink = if matches!(self.tool, Tool::Detail { .. }) { drawing_scene::GHOST_DETAIL_INK } else { drawing_scene::GHOST_INK };
         move |zoom, up| {
             let edges = shaded.iter().map(|(v, r)| (*v, up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), zoom, true)), up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), zoom, false)))).collect();
             let skip: Vec<std::ops::Range<usize>> = shaded.iter().map(|(_, r)| r.clone()).collect();
-            (Some(up.upload_lines(&drawing_scene::sheet_lines(&built, zoom, &dangling, &skip, &ghost, paper))), edges)
+            (Some(up.upload_lines(&drawing_scene::sheet_lines(&built, zoom, &dangling, &skip, (&ghost, ghost_ink), paper))), edges)
         }
     }
 
@@ -1774,7 +1776,7 @@ impl DrawingEditor {
     /// The projected or section view being placed: its preview's id (drawn grey in a 1 px frame, a section's label
     /// left out, live2 place-1118).
     pub(crate) fn placing_view(&self) -> Option<ViewId> {
-        if !matches!(self.tool, Tool::Projected { parent: Some(_) } | Tool::Section { line: Some(_), .. }) {
+        if !matches!(self.tool, Tool::Projected { parent: Some(_) } | Tool::Section { line: Some(_), .. } | Tool::Detail { radius: Some(_), .. }) {
             return None;
         }
         let shown = self.preview.as_ref()?.sheets.get(self.sheet)?;
@@ -1786,7 +1788,8 @@ impl DrawingEditor {
     fn push_placing_frame(&self, scene: &mut Scene) {
         use noshape_render::{LineData, LineSegment};
         let Some(pl) = self.placing_view().and_then(|v| self.placement(v)) else { return };
-        let off = self.tol_mm(8.0);
+        // A detail's frame stands 12 px clear of its circle (live2 place-1118).
+        let off = self.tol_mm(if matches!(self.tool, Tool::Detail { .. }) { 12.0 } else { 8.0 });
         let (a, c) = ([pl.min[0] - off, pl.min[1] - off], [pl.max[0] + off, pl.max[1] + off]);
         let q = [[a[0], a[1]], [c[0], a[1]], [c[0], c[1]], [a[0], c[1]], [a[0], a[1]]];
         let mut lines = LineData::default();

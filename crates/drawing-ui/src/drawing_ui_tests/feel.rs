@@ -609,7 +609,7 @@ fn a_projected_views_preview_is_grey_in_a_thin_frame(cx: &mut TestAppContext) {
         let b = e.built.as_ref().expect("built");
         let ghost = crate::drawing_view::ghost_picks(b, id);
         assert!(b.geometry.lines.iter().any(|l| ghost.contains(&l.pick)), "the preview has geometry");
-        let lines = crate::drawing_scene::sheet_lines(b, e.zoom, &Default::default(), &[], &ghost, false);
+        let lines = crate::drawing_scene::sheet_lines(b, e.zoom, &Default::default(), &[], (&ghost, crate::drawing_scene::GHOST_INK), false);
         let grey = lines.segments.iter().filter(|s| s.color == crate::drawing_scene::GHOST_INK).count();
         let ink = lines.segments.iter().filter(|s| s.color != crate::drawing_scene::GHOST_INK).count();
         assert!(grey > 0 && ink > 0, "the preview grey ({grey}), the other views as they are ({ink})");
@@ -697,6 +697,37 @@ fn a_projected_view_locks_within_22_5_degrees_and_turns_isometric_past(cx: &mut 
             assert!((pos[1] - centre[1]).abs() < 1e-6 && (pos[0] - p[0]).abs() < 1e-6, "locked to the parent's row, x on the pointer: {pos:?}");
         }
     }
+}
+
+/// Live2 place-1118: a detail view being placed is a grey preview with no label, its profile not yet on the parent,
+/// where the overlay keeps the plain solid circle.
+#[gpui::test]
+fn a_detail_views_preview_is_grey_with_the_parents_circle_plain(cx: &mut TestAppContext) {
+    use noshape_model::drawing::ViewKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-detail-ghost");
+    real_sheet(cx, window, &editor);
+    let (base, centre) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let v = e.current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).expect("a base view");
+        (v.id, v.position)
+    });
+    cx.update_window(window, |_, _, cx| {
+        editor.update(cx, |e, cx| {
+            e.set_tool(Tool::Detail { parent: Some(base), center: Some([0.0, 0.0]), radius: Some(0.005) }, cx);
+            e.cursor = [centre[0] + 80.0, centre[1]];
+            e.update_preview(cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        let id = e.placing_view().expect("the detail previewed");
+        let v = e.preview.as_ref().and_then(|d| d.sheets.get(e.sheet)).and_then(|s| s.view(id)).cloned().expect("in the preview");
+        assert!(v.hide_label && v.detail_hide_profile, "no label, no profile on the parent yet");
+        assert!(e.overlay.tinted.iter().any(|(pts, rgb, _)| pts.len() > 60 && *rgb == [0, 0, 0, 255]), "the parent's plain solid circle");
+    });
 }
 
 /// Live drawing-sysvars.json: a tool picks within Graebert's PICKBOX, 7 px (ours had 5): the Dimension tool lights an

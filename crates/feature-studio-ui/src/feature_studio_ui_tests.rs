@@ -152,9 +152,11 @@ fn a_new_error_shows_1891_ms_after_the_last_key_and_its_fix_clears_at_275_ms(cx:
     }
     assert!(!error(cx), "none 1.8 s after the last key");
     assert!(counted(cx), "but counted");
+    assert!(cx.update(|cx| view.read(cx).ui_busy()), "the ui-parity driver waits for it");
     assert_eq!(squiggles(cx), clean, "no squiggle 1.8 s after the last key");
     pause(cx, window, 150);
     assert!(error(cx), "the error shows by 1.95 s");
+    assert!(!cx.update(|cx| view.read(cx).ui_busy()), "and the driver reads it");
     assert!(squiggles(cx) > clean, "with its squiggle");
     for k in ["backspace", "backspace", "backspace"] {
         type_key(cx, window, k);

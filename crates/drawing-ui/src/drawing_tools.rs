@@ -820,7 +820,11 @@ impl DrawingEditor {
                     && let Some((la, lb)) = self.extend_cut(v, at, e)
                     && let Some(pl) = self.placement(v)
                 {
-                    overlay.lines.push((vec![pl.to_sheet(la), pl.to_sheet(lb)], true));
+                    // Live2 place-1118 (slc): grey (127,127,127), a long dash and two short ones (83 / 15 / 15 px, 16 px gaps).
+                    let pattern = [83.0, 16.0, 15.0, 17.0, 15.0, 17.0].map(|px| self.tol_mm(px));
+                    for piece in dash_pieces(pl.to_sheet(la), pl.to_sheet(lb), &pattern) {
+                        overlay.tinted.push((piece, [127, 127, 127, 255], 2.0));
+                    }
                 }
                 if let Some((_, Some(size))) = inference {
                     overlay.marks.push((at, crate::drawing_scene::SnapMark::Disc, size));
@@ -830,7 +834,14 @@ impl DrawingEditor {
                 if let Some(pl) = self.placement(*pid) {
                     let cs = pl.to_sheet(*ctr);
                     let at = self.snap_at(c).filter(|pp| pp.view == *pid).map(|pp| pl.to_sheet(pp.p)).unwrap_or(c);
-                    overlay.circle(cs, len(sub(at, cs)), true);
+                    // Solid black while sized (live2 place-1118).
+                    overlay.tinted.push((circle_points(cs, len(sub(at, cs))), [0, 0, 0, 255], 1.0));
+                }
+            }
+            // Placing it: the parent keeps the plain circle until the view is made (live2 place-1118).
+            Tool::Detail { parent: Some(pid), center: Some(ctr), radius: Some(r) } if self.detail_dlg.as_ref().is_none_or(|d| d.shape == 0) => {
+                if let Some(pl) = self.placement(*pid) {
+                    overlay.tinted.push((circle_points(pl.to_sheet(*ctr), r * pl.scale * 1000.0), [0, 0, 0, 255], 1.0));
                 }
             }
             Tool::Sketch { .. } => self.sketch_overlay(&mut overlay),
@@ -852,9 +863,13 @@ impl DrawingEditor {
         if let Some(mut v) = self.pending_view() {
             let mut d = self.drawing.clone();
             let insert = matches!(self.tool, Tool::InsertView { .. });
-            // A section view's preview is grey with no label (live2 place-1118).
-            if matches!(self.tool, Tool::Section { .. }) {
+            // A section or detail view's preview is grey with no label, a detail's profile not yet on its parent (live2
+            // place-1118).
+            if matches!(self.tool, Tool::Section { .. } | Tool::Detail { .. }) {
                 v.hide_label = true;
+            }
+            if matches!(self.tool, Tool::Detail { .. }) {
+                v.detail_hide_profile = true;
             }
             if let Some(s) = d.sheets.get_mut(self.sheet) {
                 if insert {
@@ -2999,4 +3014,50 @@ mod note_preview_tests {
             k => panic!("{k:?}"),
         }
     }
+}
+
+/// The line `a`–`b` cut into a dash pattern (lengths in sheet mm: dash, gap, dash, gap, …): the dashes.
+fn dash_pieces(a: [f64; 2], b: [f64; 2], pattern: &[f64]) -> Vec<Vec<[f64; 2]>> {
+    let len = (b[0] - a[0]).hypot(b[1] - a[1]);
+    let period: f64 = pattern.iter().sum();
+    if len <= 0.0 || period <= 0.0 {
+        return Vec::new();
+    }
+    let at = |t: f64| [a[0] + (b[0] - a[0]) * t / len, a[1] + (b[1] - a[1]) * t / len];
+    let mut out = Vec::new();
+    let mut t = 0.0;
+    'outer: loop {
+        for (i, l) in pattern.iter().enumerate() {
+            let end = (t + l).min(len);
+            if i % 2 == 0 && end > t {
+                out.push(vec![at(t), at(end)]);
+            }
+            t += l;
+            if t >= len {
+                break 'outer;
+            }
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod dash_tests {
+    /// A dash pattern cuts the line into its dashes, the last one cut short at the end.
+    #[test]
+    fn a_line_is_cut_into_its_dashes() {
+        let pieces = super::dash_pieces([0.0, 0.0], [0.0, 100.0], &[40.0, 10.0, 5.0, 10.0]);
+        let spans: Vec<(f64, f64)> = pieces.iter().map(|p| (p[0][1], p[1][1])).collect();
+        assert_eq!(spans, vec![(0.0, 40.0), (50.0, 55.0), (65.0, 100.0)]);
+    }
+}
+
+/// A circle as a closed polyline (sheet mm).
+fn circle_points(c: [f64; 2], r: f64) -> Vec<[f64; 2]> {
+    (0..=72)
+        .map(|i| {
+            let t = i as f64 / 72.0 * std::f64::consts::TAU;
+            [c[0] + r * t.cos(), c[1] + r * t.sin()]
+        })
+        .collect()
 }

@@ -701,10 +701,11 @@ impl FeatureStudioView {
         Some(Ok(point(x, at.center().y)))
     }
 
-    /// Typed text not yet saved, or its notices not yet compiled (the ui-parity driver waits for them, as live's
-    /// notices follow the text by the time its recorder reads them).
+    /// Typed text not yet saved, its notices not yet compiled, or a new error waiting to be drawn (the ui-parity
+    /// driver waits for them, as live's notices and gutter marks follow the text by the time its recorder reads them).
     pub fn ui_busy(&self) -> bool {
-        self.save_task.is_some() || self.compile_task.is_some()
+        let unshown = |n: &Notice| n.error && !self.shown.iter().any(|o| o.error && o.line == n.line && o.message == n.message);
+        self.save_task.is_some() || self.compile_task.is_some() || (self.error_task.is_some() && self.notices.iter().any(unshown))
     }
 
     /// Every toolbar control repainted (a cached slice): the ui-parity driver's marks.
@@ -1184,6 +1185,7 @@ impl FeatureStudioView {
             cx.background_executor().timer(ERROR_DELAY).await;
             let _ = this.update(cx, |this: &mut Self, cx| {
                 this.quiet = false;
+                this.error_task = None;
                 let src = this.editor.read(cx).value().to_string();
                 this.recompile(src, cx);
             });
