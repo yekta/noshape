@@ -983,8 +983,17 @@ impl PartStudioView {
                 let was_shift = self.sketch.as_ref().is_some_and(|s| s.shift_held);
                 let alt = modifiers.alt;
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.pointer_move(data, p, shift, alt)) {
-                    if !shift
-                        && let Some(snap) = self.model_snap(p, vp.read(cx))
+                    let snap = if shift { None } else { self.model_snap(p, vp.read(cx)) };
+                    if *SNAP_TRACE {
+                        let before = self.sketch.as_ref().and_then(|ed| ed.inference.as_ref().map(|i| i.kind));
+                        eprintln!("snap-trace model snap {:?} over {before:?}", snap.as_ref().map(|s| match s {
+                            ExternalSnap::Vertex { .. } => "vertex",
+                            ExternalSnap::Centre { .. } => "centre",
+                            ExternalSnap::Edge { midpoint: true, .. } => "edge midpoint",
+                            ExternalSnap::Edge { .. } => "edge",
+                        }));
+                    }
+                    if let Some(snap) = snap
                         && let Some(ed) = &mut self.sketch
                     {
                         ed.apply_external_snap(snap);
