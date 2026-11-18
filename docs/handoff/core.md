@@ -1,28 +1,32 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-18 15:15 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-18 16:30 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight
-- **P0s for the 17:00 cut (vs 0.4.58, qa's compat corpus vibex7 ~/qa/corpus):**
-  - 77ba403e7 (planar Move face tweak) renamed Flansch (vorne)'s neighbours Offset(..): impeller fillets lost edges.
-    REVERTED bcbe6b0f (13:52).
-  - 27b7836e0 (impeller rim splits = "walls") made Extrude Bohrungssitz Ansaugflansch's Add (scope = main body) drop
-    the main body silently (16 small parts; 0.4.58 10). 77ba403e7 had masked it. Revert 1a69d1ef QUEUED 15:10
-    (core-rw); main without it = 0.4.58's 10 parts, no status change. The walls come back only with a fix that keeps
-    the body (a Boolean on the split walls: bool's?) and a clean compat run.
-  - Fix forward of the tweak: 8eaf0a734 (core-p0 branch core-offnames): moved faces Offset(old), others keep names
-    (= 0.4.58's booleans), aliases Split{Offset(old), F, 0} -> moved face (Move face 2) and Offset(old) -> face (OCCT
-    era). Compat (on4): user docs / tickets / authored SAME; corpus = pre-existing diffs + the walls' two. After the
-    walls revert lands: rebase, rebuild cli-on, `bash ~/tmp/core/imp/compat-on.sh <cli> <tag>` (vibex7), land if clean.
-    Variants that failed: all-Offset + kept aliases (Move face 2), Split{Offset} primary (3 cf custom features).
+- **P0s for the 17:00 cut: both reverts in green 125e4d410 (15:55).** bcbe6b0f = 77ba403e7 (planar Move face tweak
+  renamed neighbours); 125e4d41 = 27b7836e0 (impeller rim splits: Extrude Bohrungssitz Ansaugflansch's Add dropped the
+  main body silently, 16 parts). The walls come back only with a fix that keeps the body + a clean compat run.
+- **Tweak back, 0.4.58 names: 1fcaaed6 CHECKING (16:13)** (core-p0 branch core-offnames): moved faces Offset(old), others
+  keep names; aliases Split{Offset(old), F, 0} -> moved face (Move face 2), Offset(old) -> face (OCCT era). Compat on
+  main (on5): all SAME but qa's known corpus diffs. Compat tool: vibex7 `bash ~/tmp/core/imp/compat-on.sh <cli> <tag>`.
+- **Shown edges (bool 11-18): 059e271f2 (core-sj branch core-shownjoin):** no-seam B-spline joins only with a periodic
+  face or two analytic faces; parting-line Split 3 13/30/20 -> 13/34/24 = live (bool's dump replayed). No T1 (the
+  part is 420 KB of B-splines; decision asked). Suite pair 9 on vibex8: sjb (main 88b8437d4) vs sjn, slot queue,
+  ~/tmp/core/p9-cmp.out, p9.done. Land if only parting-line changes.
+- **surf-intro-simple Loft 1 (skasm): de3b6e082 (core-loft, held):** surface loft takes sketch regions (T1 4/12/8 on
+  squares). skasm saw 1 face on the real doc: check against live 4/12/8 once skasm's translator lands, then land.
+- **asm-welding-config 9c7704 (lead):** first difference Sketch 9's region (109.56 vs 105.68 mm2) = skasm; Fillet 1 / 4
+  get sketch-entity edges from the translator. Reported 16:0x.
+- **Impeller Delete face 2 speed (lead, next):** 6968 ms on qa's copy: group 1 4.4 s OCCT defeature, group 2 hits the
+  300 K work bound (2.2 s) then the region fallback; live ~12 ms. Needs the local rebuild (brepq/lr2.cpp).
+- **qa 11-18 rollback-step list (speed):** fan-blade Extrude 8 120 vs 10, Derived 1 160 vs 51; motor-mount-jack
+  Extrude 2 72-133 vs 9; bottle-split Revolve 2 / Split 1 50 / 17 vs 6.5 / 3; rings-loft patterns (live/qa/rbstep-1118).
 - **Background jobs, results on vibex7 ~/tmp/core:** pair 7 `pair7.sh ms mt` (running since 11:12; p7-ms/mt.log,
   p7-cmp.out, p7.done); pair 5 `pair5.sh pm pt <42 docs>` queued behind it (p4-pm/pt.log, p5-cmp.out, p5.done). After
   both: `~/bin/slot bash pair8.sh mt fl` (Flansch, p8-cmp.out; copy core-rp's ops build to ~/tmp/core/pair-fl first).
-- **LANDED 11-18:** impeller rim splits 27b7836e0, Extrude impellerraum walls ea269148 (= 52c050e1, 09:33: Move face 1 +
-  Boolean 3 at live's volume); planar offsets 77ba403e7 + surface Extrude chains 4ca9526a1 (~10:30).
 - **Flansch verbreitern (core-rp branch flansch, on e9caeead0, uncommitted):** offset_planes takes linear extrusions too
   (the profile projected across the direction, run on 10|d| + 10 % past its ends, offset as Geom_OffsetCurve,
   extruded); extrusions move before planes so a plane moved later still meets them. T1 features_a::
@@ -39,12 +43,8 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   Parasolid's approximation. Retry parked on core-sweepseg (core-sw, 20f02b960).
 - **cf-setback-fillet (blend 11-18):** Setback Fillet 1's 3 std fill() corner patches 87.52 mm2 in live, ours +1.14
   (~1.3 % large); live/suite-truth-1118/cf-setback-fillet.json. With Fill 1.
-- **Impeller (lead P0) after 27b7836e0:** Move face 1 and Boolean 3 at live's volume (Boolean 3 43/108/66 vs live 64/189:
-  the inner wall's 15 spline pieces not chased). Fillet 4 ERROR = blend's (its input edge JOV + faces JOm/JOW match
-  live within 0.05 mm2; dump vibex7 ~/agents/core-keep/f4/fillet-32.*). **Move face 2 waits on Fillet 4:** its pick =
-  JOy (226.35 mm2, live 226.37) + a 0.47 mm2 sliver on x 6 mm at z -3.96 beside JOV that live's fillet rounds (blend
-  told; dump vibex7 ~/tmp/core/mf2dump/offsetfaces-33, probe vibex8 ~/tmp/core/probefan/offp). Delete face 2 now ERROR
-  (was a wrong OK); re-time Delete face 2 / Extrude Bohrungssitz once the 65-face part reaches them.
+- **Impeller after the reverts:** Move face 1 / Boolean 3 back to before the walls (27b7836e0 reverted); Fillet 4 is
+  blend's (f9df34212); Move face 2 needs Boolean 3's 15 inner-wall spline pieces (ours 43/108/66 vs live 64/185/123).
 - **Parity pairing (core-rv pairtype 37b1b5cad, on main 485943a92):** differences() pairs a live part with ours of its
   body kind first. manualblend Sweep 2 (skasm via lead): live's wire "Curve 2" was paired with our sheet swept along it
   (both volume 0, the sheet's box nearer); our own Curve 2 wire is > 13 mm off live's box: that is the real first
