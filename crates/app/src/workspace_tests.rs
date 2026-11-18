@@ -25,6 +25,7 @@ fn workspace(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Wo
         crate::register_assembly_hooks();
         crate::register_variable_hooks();
         crate::register_preferences_hooks();
+        crate::register_drawing_hooks();
     });
     let gpu = crate::gpu::Gpu::headless().unwrap();
     cx.update(|cx| cx.set_global(crate::gpu::GpuGlobal(gpu.clone())));
@@ -329,4 +330,36 @@ fn a_tab_switch_shows_the_new_tab_in_its_first_frame(cx: &mut TestAppContext) {
     one_frame(cx, a);
     assert!(!list(cx), "gone in the first frame after the Variable Studio is activated");
     cx.run_until_parked();
+}
+
+/// qa session-1118: Create Drawing of a part with No views starts Insert view with the first view's scale fitted to the
+/// sheet (live: a 200 mm Tray on A3 at 1:2); it was placed at the sheet's 1:1.
+#[gpui::test]
+fn create_drawing_with_no_views_fits_the_first_views_scale(cx: &mut TestAppContext) {
+    use noshape_model::drawing::{Projection, SheetSize, TitleBlockStyle, templates::DrawingTemplate};
+    let (w, ws, [studio, ..]) = workspace(cx, "no-views-scale");
+    let part = ws.read_with(cx, |ws, cx| {
+        let doc = &ws.doc.read(cx).session.doc;
+        let Some(noshape_model::TabContent::PartStudio(ps)) = doc.tab(studio).map(|t| &t.content) else { panic!("the Part Studio") };
+        let f = ps.features.iter().find(|f| f.type_id == "extrude").expect("the extrude");
+        noshape_model::BodyId { feature: f.id, index: 0 }
+    });
+    let template = DrawingTemplate::standard("ISO A3", SheetSize::A3, TitleBlockStyle::Iso, false, Projection::FirstAngle);
+    let source = noshape_model::drawing::create::DrawingSource { tab: studio, part: Some(part), config: Default::default(), sketch: None, flat: false };
+    cx.update_window(w, |_, window, cx| ws.update(cx, |ws, cx| ws.create_drawing_tab("Part 1 Drawing 1".into(), (template, None), (Some(source), None), false, window, cx))).unwrap();
+    let mut scale = None;
+    for _ in 0..600 {
+        draw(cx, w);
+        scale = ws.read_with(cx, |ws, cx| {
+            let tab = ws.doc.read(cx).session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::Drawing(_)))?.id;
+            ws.drawing_editor(tab)?.read(cx).insert.scale
+        });
+        if scale.is_some() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+    }
+    let want = noshape_model::drawing::create::first_part_view_scale(SheetSize::A3, [20.0, 5.0]);
+    assert_eq!(scale, Some(want), "the first view's scale fitted, not the sheet's 1:1");
 }

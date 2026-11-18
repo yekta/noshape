@@ -1963,3 +1963,44 @@ fn a_lost_diameters_dot_sits_at_the_circles_centre(cx: &mut TestAppContext) {
         assert!(matches!(dots.as_slice(), [(p, rgb)] if (p[0] - want[0]).hypot(p[1] - want[1]) < 1e-9 && *rgb == [221, 82, 40, 255]), "at the centre: {dots:?} for {want:?}");
     });
 }
+
+/// qa session-1118: Insert view's continuation (Projected view with the new view its parent) places along the parent's
+/// axes only: a diagonal click places nothing, where a P-started projected view goes isometric (live2 place-1118).
+#[gpui::test]
+fn insert_views_continuation_places_no_diagonal_view(cx: &mut TestAppContext) {
+    SUGGESTED.set(false);
+    let (window, editor) = drawing(cx, "feel-insert-continuation");
+    let studio = cx.update(|cx| editor.read(cx).doc.read(cx).session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).map(|t| t.id).expect("the Part Studio"));
+    cx.update(|cx| editor.update(cx, |e, cx| e.choose_source(studio, None, cx)));
+    for _ in 0..600 {
+        if cx.update(|cx| editor.read(cx).pending_view().is_some()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, window);
+    }
+    let base = [150.0, 190.0];
+    click_sheet(cx, window, &editor, base);
+    let pending = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, _, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = at;
+                e.update_preview(cx);
+            })
+        })
+        .unwrap();
+        cx.update(|cx| editor.read(cx).pending_view().is_some())
+    };
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Projected { parent: Some(_) })), "the continuation");
+    assert!(pending(cx, [base[0], base[1] - 90.0]), "below: a projected view");
+    assert!(!pending(cx, [base[0] + 150.0, base[1] - 95.0]), "a diagonal: nothing");
+    // The same with P: isometric past 22.5°.
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        let parent = e.drawing_sheet().views.first().map(|v| v.id);
+        e.set_tool(Tool::Select, cx);
+        e.set_tool(Tool::Projected { parent }, cx);
+    }));
+    assert!(pending(cx, [base[0] + 150.0, base[1] - 95.0]), "P-started: the isometric view");
+}

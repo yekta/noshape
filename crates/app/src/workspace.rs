@@ -3226,7 +3226,7 @@ impl Workspace {
     /// `template`: a built-in template, and the document's DWT tab chosen
     /// under Created by me (its formats and properties go over it). `sources`: this document's, or another document's
     /// version (Insert view on it).
-    fn create_drawing_tab(&mut self, name: String, template: (noshape_model::drawing::templates::DrawingTemplate, Option<crate::drawing_create::DwtTab>), sources: (Option<noshape_model::drawing::create::DrawingSource>, Option<crate::drawing_create::ExternalSource>), suggested: bool, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn create_drawing_tab(&mut self, name: String, template: (noshape_model::drawing::templates::DrawingTemplate, Option<crate::drawing_create::DwtTab>), sources: (Option<noshape_model::drawing::create::DrawingSource>, Option<crate::drawing_create::ExternalSource>), suggested: bool, window: &mut Window, cx: &mut Context<Self>) {
         let (template, dwt) = template;
         let (source, external) = sources;
         let doc = self.doc.read(cx).session.doc.clone();
@@ -3286,7 +3286,7 @@ impl Workspace {
                 if let (false, Some(TabView::Drawing(v))) = (suggested, this.views.get(&id)) {
                     match &source {
                         Some(s) => {
-                            let tool = crate::drawing_view::Tool::InsertView { source: s.tab, orientation: noshape_model::drawing::ViewOrientation::Front, part: s.part.clone() };
+                            let (tab, part) = (s.tab, s.part.clone());
                             let sketch = s.sketch;
                             // An assembly's last applied named position and display state (live drawing/1106).
                             let prefill = match this.views.get(&s.tab) {
@@ -3298,7 +3298,9 @@ impl Workspace {
                                     v.insert.asm_position = pos;
                                     v.insert.display_state = ds;
                                 }
-                                v.set_tool(tool, cx);
+                                // As the panel's source pick: the first view's scale fits the sheet (qa session-1118: a
+                                // 200 mm Tray on A3 at 1:2, it was placed at 1:1).
+                                v.choose_source(tab, part, cx);
                                 v.insert_sketch(sketch, cx);
                             });
                         }
@@ -3313,6 +3315,15 @@ impl Workspace {
 }
 
 impl Workspace {
+    /// The Drawing tab's editor, once shown.
+    #[cfg(test)]
+    pub(crate) fn drawing_editor(&self, tab: TabId) -> Option<Entity<crate::drawing_view::DrawingEditor>> {
+        match self.views.get(&tab) {
+            Some(TabView::Drawing(v)) => Some(v.clone()),
+            _ => None,
+        }
+    }
+
     fn toggle_tab_manager(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         use crate::tab_manager::{TabManager as Panel, TabManagerEvent};
         self.reveal_active_tab = true;

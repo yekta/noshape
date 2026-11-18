@@ -400,6 +400,8 @@ pub struct DrawingEditor {
     /// The Projected view tool's parent is drawn picked: the view Insert view just placed (live 2068), until the tool
     /// places a view or ends.
     pub projection_parent_lit: bool,
+    /// Projected view as Insert view's continuation (not started with P or the toolbar): along the parent's axes only.
+    pub insert_continuation: bool,
     pub hover_snap: Option<[f64; 2]>,
     pub selection: Vec<Sel>,
     pub drag: Drag,
@@ -779,6 +781,7 @@ impl DrawingEditor {
             menu_closed_at: None,
             view_drag_cancelled: false,
             projection_parent_lit: false,
+            insert_continuation: false,
             hover_snap: None,
             selection: Vec::new(),
             drag: Drag::None,

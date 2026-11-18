@@ -47,6 +47,7 @@ impl DrawingEditor {
         self.datum_on = None;
         self.datum_at = None;
         self.datum_edge = None;
+        self.insert_continuation = false;
         self.sketch_dim_pick = None;
         // Choosing a tool keeps the palette's changes (like a click away).
         if self.palette.is_some() {
@@ -635,6 +636,11 @@ impl DrawingEditor {
             pk.cursor = at;
         }
         let mut v = pk.pending_view(&self.view_options())?;
+        // Insert view's continuation places along the parent's axes only: a diagonal click places nothing (qa
+        // session-1118; a P-started projected view does go isometric, live2 place-1118).
+        if self.insert_continuation && matches!(v.kind, ViewKind::Projected { direction: Some(d), .. } if d[0] != 0.0 && d[1] != 0.0) {
+            return None;
+        }
         // An assembly's view: no automatic centermarks / centerlines (live: they're the parts' defaults).
         if let ViewKind::Base { source, .. } = &v.kind
             && self.sources.iter().any(|(k, s)| k.tab == *source && s.assembly)
@@ -1014,6 +1020,7 @@ impl DrawingEditor {
                     self.tool = Tool::Projected { parent: Some(id) };
                     self.selection.clear();
                     self.projection_parent_lit = true;
+                    self.insert_continuation = true;
                 }
             }
             Tool::Projected { parent: None } => {

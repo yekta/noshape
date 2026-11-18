@@ -236,7 +236,11 @@ impl DrawingEditor {
             return self.sources.get(&SourceKey { version: Some(p.id.clone()), ..SourceKey::studio(source) }).map(|s| s.name.clone()).unwrap_or_default();
         }
         let tab_name = self.doc.read(cx).session.doc.tab(source).map(|t| t.name.clone()).unwrap_or_default();
-        let part_name = part.and_then(|b| self.sources.get(&SourceKey::studio(source)).and_then(|s| s.context.bodies.iter().find(|x| &x.id == b).map(|x| x.name.clone())));
+        // The part's name as its properties have it (a renamed part: qa session-1118 "Tray", not "Part 1").
+        let part_name = part.and_then(|b| {
+            let s = self.sources.get(&SourceKey::studio(source))?;
+            s.parts.iter().find(|p| p.body.as_ref() == Some(b)).map(|p| p.name.clone()).or_else(|| s.context.bodies.iter().find(|x| &x.id == b).map(|x| x.name.clone()))
+        });
         match part_name {
             Some(p) => format!("{tab_name} {p}"),
             None => tab_name,
