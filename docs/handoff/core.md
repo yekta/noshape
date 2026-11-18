@@ -1,21 +1,36 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-18 17:20 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-18 18:10 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight
-- **Walls (core-rw branch core-walls2, d010a6d78 = 27b7836e0 re-applied, not landable yet):** with them Move face 2
-  turns Ok, Delete face 2 48 faces / 95977.8 mm3 (main 37 / 96246.4), then Extrude Bohrungssitz Ansaugflansch's Add =
-  OCCT fuse 1 object (65 faces, valid) + 9 seat prisms (valid) -> INVALID 1992 mm3, 55 faces, accepted silently (16 small
-  parts). Fuzzy 1e-8 fuse: valid 96485.5 mm3, 98 faces. Case vibex7 ~/tmp/core/imp/rec47/51a35c85013e91e7.brep, probe
-  ./fz (brepq/fz.cpp). Asked bool 17:15 (retry/refuse invalid fuse in op_boolean). Re-land walls on top of that +
-  compat-on.sh clean. Per-feature parts: vibex7 ~/tmp/core/imp/f47.sh.
+- **Walls (core-rw branch core-walls2, d010a6d78 = 27b7836e0 re-applied, HELD with bool):** with them Move face 2
+  turns Ok, Delete face 2 48 faces / 95977.8 mm3 (main 37 / 96246.4), then Extrude Bohrungssitz Ansaugflansch's Add
+  (OCCT fuse 1 object 65 faces + 9 seat prisms, all valid) comes out INVALID 1992 mm3 / 55 faces, accepted (16 parts).
+  Plain OCCT (fz) loses it only with NonDestructive/OBB/history/parallel all off; every other setting gives valid
+  96485.5 mm3 / 98 faces. bool's op_boolean (619037c8c, bool-hat) loses it too and now refuses a union that lost its
+  body (retry fuzzy, else error); bool looks for the trigger (asked: NOSHAPE_BOP_PAIRS_PARALLEL=0). Re-land walls when
+  the fuse is whole + compat-on.sh clean. Case vibex7 ~/tmp/core/imp/rec47/51a35c85013e91e7.brep, probe ./fz.
+- **Up to next nearest-first split: a5639251 CHECKING (18:03)** (core-p0 branch core-upnext): op_prism_until splits by
+  the 8 nearest faces ahead first, more while the kept piece reaches the end or a face left out could meet it.
+  fan-blade Extrude 8 118-163 -> 24-44 ms; compat A/B (vibex7 compat-ab.sh cli-unb vs cli-un) ALL-SAME; g++-13 clean;
+  T1 engine::extrude_up_to_next_before_a_row_of_parts.
+- **Pairtype LANDED 11efefb72**; skasm told.
+- **Speed list (qa 11-18 17:xx), routed:** impeller Extrude impellerraum 807 ms (OCCT edge-face 363), Extrude Bohrungssitz
+  Ansaugflansch 3366 ms, motor-mount-jack Extrude 2 (Rust sections_ahead 25 ms) -> bool. Flansch (vorne) verbreitern
+  9 ms on main (qa's 601 predates 6e19556b). fan-blade Derived 1 127 ms is outside the kernel (not looked at).
+- **Delete face 2 (3988 ms, live 10.5):** OCCT defeaturing face 24 (x=6 plate end, 4 plane neighbours + housing
+  B-spline 36) 2.7 s, face 30 (x=5, B-spline/cylinder/cone neighbours) 1.9 s. Face 24's removal trims INWARD to the
+  housing's extension (97755.8 -> 97123.4 mm3): an outward prism fill (brepq/cap.cpp) is wrong. Needs the local rebuild;
+  input still differs from live (Move face 2). Dumps vibex7 ~/tmp/core/imp/dd2/defeature-36, probes df2 / lr2 / cap.
+- **Pair 7 (e9caeead0 offset_planes) REGRESSES:** c2-sm-hem-plus / cf-sheet-metal-hem Derived 1 loses a part (26/72/48
+  -> 14/36/24), cf-mortise-and-tenon Mortise Tenon 2 19 -> 10 faces. Not landable as is.
 - **Tweak with 0.4.58 names: LANDED 6e19556b (16:34)**; main green e24a63d15.
 - **Shown edges (bool 11-18): 059e271f2 + T1 56e296b14 (core-sj branch core-shownjoin):** parting-line Split 3
   13/34/24 = live; T1 boolean_groups::sections_between_faces_with_no_seam_keep_their_vertices (zstd 113 KB). Lead: land
-  on pair 9 (vibex8: sjb main 88b8437d4 vs sjn; ~/tmp/core/p9-cmp.out, p9.done; vibe2 if not started by 17:30) when
+  on pair 9 (on vibe2 since 17:36 under slot: sjb main 88b8437d4 vs sjn; vibe2 ~/tmp/core/p9-cmp.out, p9.done) when
   only parting-line changes. g++-13 kernel build: core-sj .g13.sh on vibex7 (~/tmp/core/g13.log).
 - **c2-housing-draft (dx's DXF rows):** model = live at every feature up to Rotieren 1 (lengths; live measures circles
   polygonally, 96.093 vs 2pi r 96.133). Rotieren 1's torus exact (R 15.2, r 20.72); only difference: 8 floor lines
@@ -28,9 +43,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   300 K work bound (2.2 s) then the region fallback; live ~12 ms. Needs the local rebuild (brepq/lr2.cpp).
 - **qa 11-18 rollback-step list (speed):** fan-blade Extrude 8 120 vs 10, Derived 1 160 vs 51; motor-mount-jack
   Extrude 2 72-133 vs 9; bottle-split Revolve 2 / Split 1 50 / 17 vs 6.5 / 3; rings-loft patterns (live/qa/rbstep-1118).
-- **Background jobs, results on vibex7 ~/tmp/core:** pair 7 `pair7.sh ms mt` (running since 11:12; p7-ms/mt.log,
-  p7-cmp.out, p7.done); pair 5 `pair5.sh pm pt <42 docs>` queued behind it (p4-pm/pt.log, p5-cmp.out, p5.done). After
-  both: `~/bin/slot bash pair8.sh mt fl` (Flansch, p8-cmp.out; copy core-rp's ops build to ~/tmp/core/pair-fl first).
 - **Flansch verbreitern (core-rp branch flansch, on e9caeead0, uncommitted):** offset_planes takes linear extrusions too
   (the profile projected across the direction, run on 10|d| + 10 % past its ends, offset as Geom_OffsetCurve,
   extruded); extrusions move before planes so a plane moved later still meets them. T1 features_a::
@@ -47,13 +59,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   Parasolid's approximation. Retry parked on core-sweepseg (core-sw, 20f02b960).
 - **cf-setback-fillet (blend 11-18):** Setback Fillet 1's 3 std fill() corner patches 87.52 mm2 in live, ours +1.14
   (~1.3 % large); live/suite-truth-1118/cf-setback-fillet.json. With Fill 1.
-- **Impeller after the reverts:** Move face 1 / Boolean 3 back to before the walls (27b7836e0 reverted); Fillet 4 is
-  blend's (f9df34212); Move face 2 needs Boolean 3's 15 inner-wall spline pieces (ours 43/108/66 vs live 64/185/123).
-- **Parity pairing (core-rv pairtype 37b1b5cad, on main 485943a92):** differences() pairs a live part with ours of its
-  body kind first. manualblend Sweep 2 (skasm via lead): live's wire "Curve 2" was paired with our sheet swept along it
-  (both volume 0, the sheet's box nearer); our own Curve 2 wire is > 13 mm off live's box: that is the real first
-  difference (skasm's translator / Sketch 5). T1 parity::a_wire_pairs_with_our_wire_before_a_sheet_beside_it. If pm/pt
-  shows only expected report changes: land, tell skasm (18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6).
 - **Nuts: waits for bool2's graze fix ebc58e0be** (not landed; bool2 tells me). Alone it makes Sweep 1 OK with live's
   counts (one face a B-spline where live has a cylinder). Then re-run nuts on main vs live 135.268 mm3 / 29 faces. My
   crest move (core-rp nuts3 59df02227) and exact cylinders (nuts2 7fec58496) are DROPPED (wrong OK without bool2's fix).

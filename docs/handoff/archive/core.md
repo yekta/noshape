@@ -4473,3 +4473,15 @@ skasm meanwhile; I'll list what I change here before landing.
   closest, still not it. Probes vibex8 ~/tmp/core/probefan ./fillp, ./edgs; scratch fill1-edges.txt.
 - **Loft 4 PARKED (core-tw 7eb54c0e5):** plane-crossing retry gives live's volume but area +0.35 %, box y -452.45 vs
   -444.55: wrong rule, not landable. (core-tw also holds the uncommitted fill-dump edit.)
+
+## Moved 11-18 18:10
+- **Background jobs, results on vibex7 ~/tmp/core:** pair 7 `pair7.sh ms mt` (running since 11:12; p7-ms/mt.log,
+  p7-cmp.out, p7.done); pair 5 `pair5.sh pm pt <42 docs>` queued behind it (p4-pm/pt.log, p5-cmp.out, p5.done). After
+  both: `~/bin/slot bash pair8.sh mt fl` (Flansch, p8-cmp.out; copy core-rp's ops build to ~/tmp/core/pair-fl first).
+- **Impeller after the reverts:** Move face 1 / Boolean 3 back to before the walls (27b7836e0 reverted); Fillet 4 is
+  blend's (f9df34212); Move face 2 needs Boolean 3's 15 inner-wall spline pieces (ours 43/108/66 vs live 64/185/123).
+- **Parity pairing (core-rv pairtype 37b1b5cad, on main 485943a92):** differences() pairs a live part with ours of its
+  body kind first. manualblend Sweep 2 (skasm via lead): live's wire "Curve 2" was paired with our sheet swept along it
+  (both volume 0, the sheet's box nearer); our own Curve 2 wire is > 13 mm off live's box: that is the real first
+  difference (skasm's translator / Sketch 5). T1 parity::a_wire_pairs_with_our_wire_before_a_sheet_beside_it. If pm/pt
+  shows only expected report changes: land, tell skasm (18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6).
