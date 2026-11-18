@@ -1230,3 +1230,30 @@ Next: equal-radius rounds whose spines meet (cylinder axis through the torus' ce
   and OCCT's Booleans on the 217-face part make them slow (USB Pencere R 55 -> 175 ms, Kapak Alt R 18 -> 254, Fis
   Gecidi R 282 -> 492). Glue Shift is wrong there (tools run on through faces), pre-fusing the tools slower. Needs a
   local Boolean (only the faces the tools touch) or the direct build (BLEND-DIRECT) to be fast enough.
+
+
+## Moved from the handoff 11-18 21:15 (landed / stale)
+
+- Landed 11-16: 684e77e2 (samples / ball tools ahead), 534c6e30 (lies_on skip, loft orientation by rays, run-on trims),
+  ce61a597 (scale-first), 35c63214 (Fillet 3's direct build beside OCCT's try, loft probe two-sided per core's review,
+  sliver check by 1% areas). Mac x3: knife Fillet 2 95 -> 85, Chamfer 1 117 -> 112, Fillet 3 63 -> 47, Fillet 5 23 ->
+  21, Fillet 6 20 -> 7 (live 7); knife ~1020 ms (live 622). Lead split the knife's non-blend time: bool (Split 4,
+  Mirror 1, Chamfer 1 / Fillet 2 Booleans, Revolve 1, Extrudes 2/3/8/9), core (Extrude 10, Lofts 1/3); both told.
+- Landed 11-17 00:42: 0aad993d (367cf3ae) conic contact edges checked by the faces around them (Fillet 3 47 -> 45).
+- cf-spur-gear (11-17, Mac release, main 5b23c028f): every Spur Gear is under live (117/56/34/98/77 vs 955/95/75/283/
+  343); its opFillet is 0.3-0.4 ms, the time is the Rust op_boolean (112/46/26/78/53 ms). Sent to bool. Nothing for blend.
+- Landed 11-17: blend-necks ba7a8d755 (isaac-ball 9 -> 32/33) broke rust-zero-solid-f197's Mirror 3 (4 slivers: the
+  retry's necks cut on a result already valid changed Chamfer 3); reverted (b596da51b), re-landed 07:05 as 74d05ad5e:
+  a valid retry keeps its necks unless cutting them lets a full round merge. T1 blend::a_valid_chamfers_necks_stay_and_
+  its_mirror_adds_whole (data blend/f197-chamfer3-input.brep). Before landing: userdocs + f197 + Hole docs + every
+  ~/qa/tickets doc + qa's compat v0443 docs SAME (bin/ud-nk3.sh, the release-candidate set), g13 OK. GearLab
+  (b2e0cbd71) landed.
+- qa P0 speed (11-17, vibex7 A/B v0.4.48 -> v0.4.53): knife Chamfer 2 10.7 -> 67.9, Fillet 5 18.8 -> 95, Fillet 3 136
+  -> 188 ms; impeller Stevenrohr zum Halter 0.6 -> 2610 ms (fixed by 29c1841df, after .53; Mac main 2 ms). v0.4.53
+  predates the 11-16 speed lands; to do: Mac A/B v0.4.48 vs main on those three (bin/ab-mac.sh; commit WIP first).
+- Landed 11-16: d7f9264c9 impeller chamfer end edge joined (impeller 26 -> 27/48 on main; strict suite 127/127, userdocs
+  SAME). Core told.
+- Scale-first blend6 4b2f94289 (base 3178c98b5): release suite strict-identical 127/127, userdocs ALL-SAME; assemblies
+  (vibex6, asm-sf-base.log / asm-sf.log, unit blend-seq-sf3) running; land when identical.
+- Live's knife times (11-16): Fillet 1-8 8/9/10/6/9/27/7/12 ms, studio 622; 11-17 (live/blend/knife-regen-1117.json):
+  Chamfer 1 19, Chamfer 2 7, Fillet 2 10, Fillet 3 10, Fillet 8 12, studio 597-693. Lead: Fillet 5 at or below live is P0.

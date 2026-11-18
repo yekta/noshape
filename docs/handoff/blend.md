@@ -1,33 +1,39 @@
 # Blends (agent "blend"): current state
 
-Updated 11-18 17:30 UTC (new blend thread 0672fa20-964d-4fde-a19c-c5b4363729ba, account Bbedward). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-18 21:05 UTC (blend thread 2fc420a3 since 20:05, replacing 0672fa20). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## In flight
+## Now (11-18 21:05, new thread)
+
+- Background runs MUST be systemd units (`systemd-run -E HOME=/root -E PATH=$PATH`): `( ... &)` jobs die at turn end.
+  Units: blend-seq-x8 (bin/seq-x8.sh: f3d dump -> spring -> suspension 995636, vibex8, blend10 binary), blend-himp
+  (bin/halter-imp.sh: blend8 = blend-halter, impeller with NOSHAPE_BLEND_DEBUG + ZZ_DUMP -> vibex7 ~/tmp/blend/hdump).
+  Logs /root/blend-scratch/logs/*.out. Mac: ONE slot (noshape-env.sh), dx held it 19:52-; I build on vibex7/8.
+- Order (lead 20:05): impeller Fillet 3 speed, Halter, c2-extension-spring Fillet 1, asm-welding-config Part 6
+  fillets; + asm-suspension 995636 Fillet 3 ("Unfilleted edge overlapped by fillet.", live OK; tell asm when landed;
+  805e29e8 Fillets 3/4 after skasm's Sketch 2). Dropped (9e5b481d4): snap-hook Fillet 6, motor-mount Fillet 2 ms items,
+  and the full-round land (more code, not simpler).
+- Fillet 3 (Mac release, f3t logs): ~2.3 s = before_direct 85 + failing direct 146 + closed_run_on 840 (met 280,
+  corners 380) + reface 55 + Boolean 830 + unify 55. Direct build on the trimmed tools (ZZ_DIRECT2) = "an invalid
+  solid" in 395 ms; dumping it (ZZ_DUMP_DIRECT -> vibex8 ~/tmp/blend/f3d2) to replay with bin/f3d-replay.sh <n>.
+  blend10 uncommitted: cached face boxes + threaded touches / corner splits in closed_run_on (met 413 -> 280).
+- Halter: the old dump (Mac zzdump body-36 + add-36-*) is the tighten_tolerances variant: body invalid; tip fills'
+  sides 0.04-0.115 mm off their supports (x 5 fills 2.4e-5) and every fuse invalid. Suspected root upstream: our
+  tip x 1.502 = Chamfer Halterung's foot; live's Fillet 3 extends the chamfer face (6.18 -> 12.67 mm2) down to the
+  tip x 0.097 (live/blend/q-imp-halter). Probes kernel blend.rs zz_fill / zz_desc (blend8 uncommitted).
+- spring Fillet 1: two 0.5 mm CURVATURE rounds meeting in the middle of the slot's 1 mm end (x -11.7): live keeps two
+  faces JMG / JMC (0.8113 mm2) with an edge at y -1.0 (11/27/18); ours 10/24/16 = likely one face. Run pending.
+- live's Fillet / Chamfer pick rows (feel dialogs 11-18 batch 1): green CLI counts = live (R8 block 7; propagation on
+  10, off 8, face 12, chamfer defaults 10); chips / highlight / timing are psui's.
+
+## In flight (older)
 
 - Speed is judged on the Mac (release, quiet, median of 3) against live (DECISIONS 11-16); vibe numbers are hints.
   Done: robot-relations a4e419 (Mac 65 vs live 78), cf-part-draft Spur Gear (76-81 vs 227).
-- Landed 11-16: 684e77e2 (samples / ball tools ahead), 534c6e30 (lies_on skip, loft orientation by rays, run-on trims),
-  ce61a597 (scale-first), 35c63214 (Fillet 3's direct build beside OCCT's try, loft probe two-sided per core's review,
-  sliver check by 1% areas). Mac x3: knife Fillet 2 95 -> 85, Chamfer 1 117 -> 112, Fillet 3 63 -> 47, Fillet 5 23 ->
-  21, Fillet 6 20 -> 7 (live 7); knife ~1020 ms (live 622). Lead split the knife's non-blend time: bool (Split 4,
-  Mirror 1, Chamfer 1 / Fillet 2 Booleans, Revolve 1, Extrudes 2/3/8/9), core (Extrude 10, Lofts 1/3); both told.
-- Landed 11-17 00:42: 0aad993d (367cf3ae) conic contact edges checked by the faces around them (Fillet 3 47 -> 45).
-- cf-spur-gear (11-17, Mac release, main 5b23c028f): every Spur Gear is under live (117/56/34/98/77 vs 955/95/75/283/
-  343); its opFillet is 0.3-0.4 ms, the time is the Rust op_boolean (112/46/26/78/53 ms). Sent to bool. Nothing for blend.
-- Landed 11-17: blend-necks ba7a8d755 (isaac-ball 9 -> 32/33) broke rust-zero-solid-f197's Mirror 3 (4 slivers: the
-  retry's necks cut on a result already valid changed Chamfer 3); reverted (b596da51b), re-landed 07:05 as 74d05ad5e:
-  a valid retry keeps its necks unless cutting them lets a full round merge. T1 blend::a_valid_chamfers_necks_stay_and_
-  its_mirror_adds_whole (data blend/f197-chamfer3-input.brep). Before landing: userdocs + f197 + Hole docs + every
-  ~/qa/tickets doc + qa's compat v0443 docs SAME (bin/ud-nk3.sh, the release-candidate set), g13 OK. GearLab
-  (b2e0cbd71) landed.
-- qa P0 speed (11-17, vibex7 A/B v0.4.48 -> v0.4.53): knife Chamfer 2 10.7 -> 67.9, Fillet 5 18.8 -> 95, Fillet 3 136
-  -> 188 ms; impeller Stevenrohr zum Halter 0.6 -> 2610 ms (fixed by 29c1841df, after .53; Mac main 2 ms). v0.4.53
-  predates the 11-16 speed lands; to do: Mac A/B v0.4.48 vs main on those three (bin/ab-mac.sh; commit WIP first).
 - Knife blends left (Mac): Fillet 8 65 (live 12: OCCT's working-scale round 45 after the as-is fails 7; split-line
   join 5.8 needed), Fillet 3 45 (direct build 26: classify.tool 7 = ray intersectors on lofted tools; lofts; conic
   rebuild), Chamfer 2 35, Fillet 5 21. Probes: parked/zz-*.patch; Mac A/B: bin/ab-mac.sh <base> <cand> <doc> <regex>.
@@ -35,12 +41,6 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   the ball sections and contact curves (no solid tool), supports trimmed along the contact curves in 2D (no lies_on,
   no IntSS on supports), the shell from known adjacency, only new faces checked; est. Mac ~8-10 ms, 3-4 days incl.
   every rolling-ball fillet identical on the suite.
-- Landed 11-16: d7f9264c9 impeller chamfer end edge joined (impeller 26 -> 27/48 on main; strict suite 127/127, userdocs
-  SAME). Core told.
-- Scale-first blend6 4b2f94289 (base 3178c98b5): release suite strict-identical 127/127, userdocs ALL-SAME; assemblies
-  (vibex6, asm-sf-base.log / asm-sf.log, unit blend-seq-sf3) running; land when identical.
-- Live's knife times (11-16): Fillet 1-8 8/9/10/6/9/27/7/12 ms, studio 622; 11-17 (live/blend/knife-regen-1117.json):
-  Chamfer 1 19, Chamfer 2 7, Fillet 2 10, Fillet 3 10, Fillet 8 12, studio 597-693. Lead: Fillet 5 at or below live is P0.
 - impeller Fillet 3: 4efe95564 landed (be6f0ca8, 34/93/60). 3df3608b1 landed 13:58 as f6274d94 (core told):
   kept edges along faces the convex rounds end on (the front circle's 3 arcs, 34/95/62 as live; impeller 29/48, first
   difference Halter), merge_on_surfaces without the volume integrals (3.4 s; adaptive 15 % off), mark_kept_edges takes
