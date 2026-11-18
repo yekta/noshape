@@ -24,7 +24,7 @@ the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run 
   frame, preview over the parent) and Break view (zigzag at the pointer, view broken in the preview after the second
   click; `build::break_line_points` shared with the renderer: crates/drawing touched, run the full ops e2e first);
   BOM table placement (fixed corner snaps to the frame's corner within 10 px with a 14 px orange square; the preview
-  table not lit, so black); Crop view spline drawn open and black, closing within 6 px (CROP_CLOSE_REACH_PX).
+  table not lit, so black); Crop view spline drawn open and black, closing within 6 px (CROP_CLOSE_REACH_PX); Datum leader square to its edge, Surface finish preview, centerline snap square 9.5 px (live2 ann-1118).
 - Running: r29 full drawing run on vibex7 (~/agents/studios-keep/drw1118g). Next: fs-* rerun after 150089a4 lands.
 - cf-spur-gear 0.4.58 → 0.4.59 (lead 11-18): cold-only, in our Boolean's free-form face grids (Once::call in rayon
   workers 50 → 1028 samples); bool's batch in the range; qa bisects (told). Scratch /root/studios-scratch/prof/s.
