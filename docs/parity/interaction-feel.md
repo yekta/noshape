@@ -1117,10 +1117,10 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| Use comma as decimal separator: a dialog's Depth reads "10,25 mm" | ? | missing |
+| Use comma as decimal separator: a dialog's Depth reads "10,25 mm" | = (green c7d388e8, live2 ours-1118 prefs: set in My account › Preferences, then the block reopened: Extrude Depth "10,25" + Enter reads "10,25 mm", "10.5" reads "10,5 mm") | missing |
 | 24 hour: H:mm with no leading zero ("2:47 Today", "0:00 Nov 7") | = | app-core start_library::tests::names_and_times |
-| Display parts list properties: each part with the grey "In progress" pill | ? | missing |
-| Constrained rotate as default swaps the Alt prefix in the mouse table | ? | missing [studios] |
+| Display parts list properties: each part with the grey "In progress" pill | = (green c7d388e8, live2 ours-1118 prefs: set in My account › Preferences, then the block reopened: Part 1 with the grey "In progress" pill) | missing |
+| Constrained rotate as default swaps the Alt prefix in the mouse table | = (green c7d388e8, live2 ours-1118 prefs: set in My account › Preferences, then the block reopened: ticking it swaps the table at once: Rotate "Alt + Right mouse button drag", Constrained rotate "Right mouse button drag") | missing [studios] |
 | Export with "Store file in a new tab": "<file name> is being prepared for export. …" at 0.55 s; the tab after the source tab; the view stays | = | export_feel_tests::a_stored_export_says_it_is_prepared_and_rings_the_bell |
 
 ### numfmt-1118 (number and unit display, live's client code, 11-18 02:56)
