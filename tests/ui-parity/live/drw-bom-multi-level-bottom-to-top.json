@@ -1,19 +1,23 @@
 {
  "scenario": "drw-bom-multi-level-bottom-to-top",
- "recorded": "2026-11-14T12:13:16.272Z",
+ "recorded": "2026-11-18T07:22:48.544Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "5e37c995c7599c36fd4822a1",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "7e617ab93026a81163866448",
   "start": "pin-block-asm-drawing",
-  "startElement": "7425731ef03d2b9db73c3efb",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "2e8be4ded96940b21ba2941d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -177,17 +181,9 @@
      "text": [
       "BOM table",
       "Insert",
-      "start pin-block asm Copy 1",
       "Template",
-      "Follow assembly",
-      "Onshape Default BOM",
       "BOM type",
-      "Flattened",
-      "Structured - Top level",
-      "Structured - Multi level",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
      ],
      "fields": [
@@ -344,7 +340,7 @@
      "selection": []
     }
    },
-   "t": 230886
+   "t": 232128
   },
   {
    "step": 2,
@@ -365,17 +361,9 @@
      "text": [
       "BOM table",
       "Insert",
-      "start pin-block asm Copy 1",
       "Template",
-      "Follow assembly",
-      "Onshape Default BOM",
       "BOM type",
-      "Flattened",
-      "Structured - Top level",
-      "Structured - Multi level",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
      ],
      "fields": [
@@ -532,7 +520,7 @@
      "selection": []
     }
    },
-   "t": 259198
+   "t": 260624
   },
   {
    "step": 3,
@@ -559,17 +547,9 @@
      "text": [
       "BOM table",
       "Insert",
-      "start pin-block asm Copy 1",
       "Template",
-      "Follow assembly",
-      "Onshape Default BOM",
       "BOM type",
-      "Flattened",
-      "Structured - Top level",
-      "Structured - Multi level",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
      ],
      "fields": [
@@ -726,7 +706,7 @@
      "selection": []
     }
    },
-   "t": 276117
+   "t": 277547
   },
   {
    "step": 4,
@@ -750,17 +730,9 @@
      "text": [
       "BOM table",
       "Insert",
-      "start pin-block asm Copy 1",
       "Template",
-      "Follow assembly",
-      "Onshape Default BOM",
       "BOM type",
-      "Flattened",
-      "Structured - Top level",
-      "Structured - Multi level",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
      ],
      "fields": [
@@ -917,7 +889,7 @@
      "selection": []
     }
    },
-   "t": 292901
+   "t": 294638
   },
   {
    "step": 5,
@@ -938,17 +910,9 @@
      "text": [
       "BOM table",
       "Insert",
-      "start pin-block asm Copy 1",
       "Template",
-      "Follow assembly",
-      "Onshape Default BOM",
       "BOM type",
-      "Flattened",
-      "Structured - Top level",
-      "Structured - Multi level",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
      ],
      "fields": [
@@ -1105,7 +1069,7 @@
      "selection": []
     }
    },
-   "t": 320388
+   "t": 322776
   },
   {
    "step": 6,
@@ -1132,17 +1096,9 @@
      "text": [
       "BOM table",
       "Insert",
-      "start pin-block asm Copy 1",
       "Template",
-      "Follow assembly",
-      "Onshape Default BOM",
       "BOM type",
-      "Flattened",
-      "Structured - Top level",
-      "Structured - Multi level",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
      ],
      "fields": [
@@ -1299,7 +1255,7 @@
      "selection": []
     }
    },
-   "t": 337117
+   "t": 339734
   },
   {
    "step": 7,
@@ -1323,17 +1279,9 @@
      "text": [
       "BOM table",
       "Insert",
-      "start pin-block asm Copy 1",
       "Template",
-      "Follow assembly",
-      "Onshape Default BOM",
       "BOM type",
-      "Flattened",
-      "Structured - Top level",
-      "Structured - Multi level",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
      ],
      "fields": [
@@ -1490,7 +1438,7 @@
      "selection": []
     }
    },
-   "t": 354551
+   "t": 356611
   },
   {
    "step": 8,
@@ -1511,17 +1459,9 @@
      "text": [
       "BOM table",
       "Insert",
-      "start pin-block asm Copy 1",
       "Template",
-      "Follow assembly",
-      "Onshape Default BOM",
       "BOM type",
-      "Flattened",
-      "Structured - Top level",
-      "Structured - Multi level",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
      ],
      "fields": [
@@ -1678,7 +1618,7 @@
      "selection": []
     }
    },
-   "t": 382934
+   "t": 384674
   },
   {
    "step": 9,
@@ -1836,10 +1776,19 @@
        "position": null
       }
      ],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      },
+      {
+       "kind": "TABLE",
+       "owner": "BOM table"
+      }
+     ]
     }
    },
-   "t": 408339
+   "t": 412017
   },
   {
    "step": 10,
@@ -1996,10 +1945,19 @@
        "position": null
       }
      ],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      },
+      {
+       "kind": "TABLE",
+       "owner": "BOM table"
+      }
+     ]
     }
    },
-   "t": 435721
+   "t": 439475
   }
  ]
 }

@@ -1,19 +1,23 @@
 {
  "scenario": "drw-bom-switch-to-bom",
- "recorded": "2026-11-08T04:05:00.976Z",
+ "recorded": "2026-11-18T07:44:23.543Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "viewport": [
+   1919,
+   1079
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "26e2b18da0fb33d26b7f23d8",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "1282eb82b5ad76193139588c",
   "start": "pin-block-asm-drawing",
-  "startElement": "7425731ef03d2b9db73c3efb",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "2e8be4ded96940b21ba2941d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -96,7 +100,7 @@
    ]
   },
   "drawing": {
-   "tab": "start pin-block asm Copy 2 Drawing 1",
+   "tab": "start pin-block asm Copy 1 Drawing 1",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -106,6 +110,10 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
      "scale": "1:1",
      "brokenOut": 0
@@ -113,6 +121,10 @@
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -120,6 +132,10 @@
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -127,6 +143,10 @@
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
      "scale": "1:1",
      "brokenOut": 0
@@ -161,18 +181,32 @@
      "text": [
       "BOM table",
       "Insert",
-      "start pin-block asm Copy 2",
       "Template",
-      "Follow assembly",
-      "Onshape Default BOM",
       "BOM type",
-      "Flattened",
-      "Structured - Top level",
-      "Structured - Multi level",
       "Order",
-      "Top to bottom",
-      "Bottom to top",
       "Select fixed corner"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start pin-block asm Copy 1"
+      },
+      {
+       "label": "Template",
+       "kind": "select",
+       "value": "Follow assembly"
+      },
+      {
+       "label": "BOM type",
+       "kind": "select",
+       "value": "Flattened"
+      },
+      {
+       "label": "Order",
+       "kind": "select",
+       "value": "Top to bottom"
+      }
      ]
     },
     "dialogs": [],
@@ -250,7 +284,7 @@
      ]
     },
     "drawing": {
-     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "tab": "start pin-block asm Copy 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -260,6 +294,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -267,6 +305,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -274,6 +316,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -281,6 +327,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -290,7 +340,7 @@
      "selection": []
     }
    },
-   "t": 253121
+   "t": 232138
   },
   {
    "step": 2,
@@ -305,8 +355,8 @@
    },
    "ok": true,
    "at": [
-    1450,
-    172
+    1497,
+    181
    ],
    "state": {
     "focus": {
@@ -389,7 +439,7 @@
      ]
     },
     "drawing": {
-     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "tab": "start pin-block asm Copy 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -399,6 +449,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -406,6 +460,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -413,6 +471,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -420,6 +482,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -428,13 +494,23 @@
      "annotations": [
       {
        "kind": "table",
-       "text": "Item Quantity Part number Description 1 1 2 1"
+       "text": "Item Quantity Part number Description 1 1 2 1",
+       "position": null
       }
      ],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      },
+      {
+       "kind": "TABLE",
+       "owner": "BOM table"
+      }
+     ]
     }
    },
-   "t": 270387
+   "t": 259378
   },
   {
    "step": 3,
@@ -532,7 +608,7 @@
      ]
     },
     "drawing": {
-     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "tab": "start pin-block asm Copy 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -542,6 +618,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -549,6 +629,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -556,6 +640,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -563,6 +651,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -571,13 +663,23 @@
      "annotations": [
       {
        "kind": "table",
-       "text": "Item Quantity Part number Description 1 1 2 1"
+       "text": "Item Quantity Part number Description 1 1 2 1",
+       "position": null
       }
      ],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      },
+      {
+       "kind": "TABLE",
+       "owner": "BOM table"
+      }
+     ]
     }
    },
-   "t": 286500
+   "t": 286936
   },
   {
    "step": 4,
@@ -605,12 +707,12 @@
      "text": [
       "Sheet1 (1)",
       "In progress",
-      "start pin-block asm Copy 2",
+      "start pin-block asm Copy 1",
       "Front",
       "Right",
       "Top",
       "Isometric",
-      "start pin-block asm Copy 2"
+      "start pin-block asm Copy 1"
      ]
     },
     "dialogs": [],
@@ -688,7 +790,7 @@
      ]
     },
     "drawing": {
-     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "tab": "start pin-block asm Copy 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -698,6 +800,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -705,6 +811,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -712,6 +822,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -719,6 +833,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -727,13 +845,23 @@
      "annotations": [
       {
        "kind": "table",
-       "text": "Item Quantity Part number Description 1 1 2 1"
+       "text": "Item Quantity Part number Description 1 1 2 1",
+       "position": null
       }
      ],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      },
+      {
+       "kind": "TABLE",
+       "owner": "BOM table"
+      }
+     ]
     }
    },
-   "t": 302352
+   "t": 313101
   },
   {
    "step": 5,
@@ -754,12 +882,12 @@
      "text": [
       "Sheet1 (1)",
       "In progress",
-      "start pin-block asm Copy 2",
+      "start pin-block asm Copy 1",
       "Front",
       "Right",
       "Top",
       "Isometric",
-      "start pin-block asm Copy 2"
+      "start pin-block asm Copy 1"
      ]
     },
     "dialogs": [],
@@ -837,7 +965,7 @@
      ]
     },
     "drawing": {
-     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "tab": "start pin-block asm Copy 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -847,6 +975,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -854,6 +986,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -861,6 +997,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -868,6 +1008,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -876,13 +1020,23 @@
      "annotations": [
       {
        "kind": "table",
-       "text": "Item Quantity Part number Description 1 1 2 1"
+       "text": "Item Quantity Part number Description 1 1 2 1",
+       "position": null
       }
      ],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      },
+      {
+       "kind": "TABLE",
+       "owner": "BOM table"
+      }
+     ]
     }
    },
-   "t": 318032
+   "t": 339628
   },
   {
    "step": 6,
@@ -908,17 +1062,45 @@
      "text": [
       "Sheet1 (1)",
       "In progress",
-      "start pin-block asm Copy 2",
+      "start pin-block asm Copy 1",
       "Front",
       "Right",
       "Top",
       "Isometric",
-      "start pin-block asm Copy 2"
+      "start pin-block asm Copy 1"
      ]
     },
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "name": null,
+     "rows": [
+      "Properties...",
+      "",
+      "Replace...",
+      "",
+      "Switch to BOM",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -991,7 +1173,7 @@
      ]
     },
     "drawing": {
-     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "tab": "start pin-block asm Copy 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1001,6 +1183,10 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
        "scale": "1:1",
        "brokenOut": 0
@@ -1008,6 +1194,10 @@
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1015,6 +1205,10 @@
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1022,6 +1216,10 @@
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
        "scale": "1:1",
        "brokenOut": 0
@@ -1030,7 +1228,8 @@
      "annotations": [
       {
        "kind": "table",
-       "text": "Item Quantity Part number Description 1 1 2 1"
+       "text": "Item Quantity Part number Description 1 1 2 1",
+       "position": null
       }
      ],
      "selection": [
@@ -1041,7 +1240,7 @@
      ]
     }
    },
-   "t": 333941
+   "t": 367687
   },
   {
    "step": 7,
@@ -1053,7 +1252,7 @@
    },
    "ok": true,
    "at": [
-    178,
+    193,
     381
    ],
    "state": {
@@ -1191,8 +1390,35 @@
      ]
     },
     "drawing": {
-     "error": "translation failed <a class=osx-import-filename href='6aeff575d34b4100389cebd7'>{1}</a> failed to translate."
+     "error": "translation failed <a class=osx-import-filename href='6afd58133c753a6db6833429'>{1}</a> failed to translate."
     },
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      -2.165,
+      3.75,
+      7.5
+     ],
+     "eye_mm": [
+      16.636,
+      -28.814,
+      29.209
+     ],
+     "width_mm": 57.373,
+     "height_mm": 58.454,
+     "mmPerPixel": 0.060077,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Bill of materials",
      "rows": [
@@ -1208,7 +1434,7 @@
      "banner": null
     }
    },
-   "t": 355733
+   "t": 384822
   },
   {
    "step": 8,
@@ -1353,8 +1579,35 @@
      ]
     },
     "drawing": {
-     "error": "translation failed <a class=osx-import-filename href='6aeff57cd34b4100389cebdd'>{1}</a> failed to translate."
+     "error": "translation failed <a class=osx-import-filename href='6afd581f3c753a6db683346d'>{1}</a> failed to translate."
     },
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      -2.165,
+      3.75,
+      7.5
+     ],
+     "eye_mm": [
+      16.636,
+      -28.814,
+      29.209
+     ],
+     "width_mm": 57.373,
+     "height_mm": 58.454,
+     "mmPerPixel": 0.060077,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Bill of materials",
      "rows": [
@@ -1370,7 +1623,7 @@
      "banner": null
     }
    },
-   "t": 363324
+   "t": 391970
   }
  ]
 }
