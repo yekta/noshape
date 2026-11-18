@@ -3535,3 +3535,11 @@ Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live i
 ## 11-18 16:2x: moved from the handoff
 - blend: impeller f26 matches on its 12b25c47e (not landed); f27 Fillet 3 next (blend). core: side-cuts-tab Corner break
   fix queued (7 -> 13/18).
+
+## 11-18 (moved from the handoff at 16:5x)
+- Export feel (live2 export-feel-1118, behaviours "dx (lead 11-18 ~02:38, feel)"): in a1bc5ce3: solid exports
+  (Part Studio, part, assembly) show the "<file name> is being prepared…" bubble (~5 s; assembly's message fades at
+  4 s) and the bell's "Export completed" / "<name> was exported successfully." (no extension); drawing Options
+  "Download and store file in a new tab". Landed bfac0a31: import_files keeps the active tab; the
+  export UI test (export_feel_tests.rs; turned main red 04:19, parked T2 by the lead: it read doc.tabs, creation
+  order, where Assembly 1 precedes the stored file; fix = ordered_tabs(), T1 again in 1b62e831).

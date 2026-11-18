@@ -148,8 +148,13 @@ Open, ranked:
      face's outline, which turned snap-hook's 8 fillet ARCs (live tori, ours B-spline) and 4 faceblend ARCs into
      SPLINEs: narrowed to tori only (uncommitted at 16:1x, m9 to confirm: bottle-split ELLIPSE matches, snap-hook ARC 82).
    - sm-louver Front 608 / 465 Visible: 144 short LINEs lie exactly on the plate's front edge line (x 2.785 in),
-     live writes 1: export.rs drop_lines_on_longer writes a line wholly on a longer one once (landing 16:4x; m10 to
-     confirm). The 31 pieces 12.7 um off are in live too.
+     live writes 1: export.rs drop_lines_on_longer writes a line wholly on a longer one once (re-landing 17:3x after a107ed7e failed on psui's box-drag tests; m9 to
+     confirm). The 31 pieces 12.7 um off are in live too. File-wide the rule drops 176 (Visible LINE 2175, live 2178);
+     clamp-guillem's 2 on-longer pairs that live keeps should be `shared` (excluded): m9 checks (265 -> 263, live 268).
+     TANGENT_LINES 117 / 243: Front same length (78.3 in) in fewer pieces, Top's 32 are live's end-on stubs (noise),
+     one real miss: Top's bend tangent 2.785-4.4999 in at y 6.09203 (live TANGENT_LINES, ours nothing). Next.
+   - clamp-guillem Top: live draws y 6.5867 x 4.29-4.62 (2 pieces), ours nothing there; ours 7.077-7.161 at 30° live
+     hides. hex-bookcase ELLIPSE 0 / 2: live's degenerate ellipses (start 3pi) on a 0.5 mm mesh hole: noise.
    - Model-side (not the writer): housing-draft's 0.499 in edges bow 0.5 mm in ours (live LINEs) and its Right hole
      rim isn't an exact circle (core's Draft, sent 16:2x with numbers); extension-spring's Top has a second end rectangle (x 2.230 / 2.268) and
      Fillet 1 (blend); bottle-split's lip outline is live's noise (18 tiny pieces); hex mesh splits (no rule).
@@ -193,12 +198,6 @@ Open, ranked:
   7.786-8.061 in varies by part, ours fixed 7.810: rule unknown). clamp-guillem now 271 / 268 LINE only. sm-louver ARC/CIRCLE now match.
   Landed 05:55 (7db466c6) with 59d761674 no mark on a wholly hidden hole: hex CENTERMARKS gone, as live; c284709fa
   suite views placed by their silhouette box centre, live2 iso-place-1118); 943e05e14 landed 06:26 (8a74d626).
-- Export feel (live2 export-feel-1118, behaviours "dx (lead 11-18 ~02:38, feel)"): in a1bc5ce3: solid exports
-  (Part Studio, part, assembly) show the "<file name> is being prepared…" bubble (~5 s; assembly's message fades at
-  4 s) and the bell's "Export completed" / "<name> was exported successfully." (no extension); drawing Options
-  "Download and store file in a new tab". Landed bfac0a31: import_files keeps the active tab; the
-  export UI test (export_feel_tests.rs; turned main red 04:19, parked T2 by the lead: it read doc.tabs, creation
-  order, where Assembly 1 precedes the stored file; fix = ordered_tabs(), T1 again in 1b62e831).
 - Import / Export dialogs (live import-export-1118): queued 15790a91: import reads its files off the UI
   thread, tabs come when done, bubble "<file> has been imported." / "<file> uploaded but failed to translate." with
   Open document (file kept in CAD Imports); Export dialog keys test (focus on the dialog, Esc, Enter in File name).
