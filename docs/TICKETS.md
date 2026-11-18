@@ -766,6 +766,9 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   rectangle drawn blue at Part 2's base); the face shows amber 1.2 s after (state: nothing selected, as live).
   qa 00:57 on 591643fc (a65a2d3cf): still open: Sketch 2 / Extrude 2 related and the face amber, no rectangle at the base
   (qa-keep/sel-feel/selfeel-c2-591643fc.png, sent to skasm 01:03).
+  qa 08:01 on green 850ae7f3 (b07c27fe9 = 4a4f7e0e): the rectangle now shows at Part 2's base and the rows get the related tint, but it is
+  grey (lines ~#6B6E70, corner dots 137,137,137) and hidden behind the part's faces; live draws it solid blue with blue dots on top
+  (back corner visible; live/psui/sel-feel/list/C2-dbl-face-part2.png). Shots qa-scratch/sel-c2. Still open.
 - [x] a65a2d3cf **verified 591643fc** (qa 00:57: the row hovered draws Sketch 1's base edge lit) **P0 SELFEEL-HIDDEN-SKETCH-HOVER (skasm)**: hovering the hidden Sketch 1 row shows the tooltip but doesn't draw the sketch
   light orange in place (live row 4).
 - [x] **verified 08597f71** (qa 03:10, vibex7 at load 0.2, 2 runs: Part 2 drawn selected, no outline left on Part 1; with psui's latest-wins 5e498ffb) **P0 SELFEEL-PART-ROW (psui)**: clicking the Part 2 row selects the body (state) with Extrude 2 related, but Part 2 isn't
