@@ -1796,31 +1796,45 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
         // rib.fs: each rib its own body, cut against the part as it was, then all of them merged at once (one Boolean,
         // V432_RIB_GROUP_BOOLEANS): crossing ribs each run through the others.
         let mut ribs: Vec<Shape> = Vec::new();
+        let mut pieces: Vec<Shape> = Vec::new();
         for w in &wires {
             // Normal to the sketch plane, an open chain is one rib per edge as
             // in rib.fs (each edge of the profiles query is a profile): a leg
             // that only runs along the rim is dropped as excess, the others
             // stay (live L24's L: only its vertical leg, 2 × 8 × 8).
-            let pieces = if normal && w.edges().len() > 1 && !w.is_closed().unwrap_or(false) {
-                w.edges().iter().map(|e| k::make_wire(std::slice::from_ref(e))).collect::<Result<Vec<_>, _>>()?
-            } else {
-                vec![w.clone()]
-            };
-            for w in &pieces {
-                let res = if normal && w.edges().len() > 1 {
-                    rib_normal(&body.shape, w, dir, t, draft)
-                } else if normal {
-                    rib_sheet(&body.shape, w, dir, None, t, extend, draft)
-                } else {
-                    rib_parallel(&body.shape, w, frame.normal, opposite, t, extend, draft)
-                };
-                match res {
-                    Ok(r) => {
-                        ribs.extend(r);
-                        made += 1;
-                    }
-                    Err(e) => last_err = Some(e),
+            if normal && w.edges().len() > 1 && !w.is_closed().unwrap_or(false) {
+                for e in w.edges() {
+                    pieces.push(k::make_wire(std::slice::from_ref(&e))?);
                 }
+            } else {
+                pieces.push(w.clone());
+            }
+        }
+        let one = |w: &Shape| {
+            if normal && w.edges().len() > 1 {
+                rib_normal(&body.shape, w, dir, t, draft)
+            } else if normal {
+                rib_sheet(&body.shape, w, dir, None, t, extend, draft)
+            } else {
+                rib_parallel(&body.shape, w, frame.normal, opposite, t, extend, draft)
+            }
+        };
+        // Each profile's rib on its own, in parallel (c2-parting-line-draft-parting-line's Rib 1: 24 profiles, each cut
+        // against the part), in the profiles' order.
+        let outs: Vec<FResult<Vec<Shape>>> = if pieces.len() >= 2 {
+            use rayon::prelude::*;
+            let (legacy, stop) = (k::kernel_legacy(), k::stop_state());
+            pieces.par_iter().map(|w| k::with_stop_state(stop, || k::with_kernel_legacy(legacy.clone(), || one(w)))).collect()
+        } else {
+            pieces.iter().map(one).collect()
+        };
+        for res in outs {
+            match res {
+                Ok(r) => {
+                    ribs.extend(r);
+                    made += 1;
+                }
+                Err(e) => last_err = Some(e),
             }
         }
         if ribs.is_empty() {
