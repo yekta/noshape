@@ -499,7 +499,14 @@ fn start_frame_log() {
 
 static FRAME_LOG: OnceLock<std::sync::mpsc::SyncSender<(u128, &'static str)>> = OnceLock::new();
 
-fn frame_log(event: &'static str) {
+/// Whether `NOSHAPE_FRAME_LOG` is on.
+pub fn frame_log_on() -> bool {
+    FRAME_LOG.get().is_some()
+}
+
+/// A line in `NOSHAPE_FRAME_LOG` now (also the ui-parity driver's `driver`: the redraw it makes to read the state, whose
+/// frames are the driver's, not the step's).
+pub fn frame_log(event: &'static str) {
     let Some(tx) = FRAME_LOG.get() else { return };
     let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_micros());
     let _ = tx.try_send((t, event));

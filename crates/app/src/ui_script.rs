@@ -525,6 +525,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         let state = |cx: &mut AsyncWindowContext| -> Value { ws.update_in(cx, window_state).unwrap_or(Value::Null) };
         // The state with the tooltip drawn now (a redraw notes it).
         let read = async |cx: &mut AsyncWindowContext| -> Value {
+            noshape_app_core::gpu::frame_log("driver");
             noshape_app_core::ui_script::clear_tooltip();
             noshape_app_core::ui_script::clear_dialog();
             let _ = cx.update(|window, _| window.refresh());
@@ -548,6 +549,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         };
         // Every named control painted where it is now.
         let redraw = async |cx: &mut AsyncWindowContext| {
+            noshape_app_core::gpu::frame_log("driver");
             noshape_app_core::ui_script::clear();
             // The chrome (tab bar, navbar, left panels) is cached: repainted too.
             let _ = ws.update(cx, |w, cx| w.ui_redraw(cx));
@@ -827,6 +829,11 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 other => Err(format!("unknown step {other}")),
             };
             let idle = settle(cx).await;
+            // A timed step ("lat", NOSHAPE_FRAME_LOG): its frames end over a second before the driver's own state-read
+            // redraw, which timed the driver: qa's tab return "settled" at its read ~0.7 s after the click.
+            if step.get("lat").is_some() && noshape_app_core::gpu::frame_log_on() {
+                sleep(cx, 1000).await;
+            }
             let state_now = read(cx).await;
             screenshot(i + 1);
             let mut rec = json!({ "step": i + 1, "do": step, "ok": result.is_ok(), "state": state_now });
@@ -876,6 +883,7 @@ async fn newest_page_state(cx: &mut AsyncApp) -> Value {
     let windows = cx.update(|cx| cx.windows());
     for w in windows.into_iter().rev() {
         noshape_app_core::ui_script::clear();
+        noshape_app_core::gpu::frame_log("driver");
         if w.update(cx, |_, window, _| window.refresh()).is_err() {
             continue;
         }
@@ -958,6 +966,7 @@ pub fn start_page(cx: &mut App) {
         });
         sleep(cx, 1500).await;
         let redraw = async |w: AnyWindowHandle, cx: &mut AsyncApp| {
+            noshape_app_core::gpu::frame_log("driver");
             noshape_app_core::ui_script::clear();
             let _ = w.update(cx, |_, window, _| window.refresh());
             sleep(cx, 150).await;
