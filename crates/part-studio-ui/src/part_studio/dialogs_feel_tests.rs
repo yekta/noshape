@@ -751,3 +751,25 @@ fn the_translate_triad_sits_at_the_parts_box_centre(cx: &mut TestAppContext) {
     let centre = (lo + hi) * 0.5;
     assert!(origin.distance(centre) < 1e-6, "triad at {origin:?}, the part's box centre {centre:?}");
 }
+
+/// Live2 pattern-hole-1118 y (qa): Hole with no point: the title's tooltip ends "[Hole] did not regenerate properly: No
+/// hole points selected." (an error naming only a selection field doesn't append "A parameter value is not valid.").
+#[gpui::test]
+fn a_hole_without_points_says_only_that(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-hole-none");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("hole", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Hole dialog").dialog.clone());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.schedule_regen(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && dialog.read(cx).status.is_some());
+    draw(cx, window);
+    let title = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("dialog-title").expect("the title");
+    crate::ui_script::clear_tooltip();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(gpui_kit::point(title.origin.x + px(20.), title.center().y), None, Modifiers::default());
+    for _ in 0..50 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(10));
+        draw(cx, window);
+    }
+    let tip = crate::ui_script::shown_tooltip().unwrap_or_default();
+    assert!(tip.ends_with("did not regenerate properly: No hole points selected."), "the title's tooltip: {tip:?}");
+}

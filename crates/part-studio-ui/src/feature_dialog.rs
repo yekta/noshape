@@ -4413,9 +4413,10 @@ impl Render for FeatureDialog {
         } else if range_invalid {
             let base = status.as_ref().map(|s| s.1.clone()).filter(|m| m != VALUE_NOT_VALID).unwrap_or_default();
             Some((FeatureStatus::Error, format!("{base} {VALUE_NOT_VALID}")))
-        } else if let Some((FeatureStatus::Error, msg)) = status.as_ref().filter(|s| !self.faulty.is_empty() && !s.1.ends_with(VALUE_NOT_VALID)) {
-            // An error naming fields appends it too (live2 custom-feature-1118 b4: "…: Probe failure on purpose A
-            // parameter value is not valid."; Revolute limits, Linear pattern distance).
+        } else if let Some((FeatureStatus::Error, msg)) = status.as_ref().filter(|s| self.faulty.iter().any(|f| !self.spec_for_path(f).is_some_and(|p| matches!(p.kind, ParamKind::Query { .. }))) && !s.1.ends_with(VALUE_NOT_VALID)) {
+            // An error naming value fields appends it too (live2 custom-feature-1118 b4: "…: Probe failure on purpose A
+            // parameter value is not valid."; Revolute limits, Linear pattern distance); one naming only selection
+            // fields doesn't (Hole's "No hole points selected.", live2 pattern-hole-1118 y).
             Some((FeatureStatus::Error, format!("{msg} {VALUE_NOT_VALID}")))
         } else {
             status
