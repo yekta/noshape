@@ -1,11 +1,19 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-18 11:30 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-18 12:55 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight
+- **P0 (qa compat 11:42, vs 0.4.58): 77ba403e7 broke saved references** (impeller Fillet Flansch zum Stroemungskanal "2
+  missing selections", Fillet Ansaugflansch zum Gehaeuse "Select edges"): its tweak names every face Offset(old); 0.4.58
+  took the booleans (OCCT's offset invalid) and kept the neighbours' names. Revert db96888b QUEUED 12:39 (core-p0,
+  verified Ok on qa's copy). Fix forward c609ad23b (core-p0 branch core-offnames, on the revert): same tweak + aliases
+  old name -> new for every face not moved (T1 features_a::move_face_offset_keeps_references_to_its_neighbours_old_names
+  fails without them). Compat sets 0.4.58 vs it: vibex7 ~/tmp/core/imp/compat-on.sh -> /root/core-scratch/compat-on.out.
+  Land it when the compat run shows no new DIFF beyond qa's ALERT-ab6da5d9 minus the 3 impeller fillets.
+  e9caeead0 (offset_planes) and core-rp flansch need the same aliases (+ a compat run) before landing.
 - **Background jobs, results on vibex7 ~/tmp/core:** pair 7 `pair7.sh ms mt` (running since 11:12; p7-ms/mt.log,
   p7-cmp.out, p7.done); pair 5 `pair5.sh pm pt <42 docs>` queued behind it (p4-pm/pt.log, p5-cmp.out, p5.done). After
   both: `~/bin/slot bash pair8.sh mt fl` (Flansch, p8-cmp.out; copy core-rp's ops build to ~/tmp/core/pair-fl first).
@@ -15,13 +23,18 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   (the profile projected across the direction, run on 10|d| + 10 % past its ends, offset as Geom_OffsetCurve,
   extruded); extrusions move before planes so a plane moved later still meets them. T1 features_a::
   move_face_offset_of_an_extruded_spline_wall_and_a_plane (wall exactly 1 mm off, 6 faces). Next: impeller time A/B
-  vs pair-mt (core-rp .imp.sh -> /root/core-scratch/imp.out), g++-13 build, pair 8, land after pair 7's e9caeead0.
+  vs pair-mt (core-rp .imp.sh), g++-13 build, pair 8, land after pair 7's e9caeead0. First A/B (loaded): Flansch
+  (vorne) 12 -> 983 ms with this branch: find why before anything else.
 - **DRIVEN-PATTERN-SWEEP (qa P1) is REAL:** main fails Sweep 1 on the suite's own translation too (the suite says
   "matches to the end" only because live.jsonl's Sweep 1 line is unfetched). OCCT MakePipeShell status 1 at our
   tolerance (path ~4 mm -> 4.3e-9 m); with SetMaxSegments(1000) it builds 3 faces, valid, ~0.5 s, but keeps the 21.7°
   tilt: V 0.07543 / side 6.169 vs live 0.07985 / 6.347 (live tilts 21.7° at both caps yet less in between). Probe
   vibex7 ~/tmp/core/dp/swt3 profile.brep path.brep (src /root/core-scratch/brepq/swt*.cpp). Asked live (REQUESTS
-  11:18) for ROBK's sections along the path. Decision to the lead: land the retry (wrong-as-Ok by 5.5 % V) or wait.
+  11:18) for ROBK's sections. Lead: keep the error. Live 12:4x: tilt stays 21.5°; live's extra V/area comes from its
+  one smooth face approximating 12 sharp bends (radius to 0.05 mm, sections non-circular there): matching needs
+  Parasolid's approximation. Retry parked on core-sweepseg (core-sw, 20f02b960).
+- **cf-setback-fillet (blend 11-18):** Setback Fillet 1's 3 std fill() corner patches 87.52 mm2 in live, ours +1.14
+  (~1.3 % large); live/suite-truth-1118/cf-setback-fillet.json. With Fill 1.
 - **Impeller (lead P0) after 27b7836e0:** Move face 1 and Boolean 3 at live's volume (Boolean 3 43/108/66 vs live 64/189:
   the inner wall's 15 spline pieces not chased). Fillet 4 ERROR = blend's (its input edge JOV + faces JOm/JOW match
   live within 0.05 mm2; dump vibex7 ~/agents/core-keep/f4/fillet-32.*). **Move face 2 waits on Fillet 4:** its pick =
