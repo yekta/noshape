@@ -258,6 +258,28 @@ fn rows() -> Vec<Row> {
             let (open, text) = cx.update(|cx| view.read(cx).sketch.as_ref().map(|s| (s.text_dialog_open(), s.text_string.clone())).unwrap());
             expect((after_one, open, text.as_str()), (false, true, "Default text"), "dialog after one click, after two, its text")
         } },
+        Row { id: "search / the found tool lit in the sketch toolbar", live: "search-tools-1118: Alt+C in a sketch; 'f' lights Fillet's button yellow (its group's face), a member under a ⌄ lights the ⌄ (Fix: the test window's collapsed constraints), Highlight tool in toolbar off lights nothing", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-search-lit", Tool::Select);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_palette(w, cx))).unwrap();
+            draw(cx, window);
+            let lit = |cx: &mut TestAppContext, typed: &str| {
+                gpui_kit::VisualTestContext::from_window(window, cx).simulate_input(typed);
+                draw(cx, window);
+                let names = ["Fillet", "caret Fillet", "Constraint(Fix)", "caret Constraint(Coincident)", "extrude"];
+                let lit: Vec<&str> = names.into_iter().filter(|n| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("search-lit:{n}").into_boxed_str())).is_some()).collect();
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                    if let Some((st, _)) = &v.palette {
+                        st.clone().update(cx, |s, cx| s.set_value("", w, cx));
+                    }
+                    v.palette_query.clear();
+                })).unwrap();
+                lit
+            };
+            let found = [lit(cx, "f"), lit(cx, "chamfer"), lit(cx, "fix"), lit(cx, "extrude")];
+            cx.update(|cx| view.update(cx, |v, _| v.ui.palette_no_highlight = true));
+            let off = lit(cx, "f");
+            expect((found.map(|l| l.join(",")), off.len()), (["Fillet", "caret Fillet", "caret Constraint(Coincident)", "extrude"].map(String::from), 0), "lit for f / chamfer / fix / extrude, lit with the highlight off")
+        } },
         Row { id: "search / in a sketch", live: "sketch tools: 'Offset o', 'Linear pattern', 'Circular pattern', 'Mirror', 'Text', 'Insert image', 'Trim', 'Extend'", gap: false, check: |_| {
             let tools = noshape_ops::tool_search::searchable_sketch_tools();
             let names: Vec<&str> = tools.iter().map(|t| t.name()).collect();

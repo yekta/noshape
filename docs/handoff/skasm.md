@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 11:58 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 12:17 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -10,19 +10,20 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   7d0eb11c anchors on a used circle's centre (rocker-body Sketch 6). a98d2543 double-click counts the OS click count
   (lead P0, Windows CI 44275458892; unconfirmed until the next Windows run). Ctrl+A row + test; rows filled.
 
-## Queued 11:59 (verified: parting-line 10/17, loft-paths keeps its PIERCEs, rocker-body 28/28, parity:: 113)
-- parity.rs: sketch patterns linked first: rocker-enclosure-body 15/28 -> 28/28 (30 pattern docs otherwise unchanged).
-- parity.rs: the EDGE -> sketch-curve fallback (59e7a5fe) only for a PIERCE's `externalEdge` ref: it took Draft 1's
-  parting edges (c2-parting-line-draft-parting-line 10/17 -> 5/17 on main). Tell bool (7fa8ceab) when it lands.
+- efd27713 sketch patterns linked first (rocker-enclosure-body 28/28); EDGE -> sketch-curve fallback only for a
+  PIERCE's edge (parting-line back to 10/17; bool told).
 
-## Feel rows open
-- sm-form-1118 Form row (on main, "?"): ours = chip "Vertex of Sketch N", std fills Target face(s), preview per point,
-  no drag; ≠ Location(s) row buttons (ours one mate-connector toggle, live create point + sketch); no "Preparing
-  form…" (ours has no load wait). Fill the row.
-
-- search-tools-1118 (live2 11:5x, rows on main, "?"): Search tools in a sketch, Alt+C: 600 px panel under the toolbar
-  box, "Close search [escape]", "Start typing to search tools", footer hint + "Highlight tool in toolbar" (on), rows
-  icon / name / shortcut, first row lit with an info pane, toolbar button lit yellow. Check ours, fill the rows.
+## Feel rows (12:2x, in the worktree)
+- search-tools-1118: our panel already as live (600 px, "Close search", start text, footer, ranking = live's lists);
+  the gap was the yellow toolbar highlight in a sketch (only Part Studio buttons lit): now the found sketch tool, a
+  group's ⌄ for a member, a constraint, Construction, Extrude / Revolve (`search_lit`, debug selector
+  `search-lit:<name>`); sketchtools row "search / the found tool lit in the sketch toolbar".
+- sm-form-1118 row filled (≈ faster; ≠ Location(s) has no pencil "sketch in the dialog" button: a feature, not done).
+- hover-p0 / qa FEEL-SKETCH-REACH-OUTSIDE (TICKETS 9434d439a): outside sketch mode a shown sketch's point within 9 px
+  wins, a curve lights within 6.5 px, else what the pick finds without it (`shown_sketch_hover_id`, viewport
+  `pick_at_pointer_without`); re-resolved on each move (`ui.shown_sketch_gpu_hover`); clicks take the same. Faces /
+  edges keep their own pick (a point behind a part stays hidden). psui has the plane rows.
+- Sheet metal model arrow: needs live's face order: REQUESTS 12:16 (fs probe of qCreatedBy(id, BODY)'s faces).
 
 ## Waiting on live (REQUESTS)
 - 11:12 c2-surf-intro-mutualtrim "Title" (feature 4, its first difference): the text sketch is on face JHG (y = 0,

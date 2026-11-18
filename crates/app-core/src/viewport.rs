@@ -1230,6 +1230,19 @@ impl Viewport {
         }
     }
 
+    /// The pick at the pointer from the last pick rectangle with the ids `skip` holds never picked (what lies under a
+    /// sketch line out of its reach); None when no rectangle covers the pointer.
+    pub fn pick_at_pointer_without(&self, skip: &dyn Fn(u32) -> bool) -> Option<Option<u32>> {
+        let pick = self.pick_cache.as_ref()?;
+        let (x, y) = self.device_px(self.last_pos);
+        let r = pick_radius_px(self.scale);
+        if !pick.covers(x, y, r) {
+            return None;
+        }
+        let prio = self.pick_priority.clone();
+        Some(pick.pick(x, y, r, |id| if skip(id) { i32::MIN } else { prio(id) }))
+    }
+
     fn pick_at(&self, local: DVec2) -> Option<Option<u32>> {
         let pick = self.pick_cache.as_ref()?;
         let (x, y) = self.device_px(local);

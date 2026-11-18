@@ -75,6 +75,15 @@ impl PartStudioView {
         }
     }
 
+    /// The sketch tool search's selected result while "Highlight tool in toolbar" is on: its sketch toolbar button
+    /// turns yellow (live search-tools-1118).
+    pub(super) fn palette_found_sketch(&self, cx: &App) -> Option<PaletteItem> {
+        if self.sketch.is_none() || self.palette.is_none() || self.ui.palette_no_highlight || self.palette_query.trim().is_empty() {
+            return None;
+        }
+        self.palette_items(cx).get(self.ui.palette_sel).cloned()
+    }
+
     /// Onshape's tool search (live 2064, `noshape_ops::tool_search::rank`): the tools used last until something is
     /// typed, then the first 10 by live's score of their names ("fil" finds Fillet, Fill, Finish flex PCB model, …).
     /// In a sketch, the sketch tools by their plain names, with Extrude, Revolve and Construction (live qa5-ts-sketch-*:
@@ -297,7 +306,9 @@ impl PartStudioView {
                         .child(chip("alt/⌥"))
                         .child(chip("c"))
                         .child(div().flex_1())
-                        .child(crate::ui::os_checkbox("pal-highlight", "Highlight tool in toolbar", highlight).text_size(px(12.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(crate::ui::os_checkbox("pal-highlight", "Highlight tool in toolbar", highlight).text_size(px(12.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                            // Live search-tools-1118: the click takes the keyboard off the input; the panel stays.
+                            window.focus(&this.focus, cx);
                             this.ui.palette_no_highlight = !this.ui.palette_no_highlight;
                             cx.notify();
                         })))

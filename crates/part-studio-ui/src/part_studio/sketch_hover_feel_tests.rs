@@ -123,6 +123,60 @@ fn sketch_hover_reach_and_priority_as_live(cx: &mut TestAppContext) {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
+/// Live2 hover-p0 (ours-1118, qa FEEL-SKETCH-REACH-OUTSIDE): outside sketch mode a shown sketch's line lights to 6 px
+/// (7 and 8 px: not), a point to 9 px, and 8 px off a corner along its diagonal the corner point lights, not its lines.
+#[gpui::test]
+fn a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "shown-sketch-reach", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let feature = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+    let lines = lines_on_screen(cx, &view);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.finish_sketch(w, cx);
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let centre = lines.iter().fold(DVec2::ZERO, |c, (_, a, b)| c + *a + *b) / (2.0 * lines.len() as f64);
+    let is_line = |r: &Option<Reference>, id: u32| matches!(r, Some(Reference::SketchEntity { sketch, entity }) if *sketch == feature && *entity == id);
+    let mut wrong = Vec::new();
+    for (id, a, b) in &lines {
+        // (Off the midpoint, which turns the hover into the line's midpoint.)
+        let mid = *a + (*b - *a) * 0.3;
+        let mut n = (*b - *a).perp().normalize();
+        if n.dot((*a + *b) * 0.5 - centre) < 0.0 {
+            n = -n;
+        }
+        for (d, want) in [(0.0, true), (6.0, true), (-6.0, true), (7.0, false), (8.0, false), (-8.0, false)] {
+            pointer.move_to(cx, &view, mid + n * d);
+            let got = hovered(cx, &view);
+            if is_line(&got, *id) != want {
+                wrong.push(format!("line {id} at {d:+} px: lit {got:?}"));
+            }
+        }
+    }
+    let corner = lines[0].1;
+    let out = (corner - centre).normalize();
+    for (d, want) in [(6.0, true), (8.0, true), (11.0, false)] {
+        pointer.move_to(cx, &view, corner + out * d);
+        let got = hovered(cx, &view);
+        let point = cx.update(|cx| {
+            let v = view.read(cx);
+            let shown = v.display.sketches.iter().find(|s| s.feature == feature);
+            matches!(&got, Some(Reference::SketchEntity { sketch, entity }) if *sketch == feature && shown.is_some_and(|s| s.points.iter().any(|q| q.entity == *entity)))
+        });
+        if point != want {
+            wrong.push(format!("{d} px off a corner: lit {got:?}"));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
 /// The user's setup with a circle (Sketch 1 on Top, default iso, the planes behind): on its rim, 5 px inside and 5 px
 /// outside it, the circle lights (a curve's 7 px reach, live2 hov10); 12 px outside nothing of the sketch does; on its
 /// centre the centre point lights (a point beats the region it sits in).

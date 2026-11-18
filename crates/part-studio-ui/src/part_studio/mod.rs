@@ -1937,6 +1937,9 @@ impl PartStudioView {
         // Live: with a dialog field active, what it doesn't take isn't
         // highlighted; on a plane's resize ring nothing is.
         let id = id.filter(|_| self.ui.plane_ring_hover.is_none());
+        let gpu = id;
+        let id = self.shown_sketch_hover_id(id, cx);
+        self.ui.shown_sketch_gpu_hover = self.sketch.is_none().then_some((gpu, id));
         self.ui.hover_raw = id.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
         let cap = id.and_then(noshape_render::section_cap_of_pick).filter(|_| !self.ui.section.is_empty());
         let left = id.is_none() && !vp.read(cx).pointer_inside();
@@ -2308,6 +2311,13 @@ impl PartStudioView {
                     self.refresh_scene(false, cx);
                 }
                 self.select_other_pointer(*position, cx);
+                // The GPU's pick stands while the pointer moves along or off a sketch line: held to the reach again.
+                if self.sketch.is_none()
+                    && let Some((gpu, resolved)) = self.ui.shown_sketch_gpu_hover
+                    && self.shown_sketch_hover_id(gpu, cx) != resolved
+                {
+                    self.apply_hover_pick(gpu, vp, window, cx);
+                }
                 // A plane's resize ring under the pointer: darker, nothing
                 // pre-highlighted (live).
                 if self.plane_ring_pointer(*position, cx) {
@@ -2419,6 +2429,8 @@ impl PartStudioView {
                 }
             }
             ViewportEvent::Click { pick, position, modifiers } => {
+                // What lights is what a click takes: the shown sketches' reach.
+                let pick = self.shown_sketch_hover_id(*pick, cx);
                 let target = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
                 // Alt+click (or isolate without "Select transparent
                 // geometry") picks through transparent parts.

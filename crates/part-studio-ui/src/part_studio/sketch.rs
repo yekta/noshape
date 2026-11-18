@@ -69,6 +69,21 @@ fn remember_group_tool(tool: Tool) {
     }
 }
 
+/// Search tools' highlight on a sketch toolbar button, named `search-lit:<name>` for the tests.
+fn search_lit(button: Button, lit: bool, name: String) -> Button {
+    if !lit {
+        return button;
+    }
+    crate::ui::search_highlight(button).debug_selector(move || format!("search-lit:{name}"))
+}
+
+/// The point of segment `a`–`b` nearest `p`.
+fn closest_on_segment(p: DVec2, a: DVec2, b: DVec2) -> DVec2 {
+    let ab = b - a;
+    let t = if ab.length_squared() > 0.0 { ((p - a).dot(ab) / ab.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
+    a + ab * t
+}
+
 fn group_face(group: &[Tool]) -> Tool {
     LAST_IN_GROUP.with(|m| m.borrow().get(&format!("{:?}", group[0])).copied()).unwrap_or(group[0])
 }
@@ -815,6 +830,49 @@ impl PartStudioView {
         // Past every reach (the GPU's pick holds a line to 9 px): the region under the pointer, as live (8 px off a line
         // inside the rectangle hovers the region).
         near.and_then(pick_of).or_else(|| self.sketch_region_pick_at(p))
+    }
+
+    /// The GPU's hover pick outside sketch mode, held to live's reach for the shown sketches (live2 11-18 hover-p0
+    /// ours-1118): a sketch point within 9 px of the pointer on screen wins (over its lines at a corner too), a curve
+    /// lights within 6.5 px (the 5 px pick square reached a slanted line at 8–9). A curve out of reach gives way to
+    /// what the pick finds without it. Faces and edges keep their own pick (a sketch point behind a part stays hidden).
+    pub(super) fn shown_sketch_hover_id(&self, id: Option<u32>, cx: &App) -> Option<u32> {
+        const POINT_REACH: f64 = 9.5;
+        const CURVE_REACH: f64 = 6.5;
+        if self.sketch.is_some() {
+            return id;
+        }
+        let Some(built) = self.built.as_ref() else { return id };
+        let target = id.and_then(|i| built.picks.get(i)).map(|t| t.reference.clone());
+        let open = matches!(&target, None | Some(Reference::SketchEntity { .. } | Reference::SketchRegion { .. } | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }));
+        if !open {
+            return id;
+        }
+        let vp = self.viewport.read(cx);
+        let at = vp.pointer_position();
+        let screen = |q: &[f32; 3]| vp.project(DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64));
+        let shown = || self.display.sketches.iter().filter(|s| !s.hidden && !s.on_flat);
+        let point = shown()
+            .flat_map(|s| s.points.iter().map(move |q| (s.feature, q)))
+            .filter_map(|(f, q)| Some((f, q.entity, screen(&q.position)?.distance(at))))
+            .filter(|(_, _, d)| *d <= POINT_REACH)
+            .min_by(|a, b| a.2.total_cmp(&b.2))
+            .and_then(|(f, e, _)| built.picks.ids_for(&Reference::SketchEntity { sketch: f, entity: e }).first().copied());
+        if point.is_some() {
+            return point;
+        }
+        // A curve's distance from the pointer on screen (its drawn polyline); None for a point or no shown sketch.
+        let curve_distance = |r: &Reference| -> Option<f64> {
+            let Reference::SketchEntity { sketch, entity } = r else { return None };
+            let s = shown().find(|s| s.feature == *sketch)?;
+            let pts: Vec<DVec2> = s.curves.iter().filter(|c| c.entity == *entity).flat_map(|c| c.points.windows(2)).flat_map(|w| [screen(&w[0]), screen(&w[1])]).collect::<Option<_>>()?;
+            pts.chunks(2).map(|w| at.distance(closest_on_segment(at, w[0], w[1]))).min_by(f64::total_cmp)
+        };
+        let out_of_reach = |i: u32| built.picks.get(i).and_then(|t| curve_distance(&t.reference)).is_some_and(|d| d > CURVE_REACH);
+        match id {
+            Some(i) if out_of_reach(i) => vp.pick_at_pointer_without(&out_of_reach).flatten(),
+            _ => id,
+        }
     }
 
     /// The pick id of the open sketch's smallest region under plane point `p` (its displayed triangles).
@@ -4691,11 +4749,23 @@ impl PartStudioView {
         // Onshape's sketch toolbar has the feature toolbar's metrics (§3.10).
         // The parity driver's names: a tool by its Onshape name, a group's caret by its face's.
         let script_name = |kind: &str, tool: Tool| format!("{kind}:{}", crate::ui::onshape_title(tool.label()).split(" (").next().unwrap_or_default());
+        // Search tools' selected result, lit yellow in the toolbar (a group member not on its face lights the ⌄).
+        let found = self.palette_found_sketch(cx);
+        let found_tool = match found {
+            Some(super::view_tools::PaletteItem::SketchTool(t)) => Some(t),
+            _ => None,
+        };
+        let found_feature = match found {
+            Some(super::view_tools::PaletteItem::Feature(id)) => Some(id),
+            _ => None,
+        };
+        let found_construction = matches!(found, Some(super::view_tools::PaletteItem::Construction));
         let tool_btn = |tool: Tool, cx: &mut Context<Self>| {
+            let button = crate::ui::tool_button(SharedString::from(format!("sk-{tool:?}")), tool.icon(), active == tool, cx);
             let el = crate::ui::with_tool_tooltip(
                 SharedString::from(format!("skt-{tool:?}")),
                 tool.label(),
-                crate::ui::tool_button(SharedString::from(format!("sk-{tool:?}")), tool.icon(), active == tool, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(tool, window, cx))),
+                search_lit(button, found_tool == Some(tool), format!("{tool:?}")).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(tool, window, cx))),
             );
             crate::ui_script::wrap(el, || script_name("tool", tool))
         };
@@ -4708,15 +4778,17 @@ impl PartStudioView {
             }
             // Live: a split tool (icon + 18 px caret, no gap, group hover)
             // whose dropdown lists the group with shortcut chips.
+            let button = crate::ui::sketch_split_tool_button(SharedString::from(format!("sk-{face:?}")), face.icon(), active == face, cx);
             let main = crate::ui::with_tool_tooltip(
                 SharedString::from(format!("skt-{face:?}")),
                 face.label(),
-                crate::ui::sketch_split_tool_button(SharedString::from(format!("sk-{face:?}")), face.icon(), active == face, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
+                search_lit(button, found_tool == Some(face), format!("{face:?}")).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
             );
             let main = crate::ui_script::wrap(main, || script_name("tool", face));
+            let caret_lit = found_tool.is_some_and(|t| t != face && group.contains(&t));
             let view = cx.entity();
             let members: Vec<Tool> = group.to_vec();
-            let caret = crate::ui::tool_caret(SharedString::from(format!("skm-{:?}", group[0])), cx).dropdown_menu(move |mut menu, window, _| {
+            let caret = search_lit(crate::ui::tool_caret(SharedString::from(format!("skm-{:?}", group[0])), cx), caret_lit, format!("caret {face:?}")).dropdown_menu(move |mut menu, window, _| {
                 menu = crate::ui::fit_tool_menu(menu.min_w(px(180.)), window);
                 for t in &members {
                     let (v, t) = (view.clone(), *t);
@@ -4738,7 +4810,8 @@ impl PartStudioView {
             bar.child(crate::ui::tool_group(SharedString::from(format!("skg-{:?}", group[0])), main, caret))
         };
         let action_btn = |id: &'static str, icon: &'static str, tip: &'static str, action: Box<dyn Action>, cx: &mut Context<Self>| {
-            crate::ui::with_tool_tooltip(SharedString::from(format!("{id}-tt")), tip, crate::ui::tool_button(id, icon, false, cx).on_click(move |_, window, cx| window.dispatch_action(action.boxed_clone(), cx)))
+            let button = search_lit(crate::ui::tool_button(id, icon, false, cx), found_feature == Some(icon), icon.to_string());
+            crate::ui::with_tool_tooltip(SharedString::from(format!("{id}-tt")), tip, button.on_click(move |_, window, cx| window.dispatch_action(action.boxed_clone(), cx)))
         };
         // Undo / Redo follow the sketch's own history, greyed out with
         // nothing to undo / redo (live: both off on entering a sketch).
@@ -4788,7 +4861,7 @@ impl PartStudioView {
             bar = bar.child(crate::ui::with_tool_tooltip(
                 "sk-construction-tt",
                 "Construction (Q)",
-                crate::ui::tool_button("sk-construction", "construction", construction, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_construction(window, cx))),
+                search_lit(crate::ui::tool_button("sk-construction", "construction", construction, cx), found_construction, "Construction".into()).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_construction(window, cx))),
             ));
         }
         bar = bar.child(sep());
@@ -4814,7 +4887,7 @@ impl PartStudioView {
                 bar = bar.child(crate::ui::with_tool_tooltip(
                     SharedString::from(format!("skt-{tool:?}")),
                     tool.label(),
-                    crate::ui::tool_button(SharedString::from(format!("sk-{tool:?}")), tool.icon(), active == tool, cx)
+                    search_lit(crate::ui::tool_button(SharedString::from(format!("sk-{tool:?}")), tool.icon(), active == tool, cx), found_tool == Some(tool), format!("{tool:?}"))
                         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(tool, window, cx))),
                 ));
             }
@@ -4836,13 +4909,20 @@ impl PartStudioView {
     fn collapsed_sketch_group(&mut self, bar: gpui_kit::Div, members: Vec<Tool>, construction_item: bool, active: Tool, cx: &mut Context<Self>) -> gpui_kit::Div {
         let face = members.iter().copied().find(|t| *t == active).unwrap_or(members[0]);
         let key = format!("{:?}", members[0]);
+        let found = match self.palette_found_sketch(cx) {
+            Some(super::view_tools::PaletteItem::SketchTool(t)) => Some(t),
+            _ => None,
+        };
+        let construction_found = construction_item && matches!(self.palette_found_sketch(cx), Some(super::view_tools::PaletteItem::Construction));
+        let caret_lit = construction_found || found.is_some_and(|t| t != face && members.contains(&t));
+        let button = crate::ui::sketch_split_tool_button(SharedString::from(format!("sk-c-{face:?}")), face.icon(), active == face, cx);
         let main = crate::ui::with_tool_tooltip(
             SharedString::from(format!("skt-c-{key}")),
             face.label(),
-            crate::ui::sketch_split_tool_button(SharedString::from(format!("sk-c-{face:?}")), face.icon(), active == face, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
+            search_lit(button, found == Some(face), format!("{face:?}")).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
         );
         let view = cx.entity();
-        let caret = crate::ui::tool_caret(SharedString::from(format!("skm-c-{key}")), cx).dropdown_menu(move |mut menu, window, _| {
+        let caret = search_lit(crate::ui::tool_caret(SharedString::from(format!("skm-c-{key}")), cx), caret_lit, format!("caret {face:?}")).dropdown_menu(move |mut menu, window, _| {
             menu = crate::ui::fit_tool_menu(menu.min_w(px(180.)), window);
             for t in &members {
                 let (v, t) = (view.clone(), *t);

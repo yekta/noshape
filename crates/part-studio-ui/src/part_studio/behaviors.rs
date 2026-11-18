@@ -250,6 +250,9 @@ pub struct UiState {
     /// In sketch mode: the GPU's last hover pick and the id it was resolved to (`sketch_hover_id`), so a move that
     /// keeps the GPU's pick (the plane behind a line) still re-resolves to what is in reach under the pointer.
     pub sketch_gpu_hover: Option<(Option<u32>, Option<u32>)>,
+    /// Outside sketch mode, the GPU's hover pick and what the shown sketches' reach made of it
+    /// (`shown_sketch_hover_id`), resolved again as the pointer moves.
+    pub shown_sketch_gpu_hover: Option<(Option<u32>, Option<u32>)>,
     /// Alt is down: hover and clicks go through see-through parts.
     pub alt_held: bool,
     /// The pick under the pointer before midpoint snapping
@@ -821,6 +824,7 @@ impl UiState {
             pointer: None,
             hover_raw: None,
             sketch_gpu_hover: None,
+            shown_sketch_gpu_hover: None,
             alt_held: false,
             hover_pick: None,
             midpoint_armed: None,
