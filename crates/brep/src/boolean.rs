@@ -6735,6 +6735,35 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             _ => None,
         }
     };
+    // (Piece `pi` against solid `t` where its point is on a face of `t` and it is too narrow for another point: on that
+    // face where the face's surface holds the whole piece, its vertices and point, within the tolerance band and
+    // touches it there (normals parallel), as OCCT's faces within their tolerances (c2-wire-clip-imported's 20 um strip
+    // of a sheet's flat over another part's bend where it starts, tangent).)
+    let lies_on = |pi: usize, t: usize| -> Option<State> {
+        let f = pieces[pi].face;
+        let q = pieces[pi].inside;
+        if !other_points(pi).is_empty() {
+            return None;
+        }
+        let vs: Vec<DVec3> = pieces[pi].loops.iter().flatten().map(|&(s, rev)| cx.p(sedges[s].seg.v[usize::from(rev)])).collect();
+        let mut found = None;
+        for &g in &cx.solids[t].faces {
+            let gf = &cx.faces[g];
+            if !boxes_meet(q, q, gf.lo, gf.hi, GREY * tol) || free::surface_distance(gf, q) > GREY * tol {
+                continue;
+            }
+            let d = cx.normal_at(g, q).dot(cx.normal_at(f, q));
+            if d.abs() < 1.0 - 1e-4 || !vs.iter().all(|&v| free::surface_distance(gf, v) <= GREY * tol) {
+                return None;
+            }
+            let st = if d > 0.0 { State::OnSame } else { State::OnOpposite };
+            if found.is_some_and(|x| x != st) {
+                return None;
+            }
+            found = Some(st);
+        }
+        found
+    };
     // (Each solid's state at a point of piece `pi`, its own or (below) another.)
     let state_at = |pi: usize, at: DVec3| -> R<Vec<(usize, State)>> {
         let f = pieces[pi].face;
@@ -6830,6 +6859,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                         State::Out
                     }
                     Err(Decline(w)) if w == "a piece's point on another solid's face" && let Some(st) = tangent_side(pi, t) => st,
+                    Err(Decline(w)) if w == "a piece's point on another solid's face" && let Some(st) = lies_on(pi, t) => st,
                     r => r?,
                 },
             };
