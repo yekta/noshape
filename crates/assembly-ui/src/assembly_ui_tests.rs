@@ -1342,6 +1342,17 @@ fn a_snap_mode_drag_lands_aligned_and_opens_an_uncommitted_fastened(cx: &mut Tes
     });
 }
 
+/// Live snapmode-1118: a snap drag's reach is a 57 px square around the pointer (an edge midpoint at (57, −33), 66 px
+/// away, jumps; a corner at 58 px straight up doesn't).
+#[test]
+fn a_snap_drags_reach_is_a_57_px_square() {
+    use super::panels::in_snap_reach;
+    let at = glam::DVec2::new(400.0, 300.0);
+    for (d, reach) in [((57.0, -33.0), true), ((0.0, -57.0), true), ((57.0, 57.0), true), ((0.0, -58.0), false), ((58.0, 10.0), false)] {
+        assert_eq!(in_snap_reach(at + glam::DVec2::from(d), at), reach, "{d:?}");
+    }
+}
+
 /// Live asm/feel-1117 c-a-rowhover: hovering an instance's row outlines the part in the graphics, in hover orange, with
 /// no tint on its faces (was: the accent fill).
 #[gpui::test]

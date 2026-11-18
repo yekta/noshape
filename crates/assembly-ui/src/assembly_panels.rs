@@ -3893,13 +3893,11 @@ impl AssemblyView {
         let units = self.units(cx);
         let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
         let mut best: Option<(f64, MateConnectorRef)> = None;
-        // Live (snapmode-1118): a face's point within 57 px of the pointer takes the dragged connector (a corner at
-        // 57 px, free at 58); farther, it follows the pointer.
         for p in inference_candidates(&o.context, Some(&o.body), &hit.reference, &units) {
             let w = t.mul(&p.frame).origin;
             if let Some(s) = vp.project(w) {
                 let d = s.distance(position);
-                if d <= SNAP_DRAG_REACH_PX && best.as_ref().is_none_or(|(b, _)| d < *b) {
+                if in_snap_reach(s, position) && best.as_ref().is_none_or(|(b, _)| d < *b) {
                     best = Some((d, p.connector(&hit.path)));
                 }
             }
@@ -4374,6 +4372,13 @@ impl AssemblyView {
 /// Insert › Other documents categories (live assembly/71).
 /// How far from a face's point (corner, edge midpoint, centre) a snap-mode drag takes it (live snapmode-1118).
 const SNAP_DRAG_REACH_PX: f64 = 57.0;
+
+/// Live (snapmode-1118): a face's point takes the dragged connector within 57 px of the pointer in x and in y (a square:
+/// a corner at 57 px straight up, an edge midpoint at (57, −33)); farther, the part follows the pointer.
+pub(super) fn in_snap_reach(point: DVec2, pointer: DVec2) -> bool {
+    let d = (point - pointer).abs();
+    d.x.max(d.y) <= SNAP_DRAG_REACH_PX
+}
 
 const OTHER_SOURCES: [(&str, &str); 5] = [("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];
 
