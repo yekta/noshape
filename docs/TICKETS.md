@@ -618,6 +618,16 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - [ ] **P1 FEEL-SKETCH-REACH-OUTSIDE (psui + skasm)** (hover-p0): outside sketch mode a sketch line lights from 8 px and holds to 9; at
   a corner the whole line lights at 6 and the point never lights alone; live: line 6-7 px, point 9 px (the point beats the line).
 
+## Interaction feel: live2's "Ours" cells, batch 2 (live2 12:3x, landed 8b5439895 / 1eae71e40; evidence live/psui/ours-1118/)
+- [ ] **P1 FEEL-ISOLATE-DEFAULT-GREY (psui)**: while a part is isolated, our Default geometry rows grey out; live's lists don't change.
+- [ ] **P1 FEEL-SUPPRESS-TIMING (psui)**: Suppress: list row 253 ms, Parts 403 ms; live 208 / 332.
+- [ ] **P2 FEEL-CHIP-TOOLTIP-PLACE (psui)**: a selection chip's tooltip shows under the pointer, over the next chip; live puts it to the chip's right.
+- [ ] **P2 FEEL-CHIP-X-TOOLTIP (psui)**: the chip's × tooltip reads the chip's name; live "Delete Edge of Extrude 1".
+- [ ] **P1 FEEL-HASH-LIST-DELAY (psui)**: the "#" variable list opens ~0.7 s after the key; live on the next frame.
+- [ ] **P1 FEEL-ROW-MENU-ROLL-TO-HERE (psui)**: a feature row's menu has no "Roll to here"; live has it.
+- [ ] **P1 FEEL-FILLET-DIALOG-WIDTH (psui)**: the Fillet dialog is ~394 px wide; live 220.
+- Equal to live (live2): the two-feature suppress, the rollback release, chip click / Delete, expressions, Tab in the "#" list.
+
 ## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:10, green cafe3c2af, vibex8 Xvfb, real pointer)
 Sessions opened without the UI runner (stable view): asm-feel (Part 1 40x30x10, Part 3 20x20x5), block-fillet, hole-plate-drawing.
 Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png (vibex8 ~/agents/qa-keep/feel-1118/).
