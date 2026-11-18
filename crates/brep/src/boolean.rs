@@ -5030,6 +5030,23 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 *t = th0;
             }
         }
+        // (A face going round with the line of its seam in pieces besides its seam (other faces meeting it along
+        // there): those its loop runs up (along its parameters' v) on the far side, as a thread's rulings; all on one
+        // side left its loop open (an AppleWatchDock bore notched at its seam: a section 1.8 mm below the wall found
+        // inside it).)
+        if let Surf::Cyl { o, a, x, y, th0, r, flip, full: true, .. } = cx.faces[f].s {
+            let es = &cx.faces[f].edges;
+            let at = |p: DVec3| ((((p - o).dot(y).atan2((p - o).dot(x))) - th0 + PI).rem_euclid(TAU) - PI).abs() * r <= cx.tol;
+            let up = |(e, rev): (usize, bool)| {
+                let d = (cx.p(cx.edges[e].v[1]) - cx.p(cx.edges[e].v[0])).dot(a) * if rev { -1.0 } else { 1.0 };
+                if flip { -d > 0.0 } else { d > 0.0 }
+            };
+            let once = |e: usize| cx.edges[e].g == Geo::Line && es.iter().filter(|y| y.0 == e).count() == 1 && cx.edges[e].v.iter().all(|&w| at(cx.p(w)));
+            let right: Vec<usize> = es.iter().copied().filter(|&x| once(x.0) && up(x)).map(|x| x.0).collect();
+            if !right.is_empty() {
+                cx.faces[f].right = right;
+            }
+        }
         let s = cx.faces[f].solid;
         cx.solids[s].lo = cx.solids[s].lo.min(lo);
         cx.solids[s].hi = cx.solids[s].hi.max(hi);

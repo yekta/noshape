@@ -3057,3 +3057,40 @@ fn a_thread_root_strip_on_a_bore_split_at_its_seam_each_turn() {
 fn a_line_through_a_free_form_solid_is_cut_as_occt() {
     recorded_as_occt("091cf0f95b46fa8a", 1e-9);
 }
+
+/// A wedge of a cone cut into a counterbore above a bore whose seam's line is in pieces (a slot's side running along
+/// it, the slot just past the seam, wider and reaching back before the seam at the bore's top), the wedge rising from
+/// the bore's hole and ending at the seam's angle: it meets the bore's cylinder 1 mm above the bore's wall, outside it,
+/// and nothing is removed; noshape's Boolean takes it as OCCT's (that piece of the seam's line was on the near side of
+/// the bore's turn, its loop open on the far side, and the section's arc just before the seam was found inside it: it
+/// declined "a section without ends"; an AppleWatchDock cut kept one face more than OCCT's).
+#[test]
+fn a_cone_over_a_bore_notched_at_its_seam_cuts_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let mm = |x: f64, y: f64, z: f64| DVec3::new(x, y, z) * 1e-3;
+    let cut = |a: &k::Shape, b: &k::Shape| k::boolean(k::BooleanOp::Cut, std::slice::from_ref(a), std::slice::from_ref(b), &k::BooleanOptions::default()).unwrap().shape;
+    let block = k::make_box_corners(mm(-20.0, -20.0, 0.0), mm(20.0, 20.0, 20.0)).unwrap();
+    let counterbore = k::make_cylinder(&z_frame(mm(0.0, 0.0, 12.0)), 0.015, 0.009, TAU).unwrap();
+    let bore = k::make_cylinder(&z_frame(mm(0.0, 0.0, -1.0)), 0.010, 0.022, TAU).unwrap();
+    let slot = k::make_box_corners(mm(0.0, 0.0, 4.0), mm(25.0, 4.2, 13.0)).unwrap();
+    let step = k::make_box_corners(mm(0.0, -2.2, 11.0), mm(25.0, 6.1, 13.0)).unwrap();
+    k::set_rust_boolean(Some(false));
+    let part = cut(&cut(&cut(&cut(&block, &counterbore), &bore), &slot), &step);
+    k::set_rust_boolean(None);
+    // (From 1.354 rad before the bore's seam up to it.)
+    let turn: f64 = -1.354;
+    let cone = k::make_cone(&k::Plane::new(mm(0.0, 0.0, 11.0), DVec3::Z, DVec3::new(turn.cos(), turn.sin(), 0.0)), 0.008, 0.014, 0.006, -turn).unwrap();
+    let run = |rust: bool| {
+        k::set_rust_boolean(Some(rust));
+        let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&part), std::slice::from_ref(&cone), &k::BooleanOptions::default()).expect("the cut").shape;
+        let path = (k::last_boolean_path(), k::last_rust_decline());
+        k::set_rust_boolean(None);
+        (r, path)
+    };
+    let ((ours, path), (occt, _)) = (run(true), run(false));
+    assert_eq!(path.0, "rust", "{}", path.1);
+    let counts = |s: &k::Shape| (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge), s.count(k::ShapeType::Vertex));
+    assert_eq!(counts(&ours), counts(&occt));
+    assert!(ours.is_valid());
+    assert!((ours.volume().unwrap() - occt.volume().unwrap()).abs() <= 1e-9 * occt.volume().unwrap());
+}
