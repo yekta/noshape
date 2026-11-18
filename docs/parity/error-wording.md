@@ -30,6 +30,13 @@ live/errors-1118/. Status: **=** same, **≠** differs (owner in brackets).
 | A cycle (a = #b, b = #a) or an invalid expression ("1 +") | the bad cells (and cells depending on them) pink; hover tooltip "Error regenerating." only (no cycle wording) | the same (green 548d795fb) | = |
 | …the cell after Enter | the edited cell stays selected, red border | the selection moves to the next row (blue border) | ≠ [studios] |
 
+## Feature Studio (live2)
+
+| Situation | Live | Ours | Status |
+|---|---|---|---|
+| A custom feature's `throw regenError("…")` | row and icon red, tooltip "err Feature 1 did not regenerate properly: err too deep"; dialog title red; Features header red ⓘ; the parameter field not pink | the same form ("uip Feature 1 did not regenerate properly: uip too deep") | = |
+| Compile / parse notices | gutter ✕ + squiggle with the parser's text, {!} navbar icon, notices pane (behaviours "Feature Studio", fs parse cases) | studios' fs-* ui-parity takes | see those takes |
+
 ## Part Studio features (live)
 
 Live 2026-11-18 21:48–22:01 UTC: a 40 × 30 × 10 block, then each failing feature added by REST to a scratch Part Studio, and each row read in the
