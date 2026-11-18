@@ -516,3 +516,45 @@ fn a_sketch_circles_arcs_between_two_faces_stay_apart() {
     let t = s.shown_topology().unwrap();
     assert_eq!((s.faces().len(), t.edge_count(), t.vertex_count()), (4, 10, 8));
 }
+
+fn counts(s: &Shape) -> (usize, usize, usize) {
+    (s.count(ShapeType::Face), s.count(ShapeType::Edge), s.count(ShapeType::Vertex))
+}
+
+/// Two 10 mm cubes side by side, the second moved by `d` (z, or y), fused and unified, as live's opBoolean UNION
+/// (live/bool/q-union-merge): their tops (fronts) two faces for d from 0.5 um (live's down to 0.1 um, OCCT's tolerance), the step faces between
+/// them gone up to 10 um (Parasolid's 1e-5 m), there from 20 um.
+#[test]
+fn a_step_up_to_ten_microns_between_two_fused_blocks_is_gone() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let a = make_box_corners(DVec3::ZERO, DVec3::splat(10.0) * mm).unwrap();
+    for (axis, along) in [("z", DVec3::Z), ("y", DVec3::Y)] {
+        for (um, want) in [(0.5, (8, 18, 12)), (2.0, (8, 18, 12)), (10.0, (8, 18, 12)), (20.0, (10, 24, 16))] {
+            let o = along * um * 1e-6;
+            let b = make_box_corners(DVec3::new(10.0, 0.0, 0.0) * mm + o, DVec3::new(20.0, 10.0, 10.0) * mm + o).unwrap();
+            let u = unify_same_domain(&fuse(&a, &b).unwrap().shape).unwrap().shape;
+            assert_eq!(counts(&u), want, "{axis} {um} um");
+            let v = 2000.0 * mm * mm * mm;
+            assert!(u.is_valid() && (u.volume().unwrap() - v).abs() < 1e-6 * v, "{axis} {um} um");
+        }
+    }
+}
+
+/// A step only partly under 10 um stays (asm-isaac-ball a04711's Extrude 4: live keeps a 0.05 mm² face 1 to 110 um
+/// wide): the second block's top rising from 1 um over the first's at y = 0 to 110 um at y = 10 mm.
+#[test]
+fn a_step_wider_than_ten_microns_somewhere_stays() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let a = make_box_corners(DVec3::ZERO, DVec3::splat(10.0) * mm).unwrap();
+    let p = |y: f64, z: f64| DVec2::new(y, z) * mm;
+    let pts = [p(0.0, 0.0), p(10.0, 0.0), p(10.0, 10.110), p(0.0, 10.001)];
+    let segs: Vec<Segment2d> = (0..4).map(|i| Segment2d::Line { a: pts[i], b: pts[(i + 1) % 4] }).collect();
+    let side = make_face_2d(&Plane::new(DVec3::new(10.0, 0.0, 0.0) * mm, DVec3::X, DVec3::Y), &segs, &[]).unwrap();
+    let b = extrude(&side, DVec3::X * 10.0 * mm).unwrap().shape;
+    let u = unify_same_domain(&fuse(&a, &b).unwrap().shape).unwrap().shape;
+    let step: Vec<f64> = u.faces().iter().filter(|f| f.centroid().and_then(|c| f.normal_at_point(c)).is_ok_and(|n| n.x.abs() > 0.999) && f.centroid().is_ok_and(|c| (c.x - 10.0 * mm).abs() < 1e-9)).map(|f| f.area().unwrap() / (mm * mm)).collect();
+    assert!(step.len() == 1 && (step[0] - 0.555).abs() < 1e-3, "{step:?}");
+    assert!(u.is_valid());
+}

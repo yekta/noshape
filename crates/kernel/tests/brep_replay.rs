@@ -1059,3 +1059,19 @@ fn brep_parts_with_tilted_holes_match_occt() {
     // (All of them.)
     assert!(taken >= 24, "{taken} taken; declined: {why_not:#?}");
 }
+
+/// asm-isaac-ball e54410's Extrude 22 (recorded): two blocks fused onto a part from a sketch about 2 um off, leaving
+/// steps 1.2 and 2 um high between the faces either side. Live (Parasolid, 1e-5 m) drops them: 14 faces, no edge
+/// under 1e-5 m; so does ours, its volume as it was.
+#[test]
+fn steps_of_a_few_microns_from_a_sketch_off_by_two_are_dropped() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/brep");
+    let c = load(&dir, "6dc4464f40a8b0b2").unwrap();
+    let r = boolean(c.op, &c.objects, &c.tools, &c.opts).unwrap();
+    let u = unify_same_domain(&r.shape).unwrap().shape;
+    assert_eq!(u.count(ShapeType::Face), 14);
+    let short: Vec<f64> = u.edges().iter().filter_map(|e| e.edge_info().ok()).map(|i| i.length).filter(|&l| l <= 1e-5).collect();
+    assert!(short.is_empty(), "{short:?}");
+    let v = volume_properties(&u).unwrap().mass;
+    assert!(u.is_valid() && (v - 950.513e-9).abs() < 0.02e-9, "{v}");
+}
