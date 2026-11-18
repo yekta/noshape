@@ -5,6 +5,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa, 2026-11-18 (live's modelling session replay)
+- [ ] **P1 PATTERN-AFTER-INSERTED-CHAMFER [core]**: live's session (live/qa/session-1118 step 11): a 100 × 50 × 10 plate, a Ø10 hole
+  (Extrude 2, Remove, Through all), Fillet 1 (3 vertical edges R5), Shell 1 (top face, 2 mm), Linear pattern 1 (Feature pattern of
+  Extrude 2, edge along X, 20 mm × 3), Mirror 1 (Right). Roll back to Extrude 2, add Chamfer 1 (the hole's top edge, 1 mm), roll to the
+  end: ours Linear pattern 1 Error "Could not create all instances as entered. Try selecting "Reapply features" option." (Tray 30133.35
+  mm³); live rebuilds everything (29505.03 mm³ / 30273.90 mm²). Chamfer 1 suppressed: ours Ok, 29378.70. Repro
+  qa-scratch/tickets/session-chamfer-pattern.noshape (green 87edba24, CLI `feature list`) (qa 2026-11-18 22:44)
+
 ## qa, 2026-11-18 (heavy-model feel prep)
 - [ ] **P0 HEAVY-ASM-SOFTWARE-FRAME (asm leads: assembly load / instancing / LOD; psui joins on the renderer after the tab-return P0; lead 11:45)**: asm-xdev-subs (asm's saved rebuild, 266 occurrences),
   ours on this host's Xvfb with llvmpipe, release build of 80a64725, 1920x1080, vs live on SwiftShader on the same host (live 11-18

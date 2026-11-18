@@ -1373,6 +1373,21 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 | A press-drag on a fixed instance: the cursor `no-drop` and a small fix glyph at the pointer, nothing moves, no toast; hovering it (no press) keeps the default cursor (behaviours "icons2 (10-23)" (b)) | = (the arrow with ⊘ and the fix glyph during the drag, the block stays; the default cursor at the release: the release refreshes the viewport's cursor, which ours had kept until a later hover) | `a_fixed_instances_drag_drops_the_no_drop_cursor_at_the_release` |
 | A free instance's drag keeps the default cursor, no snap without Snap mode (icons2 (a)) | = (the default arrow) | missing |
 
+### session-1118 (live's 10-minute modelling session, live/qa/session-1118/SCRIPT.md, replayed by qa 11-18 22:44 on green 87edba24) [skasm, core]
+
+Replayed in ours with the UI-script runner (qa-scratch/session/mksession.py, steps 2a-13; the drawing steps 14a-c not yet). Of live's 14
+behaviours, 1 (no turn to the plane), 3 (box with the full-precision value selected), 4 (Enter keeps the field focused, text selected),
+5 (the extruded sketch hidden), 6 (Add + Merge scope on a face sketch), 8 (Part pattern first), 9 (Mirror turns to Add), 10 (Sketch 1
+edit rolls later features back, Parts (0)), 11 (undo takes back the bar move) and 12 (Rename selects the whole name) are =; 7's fillet
+3 mm is live's remembered radius (ours opened at the fresh 5 mm, = behaviours "sketch fillet default"). Final part: ours 30133.35 mm³ /
+30650.90 mm² against live's 29505.03 / 30273.90, from the pattern row below.
+
+| Finding | Ours | Test |
+|---|---|---|
+| 2c: with no tool, click a rectangle corner, then the sketch origin: both selected; i adds COINCIDENT and the corner jumps to the origin | ≠ [skasm]: the origin click clears the selection and selects nothing (the origin shows only its hover disc); i then opens the Coincident tool, and in that tool corner → origin adds nothing either (qa-scratch/session/origin-probe2.json) | missing |
+| 2d: in the isometric view a dimension placement click over a plane selects the plane instead of placing the dimension | ≠ [skasm]: the placement click at (40, -8) mm, inside the Top plane, places the dimension and opens its box | missing |
+| 11: roll back to Extrude 2, insert Chamfer 1 (the hole's top edge, 1 mm), roll to the end: everything rebuilds (Linear pattern 1 = a Feature pattern of Extrude 2, 3 × 20 mm) | ≠ [core]: Linear pattern 1 fails "Could not create all instances as entered. Try selecting "Reapply features" option."; with Chamfer 1 suppressed it rebuilds (29378.70 mm³). TICKETS PATTERN-AFTER-INSERTED-CHAMFER | missing |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
