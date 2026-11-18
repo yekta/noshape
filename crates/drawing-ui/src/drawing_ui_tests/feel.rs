@@ -492,6 +492,41 @@ fn the_dimension_tool_lights_a_hovered_edge_alone_in_orange(cx: &mut TestAppCont
     assert_eq!((hovered, style.hover_color), (0, crate::theme::lin(DRAWING_HOVER)), "Select: the view's tan frame, its edges as they are");
 }
 
+/// Live drawing-sysvars.json: a tool picks within Graebert's PICKBOX, 7 px (ours had 5): the Dimension tool lights an
+/// edge 6 px off it, not 9 px off.
+#[gpui::test]
+fn a_tool_picks_an_edge_within_7_px(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-pickbox");
+    real_sheet(cx, window, &editor);
+    let (mid, normal) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let len = |p: &[[f64; 2]]| (p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]);
+        let edge = g.edges.iter().filter(|x| x.visible && x.points.len() == 2).max_by(|a, b| len(&a.points).total_cmp(&len(&b.points))).expect("a straight edge");
+        let (a, b) = (pl.to_sheet(edge.points[0]), pl.to_sheet(edge.points[1]));
+        let l = (b[0] - a[0]).hypot(b[1] - a[1]);
+        ([(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0], [-(b[1] - a[1]) / l, (b[0] - a[0]) / l])
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)));
+    draw(cx, window);
+    let edge = lit_at(cx, window, &editor, mid);
+    assert!(matches!(edge, Some(Sel::Edge(..))), "on the edge: {edge:?}");
+    let off = |cx: &mut TestAppContext, px: f64| {
+        let mm = cx.update(|cx| editor.read(cx).tol_mm(px));
+        [mid[0] + normal[0] * mm, mid[1] + normal[1] * mm]
+    };
+    for (px, lights) in [(6.0, true), (9.0, false)] {
+        for sign in [1.0, -1.0] {
+            let at = off(cx, sign * px);
+            let lit = lit_at(cx, window, &editor, at);
+            assert_eq!(lit == edge, lights, "{} px off the edge: lit {lit:?}", sign * px);
+        }
+    }
+}
+
 /// Live2 feel/drawing.json D5: a dimension's text moves from 5 px of drag (4 px is a click, which selects it); no hold
 /// needed.
 #[gpui::test]

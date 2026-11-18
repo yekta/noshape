@@ -207,7 +207,7 @@ impl DrawingEditor {
         // Edges of the sheet's views only: a pending view's preview follows
         // the pointer and would cover the click.
         let sheet = self.current_sheet();
-        let h = b.hit_where(c, self.tol_mm(5.0), &|t: &PickTarget| matches!(t, PickTarget::Edge { view, .. } if sheet.view(*view).is_some()))?;
+        let h = b.hit_where(c, self.tol_mm(noshape_scene::drawing_tools::PICKBOX_PX), &|t: &PickTarget| matches!(t, PickTarget::Edge { view, .. } if sheet.view(*view).is_some()))?;
         let PickTarget::Edge { view, edge } = b.picks.get(h as usize)?.clone() else { return None };
         let g = self.geoms.get(&view)?;
         let m = g.edges.get(edge as usize)?.model?;

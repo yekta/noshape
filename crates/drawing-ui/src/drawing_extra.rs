@@ -1520,7 +1520,7 @@ impl DrawingEditor {
                 self.selection = vec![Sel::View(v)];
                 // Live asbv-8/9/10: the grip on the circle resizes it, the rest
                 // moves it.
-                if self.detail_grip(v).is_some_and(|(_, _, g)| (g[0] - start[0]).hypot(g[1] - start[1]) < self.tol_mm(5.0)) {
+                if self.detail_grip(v).is_some_and(|(_, _, g)| (g[0] - start[0]).hypot(g[1] - start[1]) < self.tol_mm(noshape_scene::drawing_tools::GRIPSIZE_PX)) {
                     return Some(Drag::ResizeDetailCircle { view: v });
                 }
                 // The label on its leader (Add leader) drags on its own.

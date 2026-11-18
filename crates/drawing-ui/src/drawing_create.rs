@@ -104,6 +104,17 @@ fn remember_template(file: &str) {
     let _ = std::fs::write(dir.join("recent_drawing_templates.txt"), list.join("\n") + "\n");
 }
 
+/// The Options choice last created with (live2 drw-create-1118: Suggested views / No views is remembered; "No views" at
+/// first), in the config dir `dir`.
+fn remembered_suggested(dir: &std::path::Path) -> bool {
+    std::fs::read_to_string(dir.join("drawing_create_options.txt")).is_ok_and(|s| s.trim() == "suggested")
+}
+
+fn remember_suggested(dir: &std::path::Path, suggested: bool) {
+    let _ = std::fs::create_dir_all(dir);
+    let _ = std::fs::write(dir.join("drawing_create_options.txt"), if suggested { "suggested\n" } else { "no views\n" });
+}
+
 pub struct CreateDrawingDialog {
     source: Option<DrawingSource>,
     dwts: Vec<DwtTab>,
@@ -177,8 +188,8 @@ impl CreateDrawingDialog {
             selected,
             custom: false,
             ct: CustomTemplate::new(metric),
-            // Onshape preselects "No views" (the first view follows the cursor).
-            suggested: false,
+            // Onshape preselects "No views" (the first view follows the cursor), then the last choice.
+            suggested: remembered_suggested(&crate::paths::config_dir()),
             focus: cx.focus_handle(),
             list_scroll: {
                 // Item 0 is the header row.
@@ -209,6 +220,9 @@ impl CreateDrawingDialog {
             && let Some(r) = self.rows.get(self.selected)
         {
             remember_template(r.file);
+        }
+        if self.source.is_some() {
+            remember_suggested(&crate::paths::config_dir(), self.suggested);
         }
         cx.emit(CreateDrawingEvent::Create { name, template, source: self.source.clone(), suggested, dwt });
     }
@@ -643,3 +657,20 @@ impl Render for CreateDrawingDialog {
             )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    /// Live2 drw-create-1118: Options opens on "No views", then on the choice last created with.
+    #[test]
+    fn the_options_choice_is_remembered() {
+        let dir = std::env::temp_dir().join(format!("noshape-create-options-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(!super::remembered_suggested(&dir), "No views at first");
+        super::remember_suggested(&dir, true);
+        assert!(super::remembered_suggested(&dir));
+        super::remember_suggested(&dir, false);
+        assert!(!super::remembered_suggested(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+

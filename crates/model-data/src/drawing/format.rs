@@ -54,20 +54,23 @@ pub fn default_digits(u: DimUnits) -> usize {
     }
 }
 
-/// Inches as a whole number and a reduced fraction to 1/64: "1 3/8".
-fn inch_fraction(inches: f64) -> String {
+/// Inches as a whole number and a reduced fraction to 1/`2^bits` (live numfmt-1118: the precision's digits pick the
+/// denominator, the drawing's 0.123 is 1/8": 2.7 in reads "2 3/4").
+fn inch_fraction(inches: f64, bits: u8) -> String {
     let sign = if inches < 0.0 { "-" } else { "" };
     let x = inches.abs();
-    let (mut whole, mut n) = (x.trunc(), ((x - x.trunc()) * 64.0).round() as u32);
-    if n == 64 {
+    let den = 1u32 << bits.min(8);
+    let (mut whole, mut n) = (x.trunc(), ((x - x.trunc()) * den as f64).round() as u32);
+    if n == den {
         whole += 1.0;
         n = 0;
     }
-    let mut d = 64;
+    let mut d = den;
     while n > 0 && n % 2 == 0 {
         n /= 2;
         d /= 2;
     }
+    let sign = if whole == 0.0 && n == 0 { "" } else { sign };
     match (whole as u64, n) {
         (w, 0) => format!("{sign}{w}"),
         (0, n) => format!("{sign}{n}/{d}"),
@@ -75,16 +78,20 @@ fn inch_fraction(inches: f64) -> String {
     }
 }
 
-/// A length (meters) as a number in `u` (fractions and feet-and-inches
-/// spelled out).
+/// A length (meters) as a number in `u` (fractions and feet-and-inches spelled out: `1'-2 1/4"`, live numfmt-1118).
 fn unit_number(drawing: &Drawing, meters: f64, u: DimUnits, precision: Option<u8>, drawing_precision: Option<u8>, tolerance: bool) -> String {
+    let bits = precision.or(drawing_precision).unwrap_or(3);
     match u {
-        DimUnits::InchFraction => inch_fraction(meters / 0.0254),
+        DimUnits::InchFraction => inch_fraction(meters / 0.0254, bits),
         DimUnits::FeetInches => {
             let inches = meters / 0.0254;
-            let ft = (inches.abs() / 12.0).trunc() * inches.signum();
-            let rest = (inches - ft * 12.0).abs();
-            format!("{}' {}\"", ft as i64, number(drawing, rest, precision, drawing_precision, 3, tolerance))
+            let den = (1u32 << bits.min(8)) as f64;
+            // Rounded first, so 11.99" reads 1'-0", not 0'-12".
+            let total = (inches.abs() * den).round() / den;
+            let ft = (total / 12.0).trunc();
+            let rest = total - ft * 12.0;
+            let sign = if inches < 0.0 && total > 0.0 { "-" } else { "" };
+            format!("{sign}{}'-{}\"", ft as i64, inch_fraction(rest, bits))
         }
         _ => number(drawing, meters / u.meters(), precision, drawing_precision, default_digits(u), tolerance),
     }
@@ -753,7 +760,13 @@ mod tests {
         let f = |u| DimFormat { units: Some(u), ..Default::default() };
         assert_eq!(dim_text(&d, &f(DimUnits::InchFraction), 0.0254 * 1.375, false, "").main, "1 3/8");
         assert_eq!(dim_text(&d, &f(DimUnits::InchFraction), 0.0254 * 0.5, false, "").main, "1/2");
-        assert_eq!(dim_text(&d, &f(DimUnits::FeetInches), 0.0254 * 14.5, false, "").main, "1' 2.5\"");
+        // Live numfmt-1118: the drawing's 0.123 precision is 1/8"; feet and inches `1'-2 1/4"`.
+        assert_eq!(dim_text(&d, &f(DimUnits::InchFraction), 0.0254 * 2.7, false, "").main, "2 3/4");
+        assert_eq!(dim_text(&d, &f(DimUnits::InchFraction), 0.0254 * 14.25, false, "").main, "14 1/4");
+        let fine = DimFormat { units: Some(DimUnits::InchFraction), precision: Some(6), ..Default::default() };
+        assert_eq!(dim_text(&d, &fine, 0.0254 * 2.7, false, "").main, "2 45/64");
+        assert_eq!(dim_text(&d, &f(DimUnits::FeetInches), 0.0254 * 14.25, false, "").main, "1'-2 1/4\"");
+        assert_eq!(dim_text(&d, &f(DimUnits::FeetInches), 0.0254 * 11.99, false, "").main, "1'-0\"");
         assert_eq!(dim_text(&d, &f(DimUnits::Yard), 0.9144 * 2.0, false, "").main, "2");
         // Parentheses, above / below text, the inspection oval.
         let t = dim_text(&d, &DimFormat { reference: true, above: "TYP".into(), below: "2X".into(), inspection_frame: true, ..Default::default() }, 0.0125, false, "");

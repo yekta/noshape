@@ -38,13 +38,20 @@ pub use noshape_ops::drawing::PRECISIONS;
 pub use noshape_ops::drawing::{DIM_TOLERANCES, HOLE_TOLERANCES};
 
 /// The palette's Precision list as live's (behaviours D31): 0 to 6 decimals, the drawing's own ("0.12 (Drawing)")
-/// right after the row of the same decimals.
-fn precision_list(own: u8) -> Vec<(String, Option<u8>)> {
-    let example = |k: u8| if k == 0 { "0".to_string() } else { format!("0.{}", &"123456"[..k as usize]) };
+/// right after the row of the same decimals; in fractional inches or feet and inches 0" to 1/256" (live numfmt-1118:
+/// `0" · 1/2" · 1/4" · 1/8" · 1/8" (Drawing) · 1/16" …`, the digits picking the denominator).
+fn precision_list(own: u8, fractional: bool) -> Vec<(String, Option<u8>)> {
+    let example = |k: u8| match (fractional, k) {
+        (true, 0) => "0\"".to_string(),
+        (true, k) => format!("1/{}\"", 1u32 << k),
+        (false, 0) => "0".to_string(),
+        (false, k) => format!("0.{}", &"123456"[..k as usize]),
+    };
+    let last = if fractional { 8 } else { 6 };
     let mut out = Vec::new();
-    for k in 0..=6u8 {
+    for k in 0..=last {
         out.push((example(k), Some(k)));
-        if k == own.min(6) {
+        if k == own.min(last) {
             out.push((format!("{} (Drawing)", example(k)), None));
         }
     }
@@ -456,10 +463,11 @@ impl DrawingEditor {
         let fmt = d.cur.format.clone();
         let sheet = self.current_sheet();
         let units = fmt.units;
+        // Live numfmt-1118: the drawing's units in brackets ("(in)"), a unit picked bare ("ft in").
         let unit_label = match units {
             None => format!("({})", noshape_model::drawing::format::length_units(&self.drawing, &fmt).symbol()),
-            Some(u) if u.symbol().is_empty() => "(ft-in)".to_string(),
-            Some(u) => format!("({})", u.symbol()),
+            Some(u) if u.symbol().is_empty() => "ft in".to_string(),
+            Some(u) => u.symbol().to_string(),
         };
         // Live's recorder reads the dimension palette's one text, its unit (live2 drw-dimension-edit: "(in)"), then an
         // open drop-down's rows (live2 drw-dimension-dblclick-precision: "(in)", "0", "0.1", …).
@@ -564,7 +572,8 @@ impl DrawingEditor {
         let angular = matches!(d.cur.kind, AnnotationKind::AngularDimension { .. });
         let props = &self.drawing.props;
         let own = if angular { props.angular_precision.unwrap_or(1) } else { props.precision.unwrap_or(3) };
-        let precisions = precision_list(own);
+        let fractional = !angular && matches!(noshape_model::drawing::format::length_units(&self.drawing, &fmt), noshape_model::drawing::DimUnits::InchFraction | noshape_model::drawing::DimUnits::FeetInches);
+        let precisions = precision_list(own, fractional);
         let prec_items: Vec<(String, bool, Act)> = precisions.iter().map(|(l, v)| { let v = *v; (l.clone(), precision == v, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.precision = v) as Act) }).collect();
         let prec_label = if d.varies_precision() { VARIES.to_string() } else { precisions.iter().find(|x| x.1 == precision).map(|x| x.0.clone()).unwrap_or_default() };
         // Live 1744: a tolerance the selection differs in: «Varies», no field.

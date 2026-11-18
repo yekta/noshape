@@ -507,7 +507,7 @@ impl DrawingEditor {
     /// The centermark (placed or automatic) under `s`: its center.
     fn centermark_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
         let b = self.built.as_ref()?;
-        let h = b.hit(s, self.pk().tol_mm(5.0))?;
+        let h = b.hit(s, self.pk().tol_mm(noshape_scene::drawing_tools::PICKBOX_PX))?;
         match b.picks.get(h as usize)? {
             PickTarget::AutoCentermark { view, center } => Some(PickedPoint { view: *view, p: [center[0] as f64 / 1e9, center[1] as f64 / 1e9], r: None }),
             PickTarget::Annotation(id) => match self.current_sheet().annotations.iter().find(|a| a.id == *id) {

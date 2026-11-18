@@ -1596,7 +1596,7 @@ impl DrawingEditor {
 
     /// The view edge under the pointer, if any.
     pub fn hovered_edge_sel(&self) -> Option<Sel> {
-        let h = self.built.as_ref()?.hit(self.cursor, self.pk().tol_mm(5.0))?;
+        let h = self.built.as_ref()?.hit(self.cursor, self.pk().tol_mm(noshape_scene::drawing_tools::PICKBOX_PX))?;
         self.sel_of_pick(h).filter(|s| matches!(s, Sel::Edge(..)))
     }
 

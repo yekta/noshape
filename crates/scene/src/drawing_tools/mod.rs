@@ -28,7 +28,7 @@ pub use jog::{AutoArm, CentermarkArms, seg_dist};
 pub use annotation_edit::LeaderHit;
 pub use opts::*;
 pub use pending::ToolValues;
-pub use pick::{SheetPick, VIEW_REACH_MM, closed_circle};
+pub use pick::{GRIPSIZE_PX, PICKBOX_PX, SheetPick, VIEW_REACH_MM, closed_circle};
 pub use smart::{Refs, same, view_of};
 pub use sketch::{SkCon, SkTool};
 pub use types::*;

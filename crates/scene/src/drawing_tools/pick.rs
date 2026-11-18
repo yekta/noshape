@@ -21,6 +21,12 @@ pub const SNAP_REACH_PX: f64 = 8.0;
 /// live2 feel/drawing.json D1: from 14 px at 3.93 px/mm, not 16).
 pub const VIEW_REACH_MM: f64 = 3.6;
 
+/// The tools' pick reach (screen px): Graebert's PICKBOX, 7 at DPR 1 (live drawing-sysvars.json; getIntersected uses
+/// it for every tool).
+pub const PICKBOX_PX: f64 = 7.0;
+/// A grip's reach (screen px): GRIPSIZE 6 (live drawing-sysvars.json, XeGrip.IsMouseOver).
+pub const GRIPSIZE_PX: f64 = 6.0;
+
 /// Select's hover reach (screen px) for an annotation's lines and from a text's box (live2 feel/drawing.json D1).
 pub const SELECT_LINE_REACH_PX: f64 = 7.0;
 pub const SELECT_TEXT_REACH_PX: f64 = 9.0;
@@ -83,7 +89,7 @@ impl<'a> SheetPick<'a> {
     }
 
     pub fn hover_at(&self) -> Option<u32> {
-        let tol = self.tol_mm(5.0);
+        let tol = self.tol_mm(PICKBOX_PX);
         // Select (live2 feel/drawing.json D1): an annotation's lines light within 6 px (not at 8), its text within 8 px
         // of its box (not at 10); the tools keep their own reach.
         let hover = match self.tool {

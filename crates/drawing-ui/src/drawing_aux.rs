@@ -404,7 +404,7 @@ impl DrawingEditor {
     /// The indicator snap point of view `v` under sheet point `s`: 0 / 1 an
     /// end, 2 the middle, 3 / 4 a letter.
     pub fn aux_grip_at(&self, v: ViewId, s: [f64; 2]) -> Option<usize> {
-        let tol = self.tol_mm(5.0);
+        let tol = self.tol_mm(noshape_scene::drawing_tools::GRIPSIZE_PX);
         self.aux_dots(v).into_iter().find(|(_, p)| (p[0] - s[0]).hypot(p[1] - s[1]) < tol).map(|(k, _)| k)
     }
 
