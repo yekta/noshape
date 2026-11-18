@@ -6161,9 +6161,11 @@ impl PartStudioView {
                     if drop.get() == Some((i, true)) { s.border_b_2() } else { s.border_t_2() }
                 }
             })
+            // At the slot the last move picked, not the row under the pointer now: a list autoscrolled under a still
+            // pointer drops at its line (live2 fl-autoscroll-1118: live picks the slot only on a move).
             .on_drop(cx.listener(move |this, _: &RollbackDrag, _, cx| {
-                let after = this.ui.feature_drop.take().is_some_and(|(r, a)| r == i && a);
-                this.set_rollback(Some(i + after as usize), cx)
+                let (r, after) = this.ui.feature_drop.take().unwrap_or((i, false));
+                this.set_rollback(Some(r + after as usize), cx)
             }))
             // Live (F33): a blue pill with the feature's name, "2 items" for several (the selection and the pressed row).
             .on_drag(
@@ -6211,11 +6213,11 @@ impl PartStudioView {
                 if self.ui.feature_drop.get() == Some((i, true)) { d.border_b_2() } else { d.border_t_2() }
             })
             .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| {
-                let after = this.ui.feature_drop.take().is_some_and(|(r, a)| r == i && a);
+                let (r, after) = this.ui.feature_drop.take().unwrap_or((i, false));
                 if let Some(f) = d.folder {
-                    return this.drop_folder_at(f, i, after, cx);
+                    return this.drop_folder_at(f, r, after, cx);
                 }
-                this.drop_features(d.id, i, after, cx);
+                this.drop_features(d.id, r, after, cx);
             }));
         // No row tooltips while a row is dragged: one scheduled over a row the
         // drag passed showed after the drop over the moved row, naming the

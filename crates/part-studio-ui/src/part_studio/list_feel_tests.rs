@@ -1071,6 +1071,36 @@ fn the_feature_list_matrix_matches_live(cx: &mut TestAppContext) {
     assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md and the row's gap): {moved:?}");
 }
 
+/// live2 fl-autoscroll-1118: the drop slot is picked only by a move, so a list scrolling under a still pointer (the
+/// autoscroll) carries the insertion line away with its rows and a release without moving drops at that line, not at
+/// the row now under the pointer. Sketch 2 dragged to the top half of Sketch 10, the list (60 sketches) scrolled 5
+/// rows, released.
+#[gpui::test]
+fn a_list_scrolled_under_a_still_drag_drops_at_its_line(cx: &mut TestAppContext) {
+    let features: Vec<serde_json::Value> = (1..=60).map(|n| serde_json::json!({ "type": "newSketch", "name": format!("Sketch {n}"), "plane": "Top", "shapes": [{ "corner_rectangle": [[0.0, 0.0], [10.0, 10.0]] }] })).collect();
+    let (window, view) = part_studio_from(cx, "fl-autoscroll", Some(serde_json::json!({ "units": "mm", "features": features })));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let l = List { window, view };
+    let (from, to) = (l.at(cx, "feature:Sketch 2"), l.at_y(cx, "feature:Sketch 10", 6.));
+    l.drag(cx, from, to, false);
+    let before = l.bounds(cx, "feature:Sketch 10").expect("Sketch 10's row");
+    let row_h = f32::from(before.size.height);
+    cx.update(|cx| l.view.update(cx, |v, cx| {
+        let o = v.ui.list_scroll.offset();
+        v.ui.list_scroll.set_offset(point(o.x, o.y - px(5. * row_h)));
+        cx.notify();
+    }));
+    draw(cx, window);
+    let moved = l.bounds(cx, "feature:Sketch 10").map(|b| f32::from(before.top() - b.top()));
+    assert!(moved.is_some_and(|m| (m - 5. * row_h).abs() < 1.), "the list scrolled 5 rows under the pointer: {moved:?}");
+    l.release(cx, to);
+    wait_until(cx, window, |cx| !l.view.read(cx).ui_busy());
+    let order = l.order(cx);
+    let at = |name: &str| order.iter().position(|n| n == name);
+    assert_eq!((at("Sketch 2"), at("Sketch 10")), (Some(8), Some(9)), "Sketch 2 just before Sketch 10 (its line), not before the row under the pointer: {order:?}");
+}
+
 /// Parts list › Properties… on two parts (live q2962): one modal for both, "2 selected", the differing fields empty
 /// ("Multiple values") and the common ones shown; a Description typed and saved goes to both and nothing else changes
 /// (each keeps its name, part number and Exclude from all BOMs); a row clicked shows that part alone, Ctrl+click brings

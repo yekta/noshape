@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-18 05:01 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-18 06:27 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -130,6 +130,20 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Pointer offset with skasm (02:2x): measured on vibex6 Xvfb (reach.sh, nav trace): X pointer → viewport +0.01 px,
   origin whole (246, 76) at 1919×1079 and 1440×900; the block's edges drawn in the column of their projection. No
   app offset; skasm owns the reach rule (qa's integer-pixel distances vs our continuous < 7.5).
+
+## 11-18 06:27
+- Ctrl+Enter on macOS (release CI 44240110025): bound to the input's Enter for FeatureDialog fields on macOS only (the
+  input's secondary-enter is Cmd there; bound everywhere, Enter ran twice on Linux). Queued 5b041766 (with 2549be00).
+- Tab-return fix (fff088e5) confirmed by its deterministic workspace test on main; qa told to compare v0.4.58 vs 0.4.53.
+- interaction-feel.md "Captures 11-17 / 11-18 (audit)": 214 finding rows with their test or "missing". New tests:
+  only_radius_and_measurement_carry_and_a_cancel_remembers_nothing (dialog memory, USER P0),
+  a_list_scrolled_under_a_still_drag_drops_at_its_line (drops at the slot, live2 fl-autoscroll-1118; fixed).
+- In progress (patch /root/psui-scratch/pick-on-move.patch + mod-all.patch): live2 hover-time-1118: every move picks at
+  once only while a sketch creation tool is active (`Viewport::pick_on_move`, separate from tool_captures_left). It
+  broke sketch_box midpoint_glyph_and_plane_clicks_in_a_sketch_as_live: after the first glyph click a fast move's
+  stale pick hovers another line (glyph_entity 6) and glyph 2's row goes. Settle that first.
+- Next: the audit's missing P0 rows (manipulator arrow drag: nothing lit, Depth focused; sel-feel box drag / relations;
+  hover-pick-1120 connector reach; measure-mass panel place / add-remove / no summary).
 
 ## Next queue
 0. First-pick test back to T1 (05:01): CI 44210027702 failed the old one-delivery version (its line 214), not the

@@ -86,7 +86,7 @@ two zooms, A 0.2754 / B 0.2316 mm/px; where they differ both are given).
 | Sketch state while editing (live2 sketch-state 11-17) | a free line: blue, the row's blue "−" badge; Fix on the line: the line black, its ends blue (free along it), the badge stays; a HORIZONTAL on that slanted line: the row red "Sketch could not be solved.", no badge, the yellow bubble, the line where it was; deleting it: back to fixed (the bubble gone); deleting the Fix: back to free | the same (Fix on a line holds the line, not its ends; the message was "Sketch has conflicting constraints") | part-studio-ui `an_open_sketchs_state_follows_its_constraints` | = (fixed) |
 | Constraint glyph selection (live2 glyph-select 11-17) | one glyph at a time: a click (Shift too) on another replaces it, Delete takes only it; a glyph click drops selected curves, a curve click drops the glyph; Shift+click on the selected glyph or an empty click deselects | the same (were additive, kept with curves) | scene `constraint_glyphs_select_one_at_a_time_as_lives` | = (fixed) |
 | A point and a circle / ellipse made coincident | the point fixed (a model vertex, a Fix): the curve shifts the shortest way, radii kept; the point free: the point moves onto the curve (live2 11-17, REQUESTS (d)) | the same (`what_moves`: the curve's centre or the point is what the solve moves) | scene `a_circle_coincident_with_a_fixed_point_shifts_and_a_free_point_moves` | = (fixed 11-17) |
-| Hover timing (no tool) | the highlight ≈ 270–300 ms after the pointer stops; with the Dimension tool ≈ 30 ms | as the GPU pick arrives | – | – |
+| Hover timing (no tool) | the highlight ≈ 270–300 ms after the pointer stops; with the Dimension tool ≈ 30 ms: live's rule (live2 hover-time-1118: `alwaysPreHighlightOnMouseMove` only while a sketch creation tool is active) | every sketch move picks at once (`tool_captures_left` is set for the whole sketch session, a plane ring and assembly parts too) | missing | ≠ (fix in progress: a glyph row's fast-move case to settle first) |
 | Nothing recoloured under the pointer mid-draw | the target line doesn't recolour | the same (`SketchEditor::mid_draw`) | – | = |
 | Hovered point look | a 10–11 px translucent orange disc, centred | the same; whole on a slanted plane | offscreen `a_hovered_sketch_point_on_a_slanted_face_draws_its_whole_disc`, `a_sketch_point_is_drawn_as_lives_in_each_state` | = |
 | Per-entity colour: a line | the line black, its free end blue; black once dimensioned; a construction line through the origin black, ends blue | a line by its own geometry (`line_motion_queries`) | sketch `a_line_with_a_free_length_is_defined_and_its_free_end_is_not`, `a_line_whose_end_moves_off_it_is_under_defined` | = |
@@ -757,11 +757,418 @@ live2's feedback.json (11-13 09:39, for psui and studios). part-studio-ui `feedb
 | Its dialog | Sketch 1 deleted under Extrude 1: the title red, the lost region a red "Missing Face" entry, ✓ not disabled (an edge whose feature is only below reads "Edge of Extrude 1": live fillet-chip-edit-healthy-moment) | "Face of deleted feature"; now "Missing Face" | = (fixed) |
 | Not yet in the matrix | a failed preview (live feedback-gaps 11-16, Shell 20 mm on the 10 mm block: every edge of the part red rgb(189, 48, 57) ~5 px, faces tinted (rgb(125, 106, 119) on the dark sides), the title red, the face chip and the feature row red, ✓ still enabled; ours the same since 11-16 (core's `FeatureState::error_parts` 601df0ac, `scene_builder::error_geometry(…, ghost: false)`: the part's shading under rgb(189,48,57) at 25 %, edges 5 px): top face (162,156,176) as live, front (124,107,120) vs (125,107,120); a Feature pattern's ghosts keep the dark 60 % style); the commit's working overlay (live first seen 1119 ms after ✓, polled every 40–150 ms; ours 1200 ms: within a frame or two, not changed without a finer measure); toasts (studios: success rgb(221,246,204), top centre, 5.1 s, no stacking, hover doesn't pause); empty states | – | – |
 
+## Captures 11-17 / 11-18 (audit: one row per feel finding)
+
+Every feel finding recorded in onshape-research/live/behaviours.md on 11-17 and 11-18 for the Part Studio, with the
+test that checks it (`file::fn`, or a matrix and its row) or **missing**. Owner other than psui in brackets. "=" ours as
+live (by its test or the code), "≠" a known difference, "?" not checked yet. P0 marks the lead's P0 captures.
+
+### hover-p0 (USER P0, sketch hover vs planes in iso, live2 11-17 12:35)
+
+| Finding | Ours | Test |
+|---|---|---|
+| A sketch line wins over any plane, in front of it or behind it on screen | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live, a_sketch_line_lights_over_the_planes_behind_it_and_lets_go |
+| A sketch point beats its lines within its reach | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live |
+| The region beats the planes behind it | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live |
+| Over a constraint glyph nothing else hovers (its entities in the secondary pre-selection) [skasm] | ? | missing |
+| The sketch's own plane never hovers in sketch mode; other planes do | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live |
+| Reach in sketch mode: line 7 px, point 10 px | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live, a_sketch_circle_and_its_centre_light_over_the_planes |
+| A plane hovers over its whole interior plus 6 px outside its edge (8 px: nothing) | ? | missing |
+| Reach outside sketch mode: line 6–7 px, point 9 px; Top hovers like any plane; the nearer plane wins where planes overlap | ? | missing |
+| Hover timing: under 0.15 px/ms picks at once; faster clears and picks min(5 × average pick, 250 ms) after the last move | = | app-core viewport::prehighlight_tests::prehighlight_waits_for_a_pause_as_live |
+| No stale hover: only what is under the pointer's last spot | = | sketch_hover_feel_tests::a_quick_sweep_off_a_line_leaves_nothing_lit, the_first_pick_at_rest_lights_what_is_under_the_pointer |
+| With no tool a line's midpoint hovers the line; a point hovers as a light-orange disc | = | sketch_box_feel_tests::midpoint_glyph_and_plane_clicks_in_a_sketch_as_live, sketch_hover_feel_tests::sketch_lines_and_points_light_as_live |
+| A glyph click selects the constraint, a second glyph click replaces it; a plane click in sketch mode selects the plane | = | sketch_box_feel_tests::midpoint_glyph_and_plane_clicks_in_a_sketch_as_live |
+| A dimension label hovers tan, a click fills it orange, a double-click opens its value box [skasm] | = | sketch_label_feel_tests::a_dimension_label_hovers_tan_selects_on_a_click_and_opens_on_a_double_click |
+| Corner and line drags with no tool: the rectangle stays one, a line moves along its normal [skasm] | ? | missing |
+| A press on a plane and a drag draws a box; window over the rectangle takes its 4 lines, crossing over the right half 3; press-release on a plane selects it | = | sketch_box_feel_tests::a_box_in_iso_over_the_planes_takes_lines_as_live |
+| With a drawing tool active no plane or region hovers, only snap targets [skasm] | = | sketch_ui_tests::no_plane_lights_while_a_line_is_drawn |
+| Constraint buttons on a two-line selection: applied at the click, selection cleared, the second-picked line moves; refusals in a bubble; Symmetric arms [skasm] | = | scene the_second_picked_line_moves_as_lives, horizontal_and_vertical_turn_both_lines_about_their_midpoints (refusal texts: missing) |
+| A dimension label dragged follows the pointer, no snap, no selection needed [skasm] | = | sketch_label_feel_tests::a_dimension_label_follows_the_pointer_without_a_selection |
+
+### feel-1417 (P0, glyph linger and label drag threshold, live2 11-17 14:16)
+
+| Finding | Ours | Test |
+|---|---|---|
+| Show constraints off: a hovered line shows its glyph row; the line turns orange [skasm] | = | sketch_glyph_feel_tests::a_hovered_lines_glyphs_wait_by_the_pointer |
+| Leaving into empty canvas: the line's orange goes first, the glyphs ~0.4–0.7 s later | = | sketch_glyph_feel_tests::a_left_lines_glyphs_go_when_the_linger_ends |
+| Moving onto a glyph within the linger keeps the row; the glyph hovers yellow, the line stays orange | = | sketch_glyph_feel_tests::a_hovered_lines_glyphs_wait_by_the_pointer |
+| The row is placed once where the hover starts (~40 px off) and doesn't follow the pointer | = | sketch_glyph_feel_tests::a_hovered_lines_glyphs_wait_by_the_pointer |
+| A dimension label starts moving 5 px from the press [skasm] | = | sketch_label_feel_tests::a_dimension_label_follows_the_pointer_without_a_selection |
+
+### wake-parallel (woken model edge, live2 11-17 14:30) [skasm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| A woken straight model edge gives no PARALLEL (0.2–3° off, woken or not) | = | snap_matrix_tests::the_sketch_snaps_matrix_matches_live / "wake/model-edge/no-parallel" |
+| It gives its end vertices' alignments (VERTICAL with its end) | = | the_sketch_snaps_matrix_matches_live / "wake/model-edge/end-alignment" |
+
+### show-constraints (Show constraints remembered, live2 11-17 14:25)
+
+| Finding | Ours | Test |
+|---|---|---|
+| The sketch dialog's Show constraints is per user, written when a sketch is committed (✓), not on ✗; off by default | ? | missing |
+
+### hover-pick-1120 (P0, hover reach and priority in iso with the planes shown, live 11-17 20:41)
+
+| Finding | Ours | Test |
+|---|---|---|
+| A part edge vs the face behind / below it: lights at 5–6 px, stays to 8–10; the face never beats the edge inside reach | ? | feel_tests::a_click_beside_an_edge_selects_what_is_lit (reach in iso: missing) |
+| A sketch point takes over from its line 8 px before the end; beyond the end 6 px; a line 5–7 px, the sketch's plane beyond | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live |
+| A mate connector wins across its drawn triad: 22 px horizontally, 13–14 px vertically, over the face | ? | missing |
+| Through a transparent default plane geometry behind it always wins; the plane lights only where nothing is behind | = | feel_tests::a_block_behind_the_front_plane_lights_through_it, part_faces_and_vertices_light_over_the_planes_behind |
+| A block edge behind the Front plane: 5–6 px from the plane side, 4 px from the face side | = | feel_tests::a_block_behind_the_front_plane_lights_through_it |
+| Timing: a fast jump lights after the pause (min(5 × average pick, 250 ms)) then one pick | = | app-core viewport::prehighlight_tests::prehighlight_waits_for_a_pause_as_live |
+
+### sel-feel (P0, Part Studio selection, live2 11-17 22:12)
+
+| Finding | Ours | Test |
+|---|---|---|
+| During a box drag nothing lights; on release the result is selected at once | = | app-core viewport (no hover while `Drag::Box`): missing as a test |
+| Window box counts on two blocks (28 / 21); a block's 18 / 5 / crossing 13 | = | feel_tests::box_select_takes_what_live_takes (one block; the two-block counts missing) |
+| A press whose first move ends over a default plane lights the plane and draws no box until the next move | ? | missing |
+| A click on a default plane selects it, a second adds; a face then a plane gives both; an empty click clears all | = | sketch_box_feel_tests::midpoint_glyph_and_plane_clicks_in_a_sketch_as_live (sketch mode); list matrix "click / a default plane: Default geometry related" |
+| A double-click on an edge selects then deselects, no chain | = | list matrix "double-click / a part: two toggles" (edge in the viewport: missing) |
+| A double-click on a face shows its feature's sketch, rows related, nothing kept selected | = | sketch_ui_tests::a_face_double_clicked_shows_its_features_sketch, sketch_hover_feel_tests::a_face_double_clicked_draws_its_sketch_through_the_pointer |
+| A feature row hovered: rgb(222,241,251), tooltip "Extrude 1 <- Sketch 1", its part outlined rgb(255,198,133) | = | list matrix "hover / the row's tooltip", "hover / the geometry lit 100 ms after, cleared 100 ms after leaving" |
+| A part row hovered: the same plus its eye icon and a "Part 2" tooltip | = | list matrix "hover / the row's tooltip" |
+| A hidden sketch row hovered: drawn in place, lit; "Sketch 1 (Hidden) is not fully defined" | = | list matrix "hover / a hidden sketch: drawn in place, lit" |
+| A feature row clicked: selected rgb(178,221,246), its part related rgb(236,240,244), the part drawn selected | = | list matrix "click / toggles, others kept" (the colours: Look rows) |
+| A viewport face / edge clicked relates its feature and part rows, never selects them | ? | missing |
+| A sketch region on a face relates only its sketch; its look a pale fill with an orange outline | ? | missing |
+| A default plane clicked: its row selected, Default geometry related | = | list matrix "click / a default plane: Default geometry related" |
+| Space or an empty click clears both sides | = | list matrix "clearing / a click on empty canvas" |
+
+### dialog-memory (USER P0, feature dialogs remembering the previous value, live 11-17 12:53)
+
+| Finding | Ours | Test |
+|---|---|---|
+| Fillet Radius remembered across documents as typed (plain or a variable-free expression), metric and inch kept apart | = | sketch_ui_tests::a_remembered_value_never_carries_a_variable |
+| A value with a #variable is never remembered: the earlier memory stays | = | sketch_ui_tests::a_remembered_value_never_carries_a_variable |
+| A cancelled dialog isn't remembered; a committed one that fails is | = | sketch_ui_tests::only_radius_and_measurement_carry_and_a_cancel_remembers_nothing (the failed one: missing) |
+| Fillet carries Radius and Measurement; not Tangent propagation, overflow, smooth corners, Asymmetric / Partial / Variable | = | sketch_ui_tests::only_radius_and_measurement_carry_and_a_cancel_remembers_nothing |
+| Extrude Depth is never remembered (25 mm / 1 in default) | = | sketch_ui_tests::only_radius_and_measurement_carry_and_a_cancel_remembers_nothing |
+| A Hole's remembered values: Units / Style everywhere, the diameter only in documents of the same length unit | = | sketch_ui_tests::remembered_hole_values_follow_the_document_units |
+
+### feature-dialogs-1117 (P0, selection boxes, live 11-17 22:52)
+
+| Finding | Ours | Test |
+|---|---|---|
+| Every dialog opens with its first box active (border rgb(22,81,176), fill rgb(222,241,251)); empty and required: red title | = | dialogs matrix "keys / on opening the first selection field has the keyboard" (the look: missing) |
+| Hover filtered by the active box: Extrude an edge lights its face; Fillet / Chamfer a vertex lights an edge; Boolean a face lights the part; planes nothing | = | feel_tests::a_dialogs_active_box_filters_what_lights |
+| Click adds, click again removes, a third adds back; an empty click changes nothing, the dialog stays | = | dialogs matrix "fields / a selected entity clicked again leaves the field", "fields / an empty click changes nothing" |
+| An entry hovered lights its geometry #f2ff80 121–181 ms after, with its name in a tooltip | = | dialogs matrix "fields / a row hovered lights its entity" (the delay: missing) |
+| Preview: asked 113–330 ms after the pick | = | dialogs matrix "preview / not while typing; Tab sends it" (the delay: missing) |
+| Enter with the keyboard outside a field commits; Esc with a pick cancels and removes the feature | = | dialogs matrix "fields / Enter with the keyboard outside a field commits", "manipulators / Esc with the button held cancels the dialog" |
+| Radius focused: the box keeps its active look, an edge click goes into it and takes the keyboard out of Radius | = | dialogs matrix "fields / Radius focused, an edge click goes into the box" |
+| Boolean Subtract: picks stay in Tools (no auto-advance); a click on Targets makes it active | = | dialogs matrix "Boolean / Subtract: picks stay in Tools" |
+
+### featurelist-feel (feature list, live2 11-17 23:25)
+
+| Finding | Ours | Test |
+|---|---|---|
+| Rollback bar held: a chip follows, the insertion line shows, the bar stays, nothing greys | = | list matrix "rollback bar / while held nothing moves or greys" |
+| On release the bar moves, the rows below grey (rgb(154,154,154) italic), the Parts list follows | = | list matrix "rollback bar / on release the rows below grey and the Parts list follows" |
+| The bar is #b8b8b8 away from the pointer (rolled back or at the end), #c8d9e2 hovered | = | missing |
+| It drops between any features or above the first, never into Default geometry | = | list matrix "rollback bar / above the first feature", "rollback bar / onto default geometry: the top" |
+| A reorder the history can't take is accepted, then fails red rgb(170,37,45) with a warning triangle, no message | = | list matrix "drag / a reorder the history can't take: red, no message" |
+| A sketch dragged onto Default geometry: nothing | = | list matrix "drag / onto default geometry: nothing" |
+| Double-click opens the dialog at (246, 79), 220 wide, right of the list; its rows edited / related | = | list matrix "double-click / the dialog right of the list, 220 px wide" |
+| Rename: 178 × 24 inline, all selected; Enter and a click elsewhere commit; F2 nothing; the tooltip gains "[Extrude]" | = | list matrix "rename / Enter commits", "rename / a click elsewhere commits", "keys / F2 on a selected row: nothing", "hover / a renamed feature's tooltip has its type" |
+| Suppress: grey italic struck through; the menu then offers Unsuppress | = | list matrix "suppress / from the menu, then Unsuppress" |
+| Autoscroll (fl-autoscroll-1118): a 60 px zone, ~200 px/s, ~390 past the edge, running with the pointer still | = | behaviors::tests::autoscroll_speeds_as_live |
+| The drop slot is picked only by a move: a list autoscrolled under a still pointer carries the line away and a release drops there | = (fixed 11-18: ours dropped at the row under the pointer) | list_feel_tests::a_list_scrolled_under_a_still_drag_drops_at_its_line |
+
+### doc-level-1117 (tab switch, undo / redo, regeneration feedback, live2 11-17 23:36)
+
+| Finding | Ours | Test |
+|---|---|---|
+| A tab switch: the old element goes at once, the list fills, the canvas last, no spinner [studios] | ? | missing |
+| Ctrl+Y redoes, Ctrl+Shift+Z doesn't (Shift+⌘Z on a Mac); no toast on undo or redo | = | app-core actions::tests::shared_keys_follow_lives_list_per_os; list matrix "undo / a rename is one step, no toast" |
+| A rename is one step; hiding a part is one step; a view change or a selection is none | = | list matrix "undo / a rename is one step, no toast", "undo / hiding a part is one step", "undo / a view change or a selection is no step" |
+| In a dialog with the keyboard in a value field Ctrl+Z does nothing; Esc then cancels | = | sketch_ui_tests::undo_does_nothing_while_a_dialog_control_has_the_keyboard |
+| Regeneration: the old model stays drawn; the working spinner from ~0.75 s (900 ms in live's code), centred low; rows ungrey when done | = | sketch_ui_tests (the spinner's state around a cancelled run, ~2563); its delay and place: missing |
+
+### rb-followup (rollback bar follow-ups, live 11-18 00:27)
+
+| Finding | Ours | Test |
+|---|---|---|
+| Released over Default geometry (expanded or collapsed) it lands at the last legal slot the line showed: the top for a normal drag | = | list matrix "rollback bar / onto default geometry: the top" |
+| Its colour: #b8b8b8 away (rolled back or at the end), rgb(200,217,226) hovered | = | missing |
+
+### spinner (the working spinner, live's client code, 11-18 00:20)
+
+| Finding | Ours | Test |
+|---|---|---|
+| One spinner, shown 900 ms after a call starts (none if it finishes sooner); body loading and box select at once | = | missing (`pending::OVERLAY_DELAY`) |
+| Its look: 50 × 50 rgba(255,255,255,0.75), radius 10, 40 px above the bottom; a 30 px ring rgb(215,215,215) with a blue quarter, 1.1 s a turn, no pulse | = | missing |
+
+### parts-list-1118 (Parts list and appearance, live 11-18 01:47)
+
+| Finding | Ours | Test |
+|---|---|---|
+| Part rename: whole name selected; Esc cancels, Enter commits, a click away commits | = | list matrix "Parts list / Rename: whole name selected, Esc cancels, Enter commits", "Parts list / a click away commits a rename" |
+| Shift+N on a selected part renames; F2 nothing | = | list matrix "Parts list / Shift+N renames a selected part, F2 nothing" |
+| A part hovered in the graphics leaves its row untinted | = | list matrix "Parts list / a part hovered in the graphics leaves its row as is" |
+| Dragging a part row does nothing | = | list matrix "Parts list / parts can't be dragged" |
+| A face's menu ends Assign material / Edit appearance / Add appearance to face… | = | menus tests (ctx-menus-1117 rows) |
+| Add appearance to face…: "Face appearance 1", 220 × 401 at (246, 79), chip "Face of Extrude 2"; a swatch recolours only that face; no feature row | = | dialogs matrix "Appearance / a face's: a feature-style dialog that recolours the face at once, no feature row" |
+| Material search: Down moves, Enter picks; no appearance preview; Esc discards | = | dialogs matrix "Material / Down and Enter pick the next match, no preview, Esc discards" |
+
+### dialog-keys-1118 (keyboard in feature dialogs, live 11-18 01:52)
+
+| Finding | Ours | Test |
+|---|---|---|
+| On opening (new or edit) the first selection field has the keyboard | = | dialogs matrix "keys / on opening the first selection field has the keyboard" |
+| "10 in" kept while focused, "254 mm" on blur; "2*#w" → "10 mm" on blur | = | fields matrix "Enter: the expression, its unit added", "blurred: the value in the document unit, 3 decimals" |
+| "5+": fine while typed; on Enter pink rgb(249,235,236), title red rgb(170,37,45), no tooltip | = | fields matrix "invalid: '5+' fine while typed, pink with a red title on Enter" |
+| "#zz" + Enter opens Create variable; the field stays pink | = | fields matrix "unknown variable: '#zz' + Enter opens Create variable" |
+| ↑ +1, ↓ −1, Shift +10, Ctrl +0.1, Alt +1; "1 in" ↑ gives "26.4 mm"; uncommitted text not stepped | = | fields matrix "arrow keys step the value", "arrow keys: Ctrl a tenth, another unit stepped in the workspace's, typed text not at all"; app-core quantity_field inch steps |
+| Tab from Depth: ± → the five checkboxes → help → out to the header; End type, the field, tabs, ✓ / ✗ skipped; Shift+Tab back | = | dialogs matrix "keys / Tab from Depth, then out of the dialog; Shift+Tab back" |
+| Space on a focused checkbox toggles it | = | dialogs matrix "keys / Space toggles a focused checkbox" |
+| End type by keyboard: search box focused, ↓ moves, Esc no change | = | dialogs matrix "keys / a dropdown: its search box focused, Down moves, Esc changes nothing" |
+| Ctrl+Enter in a value field is plain Enter (macOS too since 11-18 06:xx) | = | dialogs matrix "keys / Ctrl+Enter in a value field is Enter" |
+
+### keys-1118 (keys in lists, Delete with dependents, Tab from the graphics, live 11-18 02:56)
+
+| Finding | Ours | Test |
+|---|---|---|
+| Delete on a used sketch: no dialog, no toast; its users red, the header ⓘ; the tooltip "… did not regenerate properly: Select face or sketch region to extrude." / "1 missing selection" | = | list matrix "keys / Delete on a used sketch: no dialog, its user fails" |
+| The sketch row's menu, in live's order | = | list matrix "menu / two sketches" (the one-sketch order: missing) |
+| Sketch Ctrl+C / Ctrl+V: the copy centred on the pointer, selected, the Transform tool on it, constraints copied [skasm] | = | editing matrix "copy / sketch entities paste under the pointer" |
+| Ctrl+A in a sketch selects nothing [skasm] | ? | missing |
+| Tab from the graphics: Measure → Analysis tools → Mass → out; Shift+Tab back; no row or toolbar button a stop | = | list matrix "keys / Tab from the graphics: Measure, Analysis tools, Mass properties, then out; Shift+Tab back" |
+
+### nav-1117 (P0, navigation gaps, live 11-17 23:13)
+
+| Finding | Ours | Test |
+|---|---|---|
+| One wheel event is one step (2^(1/12)) whatever its delta, about the pointer | = | nav matrix "wheel / a notch in", "wheel / a notch out", "wheel / in and out toward the pointer" (delta independence: missing) |
+| Ctrl+wheel is the same zoom; a pinch zooms one step per event | = | missing |
+| Animated view changes: smootherstep, 500 ms for named / standard views, F and the cube; 250 ms for arrows, pan and zoom keys | = | nav matrix "animation / smootherstep", "keys / Shift+1, 5, 7 and F: 500 ms", "keys / arrows: 15°, Shift 90°, Ctrl 5°, in 250 ms", "keys / Ctrl+Shift+arrows pan 150 px in 250 ms" |
+| A new animation while one runs is ignored | = | nav matrix "animation / a new one while one runs" |
+| Below 20 fps (frames over 50 ms on average) a view change jumps | = | app-core navigation::tests::a_view_change_jumps_below_20_fps |
+
+### ctx-menus-1117 (right-click menus and Shift+/, live 11-17 23:23)
+
+| Finding | Ours | Test |
+|---|---|---|
+| "Where used for Part 1…" in its own group after Export… on every menu naming a part | = | sketch_ui_tests::where_used_for_the_part_has_its_own_group_after_export, graphics_menus_over_a_selection_as_live |
+| The Parts list row: "Where used…" after Export… (Create task left out) | = | list matrix "menu / one part" |
+| The Top plane row: "Section view…" in its own group | = | list matrix "menu / the Top plane row" |
+| Two selected: "Clear selection" above Select ▸; "Add appearance to 2 faces…"; a face + an edge drops the part rows | = | sketch_ui_tests::graphics_menus_over_a_selection_as_live |
+| Sketch mode: every menu starts "Confirm Sketch 2" ("Escape line" above it with a tool); a line's, a line + end's, a face's "Use" [psui + skasm] | = | sketch_ui_tests::sketch_entity_menus_as_lives, a_plane_behind_the_sketch_gets_its_menu |
+| Open time: rows 66–95 ms, one entity 150–270 ms; place pointer + (0, 2) / rows + (10, 12), flipped at the bottom | = | chrome matrix "context menu / at the pointer + (0, 2)", "context menu / a feature-list row's at + (10, 12)", "context menu / flips at the window's right and bottom" (open time: missing) |
+| Shift+/ sheet: 114 entries in 7 tabs, as ours | = | app-core shortcut_sheet::tests::shortcut_sheet_lists_every_part_studio_key |
+
+### manip-feel-1118 (P0, manipulator drags, live 11-18 01:20)
+
+| Finding | Ours | Test |
+|---|---|---|
+| A plain click on Extrude's arrow flips the direction; again flips back | = | dialogs matrix "manipulators / a click on Extrude's arrow flips it" |
+| While a feature arrow is dragged nothing lights under the pointer; Depth is the pointer projected on the arrow's line; the arrow blue | ? | missing |
+| During the drag Depth has the keyboard with its text selected, rewritten each update; on release it stays focused and selected | ? | missing |
+| Ctrl or Alt held changes nothing; Shift unrounded | = | manipulators::tests::a_dragged_length_steps_with_the_zoom_as_live (Shift); Ctrl / Alt: missing |
+| Esc during an arrow drag, button held, cancels the whole dialog; the release then does nothing | = | dialogs matrix "manipulators / Esc with the button held cancels the dialog" |
+| The length step 10^(round(log10(100 px in mm)) − 2); angles 5° near a multiple, 0.1° between (0.4·step·(1 + level/3)) | = | dialogs matrix "drag / the length step follows the zoom", "drag / the angle step"; manipulators::tests::a_dragged_angle_snaps_by_its_radius_as_live |
+| Transform › Translate by XYZ: the triad at the part's bounding-box centre; a plane square moves both its axes, each on the 0.1 mm step; an arrow only its own | ? | missing |
+| During any triad drag only the dragged handle is drawn (blue), the others faint grey; the old place a light ghost with an orange outline | ? | missing |
+| Assembly triad: rings at the arrow tips, arcs with a degree box, 5° only near a multiple, plane squares without a box; Esc drops the box and keeps the place [asm] | ? | missing |
+
+### view-tools-1118 (view tools, live 11-18 01:41)
+
+| Finding | Ours | Test |
+|---|---|---|
+| Keys: Y hide selected, Shift+Y show selected, P, Shift+P, Shift+H, K, Shift+I, Shift+V, Shift+X | = | app-core shortcut_sheet::tests::shortcut_sheet_lists_every_part_studio_key |
+| Shift+Y with nothing selected does nothing; with a hidden part's row selected shows it | = | editing matrix "Y / Shift+Y with nothing selected or under the pointer" (the selected-row case: missing) |
+| A hidden part's row menu: Show, Show all parts; the empty-space menu with hidden parts: Show all, Show all parts | = | list matrix "menu / a hidden part" (the empty-space menu: missing) |
+| Render-mode and perspective switches change the picture in one step, not animated; perspective 45° | ? | missing |
+| Named views: a 237 px panel; a restore animated (~240 ms on live's slow lane) | ? | missing |
+| Section view: the plane's icon is "Select default plane"; one drag arrow, a value box at it while dragging (0.1 mm steps), typing in it moves the plane | = | sketch_ui_tests::another_section_planes_arrow_drags_it (the box and typing: missing) |
+| While the dialog is open the cut faces are a flat light-orange preview; after ✓ the caps are hatched in the part's colour | ? | missing |
+| Turn off section view; Shift+X again reopens with the last plane and offset | = | sketch_ui_tests::shift_x_after_turning_off_restores_the_last_section |
+
+### sketch-entry-1118 (sketch entry and exit, live 11-18 02:06) [psui + skasm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Top selected then Shift+S: the sketch opens on Top at once; nothing selected: an empty plane field; a face selected: "Face of Extrude 1"; the row added at the rollback bar, selected [skasm] | = | sketch_ui_tests::a_preselected_sketch_plane_is_not_an_undo_step, picking_the_sketch_plane_is_an_undo_step (the face label: missing) |
+| A new sketch changes nothing on screen: nothing greys or hides, the view stays [skasm] | = | missing |
+| Another feature row clicked while sketching: nothing | = | list matrix "sketching / another row clicked does nothing" |
+| Editing a sketch rolls back: later rows grey italic, Parts (2) → (1); "Final"; ✗ brings them back | = | list matrix "sketching / later rows grey and the Parts list follows, ✗ brings them back" ("Final": missing) |
+| A hidden later sketch stays hidden while editing | = | missing |
+| Drawing on a face: the light-blue preview, then the solved lines [skasm] | ? | missing |
+| Orient normal to sketch on edit: an animated turn once the edit opens; ✗ leaves the view normal | = | sketch_ui_tests::orient_on_edit_turns_to_the_sketch_and_exit_keeps_the_view |
+
+### toolbar-highlight (Search tools' highlight, live 11-17 09:43)
+
+| Finding | Ours | Test |
+|---|---|---|
+| The found tool #FCDA7F with `inset 0 0 0 2px #FAB601`, nothing moves; a dropdown member lights the ⌄; steady | = | toolbar_highlight_tests::a_highlighted_toolbar_button_keeps_its_size_and_content |
+
+### tooltips-1118 (toolbar tooltips, live 11-18 03:53)
+
+| Finding | Ours | Test |
+|---|---|---|
+| 3 px under the button, centred on it; expanded 400 px wide, centred, the same top, clamped only at the page edge; no image; stays while hovered | = | chrome matrix "tooltip / under its tool, centred; 400 px expanded; stays while hovered" |
+
+### pick-constants (live's client code: pick and snap tolerances, 11-18 02:39)
+
+| Finding | Ours | Test |
+|---|---|---|
+| Pointer to canvas in device px, unrounded | = | the hat15b offset run (no test: input → viewport is GPUI's) |
+| Pick reach round(5·dpr) device px: an 11 × 11 window at 1×, 21 × 21 at 2×, 8 at 1.5× | = | missing (pick_radius_px) |
+| Hits ranked by type priority, then (1 + distance)·(1 − coverage), then id | = | render renderer::tests::picks_rank_by_priority_then_distance_and_coverage_as_live |
+| Sketch inference: 15 px squares and bands under the pointer's pixel, points > curves > H / V lines [skasm] | = | snap matrix (the_sketch_snaps_matrix_matches_live) |
+| Mate connector inference 50 px [asm]; Select other 8 px; the triad's free-drag ball 8 px | ? | missing |
+| Hover speed 0.15 device px/ms; the pause min(5 × average pick, 250 ms) | = | app-core viewport::prehighlight_tests::prehighlight_waits_for_a_pause_as_live (device px: missing) |
+| A left drag after > 2 device px and > 50 ms; the menu on right-up only within a 4 device px move path | = | app-core viewport tests::presses_drag_and_open_the_menu_as_live |
+| Middle double-click within 500 ms fits | = | nav matrix "double middle click / zoom to fit" |
+
+### nav-constants (live's client code: navigation, inference, manipulators, 11-18 02:44)
+
+| Finding | Ours | Test |
+|---|---|---|
+| Orbit 3 turns per canvas diagonal, speeds averaged, inertia 0.77 a frame | = | nav matrix "right drag / orbits 3 turns per canvas diagonal"; app-core navigation::tests::inertia_decays_like_onshape |
+| Wheel 2^(1/12) a notch (Windows ×3), about the pointer; pinch as Ctrl+wheel | = | nav matrix "wheel / a notch in" (Windows, pinch: missing) |
+| Zoom refused past 100 px model size or 2^24 px per unit; perspective eye 0.05–50 diameters | ? | missing |
+| Z / Shift+Z ×1.75; Ctrl+Shift+arrows 150 px; drag zoom −dy/10; arrows 15° / 5° / 90°; fit padding 1.05; FOV 45 | = | nav matrix "keys / Ctrl+Shift+arrows pan 150 px in 250 ms", "keys / arrows: 15°, Shift 90°, Ctrl 5°, in 250 ms" (Z keys, fit padding, FOV: missing) |
+| Detail drops under 20 fps, back over 30 fps | = | app-core navigation::tests::a_view_change_jumps_below_20_fps (the 30 fps return: missing) |
+| Inference keeps the previous target while it is still under the pointer [skasm] | ≠ | missing (skasm's #6) |
+| Linear step 10^(round(log10(100 px)) − 2), always rounded; angles 5° / 1° / 0.1° by a 50 px arc, ±0.4·(1 + level/3); Shift free | = | manipulators::tests::a_dragged_length_steps_with_the_zoom_as_live, a_dragged_angle_snaps_by_its_radius_as_live |
+
+### measure-mass-1118 (P0, measure readouts and Mass properties, live 11-18 00:14)
+
+| Finding | Ours | Test |
+|---|---|---|
+| 22 readouts on live's studio: a sloped edge's length, edge and face angles toward each one's middle (56.310 / 146.310 / 123.690 / 33.690), a cylinder's Diameter, Perp axes angle, Center axes dist, Face tangent angle first, vertex + face Min dist | = | measure_feel_tests::measure_pairs_on_lives_wedges_and_cylinder |
+| The summary: the old text stays until the answer, then refills | ? | missing |
+| The Measure panel (`[`): 220 px at the right; two faces Area the sum; Length unit → Inch re-measures the panel only, kept in the session; Measure type filters the panel only | = | measure matrix "the details panel: 220 × 345 for a distance and its components" (the unit and type rows: missing) |
+| Mass properties opens top-left over the list, (214, 79), 440 × 521; inertia in the account's mass unit | ? | missing |
+| A face click adds its part, a measured part clicked again leaves; volume / area summed; trailing zeros dropped | = | app-core properties_dialog mass_number tests (the add / remove: missing) |
+| While Mass is open: no bottom-right summary, an empty click keeps its parts; Esc closes it keeping the selection | ? | missing |
+| Its button again leaves it open; `[` over it opens Measure empty, the parts deselected | = | measure_feel_tests::mass_stays_open_and_bracket_opens_an_empty_measure |
+| A clicked Mass value shows the unit's highest precision (numfmt-1118) | = | measure_feel_tests::a_clicked_mass_value_toggles_the_highest_precision |
+
+### measure-wedge1 (the angle rule on live's first wedge, 11-18 01:33)
+
+| Finding | Ours | Test |
+|---|---|---|
+| Sloped face + x = 40 face 56.310 (the middles rule, not π − the normals' angle); + y = 0 33.690; + y = 30 146.310; the two top edges 56.310 | = | measure_feel_tests::measure_pairs_on_lives_wedges_and_cylinder; model-core regen::measure::tests::readout_rules_for_face_pairs |
+
+### sketch-readouts (sketch selection readouts, live 11-17 09:57 / 10:10) [skasm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| A circle alone: Diameter (no Radius); an arc alone: Radius | = | scene sketch_mode::tests::pair_readouts_follow_lives_kinds_and_arcs |
+| Pair order by kinds: with a point or a line Min · Max · Center; two circular curves Center · Max · Min | = | scene sketch_mode::tests::pair_readouts_follow_lives_kinds_and_arcs |
+| Arcs count as their arc for Min / Max; Center dist to a line is to the infinite line; a point on a line only Min 0 | = | scene sketch_mode::tests::pair_readouts_follow_lives_kinds_and_arcs |
+| Three decimals, the value's tooltip five | = | measure matrix "a value hovered: its 5 decimals' tooltip and its dashed line" |
+
+### timings-1117 (click and double-click timings on live's 30-feature part, 11-17 10:17)
+
+| Finding | Ours | Test |
+|---|---|---|
+| A face click: selected and drawn 57–67 ms (software GL); its Area readout 167–185 ms | = | latency_tests::everyday_interactions_beat_live_on_the_30_feature_part (T2, "click: the face selected and drawn") |
+| Extrude 1 double-clicked: the dialog 322–448 ms, its preview 0.73–2.2 s | = | latency_tests::everyday_interactions_beat_live_on_the_30_feature_part (T2, "dialog: Extrude 1 open on its preview") |
+
+### ui-speed-1118 (UI speed of everyday actions, live medians, 11-18 02:05) [psui + qa]
+
+| Finding (live median, settled) | Ours | Test |
+|---|---|---|
+| Extrude dialog from the toolbar: shown 221 ms, settled 1.3 s; first preview after a pick 2.0 s; ✓ → regenerated 1.1 s | = | latency_tests::everyday_interactions_beat_live_on_the_30_feature_part (T2: "dialog", "✓" targets) |
+| Open a document: shaded 7.6 s, list 11.4 s | ? | missing (qa's speed suite measures it) |
+| Tab A → B: list 1.7 s, settled 2.7 s; back 1.5 / 2.3 s | ? | missing as a psui test (qa's dock flow; workspace a_clicked_tabs_card_picture_redraws_nothing guards the trailing frames) |
+| Enter a sketch 226 ms / 1.3 s; exit (✓) 117 ms / 0.9 s; undo 107 ms / 1.0 s | ? | missing |
+| Rollback bar drop: in place ~0.1 s, settled ~1.0 s | ? | missing |
+| Context menu on a face: shown 117 ms | ? | missing |
+| Mass properties: the dialog 161 ms; values 154 ms after the pick | ? | missing (sketch_ui_tests::mass_properties_dont_hold_up_the_frame checks only that the frame isn't held) |
+
+### cfg-1118 (Configurations, live 11-18 01:03) [psui + studios]
+
+| Finding | Ours | Test |
+|---|---|---|
+| The panel docks at the right, ~700 px, the graphics shrink; the empty state ~346 ms after the click | = | missing (the 712 px panel: no test) |
+| The feature list's "Configurations" box with "Configuration [A ▾]" 193 × 26 | = | sketch_ui_tests::opening_the_configuration_select_moves_nothing (the place: missing) |
+| A duplicate row name is accepted, stored as "A0" | = | sketch_ui_tests::a_duplicate_configuration_name_and_a_bad_value_wait_for_their_row |
+| A row's menu: Switch to / Set as default / Duplicate row / Move up / Move down / Delete row | = | missing |
+| A plain click on a row name doesn't switch | = | sketch_ui_tests::a_click_on_a_configuration_row_doesnt_switch_to_it |
+| A bad configured value stays plain until its row is active; then pink and bold, its feature red, its part gone | = | sketch_ui_tests::a_bad_configured_value_is_pink_only_on_the_active_row, a_duplicate_configuration_name_and_a_bad_value_wait_for_their_row |
+| Switching: no greying; the spinner only past 900 ms | = | missing |
+| Configure from a field: the menu just "Configure", the toast with ×, the amber dotted outline until ✓ | = | sketch_ui_tests::escape_on_a_dialog_takes_its_configured_field_away (the toast: missing) |
+
+### reverify-1118 (older feel facts retaken, 11-18 02:10)
+
+| Finding | Ours | Test |
+|---|---|---|
+| 18 older facts retaken, 16 unchanged (documents rows, tab drag, sketch tool keys, Esc / empty-click selection, Offset arrow, Spline Esc, Trim trail…: their owners' existing rows) | = | their matrices' rows (Documents [studios], sketch tools [skasm]) |
+| The Extrude arrow: a plain click flips the direction (was "does nothing") | = | dialogs matrix "manipulators / a click on Extrude's arrow flips it" |
+| A drawing view's empty inside double-clicked opens View properties [studios] | ? | studios' |
+
+### prefs-1118 (Preferences that change in-app behaviour, live 11-18 02:50) [psui + studios]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Use comma as decimal separator: a dialog's Depth reads "10,25 mm" | ? | missing |
+| 24 hour: H:mm with no leading zero ("2:47 Today", "0:00 Nov 7") | = | app-core start_library::tests::names_and_times |
+| Display parts list properties: each part with the grey "In progress" pill | ? | missing |
+| Constrained rotate as default swaps the Alt prefix in the mouse table | ? | missing [studios] |
+| Export with "Store file in a new tab": "<file name> is being prepared for export. …" at 0.55 s; the tab after the source tab; the view stays | = | export_feel_tests::a_stored_export_says_it_is_prepared_and_rings_the_bell |
+
+### numfmt-1118 (number and unit display, live's client code, 11-18 02:56)
+
+| Finding | Ours | Test |
+|---|---|---|
+| formatValue: Math.round(v·10^p)/10^p (12.3455 → "12.346", −2.5@0 → "-2"), trailing zeros dropped | = | units format::live_format_tests::values_round_as_live |
+| Exponent form at ≥ 1e6, ≤ 1e-5 or rounding to 0 ("4.643e+7"); below the zero tolerance "0" | = | units format::live_format_tests::exponents_and_compound_units_as_live |
+| Compound units sorted and spaced ("deg mm", "mm⁴") | = | units format::live_format_tests::exponents_and_compound_units_as_live |
+| Measure readouts (v ± 1e-10).toFixed(p): zeros kept, ties away from zero | = | units format::live_format_tests::readouts_round_ties_away_as_live |
+| A compound unit takes its units' largest precision | ? | missing |
+| A dragged angle written at the workspace precision (3) | = | missing (manipulators.rs `format_number(deg, angle_precision)`) |
+| A clicked Mass value: the unit's maximum precision, again back | = | measure_feel_tests::a_clicked_mass_value_toggles_the_highest_precision |
+| Value-only parameters: {mm 5, in 6, cm 6, m / ft / yd 8, deg / rad 7} decimals, zeros dropped | ? | missing |
+| Drawing PICKBOX 7 for every tool; grips 6 px [studios] | ? | studios' |
+
+### server-numfmt (server number formats by experiment, live 11-18 03:05) [core + studios]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Accepted: "3/8 in", "(1 + 1/2) in", "1 ft + 6 in", "1/2" (document unit), "1 inch" / "2 inches" / "1 foot" / "1 feet", "30 degrees", "0.5 radian"; rejected: "1 1/2 in", "3/8\"", "1'6\"" | ≠ | ours accepts a superset (inch / foot marks): the lead's decision, no test |
+| Sketch dimension text, deg-min-sec and drawing fractional / feet-and-inches units are the server's [skasm / studios] | ? | theirs |
+
+### hl-pixels-1118 (P0, highlight pixel columns, live 11-18 01:13)
+
+| Finding | Ours | Test |
+|---|---|---|
+| The plain edge: dark, ~1 CSS px; the hovered edge band: opaque rim, 0.78 core, no dark border | = | scene tests edge_looks::edge_and_face_highlights_look_as_live |
+| A part selected from its row: faces tinted (top F2B648, front CD9A3D), internal edges the plain dark edge under the tint, the silhouette a 2 device px #FFC04C outline at 1× and 2× | = | scene tests edge_looks::edge_and_face_highlights_look_as_live |
+| A Parts row hovered: no tint, only the silhouette outline #FFC685, 2 device px | = | scene tests edge_looks::edge_and_face_highlights_look_as_live |
+| A face selected with its part: the face E5A222 with its #FFA90A border on its side, the silhouette #FFC04C | = | scene tests edge_looks::edge_and_face_highlights_look_as_live |
+| A sketch line: ~2 px blue at rest; hovered a #FFC685 band 5 px (9 device px at 2×), rim opaque, core 0.78; selected the same in #FFA90A | = | sketch_hover_feel_tests::sketch_lines_and_points_light_as_live |
+| A sketch point: a ~5–6 px dot at rest; hovered an 11–12 px disc (21 device px at 2×), rim #FFC685, inside 0.78; selected #FFA90A | = | sketch_hover_feel_tests::sketch_lines_and_points_light_as_live |
+
+### qv-fillets (Query variable Fillets / Matching, circle-point Coincident, live2 11-17 13:43) [core + skasm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Fillets: only fillet faces of the seed's body, by compare type (a torus by its minor radius); Matching: the seed's body only, same size and shape | = | model tests features_b::query_variable_fillets_and_matching_as_live |
+| The dialog shows no count | ? | missing |
+| Coincident of a circle / ellipse with a fixed point translates the curve the shortest way, size kept; a free point moves onto it [skasm] | ? | missing |
+
+### hover-time-1118 (P0, hover timing with no tool and why a sketch tool hovers at once, live 11-18 06:11)
+
+| Finding | Ours | Test |
+|---|---|---|
+| 3D, no tool, any entity: a fast sweep lights at stop + min(5 × average pick, 250 ms) + one pick | = | app-core viewport::prehighlight_tests::prehighlight_waits_for_a_pause_as_live |
+| A fast move off clears at once (remove-only pick); nothing new until the pause | = | sketch_hover_feel_tests::a_quick_sweep_off_a_line_leaves_nothing_lit |
+| Slow (< 0.15 px/ms): the highlight follows the pointer, one pick per move | = | app-core viewport::prehighlight_tests::prehighlight_waits_for_a_pause_as_live |
+| Every move picks at once only while a sketch creation tool (Line, Dimension) is active; a sketch with no tool, feature dialogs, mates and Measure keep the pause | ≠ (ours picks at once in a sketch with no tool, over a draggable plane ring and over assembly parts; fix in progress) | missing |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
-2. Sketch hover timing: live2's 270–300 ms after the pointer stops (no tool) vs 30 ms with the Dimension tool: asked
-   whether it is Onshape's or the recording Chrome's slow redraws before copying a delay.
+2. Sketch hover timing: 270–300 ms with no tool vs 30 ms with the Dimension tool is live's rule (hover-time-1118); ours
+   picks at once in a sketch with no tool (psui, in progress).
 3. ~~3D reach, priority, press thresholds~~ (psui 11-13). Left: the held edge against its own vertex (mate connector reach ≈, double-click fixed 11-14).
 4. ~~Inference glyph position against the pointer (live ≈ 30, 30)~~: within 2 px (psui 11-14).
 5. ~~Dimension tool placement rules~~: two points' H / V / aligned by the box, 48 / 48 of live2's positions (psui 11-14); the angle quadrant and Ø have their own tests.

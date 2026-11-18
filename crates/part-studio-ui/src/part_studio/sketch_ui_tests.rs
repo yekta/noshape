@@ -3830,6 +3830,46 @@ fn a_remembered_value_never_carries_a_variable(cx: &mut TestAppContext) {
     assert_ne!(opens(&inch, cx), "1 mm + 1 mm", "inch documents keep their own");
 }
 
+/// User P0 11-17 (live, "feature dialogs remembering the previous value"): a Fillet carries its Radius and Measurement to
+/// the next one, not Tangent propagation or Asymmetric; an Extrude's Depth is never remembered (25 mm again); a
+/// cancelled dialog leaves the memory as it was (only ✓ writes it).
+#[gpui::test]
+fn only_radius_and_measurement_carry_and_a_cancel_remembers_nothing(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "remembered-which");
+    let mm = noshape_units::UnitPrefs::default();
+    let new = |ty: &str, cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).unwrap().new_feature(ty, &mm).unwrap());
+    let opens = |ty: &str, cx: &mut TestAppContext| {
+        let mut f = new(ty, cx);
+        cx.update(|cx| view.read(cx).apply_remembered(&mut f, &mm));
+        f
+    };
+    view.update(cx, |v, _| v.ui.remembered.clear());
+    let defaults = (opens("fillet", cx), opens("extrude", cx));
+    let mut f = new("fillet", cx);
+    f.params.set("radius", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("3.5 mm")));
+    f.params.set("blendControlType", noshape_model::ParamValue::Enum("WIDTH".into()));
+    f.params.set("tangentPropagation", noshape_model::ParamValue::Bool(false));
+    f.params.set("isAsymmetric", noshape_model::ParamValue::Bool(true));
+    let mut e = new("extrude", cx);
+    e.params.set("depth", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("7 mm")));
+    view.update(cx, |v, _| {
+        v.remember_values(&f, &mm);
+        v.remember_values(&e, &mm);
+    });
+    let fillet = opens("fillet", cx);
+    let carried = (fillet.params.expr("radius").map(|x| x.text.clone()), fillet.params.enum_("blendControlType").to_string(), fillet.params.bool("tangentPropagation"), fillet.params.bool("isAsymmetric"));
+    let default_tangent = defaults.0.params.bool("tangentPropagation");
+    assert_eq!(carried, (Some("3.5 mm".to_string()), "WIDTH".to_string(), default_tangent, false), "(Radius, Measurement, Tangent propagation, Asymmetric) on the next Fillet");
+    let depth = |f: &noshape_model::partstudio::Feature| f.params.expr("depth").map(|x| x.text.clone());
+    assert_eq!(depth(&opens("extrude", cx)), depth(&defaults.1), "an Extrude's Depth isn't remembered");
+    // A Fillet opened, its Radius typed, then cancelled: the next one opens with the committed 3.5 mm.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).expect("the Fillet dialog");
+    dialog.update(cx, |d, _| d.feature.params.set("radius", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("4 mm"))));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+    assert_eq!(opens("fillet", cx).params.expr("radius").map(|x| x.text.clone()), Some("3.5 mm".to_string()), "a cancelled dialog isn't remembered");
+}
+
 /// A view with a cached slice holding a nested cached row, and a focusable element outside both: counts their renders.
 struct CacheHost {
     renders: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<&'static str, usize>>>,
