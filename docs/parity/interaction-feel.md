@@ -1306,11 +1306,11 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 
 | Finding | Ours | Test |
 |---|---|---|
-| A focused length field: wheel ±1 unit per notch, Up / Down ±1, Ctrl ±0.1, Shift ±10, Alt as plain, PageUp nothing; the text stays selected | ? | missing |
-| The wheel over an unfocused value field changes nothing | ? | missing |
-| The "#" list: Tab takes the highlighted entry (as Enter), closes the list, the keyboard stays in the field | ? | missing |
-| Search tools (Alt+C): a 600 px panel under the toolbar box (which turns "Close search [escape]"), the input focused, "Start typing to search tools", footer hint and ☑ Highlight tool in toolbar (on) | ? | missing [skasm] |
-| Search tools filtering: every key, ~60–90 ms; rows icon / name / shortcut badge; the first highlighted with an info pane (icon, name, help text); its toolbar button lit yellow while Highlight tool is on | ? | missing [skasm] |
+| A focused length field: wheel ±1 unit per notch, Up / Down ±1, Ctrl ±0.1, Shift ±10, Alt as plain, PageUp nothing; the text stays selected | = (green e503ca2f, live2 ours-1118 fields: Extrude Depth 10 → Up 11, Down 10, Ctrl+Up 10.1, Shift+Up 20.1, Alt+Up 21.1, PageUp 21.1, wheel up 22.1 / down 21.1, the text selected throughout) | missing |
+| The wheel over an unfocused value field changes nothing | = (green e503ca2f: two notches over Depth unfocused, 21.1 mm unchanged) | missing |
+| The "#" list: Tab takes the highlighted entry (as Enter), closes the list, the keyboard stays in the field | = (green e503ca2f: "#w" + Tab → "#wall_thickness", the list closed, "+1" typed into the field) | missing |
+| Search tools (Alt+C): a 600 px panel under the toolbar box (which turns "Close search [escape]"), the input focused, "Start typing to search tools", footer hint and ☑ Highlight tool in toolbar (on) | = (green e503ca2f: x 1320–1919 from y 86, "Close search escape", the input focused, "Start typing to search tools", the footer and ☑ Highlight tool in toolbar) | missing [skasm] |
+| Search tools filtering: every key, ~60–90 ms; rows icon / name / shortcut badge; the first highlighted with an info pane (icon, name, help text); its toolbar button lit yellow while Highlight tool is on | ≠ (green e503ca2f, in Sketch 1): each key filters in 81–99 ms (f, i, l), the rows (Fillet shift f, Fix shift j, Flow, Offset o, Chamfer, Transform, Insert DXF or DWG) and the first one highlighted with its info pane: =; but no toolbar button lights yellow with Highlight tool on (live: the sketch Fillet button #FCDA7F) | missing [skasm] |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
