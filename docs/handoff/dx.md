@@ -179,8 +179,7 @@ Open, ranked:
   had cf-snap-hook x_t reading back as no parts (offset surface over a converted base): fixed (cbe833343).
 - DXF rows (lead 23:0x), exchange suite drawings 0/10 (vibex6 exch-dxf / exch-fix2 logs, /root/dx-scratch/bin/
   dxflayercount.py, dxfanntext.py, dxfents.py, dxfsheet.py (two DXFs side by side), hlrplot.py / hlrgrid.py).
-  Landed 00:47 as 5076e98c: empty view-label MTEXT for base / pictorial views off 1:1, no centermark on tangent-only
-  circles, mesh parts out of HLR (crash). LANDED 03:23 as 12a38f9e:
+  Landed 5076e98c (view-label MTEXT, tangent-only circles, mesh crash; archive) and 12a38f9e (03:23):
   - 46d2c427d mesh parts drawn as live, silhouettes only (live2 q-mesh-drawing: hex "imported" alone and the rings Iso
     show no folds between facets toward the viewer, not even 90 deg: the far half of a hole rim), edge-on facets
     count as away (MESH_FACING); a B-rep edge glimpsed past mesh facet corners (piece < deflection of a longer edge)
@@ -190,8 +189,9 @@ Open, ranked:
     duct-multipart matches (live 26 LINEs doubled); 2D-only coincidences still once (drw-bom-table pin). Centermarks:
     a part-way wall marks only if a hole's (faceblend's convex ends); arcs' union, not sum, for full circles.
   Open: live splits each mesh silhouette loop into ~4 open LWPOLYLINEs (ours one per loop; rule unknown); live's 2
-  Iso ELLIPSEs in hex are B-rep hole rim quarters inside the mesh hole (ours hidden). faceblend: 2 marks left on
-  concave ~250 deg walls (pocket ends?) where live 1857 marks a radial hole's half bore: needs a live capture.
+  Iso ELLIPSEs in hex are B-rep hole rim quarters inside the mesh hole (ours hidden). 943e05e14: a mark only where
+  the cylinders' edges go all the way round seen end-on (faceblend's pocket ends none, as live; the radial-hole e2e
+  had cut a half groove, now drilled mid-height). faceblend left: ELLIPSE 25/13, SPLINE 8/23, LINE 108/103.
   Lead 11-18: the suite takes each drawing's stored scale and view positions (place_as_live in parity.rs); the
   suggested-views rule is judged only by live's Create Drawing captures (clamp Part 3 1:1 = ours; live's Iso centre
   7.786-8.061 in varies by part, ours fixed 7.810: rule unknown). clamp-guillem now 271 / 268 LINE only. sm-louver ARC/CIRCLE now match.
