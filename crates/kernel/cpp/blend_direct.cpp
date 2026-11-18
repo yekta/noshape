@@ -832,7 +832,7 @@ void print_check(const TopoDS_Shape& s)
 } // namespace
 
 std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoDS_Shape& P, const std::vector<TopoDS_Shape>& tools,
-                                                                     const std::vector<TopoDS_Shape>& rim)
+                                                                     const std::vector<TopoDS_Shape>& rim, bool checked_after)
 {
   const KernelTimer timer("blend.direct");
   const bool        dbg = debug();
@@ -1747,7 +1747,8 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
   BRepLib::UpdateTolerances(solid);
   // (Smooth edges marked so: a blend's touch edges are G1, as OCCT's blends and Booleans mark them for later Shells.)
   BRepLib::EncodeRegularity(solid, 1e-4);
-  bool valid = false;
+  bool valid = checked_after;
+  if (!checked_after)
   {
     const KernelTimer t1("blend.direct.check");
     valid = BRepCheck_Analyzer(solid).IsValid();

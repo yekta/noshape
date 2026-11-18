@@ -551,9 +551,10 @@ bool is_seam(const TopoDS_Edge& e, const NCollection_List<TopoDS_Shape>* faces);
 
 // Convenience: build OpOut from args + output + optional history.
 // Blends built with no cut (blend_direct.cpp): `P` less `tools` (each the region between an edge of P, `rim`, and its
-// blend; faces lying on P's faces), on P itself (a copy: its vertices get parameters on new edges). Throws when it can't.
+// blend; faces lying on P's faces), on P itself (a copy: its vertices get parameters on new edges). Throws when it can't;
+// an invalid result too, unless `checked_after` (the caller checks it).
 std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoDS_Shape& P, const std::vector<TopoDS_Shape>& tools,
-                                                                     const std::vector<TopoDS_Shape>& rim);
+                                                                     const std::vector<TopoDS_Shape>& rim, bool checked_after = false);
 
 OpOut make_result(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& out,
                   const BRepTools_History* h, const std::vector<const OcShape*>* sources = nullptr,
