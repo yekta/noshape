@@ -2442,6 +2442,19 @@ impl<'a> Translator<'a> {
                 }
                 Some(json!(path))
             }
+            // A decal's image: its element's file tab when fetched, else a placeholder (a decal colours a face, it makes no
+            // geometry: the surf-intro documents' "Instructions" decals, their image elements not fetched).
+            "BTMParameterReferenceImage" => {
+                let element = p["namespace"].as_str().unwrap_or("").split("::").find_map(|x| x.strip_prefix('e')).unwrap_or("").to_string();
+                match self.studios.get(&element).cloned() {
+                    Some(tab) => Some(json!(tab)),
+                    None => {
+                        let tab = self.placeholder_image().ok_or("no placeholder image")?;
+                        self.notes.push(format!("image {element} not fetched: a placeholder"));
+                        Some(json!(tab))
+                    }
+                }
+            }
             // A table from another element (Variable's lookup mode): none chosen is nothing to set.
             "BTMParameterReferenceTable" if p["elementLibraryData"]["elementLibraryId"].as_str().is_none_or(str::is_empty) => None,
             "BTMParameterFeatureList" => {
