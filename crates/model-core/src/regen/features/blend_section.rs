@@ -850,6 +850,28 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
     Ok((kept, refaced))
 }
 
+/// How far a face reaches from `p` along `u` (in it, perpendicular to the edge), up to `setback`: infinite where it
+/// reaches the setback; else its far edge, found by halving.
+fn face_reach(face: &Shape, p: DVec3, u: DVec3, setback: f64, scale: f64) -> FResult<f64> {
+    let on = |t: f64| -> FResult<bool> { Ok(k::distance(&k::make_vertex(p + u * t)?, face)?.distance <= (scale * 1e-7).max(t * 1e-4)) };
+    if on(setback)? {
+        return Ok(f64::INFINITY);
+    }
+    let (mut lo, mut hi) = (0.0, setback);
+    for _ in 0..40 {
+        let mid = 0.5 * (lo + hi);
+        if on(mid)? {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+        if hi - lo < scale * 1e-9 {
+            break;
+        }
+    }
+    Ok(lo)
+}
+
 /// Whether an edge end continues tangentially into another edge of the body.
 fn tangent_continues(body: &Shape, at: DVec3, dir: DVec3, skip: usize) -> bool {
     body.edges().iter().enumerate().any(|(j, e)| {
@@ -995,6 +1017,29 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
         feet.lock().unwrap_or_else(|e| e.into_inner()).entry(fi).or_default().push((s, DVec2::new(pr.u, pr.v)));
         Ok(pr.point)
     };
+    // A cliff round along a curved edge: the face the ball is wider than, at the edge's middle (at its ends the other
+    // face may turn away too: the round's ends are trimmed by the faces there).
+    let cliff_faces: Vec<Option<usize>> = match spec.cliff {
+        true => chain
+            .iter()
+            .map(|c| -> FResult<Option<usize>> {
+                let info = c.shape.edge_info()?;
+                let fs = ef.get(c.index).filter(|f| f.len() == 2);
+                let (Some(fs), false) = (fs, matches!(info.curve, k::Curve::Line { .. } | k::Curve::Circle { .. })) else { return Ok(None) };
+                let m = 0.5 * (info.first_param + info.last_param);
+                let (p, ff) = (c.shape.point_at(m)?, [&faces[fs[0] as usize], &faces[fs[1] as usize]]);
+                let fr = frame_at(shape, ff, p, c.shape.tangent_at(m)?.normalize(), scale)?;
+                let (s1, s2) = setbacks(&fr, spec, true)?;
+                let reach = [face_reach(ff[0], p, fr.u[0], s1, scale)?, face_reach(ff[1], p, fr.u[1], s2, scale)?];
+                Ok((0..2).filter(|&j| reach[j].is_finite()).min_by(|&a, &b| reach[a].total_cmp(&reach[b])))
+            })
+            .collect::<FResult<_>>()?,
+        false => Vec::new(),
+    };
+    let curved = |c: &ChainEdge| c.shape.edge_info().is_ok_and(|i| !matches!(i.curve, k::Curve::Line { .. } | k::Curve::Circle { .. }));
+    if spec.cliff && chain.iter().any(curved) && cliff_faces.iter().all(Option::is_none) {
+        return Err(fail("the ball fits both faces"));
+    }
     let station = |s: f64| -> FResult<(DVec3, Frame, bool, DVec3)> {
         let mut acc = 0.0;
         let last = chain.len() - 1;
@@ -1056,6 +1101,12 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                         }
                         fr.u[i] = (a - p).normalize();
                     }
+                }
+                // With overflow off a ball wider than a face rests on its far edge, found at each station along a curved
+                // edge (live c2-impeller-loft's Fillet 4: an r 5 round on a 4 mm flange takes the whole side face).
+                if let Some(&Some(j)) = cliff_faces.get(i) {
+                    let (s1, s2) = setbacks(&fr, spec, side1_first)?;
+                    fr.extent[j] = face_reach(ff[j], p, fr.u[j], [s1, s2][j], scale)?;
                 }
                 return Ok((p, fr, side1_first, tangent));
             }

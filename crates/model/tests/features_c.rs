@@ -4076,6 +4076,39 @@ fn a_round_running_off_its_edge_meets_the_grind_face_extended_as_live() {
     assert!((x_max - -3.1588).abs() < 2e-3, "grind face to x {x_max} (live -3.1588)");
 }
 
+/// c2-impeller-loft's Fillet 4 on its part as feature 32 leaves it (live geo-1118): r 5 on the 54.87 mm B-spline rim
+/// of a 4 mm flange, overflow off. The ball is wider than the flange's side, so the round takes that whole side and
+/// rests on its top edge: one face from z -4 to 0, live's 372.45 mm² and 270.11 mm³ off (this input's side is 2.1 mm
+/// shorter along its top than live's: 371.2 mm², 268.3 mm³). At the rim's ends the floor turns away too; the round runs
+/// on there to the end faces. The 0.47 mm² sliver at x 6 beside the rim stays as it is (OCCT's fillet fails).
+#[test]
+fn a_round_wider_than_a_curved_flange_takes_its_side_as_live() {
+    let input = noshape_kernel::Shape::from_bin_bytes(include_bytes!("data/impeller-fillet4-input.bin")).unwrap();
+    let brep = String::from_utf8(input.to_brep_bytes().unwrap()).unwrap();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let before = volume(&r, 0) * 1e9;
+    let b = &r.context.bodies[0];
+    let e = b.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| near(i.length, mm(54.8675), mm(1e-3)) && near((i.start.z + i.end.z) * 0.5, mm(-4.0), mm(1e-3)))).expect("the rim");
+    let edge = Reference::Edge((*b.edges[e]).clone());
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(vec![edge]));
+        p.set("radius", expr("5 mm"));
+        p.set("allowEdgeOverflow", ParamValue::Bool(false));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert!(shape.is_valid() && shape.solids().len() == 1);
+    let off = before - volume(&r, 0) * 1e9;
+    assert!((off - 270.108).abs() < 2.5, "{off} mm³ off (live 270.108)");
+    let area = |f: &noshape_kernel::Shape| f.area().unwrap() / mm(1.0).powi(2);
+    let round = shape.faces().into_iter().find(|f| (area(f) - 372.4474).abs() < 2.0).expect("the round (live 372.45 mm²)");
+    let bb = round.bounding_box(true).unwrap();
+    assert!(near(bb.min.z, mm(-4.0), mm(0.01)) && near(bb.max.z, mm(0.0), mm(0.01)), "the round spans z {} .. {} mm", bb.min.z / mm(1.0), bb.max.z / mm(1.0));
+    assert!(shape.faces().iter().any(|f| (area(f) - 0.4707).abs() < 0.005), "the sliver at x 6 stays");
+}
+
 /// c2-hunting-knife's Chamfer 1 on the blade as Fillet 2 leaves it (live 2462): offset 0.45 mm, angle 22.5°, opposite
 /// direction, on the grind face's two edges with the cutting edge's strips (a B-spline and a line, tangent), which
 /// OCCT's chamfer can't build. Live's section keeps constant offsets from the two faces (0.2445 / 0.472 mm, the asked

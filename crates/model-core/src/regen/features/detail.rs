@@ -572,6 +572,9 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             // can still be filleted by booleans (F3: R4 after R2/R3 stopped at their edges).
             Err(_) if !propagate && edges.len() == 1 && super::blend_section::section_blend(ev, bi, &edges, &unpropagated(radius)).is_ok() => continue,
             Err(_) if !overflow && rims.as_ref().is_some_and(|r| ring_blend(ev, bi, r, &edges, &radii, RimBlend::Round).is_ok()) => continue,
+            // Overflow off: a ball wider than a face along a curved edge rests on the face's far edge, as sections (live
+            // c2-impeller-loft's Fillet 4: r 5 on a 4 mm flange's curved rim, OCCT's fillet fails).
+            Err(_) if !width && !ev.bool("allowEdgeOverflow") && super::blend_section::section_blend(ev, bi, &edges, &super::blend_section::BlendSpec { cliff: true, ..unpropagated(radius) }).is_ok() => continue,
             // Concave lines whose round runs off their ends over other faces, overflow on: run on, trimmed by those
             // faces extended (c2-hunting-knife's Fillet 2, where OCCT's patch over the grind face leaves a bad solid).
             Err(_) if !width && ev.bool("allowEdgeOverflow") && all_lines(&shapes) && super::blend_section::section_blend(ev, bi, &edges, &super::blend_section::BlendSpec { overflow: true, ..unpropagated(radius) }).is_ok() => continue,
