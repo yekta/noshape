@@ -1,6 +1,6 @@
 {
   "name": "drw-note-editor",
-  "about": "Note: placed on the sheet, the note editor's toolbar open with text typed",
+  "about": "Note: placed on the sheet, text typed in the note editor, committed with the panel's ✓ (live: Escape discards the note; live2 drw-feel-1118)",
   "area": "drawing",
   "source": "studios 11-15 drawing matrix (docs/parity/drawing-matrix.md): panels no take compared",
   "start": "block-drawing",
@@ -33,6 +33,17 @@
       "do": "wait",
       "until": "ms",
       "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
     },
     {
       "do": "key",

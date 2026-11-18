@@ -1,23 +1,23 @@
 {
  "scenario": "drw-note-editor",
- "recorded": "2026-11-17T14:20:33.608Z",
+ "recorded": "2026-11-18T12:00:39.362Z",
  "app": {
   "name": "live",
   "version": "web runtime 303901ce5388bd1d8370",
   "platform": "linux (Chrome over CDP, software GL)",
   "viewport": [
    1919,
-   992
+   1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-17.6"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "060c0461ca301a2c112f155e",
-  "workspace": "96663039d748842f7c25efc6",
-  "element": "c63dee15b785878faa8b7798",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "0852b16c8da081ca702eeef8",
   "start": "block-drawing",
-  "startElement": "d0643b8ab31b96fd21acb45e",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1 (1)",
+   "tab": "Part 1 Drawing 1",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -141,7 +141,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -197,7 +197,7 @@
      "selection": []
     }
    },
-   "t": 232499
+   "t": 235642
   },
   {
    "step": 2,
@@ -212,8 +212,8 @@
    },
    "ok": true,
    "at": [
-    667,
-    799
+    636,
+    870
    ],
    "state": {
     "focus": {
@@ -224,8 +224,8 @@
      "kind": "cell-format",
      "title": "Note",
      "rect": [
-      666,
-      582,
+      636,
+      653,
       394,
       160
      ],
@@ -351,7 +351,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -407,7 +407,7 @@
      "selection": []
     }
    },
-   "t": 259502
+   "t": 265093
   },
   {
    "step": 3,
@@ -426,8 +426,8 @@
      "kind": "cell-format",
      "title": "Note",
      "rect": [
-      666,
-      582,
+      636,
+      653,
       394,
       160
      ],
@@ -553,7 +553,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -609,7 +609,7 @@
      "selection": []
     }
    },
-   "t": 286839
+   "t": 294000
   },
   {
    "step": 4,
@@ -627,8 +627,8 @@
      "kind": "cell-format",
      "title": "Note",
      "rect": [
-      666,
-      582,
+      636,
+      653,
       394,
       160
      ],
@@ -754,7 +754,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -810,7 +810,7 @@
      "selection": []
     }
    },
-   "t": 313184
+   "t": 323698
   },
   {
    "step": 5,
@@ -818,6 +818,314 @@
     "do": "wait",
     "until": "ms",
     "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "cell-format",
+     "title": "Note",
+     "rect": [
+      636,
+      653,
+      394,
+      160
+     ],
+     "fields": [
+      {
+       "label": "Font",
+       "kind": "select",
+       "value": "Noto Sans ( Note )"
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "0.1200"
+      },
+      {
+       "label": "Bold",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Italic",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Underline",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Strikethrough",
+       "kind": "toggle",
+       "value": false,
+       "enabled": true
+      },
+      {
+       "label": "Line spacing",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Horizontal alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "List",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Vertical alignment",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Note order",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert symbol",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert drawing property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Insert sheet reference property",
+       "kind": "menu-button",
+       "enabled": true
+      },
+      {
+       "label": "Text format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Date time format",
+       "kind": "menu-button",
+       "enabled": false
+      },
+      {
+       "label": "Text height",
+       "kind": "combo",
+       "value": "on"
+      },
+      {
+       "label": "Border shape",
+       "kind": "select",
+       "value": "Flag (Drawing)"
+      },
+      {
+       "label": "Border size",
+       "kind": "select",
+       "value": "2 Characters"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 352353
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "at": [
+    988,
+    667
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "note",
+       "text": "MATRIX",
+       "position": [
+        67.5,
+        38.6
+       ]
+      }
+     ],
+     "selection": []
+    }
+   },
+   "t": 380847
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
    },
    "ok": true,
    "state": {
@@ -846,13 +1154,75 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "error": "translation failed An internal error has occurred; support code 40429962e856905c299116a7"
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Note",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "note",
+       "text": "MATRIX",
+       "position": [
+        67.5,
+        38.6
+       ]
+      }
+     ],
+     "selection": []
     }
    },
-   "t": 332315
+   "t": 408386
   },
   {
-   "step": 6,
+   "step": 8,
    "do": {
     "do": "key",
     "key": "Escape"
@@ -892,7 +1262,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1 (1)",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -944,11 +1314,20 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "note",
+       "text": "MATRIX",
+       "position": [
+        67.5,
+        38.6
+       ]
+      }
+     ],
      "selection": []
     }
    },
-   "t": 358753
+   "t": 437578
   }
  ]
 }
