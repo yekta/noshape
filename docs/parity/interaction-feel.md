@@ -342,7 +342,7 @@ device pixel ratio of 1 and 2: part-studio-ui `list::the_feature_list_matrix_mat
 canvas click is the viewport's empty pick). Like the snaps matrix it prints matched / total and fails when a row's
 status moves. `LIST_ROW=<part of an id>` runs some rows.
 
-**Matched: 57 / 57** (11-13 15:51 UTC; 20 / 42 at the first run; 3 folder rows added 15:51: 1 / 3 matched, 2 fixed). ui-parity: the 78 list and tooltip scenarios 75 / 78 before the last fixes, the 3 left on green too or fixed since (feature-row-drag-above).
+**Matched: 76 / 76** (11-18 00:20 UTC, live2 featurelist-feel / doc-level-1117 rows added; 57 / 57 11-13 15:51 UTC; 20 / 42 at the first run; 3 folder rows added 15:51: 1 / 3 matched, 2 fixed). ui-parity: the 78 list and tooltip scenarios 75 / 78 before the last fixes, the 3 left on green too or fixed since (feature-row-drag-above).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -369,6 +369,17 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Undo step of a move | "Move Extrude 3", "Move 2 features" | the same (`noshape_ops::studio::move_description`, also the feature_reorder op; was "Reorder feature(s)") | = (fixed, not a matrix row) |
 | Drag: no refusal; over the canvas; Escape; default geometry; onto default geometry; parts | moves (then fails) / cancelled / cancelled / no drag / nothing / no drag | the same | = |
 | Rollback bar: the whole 26 px row grabs; top / bottom half | before / after the row | the same (its drop ignored the half) | = (fixed) |
+| Rollback bar held (live2 featurelist-feel 11-17) | the "Rollback bar" chip and the insertion line; the bar stays at its old place, nothing greys until the release | the same | = (new) |
+| Rollback bar released | the rows below grey, the Parts list follows (Parts (0) above Extrude 1); above the first feature: everything; back at the end all again | the same | = (new) |
+| Rollback bar over Default geometry | released over Origin / Top it stays where it was (live2, qa 11-18) | it rolled back to the top (an older 10-24 capture; the collapsed header still does, pending live2's recheck) | = (fixed) |
+| Rollback bar look and menu | light blue-grey rgb(200,217,226) while rolled back, grey rgb(184,184,184) at the end, the pointer over it or not; right-click: "Roll to end" alone while rolled back, no menu at the end | blue-grey only on hover, no menu (qa 11-18) | = (fixed; the colour has no matrix row) |
+| A reorder the history can't take | accepted, then the row red rgb(170,37,45) with a warning triangle; no message | the same | = (new) |
+| Rename keys | Enter commits; a click elsewhere commits; F2 does nothing; the renamed row's tooltip "Bar [Extrude] <- Sketch 1" | a click in the graphics left the input open (it kept the keyboard); now any press outside commits | = (fixed) |
+| Suppress / Unsuppress from the menu | grey italic struck through, the part gone; Unsuppress restores it | the same | = (new) |
+| Edit dialog place | Extrude 1's dialog right of the list, 220 px wide (live (246, 79) 220 × 352; qa 11-18: ours (246, 80)) | the same | = (new) |
+| Undo steps (live2 doc-level-1117) | a rename and a part's Hide are one step each, with no toast; a selection and Shift+5 are none; Ctrl+Y redoes, Ctrl+Shift+Z doesn't (app-core `actions` tests); Ctrl+Z in a dialog's field does nothing (`undo_does_nothing_while_a_dialog_control_has_the_keyboard`) | the same | = (new) |
+| Graphics menu over a selection (live ctx-menus-1117) | the face clicked selected: Clear selection above Select; two faces: "Add appearance to 2 faces…", no New sketch… / Offset plane… / Extrude… / Revolve… / Export as DXF/DWG…; a face and an edge: the faces' menu without View normal to, Delete Part 1…, the part's material and appearance rows, Fillet… / Chamfer… or analysis | the same (sketch_ui_tests `graphics_menus_over_a_selection_as_live`; a face + an edge gave the edge's menu) | = (fixed) |
+| Parts list: Cmd+click | toggles like Ctrl (metaKey or ctrlKey on every OS) | the same | = (new) |
 | Hover: the row tooltip | "Extrude 1 <- Sketch 1"; fades in from 160 ms, full by 390 | the text as before; shown at 160 ms with a 230 ms fade (was GPUI's 500 ms, no fade: `ui::ROW_TIP_DELAY`) | = (fixed) |
 | Hover: the geometry | lit 100 ms after the pointer arrives, cleared 100 ms after it leaves; a sweep lights only where it rests | the same (`LIST_HOVER_DEBOUNCE`; was at once) | = (fixed) |
 | Folders: New folder | nothing selected: an empty folder above the rollback bar; features and a part: the features; only default geometry: nothing; Escape: none | the same (default geometry alone opened the popover) | = (fixed) |

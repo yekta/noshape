@@ -228,6 +228,12 @@ impl List {
         })
     }
 
+    /// The document's Undo (what the workspace's Ctrl+Z runs).
+    fn undo(&self, cx: &mut TestAppContext) {
+        cx.update(|cx| self.view.read(cx).doc.clone()).update(cx, |d, cx| d.undo(cx));
+        draw(cx, self.window);
+    }
+
     fn dragging(&self, cx: &mut TestAppContext) -> bool {
         cx.update(|cx| cx.has_active_drag())
     }
@@ -237,8 +243,16 @@ const NONE: Modifiers = Modifiers { shift: false, control: false, alt: false, pl
 const SHIFT: Modifiers = Modifiers { shift: true, ..NONE };
 const CTRL: Modifiers = Modifiers { control: true, ..NONE };
 const ALT: Modifiers = Modifiers { alt: true, ..NONE };
+const CMD: Modifiers = Modifiers { platform: true, ..NONE };
 
 type Check = fn(&List, &mut TestAppContext) -> Result<(), String>;
+
+/// The row's menu › Rename: the inline input open.
+fn rename(l: &List, cx: &mut TestAppContext, row: &str) {
+    l.right_click(cx, &format!("feature:{row}"));
+    let at = l.bounds(cx, "menu:Rename").expect("no Rename row").center();
+    l.press(cx, at, MouseButton::Left, NONE, 1);
+}
 
 fn expect<T: PartialEq + std::fmt::Debug>(got: T, want: T, what: &str) -> Result<(), String> {
     if got == want { Ok(()) } else { Err(format!("{what}: ours {got:?}, live {want:?}")) }
@@ -500,6 +514,132 @@ fn rows() -> Vec<Row> {
             l.drag(cx, from, to, true);
             expect(l.rolled_to(cx), Some("Sketch 2".to_string()), "rolled to")
         } },
+        Row { id: "rollback bar / while held nothing moves or greys", live: "the 'Rollback bar' chip follows the pointer, the insertion line shows the slot; the bar stays at its old place, nothing greys (live2 featurelist-feel 1)", gap: false, check: |l, cx| {
+            let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 1", 6.));
+            l.drag(cx, from, to, false);
+            let held = (l.dragging(cx), cx.update(|cx| l.view.read(cx).ui.feature_drop.get().is_some()), l.rolled_to(cx), cx.update(|cx| l.view.read(cx).display.bodies.len()));
+            l.keys(cx, "escape");
+            l.release(cx, to);
+            expect(held, (true, true, Some("Extrude 3".to_string()), 3), "(dragging, a slot shown, rolled to, parts)")
+        } },
+        Row { id: "rollback bar / on release the rows below grey and the Parts list follows", live: "the bar above Extrude 1: Parts (1) -> Parts (0) here (every part's extrude rolled back); back at the end all three again", gap: false, check: |l, cx| {
+            let h = f32::from(l.bounds(cx, "feature:Sketch 1").ok_or("no row")?.size.height);
+            let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Sketch 1", h - 6.));
+            l.drag(cx, from, to, true);
+            wait_until(cx, l.window, |cx| l.view.read(cx).display.bodies.is_empty());
+            let rolled = (l.rolled_to(cx), cx.update(|cx| l.view.read(cx).display.bodies.len()));
+            let h = f32::from(l.bounds(cx, "feature:Extrude 3").ok_or("no row")?.size.height);
+            let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 3", h - 6.));
+            l.drag(cx, from, to, true);
+            wait_until(cx, l.window, |cx| l.view.read(cx).display.bodies.len() == 3);
+            let back = (l.rolled_to(cx), cx.update(|cx| l.view.read(cx).display.bodies.len()));
+            expect((rolled, back), ((Some("Sketch 1".to_string()), 0), (Some("Extrude 3".to_string()), 3)), "(rolled to, parts) after Sketch 1, back at the end")
+        } },
+        Row { id: "rollback bar / above the first feature", live: "the bar onto Sketch 1's top half: every feature rolled back, Parts (0)", gap: false, check: |l, cx| {
+            let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Sketch 1", 6.));
+            l.drag(cx, from, to, true);
+            wait_until(cx, l.window, |cx| l.view.read(cx).display.bodies.is_empty());
+            expect((l.rolled_to(cx), cx.update(|cx| l.view.read(cx).display.bodies.len())), (None, 0), "(rolled to, parts)")
+        } },
+        Row { id: "rollback bar / onto default geometry: stays", live: "released over Top it stays where it was (live2 featurelist-feel 1, qa 11-18)", gap: false, check: |l, cx| {
+            let (from, to) = (l.at(cx, "rollback"), l.at(cx, "feature:Top"));
+            l.drag(cx, from, to, true);
+            expect(l.rolled_to(cx), Some("Extrude 3".to_string()), "rolled to")
+        } },
+        Row { id: "rollback bar / its menu while rolled back: Roll to end", live: "a right-click on a rolled-back bar: 'Roll to end' alone, which rolls to the end (live2 doc-level-1117 3)", gap: false, check: |l, cx| {
+            let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 2", 6.));
+            l.drag(cx, from, to, true);
+            let at = l.bounds(cx, "rollback").ok_or("no rollback bar")?.center();
+            l.press(cx, at, MouseButton::Right, NONE, 1);
+            let menu = l.menu(cx);
+            let roll = l.bounds(cx, "menu:Roll to end").ok_or("no Roll to end row")?.center();
+            l.press(cx, roll, MouseButton::Left, NONE, 1);
+            expect((menu, l.rolled_to(cx)), (names(&["Roll to end"]), Some("Extrude 3".to_string())), "(the menu, rolled to after it)")
+        } },
+        Row { id: "drag / a reorder the history can't take: red, no message", live: "Fillet 1 above its Extrude: the row moves, then reads red rgb(170,37,45) with a warning triangle; no bubble, no refusal (live2 featurelist-feel 2)", gap: false, check: |l, cx| {
+            let (from, to) = (l.at(cx, "feature:Extrude 3"), l.at_y(cx, "feature:Sketch 3", 6.));
+            l.drag(cx, from, to, true);
+            let failed = |cx: &gpui_kit::App| {
+                let v = l.view.read(cx);
+                let id = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.name == "Extrude 3").map(|f| f.id));
+                id.and_then(|id| v.display.feature_state(id)).map(|s| s.status)
+            };
+            wait_until(cx, l.window, |cx| failed(cx).is_some_and(|s| s != noshape_model::display::FeatureStatus::Ok));
+            let status = cx.update(|cx| failed(cx));
+            expect((l.order(cx)[5].clone(), status.is_some_and(|s| matches!(s, noshape_model::display::FeatureStatus::Error | noshape_model::display::FeatureStatus::Warning))), ("Extrude 3".to_string(), true), "(the moved row, failing)")
+        } },
+        Row { id: "rename / Enter commits", live: "'Foo' + Enter renames the feature", gap: false, check: |l, cx| {
+            rename(l, cx, "Extrude 1");
+            l.keys(cx, "F o o enter");
+            expect((cx.update(|cx| l.view.read(cx).renaming.is_some()), l.order(cx)[1].clone()), (false, "Foo".to_string()), "(still renaming, name)")
+        } },
+        Row { id: "rename / a click elsewhere commits", live: "'Bar' then a click in the graphics renames the feature", gap: false, check: |l, cx| {
+            rename(l, cx, "Extrude 1");
+            l.keys(cx, "B a r");
+            let at = l.canvas(cx);
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            expect((cx.update(|cx| l.view.read(cx).renaming.is_some()), l.order(cx)[1].clone()), (false, "Bar".to_string()), "(still renaming, name)")
+        } },
+        Row { id: "keys / F2 on a selected row: nothing", live: "no rename input opens (rename is in the menu only)", gap: false, check: |l, cx| {
+            l.click(cx, "feature:Extrude 1", NONE);
+            l.keys(cx, "f2");
+            expect(cx.update(|cx| l.view.read(cx).renaming.is_some()), false, "renaming")
+        } },
+        Row { id: "hover / a renamed feature's tooltip has its type", live: "'Bar [Extrude] <- Sketch 1'", gap: false, check: |l, cx| {
+            rename(l, cx, "Extrude 1");
+            l.keys(cx, "B a r enter");
+            l.hover(cx, "feature:Bar", 450);
+            expect(crate::ui_script::shown_tooltip(), Some("Bar [Extrude] <- Sketch 1".to_string()), "tooltip")
+        } },
+        Row { id: "suppress / from the menu, then Unsuppress", live: "Suppress: the row grey italic and struck through, its part gone; its menu then has Unsuppress, which restores it", gap: false, check: |l, cx| {
+            let suppressed = |cx: &gpui_kit::App| l.view.read(cx).studio(cx).and_then(|s| s.features.iter().find(|f| f.name == "Extrude 1").map(|f| f.suppressed));
+            l.right_click(cx, "feature:Extrude 1");
+            let at = l.bounds(cx, "menu:Suppress").ok_or("no Suppress row")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).display.bodies.len() == 2);
+            let off = (cx.update(|cx| suppressed(cx)), cx.update(|cx| l.view.read(cx).display.bodies.len()));
+            l.right_click(cx, "feature:Extrude 1");
+            let at = l.bounds(cx, "menu:Unsuppress").ok_or("no Unsuppress row")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && l.view.read(cx).display.bodies.len() == 3);
+            let on = (cx.update(|cx| suppressed(cx)), cx.update(|cx| l.view.read(cx).display.bodies.len()));
+            expect((off, on), ((Some(true), 2), (Some(false), 3)), "(suppressed, parts) after Suppress, after Unsuppress")
+        } },
+        Row { id: "double-click / the dialog right of the list, 220 px wide", live: "Extrude 1's dialog at (246, 79) 220 x 352, right of the list (live2 featurelist-feel 3)", gap: false, check: |l, cx| {
+            l.double_click(cx, "feature:Extrude 1");
+            let d = l.bounds(cx, "feature-dialog").ok_or("no dialog")?;
+            let row = l.bounds(cx, "feature:Extrude 1").ok_or("no row")?;
+            let (w, left_of) = (f32::from(d.size.width).round(), d.origin.x > row.origin.x + row.size.width);
+            expect((w, left_of), (220., true), "(width, right of the list)")
+        } },
+        Row { id: "undo / a rename is one step, no toast", live: "Fin -> Fin2 then Ctrl+Z: Fin again; nothing but the change and Undo / Redo's state (live2 doc-level-1117 2)", gap: false, check: |l, cx| {
+            rename(l, cx, "Extrude 1");
+            l.keys(cx, "F o o enter");
+            let can = cx.update(|cx| l.view.read(cx).doc.read(cx).can_undo());
+            // (Ctrl+Z goes up to the workspace's Undo, not in this window.)
+            l.undo(cx);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            expect((can, l.order(cx)[1].clone(), crate::ui_script::noted_message()), (true, "Extrude 1".to_string(), None), "(Undo on after the rename, the name after Ctrl+Z, a message)")
+        } },
+        Row { id: "undo / hiding a part is one step", live: "context-menu Hide, then Ctrl+Z shows it again", gap: false, check: |l, cx| {
+            let hidden = |cx: &gpui_kit::App| l.view.read(cx).display.bodies.iter().find(|b| b.name == "Part 1").map(|b| b.hidden);
+            l.right_click(cx, "part:Part 1");
+            let at = l.bounds(cx, "menu:Hide").ok_or("no Hide row")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            wait_until(cx, l.window, |cx| hidden(cx) == Some(true));
+            l.undo(cx);
+            wait_until(cx, l.window, |cx| hidden(cx) == Some(false));
+            expect(cx.update(|cx| hidden(cx)), Some(false), "Part 1 hidden after Ctrl+Z")
+        } },
+        Row { id: "undo / a view change or a selection is no step", live: "Shift+5 and a row click: Undo stays off", gap: false, check: |l, cx| {
+            let before = cx.update(|cx| l.view.read(cx).doc.read(cx).can_undo());
+            l.click(cx, "feature:Extrude 1", NONE);
+            let at = l.canvas(cx);
+            l.event(cx, MouseMoveEvent { position: at, pressed_button: None, modifiers: NONE });
+            l.keys(cx, "shift-5");
+            l.wait(cx, 600);
+            expect((before, cx.update(|cx| l.view.read(cx).doc.read(cx).can_undo())), (false, false), "(Undo before, after a selection and Shift+5)")
+        } },
         Row { id: "hover / the row's tooltip", live: "'<name> <- <consumed features>': 'Extrude 1 <- Sketch 1'", gap: false, check: |l, cx| {
             l.hover(cx, "feature:Extrude 1", 450);
             expect(crate::ui_script::shown_tooltip(), Some("Extrude 1 <- Sketch 1".to_string()), "tooltip")
@@ -673,6 +813,12 @@ fn rows() -> Vec<Row> {
             let toggled = l.selected(cx);
             l.click(cx, "part:Part 2", CTRL);
             expect((range, toggled, l.selected(cx), l.menu(cx).is_empty()), (names(&["Part 1", "Part 2", "Part 3"]), names(&["Part 1", "Part 3"]), names(&["Part 1", "Part 2", "Part 3"]), true), "range, toggled, Ctrl, no menu")
+        } },
+        Row { id: "Parts list / Cmd toggles as Ctrl does", live: "list rows toggle on Ctrl or Cmd on every OS (metaKey || ctrlKey; live2 11-17 key mapping)", gap: false, check: |l, cx| {
+            l.click(cx, "part:Part 1", CMD);
+            let on = l.selected(cx);
+            l.click(cx, "part:Part 1", CMD);
+            expect((on, l.selected(cx), l.menu(cx).is_empty()), (names(&["Part 1"]), names(&[]), true), "after Cmd+click, again, no menu")
         } },
         Row { id: "Parts list / Shift with no part clicked before", live: "selects nothing (a fresh tab; live 08:18); a plain click selects", gap: false, check: |l, cx| {
             l.click(cx, "part:Part 2", SHIFT);

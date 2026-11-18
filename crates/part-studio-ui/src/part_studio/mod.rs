@@ -4042,9 +4042,9 @@ impl PartStudioView {
                     v_flex()
                         .relative()
                         .id("dg-rows")
+                        // (The rollback bar released over Origin or a plane stays where it was: live2 featurelist-feel 1,
+                        // qa 11-18.)
                         .children(dg_rows)
-                        .drag_over::<RollbackDrag>(|s, _, _, _| s.border_b_2().border_color(p().accent))
-                        .on_drop(cx.listener(|this, _: &RollbackDrag, _, cx| this.set_rollback(Some(0), cx)))
                         // Live: the line ends in a 9 px tick; drawn over the rows.
                         .child(div().absolute().left(px(9.)).top(px(2.)).bottom(px(1.)).w(px(1.)).bg(pal.border))
                         .child(div().absolute().left(px(5.)).bottom(px(1.)).w(px(9.)).h(px(1.)).bg(pal.border))
@@ -5648,7 +5648,11 @@ impl PartStudioView {
         // Light blue once a click gave it the keyboard, until the selection
         // changes; selecting a row leaves it gray (live 31, 32).
         let focused = self.ui.list_focus.is_focused(window) && self.ui.rollback_keyboard.as_ref() == Some(&self.selected_features);
-        div()
+        // Live (live2 featurelist-feel 1, qa 11-18): light blue-grey while it rolls features back, grey at the end,
+        // the pointer over it or not; its menu is "Roll to end" while rolled back, none at the end.
+        let rolled_back = self.studio(cx).is_some_and(|s| s.rollback_index() < s.features.len());
+        let view = cx.entity();
+        let bar = div()
             .id(SharedString::from(format!("rollback-{index}")))
             .debug_selector(|| "rollback".into())
             .h(px(crate::ui::ROW_H))
@@ -5660,9 +5664,14 @@ impl PartStudioView {
             .flex_none()
             .items_center()
             // Live (dom/cursors.txt): the default arrow, also while dragging.
-            .group("rollback")
             .tip("Rollback bar", crate::ui::TipSide::Below)
-            .child(div().w_full().h(px(7.)).bg(if focused { gpui_kit::rgb(0xa0c7dd) } else { pal.rollback }).group_hover("rollback", |d| d.bg(gpui_kit::rgb(0xc8d9e2))))
+            .child(div().w_full().h(px(7.)).bg(if focused {
+                gpui_kit::rgb(0xa0c7dd)
+            } else if rolled_back {
+                gpui_kit::rgb(0xc8d9e2)
+            } else {
+                pal.rollback
+            }))
             .on_drag(RollbackDrag, {
                 let (slot, xs) = (self.ui.feature_drop.clone(), self.ui.feature_drop_x.clone());
                 move |_, grab, _, cx| {
@@ -5676,8 +5685,15 @@ impl PartStudioView {
                 window.focus(&this.ui.list_focus, cx);
                 this.ui.rollback_keyboard = Some(this.selected_features.clone());
                 cx.notify();
-            }))
-            .into_any_element()
+            }));
+        if !rolled_back {
+            return bar.into_any_element();
+        }
+        bar.os_context_menu_offset(crate::os_menu::MENU_AT_ROW, move |menu, _, _| {
+            let v = view.clone();
+            menu.item(crate::os_menu::OsMenuItem::new("Roll to end".to_string()).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_rollback(None, cx))))
+        })
+        .into_any_element()
     }
 
     /// `slot`: the row's child index in the list and its indent: its
@@ -5903,6 +5919,14 @@ impl PartStudioView {
                 // commits (dropping the subscription keeps the blur from it).
                 Some((_, st, _)) => div()
                     .flex_1()
+                    // A press anywhere else (the graphics too, which keeps the keyboard where it was) blurs the input,
+                    // which commits (live2 featurelist-feel 4: "Bar", then a click elsewhere).
+                    .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                        if this.renaming.is_some() {
+                            let fh = this.focus.clone();
+                            window.focus(&fh, cx);
+                        }
+                    }))
                     .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                         if ev.keystroke.key == "escape" {
                             this.renaming = None;

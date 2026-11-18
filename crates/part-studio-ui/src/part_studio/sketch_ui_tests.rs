@@ -3358,6 +3358,32 @@ fn an_edge_midpoint_has_the_points_menu(cx: &mut TestAppContext) {
     assert!(of_point.iter().any(|l| l == "Delete Extrude 1") && of_point.iter().any(|l| l == "Edit Extrude 1…"), "{of_point:?}");
 }
 
+/// Live ctx-menus-1117 (face-selected, two-faces, face-and-edge; Add comment left out, cloud): with the face clicked
+/// selected the menu gains Clear selection above Select; two faces count in "Add appearance to 2 faces…" and drop the
+/// one planar face's sketch / plane / Extrude / Revolve rows and Export as DXF/DWG; a face and an edge drop View normal
+/// to, Delete Part 1… and the part's material / appearance rows.
+#[gpui::test]
+fn graphics_menus_over_a_selection_as_live(cx: &mut TestAppContext) {
+    let (window, view, top, bottom) = block_part(cx, "menus-selected");
+    let edge = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).and_then(|b| b.edge_refs.first().cloned())).expect("an edge");
+    let menu = |cx: &mut TestAppContext, sel: Vec<Reference>, at: Reference, kind| {
+        view.update(cx, |v, _| v.selection = sel);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_context_menu(Some(noshape_scene::builder::PickTarget { reference: at, kind, anchor: None }), gpui_kit::point(px(600.), px(400.)), w, cx))).unwrap();
+        draw(cx, window);
+        let labels = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
+        view.update(cx, |v, cx| v.close_context_menu(cx));
+        labels.into_iter().filter(|l| l != "———").collect::<Vec<_>>()
+    };
+    let live = |rows: &str| rows.split(" · ").map(str::to_string).collect::<Vec<_>>();
+    let tail = "Copy Part 1 · Create Drawing of Part 1… · Export… · Where used for Part 1… · Clear selection · Select · Select other… · Zoom to fit · Zoom to selection";
+    let face = menu(cx, vec![top.clone()], top.clone(), noshape_scene::builder::PickKind::Face);
+    assert_eq!(face, live("Edit Extrude 1… · Edit Sketch 1… · Show dimensions · Show dependencies of Extrude 1… · New sketch… · Offset plane… · Extrude… · Revolve… · Hide Part 1 · Isolate… · Make transparent… · Section view… · Copy Part 1 · Create Drawing of Part 1… · Export as DXF/DWG… · Export… · Where used for Part 1… · Clear selection · Select · Select other… · Zoom to fit · Zoom to selection · View normal to · Delete Part 1… · Delete Extrude 1 · Assign material for Part 1… · Edit appearance for Part 1… · Add appearance to face…"), "the face, selected");
+    let two = menu(cx, vec![top.clone(), bottom.clone()], bottom.clone(), noshape_scene::builder::PickKind::Face);
+    assert_eq!(two, live(&format!("Edit Extrude 1… · Edit Sketch 1… · Show dimensions · Show dependencies of Extrude 1… · Hide Part 1 · Isolate… · Make transparent… · Section view… · {tail} · View normal to · Delete Part 1… · Delete Extrude 1 · Assign material for Part 1… · Edit appearance for Part 1… · Add appearance to 2 faces…")), "two faces");
+    let mixed = menu(cx, vec![top.clone(), edge.clone()], edge, noshape_scene::builder::PickKind::Edge);
+    assert_eq!(mixed, live(&format!("Edit Extrude 1… · Edit Sketch 1… · Show dimensions · Show dependencies of Extrude 1… · Hide Part 1 · Isolate… · Make transparent… · Section view… · {tail} · Delete Extrude 1 · Add appearance to face…")), "a face and an edge");
+}
+
 /// IN-FEATURE-MATE-CONNECTOR (live 1851): with "Sketch points to place holes"' mate connector button on, a face
 /// picked makes a mate connector inside the Hole: chip "Mate connector", the hole at it, no Mate connector feature.
 #[gpui::test]

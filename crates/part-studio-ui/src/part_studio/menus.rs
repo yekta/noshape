@@ -102,6 +102,14 @@ impl PartStudioView {
             })
         });
         let linear_edge = target_ref.as_ref().is_some_and(|r| self.linear_edge_direction(r).is_some());
+        // Live ctx-menus-1117 (face-and-edge): on a selection of a part's faces and edges or vertices the menu is the
+        // faces' without the one face's or the edge's own rows (no creation tools, Fillet, analysis, View normal to,
+        // Delete Part 1… or the part's material and appearance).
+        let mixed = target_selected
+            && self.selection.iter().any(|r| matches!(r, Reference::Face(_)))
+            && self.selection.iter().any(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_)));
+        let kind = if mixed && matches!(kind, Some(PickKind::Edge | PickKind::Vertex)) { Some(PickKind::Face) } else { kind };
+        let (planar, linear_edge) = (planar && !mixed, linear_edge && !mixed);
         let plane_name = target_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
         let paste_sketch = Self::clipboard_has_sketch(cx);
         // Shown sketches besides the clicked one's (sketch region menus).
@@ -611,18 +619,23 @@ impl PartStudioView {
                         m = m.separator().item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))));
                     }
                     if let Some(b) = body.clone().filter(|_| !point) {
-                        let bd = b.clone();
-                        m = m.separator().item(icon_item(&format!("Delete {body_name}…"), "menu-delete", Box::new(move |this, w, cx| {
-                            // Live (qa5 DEL2): the Delete part dialog, the part prefilled.
-                            this.selection = vec![Reference::Body(bd.clone())];
-                            this.start_feature("deleteBodies", w, cx);
-                        })));
+                        m = m.separator();
+                        if !mixed {
+                            let bd = b.clone();
+                            m = m.item(icon_item(&format!("Delete {body_name}…"), "menu-delete", Box::new(move |this, w, cx| {
+                                // Live (qa5 DEL2): the Delete part dialog, the part prefilled.
+                                this.selection = vec![Reference::Body(bd.clone())];
+                                this.start_feature("deleteBodies", w, cx);
+                            })));
+                        }
                         if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
                             m = m.item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))));
                         }
+                        m = m.separator();
+                    }
+                    if let Some(b) = body.clone().filter(|_| !point && !mixed) {
                         let (b1, b2, rm) = (b.clone(), b.clone(), r.clone());
                         m = m
-                            .separator()
                             // Live: "Edit material for …" once one is assigned; the clicked entity is selected while the
                             // panel is open (ui-parity face-rclick-assign-material).
                             .item(item(&format!("{} material for {body_name}…", if has_material { "Edit" } else { "Assign" }), Box::new(move |this, w, cx| {
@@ -633,11 +646,11 @@ impl PartStudioView {
                                 this.open_material_panel(vec![b1.clone()], w, cx)
                             })))
                             .item(item(&format!("Edit appearance for {body_name}…"), Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Parts(vec![b2.clone()]), w, cx))));
-                        if k == PickKind::Face {
-                            let fs = faces.clone();
-                            let label = if fs.len() > 1 { format!("Add appearance to {} faces…", fs.len()) } else { "Add appearance to face…".to_string() };
-                            m = m.item(icon_item(&label, "add-appearance", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Faces(fs.clone(), None), w, cx))));
-                        }
+                    }
+                    if body.is_some() && !point && k == PickKind::Face {
+                        let fs = faces.clone();
+                        let label = if fs.len() > 1 { format!("Add appearance to {} faces…", fs.len()) } else { "Add appearance to face…".to_string() };
+                        m = m.item(icon_item(&label, "add-appearance", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Faces(fs.clone(), None), w, cx))));
                     }
                 }
                 // Empty space. Live 10-27 (behaviours "spec: psui
