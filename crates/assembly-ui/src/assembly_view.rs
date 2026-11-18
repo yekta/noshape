@@ -387,9 +387,12 @@ fn triad_ring_value(angle: f64, radius_px: f64, shift: bool) -> f64 {
     if shift { angle } else { ring_snap(angle, radius_px) }
 }
 
-/// [`AssemblyView::arrow_snap_step`] for an arrow that spans `px_per_mm` pixels per millimetre (metres).
-fn arrow_snap_step_for(px_per_mm: f64) -> Option<f64> {
-    (px_per_mm > 1e-9).then(|| 10f64.powf((100.0 / px_per_mm / 10.0).log10().floor()) * 1e-3)
+/// [`AssemblyView::arrow_snap_step`] for an arrow that spans `px_per_mm` pixels per millimetre, in a document whose
+/// length unit is `unit_m` metres (metres): live's manipulator rule, 10^(round(log10(100 px in the unit)) − 2) of the
+/// unit (live triad-step-1118: 0.01 mm at 0.0288 mm/px, 0.1 mm from 0.0343 to 0.291, 1 mm from 0.518).
+fn arrow_snap_step_for(px_per_mm: f64, unit_m: f64) -> Option<f64> {
+    let span = 100.0 / px_per_mm * 1e-3 / unit_m;
+    (px_per_mm > 1e-9 && span.is_finite() && span > 0.0).then(|| 10f64.powf(span.log10().round() - 2.0) * unit_m)
 }
 
 /// An explode drag's distance as live rounds it (qa5 EXV5, live 805: "Distance 18.9 mm"): 0.1 mm (0.01 in in
@@ -3837,12 +3840,11 @@ impl AssemblyView {
         .detach();
     }
 
-    /// A triad arrow drag's snap step (metres): live's client snaps to the power of ten under a tenth of what
-    /// 100 px spans along the arrow (live feel 3D: 0.1 mm at 0.071 mm/px).
+    /// A triad arrow drag's snap step (metres), from what 100 px spans along the arrow ([`arrow_snap_step_for`]).
     fn arrow_snap_step(&self, at: DVec3, axis: DVec3, cx: &App) -> Option<f64> {
         let vp = self.viewport.read(cx);
         let (a, b) = (vp.project(at)?, vp.project(at + axis.normalize_or_zero() * 1e-3)?);
-        arrow_snap_step_for(a.distance(b))
+        arrow_snap_step_for(a.distance(b), self.units(cx).length.meters())
     }
 
     fn view(&mut self, v: StandardView, cx: &mut Context<Self>) {
@@ -7379,14 +7381,17 @@ mod tests {
         assert!((explode_drag_round(0.0254 * 0.7432, &inch) / 0.0254 - 0.74).abs() < 1e-9);
     }
 
-    /// Live feel (3D) assembly: a triad arrow drag at 0.071 mm/px snaps to 0.1 mm; the step follows the zoom.
+    /// Live triad-step-1118 (12 zooms, Top view, mm document): the arrow's step follows the zoom, rounded not floored
+    /// (0.163 and 0.291 mm/px step 0.1 mm, not 1 mm); thresholds at 0.0316 and 0.316 mm/px.
     #[test]
     fn arrow_drags_snap_to_a_step_that_follows_the_zoom() {
         use super::arrow_snap_step_for;
-        let step = |mm_per_px: f64| arrow_snap_step_for(1.0 / mm_per_px).unwrap();
-        assert!((step(0.071) - 1e-4).abs() < 1e-15, "{}", step(0.071));
-        assert!((step(0.0071) - 1e-5).abs() < 1e-16, "{}", step(0.0071));
-        assert!((step(0.71) - 1e-3).abs() < 1e-14, "{}", step(0.71));
+        let step = |mm_per_px: f64| arrow_snap_step_for(1.0 / mm_per_px, 1e-3).unwrap() * 1e3;
+        for (mm_per_px, want) in [(0.0288, 0.01), (0.0343, 0.1), (0.071, 0.1), (0.163, 0.1), (0.291, 0.1), (0.518, 1.0), (0.923, 1.0), (1.645, 1.0)] {
+            assert!((step(mm_per_px) / want - 1.0).abs() < 1e-9, "{mm_per_px} mm/px: {} mm, live {want}", step(mm_per_px));
+        }
+        // An inch document steps in inches: 100 px over 2.54 mm/px is 10 in, so 0.1 in.
+        assert!((arrow_snap_step_for(1.0 / 2.54, 0.0254).unwrap() / 0.00254 - 1.0).abs() < 1e-9);
     }
 
     /// Live 2759 / feel mates.json: a ring drag snaps to 5° near the triad, within 0.4 of a step, finer far out.
