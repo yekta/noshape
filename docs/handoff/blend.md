@@ -119,7 +119,9 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
    kept. Mac full doc: Fillet 4 OK valid 105929.52 mm3 (live 105931.13); Move face 2 still ERROR (core told 11:45: input
    differs from Boolean 3, 43 vs 64 faces). GATE running: unit blend-seq-f4 (bin/seq-f4.sh): suites blend4 (base) /
    blend9 on vibe2 -> suite-r-f4{base,}.log, .cmp, f4-suite.done; documents on vibex7 -> seq-f4.log, ud-f4.done. Rust
-   only (no g13). DON'T edit blend9 / blend4 / blend-base until it's done. Land when identical but impeller.
+   only (no g13). Documents ALL-SAME (vibex7 lacks dock). Suites moved to vibex7 (lead 13:40): unit blend-seq-f4b
+   (bin/seq-f4b.sh) -> suite-x7-f4{base,}.log, .cmp, f4x7.done. Don't edit blend9 / blend4 until done. Land when only
+   the impeller differs.
    Speed: Fillet 4 Mac 602 ms (live 102): Boolean 293, face_reach bisection 153 (1915 distances), OCCT try 83.
    face_reach by projection: blend10 branch blend-f4-speed ac197ab11 (A/B running: bin/ab-mac.sh -> logs/ab-f4.out);
    land it after (a) (patch parked/f4-reach-speed.patch).
@@ -140,6 +142,13 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
    f4 + speed, then Halterung (rim_chamfer_cut 230 ms: tool 70 = 3 lofts + 3 Booleans, cut 95, unify 31, 2 checks 21;
    needs the same end trimming for live's 16-20), Bohrungssitz (938 ms all OCCT fallbacks failing on a wrong input:
    3 parts vs live 1 upstream: skip), then this end trimming.
+   Direct-build ends (blend10 branch blend-direct-ends 00e3410af = dump patch + probes; parked/direct-ends-wip.patch):
+   pairing every face a blend's box meets (ZZ_ALLNEAR; today only faces beside its supports) + keeping a ridge section
+   whose run-on to a vertex won't project gets to the sew, still open. But the untrimmed tools run on to the part's end
+   (x 79) while live's rounds stop at x 54.7-61 on the first faces met (closed_run_on's walls): the design is to trim
+   each tool's run-on at its first walls (the wall's surface extended, analytically, no op_split / Booleans), then
+   hand the trimmed tools (end caps on the walls) to the direct build. Chamfer Halterung: cheap trims (one Common with
+   slab ∩ stop, one validity check) measured 270 -> 268 ms and the doc +150 ms: dropped (zz-blend-chspeed-dropped).
    (b2) Merged-body Fillet 3 (bool2's fillet-26) recheck: still to do.
    (e) lead 11-18: Fillet Bohrungssitz Ansaugflasch (f48, last feature) text 'Unfilleted edge overlapped by fillet.'
    (v0.4.58) -> 'Failed to fillet selections.' (main): its input moves with every upstream change; the text is whichever
