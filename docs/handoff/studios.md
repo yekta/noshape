@@ -18,11 +18,11 @@ tools/tiers/land.sh --no-precheck`; builds / drawing-ui tests `NOSHAPE_RB_HOST=v
 the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run per host.
 - Landed 11-18 (all): release dialog's associated drawings, dimension value on the pointer, projected / section
   previews grey, section cut on inference points, tooltip fade, FS notice count (f0307a3e), tab switch test (794df283).
-- Queued 11-18 23:1x (one stack, rebased on the union merge): section / detail / aux / break / BOM / crop / datum /
-  surface finish / centerline placement (live2 place-1118, ann-1118), GTOL edge leader, part gone → blank + "Failed to
-  resolve part.", lost dot at the centre, VS Enter, Configurations box (refuses, right-aligned, one input tall),
-  release regeneration-errors notice (amber / red) and footer, qa session-1118 14a/b (No views fits 1:2, Insert
-  continuation axis-only, renamed part name); feel / error-wording rows in the last commit.
+- Queued 11-19 (one stack, rebased): live2 place-1118 / ann-1118 placement rows, GTOL edge leader + ⊕ size, part
+  gone → blank + "Failed to resolve part.", lost dot at the centre, VS Enter, Configurations box, release notice /
+  footer (Submit tooltip bold), qa session-1118 14a/b, toolbar tooltip redraw at 450 ms (DRW-TOOLBAR-TOOLTIP-DELAY),
+  live2 shortcuts-1118 (Shift+arrows pan, W / [ no bubble, [ panel top left, Space, Shift+N, Ctrl+S overlay).
+- Asked live2: GTOL pink alignment line's target, Crop ✕ timing, Measure's unit list.
 - drw1118g (vibex7, 11-18 21:5x): 336/341; the rest are the known non-targets below and two with no recording
   (drw-break-view-straight, drw-broken-out-offset). Running: fs-* rerun with the ui_busy wait (fs1118b, vibex7).
 - cf-spur-gear 0.4.58 → 0.4.59 (lead 11-18): cold-only, in our Boolean's free-form face grids (Once::call in rayon
