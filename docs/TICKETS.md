@@ -664,6 +664,23 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
   first 180 ms was noise), tab switch 893, 1114, prefs 1120 / 1122 / 1123, 1163, 1199, 1236, drawing 1294 / 1296 / 1297. Not re-run:
   ps-feel2 1201-1205, chips 1233-1234.
 
+## c2-impeller-loft per feature after core's reverts (qa 17:2x: release CLI of 515102325 vs v0.4.58, vibex7, 5 alternating runs, load 2 -> 20: hints; live = live's 15:33 step table, impeller-1118b.md)
+Total ours 37.8 s (v0.4.58 31.1 s; geometry differs since Fillet 4 now builds, parts_same False: no regression claim) vs live 2.6 s.
+| feature | ours ms | live ms | × | owner |
+|---|---|---|---|---|
+| Fillet 3 | 11231 | 101.5 | ×111 | blend |
+| Extrude Bohrungssitz Ansaugflansch (its fuse) | 7046 | 162.5 | ×43 | bool (bee868f71 sends it straight to the plain fuse) |
+| Delete face 2 | 5482 | 10.5 | ×522 | core |
+| Fillet Bohrungssitz Ansaugflasch (Error; live Ok) | 4367 | 250 | ×17 | blend |
+| Fillet 4 (now Ok, as live) | 1505 | 89 | ×17 | blend |
+| Extrude impellerraum | 1479 | 507.5 | ×2.9 | core |
+| Fillet Flansch zum Stroemungskanal | 1365 | 67.5 | ×20 | blend |
+| Fillet Ansaugflansch zum Gehaeuse (Error both; live Ok) | 1303 | 320.5 | ×4 | blend |
+| Chamfer Stevenrohr Halterung | 1209 | 16 | ×76 | blend |
+| Boolean Flansch+Gehäuse | 849 | 96.5 | ×8.8 | bool |
+| Shell Gehäuse | 809 | 28 | ×29 | bool |
+| Flansch (vorne) verbreitern (Move face) | 601 | 5 | ×120 | core |
+
 ## Slower than live per feature: live's rollback step costs (live 14:1x, live/qa/rbstep-1118/tables2.md) vs ours today (qa 14:5x)
 Ours: release build of 80a64725 (qa's 08:53 sweep, vibe2 at nice 10, loaded: hints), two passes; live: step ms (≈ its full-regen
 per-feature time). Each owner re-times on the Mac (DECISIONS 11-16) before and after a fix.
