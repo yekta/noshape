@@ -1228,11 +1228,11 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| A chip hovered: its tooltip with its name to the right; that entity yellow-green, the others still orange | ? | dialogs matrix "a field's row hovered" (the tooltip: missing) |
-| A chip's × hovered: red, tooltip "Delete Edge of Extrude 1"; a click removes that chip | ? | missing |
-| A click on a chip's body changes nothing; Delete and Backspace then do nothing | ? | dialogs matrix "a field's row clicked" (the keys: missing) |
-| A bare expression keeps its form with the default unit: "10+5" → "(10+5) mm", "(10+5)/3" → "((10+5)/3) mm"; "25.4mm" → "25.4 mm"; "1 in", "10 mm + 1 in", "2*#wall" as typed; "7 xyz" kept, pink (invalid) | ? | missing |
-| "#" opens the variable list on the next frame: the matching variables (icon, name, grey value) and "New variable…", the first highlighted; it filters per key; a plain letter opens it too | ? | missing |
+| A chip hovered: its tooltip with its name to the right; that entity yellow-green, the others still orange | ≠ (live2 ours-1118, green 4a69d55b): the edge yellow-green, the others orange as live, but the name tooltip shows under the pointer over the next chip (live: to the chip's right) | dialogs matrix "a field's row hovered" (the tooltip: missing) |
+| A chip's × hovered: red, tooltip "Delete Edge of Extrude 1"; a click removes that chip | ≠ (live2 ours-1118, green 4a69d55b): the × turns red and a click removes the chip, but its tooltip reads the chip's name, not "Delete Edge of Extrude 1" | missing |
+| A click on a chip's body changes nothing; Delete and Backspace then do nothing | = (live2 ours-1118, green 4a69d55b) | dialogs matrix "a field's row clicked" (the keys: missing) |
+| A bare expression keeps its form with the default unit: "10+5" → "(10+5) mm", "(10+5)/3" → "((10+5)/3) mm"; "25.4mm" → "25.4 mm"; "1 in", "10 mm + 1 in", "2*#wall" as typed; "7 xyz" kept, pink (invalid) | = (live2 ours-1118, green 4a69d55b): "(10+5) mm", "((10+5)/3) mm", "25.4 mm", "1 in", "7 xyz" pink | missing |
+| "#" opens the variable list on the next frame: the matching variables (icon, name, grey value) and "New variable…", the first highlighted; it filters per key; a plain letter opens it too | ≠ slower (live2 ours-1118, green 4a69d55b): the same list (variables, grey values, New variable…, the first highlighted) but ~0.7 s after the key (live: the next frame) | missing |
 | Enter on "New variable…": the "Create variable" panel beside the dialog, the name prefilled from the typed text; its Enter adds "#wa = <the field's value>" before the feature | ? | missing |
 
 ### sm-feel2-1118 (sheet metal panel, Sheet metal model arrow, Tab, Form, live2 11-18 09:12) [skasm]
