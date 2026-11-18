@@ -2816,7 +2816,7 @@ impl Viewport {
     pub fn rotate_step(&mut self, dir: RotateDir, degrees: f64, cx: &mut Context<Self>) {
         let (axis, angle) = nav::rotate_step_axis(&self.camera, dir, degrees);
         if self.step_rotations.is_empty() {
-            self.step_clock = Some(Instant::now());
+            self.step_clock = Some((self.clock)());
         }
         self.step_rotations.push(StepRotation::new(axis, angle, self.camera.target));
         self.axis_tag = AxisTag::None;
@@ -3046,8 +3046,9 @@ impl Render for Viewport {
         }
         // Keyboard / view cube rotation steps.
         if !self.step_rotations.is_empty() {
-            let now = Instant::now();
-            let dt = self.step_clock.map(|t| now - t).unwrap_or_default();
+            // On the viewport's clock, as its animations (a test's steps don't finish within one slow draw).
+            let now = (self.clock)();
+            let dt = self.step_clock.map(|t| now.saturating_duration_since(t)).unwrap_or_default();
             self.step_clock = Some(now);
             let camera = &mut self.camera;
             self.step_rotations.retain_mut(|s| s.advance(camera, dt));
