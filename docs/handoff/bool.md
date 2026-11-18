@@ -4,42 +4,36 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-18 16:10 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
-(NOSHAPE_GATE_HOST=vibe2); Mac for crate tests, probes and speed numbers (NOSHAPE_RB_HOST=mac; vibex8 runs ~x10 slower at
-load 26); land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs on vibex7 ~/lead-private (hat8, hat15,
-hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree from a computed pid (lead 21:06):
-`systemctl stop <unit>`; kill only own pids > 1.
+Updated 11-18 18:27 UTC. Hosts (lead 11-18): builds + probes on the Mac (NOSHAPE_RB_HOST=mac), gates on vibex7
+(NOSHAPE_GATE_HOST=vibex7 via /root/bool-scratch/gate-chain-own.sh <sha> as a systemd-run unit; off 02:00-04:00);
+land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs vibex7 ~/lead-private (hat8, hat15, hat15b,
+AppleWatchDock). Never kill a process tree from a computed pid: `systemctl stop <unit>`; kill only own pids > 1.
+
+## Ruling 11-18 (DECISIONS 9e5b481d4) and order
+Our Boolean lands on correctness (identical on corpora + hats/dock); speed counts only >= 100 ms and >= 2x per user
+action / document (no ms A/Bs). Order (lead): 1. decline reasons ranked (posted 18:1x, below); 2. work them down: bool
+takes Shell + offset (shfall), bool2 free-form sections + B-spline faces; 3. impeller (37.8 s vs live 2.6 s): Extrude
+Bohrungssitz fuse (d04c232c8) and Shell Gehaeuse. Daily report: share taken (count) + differing cases.
+Ranking (replay 118bf5b52eaa636b, 3477 distinct: same 2926, declined 378, differ 6, equivalent 119, relabelled 46):
+not tried 120 (95 our own direct builds: on_face 67, through_holes 24; local 23, slabs 2), non-manifold 33 (shfall 14),
+short section from a corner 30, point near two vertices 19 (shfall 17), sheets that meet 17, line + curved edge 16,
+inside-out tool 15 (shfall 12), a face lost 14 (shfall 10), coincident pieces differ 11, piece's point on another
+solid's face 11 (shfall 11), two edges leave a vertex 10, edge on another argument's free-form face 10 (shfall 10).
+shfall's "near two vertices" 17: fuses of a slab + 84-93 tools (most OCCT results invalid) and 6 commons; probing with
+a DBG_NEAR2 trace (scratch) in Pool::find_tol / boolean_with's 4th round.
+live (e8549719) captures at feature level ("bool truth (11-18)" in behaviours.md): sent impeller Bohrungssitz /
+Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are internal Booleans (no live analogue).
 
 ## In flight
-- LANDING 7378bd2c (queued 06:05, alone off main): Shell's drop_clear_offset_pairs shared one FClass2d across
-  threads; NCollection_Sequence::Value writes its node cache, torn -> SIGSEGV (rings-loft Shell 1 crashed 2 of 10 runs
-  on the Mac, on main since 3bba9d430 11-15). One task per face now: 20/20 clean, Shell 1 217 ms as before.
-- GATE 4cf4ce0ca DONE 14:19 (vibe2): CHECK. Replay taken 3025 -> 3091, differing 6 -> 6, crate tests pass,
-  britatap better. (1) parity56 0c382c79 / 34b59920 (fuses of 10 tools) now declined "an offset face grazing a circle"
-  (6ca175aed): OCCT ~140 ms vs ours ~78: narrow the check (next). (2) cf-surface-pattern Surface Pattern 3 Part 1
-  386/259 -> 385/258 (live 131/387/258): bisected on the Mac (at-commit-ops.sh) to 846db3d0c (usd room): one edge
-  merge; vertices now live's, edges one further. Not the 85-tool cut afe01f60 (same summary; its volume's 12th digit
-  flips run to run on both sides). DECISION ASKED (lead 15:35): accept, or land without 846db3d0c.
-- bool-hat rebased on main 57e701c03 (d04c232c8 = bee868f71).
-- parting-line Split 3: our Split gives live's 13/34/24 (dump replay); shown_topology's edge joins (common.cpp, core's
-  rules) hide the 4 vertices at the draft's sliver faces (0.13 / 0.21 mm2, 3 edges): hidden at (-13.27, +-21.73, 29.85),
-  (24.84, +-21.81, 17.36), (-39.27, +-21.81, 39.47). Fix there, not in the Boolean.
-- qa's P0 (impeller Extrude Bohrungssitz 16 parts on bcbe6b0f): range eddaea27f..168edd676 is bool2's batch; told qa.
-- GATE unit bool-gate-8086f188b on vibe2 (15:35): bool-hat top = d04c232c8 (impeller checked glue) + 8086f188b (the
-  grazing decline only where the whole offset face is within 1 um of the circle's radius: parity56 0c382c79 / 34b59920
-  ours again 8.7 ms vs OCCT 90, fan-blade still declined at once). -> chain-8086f188b.out.
-- 168edd676 (unify volume check revert) is bool2's (lead asked 16:00: Form preview 1.3 -> 2.4 s, skasm timing).
-- Shell Gehäuse (impdump/shell-59, 178 ms Mac a run): by_quadrics' first try (continued polynomials) fails after ~60 ms
-  (offsets 20, corners 12, edges 25: edge 3's marched point 0.2 mm off face 1), the tangent-extension try succeeds:
-  CheckerSI ~52 ms, add_pcurve ~26, BRepCheck ~8. Levers: fail the first try earlier / share its offsets; own SI check.
-- NEXT GATE: bee868f71 on bool-hat (after 4cf4ce0ca): a pattern's checked glue whose < 16 instances our Boolean found
-  reaching into the part ("pattern instances overlapping") runs OCCT's plain fuse at once (impeller Extrude Bohrungssitz
-  Ansaugflansch fuse 87647d5a 1000 -> 295 ms Mac, same summary + history; the Mac corpora's 232 checked-glue fuses of
-  < 16 tools identical incl. path). Found: OCCT's BRepGProp volume of impeller's housing is 1.5 % off (96918 vs our
-  volume_props 95512 mm3), so fuse_trimmed's right result failed volumes_add_up; and our volume_props takes ~1.3 s on
-  that housing (GeomAdaptor RebuildCache thrash in face_moments' integrand: B-spline / offset spans): look at it.
-- GATE unit bool-gate-4cf4ce0ca on vibe2 (12:31; the 11:50 one failed: main's build SIGTERMed under blend's suite,
-  vibe2 at 5 GB free) -> /root/bool-hat-scratch/chain-4cf4ce0ca.out. bool-hat rebased on main 1e21f28e8: the 13 below +
+- GATE unit bool-gate-123e6b177 on vibex7 (18:22, queued behind bool2's k25 gate) -> /root/bool-hat-scratch/
+  chain-123e6b177.out; wait: /root/bool-scratch/gate-wait.sh. bool-hat (branch bool-shared2) on main 57e701c03:
+  the commits below + d04c232c8 (pattern checked glue reaching in -> plain fuse at once; impeller Bohrungssitz
+  Ansaugflansch 1000 -> 295 ms Mac) + 8086f188b (offset_grazes_a_circle only within 1 um of the radius: parity56) +
+  619037c8c (a union that lost its biggest argument's body: fuzzy retry, else error, never Ok: core's walls) +
+  123e6b177 (Shell's tangent-extension try in parallel where a kept face is an open B-spline: Gehaeuse 178 -> 135 ms;
+  both tries leave the input unchanged, checked over the suite). Decision pending (lead): 846db3d0c cf-surface-pattern
+  386/259 -> 385/258. On land: private docs, tell dx / core (walls) / blend / asm.
+- Earlier gates of the stack: /root/bool-hat-scratch/chain-{4cf4ce0ca,8086f188b}.out. bool-hat rebased on main 1e21f28e8: the 13 below +
   14. Shell race fix (on main as 7b8bb249) + 15. param_of cache + 16. Shell add_pcurve analysis cache + 17. offset fit
   cache + 18. volume_possible's cut lower bound + 19. project_along tangent-corner sliver (britatap) + 20. 4cf4ce0ca
   Shell foot: bounded_foot within two walls before OCCT's global search (impeller Shell Gehäuse 199 -> 183 ms Mac). And
