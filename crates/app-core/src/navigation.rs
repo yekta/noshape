@@ -1108,6 +1108,11 @@ mod tests {
         assert!((zoom_scale(0.5) - 0.943_874).abs() < 1e-6);
         // Reverse preference.
         assert_eq!(wheel_zoom_amount(&notch(1.0, 1.0), Platform::Mac, true), Some(-0.5));
+        // Ctrl+wheel is the same zoom (live nav-1117), on every platform.
+        for (platform, step) in [(Platform::Mac, 0.5), (Platform::Linux, 0.5), (Platform::Windows, 1.5)] {
+            let ctrl = ScrollWheelEvent { modifiers: gpui_kit::Modifiers { control: true, ..Default::default() }, ..notch(1.0, 3.0) };
+            assert_eq!(wheel_zoom_amount(&ctrl, platform, false), Some(step), "{platform:?}");
+        }
         // Synthesized events without ticks: gpui's lines per notch.
         let lines = |x: f32, y: f32| wheel(None, ScrollDelta::Lines(point(x, y)), false);
         assert_eq!(wheel_zoom_amount(&lines(0.0, 1.0), Platform::Mac, false), Some(0.5));

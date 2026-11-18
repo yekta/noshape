@@ -950,8 +950,8 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| One wheel event is one step (2^(1/12)) whatever its delta, about the pointer | = | nav matrix "wheel / a notch in", "wheel / a notch out", "wheel / in and out toward the pointer" (delta independence: missing) |
-| Ctrl+wheel is the same zoom; a pinch zooms one step per event | = | missing |
+| One wheel event is one step (2^(1/12)) whatever its delta, about the pointer | = | nav matrix "wheel / a notch in", "wheel / a notch out", "wheel / in and out toward the pointer" (delta independence: navigation::tests::wheel_notch_zoom_per_platform, a notch's 5.3 lines still one step) |
+| Ctrl+wheel is the same zoom; a pinch zooms one step per event | = | app-core navigation::tests::wheel_notch_zoom_per_platform (Ctrl), pinch_updates_zoom_one_notch_each |
 | Animated view changes: smootherstep, 500 ms for named / standard views, F and the cube; 250 ms for arrows, pan and zoom keys | = | nav matrix "animation / smootherstep", "keys / Shift+1, 5, 7 and F: 500 ms", "keys / arrows: 15°, Shift 90°, Ctrl 5°, in 250 ms", "keys / Ctrl+Shift+arrows pan 150 px in 250 ms" |
 | A new animation while one runs is ignored | = | nav matrix "animation / a new one while one runs" |
 | Below 20 fps (frames over 50 ms on average) a view change jumps | = | app-core navigation::tests::a_view_change_jumps_below_20_fps |
