@@ -1312,6 +1312,16 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 | Search tools (Alt+C): a 600 px panel under the toolbar box (which turns "Close search [escape]"), the input focused, "Start typing to search tools", footer hint and ☑ Highlight tool in toolbar (on) | = (green e503ca2f: x 1320–1919 from y 86, "Close search escape", the input focused, "Start typing to search tools", the footer and ☑ Highlight tool in toolbar) | missing [skasm] |
 | Search tools filtering: every key, ~60–90 ms; rows icon / name / shortcut badge; the first highlighted with an info pane (icon, name, help text); its toolbar button lit yellow while Highlight tool is on | = (fixed 11-18; green e503ca2f, live2 in Sketch 1: each key filters in 81–99 ms (f, i, l), the rows (Fillet shift f, Fix shift j, Flow, Offset o, Chamfer, Transform, Insert DXF or DWG), the first highlighted with its info pane; no sketch toolbar button lit with Highlight tool on: now the found tool, its group's ⌄ for a member, a constraint, Construction, Extrude / Revolve) [skasm] | sketchtools "search / the found tool lit in the sketch toolbar"; ops tool_search::a_sketchs_tool_search_ranks_as_lives |
 
+### place-1118 (drawing placement: projected view, dimension, live2 11-18 17:19) [studios]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Projected view (P) preview: the new view's box, a 1 px frame rgb(154,165,175) with its geometry in grey rgb(159,159,159), centred on the pointer | ≠ (green 1000e2a3f, block-drawing): centred on the pointer (=), but the geometry drawn black, no frame | missing |
+| Projected view direction: within 22.5° of the parent's horizontal / vertical axis the orthographic view (third angle), locked to the parent's row / column; past 22.5° the isometric, free on the pointer (dx 173: dy 60 locked, 80 iso; dx 373: 140 / 160) | = (green 1000e2a3f: the same grid and sweep, 20° Right, 25–65° iso, 70° Top, 165° Left) | missing |
+| Projected view timing on live's lane: preview 0.51 s after the parent click, 0.30–0.36 s after a pointer jump (0.31–0.66 s into the iso band) | a delay, not a target: the next frame | missing |
+| Dimension placement (D, one edge): the line at the pointer's height (text middle on the pointer) either side of the edge and inside the view; the text follows the pointer's x everywhere, inside the extension lines too | ≠ (green 1000e2a3f): the line follows the pointer's height (=, ~2 px lower), the text stays centred between the extension lines wherever the pointer is (900 px, 87 px past the end: still centred) | missing |
+| Dimension placement arrows: text clear inside: arrows inside; text against an extension line (pointer 13 / 19 px inside an end): both arrows outside pointing in (53 / 59 px: inside); text past an end: arrows inside, the line carried out under the text | ≠ (green 1000e2a3f): arrows always inside, the text never leaves the middle | missing |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
