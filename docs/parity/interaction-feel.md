@@ -1250,13 +1250,13 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| Explode arrow drag: the step's Distance = the pointer's travel at the screen scale, rounded to 0.1 mm (13 px → 1 mm … 60 px → 4.4 mm at ≈ 13.6 px/mm); 4–10 px drags give a 0 mm step | ? | missing |
-| Explode step: Enter keeps it; Esc removes it and ends the explode editing | ? | exploded table "✓ / Esc on the step" (ending the editing: missing) |
-| No explode player or slider: Activate shows the exploded state in one jump (1.3–1.7 s); the steps' rollback bar moves the parts in one frame (1.4–1.7 s), not animated | ? | missing |
-| Named position row menu: Apply / Edit / Duplicate / Update named position, Delete; a click or double-click on the row applies nothing | ? | missing |
-| Apply named position: the parts jump in one frame (0.57 s), no animation; the row then selected | ? | missing |
-| Display states: a toolbar tool, not a right-strip panel | ? | missing |
-| Assembly section arrow drag: a focused value box at the arrow during the drag (0.1 mm steps), tan hatched caps on every instance; the box stays after release, text selected | ? | missing |
+| Explode arrow drag: the step's Distance = the pointer's travel at the screen scale, rounded to 0.1 mm (13 px → 1 mm … 60 px → 4.4 mm at ≈ 13.6 px/mm); 4–10 px drags give a 0 mm step | the same: the travel at the screen scale, rounded to 0.1 mm (0.01 in imperial) (`explode_drag_round`); a short drag makes a 0 mm step (asm, 11-18) | explode_drag_values_round (rounding; the 0 mm step: missing) |
+| Explode step: Enter keeps it; Esc removes it and ends the explode editing | the same (asm, 11-18): Enter keeps the step; Esc on a step a drag just made removes it and ends the editing | esc_on_a_new_explode_step_removes_it_and_ends_the_editing |
+| No explode player or slider: Activate shows the exploded state in one jump (1.3–1.7 s); the steps' rollback bar moves the parts in one frame (1.4–1.7 s), not animated | the same: no player; Activate jumps to the state and to fit in one frame (asm, 11-18: was an animated zoom); the rollback bar moves the parts in one frame on release | activating_an_exploded_view_jumps_to_it_and_to_fit |
+| Named position row menu: Apply / Edit / Duplicate / Update named position, Delete; a click or double-click on the row applies nothing | the same menu (Move up / down only with 2+ positions, Apply left out on the applied row: live 156–161); a click applies nothing (it edits the cell) | missing |
+| Apply named position: the parts jump in one frame (0.57 s), no animation; the row then selected | the same: one frame, the row marked applied; plus the "<name> is applied." toast (live extras-1118) | missing (model: named_position_restores_driving_mate_values) |
+| Display states: a toolbar tool, not a right-strip panel | the same: a toolbar tool (`tb-display-states`), its panel on the left | missing |
+| Assembly section arrow drag: a focused value box at the arrow during the drag (0.1 mm steps), tan hatched caps on every instance; the box stays after release, text selected | the same (asm, 11-18: the 0.1 mm steps and tan hatched caps while dragged were missing): the value box at the arrow during the drag, after release focused with its text selected | missing |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
