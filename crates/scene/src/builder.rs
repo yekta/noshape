@@ -1024,6 +1024,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // Standalone points and spline handles are hollow (live sketch/100, Point tool).
                 let style = if p.tip { PointSprite::HANDLE_TIP | LineSegment::ON_TOP } else if p.standalone || p.handle { PointSprite::HOLLOW } else { 0 };
                 let style = style | PointSprite::SKETCH_POINT | if p.center { PointSprite::CENTER } else { 0 };
+                let style = style | if through { LineSegment::ON_TOP } else { 0 };
                 points.points.push(PointSprite { position: p.position, color, pick_id: id, size, style, _pad: 0 });
             }
             for d in &sk.dimensions {

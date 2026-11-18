@@ -2162,3 +2162,16 @@ fn move_boundary_up_to_without_a_target_marks_the_target() {
         assert_eq!(st.faulty, want, "{cond} offset {offset}: {:?}", st.message);
     }
 }
+
+/// qa SELFEEL-DBLCLICK-FACE-SKETCH (live psui/sel-feel C2-dbl-face-part2): a double-clicked face's sketch is drawn in
+/// its constraint colours (an undimensioned rectangle blue), so a sketch the user isn't editing carries its solve's
+/// states (it showed in the inactive grey).
+#[test]
+fn a_sketch_not_edited_carries_its_constraint_states() {
+    use noshape_model::display::SketchEntityState;
+    let mut s = block();
+    let r = s.regen();
+    let sk = &r.display.sketches[0];
+    assert!(!sk.curves.is_empty() && sk.curves.iter().all(|c| c.state == SketchEntityState::Under), "{:?}", sk.curves.iter().map(|c| c.state).collect::<Vec<_>>());
+    assert!(sk.points.iter().all(|p| p.state == SketchEntityState::Under));
+}

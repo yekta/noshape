@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 07:38 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 08:18 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18
@@ -12,13 +12,20 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - b5c4ccc4: Corner / Bend relief take a rip side face as its edge (live sm-rip-1118 (b)); translator decal image.
 - cfb07d1c: pierce_point finds where a curve only touches the plane.
 
-## In the worktree (not queued)
+## In the worktree (to land together)
 - ccbc09bc9: test only: a free line's new length moves both ends equally, label kept (live sellat-1118; ours already
   did it through scale_for_edit about the box centre).
-- parity.rs (the held loft-paths patch, fixed): an EDGE ref whose body is no part tries a sketch curve with live's
-  midpoint / length first, only when the ref names a body (`r.body.is_some()`: the assembly mate-connector refs have
-  none, which broke an_assembly / a_subassembly_is_rebuilt_as_lives); `anchors_off` also counts a PIERCE edge's middle.
-  parity:: 113/113. Run 07:40 vibex8 (/root/skasm-scratch/ut-0745.log): loft-paths-guides + config-parts (no screws).
+- 51d20f639 parity.rs: an EDGE ref whose part isn't known and that has live's length tries the sketch curve with live's
+  midpoint / length first (`r.measure.is_some()`: the assembly mate-connector refs have a point only, which broke
+  an_assembly / a_subassembly_is_rebuilt_as_lives; refs.jsonl never fills `body`); `anchors_off` counts a PIERCE
+  edge's middle. parity:: 113/113; loft-paths-guides keeps Sketch 4 / 7 / 10's PIERCEs (16/29 unchanged: Loft 3 first).
+- qa SELFEEL-DBLCLICK-FACE-SKETCH on 850ae7f3 (TICKETS 8f99bc5f7): the through-drawn sketch was grey because
+  sketch_display gave every sketch not edited the Inactive state; now its solve's states (blue under-defined), the
+  cache no longer keyed on editing; its points ON_TOP as well. Model test a_sketch_not_edited_carries_its_constraint_states.
+
+## config-parts (07:40 run, ut-0800.log): links 35/35, linear-rail 26/26, pulleys 22/22, sprockets 24/24, standoffs
+32/32 match to the end; nuts 14/17 (Sweep 1 non-manifold: core); screws not run (bool's > 14 GB Boolean).
+Our solver keeps links' waist arcs on live's branch (probe /root/skasm-scratch/probes/links-waist-probe.patch).
 
 ## Waiting on live (REQUESTS)
 - 06:2x wave-washer sketches.json (Sketch 4's rectangles stored inconsistently; ours solves them outward).
@@ -26,8 +33,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 
 ## Next, in order
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
-1. config-parts (lead pushes owners): pulleys = Circular pattern 1 (core's gated aa714b30a); nuts = Sweep 1
-   non-manifold (core-rp 56328dd0b); screws = helix Sweep Boolean > 14 GB (bool).
+1. Sketch 5 of loft-paths-guides: 2 PIERCE rejected onto part edges (TRACE PIERCE ccftgSEZYLF300.pierce1/2: read the
+   error past the 300-char cut). Unfound PROJECTED (45): mostly qCompressed queries with no ids (hunting-knife Sketch
+   12, no feature lost); rocker-enclosure's wait on core's split-face fix.
 2. Suite 11-18 05:45 vibex8 (~/agents/skasm-keep/suite-0545.log): 88/126 docs, 1292/1585; untranslated sketch
    constraints 121 (45 PROJECTED model geometry not found, 24 PIERCE rejected: loft-paths-guides, surf-intro tail fin,
    manualblend Sketch 6/7). surf-intro-examples Fill 1 (area 2.6x live) and -simple Extrude 1, -mutualtrim Title next.

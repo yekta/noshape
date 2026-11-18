@@ -383,8 +383,8 @@ const KEEP_GONE_MESHES: usize = 32;
 /// `owners`: each cached mesh's body shape and the run that last showed it
 /// (the mesh keys are shape addresses: holding the shape keeps another one
 /// from getting a kept mesh's key).
-/// Sketch displays by sketch feature: the result and editing state each was made for.
-pub type SketchDisplays = HashMap<crate::reference::FeatureId, (Arc<super::context::SketchResult>, bool, SketchDisplay)>;
+/// Sketch displays by sketch feature: the result each was made for.
+pub type SketchDisplays = HashMap<crate::reference::FeatureId, (Arc<super::context::SketchResult>, SketchDisplay)>;
 
 pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &mut HashMap<u64, (u64, bool, Arc<MeshBuffers>)>, owners: &mut HashMap<u64, (u64, noshape_kernel::Shape)>, sketches: &mut SketchDisplays, run: u64) -> (StudioDisplay, bool) {
     // Preview meshes are coarser only along curves: when every body is
@@ -542,12 +542,11 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
     // (Triangulating regions is most of it: a face's imprinted piece round 400 holes took 9 ms every run.)
     sketches.retain(|f, _| ctx.sketches.iter().any(|s| s.feature == *f));
     for s in &ctx.sketches {
-        let editing = opts.editing_sketch == Some(s.feature);
         let mut sd = match sketches.get(&s.feature) {
-            Some((was, e, sd)) if Arc::ptr_eq(was, s) && *e == editing => sd.clone(),
+            Some((was, sd)) if Arc::ptr_eq(was, s) => sd.clone(),
             _ => {
-                let sd = sketch_display(s, editing);
-                sketches.insert(s.feature, (s.clone(), editing, sd.clone()));
+                let sd = sketch_display(s);
+                sketches.insert(s.feature, (s.clone(), sd.clone()));
                 sd
             }
         };
@@ -599,17 +598,16 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
     (d, needs_refine)
 }
 
-pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> SketchDisplay {
+pub fn sketch_display(s: &super::context::SketchResult) -> SketchDisplay {
     let frame = s.frame;
     let size = {
         let bb = s.sketch.bbox();
         ((bb.max - bb.min).length()).max(0.01)
     };
     let tol = (size * 2.5e-4).max(1e-6);
+    // Its solve's states even when not edited: a double-clicked face's sketch is drawn in them (the builder draws an
+    // inactive sketch in the inactive colour whatever its state).
     let state_of = |id: noshape_sketch::EntityId| -> SketchEntityState {
-        if !editing {
-            return SketchEntityState::Inactive;
-        }
         match s.report.state(id) {
             Some(ConstraintState::FullyConstrained) => SketchEntityState::Full,
             Some(ConstraintState::OverConstrained) => SketchEntityState::Over,
