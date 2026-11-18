@@ -656,6 +656,14 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - Equal to live (live2): 1294, 1296, 1297. live2 next: the non-P0 "?" rows (ui-speed 1088-1093, prefs, numfmt, 1199, 1236, 893,
   1114, 1163); snap-diag 1303 stays qa's (Snap reach, on hold for asm).
 
+## Interaction feel: live2's regression sweep on green bcbe6b0f0 (16:00-16:1x, one run per row, 3 for 1092; evidence live2-scratch/ours/sw)
+- [ ] **P0 FORM-PREVIEW-SLOWER (skasm)**: sheet-metal Form, the second point's emboss preview at 2.34 / 2.52 s (two runs); 1.3 s on
+  this morning's green, live ~1.5 s (row 1288). A regression since ~13:00's green (bool2's 13:52 batch and core's impeller lands are
+  in the range); skasm told by live2.
+- Unchanged (=): pattern-hole 1268-1280, view 992, field keys 1309-1312, ui-speed 1090 / 1092 (context menu 118 / 75 / 83 ms: the
+  first 180 ms was noise), tab switch 893, 1114, prefs 1120 / 1122 / 1123, 1163, 1199, 1236, drawing 1294 / 1296 / 1297. Not re-run:
+  ps-feel2 1201-1205, chips 1233-1234.
+
 ## Slower than live per feature: live's rollback step costs (live 14:1x, live/qa/rbstep-1118/tables2.md) vs ours today (qa 14:5x)
 Ours: release build of 80a64725 (qa's 08:53 sweep, vibe2 at nice 10, loaded: hints), two passes; live: step ms (≈ its full-regen
 per-feature time). Each owner re-times on the Mac (DECISIONS 11-16) before and after a fix.
