@@ -4338,49 +4338,52 @@ private:
       }
     if (ps.empty())
       return;
-    // (Each face's classifier made once: made for every pair it was most of the check.)
-    NCollection_DataMap<const void*, int>                 face_at;
-    std::vector<TopoDS_Face>                              fs;
-    std::vector<std::unique_ptr<BRepTopAdaptor_FClass2d>> cls;
-    for (const Pair& p : ps)
+    // (Each face's classifier made once: made for every pair it was most of the check. One thread a face: a
+    // classifier's sequences cache their last node on every read, and two threads reading one tore it, rings-loft's
+    // Shell 1 crashing.)
+    NCollection_DataMap<const void*, int> face_at;
+    std::vector<TopoDS_Face>              fs;
+    std::vector<std::vector<size_t>>      of_face;
+    for (size_t j = 0; j < ps.size(); ++j)
     {
       int n1, n2;
-      myLists(p.list)(p.at).Indices(n1, n2);
+      myLists(ps[j].list)(ps[j].at).Indices(n1, n2);
       const TopoDS_Shape& f = myDS->ShapeInfo(n1).ShapeType() == TopAbs_FACE ? myDS->Shape(n1) : myDS->Shape(n2);
       if (!face_at.IsBound(f.TShape().get()))
       {
         face_at.Bind(f.TShape().get(), static_cast<int>(fs.size()));
         fs.push_back(TopoDS::Face(f.Oriented(TopAbs_FORWARD)));
+        of_face.emplace_back();
       }
+      of_face[(size_t)face_at.Find(f.TShape().get())].push_back(j);
     }
-    cls.resize(fs.size());
-    OSD_Parallel::For(0, static_cast<int>(fs.size()), [&](int j) {
+    OSD_Parallel::For(0, static_cast<int>(fs.size()), [&](int i) {
+      std::unique_ptr<BRepTopAdaptor_FClass2d> c;
       try
       {
-        cls[(size_t)j] = std::make_unique<BRepTopAdaptor_FClass2d>(fs[(size_t)j], BRep_Tool::Tolerance(fs[(size_t)j]));
+        c = std::make_unique<BRepTopAdaptor_FClass2d>(fs[(size_t)i], BRep_Tool::Tolerance(fs[(size_t)i]));
       }
       catch (const Standard_Failure&)
       {
-      }
-    }, serial_);
-    OSD_Parallel::For(0, static_cast<int>(ps.size()), [&](int j) {
-      if (noshape_should_break() != 0)
         return;
-      int n1, n2;
-      myLists(ps[(size_t)j].list)(ps[(size_t)j].at).Indices(n1, n2);
-      const TopoDS_Shape& a = myDS->Shape(n1);
-      const TopoDS_Shape& b = myDS->Shape(n2);
-      const TopoDS_Shape& f = a.ShapeType() == TopAbs_EDGE ? b : a;
-      const BRepTopAdaptor_FClass2d* c = cls[(size_t)face_at.Find(f.TShape().get())].get();
-      if (c == nullptr)
-        return;
-      try
-      {
-        ps[(size_t)j].clear = edge_clear_of_offset(TopoDS::Edge(a.ShapeType() == TopAbs_EDGE ? a : b), TopoDS::Face(f), *c, apart_);
       }
-      catch (const Standard_Failure&)
+      for (const size_t j : of_face[(size_t)i])
       {
-        ps[(size_t)j].clear = false;
+        if (noshape_should_break() != 0)
+          return;
+        int n1, n2;
+        myLists(ps[j].list)(ps[j].at).Indices(n1, n2);
+        const TopoDS_Shape& a = myDS->Shape(n1);
+        const TopoDS_Shape& b = myDS->Shape(n2);
+        const TopoDS_Shape& f = a.ShapeType() == TopAbs_EDGE ? b : a;
+        try
+        {
+          ps[j].clear = edge_clear_of_offset(TopoDS::Edge(a.ShapeType() == TopAbs_EDGE ? a : b), TopoDS::Face(f), *c, apart_);
+        }
+        catch (const Standard_Failure&)
+        {
+          ps[j].clear = false;
+        }
       }
     }, serial_);
     std::vector<std::vector<char>> drop((size_t)myLists.Length());
