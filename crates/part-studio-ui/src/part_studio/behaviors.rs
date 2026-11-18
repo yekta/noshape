@@ -408,8 +408,8 @@ pub struct UiState {
     /// drag started (the box reads the distance from it).
     pub section_box: bool,
     pub section_drag0: Option<f64>,
-    /// Where the section arrow was pressed: its drag waits 5 px (live section-1118).
-    pub section_press: Option<glam::DVec2>,
+    /// Where an arrow was pressed: the section's and Fillet's drags wait 5 px (live section-1118, manip-1118b).
+    pub arrow_press: Option<glam::DVec2>,
     pub section_hover: Option<super::section_manip::SectionHandle>,
     /// Another section plane's handle under the cursor (its index).
     pub section_hover_other: Option<(usize, super::section_manip::SectionHandle)>,
@@ -902,7 +902,7 @@ impl UiState {
             section_snap_pos: None,
             section_box: false,
             section_drag0: None,
-            section_press: None,
+            arrow_press: None,
             section_hover: None,
             section_hover_other: None,
             section_parts: None,
@@ -3861,7 +3861,9 @@ impl PartStudioView {
     /// Not in sketch mode, nor with a field that takes no points.
     pub(super) fn update_hover(&mut self, cx: &App) -> bool {
         let raw = self.ui.hover_pick.as_ref().map(|t| t.reference.clone());
-        let raw_edge = self.ui.hover_pick.as_ref().filter(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve)).map(|t| t.reference.clone());
+        // A shown sketch's curve with no tool open is only itself: its midpoint never takes the hover (live2 rr/ln.png,
+        // qa FEEL-SKETCH-REACH-OUTSIDE: lit from 6-7 px down to 0 px, no midpoint ring); a part edge's midpoint does.
+        let raw_edge = self.ui.hover_pick.as_ref().filter(|t| t.kind == PickKind::Edge || (t.kind == PickKind::SketchCurve && self.edit.is_some())).map(|t| t.reference.clone());
         let points_ok = self.sketch.is_none() && self.active_field_filter(cx).is_none_or(field_takes_points) && !self.inference_applies(cx);
         // Out of the graphics nothing snaps (HOVER-VERTEX-STAYS: the pointer's
         // last place inside kept an armed edge's midpoint lit after it left);

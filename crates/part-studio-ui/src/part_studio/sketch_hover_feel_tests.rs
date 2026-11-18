@@ -161,6 +161,17 @@ fn a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live(cx: &mut Tes
             }
         }
     }
+    // On a line's middle, resting past the midpoint's dwell: still the line, no tool being open (live2 rr/ln.png).
+    let (id, a, b) = lines[0];
+    let mid = (a + b) * 0.5;
+    pointer.move_to(cx, &view, mid + (b - a).perp().normalize() * 3.0);
+    pointer.move_to(cx, &view, mid);
+    std::thread::sleep(crate::part_studio::behaviors::MIDPOINT_DWELL + std::time::Duration::from_millis(100));
+    pointer.frames(cx, &view);
+    let got = hovered(cx, &view);
+    if !is_line(&got, id) {
+        wrong.push(format!("resting on line {id}'s middle: lit {got:?}, not the line"));
+    }
     let corner = lines[0].1;
     let out = (corner - centre).normalize();
     for (d, want) in [(6.0, true), (8.0, true), (11.0, false)] {

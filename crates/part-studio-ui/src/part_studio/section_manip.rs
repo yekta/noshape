@@ -253,7 +253,7 @@ impl PartStudioView {
                     self.ui.section_offset_edit = None;
                     // The box comes with the first move past the dead zone (`drag_section_arrow`).
                     self.ui.section_box = false;
-                    self.ui.section_press = Some(*position);
+                    self.ui.arrow_press = Some(*position);
                     self.ui.section_drag0 = self.ui.section_dialog.as_ref().and_then(|d| self.ui.section.get(d.active)).map(|p| p.offset);
                     None
                 }
