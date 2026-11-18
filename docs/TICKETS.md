@@ -636,7 +636,7 @@ Start with "› Show changes…", 50 px, Main selected; B1's amber line up from 
 version V3"; a single click on a version row opens it ("Versions are view only. Viewing V2." [Return to Main], navbar V2); a change
 row's menu (Open, Open in new browser tab, Compare, View in repair, Create version here…); change text "Edit : Extrude 1" (live's UI
 edits say the same; "Update feature" is its API). Not judged: open / scroll timing (debug build, load ~25).
-- [ ] **P1 HISTFEEL-CHANGE-CLICK (studios)**: a single (or double) click on a change row **under a version** opens nothing (the
+- [x] (verified qa 09:24 on green 83922ad8: a click on a change row under V3 opens it, row selected, "History changes are view only. Viewing Part Studio 1 :: Edit : Extrude 1" with Restore to Main / Return to Main, model changes; qa-scratch/hi/re) **P1 HISTFEEL-CHANGE-CLICK (studios)**: a single (or double) click on a change row **under a version** opens nothing (the
   selection stays where it was, no bar); Main's change rows open on a click (qa 01:12 on 5076e98c, name text clicked, tickets/
   hist-v3-click.png). The last hovered row also keeps its tint after the pointer leaves the panel.
   Live: the click opens that microversion, the row selected #b2ddf6, with "History changes are view only. Viewing <change>"
@@ -644,7 +644,7 @@ edits say the same; "Update feature" is its API). Not judged: open / scroll timi
 - [ ] **P1 HISTFEEL-CHANGE-BAR (studios)**: right-click › Open on a change row opens it (row selected, model changes) but shows an
   orange "VIEWING HISTORY" badge after "Main" in the navbar and no bar; live: the navbar says the version it belongs to ("V3") and
   the white bar above; the panel header keeps only the compare icon and × (ours keeps all four icons, for a version too).
-- [ ] **P2 HISTFEEL-EXPANDED (studios)**: an expanded version reads "⌄ Hide changes…" (live "⌄ 15 changes", the count); its change
+- [x] (verified qa 09:24 on green 83922ad8: an expanded version reads "⌄ 15 changes") **P2 HISTFEEL-EXPANDED (studios)**: an expanded version reads "⌄ Hide changes…" (live "⌄ 15 changes", the count); its change
   rows are 26 px, white, with a time in Modified (live 30 px, grey background, Modified empty).
 - [ ] **P2 HISTFEEL-SCROLL (studios)**: the search box and toggles stay put while the rows scroll, and the legend (Workspace, Version,
   Change, …) is pinned at the panel's bottom with the graph lines drawn over it; live scrolls search, toggles and rows in one
