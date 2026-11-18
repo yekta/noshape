@@ -887,7 +887,7 @@ the plane; Extrude 1 row click selects the feature, part drawn amber, Part 1 rel
 Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctrl+click opens the menu and selects nothing.
 - [x] a65a2d3cf **verified 591643fc** (qa 00:57: m-rC3 0 related rows after the empty click) **P0 SELFEEL-RELATED-STAYS (skasm, lead 22:48 split)**: after a double-click on Part 2's top, an empty click (and every later hover) leaves
   Sketch 2 + Extrude 2 related (state rows related, 40 s later too). Live row 2/5: an empty click clears both sides.
-- [ ] 4a4f7e0e (skasm 01:33: drawn through the part, 2 px blue with corner dots; re-check on its green) **P0 SELFEEL-DBLCLICK-FACE-SKETCH (skasm)**: double-click on a face doesn't show its feature's sketch (live row 3: Sketch 2's
+- [x] (verified qa 17:55 on green e24a63d1, skasm 4c1730fd3, vibex8 :665, load 37: after the double-click Part 2's base rectangle is drawn solid blue with blue corner dots over the part, the rows related, as live; shots at 3 / 6 s, at 1.2 s still drawing on that load; qa-scratch/sel-c2/c2-e24a63d1.png) 4a4f7e0e (skasm 01:33: drawn through the part, 2 px blue with corner dots; re-check on its green) **P0 SELFEEL-DBLCLICK-FACE-SKETCH (skasm)**: double-click on a face doesn't show its feature's sketch (live row 3: Sketch 2's
   rectangle drawn blue at Part 2's base); the face shows amber 1.2 s after (state: nothing selected, as live).
   qa 00:57 on 591643fc (a65a2d3cf): still open: Sketch 2 / Extrude 2 related and the face amber, no rectangle at the base
   (qa-keep/sel-feel/selfeel-c2-591643fc.png, sent to skasm 01:03).
