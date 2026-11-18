@@ -3,6 +3,7 @@
 //! through the agent API, the GPU a no-op stand-in.
 
 use super::AssemblyView;
+use crate::assembly_scene::{Highlights, ManipHandle};
 use crate::doc_model::DocModel;
 use crate::gpu::Gpu;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, Point, TestAppContext, WindowBounds, WindowOptions, px, size};
@@ -1161,6 +1162,89 @@ fn a_hovered_instance_row_outlines_the_part_without_a_tint(cx: &mut TestAppConte
             assert!(scene.hover_outline, "the hover outline pass");
             assert!(scene.states.iter().any(|s| s & (state::HOVER | state::OUTLINE) == state::HOVER | state::OUTLINE), "its faces outlined");
             assert!(scene.states.iter().all(|s| s & state::ACCENT == 0), "no tint");
+        })
+    })
+    .unwrap();
+}
+
+/// A started triad drag of `handle` on the selected instance's triad, `value` along / about it.
+fn triad_drag(v: &AssemblyView, handle: ManipHandle, value: f64, cx: &gpui_kit::App) -> super::DragState {
+    let f = v.manipulator(cx).expect("a triad");
+    let k = match handle {
+        ManipHandle::Axis(k) => k,
+        ManipHandle::Ring(k) => ManipHandle::ring_axis(k),
+        ManipHandle::Plane(k) => k,
+        ManipHandle::Center => 2,
+    };
+    let top = v.selected[0];
+    super::DragState {
+        top,
+        press: glam::DVec2::ZERO,
+        pressed_at: std::time::Instant::now(),
+        started: true,
+        local: glam::DVec3::ZERO,
+        plane_point: f.origin,
+        plane_normal: [f.x(), f.y(), f.z()][k],
+        pending: None,
+        busy: true,
+        handle: Some(handle),
+        ids: vec![top],
+        start: Default::default(),
+        ring_v0: [f.x(), f.y(), f.z()][(k + 1) % 3],
+        value,
+        grab0: f.origin,
+        offset: glam::DVec3::ZERO,
+        triad_preview: None,
+        explode: false,
+        nested: None,
+        solved: None,
+        origin: Default::default(),
+        landed: true,
+        released: false,
+        no_box: false,
+    }
+}
+
+/// Live manip-feel-1118 (m9): an arrow / ring drag snaps (0.1 mm steps here; 5° near a multiple) but not with Shift
+/// held (3.827 mm, 28.352 deg).
+#[test]
+fn shift_frees_a_triad_drag_from_its_snap() {
+    assert!((super::triad_arrow_value(0.003827, Some(1e-4), false) - 0.0038).abs() < 1e-12);
+    assert_eq!(super::triad_arrow_value(0.003827, Some(1e-4), true), 0.003827);
+    let a = 28.352f64.to_radians();
+    assert!((super::triad_ring_value(a, 100.0, false) - 30f64.to_radians()).abs() < 1e-12, "within 2° of 30: snapped");
+    assert_eq!(super::triad_ring_value(a, 100.0, true), a);
+    let free = 22.82f64.to_radians();
+    assert_eq!(super::triad_ring_value(free, 100.0, false), free, "between multiples: free");
+}
+
+/// Live manip-feel-1118 (m9-grid): during an arrow drag the other handles fade and a line runs from a tick at the
+/// arrow's start to where it is; a ring drag draws an arc from a tick through its angle. Esc mid-drag removes the
+/// value box, the drag going on (the release keeps the move, with no box).
+#[gpui::test]
+fn a_triad_drag_fades_the_other_handles_draws_its_dimension_and_esc_drops_the_box(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "triad-drag");
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            v.selected = vec![instance(v, "Part 1 <1>", cx)];
+            v.drag = Some(triad_drag(v, ManipHandle::Axis(0), 0.004, cx));
+            let mut h = Highlights { manipulator: v.manipulator(cx).map(|f| (f, v.manip_size(cx), Some(ManipHandle::Axis(0)))), ..Default::default() };
+            v.triad_drag_marks(&mut h, cx);
+            assert!(h.manip_dragging, "the other handles fade");
+            let Some(crate::assembly_scene::DragDim::Line { start, end, tick }) = h.drag_dim else { panic!("a line: {:?}", h.drag_dim) };
+            assert!(((end - start).length() - 0.004).abs() < 1e-9 && tick.length() > 0.0 && tick.dot(end - start).abs() < 1e-12);
+            v.drag = Some(triad_drag(v, ManipHandle::Ring(0), 0.5, cx));
+            let mut h = Highlights { manipulator: h.manipulator, ..Default::default() };
+            v.triad_drag_marks(&mut h, cx);
+            assert!(matches!(h.drag_dim, Some(crate::assembly_scene::DragDim::Arc { sweep, .. }) if (sweep - 0.5).abs() < 1e-12), "an arc: {:?}", h.drag_dim);
+        })
+    })
+    .unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.on_cancel(&crate::actions::Cancel, w, cx))).unwrap();
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            assert!(v.drag.as_ref().is_some_and(|d| d.no_box), "the drag goes on, its box gone");
+            assert!(v.render_manip_value(cx).is_none(), "no value box");
         })
     })
     .unwrap();

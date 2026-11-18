@@ -267,6 +267,9 @@ struct DragState {
     landed: bool,
     /// Let go while a solve was still running: the move is made when it lands (a quick drag: asm-drag-free-part).
     released: bool,
+    /// Esc during an arrow / ring drag (live manip-feel-1118 m9): the value box is gone; the instance stays where
+    /// it is dragged and the release keeps it, with no box.
+    no_box: bool,
 }
 
 /// Snap mode drag: a connector of one instance dragged onto another's.
@@ -368,6 +371,20 @@ fn ring_snap(angle: f64, radius_px: f64) -> f64 {
     let step = [5.0f64, 1.0, 0.1][level].to_radians();
     let n = angle / step;
     if (n - n.round()).abs() <= 0.4 * (1.0 + level as f64 / 3.0) { n.round() * step } else { angle }
+}
+
+/// A triad arrow drag's distance: snapped to `step`, or as dragged with Shift held (live manip-feel-1118: 3.827 mm;
+/// Ctrl changes nothing).
+fn triad_arrow_value(s: f64, step: Option<f64>, shift: bool) -> f64 {
+    match step {
+        Some(step) if !shift => (s / step).round() * step,
+        _ => s,
+    }
+}
+
+/// A triad ring drag's angle: [`ring_snap`], or as dragged with Shift held (live manip-feel-1118: 28.352 deg).
+fn triad_ring_value(angle: f64, radius_px: f64, shift: bool) -> f64 {
+    if shift { angle } else { ring_snap(angle, radius_px) }
 }
 
 /// [`AssemblyView::arrow_snap_step`] for an arrow that spans `px_per_mm` pixels per millimetre (metres).
@@ -1435,6 +1452,7 @@ impl AssemblyView {
             h.cursor_mark = Some((p, size * 0.4));
         }
         h.manipulator = self.manipulator(cx).map(|f| (f, self.manip_size(cx), self.manip_hover.or(self.ui.manip_selected)));
+        self.triad_drag_marks(&mut h, cx);
         h.section = self.section_glyph(cx);
         h.explode_triad = self.explode_edit;
         // An explode step being made / edited: one arrow along the move
@@ -1538,6 +1556,34 @@ impl AssemblyView {
     }
 
     /// Move manipulator frame: at the bounds center of the instances it moves, world-aligned.
+    /// A triad drag (live manip-feel-1118 m9): the other handles faded, and from a tick at where the dragged handle
+    /// started a line (arrow) or an arc (ring) to where it is.
+    fn triad_drag_marks(&self, h: &mut Highlights, cx: &App) {
+        if let Some(d) = self.drag.as_ref().filter(|d| d.started && !d.explode && d.handle.is_some_and(|h| h != ManipHandle::Center))
+            && let Some((f, size, _)) = h.manipulator
+        {
+            h.manip_dragging = true;
+            let tick = size * 0.12;
+            h.drag_dim = match d.handle {
+                Some(ManipHandle::Axis(_)) => {
+                    let across = d.plane_normal.any_orthonormal_vector();
+                    let vp = self.viewport.read(cx);
+                    let view = vp.project(d.plane_point).map_or(DVec3::Z, |p| vp.ray(p).1);
+                    let across = d.plane_normal.cross(view).try_normalize().unwrap_or(across);
+                    Some(assembly_scene::DragDim::Line { start: d.plane_point, end: d.plane_point + d.plane_normal * d.value, tick: across * tick })
+                }
+                Some(ManipHandle::Ring(k)) => {
+                    let axes = [f.x(), f.y(), f.z()];
+                    let now = f.origin + axes[k] * (size * 0.94);
+                    let from = d.plane_point + glam::DQuat::from_axis_angle(d.plane_normal, -d.value) * (now - d.plane_point);
+                    let radial = (from - d.plane_point).normalize_or_zero();
+                    Some(assembly_scene::DragDim::Arc { center: d.plane_point, from, axis: d.plane_normal, sweep: d.value, tick: radial * tick })
+                }
+                _ => None,
+            };
+        }
+    }
+
     fn manipulator(&self, cx: &App) -> Option<Frame> {
         let ids = self.manip_targets(cx);
         if ids.is_empty() || (!self.ui.inserted_selection.is_empty() && self.selected == self.ui.inserted_selection) {
@@ -3139,6 +3185,7 @@ impl AssemblyView {
                         origin: self.result.solved.placements.iter().cloned().collect(),
                         landed: true,
                         released: false,
+                        no_box: false,
                     });
                     return;
                 }
@@ -3214,6 +3261,7 @@ impl AssemblyView {
                     origin: self.result.solved.placements.iter().cloned().collect(),
                     landed: true,
                     released: false,
+                    no_box: false,
                 });
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -3252,7 +3300,7 @@ impl AssemblyView {
                         let Some(v) = self.ring_vector(*position, center, axis, cx) else { return };
                         let angle = v0.cross(v).dot(axis).atan2(v0.dot(v));
                         let radius_px = self.viewport.read(cx).project(center).map_or(0.0, |c| c.distance(*position));
-                        let angle = ring_snap(angle, radius_px);
+                        let angle = triad_ring_value(angle, radius_px, window.modifiers().shift);
                         let d = self.drag.as_mut().unwrap();
                         d.value = angle;
                         d.pending = Some(DVec3::ZERO);
@@ -3270,8 +3318,8 @@ impl AssemblyView {
                         let mut s = (b * e - c * dd) / den;
                         if d.explode {
                             s = explode_drag_round(s, &self.units(cx));
-                        } else if let Some(step) = self.arrow_snap_step(d.plane_point, axis, cx) {
-                            s = (s / step).round() * step;
+                        } else {
+                            s = triad_arrow_value(s, self.arrow_snap_step(d.plane_point, axis, cx), window.modifiers().shift);
                         }
                         let p = d.plane_point + axis * s;
                         let d = self.drag.as_mut().unwrap();
@@ -3525,6 +3573,7 @@ impl AssemblyView {
             origin: self.result.solved.placements.iter().cloned().collect(),
             landed: true,
             released: false,
+            no_box: false,
         });
     }
 
@@ -3710,7 +3759,7 @@ impl AssemblyView {
             return;
         }
         self.edit(&format!("Move : {name}"), cx, |_| {});
-        if d.handle.is_some() {
+        if d.handle.is_some() && !d.no_box {
             self.open_manip_value(&d, window, cx);
         }
     }
@@ -6934,6 +6983,12 @@ impl AssemblyView {
     }
 
     fn on_cancel(&mut self, _: &Cancel, window: &mut Window, cx: &mut Context<Self>) {
+        // Esc during a triad arrow / ring drag (button held): only the value box goes (live manip-feel-1118 m9).
+        if let Some(d) = self.drag.as_mut().filter(|d| d.started && !d.explode && !d.no_box && matches!(d.handle, Some(ManipHandle::Axis(_) | ManipHandle::Ring(_)))) {
+            d.no_box = true;
+            cx.notify();
+            return;
+        }
         // ☰ › Print…'s panel first (live studios 2349: Esc closes it).
         if self.print.take().is_some() {
             window.focus(&self.focus, cx);

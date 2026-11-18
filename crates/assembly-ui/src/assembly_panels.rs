@@ -2177,7 +2177,7 @@ impl AssemblyView {
     pub(super) fn render_manip_value(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         // During the drag (live: the box is there from the start), the
         // dragged distance / angle, not yet editable.
-        let dragging = self.drag.as_ref().filter(|d| d.started && matches!(d.handle, Some(ManipHandle::Axis(_) | ManipHandle::Ring(_))));
+        let dragging = self.drag.as_ref().filter(|d| d.started && !d.no_box && matches!(d.handle, Some(ManipHandle::Axis(_) | ManipHandle::Ring(_))));
         if self.manip_value.is_none()
             && let Some(d) = dragging
         {
@@ -2200,14 +2200,14 @@ impl AssemblyView {
                     .border_1()
                     .border_color(pal.accent)
                     .text_size(px(13.33))
-                    .text_color(pal.text)
-                    .child(text)
+                    // Its text selected as live's (manip-feel-1118 m9: "3.8 mm" / "30 deg" highlighted mid-drag).
+                    .child(div().bg(pal.accent).text_color(rgb(0xffffff)).child(text))
                     .into_any_element(),
             );
         }
         // The box belongs to the triad (live assembly.md R6): it goes with it
         // (ASM-TRIAD-VALUE-STAYS: Esc / an empty click left it drawn).
-        if self.manip_value.as_ref().is_some_and(|mv| !mv.explode) && self.triad.is_none() {
+        if self.manip_value.as_ref().is_some_and(|mv| !mv.explode) && self.triad.is_none() && self.manipulator(cx).is_none() {
             self.manip_value = None;
         }
         let mv = self.manip_value.as_ref()?;

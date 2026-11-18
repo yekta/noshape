@@ -523,6 +523,10 @@ pub struct Highlights {
     pub cursor_mark: Option<(DVec3, f64)>,
     /// Explode lines (dashed), start to exploded position.
     pub trails: Vec<(DVec3, DVec3)>,
+    /// A triad handle being dragged: the other handles faded (live manip-feel-1118 m9).
+    pub manip_dragging: bool,
+    /// The dragged arrow's or ring's own dimension, from a tick at its start.
+    pub drag_dim: Option<DragDim>,
     /// Selected mate's rotation value (live 305z, 575).
     pub value_arcs: Vec<ValueArc>,
     /// Selected mate's translation values.
@@ -557,6 +561,15 @@ pub struct ValueArc {
     pub radius: f64,
     pub sweep: f64,
     pub gap: Option<(f64, f64)>,
+}
+
+/// A triad drag's dimension (live manip-feel-1118 m9): a solid blue line from where the dragged arrow started to
+/// where it is, or an arc about the ring's axis from where the dragged ring started through `sweep`; across the start
+/// a tick (`tick`: half its length and its direction).
+#[derive(Clone, Copy, Debug)]
+pub enum DragDim {
+    Line { start: DVec3, end: DVec3, tick: DVec3 },
+    Arc { center: DVec3, from: DVec3, axis: DVec3, sweep: f64, tick: DVec3 },
 }
 
 /// Manipulator handle: translate along axis k, rotate about axis k,
@@ -1032,6 +1045,24 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             }
         }
     }
+    if let Some(dim) = h.drag_dim {
+        let blue = [26, 53, 184, 255];
+        let seg = |lines: &mut LineData, a: DVec3, b: DVec3| lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: blue, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+        match dim {
+            DragDim::Line { start, end, tick } => {
+                seg(&mut lines, start, end);
+                seg(&mut lines, start - tick, start + tick);
+            }
+            DragDim::Arc { center, from, axis, sweep, tick } => {
+                let n = ((sweep.abs() / std::f64::consts::TAU * 64.0).ceil() as usize).max(1);
+                let at = |t: f64| center + glam::DQuat::from_axis_angle(axis, sweep * t) * (from - center);
+                for i in 0..n {
+                    seg(&mut lines, at(i as f64 / n as f64), at((i + 1) as f64 / n as f64));
+                }
+                seg(&mut lines, from - tick, from + tick);
+            }
+        }
+    }
     for l in &h.value_lines {
         let blue = [26, 53, 184, 255];
         let at = |t: f64| l.a + (l.b - l.a) * t;
@@ -1105,14 +1136,17 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         const CORE: [u8; 4] = [0xf7, 0xf7, 0xf8, 255];
         const HOVER: [u8; 4] = [0x3e, 0x94, 0xff, 255];
         const EXPLODE_CORE: [u8; 4] = [0xcd, 0xd0, 0xd3, 255];
+        // While a handle is dragged the others fade to a faint grey (live manip-feel-1118 m9).
+        const FAINT: u8 = 60;
         let size = *size;
         // Explode mode (live 802): a 2 px #cdd0d3 core between the grey edges.
         let (core, core_w) = if h.explode_triad { (EXPLODE_CORE, 2.0) } else { (CORE, 1.6) };
+        let (edge, core) = if h.manip_dragging { ([EDGE[0], EDGE[1], EDGE[2], FAINT], [core[0], core[1], core[2], FAINT]) } else { (EDGE, core) };
         let p3 = |p: DVec3| -> [f32; 3] { p.as_vec3().into() };
         let stroke = |ol: &mut LineData, pts: &[DVec3], closed: bool, id: u32, hl: bool| {
             let n = pts.len();
             let segs = if closed { n } else { n.saturating_sub(1) };
-            for (w, c) in [(4.0, if hl { HOVER } else { EDGE }), (core_w, if hl { HOVER } else { core })] {
+            for (w, c) in [(4.0, if hl { HOVER } else { edge }), (core_w, if hl { HOVER } else { core })] {
                 for i in 0..segs {
                     ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: c, pick_id: id, width: w, style: LineSegment::ON_TOP });
                 }
@@ -1154,7 +1188,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             let (a0, a1) = (size * 0.2, size * 0.36);
             let q = |x: f64, y: f64| f.origin + u * x + v * y;
             stroke(&mut ol, &[q(a0, a0), q(a1, a0), q(a1, a1), q(a0, a1)], true, pid, phl);
-            let fill = if phl { [HOVER[0], HOVER[1], HOVER[2], 70] } else { [0xf7, 0xf7, 0xf8, 40] };
+            let fill = if phl { [HOVER[0], HOVER[1], HOVER[2], 70] } else if h.manip_dragging { [0xf7, 0xf7, 0xf8, 15] } else { [0xf7, 0xf7, 0xf8, 40] };
             for i in 1..6 {
                 let y = a0 + (a1 - a0) * i as f64 / 6.0;
                 ol.segments.push(LineSegment { a: p3(q(a0, y)), b: p3(q(a1, y)), color: fill, pick_id: pid, width: 4.0, style: LineSegment::ON_TOP });
@@ -1165,10 +1199,11 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         let cid = overlay_id(built, OverlayPick::Manip(ManipHandle::Center));
         let chl = *hovered == Some(ManipHandle::Center);
         let o: [f32; 3] = p3(f.origin);
-        op.points.push(PointSprite { position: o, color: if chl { HOVER } else { EDGE }, pick_id: cid, size: 17.0, style: LineSegment::ON_TOP, _pad: 0 });
+        let white = if h.manip_dragging { [255, 255, 255, FAINT] } else { [255, 255, 255, 255] };
+        op.points.push(PointSprite { position: o, color: if chl { HOVER } else { edge }, pick_id: cid, size: 17.0, style: LineSegment::ON_TOP, _pad: 0 });
         op.points.push(PointSprite { position: o, color: core, pick_id: cid, size: 12.0, style: LineSegment::ON_TOP, _pad: 0 });
-        op.points.push(PointSprite { position: o, color: if chl { HOVER } else { EDGE }, pick_id: cid, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
-        op.points.push(PointSprite { position: o, color: [255, 255, 255, 255], pick_id: cid, size: 7.0, style: LineSegment::ON_TOP, _pad: 0 });
+        op.points.push(PointSprite { position: o, color: if chl { HOVER } else { edge }, pick_id: cid, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
+        op.points.push(PointSprite { position: o, color: white, pick_id: cid, size: 7.0, style: LineSegment::ON_TOP, _pad: 0 });
         scene.set_state(cid, 0);
     }
     if let Some((o, dir, size, rotation)) = h.step_arrow
