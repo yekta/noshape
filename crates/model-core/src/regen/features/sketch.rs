@@ -584,14 +584,14 @@ pub fn pierce_point(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneF
     let h = |p: DVec3| (p - frame.origin).dot(frame.normal);
     let at = |t: f64| edge.point_at(t).ok();
     let (t0, t1) = (info.first_param, info.last_param);
-    let mut best: Option<(f64, DVec3)> = None;
+    let mut best: Option<(f64, DVec3, f64)> = None;
     let mut prev: Option<(f64, f64)> = None;
     for i in 0..=SAMPLES {
         let t = t0 + (t1 - t0) * i as f64 / SAMPLES as f64;
         let p = at(t)?;
         let v = h(p);
         if best.is_none_or(|b| v.abs() < b.0) {
-            best = Some((v.abs(), p));
+            best = Some((v.abs(), p, t));
         }
         if let Some((ta, va)) = prev
             && va * v <= 0.0
@@ -620,7 +620,22 @@ pub fn pierce_point(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneF
             return Some(frame.to_local(info.start + d * s));
         }
     }
-    best.filter(|b| b.0 < 1e-7).map(|b| frame.to_local(b.1))
+    // A curve that touches the plane without crossing it (a circle tangent to it, c2-loft-paths-guides' Sketch 5): the
+    // touching point, the nearest sample refined.
+    let (_, _, tb) = best?;
+    let step = (t1 - t0) / SAMPLES as f64;
+    let (mut lo, mut hi) = ((tb - step).max(t0), (tb + step).min(t1));
+    let dist = |t: f64| at(t).map_or(f64::INFINITY, |p| h(p).abs());
+    for _ in 0..100 {
+        let (a, b) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
+        if dist(a) < dist(b) {
+            hi = b;
+        } else {
+            lo = a;
+        }
+    }
+    let t = 0.5 * (lo + hi);
+    (dist(t) < 1e-7).then(|| at(t).map(|p| frame.to_local(p))).flatten()
 }
 
 /// Trace of a plane in the sketch plane: a point on it and its direction
@@ -905,6 +920,20 @@ pub fn update_intersection(sk: &mut noshape_sketch::Sketch, entities: &[u32], cu
 
 #[cfg(test)]
 mod text_expression_tests {
+    /// c2-loft-paths-guides' Sketch 5 (plane x = -50.8 mm): its PIERCE targets are circles of r 50.8 about x = 0 that
+    /// only touch the plane: the touching point (it was none: no sample crossed it).
+    #[test]
+    fn a_circle_touching_the_plane_pierces_it_where_it_touches() {
+        let frame = crate::display::PlaneFrame { origin: glam::DVec3::new(-0.0508, 0.0, 0.0), ..crate::display::PlaneFrame::RIGHT };
+        // Turned off the samples: its touching point between two of them.
+        for turn in [0.0f64, 0.0123] {
+            let axis = glam::DVec3::new(0.0, (1.0 - turn * turn).sqrt(), 0.0) + glam::DVec3::new(0.0, 0.0, turn);
+            let edge = noshape_kernel::make_circle(glam::DVec3::new(0.0, 0.254, 0.0), axis.normalize(), 0.0508).unwrap();
+            let p = super::pierce_point(&edge, &frame).expect("where it touches");
+            assert!((frame.to_world(p) - glam::DVec3::new(-0.0508, 0.254, 0.0)).length() < 1e-6, "{p}");
+        }
+    }
+
     use super::*;
 
     #[test]

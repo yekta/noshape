@@ -19,6 +19,18 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - db01062d: Corner / Bend relief take a rip side face as its long edge, chip "Edge of Sheet metal model 1", fail as live.
 - next: decal image (fetched file tab or placeholder): seven surf-intro docs 4 -> 5 features.
 
+## Held (not committed): /root/skasm-scratch/held/loft-paths-pierce.patch
+- parity.rs: an EDGE ref whose body is no part tries a sketch curve with live's midpoint / length first (Sketch 3's arc
+  JOB in c2-loft-paths-guides); `anchors_off` also counts a PIERCE edge's middle (ref `point`) on the plane. With it
+  loft-paths-guides keeps Sketch 4 / 7 / 10's PIERCEs (were taken back). BREAKS parity::an_assembly_is_rebuilt_as_lives
+  and a_subassembly_is_rebuilt_as_lives (parity.rs:3783 / 3929): find which half, fix, then land.
+- Sketch 5's 2 PIERCE rejected remain: targets are circles touching the plane; pierce_point now finds a touching point
+  (committed, unit test), yet sketch_constrain still refuses: trace `model.shapes(r)` in sketch_use::external_entity.
+
+## To check (live 11-18, qa sellat-1118): a horizontal line 40 mm (Horizontal + length only, start off the origin),
+length set to 50: live moves both ends equally (start -5, end 45), midpoint and label stay; back to 40 returns. Ours has
+onshape_ux `length_edit_moves_both_ends_equally`: confirm it covers this (start off origin, the label stays).
+
 ## Waiting on live (REQUESTS)
 - 06:2x wave-washer sketches.json (Sketch 4's rectangles stored inconsistently; ours solves them outward).
 - 06:4x surf-intro Derived 1 sources (5 docs stop at Derived 1 NOT BUILT).
