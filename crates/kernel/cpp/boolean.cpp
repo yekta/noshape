@@ -7508,6 +7508,13 @@ static bool fuse_glued(const TopoDS_Shape& target, const TopoDS_Shape& tool, Top
       }
   if (pa == nullptr)
     return false;
+  // (One the other's mirror image, either placed by a location: not glued, as before the mirrored planes were seen
+  // (the glued result keeps the location, and the unify then leaves the two halves of a curved side apart).)
+  if (pa->pln.Position().Direct() != pb->pln.Position().Direct())
+    for (const TopoDS_Shape* sh : {&sa, &sb})
+      for (TopExp_Explorer x(*sh, TopAbs_FACE); x.More(); x.Next())
+        if (!x.Current().Location().IsIdentity())
+          return false;
   const gp_Pln& pl  = pa->pln;
   auto          on = [&](const std::vector<Flat>& v, const Flat* keep) {
     return std::any_of(v.begin(), v.end(), [&](const Flat& x) { return &x != keep && x.pln.Axis().Direction().IsParallel(pl.Axis().Direction(), 1e-12) && pl.Distance(x.pln.Location()) <= tol; });
