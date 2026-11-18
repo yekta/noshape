@@ -27,6 +27,8 @@ enum E {
     At(&'static str, [f64; 3]),
     Id(&'static str),
     Part(&'static str),
+    /// The midpoint of the edge through this point.
+    Mid([f64; 3]),
 }
 
 const V40: E = E::At("vertices", [40., 0., 0.]);
@@ -51,13 +53,17 @@ struct Bench {
 
 impl Bench {
     fn open(cx: &mut TestAppContext, name: &str, scale: f32) -> Self {
-        let (window, view) = part_studio_from(cx, name, Some(document()));
+        Self::open_doc(cx, name, scale, document(), 3)
+    }
+
+    fn open_doc(cx: &mut TestAppContext, name: &str, scale: f32, doc: serde_json::Value, parts: usize) -> Self {
+        let (window, view) = part_studio_from(cx, name, Some(doc));
         cx.update_window(window, |_, w, _| {
             w.set_scale_factor(scale);
             w.activate_window();
         })
         .unwrap();
-        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.len() == 3);
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.len() == parts);
         draw(cx, window);
         let failed = cx.update(|cx| {
             let v = view.read(cx);
@@ -73,6 +79,10 @@ impl Bench {
             E::Id(id) => return noshape_ops::refs::parse_str(id).ok_or(format!("no reference {id}")),
             E::Part(name) => return cx.update(|cx| self.view.read(cx).display.bodies.iter().find(|b| b.name == name).map(|b| Reference::Body(b.id.clone()))).ok_or(format!("no part {name}")),
             E::At(kind, at) => (kind, at),
+            E::Mid(at) => {
+                let on = self.reference(cx, E::At("edges", at))?;
+                return Ok(Reference::Implicit { on: Box::new(on), inference: noshape_model::reference::Inference::Midpoint });
+            }
         };
         let mut ctx = noshape_ops::Ctx::new();
         let args = serde_json::json!({ "doc": self.path.to_str(), "kind": kind, "at": [at] });
@@ -297,4 +307,86 @@ fn the_measure_matrix_matches_live(cx: &mut TestAppContext) {
     let matched = report.iter().filter(|l| l.starts_with('=')).count();
     eprintln!("measure matrix: {matched} / {} rows match live\n{}", report.len(), report.join("\n"));
     assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md and the row's gap): {moved:?}");
+}
+
+/// live2 measure-mass-1118 (the bottom-right summary on its "l2 measure feel" studio: a 40 × 30 × 10 block, a wedge
+/// (60,0)(90,0)(60,20) × 10, a cylinder r8 at (120,15) × 15, a wedge (60,40)(60,60)(90,60) × 10): readouts the matrix
+/// didn't have, among them live's angle between two faces or edges, taken toward each one's middle from where they meet.
+#[gpui::test]
+fn measure_pairs_on_lives_wedges_and_cylinder(cx: &mut TestAppContext) {
+    let poly = |n: u32, pts: &[[f64; 2]]| {
+        let mut p = pts.to_vec();
+        p.push(pts[0]);
+        serde_json::json!({ "type": "newSketch", "name": format!("Sketch {n}"), "plane": "Top", "shapes": [{ "line": p }] })
+    };
+    let extrude = |n: u32, depth: &str| serde_json::json!({ "type": "extrude", "name": format!("Extrude {n}"), "params": { "entities": [format!("Sketch {n} region 0")], "endBound": "BLIND", "depth": depth, "operationType": "NEW" } });
+    let doc = serde_json::json!({ "units": "mm", "features": [
+        poly(1, &[[0., 0.], [40., 0.], [40., 30.], [0., 30.]]), extrude(1, "10 mm"),
+        poly(2, &[[60., 0.], [90., 0.], [60., 20.]]), extrude(2, "10 mm"),
+        { "type": "newSketch", "name": "Sketch 3", "plane": "Top", "shapes": [{ "circle": [[120, 15], [128, 15]] }] }, extrude(3, "15 mm"),
+        poly(4, &[[60., 40.], [60., 60.], [90., 60.]]), extrude(4, "10 mm")
+    ] });
+    let b = Bench::open_doc(cx, "measure-pairs", 1.0, doc, 4);
+    let hyp = E::At("edges", [75., 10., 10.]);
+    let hyp4 = E::At("faces", [75., 50., 5.]);
+    let cyl = E::At("faces", [128., 15., 7.]);
+    let cases: [(&[E], &str); 22] = [
+        (&[hyp], "Length:36.056mm"),
+        (&[hyp, E::At("edges", [40., 15., 10.])], "Angle:56.310deg"),
+        (&[hyp, E::At("edges", [60., 10., 10.])], "Angle:56.310deg"),
+        (&[hyp, E::At("edges", [20., 30., 10.])], "Angle:146.310deg"),
+        (&[hyp4], "Area:360.555mm2"),
+        (&[hyp4, E::At("faces", [40., 15., 5.])], "Angle:123.690deg"),
+        (&[E::At("faces", [40., 15., 5.]), hyp4], "Angle:123.690deg"),
+        (&[hyp4, E::At("faces", [20., 0., 5.])], "Angle:33.690deg"),
+        (&[E::At("faces", [20., 0., 5.]), hyp4], "Angle:33.690deg"),
+        (&[hyp4, E::At("faces", [20., 15., 10.])], "Perp planes angle:90.000deg"),
+        (&[cyl], "Diameter:16.000mm"),
+        (&[cyl, E::At("faces", [20., 15., 10.])], "Perp axes angle:90.000deg"),
+        (&[cyl, E::At("faces", [120., 15., 15.])], "Perp axes angle:90.000deg"),
+        (&[cyl, E::Mid([20., 0., 0.])], "Min dist:93.119mm Center axes dist:101.119mm Max dist:110.145mm"),
+        (&[E::At("vertices", [40., 0., 10.])], "Point: 40.000mm 0.000mm 10.000mm"),
+        (&[E::At("vertices", [40., 0., 10.]), E::At("faces", [65., 5., 10.])], "Min dist:20.000mm"),
+        (&[E::At("vertices", [40., 0., 10.]), E::At("faces", [75., 0., 5.])], "Min dist:20.000mm"),
+        (&[E::At("faces", [20., 15., 10.]), E::At("faces", [65., 5., 10.])], "Parallel dist:0.000mm"),
+        (&[E::At("faces", [20., 15., 10.]), hyp], "Parallel dist:0.000mm"),
+        (&[E::At("faces", [120., 15., 15.]), E::At("edges", [40., 15., 10.])], "Parallel dist:5.000mm"),
+        (&[E::At("edges", [128., 15., 15.]), hyp], "Min dist:26.026mm Max dist:68.391mm Center dist:29.548mm"),
+        (&[E::At("edges", [128., 15., 15.]), E::At("faces", [120., 15., 15.])], "Face tangent angle:0.000deg Center dist:0.000mm Max dist:16.000mm Min dist:0.000mm"),
+    ];
+    let squash = |t: &str| t.split_whitespace().collect::<String>();
+    let mut off = Vec::new();
+    for (sel, live) in cases {
+        let rows = b.readout(cx, sel, &[]).unwrap_or_else(|e| vec![e]);
+        // ("svg-icon-XYZ-Icons-AlongX: 40.000 mm": the axis icon's name before the value.)
+        let ours: String = rows.iter().map(|r| squash(r.rsplit_once("Icons-").map_or(r.as_str(), |(_, v)| v.split_once(':').map_or(v, |(_, x)| x)))).collect();
+        if ours != squash(live) {
+            off.push(format!("{sel:?}: ours {ours}, live {}", squash(live)));
+        }
+    }
+    assert!(off.is_empty(), "measure pairs off live's:\n{}", off.join("\n"));
+}
+
+/// live2 measure-mass-1118: the Mass properties button again leaves the panel open; `[` over it closes it and opens
+/// Measure empty, the measured parts deselected.
+#[gpui::test]
+fn mass_stays_open_and_bracket_opens_an_empty_measure(cx: &mut TestAppContext) {
+    let b = Bench::open(cx, "mass-bracket", 1.0);
+    let part = b.reference(cx, E::Part("Part 2")).unwrap();
+    cx.update(|cx| b.view.update(cx, |v, cx| {
+        v.selection = vec![part.clone()];
+        v.open_mass(cx);
+        v.open_mass(cx);
+    }));
+    draw(cx, b.window);
+    assert!(cx.update(|cx| b.view.read(cx).show_mass), "the button again leaves it open");
+    let focus = cx.update(|cx| b.view.read(cx).focus.clone());
+    cx.update_window(b.window, |_, w, cx| w.focus(&focus, cx)).unwrap();
+    gpui_kit::VisualTestContext::from_window(b.window, cx).simulate_keystrokes("[");
+    draw(cx, b.window);
+    let state = cx.update(|cx| {
+        let v = b.view.read(cx);
+        (v.show_mass, v.ui.measure_pinned, v.selection.len())
+    });
+    assert_eq!(state, (false, true, 0), "(Mass open, Measure open, selected) after [");
 }

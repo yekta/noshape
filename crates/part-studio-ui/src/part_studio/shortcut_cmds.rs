@@ -239,11 +239,8 @@ impl PartStudioView {
             "Curvature color map" => self.toggle_analysis(Analysis::Curvature, window, cx),
             "Collapse all in list" => self.set_all_folders_collapsed(true, cx),
             "Expand all in list" => self.set_all_folders_collapsed(false, cx),
-            "Mass and section properties" => {
-                // As the Mass properties button at the bottom right.
-                self.ui.measure_pinned = false;
-                self.set_show_mass(!self.show_mass, cx);
-            }
+            // As the Mass properties button at the bottom right.
+            "Mass and section properties" => self.open_mass(cx),
             _ => {}
         }
     }

@@ -3864,10 +3864,7 @@ impl PartStudioView {
                                                 this.ui.measure_pinned = !this.ui.measure_pinned;
                                                 this.set_show_mass(false, cx);
                                             }
-                                            "Mass and section properties" => {
-                                                this.ui.measure_pinned = false;
-                                                this.set_show_mass(!this.show_mass, cx);
-                                            }
+                                            "Mass and section properties" => this.open_mass(cx),
                                             _ => {
                                                 window.focus(&this.focus, cx);
                                                 this.toggle_construction(window, cx);

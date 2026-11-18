@@ -1371,10 +1371,7 @@ impl PartStudioView {
             out.push(
                 div()
                     .id(id("mass-tip"))
-                    .child(btn(id("mass"), "mass-properties", mass_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.ui.measure_pinned = false;
-                        this.set_show_mass(!this.show_mass, cx);
-                    })))
+                    .child(btn(id("mass"), "mass-properties", mass_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_mass(cx))))
                     .tip("Display mass and section properties", TipSide::Above)
                     .into_any_element(),
             );
@@ -2394,6 +2391,15 @@ impl PartStudioView {
         let (_, at) = self.ui.com.as_ref()?;
         let p = self.viewport.read(cx).project(*at)?;
         Some(div().absolute().left(px(p.x as f32 - 9.)).top(px(p.y as f32 - 9.)).child(crate::assets::icon(&crate::assets::icon_path("com-indicator"), 18., cx)).into_any_element())
+    }
+
+    /// The Mass properties button (and its shortcut): opens the panel; open, it stays as it is (live measure-mass-1118:
+    /// three clicks leave it open; Esc closes it).
+    pub(super) fn open_mass(&mut self, cx: &mut Context<Self>) {
+        if !self.show_mass {
+            self.ui.measure_pinned = false;
+            self.set_show_mass(true, cx);
+        }
     }
 
     pub(super) fn set_show_mass(&mut self, show: bool, cx: &mut Context<Self>) {

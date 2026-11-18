@@ -204,6 +204,29 @@ enum Geo {
     Other,
 }
 
+/// Where the line through `o` along `d` meets the plane through `q` with normal `n`.
+fn meeting_point(o: DVec3, d: DVec3, q: DVec3, n: DVec3) -> DVec3 {
+    let den = d.dot(n);
+    if den.abs() < 1e-12 { o } else { o + d * ((q - o).dot(n) / den) }
+}
+
+/// The angle between the directions from a point of the line through `p` along `u` toward the middles of `a` and
+/// `b` (a face's area centroid, an edge's midpoint), each taken square to that line; None when a middle lies on it.
+fn toward_middles(a: &Shape, b: &Shape, p: DVec3, u: DVec3) -> Option<f64> {
+    let middle = |s: &Shape| match s.shape_type() {
+        ShapeType::Face => s.centroid().ok(),
+        ShapeType::Edge => s.edge_info().ok().map(|i| (i.start + i.end) * 0.5),
+        _ => None,
+    };
+    let square = |m: DVec3| {
+        let v = m - p;
+        let w = v - u * v.dot(u);
+        (w.length() > 1e-9).then_some(w)
+    };
+    let (wa, wb) = (square(middle(a)?)?, square(middle(b)?)?);
+    Some(wa.angle_between(wb))
+}
+
 fn geo(s: &Shape) -> Geo {
     match s.shape_type() {
         ShapeType::Face => match s.face_surface() {
@@ -390,7 +413,10 @@ pub fn quick_line(rows: &[(String, Measurement)], count: usize) -> Vec<(String, 
     let secondary = |l: &str| count > 1 && (l == "Area" || l == "Length");
     let Some(first) = rows.iter().position(|(l, _)| !secondary(l)) else { return Vec::new() };
     let mut out = vec![rows[first].clone()];
-    if rows.iter().any(|(l, _)| CIRCULAR.contains(&l.as_str())) {
+    // (An angle between two directions stands alone: a cylinder and a face across it read "Perp axes angle: 90.000 deg"
+    // only; a circle and its own face join the distances after "Face tangent angle", live measure-mass-1118.)
+    let lone_angle = matches!(rows[first].1, Measurement::Angle(_)) && rows[first].0 != "Face tangent angle";
+    if rows.iter().any(|(l, _)| CIRCULAR.contains(&l.as_str())) && !lone_angle {
         out.extend(rows[first + 1..].iter().filter(|(l, _)| LINE_DISTANCES.contains(&l.as_str())).cloned());
     }
     // Live (measure.json "two circles / circle + edge"): Min dist | Max dist | Center dist, the centres' last.
@@ -522,8 +548,11 @@ pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
                 out.extend(min());
                 out.extend(max());
             } else {
-                // The angle between the faces (live: a 45° chamfer against the top reads 135°).
-                let t = std::f64::consts::PI - n1.angle_between(n2);
+                // Live (measure-mass-1118): the angle between the directions from where the planes meet toward each
+                // face's middle (a 45° chamfer against the top reads 135°; a sloped face against y = 0, 33.69°).
+                let u = n1.cross(n2).normalize();
+                let p = meeting_point(o1, n1.cross(u), o2, n2);
+                let t = toward_middles(a, b, p, u).unwrap_or_else(|| std::f64::consts::PI - n1.angle_between(n2));
                 out.push((if is_right_angle(t) { "Perp planes angle" } else { "Angle" }.into(), Measurement::Angle(t)));
                 out.extend(area());
                 out.extend(max());
@@ -538,7 +567,10 @@ pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
                 out.extend(max());
                 out.extend(min());
             } else {
-                let t = angle.unwrap_or_else(|| d1.angle_between(d2));
+                // Live (measure-mass-1118): toward each edge's middle from where the lines meet (or come closest).
+                let u = d1.cross(d2).normalize();
+                let p = meeting_point(o1, d1, o2, d2.cross(u).normalize());
+                let t = toward_middles(a, b, p, u).or(angle).unwrap_or_else(|| d1.angle_between(d2));
                 out.push((if is_right_angle(t) { "Perp lines angle" } else { "Angle" }.into(), Measurement::Angle(t)));
                 out.extend(min());
                 // Skew lines: the distance along their common perpendicular.
