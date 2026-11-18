@@ -363,6 +363,23 @@ impl GFace {
     }
 
     /// A point's parameters on a NURBS face's surface (from the nearest of its samples).
+    /// [`Self::uv_of`]'s first try alone: from the nearest sample, not again from other rows; not kept.
+    fn uv_first(&self, p: DVec3) -> DVec2 {
+        let Some(ns) = &self.ns else { return DVec2::ZERO };
+        let key = [p.x.to_bits(), p.y.to_bits(), p.z.to_bits()];
+        if let Some(uv) = self.uvs.lock().ok().and_then(|m| m.get(&key).copied()) {
+            return uv;
+        }
+        let g = self.grid.get_or_init(|| free::cached_grid(ns, self.uvbox));
+        let (grid, near) = (&g.pts, &g.near);
+        let at = if p.is_finite() {
+            near.of(p)
+        } else {
+            grid.iter().enumerate().min_by(|a, b| (a.1.1 - p).length_squared().total_cmp(&(b.1.1 - p).length_squared())).map(|x| x.0)
+        };
+        ns.param_of(p, at.map_or(DVec2::ZERO, |i| grid[i].0), self.uvbox).0
+    }
+
     fn uv_of(&self, p: DVec3) -> DVec2 {
         let Some(ns) = &self.ns else { return DVec2::ZERO };
         let key = [p.x.to_bits(), p.y.to_bits(), p.z.to_bits()];
@@ -701,6 +718,41 @@ impl Pool {
             cells(&self.grid, self.key(p), &mut take);
         } else if far <= self.ccell {
             cells(&self.coarse, self.ckey(p), &mut take);
+        } else {
+            for i in 0..self.p.len() as u32 {
+                take(i);
+            }
+        }
+        for &i in &self.huge {
+            take(i);
+        }
+        near
+    }
+
+    /// The vertices within `r` of `p`, with their distances (by the grid whose cells hold `r`, else all).
+    fn within(&self, p: DVec3, r: f64) -> Vec<(u32, f64)> {
+        let mut near: Vec<(u32, f64)> = Vec::new();
+        let mut take = |i: u32| {
+            let d = (self.p[i as usize] - p).length();
+            if d <= r && !near.iter().any(|x| x.0 == i) {
+                near.push((i, d));
+            }
+        };
+        let mut cells = |grid: &HashMap<(i64, i64, i64), Vec<u32>>, k: (i64, i64, i64)| {
+            for dx in -1..=1 {
+                for dy in -1..=1 {
+                    for dz in -1..=1 {
+                        for &i in grid.get(&(k.0 + dx, k.1 + dy, k.2 + dz)).into_iter().flatten() {
+                            take(i);
+                        }
+                    }
+                }
+            }
+        };
+        if r <= self.cell {
+            cells(&self.grid, self.key(p));
+        } else if r <= self.ccell {
+            cells(&self.coarse, self.ckey(p));
         } else {
             for i in 0..self.p.len() as u32 {
                 take(i);
@@ -2085,7 +2137,7 @@ impl Ctx<'_> {
                             d <= cx.pool.pair(cx.edges[e].t, cx.pool.t[w as usize]) && (0.0..=1.0).contains(&u)
                         })
                     };
-                    cx.pool.near_tol(p, reach).into_iter().filter(|x| x.1 <= reach && on(fs, x.0) && on(ft, x.0)).min_by(|x, y| x.1.total_cmp(&y.1)).map(|x| x.0)
+                    cx.pool.within(p, reach).into_iter().filter(|x| on(fs, x.0) && on(ft, x.0)).min_by(|x, y| x.1.total_cmp(&y.1)).map(|x| x.0)
                 })
             };
             // (OCCT's curve ending inside both faces: a new vertex at its end of the curve's tolerance, OCCT's bound
@@ -2220,7 +2272,7 @@ impl Ctx<'_> {
     /// from `point`: each from where it comes onto the surface to where it leaves, a vertex where it crosses the
     /// face's own edge there ([`Self::edge_crossing`]); the whole of it where it never leaves. None where it leaves
     /// without crossing an edge.
-    fn stretches_over(&mut self, e: usize, f: usize, point: &dyn Fn(f64) -> DVec3, (t0, e0): (f64, End), (t1, e1): (f64, End)) -> R<Option<Vec<EdgePart>>> {
+    fn stretches_over(&mut self, e: usize, f: usize, point: &dyn Fn(f64) -> DVec3, (t0, e0): (f64, End), (t1, e1): (f64, End), keep: &dyn Fn(&Self, f64, f64) -> bool) -> R<Option<Vec<EdgePart>>> {
         let gap = GREY * self.pool.pair(self.edges[e].t, self.faces[f].t);
         const N: usize = 256;
         let ts: Vec<f64> = (0..=N).map(|k| t0 + (t1 - t0) * k as f64 / N as f64).collect();
@@ -2252,31 +2304,32 @@ impl Ctx<'_> {
             while k <= N && on[k] {
                 k += 1;
             }
-            let a = if start == 0 { Some((t0, e0)) } else { self.edge_crossing(e, f, point, ts[start - 1], ts[start])? };
-            let b = if k > N { Some((t1, e1)) } else { self.edge_crossing(e, f, point, ts[k], ts[k - 1])? };
+            let a = if start == 0 { Some((t0, None)) } else { self.edge_crossing(e, f, point, ts[start - 1], ts[start]).map(|(t, q, d)| (t, Some((q, d)))) };
+            let b = if k > N { Some((t1, None)) } else { self.edge_crossing(e, f, point, ts[k], ts[k - 1]).map(|(t, q, d)| (t, Some((q, d)))) };
             let (Some(a), Some(b)) = (a, b) else { return Ok(None) };
-            parts.push((a.0, a.1, b.0, b.1));
+            // (A vertex at a crossing only for a part kept.)
+            if !keep(self, a.0, b.0) {
+                continue;
+            }
+            let ea = match a.1 { Some((q, d)) => End::Vertex(self.pool.add_tol(q, d)?), None => e0 };
+            let eb = match b.1 { Some((q, d)) => End::Vertex(self.pool.add_tol(q, d)?), None => e1 };
+            parts.push((a.0, ea, b.0, eb));
         }
         Ok(Some(parts))
     }
 
     /// Where edge `e` (its point at `t` from `point`) comes onto free-form face `f`'s surface between `off` (off it) and
-    /// `onto` (on it): where it comes nearest the face's edge nearest there, a vertex between the
-    /// two; none where that's beyond the two edges' tolerances (OCCT's edge-edge crossing: a circle grazing a thread's
+    /// `onto` (on it): where it comes nearest the face's edge nearest there, its parameter, the point between the two
+    /// and that point's tolerance; none where that's beyond the two edges' tolerances (OCCT's edge-edge crossing: a circle grazing a thread's
     /// run-out edge stays within 0.8 um of it for 44 degrees and crosses it at one point).
-    fn edge_crossing(&mut self, e: usize, f: usize, point: &dyn Fn(f64) -> DVec3, off: f64, onto: f64) -> R<Option<(f64, End)>> {
+    fn edge_crossing(&self, e: usize, f: usize, point: &dyn Fn(f64) -> DVec3, off: f64, onto: f64) -> Option<(f64, DVec3, f64)> {
         // (Two samples' spacing either way of their middle.)
         let b = 0.5 * (off + onto);
         let p = point(b);
-        let Some(x) = self.faces[f].edges.iter().map(|&(x, _)| x).min_by(|&x, &y| self.edge_point_near(x, p).0.total_cmp(&self.edge_point_near(y, p).0)) else {
-            return Ok(None);
-        };
+        let x = self.faces[f].edges.iter().map(|&(x, _)| x).min_by(|&x, &y| self.edge_point_near(x, p).0.total_cmp(&self.edge_point_near(y, p).0))?;
         let h = 2.0 * (onto - off).abs();
         let (t, d, q) = self.nearest_to_edge(x, point, b - h, b + h);
-        if d > self.pool.pair(self.edges[e].t, self.edges[x].t) {
-            return Ok(None);
-        }
-        Ok(Some((t, End::Vertex(self.pool.add_tol((point(t) + q) * 0.5, (0.5 * d).max(self.tol))?))))
+        (d <= self.pool.pair(self.edges[e].t, self.edges[x].t)).then(|| (t, (point(t) + q) * 0.5, (0.5 * d).max(self.tol)))
     }
 
     /// Edge `x`'s point nearest `p`, and its distance.
@@ -2345,7 +2398,15 @@ impl Ctx<'_> {
             _ => unreachable!(),
         };
         let whole = (t0, End::Vertex(s.v[0]), t1, End::Vertex(s.v[1]));
-        let Some(parts) = self.stretches_over(e, f, &|t| at(t).0, (t0, whole.1), (t1, whole.3))? else {
+        // (Not where it runs along the face's own edge (a cylinder's end circle along the rim of a B-spline copy of it,
+        // shfall 3cc4df89: a vertex where it leaves the copy, 12 um short of the circle's end, split the rim edge).)
+        let along = |cx: &Self, a0: f64, a1: f64| {
+            [0.25, 0.5, 0.75].iter().all(|k| {
+                let p = at(a0 + (a1 - a0) * k).0;
+                cx.faces[f].edges.iter().any(|&(x, _)| cx.edge_point_near(x, p).0 <= cx.pool.pair(cx.edges[e].t, cx.edges[x].t))
+            })
+        };
+        let Some(parts) = self.stretches_over(e, f, &|t| at(t).0, (t0, whole.1), (t1, whole.3), &|cx, a0, a1| !along(cx, a0, a1))? else {
             return Err(Decline("an edge on another argument's free-form face"));
         };
         // (On it all along: as any edge on a face's surface.)
@@ -2484,7 +2545,7 @@ impl Ctx<'_> {
                 // its stretches on the surface, each from where it crosses the face's edge to where it crosses it again.)
                 if whole.is_none()
                     && let [(a0, e0, a1, e1)] = parts[..]
-                    && let Some(runs) = self.stretches_over(e, f, &|t| at(t).0, (a0, e0), (a1, e1))?
+                    && let Some(runs) = self.stretches_over(e, f, &|t| at(t).0, (a0, e0), (a1, e1), &|_, _, _| true)?
                 {
                     parts = runs.into_iter().filter(|&(b0, _, b1, _)| path.length(b0.min(b1), b0.max(b1)) > self.tol).collect();
                     on_free = Vec::with_capacity(parts.len());
@@ -2894,7 +2955,7 @@ impl Ctx<'_> {
                 if matches!(self.faces[g].s, Surf::Nurbs { .. }) && !boxes_meet(p, p, lo, hi, tol) {
                     continue;
                 }
-                if free::whole_surface_distance(&self.faces[g], p) > tol {
+                if free::whole_surface_distance_first(&self.faces[g], p) > tol {
                     return self.lies_on(fs, ft) || self.lies_on(ft, fs);
                 }
                 n += 1;
@@ -2913,7 +2974,7 @@ impl Ctx<'_> {
             return false;
         }
         let samples = self.face_samples(f);
-        samples.len() >= 8 && samples.iter().rev().all(|&p| free::whole_surface_distance(&self.faces[g], p) <= self.tol)
+        samples.len() >= 8 && samples.iter().rev().all(|&p| free::whole_surface_distance_first(&self.faces[g], p) <= self.tol)
     }
 
     fn nurbs_pair(&mut self, fs: usize, ft: usize) -> R<()> {

@@ -703,6 +703,20 @@ pub(super) fn whole_surface_distance(g: &GFace, p: DVec3) -> f64 {
     }
 }
 
+/// [`whole_surface_distance`] by a free-form face's point found from its nearest sample alone ([`GFace::uv_first`]):
+/// whether a face's samples lie on another's surface (a knurl's blank against its grooves: the turn retry of
+/// [`GFace::uv_of`] took a third of its Boolean there).
+pub(super) fn whole_surface_distance_first(g: &GFace, p: DVec3) -> f64 {
+    match (&g.s, g.ns.as_deref()) {
+        (Surf::Nurbs { .. }, Some(FreeSurface::Torus { .. } | FreeSurface::Sphere { .. })) => whole_surface_distance(g, p),
+        (Surf::Nurbs { .. }, Some(ns)) => {
+            let uv = g.uv_first(p);
+            (ns.at(uv.x, uv.y) - p).length()
+        }
+        _ => whole_surface_distance(g, p),
+    }
+}
+
 /// Where a curve lying on free-form face `g` (its point at `t` from `at`) crosses the seam of a face going a whole turn
 /// round: its parameters (its parameters on the face jump by a turn there), in its own order.
 pub(super) fn seam_crossings(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, t1: f64) -> Vec<f64> {
