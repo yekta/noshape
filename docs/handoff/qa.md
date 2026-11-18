@@ -174,7 +174,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 1. **17:00 cut (11-18)**: TICKETS "Release blockers for the 2026-11-18 17:00 release". The qa-cut-1615 timer runs cut-verdict.sh at
    16:15 (cut-must.txt by subject, "subject:<text>|<label>": fff088e5, 7b8bb2491, 8f6424b40, 459976266, 9595bbf05 tab return,
    a98d25431 Windows double-click, 0a50fd4b5 Windows nav (lead said e7d9df8c), core's revert db96888b of 77ba403e7; missing -> HOLD;
-   13:20: the last two not in green c7d388e8, the revert not on main yet; without it HOLD on the impeller renames) -> qa-alerts + compat/cut-1118-1615.txt. Read the
+   13:20: the last two not in green c7d388e8; the revert waits in vibe2's queue: unit qa-imp-wait (bin/imp-wait.sh) runs impeller
+   compat vs 0.4.58 on its first green -> compat/imp-<sha8>.txt + qa-alerts; qa-ci-44311059310 (bin/ci-wait.sh) alerts Windows Test) -> qa-alerts + compat/cut-1118-1615.txt. Read the
    ticket and corpus sections (a status that gets worse is a HOLD unless in compat/accepted.txt; cf-sheet-metal-model-plus's
    unfold Warning was a stale app copy: SAME on 6dbd91f3), update the entry with GO / HOLD and its green, commit docs-only. After the publish:
    `systemd-run --unit qa-pub-<v> -E HOME=/root -E PATH=$PATH bash /root/qa-scratch/bin/rel-pub-all.sh 0.4.58 <v> <cand on vibex7>`.
