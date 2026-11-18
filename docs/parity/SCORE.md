@@ -150,11 +150,11 @@ mirror-face-type (a live DOM detail).
 
 ## Speed window (qa, 02:00–04:00 UTC; vibe7 from 2026-11-13, a new baseline; docs/parity/INDEX.md "Scoring changes")
 
-### Nightly, vibe7 02:00 (qa-w7-nightly, every night; the newest release's Linux CLI)
+### Nightly, vibex7 02:00 (qa-w7-nightly, every night; the newest release's Linux CLI)
 
 Each night's row is added by the unit: model suite documents faster than live (median of 3 regen_ms against live's), the sum
 of our medians (live 41.1 s), and the user documents' cold open (median of 3; the hats' Mac mini hat tab, the dock's 8 tabs), as
-11-14's like-for-like run below. Load is vibe7's during the model timings.
+11-14's like-for-like run below. Load is vibex7's during the model timings.
 
 | night (UTC) | release CLI | load | models faster than live, of 84 | sum of ours | hat8 cold | hat15 cold | hat15b cold | dock cold | dock reopen |
 |---|---|---|---|---|---|---|---|---|---|
@@ -162,6 +162,7 @@ of our medians (live 41.1 s), and the user documents' cold open (median of 3; th
 | 2026-11-15 | – | – | not run (the one-night unit had ended) | | | | | | |
 | 2026-11-16 | v0.4.53 | 4.5–8.3 (qa's GUI fuzz used ~2 of 8 cores alongside; paused in the window from 11-17) | **58** | 68.3 s | 6.26 s | 6.05 s | 5.97 s | 16.00 s | 4.61 s |
 | 2026-11-17 | v0.4.55 | 0.5–0.5 | **1** | 0.0 s | 5.09 s | – | – | – | INVALID: CLI pair path unexpanded, 1 of 84 docs timed (fixed for 11-18) |
+| 2026-11-18 | v0.4.57 (v0.4.56 alternating: 55.7 -> 54.8 s, 1 docs > 1.25x slower); live: 84 of 84 fresh-copy | 1.4–3.5 | **60** | 54.8 s | 5.15 s | 5.16 s | 5.19 s | 7.51 s | 3.46 s |
 
 2026-11-13, vibe7 load 0.1–1.9, nothing else running; v0.4.46 (e06b09c83) and main's head (91a90caf) built there, run back to back.
 
