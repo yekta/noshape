@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 23:40 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-19 01:12 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -37,9 +37,26 @@ quadrant's snap wakes no alignment source (ours aligns with points only).
   Sketch 13); translator: Use'd B-spline ends by first pole (asm-suspension 805e29 Sketch 2), line-across-circle
   minimum distance r - d (`h.internal`, 995636 Sketch 4), `sketch_draw` `apart` + `loose_ends` (995636 Sketch 13);
   the Origin selectable in a sketch (qa session-1118). Suite A/B: identical (90/126, 1325/1585).
-- Queued: a678e02c (shown point reach 8.5 px: qa measured 10 lit at 9.5, live 9).
+- Landed 65fd9adb (00:14): shown point reach 8.5 px (qa: lit at 10, live 9) + stale feel rows.
 - asm-suspension still: Fillet 3 / 4, Body / Joint / Lower Control Arm offsets: our edges B-splines where live's are
   r40 circles (core's; asm routes). asm-tvc-mount ring: not cce30a1a (A/B identical); asm bisects.
+
+## Big-sketch feel (lead 23:4x): reported 01:12, nothing >= 100 ms in ours
+- Ours (vibe2 release, solver + regions + redraw = clone/overlay/glyphs/labels), worst of 5 picks / 150 steps:
+  infento "Part grid" (3057 ent / 1313 con ours): press 4-10 ms, drag 7.0 avg / 11 worst, redraw 1.2, regen 12-32 ms
+  (live's recorded regen 13984 ms); no driving dimensions. robot "Sketch 2": press 3-5, drag 3.9 / 19, edit 11-14
+  (362 PROJECTED not built: Import 1 not fetched). keyboard "Sketch 5": not buildable offline (on Import 1's face);
+  substitute bjr-config 5d8bc1 "Sketch 29" (622 / 610): press 2.5-25, drag 15 / 44 (60 of 150 steps > 16 ms), edit
+  16-20, redraw 0.8.
+- Live's numbers: REQUESTS 23:45 still open; compare when they come (only a >= 100 ms gap would be mine).
+- Runs: vibe2 ~/tmp/skasm/{inf1,bjr1,bigm} model dirs (studio cut to the sketch), inf1.sh / redraw.sh (scratch bin).
+  The full infento doc (349 features) takes > 40 min to translate (not a sketch cost: Part grid itself 15 s).
+- THE PROBE IS WIRED INTO THE TREE UNCOMMITTED: crates/ops/tests/zz_sketch_speed.rs + `mod zz_sketch_speed;` in
+  crates/ops/tests/all.rs: `git checkout crates/ops/tests/all.rs && rm crates/ops/tests/zz_sketch_speed.rs` before
+  any commit / land (copy with REDRAW: /root/skasm-scratch/probes/zz_sketch_speed.rs).
+Then: live's sketch-shortcut ≠ rows when they come; welding Sketch 12 (2 PROJECTED Uses: "Is" resolves to our vertex
+at x -118.985 mm, live's at -112.02; rerun vibe2 ~/tmp/skasm/cfgs.sh -> cfgs.log, saved doc ~/tmp/skasm/cfgsave).
+Waiting: live rechecks error rows 82-85.
 
 ## Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
 regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).
