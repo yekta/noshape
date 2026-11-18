@@ -1415,9 +1415,12 @@ impl PartStudioView {
             }
             // A mate connector field takes the inference point under the pointer (inference.rs).
             let inferred = self.inferred_origin(&target.reference);
+            // Corner's and Bend relief's box takes a sheet metal part's thin side face as the joint's edge, its definition
+            // entity (live 11-18 sm-rip-1118: a rip's side face goes in as "Edge of Sheet metal model 1").
+            let taken = if filter == SM_CORNER_FILTER { self.side_face_edge(&target.reference).unwrap_or_else(|| target.reference.clone()) } else { target.reference.clone() };
             dialog.update(cx, |d, cx| match inferred {
                 Some(o) => d.pick_connector(o, cx),
-                None => d.add_pick(target.reference.clone(), cx),
+                None => d.add_pick(taken, cx),
             });
         } else if let Some(pos) = self.selection.iter().position(|r| *r == target.reference) {
             self.selection.remove(pos);
@@ -1426,6 +1429,24 @@ impl PartStudioView {
         }
         self.refresh_scene(false, cx);
         cx.notify();
+    }
+
+    /// A sheet metal part's thin side face (not a wall's broad face): its longest edge, along the joint or rim the face
+    /// stands on (that edge's definition entity is the face's).
+    fn side_face_edge(&self, r: &Reference) -> Option<Reference> {
+        let Reference::Face(n) = r else { return None };
+        let ctx = self.context.as_ref()?;
+        let (b, sm) = ctx.bodies.iter().find_map(|b| Some((b, ctx.sheet_metal.get(&b.id)?)).filter(|(b, _)| b.faces.iter().any(|f| **f == *n)))?;
+        let i = b.faces.iter().position(|f| **f == *n)?;
+        if sm.wall_of_face(n).is_some() || b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()?.face_plane().ok().flatten().is_none() {
+            return None;
+        }
+        let length = |e: &Reference| {
+            let body = self.display.bodies.iter().find(|x| x.edge_refs.contains(e))?;
+            let pl = body.mesh.edges.get(body.edge_refs.iter().position(|x| x == e)?)?;
+            Some(pl.windows(2).map(|w| glam::Vec3::from(w[0]).distance(glam::Vec3::from(w[1]))).sum::<f32>())
+        };
+        noshape_scene::builder::face_edges(&self.display, r).into_iter().filter_map(|e| Some((length(&e)?, e))).max_by(|a, b| a.0.total_cmp(&b.0)).map(|x| x.1)
     }
 
     /// The sketch region a curve bounds, when `filter` takes regions but not

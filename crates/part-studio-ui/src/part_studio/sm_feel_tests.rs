@@ -319,3 +319,62 @@ fn a_corner_rip_made_a_bend_cannot_unfold_as_lives(cx: &mut TestAppContext) {
     assert_eq!(got, (Some("Modify joint 1".into()), Some((FeatureStatus::Error, Some(msg.into()))), Some(5), Some((FeatureStatus::Warning, msg.into()))), "(the joint, its state (live: a WARNING listed as failed), the part's bends, the yellow toast)");
     assert_eq!(flat(cx), Some(false), "no flat");
 }
+
+/// Live 11-18 sm-rip-1118 (b): a rip's thin side face clicked in Corner (or Bend relief) goes in as the rip's definition
+/// edge, a chip "Edge of Sheet metal model 1", and the feature fails: "Sheet metal corner not found." / "Selection is not
+/// a bend relief.".
+#[gpui::test]
+fn a_rips_side_face_in_corner_or_bend_relief_is_its_edge_and_fails_as_lives(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "20 mm" } },
+        { "type": "sheetMetalStart", "name": "Sheet metal model 1", "params": { "process": "CONVERT", "partToConvert": ["part 0"], "facesToExclude": ["face through [30, 20, 20]"],
+            "bends": ["edge through [30, 0, 0]", "edge through [60, 20, 0]", "edge through [30, 40, 0]", "edge through [0, 20, 0]"] } },
+    ] });
+    let (window, view) = part_studio_from(cx, "sm-rip-side", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    // The thin side face of the rip at the box's corner (60, 0, 10) mm.
+    let face = cx.update(|cx| {
+        let v = view.read(cx);
+        let ctx = v.context.as_ref().unwrap();
+        let (b, sm) = ctx.bodies.iter().find_map(|b| Some((b, ctx.sheet_metal.get(&b.id)?))).expect("the sheet metal part");
+        let corner = glam::DVec3::new(0.06, 0.0, 0.01);
+        b.faces
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| sm.wall_of_face(n).is_none())
+            .filter_map(|(i, n)| {
+                let f = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()?;
+                f.face_plane().ok().flatten()?;
+                let bb = f.bounding_box(false).ok()?;
+                Some((Reference::Face((**n).clone()), ((bb.min + bb.max) * 0.5 - corner).length()))
+            })
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(r, _)| r)
+            .expect("a rip side face")
+    });
+    let mut got = Vec::new();
+    for ty in ["sheetMetalCorner", "sheetMetalBendRelief"] {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature(ty, w, cx))).unwrap();
+        draw(cx, window);
+        cx.update(|cx| view.update(cx, |v, cx| v.pick(noshape_scene::builder::PickTarget { reference: face.clone(), kind: noshape_scene::builder::PickKind::Face, anchor: None }, cx)));
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        draw(cx, window);
+        got.push(cx.update(|cx| {
+            let v = view.read(cx);
+            let d = v.edit.as_ref().unwrap().dialog.read(cx);
+            let picked: Vec<String> = d.feature.params.0.values().filter_map(|p| match p {
+                noshape_model::params::ParamValue::Query(q) => Some(q.iter().map(|r| (v.labeler(cx))(r)).collect::<Vec<_>>()),
+                _ => None,
+            }).flatten().collect();
+            (picked, v.display.feature_state(d.feature.id).and_then(|s| s.message.clone()))
+        }));
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    }
+    assert_eq!(got, vec![
+        (vec!["Edge of Sheet metal model 1".to_string()], Some("Sheet metal corner not found.".to_string())),
+        (vec!["Edge of Sheet metal model 1".to_string()], Some("Selection is not a bend relief.".to_string())),
+    ]);
+}
