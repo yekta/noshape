@@ -164,6 +164,85 @@ fn timed_bracket_drawing_four_views() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Drawing views of the heaviest corpus parts (lead 11-18: users wait on them), placed as a user does: Create drawing
+/// (No views), Insert view Front, then Top, Right and Isometric projected from it, each timed from the call to its view
+/// drawn (no kept view: each run starts cold); then the last solid feature suppressed, the drawing's Update timed to its
+/// views redrawn, and unsuppressed. NOSHAPE_DRAWING_PERF: the models (corpus names, or an assembly corpus studio as
+/// `<assembly>/studios/<element>`); live's times: behaviours "dx drawing views on corpus parts".
+#[test]
+#[ignore = "T2: the corpus is on the build hosts only"]
+fn timed_corpus_drawing_views() {
+    let models = std::path::PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into()));
+    let list = std::env::var("NOSHAPE_DRAWING_PERF").unwrap_or_else(|_| "c2-impeller-loft,c2-rings-loft,cf-snap-hook,asm-xdev-subs/studios/62b37d60151c2ce87dea5e91,asm-xdev-subs/studios/3406573cf4556f343a88dce8".into());
+    let runs: usize = std::env::var("NOSHAPE_PERF_RUNS").ok().and_then(|r| r.parse().ok()).unwrap_or(3);
+    let tmp = std::env::temp_dir().join(format!("noshape-dx-perf-views-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    let ms = |t: Instant| t.elapsed().as_secs_f64() * 1000.0;
+    let call_once = |t: &mut noshape_ops::parity::Translator, tool: &str, args: Value| t.call(tool, args).unwrap_or_else(|e| panic!("{tool}: {e}"));
+    for name in list.split(',') {
+        // An assembly corpus studio: its files under the names a corpus model's have.
+        let dir = match name.split_once("/studios/") {
+            Some((asm, element)) => {
+                let d = tmp.join(element);
+                std::fs::create_dir_all(&d).unwrap();
+                for (from, to) in [("json", "features.json"), ("live.jsonl", "live.jsonl"), ("refs.jsonl", "refs.jsonl"), ("sketches.json", "sketches.json")] {
+                    let _ = std::fs::copy(models.join(asm).join("studios").join(format!("{element}.{from}")), d.join(to));
+                }
+                d
+            }
+            None => models.join(name),
+        };
+        let Some((features, live, refs)) = crate::parity::read_model(&dir) else {
+            eprintln!("{name}: no corpus model at {}", dir.display());
+            continue;
+        };
+        let mut ctx = Ctx::new();
+        let path = tmp.join(format!("{}.noshape", name.replace('/', "-")));
+        let mut t = noshape_ops::parity::Translator::open(&mut ctx, &path, &features, noshape_ops::parity::live_refs(&live, &refs)).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let regen = Instant::now();
+        for k in 0..t.len() {
+            t.step(k);
+        }
+        // The Part Studio as its tab shows it, regenerated once (a drawing of it is made from that regeneration).
+        call_once(&mut t, "query_parts", json!({ "tab": "Part Studio 1" }));
+        let regen = ms(regen);
+        let last = features["features"].as_array().into_iter().flatten().rev().find(|f| f["featureType"] != "newSketch" && f["suppressed"] != true).and_then(|f| t.ours(f["featureId"].as_str()?)).map(str::to_string);
+        let mut call = |tool: &str, args: Value| t.call(tool, args).unwrap_or_else(|e| panic!("{name}: {tool}: {e}"));
+        let (mut base, mut projected, mut update) = (Vec::new(), [Vec::new(), Vec::new(), Vec::new()], Vec::new());
+        for _ in 0..runs {
+            noshape_ops::drawing::drop_cached_views();
+            let drawing = call("drawing_create", json!({ "template": "ANSI_A_INCH.dwt", "suggested_views": false }))["drawing"].as_str().unwrap().to_string();
+            let at = Instant::now();
+            let front = call("drawing_insert_view", json!({ "drawing": drawing, "source": "Part Studio 1", "orientation": "front", "position": [70, 70] }))["view"].clone();
+            call("drawing_get", json!({ "drawing": drawing, "edges": false }));
+            base.push(ms(at));
+            for (i, position) in [[70, 170], [180, 70], [180, 170]].into_iter().enumerate() {
+                let at = Instant::now();
+                call("drawing_projected_view", json!({ "drawing": drawing, "parent": front, "position": position }));
+                call("drawing_get", json!({ "drawing": drawing, "edges": false }));
+                projected[i].push(ms(at));
+            }
+            let Some(f) = &last else { continue };
+            call("feature_suppress", json!({ "tab": "Part Studio 1", "features": [f] }));
+            let at = Instant::now();
+            call("drawing_update", json!({ "drawing": drawing }));
+            let g = call("drawing_get", json!({ "drawing": drawing, "edges": false }));
+            update.push(ms(at));
+            assert_eq!(g["views"].as_array().map_or(0, |v| v.len()), 4, "{name}: {g}");
+            call("feature_suppress", json!({ "tab": "Part Studio 1", "features": [f], "suppressed": false }));
+        }
+        eprintln!("{name}: regenerated in {regen:.0} ms; the last solid feature {last:?}");
+        report(&format!("{name}: Insert view Front"), base);
+        for (i, which) in ["Top", "Right", "Isometric"].into_iter().enumerate() {
+            report(&format!("{name}: projected {which}"), std::mem::take(&mut projected[i]));
+        }
+        if !update.is_empty() {
+            report(&format!("{name}: Update after the last solid feature suppressed"), update);
+        }
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
 /// PLAN 2.7 dx: import of the NIST MTC CRADA assembly from STEP and from
 /// Parasolid (live's own exports of it: tests/perf/nist-mtc-crada-assembly.step
 /// / .x_t), from Import to the parts regenerated and tessellated for display.

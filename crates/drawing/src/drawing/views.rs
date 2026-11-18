@@ -377,6 +377,11 @@ fn lin_to_srgb(c: f32) -> u8 {
 /// same evaluation (a 2000-instance assembly's takes about 0.4 s).
 static RECENT_SOURCES: std::sync::LazyLock<Mutex<std::collections::VecDeque<(SourceKey, u64, SourceModel)>>> = std::sync::LazyLock::new(Default::default);
 
+/// Forget the sources evaluated last (a cold start's timing: dx_perf).
+pub fn forget_recent_sources() {
+    RECENT_SOURCES.lock().clear();
+}
+
 /// Regenerate / evaluate one source. `regen` is reused for Part Studios
 /// (incremental), `assemblies` caches studio regenerations for assemblies.
 pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerator, assemblies: &mut AssemblyEvaluator) -> Option<SourceModel> {

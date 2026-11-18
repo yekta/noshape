@@ -118,12 +118,6 @@ Open, ranked:
   blend (FYI). draft_robust whole-body is_valid: core's 77715251. The kernel profile's per-feature block also counts
   the suite's measurement after the feature (boxes, props, display mesh): compare with the feature's own regen ms.
 
-- Corpus widening (lead via live): live captures 5 public documents for the least-covered features, approved by me
-  (before 23:20): c2-surf-workshop-<studio>, c2-surf-intro-<studio>, c2-rib-wrap, c2-sm-tablet-stand,
-  c2-sm-rocker-enclosure (in that order; assemblies only if asm wants them), each with its configuration definition,
-  `__liveConfiguration` and refs.jsonl; then a second search (sweep twist, loft path/guides, sheet metal rip/corner/hem,
-  a configured part). Run them alone once in, sort first differences to owners.
-
 ## Next, in order
 0. Speed vs live (lead 11-18 06:1x; release, vibex8, dx_perf, same run; live behaviours "speed: drawings", "dx speed:
    drawing creation and NIST import", "dx (2026-11-02, P1 drawing speed on big models)"):
@@ -134,31 +128,37 @@ Open, ranked:
      DWG 0.16 / DXF 0.22 / PNG 1.05 s (7.2-18.3 s).
    - imports: NIST STEP 4.15 / x_t 2.16 s (38.7 / 24.5 s); live big asm STEP 2.8 / x_t 1.7 / IGES 7.1 s (33.5 / 12.9 /
      69.3 s); exchange suite 173/174 at or under live's.
-   - Mac (11-18 17:1x, release, median of 3): c2-rings-loft x_t import 2.28 s (live 8.6), STEP 0.95; cf-spur-gear
-     regenerates in 467 ms (live's full-regen per-feature sum 697 ms; qa's TICKETS row was loaded vibe2).
+   - Corpus drawing views (lead 11-18 18:0x; dx_perf timed_corpus_drawing_views, Mac release, cold views after the
+     studio's regeneration; live2 asked in REQUESTS 18:07, no live times yet): impeller Front 150 / Top 121 / Right 170
+     / Iso 127 ms, Update after a suppression 194; rings-loft 393 / 291 / 448 / 474, Update 612; snap-hook 22 / 10 / 31
+     / 28, 36; xDev Bushing <2, guide adapter 6 / 4 / 17 / 6, 19. Fixed: the agent API's Insert view into an empty
+     drawing regenerated the studio afresh (impeller 9.7 s): SheetModel::build primes `extra`. Rule (DECISIONS
+     9e5b481d4): only views >= 100 ms and >= 2x over live's count.
+   - Mac (11-18, release, median of 3): c2-rings-loft x_t import 2.28 s (live 8.6), STEP 0.95; cf-o-ring ACIS 0.63 s
+     (live 10.6; vibex8 4.3-13 s by load); cf-spur-gear regenerates in 467 ms (live's full-regen per-feature sum 697 ms; qa's TICKETS row was loaded vibe2).
    - c2-rings-loft live.x_t import 17.5 -> 7.9 s on vibex8 (live 8.6; STEP 2.7): tube at 10 nm (f91b8d66) and intersection curves
      fit to 10 nm segment by segment (aad79780, queued fbf75841; blend faces' pcurves 13.7k -> 4.6k knots, STEP 2.4k).
      Left vs STEP: ShapeFix projects every pcurve with >= 23 knots and our 11-point curves with 45; STEP's edges are
      single cubic spans with ~10 um tolerances (ours 10 nm). Next lever if needed: pcurves on the tube from on_both's
      (u, v) at the 3D curve's parameters instead of ShapeFix's projection. A/B tool: vibex8 ~/agents/dx-keep/xtab
      (run.sh, ~/tmp/dx/xtcmp.py), dump patch idea in /root/dx-scratch.
-1. DXF rows vs live2's model truth (behaviours "dx + studios (lead 11-18 ~13:45)", live/dx/drw-truth-1118); m8 run
-   vibex8 ~/agents/dx-keep/exch-m8.log, files ~/tmp/dx/exs-m8, tools /root/dx-scratch/bin/dxfdiff.py / dxfplot2.py:
-   - Torus outlines at a slant are SPLINEs (hlr.cpp freeform_outline, landed 15:18); m8 also flagged every B-spline
-     face's outline, which turned snap-hook's 8 fillet ARCs (live tori, ours B-spline) and 4 faceblend ARCs into
-     SPLINEs: narrowed to tori only (uncommitted at 16:1x, m9 to confirm: bottle-split ELLIPSE matches, snap-hook ARC 82).
-   - sm-louver Front 608 / 465 Visible: 144 short LINEs lie exactly on the plate's front edge line (x 2.785 in),
-     live writes 1: export.rs drop_lines_on_longer writes a line wholly on a longer one once (re-landing 17:3x after a107ed7e failed on psui's box-drag tests; m9 to
-     confirm). The 31 pieces 12.7 um off are in live too. File-wide the rule drops 176 (Visible LINE 2175, live 2178);
-     clamp-guillem's 2 on-longer pairs that live keeps should be `shared` (excluded): m9 checks (265 -> 263, live 268).
-     TANGENT_LINES 117 / 243: Front same length (78.3 in) in fewer pieces, Top's 32 are live's end-on stubs (noise),
-     one real miss: Top's bend tangent 2.785-4.4999 in at y 6.09203 (live TANGENT_LINES, ours nothing). Next.
-   - clamp-guillem Top: live draws y 6.5867 x 4.29-4.62 (2 pieces), ours nothing there; ours 7.077-7.161 at 30° live
-     hides. hex-bookcase ELLIPSE 0 / 2: live's degenerate ellipses (start 3pi) on a 0.5 mm mesh hole: noise.
+1. DXF rows vs live2's model truth (behaviours "dx + studios (lead 11-18 ~13:45)", live/dx/drw-truth-1118). m9
+   (vibex8 ~/agents/dx-keep/exch-m9.log, files ~/tmp/dx/exs-m9; tools /root/dx-scratch/bin/dxfdiff.py, dxfplot2.py,
+   dxfonlonger.py; DXPROBE patch /root/dx-scratch/dxprobe.patch dumps drawing_get per doc), 90bc06a7 queued 17:4x
+   (a107ed7e failed on psui's box-drag tests mid-land, they pass rebased):
+   - Torus-only slanted outlines as SPLINE: snap-hook ARC 82 and bottle-split ELLIPSE match, faceblend ARC 18 / 17.
+   - drop_lines_on_longer (a line wholly on a longer one, same view and style, not `shared`, written once):
+     sm-louver Visible LINE 2175 / 2178 (Front's 144 pieces on the plate edge), clamp-guillem 263 / 268 (the shared
+     pairs live keeps kept), extension-spring 114 / 117 (its 6 were overlaps on the extra end rectangle: core).
+   - sm-louver TANGENT_LINES 117 / 243: Front same length (78.3 in) in fewer pieces, Top's 32 live end-on stubs
+     (noise); Top's bend tangent at y 6.09203 in (live) has no model edge in ours (nearest 0.02 mm either side): open.
+   - clamp-guillem Top y 6.5867 x 4.29-4.62: our model edge is there but HLR hides it where it meets a fillet
+     tangentially (live visible); ours 7.077-7.161 at 30° live hides: grazing HLR, open. hex ELLIPSE 0 / 2: live's
+     degenerate ellipses on a 0.5 mm mesh hole (noise).
    - Model-side (not the writer): housing-draft's 0.499 in edges bow 0.5 mm in ours (live LINEs) and its Right hole
      rim isn't an exact circle (core's Draft, sent 16:2x with numbers); extension-spring's Top has a second end rectangle (x 2.230 / 2.268) and
      Fillet 1 (blend); bottle-split's lip outline is live's noise (18 tiny pieces); hex mesh splits (no rule).
-   - Import: "Upload only" for a bare assembly (live upload-only-1118) queued 6cddcbf2; "Preserve source IDs" is
+   - Import: "Upload only" for a bare assembly (live upload-only-1118) landed 0e95ad97; "Preserve source IDs" is
      server-off for live's users (behaviours 15:00): nothing to build.
 1. Exchange m5 (vibex8 06:0x): imports 114/130, live imports ours 46/48, ours reads ours 148/154, DXF 1/10 (duct).
    DXF rows left follow model differences: faceblend full-round fillet edges B-spline in live (blend told 06:1x),

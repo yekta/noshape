@@ -117,6 +117,9 @@ impl SheetModel {
     /// places), exact view geometry and the assembled sheet.
     pub fn build(od: &mut crate::OpenDoc, tab: TabId, drawing: Drawing, sheet: usize, extra: &[SourceKey]) -> Self {
         od.prime_drawing_sources(&drawing);
+        // What Insert view places too: from its tab's regeneration (impeller's Front view regenerated the whole
+        // studio afresh, 9.7 s for 0.15 s).
+        od.prime_sources(extra.iter().cloned());
         let session = &od.session;
         let doc = &session.doc;
         // This document's versions and other documents' (Insert view › Other documents: `ext:` keys).
@@ -200,6 +203,7 @@ pub fn drop_cached_views() {
     SOURCES.lock().clear();
     OLD_STATES.lock().clear();
     *VIEWS.lock() = (0, Arc::new(ViewCache::new()));
+    views::forget_recent_sources();
 }
 
 /// The shared view cache (started afresh every 200 uses, to bound it).
