@@ -5441,3 +5441,34 @@ fn where_used_for_the_part_has_its_own_group_after_export(cx: &mut TestAppContex
     let at = rows.iter().position(|r| r == "Where used for Part 1…").expect("Where used for Part 1…");
     assert_eq!((rows[at - 2].as_str(), rows[at - 1].as_str(), rows.get(at + 1).map(String::as_str)), ("Export…", "———", Some("———")), "{rows:?}");
 }
+
+/// Live2 cfg-1118 (qa CFGFEEL-ROW-CLICK-SWITCHES): a plain click on a configuration row doesn't switch to it; only the
+/// row menu's Switch to and the feature list's box do.
+#[gpui::test]
+fn a_click_on_a_configuration_row_doesnt_switch_to_it(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-row-click", &[("width", "30 mm")]);
+    let (rows, input) = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let mut input = String::new();
+            v.edit_config("Configure", cx, |ps| {
+                input = noshape_ops::config::add_input(ps, "List");
+                noshape_ops::config::add_option(ps, &input, "A".into());
+            });
+            v.right_panel = Some(crate::part_studio::config_panel::RightPanel::Configurations);
+            let rows: Vec<String> = match v.studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == input)).map(|i| &i.kind) {
+                Some(noshape_model::configuration::ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
+                _ => Vec::new(),
+            };
+            (rows, input)
+        })
+    });
+    draw(cx, window);
+    let before = cx.update(|cx| view.read(cx).config_values.0.get(&input).cloned());
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let b = vcx.debug_bounds(Box::leak(format!("cfg-row {input} {}", rows[1]).into_boxed_str())).expect("row A drawn");
+    vcx.simulate_click(b.center(), Modifiers::default());
+    draw(cx, window);
+    let after = cx.update(|cx| view.read(cx).config_values.0.get(&input).cloned());
+    assert_ne!(after.as_deref(), Some(rows[1].as_str()), "the click didn't switch to A");
+    assert_eq!(after, before);
+}

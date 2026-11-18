@@ -53,6 +53,14 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   up / Move down / Delete row, a plain row click doesn't switch; duplicate row names accepted (id A0, shown "A"); bad
   cells pink + bold only once their row is active; no greyed rows on a switch, spinner after ~1.2 s. Mine: check the
   Variable Studio configuration panel against it.
+- live, documents / Import / Derived + Insert (behaviours "studios + dx (lead 11-18, P0 feel): documents list,
+  Import into a document, Derived / Insert panels", live/studios/docs-import-feel-1118/): search on Enter only (Esc
+  keeps it); header sort A-Z, Z-A, default; row hover Share / Trash / Label icons; double-click opens; inline Rename
+  (Enter / Esc); Delete or trash icon -> "Send to trash" (Enter nothing, Esc closes) + toast with Restore; New
+  document Enter creates and opens. Import: "CAD Imports" folder tab ~1.8 s, the Part Studio tab before it ~6.9 s,
+  active tab unchanged, blue bar under the bell, toast "<file> has been imported. Open document". Derived / Insert
+  searches filter ~350 ms after the last key, Enter nothing; Derived: Enter 1 closes the panel, 2 commits; Esc 1
+  closes, 2 cancels.
 - live, history panel (behaviours "Versions and history panel: hover, a change row, scrolling a long history",
   live/studios/history-feel-1117/): hover never previews (row tints #def1fb + tooltip; a change row's "<tab> :: Update
   feature : Extrude 1: Change by <user> at <time>"; graphics / navbar stay the workspace's). Change rows 30 px, only

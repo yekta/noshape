@@ -1678,7 +1678,6 @@ impl PartStudioView {
                 }
                 for (rk, rname) in &rows {
                     let active = *rk == current;
-                    let (ia, rka) = (iid.clone(), rk.clone());
                     let name_el: AnyElement = if matches!(input.kind, ConfigInputKind::List { .. }) {
                         let (a, b) = (iid.clone(), rk.clone());
                         self.config_name_cell(format!("opt-{iid}-{rk}"), rname.clone(), (px(13.33), if active { FontWeight::MEDIUM } else { FontWeight::NORMAL }), window, cx, move |this, v, cx| {
@@ -1700,8 +1699,10 @@ impl PartStudioView {
                             .into_any_element()
                     };
                     let (da, db, vr) = (iid.clone(), rk.clone(), view.clone());
+                    let row_selector = format!("cfg-row {iid} {rk}");
                     let mut row = h_flex()
                         .id(SharedString::from(format!("cfg-row-{iid}-{rk}")))
+                        .debug_selector(move || row_selector)
                         .map(|d| crate::ui_script::mark(d, || format!("config_row:{rname}")))
                         .on_mouse_down(MouseButton::Right, cx.listener(|this, _, window, cx| window.focus(&this.panel_row_focus, cx)))
                         .border_l_1()
@@ -1715,12 +1716,8 @@ impl PartStudioView {
                                 .when(active, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().top_0().bottom_0().w(px(3.)).bg(pal.accent)))
                                 .child(name_el),
                         )
-                        // Clicking a row makes it the current configuration.
-                        .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
-                            if e.click_count() == 1 {
-                                this.set_config_value(&ia, rka.clone(), window, cx);
-                            }
-                        }))
+                        // A plain click doesn't switch: only the row menu's Switch to and the feature list's box do (live2
+                        // cfg-1118, qa CFGFEEL-ROW-CLICK-SWITCHES).
                         .when(matches!(input.kind, ConfigInputKind::List { .. }), |d| {
                             // Live 1717: Switch to "X" (not the current row), Set
                             // as default (not the default), Duplicate row, Move up /
