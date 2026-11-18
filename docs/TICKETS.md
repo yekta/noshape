@@ -559,6 +559,27 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Versions and history panel vs live's 11-17 capture (qa 00:45, green 0f7610c83, vibex6 Xvfb, real pointer)
+Document as live's set-up (CLI: 40 Extrude depth edits, V1 / V2 / V3 at 6 / 16 / 31, branch B1 from V1; qa-scratch/hi his.sh, :670).
+Sheet: qa-scratch/tickets/history-feel-sheet.png (vibex6 ~/agents/qa-keep/history-feel). Match live: rows B1, Main, V3, V2, V1,
+Start with "› Show changes…", 50 px, Main selected; B1's amber line up from V1; hover tints #def1fb; a version row's tooltip "Open
+version V3"; a single click on a version row opens it ("Versions are view only. Viewing V2." [Return to Main], navbar V2); a change
+row's menu (Open, Open in new browser tab, Compare, View in repair, Create version here…); change text "Edit : Extrude 1" (live's UI
+edits say the same; "Update feature" is its API). Not judged: open / scroll timing (debug build, load ~25).
+- [ ] **P1 HISTFEEL-CHANGE-CLICK (studios)**: a single (or double) click on a change row opens nothing: Main stays selected, no bar.
+  Live: the click opens that microversion, the row selected #b2ddf6, with "History changes are view only. Viewing <change>"
+  [Restore to Main] [Return to Main].
+- [ ] **P1 HISTFEEL-CHANGE-BAR (studios)**: right-click › Open on a change row opens it (row selected, model changes) but shows an
+  orange "VIEWING HISTORY" badge after "Main" in the navbar and no bar; live: the navbar says the version it belongs to ("V3") and
+  the white bar above; the panel header keeps only the compare icon and × (ours keeps all four icons, for a version too).
+- [ ] **P2 HISTFEEL-EXPANDED (studios)**: an expanded version reads "⌄ Hide changes…" (live "⌄ 15 changes", the count); its change
+  rows are 26 px, white, with a time in Modified (live 30 px, grey background, Modified empty).
+- [ ] **P2 HISTFEEL-SCROLL (studios)**: the search box and toggles stay put while the rows scroll, and the legend (Workspace, Version,
+  Change, …) is pinned at the panel's bottom with the graph lines drawn over it; live scrolls search, toggles and rows in one
+  container with only "Name | Modified" pinned, and the legend comes after Start at the end of the list.
+- [ ] **P2 HISTFEEL-CHANGE-TOOLTIP (studios)**: a change row hovered 2 s shows no tooltip (live "<change>: Change by <user> at 11:42 PM
+  Today"); a version row's tooltip sits under the pointer (live: beside the panel's right edge).
+
 ## Sheet metal, right-click menus and navigation vs live's 11-17 captures (qa 00:16, green 7187ac751, vibex6 Xvfb, real pointer and keys)
 Documents sm-box (plate + Flange 1 / 2, mitred corner) and block-fillet (qa-scratch/fl: sm.sh, menu.sh, anim.sh; sheets
 tickets/sm-menu-sheet.png, vibex6 ~/agents/qa-keep/sm-menu-nav/).
@@ -599,10 +620,12 @@ Variable Studio: Enter on a name makes "w | Length | 0 mm |" and moves to the ne
 while typing drops it; a duplicate becomes "w_0"; "10" -> "10 mm" and the keyboard moves down; an error value turns pink; "2 i"
 lists in / isInteger(x). Feature Studio: "op" lists opMoveCurveBoundary first with the doc panel, Down moves, Enter inserts the
 snippet, Tab closes and inserts a tab, Esc keeps "op"; Commit solid blue while edited, pale right after Ctrl+S, the error kept.
-- [ ] **P2 FLFEEL-BAR-DEFAULT-GEOMETRY (psui)**: the rollback bar released over the Top row moves above the first feature (all grey);
-  live leaves it where it was (no drop into Default geometry).
-- [ ] **P2 FLFEEL-BAR-END-COLOUR (psui)**: the bar dragged back to the end stays light blue-grey (200,217,226) 2 s later; live turns
-  it grey (184,184,184) at the end (as ours draws it in a fresh document).
+- [x] not a bug (psui 11-18 01:00, live2's recapture "rollback bar follow-ups") **P2 FLFEEL-BAR-DEFAULT-GEOMETRY (psui)**: the rollback bar released over the Top row moves above the first feature (all grey);
+  live leaves it where it was (no drop into Default geometry). Recapture: a normal drag released over Origin / Top / Right / the
+  header lands at the top (all rolled back), as ours did; only a fast flick lands lower. 2234f511 changed it; 8d2e0056 restores it.
+- [x] not a bug (same recapture) **P2 FLFEEL-BAR-END-COLOUR (psui)**: the bar dragged back to the end stays light blue-grey (200,217,226) 2 s later; live turns
+  it grey (184,184,184) at the end (as ours draws it in a fresh document). Recapture: #b8b8b8 with the pointer away, rolled back or
+  not; (200,217,226) only while hovered: my 2 s shot had the pointer still on it. 8d2e0056 restores ours.
 - [ ] **P2 FLFEEL-BAR-MENU (psui)**: a right-click on the rollback bar opens no menu; live's has "Roll to end".
 - [ ] **P1 VSFEEL-NAME-RED (studios)**: an invalid name ("10", "1x") isn't marked while typed (live: red border, pink fill at once);
   after an Enter on it, Esc keeps the text (live throws it away).
@@ -665,16 +688,18 @@ move (live's quirk); plane click selects it, a second adds, face + plane both, e
 list hover: Extrude 1 row bg + "Extrude 1 <- Sketch 1" + part outlined light orange, Part 2 row + eye + tooltip, Top row lights
 the plane; Extrude 1 row click selects the feature, part drawn amber, Part 1 related; face picks relate feature + part rows;
 Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctrl+click opens the menu and selects nothing.
-- [ ] **P0 SELFEEL-RELATED-STAYS (skasm, lead 22:48 split)**: after a double-click on Part 2's top, an empty click (and every later hover) leaves
+- [x] a65a2d3cf **verified 591643fc** (qa 00:57: m-rC3 0 related rows after the empty click) **P0 SELFEEL-RELATED-STAYS (skasm, lead 22:48 split)**: after a double-click on Part 2's top, an empty click (and every later hover) leaves
   Sketch 2 + Extrude 2 related (state rows related, 40 s later too). Live row 2/5: an empty click clears both sides.
 - [ ] **P0 SELFEEL-DBLCLICK-FACE-SKETCH (skasm)**: double-click on a face doesn't show its feature's sketch (live row 3: Sketch 2's
   rectangle drawn blue at Part 2's base); the face shows amber 1.2 s after (state: nothing selected, as live).
-- [ ] **P0 SELFEEL-HIDDEN-SKETCH-HOVER (skasm)**: hovering the hidden Sketch 1 row shows the tooltip but doesn't draw the sketch
+  qa 00:57 on 591643fc (a65a2d3cf): still open: Sketch 2 / Extrude 2 related and the face amber, no rectangle at the base
+  (qa-keep/sel-feel/selfeel-c2-591643fc.png, sent to skasm 01:03).
+- [x] a65a2d3cf **verified 591643fc** (qa 00:57: the row hovered draws Sketch 1's base edge lit) **P0 SELFEEL-HIDDEN-SKETCH-HOVER (skasm)**: hovering the hidden Sketch 1 row shows the tooltip but doesn't draw the sketch
   light orange in place (live row 4).
 - [ ] **P0 SELFEEL-PART-ROW (psui)**: clicking the Part 2 row selects the body (state) with Extrude 2 related, but Part 2 isn't
   drawn selected and Part 1 keeps a light-orange hover outline (the pointer crossed the Part 1 row on its way): a stale list hover,
   as USER-HOVER-STAYS-LIT (live row 5: the part drawn selected).
-- [ ] **P1 SELFEEL-PLANE-DEFAULT-GEOMETRY (skasm)**: a default plane picked in the viewport selects its row, but "Default
+- [x] a65a2d3cf **verified 591643fc** (qa 00:57: the Default geometry header tinted with Top selected) **P1 SELFEEL-PLANE-DEFAULT-GEOMETRY (skasm)**: a default plane picked in the viewport selects its row, but "Default
   geometry" isn't related (live rows 2 and 5).
 - Not judged: the selected look appeared 0.25-1 s late in some shots (box release, a face, a plane; others at once): Xvfb debug
   build at load 24, re-check on a release build in the quiet window. Not run: Sketch 3's region (our two-blocks start has no
@@ -684,6 +709,10 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
 - **Must carry (qa-cut-0415 says HOLD if the candidate lacks one; list in qa-scratch cut-must.txt)**: psui's per-unit remembered
   values 40a994a16 with db4ff933c, 65ceee7f2, ea25d544e (on main; verified 20:40 on green 0cc996f7: 3 mm / 0.3 cm / 0.2 in /
   5 mm, no lingering glyph); core's revert of c064b550a (lands via vibe2 tonight; not on main at 21:55).
+  01:00 added (lead): core's f824d120b (the revert), psui's hover fix 5e498ffb, skasm's a6236ed3a (stack: a65a2d3cf selection feel,
+  snaps, a3974c745 Flange, 59cad3c05 joint hover), and **P0 FACES-PATTERN-SLOTS (core)**: compat 00:37 on green 0f7610c8 vs 0.4.57:
+  faces-pattern-slots refs 16 / 17 / 18 Ok -> Error "Select a sketch plane." (suspects 2c51590b0 / 215c12d6b): HOLD unless fixed or
+  reverted in the candidate.
 - **LOFT-PATHS-MIRROR-WRONG-VOLUME (shipped in v0.4.57)**: c064b550a (01:23) is in v0.4.57: c2-loft-paths-guides Mirror 1 is Ok
   with the wrong part (fa6f90cc: 13/33/25 faces/edges/vertices, 5269155 mm³; live 27/67/47, 6325199 mm³). qa-lp-verify runs
   that document alone on the first green with core's revert (vibex6) -> qa-alerts and here.
