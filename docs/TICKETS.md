@@ -647,6 +647,9 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - [ ] **P2 HOLE-NOPOINT-TOOLTIP (psui)**: the Hole's no-point tooltip appends "A parameter value is not valid."; live's doesn't.
 - [ ] **P1 HOLE-CALLOUT-PLACE (psui)**: our hole callout runs on a long leader along the face's far edge; live's lies by the hole.
 
+## Interaction feel: live2's "Ours" cells, batch 6 (sm-form row 1288; live2 13:09, green)
+- [ ] **P1 FORM-DEFAULT-STUDIO (skasm)**: the sheet-metal Form dialog opens with "Form Part Studio" empty; live's opens with Circle emboss. The rest matches.
+
 ## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:10, green cafe3c2af, vibex8 Xvfb, real pointer)
 Sessions opened without the UI runner (stable view): asm-feel (Part 1 40x30x10, Part 3 20x20x5), block-fillet, hole-plate-drawing.
 Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png (vibex8 ~/agents/qa-keep/feel-1118/).
