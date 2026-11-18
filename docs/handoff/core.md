@@ -1,62 +1,71 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-18 03:01 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-18 09:09 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight
-- **core-oc (core-oc 62dc4ed59 + 8139e9f22 on main da0c6fb73): LAND ~05:30 (lead: hold past the 05:00 cut).** Adaptive
-  offset volume check (fan-blade) + sweep start cap on the profile's plane (GearLab 8f5622 363 -> 283 faces = live).
-  Pair base3 vs oc clean (1295 = 1295, 0 newly invalid, 0 CHECK changes). g++-13 OK. Rebase over main first.
-- **Pairs waiting (results then land each via vibe2, rebased):**
-  - vibe2 slot: pair3 nb vs nuts (~/tmp/core/p3-cmp.out): nuts Sweep 1, core-rp 56328dd0b (item 4 below).
-  - vibex8 slot: pair3 nb2 vs pc (~/tmp/core/p3-cmp.out): pulleys cap re-land GATED, core-rv aa714b30a on 55fc929c
-    (the new cap search only for Face patterns; Feature patterns as 0.4.57). Its CLI: faces-pattern-slots SAME vs
-    0.4.57 (qa's userdocs.py on vibex7 ~/tmp/qa), pulleys T1 passes.
-  - vibex8 slot: pair4 nb2 vs lp (~/tmp/core/p4-cmp.out): loft-paths, core-tw 4299fbd0f (item 4c).
-- **11-18 01:40 LANDED 55fc929c: revert of 2c51590b0** (P0: qa's faces-pattern-slots, 20 sketches "Select a sketch plane."
-  on 0f7610c8 vs 0.4.57; a Feature pattern of pockets went through the faces tool once the cap worked, renaming its
-  instance faces). f824d120 (11-17 23:26) landed knifehandle Move face (FaceTweak) + c064b550a's revert.
+- **Impeller upstream P0 (lead): QUEUED ea269148 (09:05, vibe2).** A sketch circle running
+  along imprinted face arcs that go all round it keeps the arcs' ends as joints (SketchResult::joints): the profile isn't
+  merged there, its arcs are kept-edge marked, op_prism marks the swept side edges kept, face_joins skips kept edges.
+  Extrude impellerraum 41/106/66 (live 59/158/100: inner wall's 15 spline pieces not chased), Extrude 6 Part 2 7/14/8
+  (live 21/57/38), Move face 1 OK at live's volume, Boolean 3 43/108/66 at live's volume and area. Fillet 4 still ERROR
+  "Failed to fillet selections." (blend's; f35 input volume 106197.8 vs live 105929.0). T1 sketch_assoc::a_circle_along_
+  a_faces_split_rim_keeps_the_split_in_its_wall. Pair mb vs ij CLEAN 08:41 (only impeller changes, 0 newly invalid;
+  after it: Fillet 4 ERROR (blend's), Move face 2 ERROR, Delete face 2 ERROR (was a wrong OK)); g++-13 OK.
+  Move face 2 waits on Fillet 4: its pick = JOy (226.35 mm2) + a 0.47 mm2 sliver on x 6 mm at z -3.96 beside JOV
+  that live's fillet rounds (blend told). Dump vibex7 ~/tmp/core/mf2dump/offsetfaces-33, probe vibex8 ./offp. Fillet 4 check for blend: dump vibex7 ~/tmp/core/f4dump (ops binary all-93b192dee51da682), compare
+  the picked edge with live JOV (OTHER, 54.867 mm, mid (23.724, 0.003, -4.0) mm) via probe vibex8 ~/tmp/core/probefan/ed;
+  match -> send blend the dump, else upstream = mine. Then Move face 2.
+- **Landed 11-18:** core-oc c703c330 + b42f699a8 (05:55, adaptive offset check + sweep start cap); pulleys gated
+  406422d74 + Loft 3 e841ff485 (06:27; skasm told).
+- **Fan-blade P0 (fix forward):** main after core-oc 1484 ms vs 0.4.56 730 (vibex8, same run); Boolean 2 877 vs 122
+  (live 364). bool's b5b566884 drops the wasted Rust attempt; my lever: per-tool offsets' edges 52 + check 24 ms
+  (NOSHAPE_OFFSET_DEBUG=1). A/B: vibex8 ~/tmp/core/{rel56/noshape-cli,udoc/cli-main,fansaved}, qa's ab-feat.py.
+- **Nuts: bool2's graze fix ebc58e0be (not landed, gates after its stack) alone makes Sweep 1 OK with live's counts
+  (one face a B-spline where live has a cylinder).** When bool2 says it landed: re-run nuts on main, compare
+  volume/area with live (135.268 mm3, 29 faces). The crest move (core-rp nuts3 59df02227) is DROPPED: without bool2's
+  fix OCCT then returns the uncut part as OK (143.88 mm3, wrong), and with it bool measured 35 faces vs live 29.
+  Exact cylinders (nuts2 7fec58496) dropped too. Cases vibex8 ~/agents/core-keep/nuts/.
+- **Pair 6 (vibex7 slot, full suite): mb (main 33c575415) vs ms = core-oc msx (33c575415 + 81de7a342 + 62525922e)**
+  (~/tmp/core/pair6.sh, p6-cmp.out, p6.done; land the branch commits below after it's clean):
+  - core-oc movepl f4bee47f1 (on main a8b7f0d6c): Move face Offset of planes facing one way = k::tweak_faces translation,
+    every face named Offset(its old name) as OCCT's offset; tried before the freeform booleans. Flansch (vorne)
+    verbreitern 835 -> 11 ms (live 6); Flansch verbreitern still booleans 136 ms (tweak declines; live 10). T1
+    features_a::move_face_offset_of_a_plane_between_sloping_sides.
+  - surf1 461305f33 (core-rv; = 9f5245ac0 on movepl): surface Extrude one surface per chain (surf-intro-simple
+    Extrude 1 = live; Revolve 1 ERROR on main too). T1 features_a::a_surface_extrude_makes_one_surface_per_chain_of_curves.
+- **Fill 1 (surf-intro-examples) research, parked:** edges dumped (core-tw uncommitted fill-dump: the dump now holds
+  the edges; vibex8 ~/tmp/core/probefan/fill1.brep, probe ./fillp = /root/core-scratch/brepq/fillp.cpp). Live's centre
+  (1.62, 68.57, 20.92) mm; all ours sit 9-15 mm lower: plate 61909 mm2 (balloons), Coons 23786 (box z 89.6),
+  harmonic 22552 / biharmonic 22708 (box = live's, centre z 6.1). Parasolid's G0 fill isn't any of those.
+- **Loft 4 PARKED (core-tw 7eb54c0e5):** plane-crossing retry gives live's volume but area +0.35 %, box y -452.45 vs
+  -444.55: wrong rule, not landable. (core-tw also holds the uncommitted fill-dump edit.)
+- **Re-time once the 65-face part reaches them:** impeller Delete face 2 (live 12 ms; 4.8 s ours = op_defeature, 3.0 s
+  Edge-Face) and Extrude Bohrungssitz Ansaugflansch (live 155; 3.2 s ours = op_boolean).
 - knifehandle left: Fillet 3 7/15/10 vs 6/12/8 -> Chamfer 1 wrong as Ok (9286 vs 10424 mm3): blend's (agreed 11-18 03:0x).
   Sweep 2 area 18225.81 vs 18227.26 mm2 (mine, small). TRANSLATE's rigid branch through the tweak; Delete face 2.
-- **Impeller Extrude impellerraum split walls: DROPPED.** Live (behaviours.md, live/core/q-imprint-walls/README.md): the
-  face's edges split the sketch's regions but Extrude never keeps walls split where they cross a curve = main.
-  00279fbca (branch core-imprint-dropped) was wrong. impellerraum's missing faces (38 vs 59) come from its input (our 35
-  faces vs live 39 after Halter, blend's build).
 - **Shipped in v0.4.57:** scissor-lift revert + rack-pinion frame fix (on main since 7a174ae2). Re-land the pattern
   surface join later with fed22d as its test (/root/core-scratch/sl-makesolid-wip.patch).
 - **(4) local Delete face rebuild** once Delete face 2 sees live's faces (blend's Halter build feeds it); src
   /root/core-scratch/brepq/lr*.cpp (B-spline neighbour 1.55 mm2 off). Projection WIP parked:
   /root/core-scratch/proj-tight.patch.
+- **qa 11-18 per-feature >5x live (release main 7db466c62 vibex8, raw /root/qa-scratch/feat3/ab.jsonl):** impeller
+  Flansch (vorne) verbreitern 817 vs 6.5 ms, Flansch verbreitern 289 vs 8 (early moveFaces: input = live's, do these
+  first), Extrude 4 693 vs 41.5, Extrude 3 251 vs 23, Extrude 1 171 vs 25; Delete face 2 4032 vs 12 and Extrude
+  Bohrungssitz Ansaugflansch 5632 vs 154.5 wait for the right input (lead); valve Extrude 1 95 vs 10, Extrude 2 71 vs 11;
+  knife Extrude 8 89 vs 10, Revolve 1 54 vs 10.5.
+- **skasm via lead 11-18 (after impeller upstream / fan-blade / nuts):** (1) c2-surf-intro-simple Extrude 1 (surface
+  extrude of a spline + a separate rectangle): live one surface body per connected chain (3 parts, the rectangle a
+  4/12/8 tube), ours one body 5/16/12 (2 parts). (2) c2-surf-intro-examples Fill 1, inputs now = live's: area 61911 vs
+  live 23827 mm2, box z -105..54 vs live -33..55 (see Fill G0 notes below).
 - **Queue after those:**
   1. qa: c2-fan-blade-sweep Boolean 2 (~1.2 s loaded vs live 364; 75-88 ms before my exact offsets, which fixed the
      volume): offsets 2 x ~176 ms in parallel (edges 73, volume check 62 -> ~17 with adaptive GProp: core-oc 482163a60), noshape Boolean decline ~300 ms + OCCT ~1.3 s on the exact offset faces (bool's). B-spline
      approximation of the offsets: slower, dropped.
   2. pulleys Circular pattern 1 speed (273 ms unloaded vs live 23): bool took the Boolean (arc across a seam).
   3. c2-loft-paths-guides: see 4c (centripetal path loft, pair waiting).
-  4. nuts Sweep 1 "non-manifold body" (dx 11-17 21:15): COMMITTED core-rp 56328dd0b on main 34d3c4c39 (pair nb vs nuts
-     building vibex7 00:4x): op_pipe_shell faces_on_cylinders (side faces exactly on a cylinder become it, a turn each,
-     cylinder_turns; circle fit from 3 well-spread lines: whole-turn strips start and end at one angle), solid_a.rs
-     helical_sweep_clear takes per-turn vertices (screw_off), common.cpp shown_topology seam within 1e-7 of a period.
-     ERROR -> OK at live's volume, 29/59/32 expected after the seam fix (was 30/61/34: root sliver's seam 3.2e-8 rad
-     off 2pi after the Rust Boolean), 3.8 s -> 0.8 s (Rust Boolean 0.5 s + unify check 0.25 s left, bool's).
-     T1 features_c::a_thread_cut_with_its_crest_on_the_bore_removes_the_thread (fails on main).
-  4a. blend 11-18 01:4x: c2-impeller-loft's -9425 mm3 starts at f33 Move face 1 (OFFSET, ERROR "Could not offset selected
-     faces as requested."): its Part 2 from f32 Extrude 6 (NEW from face JkK, 3° draft) is 4/4/0 vs live 21/57/38, from
-     f31 Extrude impellerraum 38/99/62 vs live 59/158/100 (adds 3 faces, live 20; Halter f29 is blend's, 4 faces short).
-     Repro NOSHAPE_PARITY_ONLY=c2-impeller-loft NOSHAPE_PARITY_DIFFERING=1.
-  4c. LOFT-PATHS-TOPOLOGY (qa P2): COMMITTED core-tw 4299fbd0f on main 0fda4de5a (pair binary lp = same on 55fc929c,
-     pair4 nb2 vs lp on vibex8): c064b550a's `|| along` merge again + ThruSections Approx_Centripetal for path lofts
-     (spaced by parameter the side ran 0.96 mm back past the first profile: probe brepq/ovs.cpp; Mirror 1's OCCT fuse
-     then dropped the loft). Loft 3 15/37/27 (live 15/33/23), Mirror 1 27/73/53 at live's volume, Extrude 3 33 faces.
-     C1 approximation of C0 merges not needed (WIP /root/core-scratch/loft-along-merge-c1-wip.patch, unused). Loft 4's
-     ERROR is on main too. T1 features_a::a_path_loft_of_two_slots_has_one_side_face (+ no overshoot).
-  4d. loft-paths Loft 4 ERROR (main too; live OK 34/86/60): its slot profile (101.6 mm long, in the path's plane)
-     reaches past the path's centre of curvature (90° arc, R ~41 mm): path_sections' MakePipeShell folds the far end
-     (its arc face squeezed into 7 mm) and every cut misses that face (3-edge open sections -> ThruSections fails).
-     Live's path sections can't be pipe cuts: carry each profile along the path with a frame instead. Debug patch
-     /root/core-scratch/loft4-debug.patch (NOSHAPE_LOFT_DEBUG section/pipe prints, NOSHAPE_LOFT_DUMP), probe brepq/secp.cpp.
   4b. asm a04711 Extrude 4 "non-manifold" (asm's c22): our op_boolean's OCCT path cuts Part 3 to 422.23 mm3 (13 faces,
      non-manifold) where plain BRepAlgoAPI_Cut on the recorded case gives live's 213.964: sent to bool 22:40 (case
      vibex8 ~/tmp/core/a04rec/ad565563c0275193, probe ~/tmp/core/probefan/cutp, src brepq/cutp.cpp).
@@ -104,9 +113,8 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   corners, 10293.9930 mm2, centre (50,50,7.5). Next after the impeller.
 - fan-blade Boolean 2: 56/139/84 with core-next (live 56/143/88): +2 edges +2 vertices per hole need live's x_t
   (now at /root/parity/models/c2-fan-blade-sweep/live-base.x_t, 11-17). Probe vibe5 (down 11-17) ~/tmp/core/probefan (src /root/core-scratch/brepq).
-- Worktrees: core-oc (oc stack), core-rp (nuts 56328dd0b), core-rv (pulleys gated aa714b30a), core-tw (loft-paths: 4299fbd0f on
-  main; HEAD = its 55fc929c cherry-pick 83a551850 for pair binary lp), core-bis2 (main base binaries), core-trace (core-pipe2), core-bis: docs
-  lands + Mac timing (.mac.sh, .macdoc = qa's impeller copy).
+- Worktrees: core-bis (impeller a08b41153; docs lands, Mac timing .mac.sh), core-oc (main base binaries),
+  core-rp (nuts, clean 56328dd0b), core-tw (Loft 4 7eb54c0e5), core-trace (core-pipe2), core-rv (landed, free).
 - rocker-enclosure-sm Extrude 2 (next): Sketch 4's four Use circles (PROJECTED, live's external edges at x 45-60 mm,
   not on our part) come out as two: Extrude 2 names one region twice and cuts 2 holes of 4. Sketch translation:
   written into docs/handoff/skasm.md (landed 11-16).
@@ -118,13 +126,8 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   one per wall (6 faces; ours 10: a face per path edge). **Committed b173dc5bb (core-oc, NOT in the vibex7 pair):
   join_collinear_lines joins a sweep path's lines along one line into one edge (first piece's source)**: Main pipe's
   faces = live (only its box differs, the take-back). T1 features_a::a_sweep_along_collinear_lines_has_one_side_face.
-- c2-surf-intro-examples Fill 1 (5/13, parked): 4 G0 boundary edges (2 fit splines, 2 sketch splines; they match
-  live's lengths). fair_g1_fill returns nothing for them, so OCCT's plate (MakeFilling) balloons: 61911 mm², box to
-  x 198 mm; live 23827.4. A Coons patch (GeomFill_BSplineCurves, CoonsStyle) gives 23669.5 (-0.66 %: outside the
-  band), box inside the boundary's. fair_g1_fill declines because the edges share no vertices: ConnectEdgesToWires
-  rebuilds them and the IsSame lookup (at < 0) fails. Matching by midpoint (/root/core-scratch/fair-fill-midpoint.patch)
-  makes the fair fill run: 22754.7 (-4.5 %). Live's box bulges past the boundary (y -19..157.6 vs 0..152.4), so
-  neither is Parasolid's G0 fill; needs a live capture of a plain 4-edge G0 fill (area, a mid-surface point) first.
+- Fill 1 older tries: fair_g1_fill declines (edges share no vertices; midpoint matching patch
+  /root/core-scratch/fair-fill-midpoint.patch gives 22754.7 mm2, -4.5 %).
 - c2-surf-workshop-split Boundary surface 1 (6/12, parked): 2x2 profiles, defaults; ours 3803.55 mm², live 3762.61
   (+1.1 %). It goes through k::fill_surface (op_fill) but not its plate: a Coons branch for 4 G0 edges placed first
   changed nothing (edge count != 4 or Coons declined; not chased). Experimental coons_fill saved in
