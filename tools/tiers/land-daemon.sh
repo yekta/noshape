@@ -300,8 +300,15 @@ run_batch() {
       :
     elif git merge-base --is-ancestor HEAD "$jref" && [ "$(git rev-list --count HEAD.."$jref")" = "$(echo "$commits" | wc -l)" ]; then
       git merge -q --ff-only "$jref"   # (its own shas, as when it was rebased on this main)
-    elif ! git cherry-pick $commits > /dev/null 2>&1; then
+    elif ! cp_out=$(git cherry-pick --empty=drop $commits 2>&1); then
       files=$(git diff --name-only --diff-filter=U); git cherry-pick --abort 2>/dev/null; git reset -q --hard "$before"
+      # No conflicting file: not a conflict (11-18 23:38: seven changes FAILED "(in )" at once, stacked on a batch
+      # mid push-retry; each applied cleanly on main a minute later). Logged, and queued again once.
+      if [ -z "$files" ] && [ ! -e "$LD/jobs/$key.cpretry" ]; then
+        : > "$LD/jobs/$key.cpretry"
+        log "$bid: $(field name "$key") ${key##*-}: cherry-pick failed without a conflict ($(echo "$cp_out" | tail -2 | tr '\n' ' ')): queued again"
+        front retest "$key"; continue
+      fi
       other=""
       for k in "${applied[@]}"; do
         echo "$files" | grep -qxF -f <(sed -n '/^--$/,$p' "$LD/jobs/$k.job" | tail -n +2) && other="$other $(field name "$k") ${k##*-}"
