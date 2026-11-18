@@ -575,6 +575,15 @@ Parts (1), cell bold; switching back clears at once and never greys rows (6 shot
 - [ ] **P3 CFGFEEL-DUP-ID (studios)**: CLI config add_option "A" twice gives the id "A_2"; live stores "A0" (FeatureScript ids).
 - Not judged: a row added after a parameter is configured shows an empty Depth cell in ours (live2 added its rows before configuring).
 
+## Workflow feel vs live's 11-18 07:09-07:22 timings (qa 07:38, green b5c4ccc4, live's host and method: Xvfb, real pointer, polled crops at live's 139 ms, n 10, medians)
+
+Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembly too). Ours is faster on every row, so there are no tickets. Data: qa-scratch/wf.
+- Extrude toolbar click → dialog: live 1518, ours 185.
+- First face pick → preview: live first 1236 / settled 2301, ours 304 / 560.
+- ✓ → dialog closed: live 811, ours 147. ✓ → part regenerated, settled: live 1511, ours 290.
+- Tab Part Studio → Assembly, list / graphics settled: live 3894 / 4317, ours 138 / 294. Assembly → Part Studio: live 3114 / 3429, ours 139 / 296.
+- Right-click → menu: live 666, ours 148. Feature row hover → part highlight: live 679, ours 349.
+
 ## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:10, green cafe3c2af, vibex8 Xvfb, real pointer)
 Sessions opened without the UI runner (stable view): asm-feel (Part 1 40x30x10, Part 3 20x20x5), block-fillet, hole-plate-drawing.
 Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png (vibex8 ~/agents/qa-keep/feel-1118/).
@@ -610,7 +619,7 @@ run (import takes ~60-100 ms), lit = the light-orange outline; feature list: 45 
 - [ ] (psui 06:57: cafe3c2af picks at once in any sketch state; the 600-800 ms is pick + frame latency on llvmpipe. psui's next land makes it live's rule, pause with no tool / every move with a tool; re-run then, Line still slow = a perf ticket) **P1 FEEL-SKETCH-TOOL-PICK (psui)**: on a sketch line, a fast sweep in lights it at the same time with the Line tool active as with
   no tool: unlit at 450 ms, lit from 600-800 ms in both (2 runs each, same session, load 14). Live: with a sketch tool every move picks
   at once (lit 17-28 ms after the move); with no tool ~270 ms. Check tool_captures_left for the Line tool (behaviours, same section).
-- [ ] 33c57541 (psui 06:57: fixed, landed 06:48, after cafe3c2af; qa-wait-33c5 re-runs it on its first green) **P0 FEEL-FL-AUTOSCROLL-DROP (psui)**: Sketch 2 dragged to 20 px above the feature list's bottom and held still 1 s: the list
+- [x] 33c57541 (verified qa 07:21 on green b5c4ccc4: line between Sketch 11 and 12, Sketch 2 dropped after Sketch 11, at the line, as live) **P0 FEEL-FL-AUTOSCROLL-DROP (psui)**: Sketch 2 dragged to 20 px above the feature list's bottom and held still 1 s: the list
   scrolls and the insertion line scrolls with the rows (between Sketch 11 and 12), as live; released without moving, Sketch 2 lands
   after Sketch 23 (the row under the pointer by then). Live drops it at the line (behaviours "feature-list drag autoscroll":
   after Sketch 16 in its run). Sheet tickets/fl-autoscroll-drop.png (vibex8 ~/agents/qa-keep/feel-1118/).
