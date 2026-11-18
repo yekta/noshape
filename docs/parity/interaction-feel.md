@@ -701,6 +701,7 @@ live2's dialogs.json (11-13 05:40–07:25; rules read from the client bundle). p
 | Properties' Enter and Esc | do nothing (no apply, no close) | the same | = |
 | Properties' Tab order | Name, Description, Part number, Revision, Vendor, Project, Product line, Title 1–3, Not revision managed, Exclude from all BOMs | Tab stayed in Description (indented it) and the checkboxes took no Tab; now live's order (Description passes Tab on, the two checkboxes are Tab stops) | = (fixed) |
 | Appearance on opening | 220 × 400 at the graphics area's bottom left; hex focused and selected, uppercase without '#'; A "1.00" | the same | = |
+| Appearance colour picking (live2 mass-appear-1118) | Palette: 18 px swatches, a click recolours the part at once (hex "FF0000"), ✓ keeps it; Custom: a 152 px saturation / value square and a 50 px hue strip: a press alone changes nothing, a drag updates the hex and recolours the part live, a hue click keeps saturation / value; Esc reverts the part exactly | – | – |
 | Material on opening | 280 × 368 at the graphics area's bottom; nothing picked ('- None -') | the same | = |
 | Material: a picked row | the list closes, the search keeps the keyboard with its text cleared; typing opens the list again; "No material assigned" stays under the open list (material-search-acetal-ok, material-library-pick-abs-cancel) | the keyboard went nowhere and the line hid while the list was open; now as live (the search stays in the tree, unseen) | = (fixed) |
 | Material's search and Esc | filters as you type ("steel": 38 rows; live's read counted its highlighted first row twice), the first highlighted; Esc closes the list only, a second Esc the dialog | the second Esc did nothing (the keyboard was left on the closed list's search); now it cancels | = (fixed) |
@@ -1051,6 +1052,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | The summary: the old text stays until the answer, then refills | ? | missing |
 | The Measure panel (`[`): 220 px at the right; two faces Area the sum; Length unit → Inch re-measures the panel only, kept in the session; Measure type filters the panel only | = | measure matrix "the details panel: 220 × 345 for a distance and its components" (the unit and type rows: missing) |
 | Mass properties opens top-left over the list, (214, 79), 440 × 521; inertia in the account's mass unit | ? | missing |
+| Mass and section properties timing (live2 mass-appear-1118, software GL): panel +466 ms, values +555; a part added: chip +494, totals +1026, the old totals shown until then (no blank or spinner); removed: chip +96, totals +210 | – | – |
 | A face click adds its part, a measured part clicked again leaves; volume / area summed; trailing zeros dropped | = | app-core properties_dialog mass_number tests (the add / remove: missing) |
 | While Mass is open: no bottom-right summary, an empty click keeps its parts; Esc closes it keeping the selection | ? | missing |
 | Its button again leaves it open; `[` over it opens Measure empty, the parts deselected | = | measure_feel_tests::mass_stays_open_and_bracket_opens_an_empty_measure |
