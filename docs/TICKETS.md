@@ -609,11 +609,11 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 ## Interaction feel: live2's "Ours" cells on the P0 rows (live2 12:1x, green 4a69d55b, Xvfb :125, real pointer; evidence live/psui/ours-1118/)
 - [ ] **P1 FEEL-EDGE-VS-FACE-HOLD (psui)** (hover-pick-1120): a part edge over the face behind it lights at 6 px but the face takes
   over at 8 px (the edge holds only to 7); live lights at 5-6 and holds to 8-10 px.
-- [ ] **P1 FEEL-PLANE-FIRST-MOVE (psui)** (sel-feel): press on empty space, first move onto a default plane: ours draws the crossing
+- [ ] (psui 12:4x: fixed with a test, land queue; qa re-runs on its green) **P1 FEEL-PLANE-FIRST-MOVE (psui)** (sel-feel): press on empty space, first move onto a default plane: ours draws the crossing
   box on that move and no plane lights; live lights the plane and shows no box until the next move.
-- [ ] **P1 FEEL-MASS-PANEL-PLACE (psui)** (measure-mass-1118): Mass properties opens under the feature list, only its right part
+- [ ] (psui 12:4x: the place came from a saved panel_positions.json "mass" offset of an assembly drag; still real: the offset is shared across studios and a panel moved over the list draws under it) **P1 FEEL-MASS-PANEL-PLACE (psui)** (measure-mass-1118): Mass properties opens under the feature list, only its right part
   showing (right edge x 405, bottom ~y 288); live puts it over the list at (214, 79), 440 x 521.
-- [ ] **P1 FEEL-HIDE-TIMING (psui)** (ps-feel2-1118, 60 fps capture): Y: row 269 ms, part gone 669 ms (live 73 / 436); Shift+Y 408 /
+- [ ] (psui 12:4x: fixed with a test, land queue; qa re-runs on its green) **P1 FEEL-HIDE-TIMING (psui)** (ps-feel2-1118, 60 fps capture): Y: row 269 ms, part gone 669 ms (live 73 / 436); Shift+Y 408 /
   774 ms (live 108 / 562).
 - [ ] **P1 FEEL-SKETCH-REACH-OUTSIDE (psui + skasm)** (hover-p0): outside sketch mode a sketch line lights from 8 px and holds to 9; at
   a corner the whole line lights at 6 and the point never lights alone; live: line 6-7 px, point 9 px (the point beats the line).
@@ -624,8 +624,8 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - [ ] **P2 FEEL-CHIP-TOOLTIP-PLACE (psui)**: a selection chip's tooltip shows under the pointer, over the next chip; live puts it to the chip's right.
 - [ ] **P2 FEEL-CHIP-X-TOOLTIP (psui)**: the chip's × tooltip reads the chip's name; live "Delete Edge of Extrude 1".
 - [ ] **P1 FEEL-HASH-LIST-DELAY (psui)**: the "#" variable list opens ~0.7 s after the key; live on the next frame.
-- [ ] **P1 FEEL-ROW-MENU-ROLL-TO-HERE (psui)**: a feature row's menu has no "Roll to here"; live has it.
-- [ ] **P1 FEEL-FILLET-DIALOG-WIDTH (psui)**: the Fillet dialog is ~394 px wide; live 220.
+- [ ] (psui 12:4x: our menu matrix has it on Extrude 1; asked live2 which row) **P1 FEEL-ROW-MENU-ROLL-TO-HERE (psui)**: a feature row's menu has no "Roll to here"; live has it.
+- [ ] (psui 12:4x: not a product bug: /root's shared config had featureDialogWidths.fillet = 392 from an earlier resize; close when live2's fresh-config retake shows 220) **P1 FEEL-FILLET-DIALOG-WIDTH (psui)**: the Fillet dialog is ~394 px wide; live 220.
 - Equal to live (live2): the two-feature suppress, the rollback release, chip click / Delete, expressions, Tab in the "#" list.
 
 ## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:10, green cafe3c2af, vibex8 Xvfb, real pointer)
