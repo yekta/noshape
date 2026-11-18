@@ -8631,7 +8631,9 @@ bool volume_possible(uint8_t op, const std::vector<TopoDS_Shape>& a, const std::
     case 0:
       return v <= va + vt + tol && v >= big - tol;
     case 1:
-      return v <= va + tol;
+      // (Nor less than the tools take: c2-config-parts-nuts' thread cut retried came back 121.4 mm³ from a 143.9 mm³
+      // nut and an 11.9 mm³ thread.)
+      return v <= va + tol && v >= va - vt - tol;
     default:
       return v <= std::min(va, vt) + tol;
   }
