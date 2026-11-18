@@ -33,21 +33,25 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## P0 dock tab return (lead 11-18, must be in the 17:00 cut)
+## P0s 11-18
 
-- qa: the dock's return to an open tab "settles" ~820 ms vs 0.4.53 ~140–190 (lat-steps.py: last frame before a 450 ms
-  gap). Same-run A/Bs (qa's and mine, vibex7, load ~20) are bimodal for every build, 0.4.53 too: ~200 or ~800 ms,
-  by whether a pair of late frames (~600 and ~750 ms after the click, in 0.4.53 as well) comes within 450 ms.
-- Since 2219c4373 (v0.4.54) the hover card (shown 400 ms into qa's 500 ms rest) builds its scene from the open view's
-  display at once: scene build 55–128 ms + upload + a 1248×728 render (~0.6 s llvmpipe) right at the click.
-  Fix in the worktree (tab_thumbs.rs): the whole picture job waits `PICTURE_WAIT` 250 ms, a click on the tab in that
-  time drops it; 1× supersample on a software GPU. Test a_clicked_tabs_card_picture_redraws_nothing (rendering GPU,
-  `deliver_frames`).
-- Open: what draws the late pair in every build (diagnostic: /root/psui-scratch/tab/diag.py adds `NOSHAPE_DIAG=1`
-  notify / refresh callers to vendored gpui; never land it). Scripts: /root/psui-scratch/tab/ (tabab.sh rounds,
-  lat-steps.py, frames-after.py, cap.sh); vibex7 ~/tmp/psui (apps/, priv/dock.noshape: delete when done).
-- Parked: press-interval patch (/root/psui-scratch/press-interval.patch: feature-row double-click by X server times);
-  must also check no other press came between the two row clicks before landing.
+- Dock tab return: landed 182c0efc (11:59; the fix commit is 9595bbf05). The hover card's picture job waits 250 ms
+  (`PICTURE_WAIT`), and a click on the tab drops it; 1× on a software GPU. Same-run A/B (vibex7, 10 returns, medians):
+  tab drawn 224 ms (0.4.53 218, green 321), last frame 788 (830, 1034). The ~600–800 ms frame pair in every build is
+  the ui-parity driver's state read (3de2cd04: a "lat" step reads 1 s later with NOSHAPE_FRAME_LOG; "driver" marks in
+  the log; qa's lat-steps ends settle there). qa-tabwatch re-times on 9595bbf05's first green.
+- Windows CI 44292110845 nav matrix "ctrl-left: 0 steps turning": arrow steps ran on the wall clock (a >250 ms draw
+  finished the step); now on the viewport's clock (3de2cd04's batch, queued 12:2x).
+- HEAVY-ASM-SOFTWARE-FRAME (asm's data, mesher side mine): asm-xdev-subs 7.76 M triangles with the angle mesh
+  (chord: 1.05 M); a few imported bodies blow up (SCHUNK Gehaeuse 1.17 M, a 7 mm bearing 68 k). Trying a chord floor
+  (`MeshOptions::min_size` = k × body diagonal) with asm's render_image probe: /root/psui-scratch/heavy-probe.py +
+  heavy-run.sh (vibex6 ~/tmp/psui/heavy, mode 700; delete after). Needs live's look checked for the floor.
+- Scripts: /root/psui-scratch/tab/ (tabab.sh, lat-steps.py, frames-after.py, cap.sh, diag.py: NOSHAPE_DIAG
+  notify/refresh callers, never land). vibex7 ~/tmp/psui/priv/dock.noshape: delete when the tab work is over.
+- Parked: /root/psui-scratch/press-interval2.patch (feature-row double-click by X server press times + press
+  numbers, `row_clicked_again` + test): build, test, land.
+- Queue: live's pattern-hole-1118 rows (13, interaction-feel.md), live2's field-keys-1118 rows, config table keys,
+  chips-expr rows, plane reach decision.
 
 ## In flight
 
