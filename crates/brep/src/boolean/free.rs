@@ -148,6 +148,26 @@ impl Nearest {
         }
         best.map(|b| b.1)
     }
+
+    /// The points within `r` of `p` (squared distances), in no order.
+    pub(super) fn within(&self, p: DVec3, r2: f64, out: &mut Vec<usize>) {
+        let mut todo = vec![(0usize, self.pts.len(), 0.0f64)];
+        while let Some((lo, hi, least)) = todo.pop() {
+            if lo >= hi || least > r2 {
+                continue;
+            }
+            let mid = (lo + hi) / 2;
+            let i = self.order[mid] as usize;
+            if (self.pts[i] - p).length_squared() <= r2 {
+                out.push(i);
+            }
+            let k = self.axis[mid] as usize;
+            let off = p[k] - self.pts[i][k];
+            let (near, far) = if off < 0.0 { ((lo, mid), (mid + 1, hi)) } else { ((mid + 1, hi), (lo, mid)) };
+            todo.push((far.0, far.1, least.max(off * off)));
+            todo.push((near.0, near.1, least));
+        }
+    }
 }
 
 /// A NURBS curve's length from `t0` to `t1` (Gauss–Legendre, 4 points on each of 4 pieces a knot span it is on).
@@ -218,6 +238,55 @@ pub(super) fn cached_grouped(g: &GFace) -> std::sync::Arc<Patches> {
 pub(super) struct Grid {
     pub(super) pts: Vec<(DVec2, DVec3)>,
     pub(super) near: Nearest,
+    /// The surface comes back near itself ([`folds`]).
+    pub(super) folds: bool,
+}
+
+/// Whether samples ([`samples`]: u by u, each a run of the v values) of a surface come back near each other: two
+/// within a sample's farthest neighbour of it, a quarter as far apart as the shorter way between them along its rows
+/// and columns (a helical thread strip's neighbouring turns).
+fn folds(pts: &[(DVec2, DVec3)], near: &Nearest) -> bool {
+    let nv = pts.iter().take_while(|x| x.0.x == pts[0].0.x).count().max(1);
+    let nu = pts.len() / nv;
+    if nu * nv != pts.len() || nu < 2 || nv < 2 {
+        return false;
+    }
+    let at = |i: usize, j: usize| pts[i * nv + j].1;
+    // (Each row's and column's length so far.)
+    let mut along_v = vec![0.0; pts.len()];
+    let mut along_u = vec![0.0; pts.len()];
+    for i in 0..nu {
+        for j in 1..nv {
+            along_v[i * nv + j] = along_v[i * nv + j - 1] + (at(i, j) - at(i, j - 1)).length();
+        }
+    }
+    for j in 0..nv {
+        for i in 1..nu {
+            along_u[i * nv + j] = along_u[(i - 1) * nv + j] + (at(i, j) - at(i - 1, j)).length();
+        }
+    }
+    let mut out = Vec::new();
+    for i in 0..nu {
+        for j in 0..nv {
+            let p = at(i, j);
+            let h = [(i.wrapping_sub(1), j), (i + 1, j), (i, j.wrapping_sub(1)), (i, j + 1)]
+                .iter()
+                .filter(|&&(a, b)| a < nu && b < nv)
+                .map(|&(a, b)| (at(a, b) - p).length_squared())
+                .fold(0.0f64, f64::max);
+            out.clear();
+            near.within(p, h, &mut out);
+            for &k in &out {
+                let (a, b) = (k / nv, k % nv);
+                let v_then_u = (along_v[i * nv + b] - along_v[i * nv + j]).abs() + (along_u[a * nv + b] - along_u[i * nv + b]).abs();
+                let u_then_v = (along_u[a * nv + j] - along_u[i * nv + j]).abs() + (along_v[a * nv + b] - along_v[a * nv + j]).abs();
+                if (pts[k].1 - p).length() < 0.25 * v_then_u.min(u_then_v) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 pub(super) fn cached_grid(ns: &FreeSurface, uv: [f64; 4]) -> std::sync::Arc<Grid> {
@@ -227,7 +296,8 @@ pub(super) fn cached_grid(ns: &FreeSurface, uv: [f64; 4]) -> std::sync::Arc<Grid
     }
     let pts = samples(ns, uv);
     let near = Nearest::new(pts.iter().map(|x| x.1).collect());
-    let g = std::sync::Arc::new(Grid { pts, near });
+    let folds = folds(&pts, &near);
+    let g = std::sync::Arc::new(Grid { pts, near, folds });
     if let Ok(mut c) = GRID_CACHE.lock() {
         let bytes = std::mem::size_of::<Grid>() + g.pts.len() * (40 + 24 + 4 + 1);
         c.put(key, g.clone(), bytes);
