@@ -2104,6 +2104,11 @@ impl DrawingEditor {
         }
         self.menu_at = self.local(position);
         let entries = self.context_menu_entries(pick, cx);
+        // The pointer is on the menu now: the canvas hover drops, so a selected leader shows orange, not tan (live2
+        // drw-leader-add-node s10).
+        if self.hover.take().is_some() {
+            self.redraw(cx);
+        }
         let ed = cx.entity();
         // Onshape's right-click menu (os_menu: 12 px text, a drawing's 23.5 px rows).
         // Esc on a table cell's menu closes the Cell panel too and clears the selection (live2 drw-hole-table-cell-rmb

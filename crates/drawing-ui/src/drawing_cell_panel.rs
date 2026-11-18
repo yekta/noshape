@@ -34,11 +34,9 @@ impl DrawingEditor {
     fn cell_panel_sel(&self) -> Option<CellSel> {
         let cs = self.cell_sel?;
         let t = self.current_sheet().table(cs.table)?;
-        // Live: the Cell panel shows for one plain cell (none with a range or a merged cell selected).
-        let one = cs.a == cs.b && t.merge_at(cs.a.0, cs.a.1).is_none();
         // A revision table's cell too (live2 drw-revision-*: its merge icons disabled).
         // And a hole table's (live drw-hole-table-cell-format: its formats only).
-        (matches!(t.kind, TableKind::General { .. } | TableKind::Revision { .. } | TableKind::Hole { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select) && one).then_some(cs)
+        (matches!(t.kind, TableKind::General { .. } | TableKind::Revision { .. } | TableKind::Hole { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select)).then_some(cs)
     }
 
     /// Create / drop the panel's state as the cell selection changes (from render).
@@ -180,8 +178,13 @@ impl DrawingEditor {
         // A single cell can size the rows / columns it spans (live drw-hole-table-cell-format: a hole table's merged
         // SIZE cell over three rows sizes them).
         let merge = l.merges.iter().find(|m| m.contains(r0, c0)).copied().filter(|_| single);
-        let (cols_on, rows_on) = (!single || merge.is_some_and(|m| m.cols > 1), !single || merge.is_some_and(|m| m.rows > 1));
         let (r0, r1, c0, c1) = merge.map_or((r0, r1, c0, c1), |m| (m.row, m.row + m.rows - 1, m.col, m.col + m.cols - 1));
+        // Live2 drw-table-cells-* 11-17: the panel shows for a range and a merged cell too. Sizing needs two columns
+        // (rows) spanned; Merge more than one cell, not one merged cell already; Remove leaves at least one row / column.
+        let (cols_on, rows_on) = (c1 > c0, r1 > r0);
+        let whole_merge = l.merges.iter().any(|m| (m.row, m.col, m.row + m.rows - 1, m.col + m.cols - 1) == (r0, c0, r1, c1));
+        let merge_on = !single && !whole_merge;
+        let (rm_rows_on, rm_cols_on) = (!(r0 == 0 && r1 + 2 >= l.ys.len()), !(c0 == 0 && c1 + 2 >= l.xs.len()));
         let size_cols: AnyElement = {
             let b = icon_btn("cp-eq-cols", "cell-size-cols-equal", "Size columns equally", false, cols_on, cx);
             if !cols_on {
@@ -212,9 +215,10 @@ impl DrawingEditor {
                 b.on_click(table_op("Size rows equally", std::rc::Rc::new(move |t: &mut Table| t.row_height = tallest), Some((0, 0)))).into_any_element()
             }
         };
-        // A hole table's cells: only its sizes (live drw-hole-table-cell-format).
-        let hole_table = matches!(t.kind, TableKind::Hole { .. });
-        let row1 = if hole_table { h_flex().h(px(30.)).pl(px(1.)).gap(px(2.)).child(size_cols).child(size_rows) } else { h_flex()
+        // A hole table's and a revision table's cells: sizes and formats only (live drw-hole-table-cell-format, live2
+        // drw-revision-cell-format 11-17).
+        let sizes_only = matches!(t.kind, TableKind::Hole { .. } | TableKind::Revision { .. });
+        let row1 = if sizes_only { h_flex().h(px(30.)).pl(px(1.)).gap(px(2.)).child(size_cols).child(size_rows) } else { h_flex()
             .h(px(30.))
             .pl(px(1.))
             .gap(px(2.))
@@ -222,7 +226,7 @@ impl DrawingEditor {
             .child(icon_btn("cp-row-below", "cell-insert-row-below", "Insert row below", false, true, cx).on_click(table_op("Insert row below", std::rc::Rc::new(move |t: &mut Table| t.insert_row(r1 + 1)), Some((0, 0)))))
             .child(icon_btn("cp-col-left", "cell-insert-col-left", "Insert column left", false, true, cx).on_click(table_op("Insert column left", std::rc::Rc::new(move |t: &mut Table| t.insert_col(c0)), Some((0, 1)))))
             .child(icon_btn("cp-col-right", "cell-insert-col-right", "Insert column right", false, true, cx).on_click(table_op("Insert column right", std::rc::Rc::new(move |t: &mut Table| t.insert_col(c1 + 1)), Some((0, 0)))))
-            .child(icon_btn("cp-rm-rows", "cell-remove-rows", "Remove rows", false, true, cx).on_click(table_op(
+            .child(icon_btn("cp-rm-rows", "cell-remove-rows", "Remove rows", false, rm_rows_on, cx).on_click(table_op(
                 "Remove rows",
                 std::rc::Rc::new(move |t: &mut Table| {
                     for r in (r0..=r1).rev() {
@@ -231,7 +235,7 @@ impl DrawingEditor {
                 }),
                 None,
             )))
-            .child(icon_btn("cp-rm-cols", "cell-remove-cols", "Remove columns", false, true, cx).on_click(table_op(
+            .child(icon_btn("cp-rm-cols", "cell-remove-cols", "Remove columns", false, rm_cols_on, cx).on_click(table_op(
                 "Remove columns",
                 std::rc::Rc::new(move |t: &mut Table| {
                     for c in (c0..=c1).rev() {
@@ -253,7 +257,7 @@ impl DrawingEditor {
             .child(size_cols)
             .child(size_rows)
             .child({
-                let b = popup_btn("cp-merge", "cell-merge", "Merge cells", !single, cx);
+                let b = popup_btn("cp-merge", "cell-merge", "Merge cells", merge_on, cx);
                 if single {
                     b.into_any_element()
                 } else {
@@ -364,13 +368,14 @@ impl DrawingEditor {
             // buttons, merge greyed for one cell.
             let button = |label: &str, enabled: bool| serde_json::json!({ "label": label, "kind": "button", "enabled": enabled });
             let mut fields: Vec<serde_json::Value> = Vec::new();
-            if !hole_table {
-                fields.extend(["Insert row above", "Insert row below", "Insert column left", "Insert column right", "Remove rows", "Remove columns"].map(|l| button(l, true)));
+            if !sizes_only {
+                fields.extend(["Insert row above", "Insert row below", "Insert column left", "Insert column right"].map(|l| button(l, true)));
+                fields.extend([button("Remove rows", rm_rows_on), button("Remove columns", rm_cols_on)]);
                 fields.push(menu("Duplicate cells", true));
             }
             fields.extend([button("Size columns equally", cols_on), button("Size rows equally", rows_on)]);
-            if !hole_table {
-                fields.extend([menu("Merge cells", !single), button("Unmerge cells", merged)]);
+            if !sizes_only {
+                fields.extend([menu("Merge cells", merge_on), button("Unmerge cells", merged)]);
             }
             fields.extend([
                 serde_json::json!({ "label": "Font", "kind": "select", "value": family }),

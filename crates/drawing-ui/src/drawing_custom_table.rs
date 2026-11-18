@@ -288,12 +288,12 @@ impl DrawingEditor {
             .map(|l| MenuEntry::item(l.name(), move |t, _, cx| t.edit_table(id, "Move to", cx, |t| t.layer = l)).disabled(l == cur))
             .collect();
         out.push(MenuEntry::Submenu("Move to".into(), layers));
-        // The table list is the stacking order. Live drawing/289, live2 REQUESTS 11-14 00:48: greyed only with no
-        // other annotation-layer object on its sheet (views don't count): a table placed on a sheet of views alone.
-        // (A hole table's tags are objects of their own: live2 drw-hole-table-rmb, both offered.)
+        // The table list is the stacking order. With no other annotation-layer object on its sheet Bring to front is
+        // greyed; Send to back stays while views lie behind it (live2 drw-table-delete, drw-revision-table-delete
+        // 11-17, recorder .7). (A hole table's tags are objects of their own: live2 drw-hole-table-rmb, both offered.)
         let alone = sheet.tables.len() == 1 && sheet.annotations.is_empty() && sheet.images.is_empty() && !matches!(t.kind, TableKind::Hole { .. });
         out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_table(id, true, cx)).disabled(alone));
-        out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_table(id, false, cx)).disabled(alone));
+        out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_table(id, false, cx)).disabled(alone && sheet.views.is_empty()));
         // A separator before a Switch to… row only (live2 dom/context-menus-drawing-2.txt: a plain table's Move to
         // sheet... follows Send to back).
         if matches!(t.kind, TableKind::Bom { .. } | TableKind::Custom { .. }) {

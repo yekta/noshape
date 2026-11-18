@@ -206,7 +206,8 @@ impl DrawingEditor {
         out.push(MenuEntry::Submenu("Move to".into(), layers));
         let alone = sheet.tables.len() == 1 && sheet.annotations.is_empty() && sheet.images.is_empty();
         out.push(MenuEntry::item("Bring to front", move |t, _, cx| t.order_table(id, true, cx)).disabled(alone));
-        out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_table(id, false, cx)).disabled(alone));
+        // (Send to back stays while views lie behind it: live2 drw-revision-table-delete 11-17, as a table's.)
+        out.push(MenuEntry::item("Send to back", move |t, _, cx| t.order_table(id, false, cx)).disabled(alone && sheet.views.is_empty()));
         out.push(MenuEntry::Separator);
         out.push(MenuEntry::item("Clear selection", |t, _, cx| {
             t.selection.clear();
@@ -350,6 +351,8 @@ impl DrawingEditor {
         crate::ui_script::note_dialog(|| {
             let mut text = crate::drawing_panels::PanelText::default();
             text.texts(["Revision table", "Multi-sheet"]).options(["See sheet 1", "Linked"]).text("Visible rows").options((1..=100).map(|n: u32| n.to_string()));
+            // (The rest past the 30 lines older recorders read: live2's 2026-11-17.7 retakes.)
+            text.text("Order").options(["Top to bottom", "Bottom to top"]).texts(["Hide revision callouts no longer shown in the table", "Select fixed corner"]);
             let fields = serde_json::json!([
                 { "label": "Multi-sheet", "kind": "select", "value": if see1 { "See sheet 1" } else { "Linked" } },
                 { "label": "Visible rows", "kind": "select", "value": rows_now.to_string() },

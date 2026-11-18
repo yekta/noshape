@@ -287,6 +287,15 @@ impl DrawingEditor {
                 ed.edit_table(id, label, cx, move |t| f(t));
             })
         };
+        // Merge ▸ and Unmerge keep the cells selected (live2 drw-table-cells-merge s12, -unmerge s15: the Cell panel
+        // stays, Merge / Unmerge swapped).
+        let keep = |label: &'static str, f: Box<dyn Fn(&mut noshape_model::drawing::Table)>| {
+            let f = std::rc::Rc::new(f);
+            MenuEntry::item(label, move |ed, _, cx| {
+                let f = f.clone();
+                ed.edit_table(id, label, cx, move |t| f(t));
+            })
+        };
         // Remove ▸ Columns / Rows: one cell stays selected where the first removed one was (live: its Cell panel
         // stays open).
         let remove = |label: &'static str, f: Box<dyn Fn(&mut noshape_model::drawing::Table)>| {
@@ -341,29 +350,44 @@ impl DrawingEditor {
         // Live drawing/538: Merge ▸ All / Horizontal / Vertical (greyed for
         // one cell); a block has no Resize….
         let multi = r1 > r0 || c1 > c0;
+        // (Horizontal needs two columns, Vertical two rows: live2 drw-table-cells-merge s11, one row's Vertical greyed.)
         let merge = vec![
-            edit("All", Box::new(move |t| {
+            keep("All", Box::new(move |t| {
                 t.merge_cells((r0, c0), (r1, c1));
             })),
-            edit("Horizontal", Box::new(move |t| {
+            keep("Horizontal", Box::new(move |t| {
                 for r in r0..=r1 {
                     t.merge_cells((r, c0), (r, c1));
                 }
-            })),
-            edit("Vertical", Box::new(move |t| {
+            }))
+            .disabled(c1 == c0),
+            keep("Vertical", Box::new(move |t| {
                 for c in c0..=c1 {
                     t.merge_cells((r0, c), (r1, c));
                 }
-            })),
+            }))
+            .disabled(r1 == r0),
         ]
         .into_iter()
         .collect();
         // Live (behaviours 1498, qa DWG-CELL-MERGE-GREY): for one cell
         // "Merge ▸" itself is greyed (an empty submenu).
-        out.push(MenuEntry::Submenu("Merge".into(), if multi { merge } else { Vec::new() }));
-        out.push(edit("Unmerge", Box::new(move |t| {
-            t.unmerge(r0, c0);
-        })).disabled(t.merge_at(r0, c0).is_none()));
+        // (A merged cell is a block too: live2 drw-table-cells-unmerge s14, Merge ▸ offered on it.)
+        let block = multi || t.merge_at(r0, c0).is_some_and(|m| m.rows > 1 || m.cols > 1);
+        out.push(MenuEntry::Submenu("Merge".into(), if block { merge } else { Vec::new() }));
+        // Unmerge leaves the block it split selected (live2 drw-table-cells-unmerge s15: Merge enabled again).
+        let merged = t.merge_at(r0, c0);
+        out.push(
+            MenuEntry::item("Unmerge", move |ed, _, cx| {
+                if let Some(m) = merged {
+                    ed.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: (m.row, m.col), b: (m.row + m.rows - 1, m.col + m.cols - 1) });
+                }
+                ed.edit_table(id, "Unmerge", cx, move |t| {
+                    t.unmerge(r0, c0);
+                });
+            })
+            .disabled(merged.is_none()),
+        );
         let resize = resize.filter(|_| !multi);
         out.extend(resize);
         out.push(MenuEntry::Separator);

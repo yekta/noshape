@@ -831,3 +831,45 @@ fn a_single_centre_marks_grip_shortens_it_from_hover(cx: &mut TestAppContext) {
     let (_, _, after) = arm(cx);
     assert!((before - after - 10.0 * mm_per_px).abs() < 0.5 * mm_per_px, "10 px inward from hover: shorter than its default ({before} -> {after})");
 }
+
+/// Live2 drw-leader-add-node s10: a right-click on a note's leader selects the note and its menu takes the pointer, so
+/// the leader shows selected (orange), not hovered (tan).
+#[gpui::test]
+fn a_right_click_on_a_leader_selects_its_note_and_drops_the_hover(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let num = |v: &Value| v.as_f64().unwrap_or(0.0);
+        let mut corner = [f64::MAX, f64::MAX];
+        for v in g["views"].as_array().cloned().unwrap_or_default() {
+            for e in v["edges"].as_array().cloned().unwrap_or_default().iter().filter(|e| e["type"] == "line") {
+                for k in ["a", "b"] {
+                    let p = [num(&e[k][0]), num(&e[k][1])];
+                    if p[0] + p[1] < corner[0] + corner[1] {
+                        corner = p;
+                    }
+                }
+            }
+        }
+        let at = [(corner[0] - 40.0).max(25.0), (corner[1] - 40.0).max(25.0)];
+        call(ctx, "drawing_note", json!({ "drawing": dw, "text": "TEMP", "position": at, "leader": corner }));
+    }));
+    let (window, editor) = drawing(cx, "feel-leader-rclick");
+    real_sheet(cx, window, &editor);
+    let (id, mid) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let a = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Note { .. })).expect("the note");
+        let (_, path) = e.leader_paths_of(a).into_iter().next().expect("its leader");
+        let (p, q) = (path.bend(), *path.points.last().expect("the leader's end"));
+        (a.id, [(p[0] + q[0]) * 0.5, (p[1] + q[1]) * 0.5])
+    });
+    assert_eq!(lit_at(cx, window, &editor, mid), Some(Sel::Annotation(id)), "the leader lights its note");
+    let p = at_window(cx, &editor, mid);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_down(p, MouseButton::Right, Modifiers::default());
+    v.simulate_mouse_up(p, MouseButton::Right, Modifiers::default());
+    draw(cx, window);
+    let (sel, hover) = cx.update(|cx| (editor.read(cx).selection.clone(), editor.read(cx).hover));
+    assert_eq!(sel, vec![Sel::Annotation(id)], "the note selected");
+    assert_eq!(hover, None, "the menu has the pointer: nothing hovered on the sheet");
+}

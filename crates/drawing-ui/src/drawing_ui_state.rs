@@ -445,13 +445,16 @@ impl DrawingEditor {
             let thin = |id: u64| sheet.annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. } | AnnotationKind::CircleCenterline { .. }));
             // A selected hole callout is orange only behind its text (live q-escsel: its leader stays black).
             let callout_lines = self.hole_callout_selection_picks();
+            // A hovered note is drawn tan over its orange (live2 drw-leader-add-node s8: the pointer still on the leader
+            // just added, nothing read); a hovered dimension keeps its orange (drw-dimension-angular s5).
+            let tan = self.hover.and_then(|h| self.sel_of_pick(h)).filter(|s| matches!(s, Sel::Annotation(a) if sheet.annotations.iter().any(|x| x.id == *a && matches!(x.kind, AnnotationKind::Note { .. }))));
             let lit_as = |pick: u32, thin_ones: bool| {
                 let Some(p) = b.picks.get(pick as usize) else { return false };
                 self.selection.iter().any(|s| match (s, p) {
                     // A table with cells picked is orange only in them (live2 drw-revision-cell-*: no view's box reads it).
                     (Sel::Table(a), PickTarget::Table(t)) => a == t && self.cell_sel.is_none_or(|c| c.table != *a),
                     (Sel::Hatch(a), PickTarget::Hatch(t)) => a == t,
-                    (Sel::Annotation(a), PickTarget::Annotation(t)) => a == t && thin(*a) == thin_ones,
+                    (Sel::Annotation(a), PickTarget::Annotation(t)) => a == t && thin(*a) == thin_ones && tan != Some(Sel::Annotation(*a)),
                     (Sel::AutoCentermark(v, k), PickTarget::AutoCentermark { view, center }) => thin_ones && v == view && k == center,
                     (Sel::Sketch(a), PickTarget::SketchEntity(t)) => a == t,
                     _ => false,
@@ -469,12 +472,13 @@ impl DrawingEditor {
             for v in &sheet.views {
                 let Some(pl) = self.placement(v.id) else { continue };
                 let inside = |p: [f64; 2]| p[0] >= pl.min[0] && p[0] <= pl.max[0] && p[1] >= pl.min[1] && p[1] <= pl.max[1];
+                // A segment's length inside the box (a leader crossing a view into it counts: live2 drw-leader-add-node s10).
+                let len_in = |a: [f64; 2], b: [f64; 2]| clipped_len(a, b, pl.min, pl.max);
                 let mut px = 0.0;
+                // (Highlighted lines are 2 px wide: render_style.)
                 for l in b.geometry.lines.iter().filter(|l| (lit(l.pick) && !callout_lines.contains(&l.pick)) || selected_view(l.pick, v.id)) {
                     for w in l.points.windows(2) {
-                        if inside([(w[0][0] + w[1][0]) / 2.0, (w[0][1] + w[1][1]) / 2.0]) {
-                            px += (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]) * self.zoom;
-                        }
+                        px += len_in(w[0], w[1]) * self.zoom * 2.0;
                     }
                 }
                 // (A text's ink: about one and a half times its height a character.)
@@ -487,9 +491,7 @@ impl DrawingEditor {
                 }
                 for l in b.geometry.lines.iter().filter(|l| lit_as(l.pick, true)) {
                     for w in l.points.windows(2) {
-                        if inside([(w[0][0] + w[1][0]) / 2.0, (w[0][1] + w[1][1]) / 2.0]) {
-                            px += (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]) * self.zoom;
-                        }
+                        px += len_in(w[0], w[1]) * self.zoom;
                     }
                 }
                 if px > 60.0 {
@@ -511,7 +513,8 @@ impl DrawingEditor {
                 Some(PickTarget::View(v) | PickTarget::Edge { view: v, .. }) => Some(*v),
                 _ => None,
             }).filter(|v| near(*v));
-            if let Some(v) = hovered {
+            // (Not with table cells picked: live2 drw-table-cells-remove s11, Remove ▸ Columns clicked over Isometric.)
+            if let Some(v) = hovered.filter(|_| self.cell_sel.is_none()) {
                 selection.push(("EDGE+".into(), self.ui_view_name(v)));
             }
         }
@@ -762,4 +765,39 @@ fn tenths(p: [f64; 2]) -> [i64; 2] {
 /// [`tenths`] back to millimetres for the state.
 fn mm(p: [i64; 2]) -> [f64; 2] {
     [p[0] as f64 / 10.0, p[1] as f64 / 10.0]
+}
+
+/// The length of segment `a`-`b` inside the box `min`-`max` (Liang-Barsky clipping).
+fn clipped_len(a: [f64; 2], b: [f64; 2], min: [f64; 2], max: [f64; 2]) -> f64 {
+    let d = [b[0] - a[0], b[1] - a[1]];
+    let (mut t0, mut t1) = (0.0_f64, 1.0_f64);
+    for k in 0..2 {
+        if d[k] == 0.0 {
+            if a[k] < min[k] || a[k] > max[k] {
+                return 0.0;
+            }
+            continue;
+        }
+        let (ta, tb) = ((min[k] - a[k]) / d[k], (max[k] - a[k]) / d[k]);
+        t0 = t0.max(ta.min(tb));
+        t1 = t1.min(ta.max(tb));
+    }
+    if t1 <= t0 {
+        return 0.0;
+    }
+    (t1 - t0) * d[0].hypot(d[1])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clipped_len;
+
+    #[test]
+    fn a_segment_counts_its_length_inside_the_box() {
+        let (min, max) = ([0.0, 0.0], [10.0, 4.0]);
+        assert_eq!(clipped_len([5.0, -6.0], [5.0, 4.0], min, max), 4.0, "a leader ending on the box's top edge from below");
+        assert_eq!(clipped_len([2.0, 1.0], [8.0, 1.0], min, max), 6.0, "all inside");
+        assert_eq!(clipped_len([-5.0, 6.0], [15.0, 6.0], min, max), 0.0, "outside");
+        assert!((clipped_len([-2.0, -2.0], [12.0, 12.0], min, max) - 4.0 * 2f64.sqrt()).abs() < 1e-12, "a diagonal through a corner");
+    }
 }
