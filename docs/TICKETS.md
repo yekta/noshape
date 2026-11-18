@@ -717,6 +717,12 @@ tonight's 02:00 window on vibex7 with v0.4.59 (qa-flow-night, 5 rounds). No row 
 | Fillet: dialog / edge -> preview / commit | 690 (550-831) / 634 (554-714) / 498 (429-566) | 1690 / 2561 / 1473 |
 | Fastened: dialog / second face -> solved / commit | 192 (123-262) / 352 (202-501) / 288 (189-386) | 856 / 1997 / 967 |
 | Drawing: Insert view dialog / base view placed / projected placed | 71 (56-86) / 248 (110-385) / 209 (166-252) | 260 / ~1641 / ~1617 (±0.5 s) |
+| Sheet metal model: dialog / region -> preview / ✓ (vibe2 20:4x, load 41-51, 1 round) | 480 / 1157 / 161 | 1701 / 3851 / 1692 |
+| Flange: dialog / edge -> preview / ✓ (cold: no warm pass) | 101 / 1489 / 679 | 1908 / 2512 / 1791 |
+| Sketch dimension: placement -> edit box (2nd frame) / value Enter -> solved | 201 / 431 | 287 (UI) / 1011 |
+| Linear pattern (feature): dialog / row -> field / edge -> preview / ✓ | 357 / 471 / 102 / 229 | 1518 / 587 / 1684 / 1106 |
+Not timed on ours yet: the Variable Studio edit -> Part Studio rebuilt (no start uses a Variable Studio variable), the Flat view panel.
+The window runs (qa-flow-night, qa-big-night, qa-flow2-night, v0.4.59) give the valid numbers.
 
 ## Slower than live per feature: live's rollback step costs (live 14:1x, live/qa/rbstep-1118/tables2.md) vs ours today (qa 14:5x)
 **Superseded 18:2x by DECISIONS 11-18 (user: human scale, 9e5b481d4): per-feature ratios are not gaps; the rows below are owners' leads
