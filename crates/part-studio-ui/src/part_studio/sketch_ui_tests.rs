@@ -6082,3 +6082,24 @@ fn the_configurations_box_refuses_a_value_out_of_range_or_not_a_value(cx: &mut T
     assert_eq!(enter(cx, "abc"), ("abc".to_string(), None), "not a value: kept, not applied");
     assert_eq!(enter(cx, "20").1.as_deref(), Some("20 mm"), "a good value applies");
 }
+
+/// Live errors-1118 (panel.png, panel-len-only.png): the Configurations box stands as tall with two inputs as with one,
+/// the second row cut off (it scrolls).
+#[gpui::test]
+fn the_configurations_box_stays_one_input_tall_with_two(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-box-two", &[("width", "30 mm")]);
+    let box_h = |cx: &mut TestAppContext| {
+        draw(cx, window);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.debug_bounds("cfg-box").expect("the box drawn").size.height
+    };
+    cx.update(|cx| view.update(cx, |v, cx| v.edit_config("Configure", cx, |ps| {
+        noshape_ops::config::add_variable_input(ps, "Len", "LENGTH", "10 mm", None);
+    })));
+    let one = box_h(cx);
+    cx.update(|cx| view.update(cx, |v, cx| v.edit_config("Configure", cx, |ps| {
+        noshape_ops::config::add_input(ps, "List");
+    })));
+    let two = box_h(cx);
+    assert!((one - two).abs() < px(0.5), "one input {one:?}, two {two:?}");
+}

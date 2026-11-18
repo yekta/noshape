@@ -2619,14 +2619,20 @@ impl PartStudioView {
         // Live (dom/cursor-rows.json): the line under the block is a
         // `row-resize` splitter (≈8 px). Its least is the bare title row; it
         // can grow past the inputs (blank space). Double-click does nothing.
-        let height = self.ui.cfg_box_h;
+        // Until dragged it stands as tall as with one input: more inputs scroll in it (live errors-1118: Len and a
+        // List "Size", the Size row cut off).
+        let visible = shown.iter().filter(|v| v.visible).count();
+        let height = self.ui.cfg_box_h.or_else(|| (visible > 1).then_some(CFG_BOX_ONE_INPUT_H));
         Some(
             div()
                 .id("cfg-box")
                 .debug_selector(|| "cfg-box".into())
                 .relative()
                 .flex_none()
-                .child(col.when_some(height, |c, h| c.h(px(h)).overflow_hidden()))
+                .child(match height {
+                    Some(h) => col.id("cfg-box-inputs").h(px(h)).overflow_y_scroll().into_any_element(),
+                    None => col.into_any_element(),
+                })
                 .child(
                     div()
                         .id("cfg-box-splitter")
@@ -3312,6 +3318,9 @@ fn config_value_refused(input: &ConfigInput, text: &str, units: &noshape_units::
     let Some(dim) = noshape_ops::config::kind_dim(*kind) else { return false };
     noshape_ops::config::value_error(input, text, units).is_some() || (!text.trim().is_empty() && noshape_units::evaluate_as(text, dim, units, &noshape_units::EmptyScope).is_err())
 }
+
+/// The Configurations box's height with one input: the title row, the input's row and the space under it (live 183).
+const CFG_BOX_ONE_INPUT_H: f32 = 6. + 30. + 26. + 18. + 1.;
 
 /// Dragging the splitter under the feature list's Configurations block.
 #[derive(Clone)]
