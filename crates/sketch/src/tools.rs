@@ -92,8 +92,9 @@ impl Sketch {
         self.entities().filter(|e| e.kind() != EntityKind::Point).map(|e| e.id).collect()
     }
 
-    /// Intersections of entity `id` with every other curve (sorted by parameter).
-    fn cuts(&self, id: EntityId) -> Vec<Cut> {
+    /// Intersections of entity `id` with every other curve (sorted by parameter); none within `corner` of a chain's
+    /// corner (where two other curves end: live sktools-1118, a line passing ~1 px by one doesn't cross there).
+    fn cuts(&self, id: EntityId, corner: f64) -> Vec<Cut> {
         let tol = self.tool_tol();
         let Some(c) = self.curve(id) else { return Vec::new() };
         let bb = c.bbox().expanded(tol);
@@ -112,6 +113,14 @@ impl Sketch {
                 });
                 out.push(Cut { t: x.t1, p: x.point, other, at_point });
             }
+        }
+        if corner > 0.0 {
+            // (curve, end) of every other curve; a corner is where two of them end, the curve passing within `corner`.
+            let ends: Vec<(EntityId, DVec2)> = self.curve_ids().into_iter().filter(|o| *o != id).filter_map(|o| Some((o, self.endpoints(o)?))).flat_map(|(o, (a, b))| [(o, a), (o, b)]).filter_map(|(o, p)| Some((o, self.point(p)?))).collect();
+            let near = |q: DVec2| ends.iter().filter(|(_, e)| (*e - q).length() <= 4.0 * tol).map(|(o, _)| *o).collect::<Vec<_>>();
+            let corners: Vec<(DVec2, Vec<EntityId>)> = ends.iter().map(|(_, e)| (*e, near(*e))).filter(|(e, at)| at.len() >= 2 && c.closest(*e).2 <= corner).collect();
+            // (Its crossings with those curves near the corner: a shallow pass meets them a few px away.)
+            out.retain(|x| !corners.iter().any(|(q, at)| at.contains(&x.other) && (*q - x.p).length() <= 20.0 * corner));
         }
         out.sort_by(|a, b| a.t.total_cmp(&b.t));
         let mut dedup: Vec<Cut> = Vec::new();
@@ -253,10 +262,15 @@ impl Sketch {
     /// periodic curves `t1` may pass the period end): the Trim tool's hover
     /// highlights only that piece (live, qa5 sketch tools).
     pub fn trim_span(&self, id: EntityId, pick: DVec2) -> Option<(f64, f64)> {
+        self.trim_span_near(id, pick, 0.0)
+    }
+
+    /// [`Sketch::trim_span`] with crossings within `corner` of a chain's corner not counted.
+    pub fn trim_span_near(&self, id: EntityId, pick: DVec2, corner: f64) -> Option<(f64, f64)> {
         let c = self.curve(id)?;
         let tp = c.closest(pick).0;
         let (a, b) = c.domain();
-        let cuts = self.cuts(id);
+        let cuts = self.cuts(id, corner);
         if c.is_periodic() {
             let period = b - a;
             let mut ts: Vec<f64> = cuts.iter().map(|x| a + (x.t - a).rem_euclid(period)).collect();
@@ -278,10 +292,15 @@ impl Sketch {
     /// Trim: removes the piece of `id` between the intersections around the
     /// picked point (deletes the whole entity if it has no intersections).
     pub fn trim(&mut self, id: EntityId, pick: DVec2) -> Result<EditResult> {
+        self.trim_near(id, pick, 0.0)
+    }
+
+    /// [`Sketch::trim`] with crossings within `corner` of a chain's corner not counted (the Trim tool: ~1 px).
+    pub fn trim_near(&mut self, id: EntityId, pick: DVec2, corner: f64) -> Result<EditResult> {
         let c = self.curve(id).ok_or(SketchError::UnknownEntity(id))?;
         let mut res = EditResult::default();
         let tp = c.closest(pick).0;
-        let cuts = self.cuts(id);
+        let cuts = self.cuts(id, corner);
         let (a, b) = c.domain();
         if c.is_periodic() {
             let period = b - a;

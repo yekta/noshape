@@ -98,4 +98,8 @@ fn a_dimension_label_hovers_tan_selects_on_a_click_and_opens_on_a_double_click(c
     draw(cx, window);
     let editing = cx.update(|cx| view.read(cx).dim_input.as_ref().map(|(c, _, _)| *c));
     assert_eq!(editing, hovered, "a double-click opens its value box");
+    // (Live dimbox-1118, recheck b5b664aa: its value selected and lit blue; ours paints a selection only while the
+    // field has the keyboard.)
+    let lit = cx.update_window(window, |_, w, cx| view.read(cx).dim_input.as_ref().is_some_and(|(_, st, _)| st.read(cx).focus_handle(cx).is_focused(w) && !st.read(cx).selected_range().is_empty())).unwrap();
+    assert!(lit, "the box has the keyboard, its value selected");
 }

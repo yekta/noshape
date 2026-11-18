@@ -423,6 +423,8 @@ const WOKEN_EDGE_ENDS: [EntityId; 2] = [EntityId(u32::MAX - 2), EntityId(u32::MA
 /// Stands for the woken point outside the sketch (another sketch's point, a model vertex) in an inference's alignments
 /// until the click uses it.
 const WOKEN_POINT: EntityId = EntityId(u32::MAX - 4);
+/// Trim: crossings this close to a chain's corner don't count (live sktools-1118 ~1 px, recheck b5b664aa 0.6 px).
+const TRIM_CORNER_PX: f64 = 1.5;
 /// How far the pointer moves from a press, on screen, before the press is a drag (live2 "feel (sketch)" (5): a drag
 /// starts at about 5 px on an end point or a line, whatever the time; less is a click).
 const DRAG_START_PX: f64 = 5.0;
@@ -3253,7 +3255,7 @@ impl SketchEditor {
                 return EditOutcome::none();
             }
         } else {
-            data.sketch.trim(id, p).map(|_| ())
+            data.sketch.trim_near(id, p, self.world_per_px * TRIM_CORNER_PX).map(|_| ())
         };
         match res {
             Ok(()) => {
@@ -6477,7 +6479,7 @@ impl SketchEditor {
             && self.drag.is_none()
             && let (Some(h), Some(c)) = (self.hover, self.cursor)
             && let Some(curve) = data.sketch.curve(h)
-            && let Some((t0, t1)) = data.sketch.trim_span(h, c)
+            && let Some((t0, t1)) = data.sketch.trim_span_near(h, c, self.world_per_px * TRIM_CORNER_PX)
         {
             let n = 64;
             let (a, b) = curve.domain();
@@ -12032,25 +12034,32 @@ mod tests {
         assert_eq!(d.dimension_labels.get(&cid.0), Some(&[to.x, to.y]));
     }
 
-    /// Live (behaviours "feel (Sketch tools) retaken 11-18", sktools-1118 st-trim-all): a line passing ~1 px by a
-    /// chain's corner doesn't cross there; a click near its free end trims it up to its crossing with the next segment.
+    /// Live (behaviours "feel (Sketch tools) retaken 11-18", sktools-1118 st-trim-all; live recheck b5b664aa): a line
+    /// passing ~1 px by a chain's corner, outside it or across it, doesn't cross there; a click near its free end trims
+    /// it up to its crossing with the next segment.
     #[test]
     fn a_trim_past_a_chains_corner_goes_to_the_next_crossing() {
-        let (mut ed, mut d) = editor(Tool::Trim);
         let px = |x: f64, y: f64| v(x * PX, -y * PX);
-        let pts: Vec<EntityId> = [(500.0, 650.0), (600.0, 650.0), (650.0, 560.0), (750.0, 600.0)].iter().map(|(x, y)| d.sketch.add_point(px(*x, *y))).collect();
-        for w in pts.windows(2) {
-            d.sketch.add_line_between(w[0], w[1]).unwrap();
+        let corner = v(600.0, 650.0);
+        let d = v(220.0, -200.0).normalize();
+        for off in [0.9, -0.6] {
+            let (mut ed, mut data) = editor(Tool::Trim);
+            let pts: Vec<EntityId> = [(500.0, 650.0), (600.0, 650.0), (650.0, 560.0), (750.0, 600.0)].iter().map(|(x, y)| data.sketch.add_point(px(*x, *y))).collect();
+            for w in pts.windows(2) {
+                data.sketch.add_line_between(w[0], w[1]).unwrap();
+            }
+            let through = corner + d.perp() * off;
+            let (a, b) = (through - d * 150.0, through + d * 120.0);
+            let line = data.sketch.add_line(px(a.x, a.y), px(b.x, b.y));
+            let pick = through - d * 110.0;
+            click(&mut ed, &mut data, px(pick.x, pick.y));
+            let c = data.sketch.curve(line).expect("the piece past the third segment stays");
+            let (s, e) = (c.start_point() / PX, c.end_point() / PX);
+            let (lo, hi) = if s.x < e.x { (s, e) } else { (e, s) };
+            assert!((hi - v(b.x, -b.y)).length() < 1e-6, "{off}: {hi:?}");
+            assert!(lo.x > 670.0 && lo.x < 700.0, "{off} px off the corner: it starts at the third segment's crossing, not by the corner: {lo:?}");
+            assert_eq!(count(&data, EntityKind::Line), 4);
         }
-        let line = d.sketch.add_line(px(480.0, 760.0), px(700.0, 560.0));
-        let y_at = |x: f64| 760.0 - (x - 480.0) * 200.0 / 220.0;
-        click(&mut ed, &mut d, px(540.0, y_at(540.0)));
-        let c = d.sketch.curve(line).expect("the piece past the third segment stays");
-        let (s, e) = (c.start_point() / PX, c.end_point() / PX);
-        let (lo, hi) = if s.x < e.x { (s, e) } else { (e, s) };
-        assert!((hi - v(700.0, -560.0)).length() < 1e-6, "{hi:?}");
-        assert!(lo.x > 680.0 && lo.x < 690.0, "it starts at the third segment's crossing, not by the corner: {lo:?}");
-        assert_eq!(count(&d, EntityKind::Line), 4);
     }
 
     #[test]
