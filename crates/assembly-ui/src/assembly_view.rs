@@ -1518,6 +1518,11 @@ impl AssemblyView {
         if let Some(slot) = self.ui.cap_hover.filter(|_| self.ui.section.is_some()).and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }
+        // Live asm-views2-1118: while the section's handle is dragged its caps are the tan hatched preview on every instance.
+        let dragged = self.ui.section.as_ref().filter(|_| self.ui.section_drag.as_ref().is_some_and(|d| d.moved)).and_then(|s| s.dialog.as_ref()).map(|d| d.active);
+        if let Some(slot) = dragged.and_then(|k| scene.clip_selected.get_mut(k)) {
+            *slot = true;
+        }
         // Onshape's cursors (docs/parity/cursors.md): the selection count,
         // and the snap-mate cursor while a drag is snapped to a target
         // connector (Onshape: alignSnapData with target data shows it,
@@ -2487,13 +2492,14 @@ impl AssemblyView {
         self.reapply_display(cx);
     }
 
-    /// Row menu › Activate <view>: the view jumps to its exploded state, then the camera zooms to fit, animated
-    /// (live extras-1118: no playback; a plain row click only selects).
+    /// Row menu › Activate <view>: the view jumps to its exploded state and the camera to fit it, in one frame (live
+    /// asm-views2-1118: two changed frames, the view and the parts, no motion between; no player; a plain row click
+    /// only selects).
     fn activate_explode_from_menu(&mut self, i: usize, cx: &mut Context<Self>) {
         self.ui.explode_sel = Some((i, None));
         self.explode_edit = true;
         self.activate_explode(Some(i), cx);
-        self.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx));
+        self.viewport.update(cx, |vp, cx| vp.zoom_to_fit(false, cx));
     }
 
     /// Add exploded view (panel footer, top row menu): a new empty view in
@@ -3757,9 +3763,8 @@ impl AssemblyView {
     /// A drag let go: an explode step is made, or the instances' move.
     fn finish_drag(&mut self, d: DragState, window: &mut Window, cx: &mut Context<Self>) {
         if d.explode {
-            if let Some(step) = self.explode_preview.take()
-                && (d.value.abs() > 1e-9 || d.offset.length() > 1e-9)
-            {
+            // Live asm-views2-1118: a short drag (4–10 px) makes a 0 mm step too.
+            if let Some(step) = self.explode_preview.take() {
                 self.push_explode_step(step, cx);
                 // Live 805: the "Explode step" dialog opens at once.
                 if let Some(k) = self.explode_view(cx).map(|v| v.steps.len().saturating_sub(1)) {
@@ -7009,6 +7014,9 @@ impl AssemblyView {
             self.accept_relation(cx);
         } else if self.ui.section.as_ref().is_some_and(|s| s.dialog.is_some()) {
             self.close_section_dialog(true, window, cx);
+        } else if self.step_edit.is_some() {
+            // Live asm-views2-1118: Enter keeps the step.
+            self.accept_step_edit(cx);
         }
     }
 
@@ -7041,7 +7049,14 @@ impl AssemblyView {
         if self.cancel_bom_cell(cx) {
             window.focus(&self.focus, cx);
         } else if self.step_edit.is_some() {
-            self.cancel_step_edit(cx);
+            // Live asm-views2-1118: Esc on a step a drag just made removes it and also ends the explode editing.
+            if self.step_edit.as_ref().is_some_and(|s| s.created) {
+                self.cancel_step_edit(cx);
+                self.message = None;
+                self.activate_explode(None, cx);
+            } else {
+                self.cancel_step_edit(cx);
+            }
             cx.notify();
         } else if self.ui.std.editing.is_some() {
             // Edit standard content closes as its ✕ (live asm-standard-content-edit-instance).

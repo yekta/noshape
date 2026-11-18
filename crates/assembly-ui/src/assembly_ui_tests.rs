@@ -1231,10 +1231,39 @@ fn ticking_a_driver_mate_makes_the_first_named_position_at_once(cx: &mut TestApp
     });
 }
 
-/// Live extras-1118: "Activate Explode 1" jumps to the exploded state at once (no playback), then the camera zooms to
-/// fit the exploded parts, animated.
+/// Live asm-views2-1118: a step a drag just made (its dialog open): Enter keeps it, editing goes on; Esc removes it and
+/// also ends "Editing Explode 1" (one Esc).
 #[gpui::test]
-fn activating_an_exploded_view_jumps_then_zooms_to_fit(cx: &mut TestAppContext) {
+fn esc_on_a_new_explode_step_removes_it_and_ends_the_editing(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "explode-esc");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            let step: noshape_model::assembly::ExplodeStep = serde_json::from_value(json!({ "instances": [pin], "translation": [0.0, 0.0, 0.0], "rotation_axis": null, "rotation_angle": 0.0 })).unwrap();
+            v.edit("Insert : Explode 1", cx, |a| a.exploded_views.push(noshape_model::assembly::ExplodedView { name: "Explode 1".into(), steps: vec![] }));
+            v.activate_explode_from_menu(0, cx);
+            let steps = |v: &AssemblyView, cx: &gpui_kit::App| v.assembly(cx).unwrap().exploded_views[0].steps.len();
+            for (enter, left) in [(true, 1), (false, 1)] {
+                v.push_explode_step(step.clone(), cx);
+                v.open_step_edit(steps(v, cx) - 1, true, w, cx);
+                if enter {
+                    v.on_accept(&crate::actions::Accept, w, cx);
+                    assert!(v.step_edit.is_none() && v.explode_edit, "Enter: kept, still editing");
+                } else {
+                    v.on_cancel(&crate::actions::Cancel, w, cx);
+                    assert!(v.step_edit.is_none() && !v.explode_edit && v.explode.is_none(), "Esc: editing ended");
+                }
+                assert_eq!(steps(v, cx), left);
+            }
+        });
+    })
+    .unwrap();
+}
+
+/// Live asm-views2-1118: "Activate Explode 1" jumps to the exploded state and the camera to fit the exploded parts in
+/// one frame (no playback, no animation).
+#[gpui::test]
+fn activating_an_exploded_view_jumps_to_it_and_to_fit(cx: &mut TestAppContext) {
     let (window, view) = pattern_assembly(cx, "explode-activate");
     cx.update_window(window, |_, _, cx| {
         view.update(cx, |v, cx| {
@@ -1242,13 +1271,14 @@ fn activating_an_exploded_view_jumps_then_zooms_to_fit(cx: &mut TestAppContext) 
             let step: noshape_model::assembly::ExplodeStep = serde_json::from_value(json!({ "instances": [pin], "translation": [0.0, 0.0, 0.5], "rotation_axis": null, "rotation_angle": 0.0 })).unwrap();
             v.edit("Insert : Explode 1", cx, |a| a.exploded_views.push(noshape_model::assembly::ExplodedView { name: "Explode 1".into(), steps: vec![step] }));
             let before = v.result.instance_bounds(pin).unwrap();
+            let distance = v.viewport.read(cx).camera.distance;
             v.activate_explode_from_menu(0, cx);
             assert_eq!(v.explode, Some(0));
             assert!(v.explode_progress.is_none(), "no playback");
             let after = v.result.instance_bounds(pin).unwrap();
             assert!((after.0.z - before.0.z - 0.5).abs() < 1e-6, "exploded at once: {before:?} -> {after:?}");
-            let (to, _) = v.viewport.read(cx).animation().expect("an animated zoom to fit");
-            assert!(to.distance > v.viewport.read(cx).camera.distance, "zooms out to the exploded pin");
+            assert!(v.viewport.read(cx).animation().is_none(), "no animation");
+            assert!(v.viewport.read(cx).camera.distance > distance, "zoomed out to the exploded pin at once");
         });
     })
     .unwrap();

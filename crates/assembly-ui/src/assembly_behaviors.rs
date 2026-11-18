@@ -5631,7 +5631,8 @@ impl AssemblyView {
         let new_plane = match d.handle {
             SectionHandle::Arrow => {
                 let Some(t) = self.line_param(position, pl0.base(), pl0.dir(), cx) else { return true };
-                let v = t - d.s0;
+                // Live asm-views2-1118: the plane moves in 0.1 mm steps ("-1.1 mm" … "-6.6 mm").
+                let v = super::explode_drag_round(t - d.s0, &self.units(cx));
                 let mut pl = pl0.clone();
                 pl.offset = pl0.offset + v * pl0.dir().dot(pl0.normal);
                 Some((pl, v))
