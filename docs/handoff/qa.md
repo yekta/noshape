@@ -160,6 +160,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    SNAPMODE-REACH (70 vs 57 px), P1 SNAPMODE-RELEASE-DIALOG; psui P1 ROW-DBLCLICK-DISTANCE. Runner-built docs reopened without the
    runner (vibex8 ~/tmp/qa/fl/docs: asm-feel, hole-plate-drawing): stable views. Drivers qa-scratch/af/snapm2.py, hv2/rowk.py, hv2/drw.py.
    qa-wait-33c5 re-runs FEEL-FL-AUTOSCROLL-DROP on psui's 33c57541 green.
+0x. **Speed sweep (lead 07:45, done 08:53)**: bin/speed-sweep.sh <sha> (SKIP_BUILD=1 reuses vibe2 ~/agents/qa-speed/target, 7.9 GB):
+   release build on vibe2, corpus A/B there + user docs / dock tab on vibex7, ab-feat2.py two passes, bin/speed-sum.py <dir> pass|ud.
+   80a64725 vs v0.4.57: no regression (TICKETS 364fac560). A/Bs ran outside the slots at nice 10 (both slots queued ~2 h).
+   v0.4.58 published check 08:28-08:4x: SHA OK, user docs SAME, quit 5/5, baseline -> 0.4.58.
 0w. **Workflow feel vs live (07:38)**: TICKETS "Workflow feel vs live's 11-18 07:09-07:22 timings": ours faster on every row, no
    tickets (qa-scratch/wf: wflat.py on this host's Xvfb :153, two-blocks reopened without the runner, PIL crops padded to live's
    139 ms, timestamps at capture). FEEL-FL-AUTOSCROLL-DROP verified 07:21 (b5c4ccc4), psui told. psui's next land has ROW-DBLCLICK.
