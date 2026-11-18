@@ -496,6 +496,44 @@ pub fn aux_indicator(sheet: &Sheet, id: ViewId, ppl: &ViewPlacement, parent: Opt
     Some(AuxIndicator { anchor: c, es, ns, offset, ext, elbows, tips, mid: at((ext[1] - ext[0]) / 2.0), letters })
 }
 
+/// A break line from `s0` to `s1` (sheet mm) in its line type, `nrm` across it (the break's axis on the sheet).
+pub fn break_line_points(s0: [f64; 2], s1: [f64; 2], nrm: [f64; 2], style: BreakStyle) -> Vec<[f64; 2]> {
+    match style {
+        BreakStyle::Straight => vec![s0, s1],
+        BreakStyle::ZigZag => {
+            let m = [(s0[0] + s1[0]) / 2.0, (s0[1] + s1[1]) / 2.0];
+            let d = [s1[0] - s0[0], s1[1] - s0[1]];
+            let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
+            let u = [d[0] / l, d[1] / l];
+            let at = |t: f64, o: f64| [m[0] + u[0] * t + nrm[0] * o, m[1] + u[1] * t + nrm[1] * o];
+            vec![s0, at(-3.0, 0.0), at(-1.5, 2.0), at(1.5, -2.0), at(3.0, 0.0), s1]
+        }
+        BreakStyle::SmallZigZag => {
+            // Small teeth along the whole line.
+            let d = [s1[0] - s0[0], s1[1] - s0[1]];
+            let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
+            let n = ((l / 2.0).round() as usize).clamp(2, 400);
+            (0..=n)
+                .map(|i| {
+                    let t = i as f64 / n as f64;
+                    let o = if i == 0 || i == n { 0.0 } else if i % 2 == 1 { 0.6 } else { -0.6 };
+                    [s0[0] + d[0] * t + nrm[0] * o, s0[1] + d[1] * t + nrm[1] * o]
+                })
+                .collect()
+        }
+        BreakStyle::Curve => {
+            let n = 24;
+            (0..=n)
+                .map(|i| {
+                    let t = i as f64 / n as f64;
+                    let o = (t * std::f64::consts::TAU).sin() * 1.5;
+                    [s0[0] + (s1[0] - s0[0]) * t + nrm[0] * o, s0[1] + (s1[1] - s0[1]) * t + nrm[1] * o]
+                })
+                .collect()
+        }
+    }
+}
+
 /// `frame_of`: the views' frames (breaks inherited from a parent).
 pub fn placement_of(sheet: &Sheet, id: ViewId, g: &ViewGeometry, frame_of: &dyn Fn(ViewId) -> Option<views::ViewFrame>) -> Option<ViewPlacement> {
     let v = sheet.view(id)?;
@@ -2461,40 +2499,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         pl.to_sheet(q)
                     };
                     let (s0, s1) = (pt(o0), pt(o1));
-                    let pts: Vec<[f64; 2]> = match style {
-                        BreakStyle::Straight => vec![s0, s1],
-                        BreakStyle::ZigZag => {
-                            let m = [(s0[0] + s1[0]) / 2.0, (s0[1] + s1[1]) / 2.0];
-                            let d = [s1[0] - s0[0], s1[1] - s0[1]];
-                            let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
-                            let u = [d[0] / l, d[1] / l];
-                            let at = |t: f64, o: f64| [m[0] + u[0] * t + nrm[0] * o, m[1] + u[1] * t + nrm[1] * o];
-                            vec![s0, at(-3.0, 0.0), at(-1.5, 2.0), at(1.5, -2.0), at(3.0, 0.0), s1]
-                        }
-                        BreakStyle::SmallZigZag => {
-                            // Small teeth along the whole line.
-                            let d = [s1[0] - s0[0], s1[1] - s0[1]];
-                            let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
-                            let n = ((l / 2.0).round() as usize).clamp(2, 400);
-                            (0..=n)
-                                .map(|i| {
-                                    let t = i as f64 / n as f64;
-                                    let o = if i == 0 || i == n { 0.0 } else if i % 2 == 1 { 0.6 } else { -0.6 };
-                                    [s0[0] + d[0] * t + nrm[0] * o, s0[1] + d[1] * t + nrm[1] * o]
-                                })
-                                .collect()
-                        }
-                        BreakStyle::Curve => {
-                            let n = 24;
-                            (0..=n)
-                                .map(|i| {
-                                    let t = i as f64 / n as f64;
-                                    let o = (t * std::f64::consts::TAU).sin() * 1.5;
-                                    [s0[0] + (s1[0] - s0[0]) * t + nrm[0] * o, s0[1] + (s1[1] - s0[1]) * t + nrm[1] * o]
-                                })
-                                .collect()
-                        }
-                    };
+                    let pts = break_line_points(s0, s1, nrm, style);
                     g.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
                 }
             }

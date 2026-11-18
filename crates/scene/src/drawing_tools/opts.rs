@@ -180,10 +180,8 @@ impl SheetPick<'_> {
             Tool::Auxiliary { parent: Some((pid, edge_dir)) } => {
                 let parent = sheet.view(*pid)?;
                 let n = norm([-edge_dir[1], edge_dir[0]]);
+                // Over the parent too (live2 place-1118).
                 let t = dot(sub(c, parent.position), n);
-                if t.abs() < 15.0 {
-                    return None;
-                }
                 let pos = [parent.position[0] + n[0] * t, parent.position[1] + n[1] * t];
                 let mut v = mk(ViewKind::Auxiliary { parent: *pid, edge_dir: *edge_dir }, pos, Some(parent));
                 // Auxiliary view dialog: label, Reverse, reference indicator.

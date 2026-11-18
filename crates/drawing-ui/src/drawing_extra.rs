@@ -1073,33 +1073,25 @@ impl DrawingEditor {
                     overlay.rect(*f, c, true);
                 }
             }
-            Tool::Break { parent: Some(pid), first, vertical } => {
-                let Some(pl) = self.placement(*pid) else { return };
-                // Placed, waiting for ✓: its two lines (view coordinates on the break's axis).
-                if let Some((_, b)) = self.break_dlg.as_ref().and_then(|d| d.pending.clone()) {
-                    let k = if b.vertical { 0 } else { 1 };
-                    for x in [b.a, b.b] {
-                        let mut at = pl.to_view(pl.min);
-                        at[k] = x;
-                        let s = pl.to_sheet(at);
-                        if b.vertical {
-                            overlay.lines.push((vec![[s[0], pl.min[1] - 3.0], [s[0], pl.max[1] + 3.0]], true));
-                        } else {
-                            overlay.lines.push((vec![[pl.min[0] - 3.0, s[1]], [pl.max[0] + 3.0, s[1]]], true));
-                        }
-                    }
+            // Live (live2 place-1118): a break line in the dialog's line type at the pointer over the view and at the first
+            // click; once both are placed the preview shows the view broken (`break_preview`).
+            Tool::Break { parent, first, vertical } => {
+                if self.break_dlg.as_ref().is_some_and(|d| d.pending.is_some()) {
                     return;
                 }
-                let mut xs = vec![self.cursor];
-                if let Some(f) = first {
-                    xs.push(*f);
-                }
-                for x in xs {
-                    if *vertical {
-                        overlay.lines.push((vec![[x[0], pl.min[1] - 3.0], [x[0], pl.max[1] + 3.0]], true));
+                let at = self.cursor;
+                let Some(pl) = parent.or_else(|| self.view_at(at)).and_then(|v| self.placement(v)) else { return };
+                let style = self.break_dlg.as_ref().map_or(BreakStyle::ZigZag, |d| d.style);
+                // Past the geometry as a placed break's line (0.1 in on ANSI).
+                let m = if self.drawing.is_ansi() { 2.54 } else { 3.0 };
+                let hover = pl.contains(at, 0.0).then_some(at);
+                for x in hover.into_iter().chain(*first) {
+                    let (s0, s1, nrm) = if *vertical {
+                        ([x[0], pl.min[1] - m], [x[0], pl.max[1] + m], pl.dir_to_sheet([1.0, 0.0]))
                     } else {
-                        overlay.lines.push((vec![[pl.min[0] - 3.0, x[1]], [pl.max[0] + 3.0, x[1]]], true));
-                    }
+                        ([pl.min[0] - m, x[1]], [pl.max[0] + m, x[1]], pl.dir_to_sheet([0.0, 1.0]))
+                    };
+                    overlay.tinted.push((build::break_line_points(s0, s1, nrm, style), [0, 0, 0, 255], 1.0));
                 }
             }
             Tool::Ordinate { origin: Some(o), .. } => {

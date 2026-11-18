@@ -1773,10 +1773,10 @@ impl DrawingEditor {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
     }
 
-    /// The projected or section view being placed: its preview's id (drawn grey in a 1 px frame, a section's label
+    /// The projected, auxiliary, section or detail view being placed: its preview's id (drawn grey in a 1 px frame, a section's label
     /// left out, live2 place-1118).
     pub(crate) fn placing_view(&self) -> Option<ViewId> {
-        if !matches!(self.tool, Tool::Projected { parent: Some(_) } | Tool::Section { line: Some(_), .. } | Tool::Detail { radius: Some(_), .. }) {
+        if !matches!(self.tool, Tool::Projected { parent: Some(_) } | Tool::Auxiliary { parent: Some(_) } | Tool::Section { line: Some(_), .. } | Tool::Detail { radius: Some(_), .. }) {
             return None;
         }
         let shown = self.preview.as_ref()?.sheets.get(self.sheet)?;
@@ -2050,7 +2050,9 @@ impl DrawingEditor {
     }
 
     pub fn update_hover(&mut self, cx: &mut Context<Self>) {
-        let hover = self.pk().hover_at();
+        // The table being placed is not lit: it follows the pointer in black lines (live2 place-1118).
+        let placing = |t: &PickTarget| matches!(t, PickTarget::Table(id) if self.drawing_sheet().table(*id).is_none());
+        let hover = self.pk().hover_at().filter(|h| !self.built.as_ref().and_then(|b| b.picks.get(*h as usize)).is_some_and(placing));
         if hover != self.hover {
             self.hover = hover;
             self.redraw(cx);

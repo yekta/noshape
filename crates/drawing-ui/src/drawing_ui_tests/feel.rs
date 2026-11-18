@@ -1529,3 +1529,129 @@ fn esc_mid_box_does_nothing_and_an_empty_box_keeps_the_selection(cx: &mut TestAp
     let kept = drag_box(cx, far.0, far.1, false);
     assert_eq!(kept, sel, "an empty box keeps the selection");
 }
+
+/// Live2 place-1118: Auxiliary view: the view being placed is a grey preview in the thin frame with no letters and no
+/// label, its fold line midway between the parent's edge and the preview's frame; with the pointer over the parent the
+/// preview sits on it.
+#[gpui::test]
+fn an_auxiliary_views_preview_is_grey_framed_without_letters_and_shows_over_its_parent(cx: &mut TestAppContext) {
+    use noshape_model::drawing::ViewKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-aux-ghost");
+    real_sheet(cx, window, &editor);
+    let (base, centre, edge) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let v = e.current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).expect("a base view");
+        let g = e.geoms.get(&v.id).cloned().expect("geometry");
+        (v.id, v.position, [g.max[0], (g.min[1] + g.max[1]) / 2.0])
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Auxiliary { parent: None }, cx)));
+    draw(cx, window);
+    let place = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, _, cx| {
+            editor.update(cx, |e, cx| {
+                if let Some(d) = &mut e.aux_dlg {
+                    d.anchor = Some(edge);
+                }
+                e.tool = Tool::Auxiliary { parent: Some((base, [0.0, 1.0])) };
+                e.cursor = at;
+                e.update_preview(cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+    };
+    // Twice: the second preview takes the first one's box for its fold line.
+    place(cx, [centre[0] + 90.0, centre[1]]);
+    place(cx, [centre[0] + 90.0, centre[1]]);
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        let id = e.placing_view().expect("the auxiliary view previewed");
+        let v = e.preview.as_ref().and_then(|d| d.sheets.get(e.sheet)).and_then(|s| s.view(id)).cloned().expect("in the preview");
+        let a = v.aux_ref.clone().expect("its reference indicator");
+        assert!(v.hide_label && a.letter.is_empty(), "no label, no letters");
+        let (pl, ppl) = (e.placement(id).expect("framed"), e.placement(base).expect("the parent"));
+        let (edge_x, frame_x) = (ppl.to_sheet(edge)[0], pl.min[0] - e.tol_mm(8.0));
+        let off = a.offset.expect("the fold line placed");
+        assert!((edge_x + off - (edge_x + frame_x) / 2.0).abs() < 0.05, "midway: edge {edge_x}, frame {frame_x}, line at {}", edge_x + off);
+    });
+    place(cx, centre);
+    assert!(cx.update(|cx| editor.read(cx).placing_view().is_some()), "over the parent the preview shows");
+}
+
+/// Live2 place-1118: Break view: a zigzag break line at the pointer over the view (none off it), each click places
+/// one, and after the second the view shows broken at once, before ✓.
+#[gpui::test]
+fn a_break_line_follows_the_pointer_and_two_clicks_break_the_view_at_once(cx: &mut TestAppContext) {
+    use noshape_model::drawing::ViewKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-break-preview");
+    real_sheet(cx, window, &editor);
+    let (base, pl) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let v = e.current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).map(|v| v.id).expect("a base view");
+        (v, e.placement(v).expect("placed"))
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Break { parent: None, first: None, vertical: true }, cx)));
+    draw(cx, window);
+    let x = |t: f64| [pl.min[0] + (pl.max[0] - pl.min[0]) * t, (pl.min[1] + pl.max[1]) / 2.0];
+    let zigzags = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, _, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = at;
+                e.update_preview(cx);
+            })
+        })
+        .unwrap();
+        cx.update(|cx| editor.read(cx).overlay.tinted.iter().filter(|(pts, rgb, _)| pts.len() == 6 && *rgb == [0, 0, 0, 255]).count())
+    };
+    assert_eq!(zigzags(cx, x(0.3)), 1, "a zigzag at the pointer over the view");
+    assert_eq!(zigzags(cx, [pl.max[0] + 30.0, pl.max[1] + 30.0]), 0, "none off it");
+    click_sheet(cx, window, &editor, x(0.3));
+    assert_eq!(zigzags(cx, x(0.7)), 2, "the first one placed and one at the pointer");
+    click_sheet(cx, window, &editor, x(0.7));
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(e.drawing_sheet().view(base).is_some_and(|v| v.breaks.is_empty()), "not applied before ✓");
+        let shown = e.preview.as_ref().and_then(|d| d.sheets.get(e.sheet)).and_then(|s| s.view(base)).map(|v| v.breaks.len());
+        assert_eq!(shown, Some(1), "the view broken in the preview");
+        assert_eq!(e.placement(base).map(|p| p.nbreaks), Some(1), "and drawn broken");
+    });
+}
+
+/// Live2 place-1118 (pin-block-asm-drawing): placing a BOM table, its fixed corner (top right) snaps to the border
+/// frame's corner with a hollow orange square from 5 and 8.6 px, not 12.8; the table under the pointer is not lit (live
+/// draws it in black lines).
+#[gpui::test]
+fn a_placed_bom_tables_corner_snaps_to_the_frames_corner_within_10_px(cx: &mut TestAppContext) {
+    use crate::drawing_scene::SnapMark;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-bom-corner");
+    real_sheet(cx, window, &editor);
+    let corner = cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            e.sources.values_mut().for_each(|s| s.assembly = true);
+            e.tool = Tool::Table { kind: noshape_scene::drawing_tools::TableTool::Bom, view: None, origin: None };
+            e.sync_table_dlg();
+            let [_, _, x1, y1] = e.current_sheet().size.frame_rect();
+            [x1, y1]
+        })
+    });
+    draw(cx, window);
+    for (px_off, snaps) in [(5.0, true), (8.6, true), (12.8, false)] {
+        let mm = cx.update(|cx| editor.read(cx).tol_mm(px_off)) / std::f64::consts::SQRT_2;
+        let at = at_window(cx, &editor, [corner[0] - mm, corner[1] - mm]);
+        VisualTestContext::from_window(window, cx).simulate_mouse_move(at, None, Modifiers::default());
+        draw(cx, window);
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            assert!(e.table_dlg_preview().is_some(), "the table follows the pointer");
+            let snapped = (e.cursor[0] - corner[0]).hypot(e.cursor[1] - corner[1]) < 1e-9;
+            assert_eq!(snapped, snaps, "{px_off} px off the corner: at {:?}", e.cursor);
+            let mark = e.overlay.marks.iter().any(|(p, k, _)| *k == SnapMark::Box && *p == corner);
+            assert_eq!(mark, snaps, "{px_off} px: the orange square");
+            let lit = e.hover.and_then(|h| e.built.as_ref().and_then(|b| b.picks.get(h as usize)).cloned());
+            assert!(!matches!(lit, Some(noshape_model::drawing::build::PickTarget::Table(_))), "the table being placed is not lit: {lit:?}");
+        });
+    }
+}

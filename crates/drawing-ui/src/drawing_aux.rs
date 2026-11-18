@@ -10,7 +10,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::ViewId;
+use noshape_model::drawing::{Sheet, ViewId, ViewKind, views};
 
 /// Pushes one highlight segment (from, to, colour, width in px).
 type SegFn = dyn FnMut(&mut noshape_render::LineData, [f64; 2], [f64; 2], [u8; 4], f32);
@@ -35,6 +35,20 @@ fn unit(a: [f64; 2]) -> [f64; 2] {
 }
 
 impl DrawingEditor {
+    /// The fold line of auxiliary view `id` being placed, midway between the parent's edge and the preview's frame
+    /// (live2 place-1118). The last preview's box gives the view's size (the same wherever it moves); the first frame
+    /// keeps the line's usual distance.
+    pub(crate) fn aux_fold_offset(&self, sheet: &Sheet, id: ViewId) -> Option<f64> {
+        let v = sheet.view(id)?;
+        let ViewKind::Auxiliary { parent, .. } = v.kind else { return None };
+        let (ppl, last, n) = (self.placement(parent)?, self.placement(id)?, views::auxiliary_toward(sheet, id)?);
+        let ns = ppl.dir_to_sheet(n);
+        let along = |q: [f64; 2], o: [f64; 2]| (q[0] - o[0]) * ns[0] + (q[1] - o[1]) * ns[1];
+        let near = [last.min, [last.max[0], last.min[1]], last.max, [last.min[0], last.max[1]]].into_iter().map(|q| along(q, last.position)).fold(f64::INFINITY, f64::min);
+        let frame = along(v.position, ppl.to_sheet(v.aux_ref.as_ref()?.anchor)) + near - self.tol_mm(8.0);
+        Some(frame / 2.0)
+    }
+
     /// Create / drop the dialog with the Auxiliary view tool (called from render).
     pub fn sync_aux_dlg(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let active = matches!(self.tool, Tool::Auxiliary { .. });

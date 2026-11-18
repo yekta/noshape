@@ -9,52 +9,28 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 15:57 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 20:51 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
-tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh`; drawing runs vibex8.
-- Landed 11-18: 882a3ecd, 781eac7c, 37ecb60c, d2eb5c15, b5c4ccc4 (duplicate workspace names, BOM cell panel, BOM
-  split), 4beed1be (ISO value on the pointer, placed BOM selected, Reset ordinate, section Exclude checkbox, linestyle).
-- Landing (2eb64993 + the next commit): Select on a view's edge selects the view; Edit detail… × → "Select closed
-  profile" (tooltip, own field id), Esc closes, also from the View label field; no tool read while editing; section
-  label gap by cut (horizontal 5.81 mm, vertical 3.02; live2 sec-label-1118, residuals 0.65 / 0.5 unexplained); Edit
-  section: Section id field read, rows placed by live's clicks (input y 121, flip 153, Exclude 234), Excluded parts
-  named inside its box with one chip per row (× "Delete <part>" at the right), Esc from the Section id field closes;
-  View properties' "Apply parent view section cut" last and read; Revision table tool only with managed workflows
-  (the 8 drw-revision-* set config_files); Release all configurations… (live release-gaps-1118: part menu after
-  Release…, one row per configuration named as the part, tooltip "Part 1 / Size / Small"; op release_create
-  `all_configurations`, e2e). run19–22: drw-detail-* all match, drw-section-exclude-from-cut 22/23 before the Esc fix.
-- Landed e24a63d1 16:13, 145333a8 16:34 (associated drawings under their part); 44f4fc11 queued (ops order).
-- Landed 44f4fc11 17:09, 56b1ce62 17:28. Landing now: live2 place-1118 (dimension value follows the pointer, ANSI;
-  crowded arrows flip; projected / section preview grey in a thin frame, section label hidden; Vertical / Horizontal
-  section cut fixed only on an inference point, else the click picks the view); kit tooltip fade from 0.25 (qa
-  DRW-TOOLBAR-TOOLTIP-DELAY: measured 511–625 ms after, 666–810 before; the rest is one software-GL frame). drw1118f
-  46/46. ui-parity runs now on vibe2 / vibex7 via ~/bin/slot (vibex6 = watcher), one per host.
-- Earlier: live2 feel batch 1 (11-18 16:15): note leader lights to 8 px (SELECT_LEADER_REACH_PX 9, was 11), a circle
-  centre snaps from 9 px (CENTER_SNAP_REACH_PX 10, vertices stay 8); mouse table's Alt swap test; feel doc rows
-  (PICKBOX, fractions, toolbar tooltip). "Unshare selected (N) with me": cloud, left out (lead).
-- Local (next land): release dialog associated drawings as live (release-gaps-1118): Include associated drawings puts
-  each drawing as a child row under the part it shows (its configuration's row first; blue corner mark, indented; the
-  part gets a ⌄ expander that folds it), the button stays pressed; release conditions now live on each row (a drawing
-  added after the dialog opened had no "Drawing has a pending update", and a removed row shifted the others' issues);
-  undo / redo keep child rows; removing the part lists its drawings on their own. Test
-  an_associated_drawing_goes_under_its_part_with_its_pending_update. The funnel already shows with two item kinds.
-- Next: a full drawing run after the land; drw-section-exclude-from-cut s22 rerun (run23).
-- Full run drw1118d (vibex6, ~/agents/studios-keep/drw1118d): 333/341. Not targets: inspection-table-iso-scrolled s2,
-  revision-table-delete s8, replicate-region-place s21 (server toast); drw-canvas-zoom-to-sheet / drw-ref-pin-reference
-  have no usable recording.
-- live2's drw-bom-table / drw-note-editor retakes match (run16).
-- uip-mine.sh on vibex6 takes exact names too (`$p.json` and `$p-*.json`).
-- FS / VS timings (live fsvs-feel-1118) re-checked: every row as live (230 / 1891 / 275 / 526 ms; the add row's
-  0.85 s first key is live's slowness).
-- Checked against live 08:4x, already as live: documents search on Enter only; version row menu (View in repair,
-  Restore to Main…, Releases only with candidates; Copy link web-only); Restore strategy dialog; Create version (V<n>
-  focused, Enter creates, Esc closes); Branch (B<n> selected, Enter creates and opens).
-- Drawing items left: drw-gtol-type-list s5 / drw-hatch-panel s29 (list highlight). Not targets: replicate-region-place s21 (live's
-  toast comes ~9.75 s after ✓, server time; ours at once, gone by the 12 s read), drw-revision-table-delete s8,
-  drw-inspection-table-iso-scrolled s2 (reader count), drw-note-editor (retake asked).
+tools/tiers/land.sh --no-precheck`; builds / drawing-ui tests `NOSHAPE_RB_HOST=vibex8 tools/tiers/rb.sh`; ops e2e on
+the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run per host.
+- Landed 11-18 (all): release dialog's associated drawings, dimension value on the pointer, projected / section
+  previews grey, section cut on inference points, tooltip fade, FS notice count (f0307a3e), tab switch test (794df283).
+- Queued 150089a4: section cut line grey dash-dot, detail circle black + grey framed preview, ui-parity driver waits
+  for a pending FS error (`ui_busy`), so the 18 fs-* takes read their notice.
+- Local (next land): live2 place-1118 Auxiliary (grey framed preview, no letters / label, fold line midway to the
+  frame, preview over the parent) and Break view (zigzag at the pointer, view broken in the preview after the second
+  click; `build::break_line_points` shared with the renderer: crates/drawing touched, run the full ops e2e first);
+  BOM table placement (fixed corner snaps to the frame's corner within 10 px with a 14 px orange square; the preview
+  table not lit, so black).
+- Running: r29 full drawing run on vibex7 (~/agents/studios-keep/drw1118g). Next: fs-* rerun after 150089a4 lands.
+- cf-spur-gear 0.4.58 → 0.4.59 (lead 11-18): cold-only, in our Boolean's free-form face grids (Once::call in rayon
+  workers 50 → 1028 samples); bool's batch in the range; qa bisects (told). Scratch /root/studios-scratch/prof/s.
+- Not targets: replicate-region-place s21 (server toast), drw-revision-table-delete s8,
+  drw-inspection-table-iso-scrolled s2; drw-canvas-zoom-to-sheet / drw-ref-pin-reference have no usable recording.
+- Awaiting live2: Versions panel feel re-take (REQUESTS 11-18 19:53).
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell

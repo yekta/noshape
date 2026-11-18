@@ -12,6 +12,9 @@ use noshape_model::drawing::*;
 pub use noshape_scene::drawing_tools::geom::*;
 use noshape_scene::drawing_tools as dt;
 
+/// How near (px) a placed table's fixed corner snaps to the border frame's corner (live2 place-1118).
+pub(crate) const TABLE_CORNER_REACH_PX: f64 = 10.0;
+
 impl DrawingEditor {
     // ------------------------------------------------------------ tools
 
@@ -730,6 +733,7 @@ impl DrawingEditor {
         }
         self.section_edit_overlay(&mut overlay);
         self.table_tool_overlay(&mut overlay, cx);
+        self.table_corner_mark(&mut overlay);
         let mut preview: Option<Drawing> = None;
         match &self.tool {
             Tool::Dimension { picks, .. } => {
@@ -863,10 +867,13 @@ impl DrawingEditor {
         if let Some(mut v) = self.pending_view() {
             let mut d = self.drawing.clone();
             let insert = matches!(self.tool, Tool::InsertView { .. });
-            // A section or detail view's preview is grey with no label, a detail's profile not yet on its parent (live2
-            // place-1118).
-            if matches!(self.tool, Tool::Section { .. } | Tool::Detail { .. }) {
+            // A section, detail or auxiliary view's preview is grey with no label, a detail's profile not yet on its
+            // parent, an auxiliary's arrows without letters (live2 place-1118).
+            if matches!(self.tool, Tool::Section { .. } | Tool::Detail { .. } | Tool::Auxiliary { .. }) {
                 v.hide_label = true;
+            }
+            if let Some(a) = v.aux_ref.as_mut() {
+                a.letter.clear();
             }
             if matches!(self.tool, Tool::Detail { .. }) {
                 v.detail_hide_profile = true;
@@ -875,7 +882,13 @@ impl DrawingEditor {
                 if insert {
                     noshape_model::drawing::create::push_inserted_view(s, v);
                 } else {
+                    let id = v.id;
                     s.views.push(v);
+                    if let Some(off) = self.aux_fold_offset(s, id)
+                        && let Some(a) = s.view_mut(id).and_then(|v| v.aux_ref.as_mut())
+                    {
+                        a.offset = Some(off);
+                    }
                 }
             }
             preview = Some(d);
@@ -911,7 +924,7 @@ impl DrawingEditor {
             preview = base;
         }
         // Edit detail / Edit section: the edited view as the dialog has it.
-        if let Some(d) = self.detail_edit_drawing(cx).or_else(|| self.section_edited()).or_else(|| self.foreshorten_preview()) {
+        if let Some(d) = self.detail_edit_drawing(cx).or_else(|| self.section_edited()).or_else(|| self.foreshorten_preview()).or_else(|| self.break_preview()) {
             preview = Some(d);
         }
         overlay.infer.extend(self.infer_lines.iter().cloned());
@@ -1613,6 +1626,20 @@ impl DrawingEditor {
         }
     }
 
+    /// The border frame's corners (sheet mm).
+    fn frame_corners(&self) -> [[f64; 2]; 4] {
+        let [x0, y0, x1, y1] = self.current_sheet().size.frame_rect();
+        [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+    }
+
+    /// Placing a table with its fixed corner snapped on the frame's corner: the hollow orange square there, 14 px
+    /// (live2 place-1118).
+    fn table_corner_mark(&self, overlay: &mut Overlay) {
+        if self.placing_table() && self.frame_corners().contains(&self.cursor) {
+            overlay.marks.push((self.cursor, crate::drawing_scene::SnapMark::Box, self.tol_mm(14.0)));
+        }
+    }
+
     /// A table tool waiting for the placing click.
     pub fn placing_table(&self) -> bool {
         match &self.tool {
@@ -1620,6 +1647,8 @@ impl DrawingEditor {
             Tool::Table { kind: TableTool::General | TableTool::Revision, .. } => true,
             Tool::Table { kind: TableTool::Hole, view: Some(_), .. } => self.hole_ready_to_place(),
             Tool::Table { view: Some(_), .. } => true,
+            // A BOM or cut list from the dialog's source (no view picked).
+            Tool::Table { kind: TableTool::Bom | TableTool::CutList, .. } => self.table_dlg_preview().is_some(),
             _ => false,
         }
     }
@@ -1630,6 +1659,12 @@ impl DrawingEditor {
     pub fn infer_table_placement(&mut self) {
         let tol = self.tol_mm(6.0);
         let c = self.cursor;
+        // The border frame's inner corners take the fixed corner first, within 10 px (live2 place-1118: at 5 and
+        // 8.6 px, not at 12.8), marked by a hollow orange square (`table_corner_mark`).
+        if let Some(k) = self.frame_corners().into_iter().filter(|k| len(sub(*k, c)) <= self.tol_mm(TABLE_CORNER_REACH_PX)).min_by(|a, b| len(sub(*a, c)).total_cmp(&len(sub(*b, c)))) {
+            self.cursor = k;
+            return;
+        }
         let mut xs: Vec<f64> = Vec::new();
         let mut ys: Vec<f64> = Vec::new();
         if let Some(b) = &self.built {

@@ -12,7 +12,7 @@ use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::{BreakStyle, ViewBreak, ViewId};
+use noshape_model::drawing::{BreakStyle, Drawing, ViewBreak, ViewId};
 
 const STYLES: [(&str, BreakStyle); 4] = [("Zig zag", BreakStyle::ZigZag), ("Small zig zag", BreakStyle::SmallZigZag), ("Curve", BreakStyle::Curve), ("Straight", BreakStyle::Straight)];
 
@@ -46,6 +46,7 @@ impl DrawingEditor {
                         && let Some(d) = &mut this.break_dlg
                     {
                         d.gap = v * 1000.0;
+                        this.update_preview(cx);
                     }
                 });
                 self.break_dlg = Some(BreakDlg { style: BreakStyle::ZigZag, gap, gap_input: st, pending: None, edit: None, _sub: sub });
@@ -79,6 +80,22 @@ impl DrawingEditor {
         }
         self.update_preview(cx);
         cx.notify();
+    }
+
+    /// The two lines placed (or a break edited): the view broken at once with the dialog's line type and gap, until ✓
+    /// (live2 place-1118).
+    pub fn break_preview(&self) -> Option<Drawing> {
+        let d = self.break_dlg.as_ref()?;
+        let (view, mut b) = d.pending.clone()?;
+        b.style = d.style;
+        b.gap_mm = d.gap;
+        let mut out = self.drawing.clone();
+        let v = out.sheets.get_mut(self.sheet)?.view_mut(view)?;
+        match d.edit.and_then(|(_, i)| v.breaks.get_mut(i)) {
+            Some(x) => *x = b,
+            None => v.breaks.push(b),
+        }
+        Some(out)
     }
 
     /// ✓: the placed break applied (or the edited one replaced) with the dialog's line type and gap.
@@ -150,6 +167,7 @@ impl DrawingEditor {
                         if let Some(d) = &mut t.break_dlg {
                             d.style = st;
                         }
+                        t.update_preview(cx);
                         cx.notify();
                     })
                 }));
