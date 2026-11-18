@@ -388,10 +388,11 @@ pub struct SolveResult {
 
 /// Base alignment between connector frames.
 fn base_rotation(flip_primary: bool, reorient: u8) -> DQuat {
-    // Flipped about X first, then the quarter turns about Z: live's opposed Fastened with PLUS_Y has the second X along
-    // the first's +Y, MINUS_Y along its −Y (bjr-config, corexy, isaac-ball's Fastened 90, infento-subs: every one).
-    let r0 = if flip_primary { DQuat::IDENTITY } else { DQuat::from_rotation_x(std::f64::consts::PI) };
-    DQuat::from_rotation_z(reorient as f64 * std::f64::consts::FRAC_PI_2) * r0
+    // The quarter turns' sense follows the Z alignment, as live's raw connector frames over the corpus's OK Fastened
+    // mates show (Z opposed, our flip off = live's primaryAxisAlignment true: PLUS_Y +90°, 45 mates; Z aligned: PLUS_Y
+    // −90°, 8) and live's Q on pin-block's edited Revolute (mate-keys-1118: the pin −90° about world Z, its Z −Z).
+    let quarter = std::f64::consts::FRAC_PI_2 * reorient as f64;
+    if flip_primary { DQuat::from_rotation_z(-quarter) } else { DQuat::from_rotation_z(quarter) * DQuat::from_rotation_x(std::f64::consts::PI) }
 }
 
 /// Relative transform `Fa⁻¹ Fb` expressed after removing the base alignment.

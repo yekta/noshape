@@ -847,6 +847,11 @@ impl AssemblyView {
             if s.editing.is_none() && !s.solve_all {
                 opts.hold_values.extend(noshape_model::assembly::eval::new_mate_holds(&m, &self.units(cx)));
             }
+            // An edited mate keeps its free values, so Flip / Reorient (A / Q) turn the free part (live mate-keys-1118:
+            // Q turns pin-block's pin −90° about the Revolute's axis).
+            if let Some(v) = s.editing.filter(|_| !s.solve_all).and_then(|id| self.result.solved.mate_values.get(&id)) {
+                opts.hold_values.extend(noshape_model::assembly::eval::mate_dofs(m.mate_type).iter().map(|(ix, _)| (m.id, *ix, v[*ix])));
+            }
             match s.editing.and_then(|id| asm.mates.iter().position(|x| x.id == id)) {
                 Some(i) => asm.mates[i] = m,
                 None => asm.mates.push(m),

@@ -1588,6 +1588,78 @@ fn part_pattern_follows_studio_pattern() {
     assert!((xs[0] - 0.01).abs() < 1e-6 && (xs[1] - 0.02).abs() < 1e-6, "{xs:?}");
 }
 
+/// Live's raw connector frames over the corpus's solved Fastened mates (asm-scissor-lift's Fastened 35): reorienting the
+/// secondary axis to +Y turns the second connector's X onto the first's −Y when their Z axes are aligned (our flip on),
+/// onto +Y when they are opposed (one sense for both turned scissor-lift's leadscrew chain 45°).
+#[test]
+fn a_fastened_secondary_axis_turns_with_the_flip() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (top, bottom) = (face_with(&r, "CapEnd"), face_with(&r, "CapStart"));
+    let units = UnitPrefs::default();
+    for flip in [true, false] {
+        let mut m = mate(10, MateType::Fastened, conn(1, top.clone(), Inference::Centroid), conn(2, bottom.clone(), Inference::Centroid));
+        (m.flip_primary, m.reorient_secondary) = (flip, 1);
+        let asm = Assembly {
+            instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.07, 0.03, -0.02), false)],
+            mates: vec![m],
+            ..Default::default()
+        };
+        let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+        assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+        let a = res.connector_world(&conn(1, top.clone(), Inference::Centroid), &units).unwrap();
+        let b = res.connector_world(&conn(2, bottom.clone(), Inference::Centroid), &units).unwrap();
+        let along = b.x().dot(a.y());
+        assert!((along - if flip { -1.0 } else { 1.0 }).abs() < 1e-9, "flip {flip}: X onto Y {along}");
+    }
+}
+
+/// Live mate-keys-1118 (pin-block's Revolute 1 edited, the pin free): Q turns the pin −90° about the mate's Z round the
+/// connectors' origin (a second Q 180°), A turns it over there (mirrored about the hole's mid-plane); the edited mate
+/// keeps its angle, so the free rotation doesn't absorb the turn.
+#[test]
+fn an_edited_revolutes_q_and_a_turn_the_free_part_as_live() {
+    let f = doc_with(vec![plate_with_hole(), pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (plate, rp) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (pin, rq) = body_of(&mut ev, &f.doc, f.studios[1]);
+    let (hole, pin_face) = (cylinder_face(&rp), cylinder_face(&rq));
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Plate <1>", f.studios[0], plate, DVec3::ZERO, true),
+            part_instance(2, "Pin <1>", f.studios[1], pin, DVec3::new(0.0, 0.0, -0.01), false),
+        ],
+        mates: vec![mate(10, MateType::Revolute, conn(2, pin_face, Inference::MidAxis), conn(1, hole, Inference::MidAxis))],
+        ..Default::default()
+    };
+    // Live's REST-made Revolute 1 has Flip primary axis on (the pin upright).
+    asm.mates[0].flip_primary = true;
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+    let pose = |res: &eval::AssemblyResult| {
+        let p = res.solved.placement(InstanceId(2)).unwrap();
+        let q = DQuat::from_xyzw(p.rotation[0], p.rotation[1], p.rotation[2], p.rotation[3]);
+        (glam::DMat3::from_quat(q), DVec3::from(p.translation))
+    };
+    let (r0, t0) = pose(&res);
+    assert!(r0.abs_diff_eq(glam::DMat3::IDENTITY, 1e-6) && t0.abs_diff_eq(DVec3::new(0.0, 0.0, -0.01), 1e-9), "in place: {r0:?} {t0:?}");
+    let held = res.solved.mate_values[&MateId(10)][0];
+    let mut edit = |asm: &mut Assembly, flip: bool, reorient: u8| {
+        (asm.mates[0].flip_primary, asm.mates[0].reorient_secondary) = (flip, reorient);
+        let opts = SolveOptions { hold_values: vec![(MateId(10), 0, held)], ..Default::default() };
+        pose(&ev.evaluate(&f.doc, asm, &opts, None))
+    };
+    let (r1, _) = edit(&mut asm, true, 1);
+    assert!(r1.abs_diff_eq(glam::DMat3::from_rotation_z(-std::f64::consts::FRAC_PI_2), 1e-6), "Q: −90° about Z: {r1:?}");
+    let (r2, _) = edit(&mut asm, true, 2);
+    assert!(r2.abs_diff_eq(glam::DMat3::from_diagonal(DVec3::new(-1.0, -1.0, 1.0)), 1e-6), "Q twice: 180°: {r2:?}");
+    let (ra, ta) = edit(&mut asm, false, 0);
+    // (Live turns it about the connector's Y, diag(−1, 1, −1); ours about X: the pin is round, the open item in asm's handoff.)
+    assert!((ra * DVec3::Z).z < -0.999, "A: turned over: {ra:?}");
+    assert!((ta.z - 0.02).abs() < 1e-9, "A: mirrored about the hole's mid-plane: {ta:?}");
+}
+
 #[test]
 fn snap_explode_progress_replace_and_config() {
     // The second studio is a copy of the first (same feature ids, so same face names).
