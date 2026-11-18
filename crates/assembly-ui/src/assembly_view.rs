@@ -7002,6 +7002,11 @@ impl AssemblyView {
     }
 
     fn on_cancel(&mut self, _: &Cancel, window: &mut Window, cx: &mut Context<Self>) {
+        // Esc during a snap-mode drag does nothing: the release still moves the part, and snap mode stays on (live
+        // snapmode-1118).
+        if self.snap_drag.as_ref().is_some_and(|s| s.started) {
+            return;
+        }
         // Esc during a triad arrow / ring drag (button held): only the value box goes (live manip-feel-1118 m9).
         if let Some(d) = self.drag.as_mut().filter(|d| d.started && !d.explode && !d.no_box && matches!(d.handle, Some(ManipHandle::Axis(_) | ManipHandle::Ring(_)))) {
             d.no_box = true;

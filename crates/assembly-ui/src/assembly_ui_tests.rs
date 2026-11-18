@@ -1263,6 +1263,38 @@ fn an_opened_linear_pattern_counts_its_row(cx: &mut TestAppContext) {
     .unwrap();
 }
 
+/// Live snapmode-1118: Esc during a snap-mode drag doesn't cancel it, a release with no snap leaves the part where it
+/// followed the pointer (no message), and snap mode stays on.
+#[gpui::test]
+fn a_snap_mode_drag_keeps_its_move_through_esc_and_stays_in_snap_mode(cx: &mut TestAppContext) {
+    use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
+    let (window, view) = pattern_assembly(cx, "snap-drag");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            let before = v.result.instance_bounds(pin).unwrap();
+            v.toggle_snap(w, cx);
+            let top = face_connector(v, "Part 2 <1>", true, cx);
+            let Reference::Implicit { on, .. } = &top.reference else { panic!("an implicit connector") };
+            let occ = v.result.occurrences.iter().position(|o| o.top() == pin).unwrap();
+            v.hover = Some(AsmPickTarget { path: vec![pin], reference: (**on).clone(), kind: PickKind::Face, occ, anchor: None });
+            let at = v.viewport.read(cx).project(v.result.occurrences[occ].transform.transform_point3(glam::DVec3::ZERO)).unwrap();
+            v.pointer = at;
+            v.start_snap_drag(at, cx);
+            // Far from everything: no snap target, the pin follows the pointer.
+            v.update_snap_drag(at + glam::DVec2::new(0.0, -300.0), cx);
+            v.on_cancel(&crate::actions::Cancel, w, cx);
+            assert!(v.snap_drag.is_some(), "Esc doesn't cancel the drag");
+            v.finish_snap_drag(w, cx);
+            let after = v.result.instance_bounds(pin).unwrap();
+            assert!(after.0.distance(before.0) > 1e-3, "moved: {before:?} -> {after:?}");
+            assert!(v.message.is_none(), "{:?}", v.message);
+            assert!(v.snap.is_some(), "snap mode stays on");
+        });
+    })
+    .unwrap();
+}
+
 /// Live asm/feel-1117 c-a-rowhover: hovering an instance's row outlines the part in the graphics, in hover orange, with
 /// no tint on its faces (was: the accent fill).
 #[gpui::test]

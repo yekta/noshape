@@ -3985,15 +3985,11 @@ impl AssemblyView {
             cx.notify();
             return;
         }
-        if s.target.is_none() {
-            // Dropped on nothing: back to where it was.
-            self.message = Some((false, "Snap: no target mate connector under the cursor.".into()));
-            self.schedule_eval(window, cx);
-            return;
-        }
         // Live (behaviours "skasm (2026-11-03 23:11, P3) assembly parity
-        // audit" (6)): the instance stays where it snapped; no mate dialog, no mate.
-        self.snap = None;
+        // audit" (6)): the instance stays where it snapped; no mate dialog, no mate. Dropped with no snap it stays
+        // where it followed the pointer (live snapmode-1118 runs 2-3: moved, no message).
+        // Snap mode stays on (live snapmode-1118: it persists across drags).
+        self.snap = Some(None);
         self.message = None;
         let name = self.assembly(cx).and_then(|a| a.instance(s.top).map(|i| i.name.clone())).unwrap_or_default();
         self.edit(&format!("Move : {name}"), cx, |_| {});
