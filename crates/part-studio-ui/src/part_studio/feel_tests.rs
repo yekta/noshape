@@ -671,6 +671,54 @@ fn a_plane_lights_6_px_past_its_edge(cx: &mut TestAppContext) {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
+/// Live2 sel-feel (11-17, box-e/ltr-from-plane; qa FEEL-PLANE-FIRST-MOVE): a press on empty space whose first move ends
+/// over a default plane lights the plane and draws no box, nor does a 1 px nudge; the next move draws it.
+#[gpui::test]
+fn a_box_whose_first_move_ends_on_a_plane_waits_a_move(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = part_studio(cx, "box-first-move-plane");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // Spots near each shown plane's corners (where no other plane is over them: the one lit at rest).
+    let spots: Vec<(Reference, DVec2)> = cx.update(|cx| {
+        let v = view.read(cx);
+        let vp = v.viewport.read(cx);
+        v.display.planes.iter().filter(|p| !p.hidden).flat_map(|p| [(-0.8, -0.8), (0.8, -0.8), (0.8, 0.8), (-0.8, 0.8)].map(|(u, v)| (p.reference.clone(), p.corner(u, v)))).filter_map(|(r, w)| Some((r, vp.project(w)?))).collect()
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).hover.clone());
+    let (plane, centre) = spots
+        .into_iter()
+        .find(|(plane, at)| {
+            pointer.move_to(cx, &view, *at);
+            lit(cx).as_ref() == Some(plane)
+        })
+        .expect("a plane's corner that lights it at rest");
+    let empty = DVec2::new(15.0, 15.0);
+    pointer.move_to(cx, &view, empty);
+    assert!(lit(cx).is_none(), "nothing lights at the viewport's corner");
+    let press = pointer.window_point(cx, empty);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: press, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+    // (Past the press's hold time, as a person's drag.)
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    let drag_to = |cx: &mut TestAppContext, at: DVec2| {
+        let win = pointer.window_point(cx, at);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, Some(gpui_kit::MouseButton::Left), Modifiers::default());
+        pointer.frames(cx, &view);
+        (lit(cx), cx.update(|cx| pointer.vp.read(cx).box_drag()))
+    };
+    let first = drag_to(cx, centre);
+    let nudged = drag_to(cx, centre + DVec2::new(1.0, 0.0));
+    let next = drag_to(cx, centre + DVec2::new(20.0, 10.0));
+    let up = pointer.window_point(cx, centre + DVec2::new(20.0, 10.0));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: up, modifiers: Modifiers::default(), click_count: 1 });
+    assert_eq!(
+        (first, nudged.1, next.1),
+        ((Some(plane), false), false, true),
+        "((lit, box) at the first move onto the plane, box after a 1 px nudge, box after the next move)"
+    );
+}
+
 /// Live hover-pick-1120 (11-17 20:41): a mate connector on a face wins over the face across its drawn disc and triad:
 /// lit 22 px out to either side, 13 px up or down, in the iso view.
 #[gpui::test]

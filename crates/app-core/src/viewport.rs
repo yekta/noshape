@@ -372,6 +372,9 @@ pub struct Viewport {
     /// two clicks can't undo it as it does a timer read when the click is handled (Windows CI's software GPU).
     left_click_count: usize,
     press_travel: f64,
+    /// A left press on empty space whose drag-starting move ended over geometry: where (the box waits for a move past
+    /// the drag threshold from there).
+    box_waits_from: Option<DVec2>,
     /// The press's summed move path (CSS px) and where it last was: the right-click menu's travel (live sums it).
     press_path: (f64, DVec2),
     last_pos: DVec2,
@@ -701,6 +704,7 @@ impl Viewport {
             middle_released: None,
             left_click_count: 0,
             press_travel: 0.0,
+            box_waits_from: None,
             press_path: (0.0, DVec2::ZERO),
             last_pos: DVec2::ZERO,
             hover_unconfirmed: false,
@@ -2280,6 +2284,7 @@ impl Viewport {
         self.press_pos = p;
         self.press_at = (self.clock)();
         self.press_travel = 0.0;
+        self.box_waits_from = None;
         self.press_path = (0.0, p);
         self.last_pos = p;
         if let Some(id) = self.label_at(p) {
@@ -2367,8 +2372,9 @@ impl Viewport {
         }
         self.press_travel = self.press_travel.max(p.distance(self.press_pos));
         self.press_path = (self.press_path.0 + p.distance(self.press_path.1), p);
+        let travel = self.box_waits_from.map_or(self.press_travel, |q| p.distance(q));
         if let Drag::Pending(button) = self.drag
-            && press_becomes_drag(button, self.press_travel, f64::from(self.scale), self.press_held(), self.ctrl_click_press)
+            && press_becomes_drag(button, travel, f64::from(self.scale), self.press_held(), self.ctrl_click_press)
         {
             // `onDragStart`: what this button + modifier combination does.
             let resolver = ModeResolver::new(MouseControls::current(), nav::Space::ThreeD);
@@ -2383,6 +2389,17 @@ impl Viewport {
                 self.zoom_anchor = self.press_pos;
                 self.flush_pending_rotate(cx);
                 self.set_nav_mode(mode, self.press_pos);
+            } else if button == MouseButton::Left
+                && self.box_waits_from.is_none()
+                && self.pick_at(self.press_pos) == Some(None)
+                && let Some(Some(id)) = self.pick_at(p)
+            {
+                // Live (sel-feel 11-17, box-e/ltr-from-plane): a press on empty space whose first move ends over a
+                // plane lights it and draws no box; the box comes with a move past the drag threshold from there.
+                self.box_waits_from = Some(p);
+                self.set_hover(Some(id), cx);
+                cx.notify();
+                return;
             } else {
                 // Dragging from geometry with no tool is a box select too
                 // (Onshape only drags geometry inside sketches/assemblies);
