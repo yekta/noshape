@@ -120,4 +120,4 @@ Live 2026-11-18 22:20–22:22 UTC: a Variable input Len (Length, 1–100 mm, def
 |---|---|---|---|
 | Out of range (500, -5) | the field pink rgb(249, 235, 236) with a red underline rgb(189, 48, 57), reading "500 mm" (unit added), its text selected; no message, no tooltip; the model stays at the last valid value | pink with a red underline, "500" (no unit); hovering shows the tooltip "Enter a value between 1 and 100. Current value is 500." | ≠ [studios] |
 | Not a value ("abc", "3 kg") | the same pink field, the text kept, the model unchanged | "abc" accepted as is: the field not marked, the model fails (Features header ⬇ red) | ≠ [studios] |
-| The Variable's box at rest | the value right-aligned, ▲ ● ▼ spinner on its right | left-aligned, no spinner | ≠ [studios] |
+| The Variable's box at rest | the value right-aligned (text-align right); no spinner (the ▲ ● ▼ in panel.png was the Configurations box's scrollbar: with Len and a List Size the box cut the Size row and scrolled; with Len alone no bar, panel-len-only.png) | left-aligned | ≠ [studios] |
