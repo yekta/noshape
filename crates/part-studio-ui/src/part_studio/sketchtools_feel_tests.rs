@@ -182,10 +182,10 @@ fn rows() -> Vec<Row> {
                     let v = view.read(cx);
                     let (ed, data) = (v.sketch.as_ref().unwrap(), v.sketch_data(cx).unwrap());
                     let vp = v.viewport.read(cx);
-                    let (o, dir) = vp.ray(vp.pointer_position());
+                    let (o, dir) = vp.ray(glam::DVec2::new(350., 300. - d));
                     let p = ed.plane_point(o, dir).unwrap();
                     let sk = &data.sketch;
-                    let level = sk.entities().find(|e| sk.curve(e.id).is_some_and(|c| matches!(c, noshape_sketch::Curve2::Line { a, b } if (a.y - b.y).abs() < 1e-12))).unwrap().id;
+                    let level = sk.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).max_by(|a, b| sk.curve(a.id).map(|c| c.length()).unwrap_or(0.).total_cmp(&sk.curve(b.id).map(|c| c.length()).unwrap_or(0.))).unwrap().id;
                     v.in_sketch_reach(level, p, cx)
                 })
             });

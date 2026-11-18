@@ -23,6 +23,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   sketch_display gave every sketch not edited the Inactive state; now its solve's states (blue under-defined), the
   cache no longer keyed on editing; its points ON_TOP as well. Model test a_sketch_not_edited_carries_its_constraint_states.
 
+- live2 sktools-1118 / sk-feel2-1118: Trim reach 6.5 px (`in_sketch_reach`) and tan #D6BD95 (`TRIM_PIECE`); glyph hover
+  margin 4 px (`GLYPH_MARGIN`, lit to 14 px; live's 16 px slide hold not done); fillet drag and the Offset drag across
+  the curve already live's; a new dimension's label has no snap (test). Rows filled in interaction-feel.
+
 ## config-parts (07:40 run, ut-0800.log): links 35/35, linear-rail 26/26, pulleys 22/22, sprockets 24/24, standoffs
 32/32 match to the end; nuts 14/17 (Sweep 1 non-manifold: core); screws not run (bool's > 14 GB Boolean).
 Our solver keeps links' waist arcs on live's branch (probe /root/skasm-scratch/probes/links-waist-probe.patch).

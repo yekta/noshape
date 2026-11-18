@@ -1208,8 +1208,8 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| Offset arrow dragged back across the curve: the value goes through 0 and the preview jumps to the other side, the arrow flipping; the value shown has no sign; no stop at 0 or at the opposite edge; release keeps the preview, Enter commits with the palette ("24.8 mm") | ? | missing |
-| A dimension label placed level with another dimension: follows the pointer 1:1 across it, no snap, no alignment line (sketch dimensions have no text inference; drawings do, D4) | ? | missing |
+| Offset arrow dragged back across the curve: the value goes through 0 and the preview jumps to the other side, the arrow flipping; the value shown has no sign; no stop at 0 or at the opposite edge; release keeps the preview, Enter commits with the palette ("24.8 mm") | = (the drag adds to the offset at the press on the arrow steps; over the curve it goes to the other side, the size unsigned; Enter opens the distance box) | sketch_mode `offset_preview_arrow_and_repeat` |
+| A dimension label placed level with another dimension: follows the pointer 1:1 across it, no snap, no alignment line (sketch dimensions have no text inference; drawings do, D4) | = (the label at the pointer, stored where clicked) | sketch_mode `a_new_dimensions_label_snaps_to_no_other_dimension` |
 
 ### asm-feel3-1118 (instance / mate list, Insert, mate connector dots, live2 11-18 09:00) [asm]
 
