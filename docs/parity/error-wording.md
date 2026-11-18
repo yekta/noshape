@@ -21,6 +21,7 @@ live/errors-1118/. Status: **=** same, **≠** differs (owner in brackets).
 |---|---|---|---|
 | The part changed (out of date) | the toolbar's Update icon yellow, tooltip "Update from this workspace (ctrl+q)"; views unchanged | the same (green 548d795fb) | = |
 | The part gone (its feature suppressed), after Update | a blue info toast "ⓘ Failed to resolve part. ×"; all views vanish (no geometry, no frame) | no toast; each view shows "No parts to show" in a small box | ≠ [studios] |
+| A dimension whose reference is lost (the hole it measured suppressed), after Update | kept with its value, drawn red-orange rgb(221,82,40), a filled dot of that colour at the lost circle's centre; no toast or tooltip | the same colour and value; ≠ the dot at the leader's end on the old circle, not at its centre | ≈ [studios] |
 
 ## Part Studio features (live)
 
