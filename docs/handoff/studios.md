@@ -9,83 +9,74 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 01:37 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30.
+Updated 2026-11-18 02:33 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
 tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh`; drawing runs vibex8.
-- Landed 11-17: ec42bd22 22:23, a4502066 23:37 (Edge condition symbols, weld centered joints, hatch Esc, hole callout
-  dual row), 4014c1fd 23:43 (mate glyph press = its click; deterministic test).
-- Queued on vibe2 01:36: e55271ab = 6fa3c795 (failed 01:14 on menu coverage: "drawing:Unmerge" now listed) + the
-  history change bar / change-row keys / config row click. Contents: leader right-click and Add / Remove node; Cell
-  panel for ranges and merged cells; revision Cell panel; tables' Send to back; reader emulation (2 px, clipped, hovered
-  note); documents list Ctrl or Cmd; VS name red / Esc, foreign length, error tooltip and border; view drag alone, Esc
-  mid-drag, 200 ms view double-click, Esc mid-box, revision callout table unlit; history: change rows keyed by full id
-  (8-digit prefixes collided, clicks lost), "History changes are view only. Viewing <change>" bar with Restore / Return,
-  navbar the version a change is under, header only compare and x while viewing; config row click doesn't switch.
-  Checked: drawing takes 33/36 then the rest, vs-* 20/20, ver-* 21/21, feel tests, clippy.
-- Full drawing run 11-18 00:00 on vibex8 (~/agents/studios-keep/drw1118a, build before the cell / VS / feel fixes;
-  memguard pgid verified): its selection diffs came from a wider hover rule since narrowed to notes.
-- Still differing (next, in order): drw-revision-table-delete s8 (after Delete live reads Top lit, ours Front: the
-  hover-after-menu rule), ordinate add-to-group / Reset ordinate, note copy-paste menu, note editor closing, sheet
-  properties zones, view adjust linestyle rows, replicate region panel, detail-id label position, section
-  exclude-from-cut, synchronize-breaks Gap distance, simplification-absolute BOM row name, toolbar Undo tip take,
-  drw-gtol-type-list (new take: pending annotation), drw-hatch-panel s29 list highlight, vs-cfg-delete-input s4 message
-  (old take, likely pre-existing).
+- Landed 11-18: e55271ab as 882a3ecd 01:57 (leader right-click / nodes, Cell panels, reader emulation, documents Ctrl
+  or Cmd, VS name / units / error looks, view drag / Esc / 200 ms double-click / box, history change bar + full-id
+  row keys, config row click).
+- Local, to land (6089631b9 + working tree): configurations: the active row's failing value pink, "›" + ± number
+  cells, row ids A0 (qa CFGFEEL P2/P3); history: "⌄ N changes", grey 30 px change rows without time, their tooltip
+  "<name>: Change by <user> at <time>", one scroll container with the Name | Modified header pinned and the legend
+  at the end (qa HISTFEEL P2s); custom features: title tooltip appends " A parameter value is not valid." when the
+  error names fields; a linked custom feature behind a newer version: blue row indicator "Change version of linked
+  document" -> Reference manager, row menu Update linked document… / Open linked document, the Reference manager and
+  document_update_references move it (the app's dialog now uses ops' workspace_update, no copy). Checks: ver-* +
+  hist* 135/136 (723/723 states; one without recording), config-* takes, feel tests per item.
+- Still differing (drawings, in order): drw-revision-table-delete s8 (hover-after-menu rule), ordinate add-to-group /
+  Reset ordinate, note copy-paste menu, note editor closing, sheet properties zones, view adjust linestyle rows,
+  replicate region panel, detail-id label position, section exclude-from-cut, synchronize-breaks Gap distance,
+  simplification-absolute BOM row name, toolbar Undo tip take, drw-gtol-type-list, drw-hatch-panel s29.
 - Run when landed (vibex8): live2's drw-hole-table-empty-tips, drw-view-properties-projected-from-section,
-  drw-view-replicate-region-place.
+  drw-view-replicate-region-place; the full drawing run again on the newest build.
 
-## Feel rows to take (11-17 23:3x, gaps only; check ours against each, fix with a feel test)
-- live, VS / FS editing (behaviours "Variable Studio and Feature Studio editing", live/studios/vs-fs-feel-1117/):
-  VS add: name + Enter makes "w | Length | 0 mm", focus to the next add row's Name; an invalid name red while typing,
-  Enter does nothing; a duplicate becomes "w_0". VS value errors only after Enter: pink cell, red border selected,
-  grey "Error regenerating." bubble over the Value header; "2 in" shows 50.8 mm, the expression in the bubble when
-  selected. FS autocomplete: Enter inserts the snippet, Tab closes the list and inserts a tab, Esc keeps the typed
-  text. FS errors while typing (<0.5 s, before saving): red x at gutter line 1 with a tooltip, squiggle on the token;
-  Ctrl/Cmd+S commits, the Commit button pales; a fixed error greys ~150 ms, gone ~500 ms.
-- qa HISTFEEL (11-18, TICKETS 16b1c4255; sheet vibex6 ~/agents/qa-keep/history-feel): P1 CHANGE-CLICK (a click on a
-  change row opens nothing; live opens it with the bar "History changes are view only. Viewing <change>" [Restore to
-  Main] [Return to Main]); P1 CHANGE-BAR (Open shows an orange VIEWING HISTORY badge, no bar; live: navbar "V3", the
-  panel header only compare and x); P2 EXPANDED ("Hide changes..." vs live "15 changes"; rows 26 px white with a time vs
-  30 px grey, no time); P2 SCROLL (search / toggles / legend fixed, lines over the legend; live scrolls all but the
-  Name | Modified header, legend at the end); P2 CHANGE-TOOLTIP (none on change rows).
-- live2, Configurations (behaviours "psui + studios (lead 11-18 ~00:30, feel): Configurations", live/feel/cfg-1118/;
-  also sent to psui, who owns the Part Studio panel): row menu Switch to "X" / Set as default / Duplicate row / Move
-  up / Move down / Delete row, a plain row click doesn't switch; duplicate row names accepted (id A0, shown "A"); bad
-  cells pink + bold only once their row is active; no greyed rows on a switch, spinner after ~1.2 s. Mine: check the
-  Variable Studio configuration panel against it.
-- live, documents / Import / Derived + Insert (behaviours "studios + dx (lead 11-18, P0 feel): documents list,
-  Import into a document, Derived / Insert panels", live/studios/docs-import-feel-1118/): search on Enter only (Esc
-  keeps it); header sort A-Z, Z-A, default; row hover Share / Trash / Label icons; double-click opens; inline Rename
-  (Enter / Esc); Delete or trash icon -> "Send to trash" (Enter nothing, Esc closes) + toast with Restore; New
-  document Enter creates and opens. Import: "CAD Imports" folder tab ~1.8 s, the Part Studio tab before it ~6.9 s,
-  active tab unchanged, blue bar under the bell, toast "<file> has been imported. Open document". Derived / Insert
-  searches filter ~350 ms after the last key, Enter nothing; Derived: Enter 1 closes the panel, 2 commits; Esc 1
-  closes, 2 cancels.
-- live, history panel (behaviours "Versions and history panel: hover, a change row, scrolling a long history",
-  live/studios/history-feel-1117/): hover never previews (row tints #def1fb + tooltip; a change row's "<tab> :: Update
-  feature : Extrude 1: Change by <user> at <time>"; graphics / navbar stay the workspace's). Change rows 30 px, only
-  under an expanded "⌄ N changes"; a click opens that microversion with the bar "History changes are view only.
-  Viewing <change>" [Restore to Main] [Return to Main]. The whole panel scrolls as one (search box and toggles too),
-  "Name | Modified" header pinned, all rows built up front, the graph continuous (amber branch line V1 -> hollow circle).
-- live2, macOS keys: documents list toggles on Ctrl or Cmd on every OS (done, start_window.rs `toggles`); drawing
-  Ctrl+M = Max/min checked: drw-max-min-key matches in the app (the workspace binding has no handler there).
-- live, drawing view feel (behaviours "studios (lead 11-18, P0 feel): drawing view drag preview…",
-  live/studios/drawing-feel-1118/): (1) a dragged view moves alone (orange, old place blank), aligned views follow
-  only after release, no guide line, ends unselected, Ctrl+Z undoes; (2) Esc mid-drag: preview stays while held, the
-  view goes back on release; (3) double-click anywhere a click takes a view (its empty inside too) opens View
-  properties within 200 ms (not 250); on a dimension, its editor; (4) a dimension in a view lights alone, no dwell;
-  (5) box select: no pre-highlight while dragging, shown on release; Esc mid-box nothing; empty box keeps selection.
-- qa VSFEEL (11-18, d65a06570): name red / Esc (done), units 50.8 mm + error tooltip + red border (done); the bubble
-  over the header is the hover tooltip drawn above the cell (live vs-value-decimals s2: none on a click): position
-  still ours (at the pointer).
-- live2, document level (behaviours "studios + psui (11-17, interaction feel)", live/feel/doc-level-1117/): tab switch:
-  the URL changes at once, the old list and canvas vanish at once, then the toolbar swaps and the list fills, the 3D
-  canvas last; no spinner. Undo / redo: Ctrl+Y redoes, Ctrl+Shift+Z doesn't (Linux; ours already: actions.rs), no
-  toast; Rename and part Hide one step each; view changes / selections none; Ctrl+Z in a dialog's value field does
-  nothing. Regen (psui's pending.rs spinner): old model stays drawn, rows grey; after ~0.75 s a 50x50 box at the
-  viewport's bottom centre, blue spinner pulsing 30-42 px; rows update when done, spinner lingers, no toast.
+## Feel rows to take (gaps only; check ours against each, fix with a feel test)
+- live drawing constants + number formats (behaviours "… drawing pick/snap constants", "server-side number formats by
+  experiment" §3; live/psui/numfmt-1118/). Done locally: tools pick within PICKBOX 7 px (hover_at, hovered_edge_sel,
+  centermark_point, section edge), grips GRIPSIZE 6 px (detail circle resize, aux indicator); fractional inches round
+  to the precision (digits = power of two, drawing 0.123 = 1/8": "2 3/4"), feet and inches `1'-2 1/4"`, the fractional
+  precision list 0" … 1/256", an explicit unit's button bare ("ft in"). Left: the fraction drawn stacked (ours
+  inline); jog / leader / hole-table / attach picks still 5 px (not named by live: ask if they are getIntersected too);
+  24 h time H:mm done (history rows keep the time on older days).
+- live2 workspaces (behaviours "studios (lead 11-18 ~02:23, feel): workspaces", live/studios/ws-1118/). Done locally:
+  Delete on every non-default workspace row (current too, none on the default), deleting the one you're in lands
+  viewing its branched-from version ("…and navigate you to V1."), notice "Deleted workspace B2." + Restore, ops
+  history_delete_branch / history_restore_branch; Branch dialog's "Name is required and cannot exceed 256
+  characters." with Create off, default name from the live workspaces; a Merge deletes what the source deleted even if
+  the target edited it (model-core merge.rs); navbar workspace name's tooltip. Left: duplicate workspace names
+  (live accepts a second "Main"; our store refuses BranchNameTaken: decision asked); merge preview "Edited" tooltip
+  "Last change by <user> at <time>" (needs the last microversion per tab per side); switch's centred "Loading
+  workspace…" spinner (ours switches at once: not a target unless slow); Create workspace and edit properties ->
+  Properties modal fields (Name *, Description, Category "Onshape Workspace" greyed, Apply / Save greyed, Close):
+  check ours.
+- live2 drawing creation (behaviours "studios (lead 11-18 ~02:07, feel): drawing creation", live/studios/
+  drw-create-1118/): Create Drawing shows in 237 ms on "Recently opened" with "Retrieving templates…", OK disabled
+  while it loads, no focus, Options Suggested / No views remembered; Enter after the list loaded creates (tab 1.9 s).
+  First view (No views): the preview's centre on the pointer, no snap to the sheet centre. No Auto-dimension tool.
+- live2 custom features (behaviours "studios (lead 11-18 ~01:53, feel): custom features", live/studios/
+  custom-feature-1118/): dialog rows, conditional field, red title / pink field: ours already (test
+  a_custom_features_dialog_is_generated_and_fails_as_live). Left: ✓ is pale in both while the error names a number
+  field, live2 says a click still commits (ours: disabled; the hem capture said off): ask live2 to confirm. FS save ->
+  Part Studio regenerates by itself ~1.1 s, an open dialog does NOT relabel: check ours.
+- live VS / FS (live/studios/vs-fs-feel-1117/): VS add-row focus to the next Name, duplicate -> "w_0"; FS
+  autocomplete Enter inserts, Tab closes + inserts a tab, Esc keeps text; FS errors while typing (<0.5 s) red x at
+  gutter line 1 + squiggle, Ctrl/Cmd+S commits, Commit pales, a fixed error greys ~150 ms, gone ~500 ms. qa VSFEEL
+  bubble position: ours at the pointer, live above the cell.
+- qa HISTFEEL "sticky hover" (mm.png): the tint there is #b2ddf6, the viewed change's selection (live selects it too),
+  not the #def1fb hover: no change.
+- live2 drawing creation: Options remembered (done, drawing_create_options.txt); first view centre on the pointer, no
+  sheet-centre snap: ours already (position = cursor); no Auto-dimension: ours has none; "Retrieving templates…" /
+  OK disabled while loading: ours loads at once (not a target).
+- live documents / Import / Derived + Insert (live/studios/docs-import-feel-1118/): search on Enter only; sort A-Z,
+  Z-A, default; row hover icons; double-click opens; inline Rename; Delete -> "Send to trash" (Enter nothing, Esc
+  closes) + toast with Restore; New document Enter creates. Import: "CAD Imports" tab ~1.8 s, the Part Studio tab
+  ~6.9 s, active tab unchanged, blue bar, toast. Derived / Insert search ~350 ms after the last key, Enter nothing;
+  Derived Enter 1 closes the panel, 2 commits; Esc 1 closes, 2 cancels.
+- live2 document level (live/feel/doc-level-1117/): tab switch order (URL, old list / canvas gone at once, toolbar,
+  list, 3D last; no spinner); undo / redo as ours; regen spinner is psui's.
 
 ## Lead's queue (11-17, restated after compaction)
 1. Land what is green. 2. User P0: hover / select parity in Assemblies (instances, mate connectors, mates list <->
