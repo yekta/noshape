@@ -4772,6 +4772,24 @@ private:
   const EdgeFace&  by_distance_;
 };
 
+// A surface's analysis, kept for the next edge on it (per thread): its bound isolines and point grid, made anew for
+// every edge, were a quarter of c2-impeller-loft's Shell of two offset faces.
+static occ::handle<ShapeAnalysis_Surface> surface_analysis(const occ::handle<Geom_Surface>& s)
+{
+  thread_local std::vector<std::pair<occ::handle<Geom_Surface>, occ::handle<ShapeAnalysis_Surface>>> kept;
+  for (size_t i = 0; i < kept.size(); ++i)
+    if (kept[i].first == s)
+    {
+      std::rotate(kept.begin(), kept.begin() + static_cast<long>(i), kept.begin() + static_cast<long>(i) + 1);
+      return kept.front().second;
+    }
+  const occ::handle<ShapeAnalysis_Surface> a = new ShapeAnalysis_Surface(s);
+  kept.insert(kept.begin(), {s, a});
+  if (kept.size() > 8)
+    kept.pop_back();
+  return a;
+}
+
 // Edge `ne`'s curve on face `nf` (an offset of `of`, its surface the offset of `of`'s in the same frame): projected,
 // then moved by whole turns in u to start where `oe`'s curve on `of` starts (a seam: both of its curves, in `oe`'s
 // order).
@@ -4808,8 +4826,9 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
       cn = occ::down_cast<Geom2d_Curve>(co->Copy());
     else if (kind == GeomAbs_BSplineSurface || kind == GeomAbs_OffsetSurface || kind == GeomAbs_SurfaceOfExtrusion || kind == GeomAbs_SurfaceOfRevolution || kind == GeomAbs_BezierSurface)
     {
-      ShapeConstruct_ProjectCurveOnSurface pcs;
-      pcs.Init(sn, Precision::Confusion());
+      const occ::handle<ShapeAnalysis_Surface> sas = surface_analysis(sn);
+      ShapeConstruct_ProjectCurveOnSurface     pcs;
+      pcs.Init(sas, Precision::Confusion());
       if (!pcs.Perform(c3, a, b, cn))
         cn.Nullify();
       // (Its ends on the edge's: the projection's ran 23 µm off them where the inlet's offset meets the impeller's
@@ -4817,7 +4836,6 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
       // (Not on a closed surface, where an end on the seam can be taken to its other side.)
       if (const occ::handle<Geom2d_BSplineCurve> bc = occ::down_cast<Geom2d_BSplineCurve>(cn); !bc.IsNull() && !bc->IsPeriodic() && !sn->IsUClosed() && !sn->IsVClosed())
       {
-        const occ::handle<ShapeAnalysis_Surface> sas = new ShapeAnalysis_Surface(sn);
         for (const auto [pole, at] : {std::pair{1, a}, std::pair{bc->NbPoles(), b}})
         {
           const gp_Pnt   P  = c3->Value(at);
