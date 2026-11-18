@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-18 20:12 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-18 21:10 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -70,7 +70,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
    handle a white-outlined ~16 px triangle on the edge's middle (ours an arrow) and its ~5 px dead zone.
 7. Live 11-18 new rows still open: Fillet handle look (triangle) and dead zone; the Section arrow turning blue while
    dragged (unchecked); view cube press/drag (≤2 px is a click, 3+ nothing, a 40 px drag neither orbits nor clicks).
-8. Live's feature-dialog rows 11-18 (behaviours "feel (feature dialogs) 11-18, batch 1" / "batch 2", live/feel/
+8. (21:1x, next up) Live's feature-dialog rows 11-18. Checked: a tool clicked with a dialog open accepts it (ours
+   `accept_open_dialog`, =); no auto-advance for multi-pick boxes (ours advances only a filled max-picks field, =).
+   To do: the Tab orders (find our Fillet Tab row in docs/parity/interaction-feel.md "Tab from Fillet's Radius" and
+   its test), Esc after Tab left the dialog, Hole's title, Revolve's Full revolve checkbox. Live's feature-dialog rows 11-18 (behaviours "feel (feature dialogs) 11-18, batch 1" / "batch 2", live/feel/
    dialogs-1118/): check ours and add rows: Extrude's flip on the End type row, Depth's ± after the value; Chamfer
    focus "Entities to chamfer", Tab Distance → ± → Tangent propagation → help → out (dropdowns and boxes skipped), Two
    distances' flip on Distance 1 + "Direction overrides"; Shell Tab thickness → flip → help; Hole Tab with its
@@ -87,9 +90,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   548d795f (red main: box-drag tests held their press 0 ms; a box lights nothing; the press remembers empty space;
   both box tests 10 / 10 beside a build on vibe2), 3fa69088 (Section dialog at (396, 179), its arrow's 5 px dead zone
   and value box by the head).
-- In the worktree, not landed: the Coarse level + Tag (std 3112 "Standard content", tooltip): tests and clippy pass;
-  waiting for main green, then the TTF / orbit / RSS A/B (/root/psui-scratch/ttf2.sh on vibe2, Assembly 1 moved first
-  in ~/tmp/psui/heavy/a.noshape; RSS from the app = the child of `timeout`), then ops coverage / AGENT_API for Tag.
+- Queued 404f2e1f (21:0x): the Coarse level (big_scene > 1 M; xdev-subs A/B: first frame unchanged, orbit 10.5 → 13
+  frames / 4 s, RSS +0.4 GB; the regen result key now includes coarser_levels), Fillet triangle + dead zone, no
+  sketch-line midpoint with no tool, Tag "Standard content". Heavy doc copies deleted on vibe2 and vibex6.
 - Agent ids (11-18 20:xx): core d30002ca-d013-4435-b7d9-7da9cb564cec, blend de66e481-56e2-4005-a5d3-9fa897ca5fde.
 - Done today: tab return 9595bbf05 (qa: 111 vs 151 ms, in the 17:00 cut); Windows nav e7d9df8c (12:57).
 - Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over; vibex6 ~/tmp/psui/heavy after the mesh work.
