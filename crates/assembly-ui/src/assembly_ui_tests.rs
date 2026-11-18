@@ -1105,11 +1105,12 @@ fn two_selected_instances_have_lives_list_menu(cx: &mut TestAppContext) {
     .unwrap();
 }
 
-/// Live 3d.json implicit_mate_connectors_in_a_mate_dialog: over a planar face the preview connector is the face's
-/// centroid wherever the pointer is on the face (here right by a corner's dot); with Shift locking the face's points
-/// the nearest one is taken.
+/// Live asm/feel-1117 (reach-corner-strip; its client's COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX = 50): over a planar
+/// face the preview connector jumps to a dot within 50 px of the pointer (a corner 3 px away), else it sits at the
+/// face's centroid (the pointer 51 px from the nearest dot); with Shift locking the face's points the nearest is taken
+/// at any distance.
 #[gpui::test]
-fn a_faces_connector_is_its_centroid_wherever_the_pointer_is(cx: &mut TestAppContext) {
+fn a_faces_connector_takes_a_dot_within_50_px_else_its_centroid(cx: &mut TestAppContext) {
     use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
     let (window, view) = pattern_assembly(cx, "face-centroid");
     cx.update_window(window, |_, w, cx| {
@@ -1122,14 +1123,44 @@ fn a_faces_connector_is_its_centroid_wherever_the_pointer_is(cx: &mut TestAppCon
             v.hover = Some(AsmPickTarget { path: vec![id], reference: (**on).clone(), kind: PickKind::Face, occ, anchor: None });
             v.update_inference(cx);
             let (_, _, cands) = v.infer.clone().expect("the face's points");
+            let tf = v.result.occurrences[occ].transform;
+            let at = |v: &AssemblyView, p: glam::DVec3, cx: &gpui_kit::App| v.viewport.read(cx).project(tf.transform_point3(p)).unwrap();
             let corner = cands.iter().find(|c| matches!(c.reference, Reference::Implicit { inference: Inference::Vertex, .. })).expect("a corner").frame.origin;
-            let o = &v.result.occurrences[occ];
-            v.pointer = v.viewport.read(cx).project(o.transform.transform_point3(corner)).unwrap() + glam::DVec2::new(3.0, 3.0);
+            v.pointer = at(v, corner, cx) + glam::DVec2::new(3.0, 3.0);
+            v.update_inference(cx);
+            assert!(matches!(cands[v.infer_choice.expect("a choice")].reference, Reference::Implicit { inference: Inference::Vertex, .. }), "the corner 3 px away");
+            // From the corner straight toward the centroid until the nearest dot is 51 px away.
+            let dots: Vec<glam::DVec2> = cands.iter().skip(1).map(|c| at(v, c.frame.origin, cx)).collect();
+            let (c0, c1) = (at(v, corner, cx), at(v, cands[0].frame.origin, cx));
+            let far = (0..=100).map(|i| c0 + (c1 - c0) * (i as f64 / 100.0)).find(|p| dots.iter().all(|d| d.distance(*p) > 51.0));
+            let Some(far) = far else { panic!("the face is too small on screen for a point 51 px from every dot") };
+            v.pointer = far;
             v.update_inference(cx);
             assert_eq!(v.infer_choice, Some(0), "the centroid");
+            v.pointer = at(v, corner, cx) + glam::DVec2::new(3.0, 3.0);
             v.infer_locked = true;
             v.update_inference(cx);
             assert_ne!(v.infer_choice, Some(0), "Shift: the corner by the pointer");
+        })
+    })
+    .unwrap();
+}
+
+/// Live asm/feel-1117 c-a-rowhover: hovering an instance's row outlines the part in the graphics, in hover orange, with
+/// no tint on its faces (was: the accent fill).
+#[gpui::test]
+fn a_hovered_instance_row_outlines_the_part_without_a_tint(cx: &mut TestAppContext) {
+    use noshape_render::scene::state;
+    let (window, view) = pattern_assembly(cx, "row-hover");
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            v.ui.list_hover = Some(instance(v, "Part 1 <1>", cx));
+            v.refresh_scene(false, cx);
+            let vp = v.viewport.read(cx);
+            let scene = vp.scene();
+            assert!(scene.hover_outline, "the hover outline pass");
+            assert!(scene.states.iter().any(|s| s & (state::HOVER | state::OUTLINE) == state::HOVER | state::OUTLINE), "its faces outlined");
+            assert!(scene.states.iter().all(|s| s & state::ACCENT == 0), "no tint");
         })
     })
     .unwrap();

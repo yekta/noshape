@@ -483,6 +483,9 @@ pub struct Triad {
 pub struct Highlights {
     pub selected_tops: Vec<noshape_model::assembly::InstanceId>,
     pub accent_tops: Vec<noshape_model::assembly::InstanceId>,
+    /// Instances hovered as a whole (their row in the list): outlined in hover orange, no tint, their edges as at
+    /// rest (live asm/feel-1117 c-a-rowhover; the Part Studio's hovered part).
+    pub hover_tops: Vec<noshape_model::assembly::InstanceId>,
     pub hover_entity: Option<(InstancePath, Reference)>,
     pub selected_entities: Vec<(InstancePath, Reference)>,
     pub triads: Vec<Triad>,
@@ -930,6 +933,12 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     for top in &h.accent_tops {
         for &id in built.picks.faces_of(*top) {
             scene.add_flag(id, state::ACCENT);
+        }
+    }
+    for top in &h.hover_tops {
+        for &id in built.picks.faces_of(*top) {
+            scene.add_flag(id, state::HOVER | state::OUTLINE);
+            scene.hover_outline = true;
         }
     }
     // A selected (or just inserted) instance: Onshape's whole-part amber,

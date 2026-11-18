@@ -175,6 +175,10 @@ pub fn bind_keys(cx: &mut App) {
 }
 
 /// The relation dialog's types, in the live select's order.
+/// How near (px) the pointer brings a hovered face's connector to one of its inference dots (live's client:
+/// COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX), and a hovered edge's to one of its ends (asm/feel-1117).
+const INFERENCE_PICK_RADIUS_PX: f64 = 50.0;
+const EDGE_END_PICK_RADIUS_PX: f64 = 15.0;
 const RELATION_KINDS: [RelationType; 4] = [RelationType::Gear, RelationType::RackAndPinion, RelationType::Screw, RelationType::Linear];
 
 #[path = "assembly_behaviors.rs"]
@@ -1209,9 +1213,9 @@ impl AssemblyView {
         }
         // Shown mates draw their glyphs alone at rest, no connector triads (live2 mate-glyphs 11-17: the triad only
         // once the mate is selected).
-        // Instance row hovered in the list: highlighted in the graphics area.
+        // Instance row hovered in the list: outlined in the graphics area, not tinted (live asm/feel-1117).
         if let Some(top) = self.ui.list_hover {
-            h.accent_tops.push(top);
+            h.hover_tops.push(top);
         }
         h.selected_tops.extend(self.ui.step_hover.iter().copied());
         if let Some(m) = &self.ui.measure {
@@ -2671,18 +2675,6 @@ impl AssemblyView {
             }
         }
         let Some((key, occ, cands)) = &self.infer else { return false };
-        // Live (3d.json implicit_mate_connectors_in_a_mate_dialog): over a planar face the connector sits at its
-        // centroid, over an edge at its midpoint (a circle's centre), wherever the pointer is on it; the other points
-        // are dots until the pointer reaches their own vertex or edge (or Shift locks the entity's points).
-        let primary = |r: &Reference| match r {
-            Reference::Implicit { inference: Inference::Centroid, on } => matches!(**on, Reference::Face(_)),
-            Reference::Implicit { inference: Inference::Midpoint | Inference::CenterRim, on } => matches!(**on, Reference::Edge(_)),
-            _ => false,
-        };
-        if !locked && matches!(key.1, Reference::Face(_) | Reference::Edge(_)) && cands.first().is_some_and(|c| primary(&c.reference)) {
-            self.infer_choice = Some(0);
-            return old != self.infer_choice;
-        }
         let Some(o) = self.result.occurrences.get(*occ) else { return false };
         let vp = self.viewport.read(cx);
         let mut best: Option<(usize, f64)> = None;
@@ -2694,6 +2686,20 @@ impl AssemblyView {
                     best = Some((i, d));
                 }
             }
+        }
+        // Live (asm/feel-1117 reach-corner-strip, its client's COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX = 50): over a
+        // planar face the connector jumps to a dot within 50 px of the pointer, else it sits at the face's centroid;
+        // over an edge at its midpoint (a circle's centre) unless an end is within 15 px (the strip: the end at 15 px,
+        // the midpoint at 18). Shift (locked points) takes the nearest at any distance.
+        let primary = |r: &Reference| match r {
+            Reference::Implicit { inference: Inference::Centroid, on } => matches!(**on, Reference::Face(_)),
+            Reference::Implicit { inference: Inference::Midpoint | Inference::CenterRim, on } => matches!(**on, Reference::Edge(_)),
+            _ => false,
+        };
+        if !locked && matches!(key.1, Reference::Face(_) | Reference::Edge(_)) && cands.first().is_some_and(|c| primary(&c.reference)) {
+            let reach = if matches!(key.1, Reference::Face(_)) { INFERENCE_PICK_RADIUS_PX } else { EDGE_END_PICK_RADIUS_PX };
+            self.infer_choice = Some(best.filter(|&(_, d)| d <= reach).map_or(0, |b| b.0));
+            return old != self.infer_choice;
         }
         self.infer_choice = best.map(|b| b.0);
         old != self.infer_choice
