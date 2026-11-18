@@ -114,13 +114,13 @@ Live: behaviours.md (lines cited) and live2's feel/drawing.json (D1–D6, F3, F4
 | View edge / inside hover reach (Select) | the whole view lights (tan frame ~8 px outside its geometry) from 14–16 px outside an edge, not 16–20; constant in sheet mm (D1) | 3.6 sheet mm round the view box (`VIEW_REACH_MM`, `view_under`) | GPUI feel `a_view_lights_and_is_taken_within_its_reach_in_sheet_mm` | = |
 | Dimension line / extension line, centerline, centermark arm | 6 px, not 8 (D1; extension 4 / 6 at zoom B) | 7 px (`SELECT_LINE_REACH_PX`, `hit_reach`) | GPUI feel `a_dimensions_line_and_text_light_at_lives_reach` (dimension line) | = |
 | Dimension / note text | 8 px outside the text box, not 10 (D1) | 9 px outside the box (`SELECT_TEXT_REACH_PX`, `text_box_distance`) | GPUI feel `a_dimensions_line_and_text_light_at_lives_reach` (dimension text) | = |
-| Note leader | 10 px, not 12; lights the note (D1) | 11 px for its stroke and nodes in Select's hover too (`SELECT_LEADER_REACH_PX`, `leader_reach`; was the 7 px line reach) | GPUI feel `a_note_leader_lights_its_note_within_10_px` | = |
+| Note leader | 8 px, not 10; lights the note (live2 batch 1, 11-18 16:15; 11-13 had 10 / 12) | 9 px for its stroke and nodes in Select's hover too (`SELECT_LEADER_REACH_PX`, `leader_reach`; was 11) | GPUI feel `a_note_leader_lights_its_note_within_8_px` | = (fixed 11-18) |
 | Priority: annotation vs view | an extension line's foot on a view edge lights the dimension and a click selects it (3 of 3, live2 drw-feel-q (b)); a centerline over a view edge lights both and a click takes the view (D2); on the centerline 3 px inside the view, hover and click take the centerline (followUp (2)) | annotation first (−2.5 px bias); a centerline lit where it runs on a view edge gives way to the edge, which stands for the view (`centerline_on_edge`) | GPUI feel `a_centerline_on_a_view_edge_gives_way_to_the_view` | = |
-| Snap reach (Dimension tool, Note leader) | 7 px, not 9, for vertices and circle centres; 5 px along an edge; constant in px (D3) | 8 px (`SNAP_REACH_PX`) | GPUI `a_views_vertex_snaps_within_8_px_on_screen` (7 snaps, 9 doesn't) | = |
+| Snap reach (Dimension tool, Note leader) | 7 px, not 9, for vertices; a circle centre 9 px, not 11, on the diagonal and from inside the hole (live2 batch 1, 11-18 16:15; 11-13 had 7 / 9); 5 px along an edge; constant in px (D3) | 8 px (`SNAP_REACH_PX`), a centre 10 px (`CENTER_SNAP_REACH_PX`; was 8) | GPUI `a_views_vertex_snaps_within_8_px_on_screen` (7 snaps, 9 doesn't), feel `the_dimension_tool_snaps_to_a_circle_centre_within_9_px` | = (centre fixed 11-18) |
 | Snap marker, dimension tools | a filled 10 px disc rgb(216,165,102) for every kind, none in Select, none for a midpoint (D3) | the same (`SnapMark::Disc`), also the Dimension tool's sticky centre dots (bm 4062) | GPUI feel `the_dimension_tool_snaps_to_a_vertex_within_its_reach_and_select_marks_none` | = |
 | Snap marker, Note tool | a hollow square ~15 px rgb(255,130,63) round the vertex (bm 26796, C11 (a)) | the same (`SnapMark::Box`) | – | = |
 | Midpoints / quadrants | only after Shift+Q (D22) | the same | – | = |
-| Two points in reach | the nearer, one marker (bm 4092) | the nearer (`snap_near`) | – | = |
+| Two points in reach | the nearer, one marker (bm 4092) | the nearer (`snap_at_with`) | – | = |
 | Placement inference (note / dimension text) | 7 px, not 9; pink dotted line, red ✕ (D4) | 8 px (`INFER_REACH_PX`), the same line and ✕ | GPUI feel `placing_a_note_lines_up_with_another_within_8_px` | = |
 | Box select look | left → right: light-blue fill, solid 1 px blue; right → left: pale-yellow fill, dashed yellow-orange (F3) | the same (`box_overlay`) | – | = |
 | Box select, annotations | a note half inside: right → left only; fully inside: both (F3) | the same (`select_in_box`) | GPUI `a_box_right_to_left_takes_what_it_crosses` | = |
@@ -1120,7 +1120,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Use comma as decimal separator: a dialog's Depth reads "10,25 mm" | = (green c7d388e8, live2 ours-1118 prefs: set in My account › Preferences, then the block reopened: Extrude Depth "10,25" + Enter reads "10,25 mm", "10.5" reads "10,5 mm") | missing |
 | 24 hour: H:mm with no leading zero ("2:47 Today", "0:00 Nov 7") | = | app-core start_library::tests::names_and_times |
 | Display parts list properties: each part with the grey "In progress" pill | = (green c7d388e8, live2 ours-1118 prefs: set in My account › Preferences, then the block reopened: Part 1 with the grey "In progress" pill) | missing |
-| Constrained rotate as default swaps the Alt prefix in the mouse table | = (green c7d388e8, live2 ours-1118 prefs: set in My account › Preferences, then the block reopened: ticking it swaps the table at once: Rotate "Alt + Right mouse button drag", Constrained rotate "Right mouse button drag") | missing [studios] |
+| Constrained rotate as default swaps the Alt prefix in the mouse table | = (green c7d388e8, live2 ours-1118 prefs: set in My account › Preferences, then the block reopened: ticking it swaps the table at once: Rotate "Alt + Right mouse button drag", Constrained rotate "Right mouse button drag") | preferences-ui `mouse_prefs::tests::constrained_rotate_as_default_swaps_the_alt_prefix` |
 | Export with "Store file in a new tab": "<file name> is being prepared for export. …" at 0.55 s; the tab after the source tab; the view stays | = | export_feel_tests::a_stored_export_says_it_is_prepared_and_rings_the_bell |
 
 ### numfmt-1118 (number and unit display, live's client code, 11-18 02:56)
@@ -1135,14 +1135,14 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | A dragged angle written at the workspace precision (3) | = | missing (manipulators.rs `format_number(deg, angle_precision)`) |
 | A clicked Mass value: the unit's maximum precision, again back | = | measure_feel_tests::a_clicked_mass_value_toggles_the_highest_precision |
 | Value-only parameters: {mm 5, in 6, cm 6, m / ft / yd 8, deg / rad 7} decimals, zeros dropped | ? | missing |
-| Drawing PICKBOX 7 for every tool; grips 6 px [studios] | ? | studios' |
+| Drawing PICKBOX 7 for every tool; grips 6 px [studios] | = (ef2dfdfd, 9f629e6f: every tool's pick, the detail loop, the hole table's X direction; the centre mark, detail circle, aux indicator and leader anchor grips) | GPUI feel `a_tool_picks_an_edge_within_7_px` |
 
 ### server-numfmt (server number formats by experiment, live 11-18 03:05) [core + studios]
 
 | Finding | Ours | Test |
 |---|---|---|
 | Accepted: "3/8 in", "(1 + 1/2) in", "1 ft + 6 in", "1/2" (document unit), "1 inch" / "2 inches" / "1 foot" / "1 feet", "30 degrees", "0.5 radian"; rejected: "1 1/2 in", "3/8\"", "1'6\"" | ≠ | ours accepts a superset (inch / foot marks): the lead's decision, no test |
-| Sketch dimension text, deg-min-sec and drawing fractional / feet-and-inches units are the server's [skasm / studios] | ? | theirs |
+| Sketch dimension text, deg-min-sec and drawing fractional / feet-and-inches units are the server's [skasm / studios] | drawings = (ef2dfdfd, 1e21f28e: fractional inches to the precision, "2 3/4", `1'-2 1/4"`, drawn stacked); sketch: skasm's | drawing sheet `a_fractional_value_is_drawn_stacked` |
 
 ### hl-pixels-1118 (P0, highlight pixel columns, live 11-18 01:13)
 
@@ -1292,7 +1292,7 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 | Finding | Ours | Test |
 |---|---|---|
 | BOM table properties closed by Esc, ✕ or ✓: the table stays selected (grips, tan outline) | = (green e503ca2f, live2 ours-1118 drawing, start pin-block-asm-drawing: a placed BOM, right-click › BOM table properties…, closed by Esc, ✓ and ✕: grips and tan outline stay each time) | ui-parity drw-bom-table-properties (reader) |
-| Drawing toolbar: the title tooltip at ~0.47 s, then the help popover at ~3.1 s (400 px wide at the frame's left, 37 px down, title bar + text, stays while resting); every tool but Undo / Redo has one | ≠ (green e503ca2f, live2 ours-1118 drawing, start pin-block-asm-drawing, Note tool): the 400 px help popover at the frame's left at 3.23 s (title bar + steps, =); but the title tooltip at 0.70 s, live ~0.47 s | missing (ours has none) |
+| Drawing toolbar: the title tooltip at ~0.47 s, then the help popover at ~3.1 s (400 px wide at the frame's left, 37 px down, title bar + text, stays while resting); every tool but Undo / Redo has one | = (fixed 708cf617: the title tooltip at 450 ms; the popover at 3.1 s, 400 px at the frame's left under the toolbar, title bar + numbered steps, covering the tooltip; texts our own words, DECISIONS 11-18) | GPUI feel `a_toolbar_tools_help_shows_after_3_s_under_the_toolbar` (440 ms none, 460 ms the tooltip, 3.2 s the popover) |
 | Hatch Pattern list: under the field (1 px), its width + 2, 30 px rows, at most 341 px then scrolls; opens upward when the field is low; a second click on the field closes it and keeps the value | = (green e503ca2f, live2 ours-1118 drawing, start pin-block-asm-drawing, Hatch region: under the field, its width + ~2, 30 px rows; ANSI's 9 rows fit, ISO's list stops at ~340 px and scrolls; a second click on the field closes it, the value kept; the upward case not tried) | ui-parity drw-hatch-panel |
 | Sheet properties › Custom: zones 4 × 4 (ANSI) / 6 × 4 (ISO) whatever the size before; width / height fields take the previous size's dimensions | = (green e503ca2f, live2 ours-1118 drawing, start pin-block-asm-drawing, ANSI A → Custom: zones 4 × 4, width / height 11 in × 8.5 in; ISO not tried) | ui-parity drw-sheet-properties-custom-zones |
 

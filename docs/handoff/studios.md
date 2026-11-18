@@ -33,7 +33,10 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   (the 8 drw-revision-* set config_files); Release all configurations… (live release-gaps-1118: part menu after
   Release…, one row per configuration named as the part, tooltip "Part 1 / Size / Small"; op release_create
   `all_configurations`, e2e). run19–22: drw-detail-* all match, drw-section-exclude-from-cut 22/23 before the Esc fix.
-- e24a63d1 (2eb64993 + 7f8eab37) checking on the queue since 15:57.
+- Landed e24a63d1 16:13, 145333a8 16:34 (associated drawings under their part); 44f4fc11 queued (ops order).
+- Landing: live2 feel batch 1 (11-18 16:15): note leader lights to 8 px (SELECT_LEADER_REACH_PX 9, was 11), a circle
+  centre snaps from 9 px (CENTER_SNAP_REACH_PX 10, vertices stay 8); mouse table's Alt swap test; feel doc rows
+  (PICKBOX, fractions, toolbar tooltip). "Unshare selected (N) with me": cloud, left out (lead).
 - Local (next land): release dialog associated drawings as live (release-gaps-1118): Include associated drawings puts
   each drawing as a child row under the part it shows (its configuration's row first; blue corner mark, indented; the
   part gets a ⌄ expander that folds it), the button stays pressed; release conditions now live on each row (a drawing

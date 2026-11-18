@@ -147,9 +147,6 @@ impl MousePrefsView {
 
     fn table(&self) -> AnyElement {
         let pal = p();
-        let alt = "Alt + ";
-        // Constrained rotate carries "Alt + " unless it is the default (then Rotate does).
-        let (rotate_prefix, constrained_prefix) = if self.edited.constrained_rotate { (alt, "") } else { ("", alt) };
         let header = |text: &'static str| {
             div()
                 .w(px(COL_W))
@@ -163,25 +160,16 @@ impl MousePrefsView {
                 .line_height(px(16.))
                 .child(text)
         };
-        let cell = |prefix: &'static str, text: &'static str| {
+        let cell = |text: String| {
             let lines: Vec<String> = text.split('\n').map(|l| l.trim_end().to_string()).collect();
-            let n = lines.len();
-            v_flex().w(px(COL_W)).h_full().pl(px(10.)).items_center().justify_center().text_size(px(14.)).line_height(px(21.)).children(lines.into_iter().enumerate().map(move |(i, l)| {
-                div().child(if i == 0 && n > 0 { format!("{prefix}{l}") } else { l })
-            }))
+            v_flex().w(px(COL_W)).h_full().pl(px(10.)).items_center().justify_center().text_size(px(14.)).line_height(px(21.)).children(lines.into_iter().map(|l| div().child(l)))
         };
-        let rows = self.edited.preset.table().into_iter().enumerate().map(|(i, (name, d3, d2))| {
-            let prefix = match i {
-                0 => rotate_prefix,
-                1 => constrained_prefix,
-                _ => "",
-            };
+        let rows = table_rows(&self.edited).into_iter().map(|(name, d3, d2)| {
             h_flex()
                 .h(px(if name == "Pan" { PAN_ROW_H } else { ROW_H }))
                 .child(div().w(px(COL_W)).h_full().pl(px(20.)).pt(px(23.)).text_size(px(16.)).font_weight(FontWeight::SEMIBOLD).line_height(px(24.)).child(name))
-                .child(cell(prefix, d3))
-                // The 2D column never shows the Alt prefix ("Not applicable").
-                .child(cell("", d2))
+                .child(cell(d3))
+                .child(cell(d2.to_string()))
         });
         v_flex()
             .w(px(TABLE_W))
@@ -190,6 +178,13 @@ impl MousePrefsView {
             .children(rows)
             .into_any_element()
     }
+}
+
+/// The table's rows as shown: Constrained rotate's 3D drag carries "Alt + " unless constrained rotate is the default,
+/// then Rotate's does (live2 prefs-1118: ticking the box swaps them at once); the 2D column never has it.
+fn table_rows(c: &MouseControls) -> Vec<(&'static str, String, &'static str)> {
+    let alt_row = if c.constrained_rotate { 0 } else { 1 };
+    c.preset.table().into_iter().enumerate().map(|(i, (name, d3, d2))| (name, if i == alt_row { format!("Alt + {d3}") } else { d3.to_string() }, d2)).collect()
 }
 
 impl Default for MousePrefsView {
@@ -257,5 +252,22 @@ impl Render for MousePrefsView {
                         ),
                     ),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MouseControls, Preset, table_rows};
+
+    /// Live2 prefs-1118: "Set default rotation behavior to constrained rotate" swaps the Alt prefix in the 3D column.
+    #[test]
+    fn constrained_rotate_as_default_swaps_the_alt_prefix() {
+        let mut c = MouseControls { preset: Preset::Onshape, constrained_rotate: false, ..Default::default() };
+        let rows = table_rows(&c);
+        assert_eq!((rows[0].1.as_str(), rows[1].1.as_str()), ("Right mouse button drag", "Alt + Right mouse button drag"));
+        c.constrained_rotate = true;
+        let rows = table_rows(&c);
+        assert_eq!((rows[0].1.as_str(), rows[1].1.as_str()), ("Alt + Right mouse button drag", "Right mouse button drag"));
+        assert!(rows.iter().all(|r| !r.2.starts_with("Alt")), "the 2D column has no Alt prefix");
     }
 }

@@ -14,8 +14,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// How far (screen px) a view's snap point reaches with the Dimension tool (live2 feel/drawing.json D3: a vertex up to
-/// 7 px and not at 9, a circle centre 7 px; behaviours "dsn"'s 10–13 px was more).
+/// 7 px and not at 9; behaviours "dsn"'s 10–13 px was more).
 pub const SNAP_REACH_PX: f64 = 8.0;
+/// A circle centre's reach (live2 batch 1, 11-18 16:15: lit at 9 px and not at 11, on the diagonal and from inside the
+/// hole alike; 11-13 had 7 / 9).
+pub const CENTER_SNAP_REACH_PX: f64 = 10.0;
 
 /// How far outside its geometry a view lights and takes a click in Select, in sheet mm (it scales with the zoom;
 /// live2 feel/drawing.json D1: from 14 px at 3.93 px/mm, not 16).
@@ -30,8 +33,9 @@ pub const GRIPSIZE_PX: f64 = 6.0;
 /// Select's hover reach (screen px) for an annotation's lines and from a text's box (live2 feel/drawing.json D1).
 pub const SELECT_LINE_REACH_PX: f64 = 7.0;
 pub const SELECT_TEXT_REACH_PX: f64 = 9.0;
-/// Select's hover reach (screen px) from a note's leader: it lights the note from 10 px, not 12 (D1).
-pub const SELECT_LEADER_REACH_PX: f64 = 11.0;
+/// Select's hover reach (screen px) from a note's leader: it lights the note at 8 px, not at 10 (live2 batch 1, 11-18
+/// 16:15; 11-13 had 10 / 12).
+pub const SELECT_LEADER_REACH_PX: f64 = 9.0;
 
 /// The editor state picking reads.
 #[derive(Clone, Copy)]
@@ -340,15 +344,21 @@ impl<'a> SheetPick<'a> {
         let built = self.built?;
         let mut best: Option<(f64, PickedPoint)> = None;
         let reach = self.tol_mm(SNAP_REACH_PX);
+        let center_reach = self.tol_mm(CENTER_SNAP_REACH_PX);
         for pl in &built.placements {
-            if !pl.contains(s, reach.max(3.0)) {
+            if !pl.contains(s, center_reach.max(3.0)) {
                 continue;
             }
             let Some(g) = self.geoms.get(&pl.id) else { continue };
             let vp = pl.to_view(s);
             let tol = reach / (pl.scale * 1000.0);
-            if let Some(sn) = g.snap_near(vp, tol) {
-                let d = len(sub(sn.p, vp)) * pl.scale * 1000.0;
+            let center_tol = center_reach / (pl.scale * 1000.0);
+            for sn in &g.snaps {
+                let dv = len(sub(sn.p, vp));
+                if dv > if sn.kind == SnapKind::Center { center_tol } else { tol } {
+                    continue;
+                }
+                let d = dv * pl.scale * 1000.0;
                 // Prefer vertices over centers at equal distance.
                 let d = if sn.kind == SnapKind::Center { d + 0.01 } else { d };
                 if best.as_ref().is_none_or(|(bd, _)| d < *bd) {

@@ -373,9 +373,40 @@ fn the_dimension_tool_snaps_to_a_vertex_within_its_reach_and_select_marks_none(c
     assert!(snapped(cx, 2.0).is_none(), "Select: no snap marker");
 }
 
-/// Live2 feel/drawing.json D1: a note's leader lights the note from 10 px off its stroke, not from 12.
+/// Live2 batch 1 (11-18 16:15): with the Dimension tool a circle's centre snaps from 9 px on the diagonal, not from 11
+/// (a vertex stays 7 / 9).
 #[gpui::test]
-fn a_note_leader_lights_its_note_within_10_px(cx: &mut TestAppContext) {
+fn the_dimension_tool_snaps_to_a_circle_centre_within_9_px(cx: &mut TestAppContext) {
+    use noshape_model::drawing::views::SnapKind;
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    HOLED.set(true);
+    let (window, editor) = drawing(cx, "feel-centre-snap");
+    HOLED.set(false);
+    real_sheet(cx, window, &editor);
+    let (centre, mm_per_px) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let built = e.built.as_ref().expect("built");
+        let centre = built.placements.iter().find_map(|pl| e.geoms.get(&pl.id)?.snaps.iter().find(|s| s.kind == SnapKind::Center).map(|s| pl.to_sheet(s.p))).expect("a circle centre");
+        let (a, b) = (e.sheet_to_local([0.0, 0.0]), e.sheet_to_local([100.0, 0.0]));
+        (centre, 100.0 / (b[0] - a[0]).abs())
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)));
+    draw(cx, window);
+    let on_centre = |cx: &mut TestAppContext, d_px: f64| {
+        let k = d_px * mm_per_px / std::f64::consts::SQRT_2;
+        lit_at(cx, window, &editor, [centre[0] - k, centre[1] - k]);
+        cx.update(|cx| editor.read(cx).hover_snap).is_some_and(|s| (s[0] - centre[0]).abs() < 1e-6 && (s[1] - centre[1]).abs() < 1e-6)
+    };
+    for d in [0.0, 5.0, 9.0] {
+        assert!(on_centre(cx, d), "{d} px from the centre on the diagonal: snapped");
+    }
+    assert!(!on_centre(cx, 11.0), "11 px from the centre: no snap");
+}
+
+/// Live2 batch 1 (11-18 16:15): a note's leader lights the note to 8 px off its stroke, not at 10 (11-13 had 10 / 12).
+#[gpui::test]
+fn a_note_leader_lights_its_note_within_8_px(cx: &mut TestAppContext) {
     SUGGESTED.set(true);
     SETUP.set(Some(|ctx, dw| {
         // The leader to a view's lowest-left vertex, the note down and left of it on the empty sheet.
@@ -407,7 +438,7 @@ fn a_note_leader_lights_its_note_within_10_px(cx: &mut TestAppContext) {
         let (a2, b2) = (e.sheet_to_local([0.0, 0.0]), e.sheet_to_local([100.0, 0.0]));
         (a.id, [(p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0], [-(q[1] - p[1]) / l, (q[0] - p[0]) / l], 100.0 / (b2[0] - a2[0]).abs())
     });
-    for (d, lit) in [(0.0, true), (6.0, true), (10.0, true), (12.0, false)] {
+    for (d, lit) in [(0.0, true), (6.0, true), (8.0, true), (10.0, false)] {
         for side in [1.0, -1.0] {
             let at = [mid[0] + side * n[0] * d * mm_per_px, mid[1] + side * n[1] * d * mm_per_px];
             let got = lit_at(cx, window, &editor, at);
