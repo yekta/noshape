@@ -1339,7 +1339,7 @@ impl Workspace {
                 let _ = handle.update(cx, |_, window, cx| {
                     if !cad.is_empty() {
                         // Live: the view stays on the open tab (the new tabs go after it).
-                        crate::import_dialog::open(doc, cad, after, true, |_, _, _| {}, window, cx)
+                        crate::import_dialog::open(doc, cad, after, true, window, cx)
                     }
                 });
             });
@@ -1390,7 +1390,7 @@ impl Workspace {
                     return;
                 }
                 // Live doc-cad-file-import: the new tabs are added and the open tab stays.
-                crate::import_dialog::open(self.doc.clone(), vec![path], Some(id), false, |_, _, _| {}, window, cx);
+                crate::import_dialog::open(self.doc.clone(), vec![path], Some(id), false, window, cx);
             }
         }
     }

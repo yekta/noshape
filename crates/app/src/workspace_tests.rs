@@ -215,3 +215,50 @@ fn the_versions_flyouts_open_state_carries_over_to_the_next_document(cx: &mut Te
     let (_, ws3, _) = workspace(cx, "hist-carry-3");
     assert!(!cx.update(|cx| ws3.read(cx).history_open()), "closed there, closed in the one after");
 }
+
+/// Import (live import-export-1118): the files are translated off the UI thread (the document unchanged until then);
+/// the Part Studio goes right after the active tab, the view stays, the file is kept in CAD Imports, and the bubble
+/// reads "<file> has been imported." with "Open document"; a file that doesn't translate is kept too, its bubble
+/// "<file> uploaded but failed to translate." with the same link.
+#[gpui::test]
+fn an_import_translates_off_the_ui_thread_and_bubbles_as_live(cx: &mut TestAppContext) {
+    let (w, ws, [_, _, _, c]) = workspace(cx, "import");
+    let dir = std::env::temp_dir().join(format!("noshape-workspace-import-files-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let good = dir.join("block.step");
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": dir.join("src.noshape").to_str().unwrap() }));
+        call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+        call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "corner_rectangle", "points": [[0, 0], [20, 10]] }));
+        let region = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" }))["regions"][0]["id"].clone();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm" } }));
+        call(&mut ctx, "export_parts", json!({ "format": "STEP", "file": good.to_str().unwrap() }));
+    }
+    let broken = dir.join("broken.step");
+    std::fs::write(&broken, "not a STEP file").unwrap();
+    let doc = cx.update(|cx| ws.read(cx).doc.clone());
+    let tabs = |cx: &mut TestAppContext| doc.read_with(cx, |d, _| d.session.doc.ordered_tabs().iter().map(|t| t.name.clone()).collect::<Vec<_>>());
+    let before = tabs(cx);
+    cx.update(|cx| crate::import_dialog::import(&doc, std::slice::from_ref(&good), Default::default(), Some(c), true, cx));
+    assert_eq!(tabs(cx), before, "nothing added before the file is read");
+    cx.run_until_parked();
+    draw(cx, w);
+    let after = tabs(cx);
+    let at = after.iter().position(|n| n == "C").unwrap();
+    assert_eq!(after.get(at + 1).map(String::as_str), Some("block"), "the Part Studio right after the active tab: {after:?}");
+    assert_eq!(cx.update(|cx| ws.read(cx).active), Some(c), "the view stays");
+    let kept = |cx: &mut TestAppContext, name: &str| {
+        doc.read_with(cx, |d, _| {
+            let folder = d.session.doc.settings.folders.iter().find(|f| f.name == "CAD Imports").map(|f| f.id);
+            d.session.doc.tabs.iter().any(|t| t.name == name && folder.is_some() && d.session.doc.parent_of(t.id) == folder)
+        })
+    };
+    assert!(kept(cx, "block.step"), "the file kept in CAD Imports");
+    assert!(doc.read_with(cx, |d, _| d.notice_link("block.step has been imported.").is_some_and(|l| l.label == "Open document")));
+    cx.update(|cx| crate::import_dialog::import(&doc, std::slice::from_ref(&broken), Default::default(), Some(c), true, cx));
+    cx.run_until_parked();
+    assert!(kept(cx, "broken.step"), "a file that didn't translate is kept too");
+    assert!(doc.read_with(cx, |d, _| d.notice_link("broken.step uploaded but failed to translate.").is_some_and(|l| l.label == "Open document")));
+    let _ = std::fs::remove_dir_all(&dir);
+}

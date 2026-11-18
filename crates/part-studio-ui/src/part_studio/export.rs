@@ -436,6 +436,7 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
             )
             .child(
                 div()
+                    .debug_selector(|| "ex-file".into())
                     .mt(px(INPUT_MT))
                     .h(px(34.))
                     .px(px(1.))

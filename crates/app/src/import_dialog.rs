@@ -33,7 +33,7 @@ use std::rc::Rc;
 use noshape_ops::import::{MESH_UNITS, NATIVE_PARTS};
 
 #[derive(Clone, Copy, Default)]
-struct Choice {
+pub(crate) struct Choice {
     combine: bool,
     appearances: bool,
     density: bool,
@@ -58,16 +58,13 @@ impl Choice {
     }
 }
 
-/// Show the modal for `paths`; Import adds the tabs (after `after`) and
-/// calls `opened` with the first new tab.
+/// Show the modal for `paths`; Import adds the tabs (after `after`; the view stays, as live's).
 /// `keep_files`: also keep each file as a file tab in "CAD Imports" (Import;
 /// not when translating an existing file tab).
-pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, keep_files: bool, opened: impl Fn(TabId, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, keep_files: bool, window: &mut Window, cx: &mut App) {
     let ok_paths = paths.clone();
-    let on_ok = move |c: Choice, window: &mut Window, cx: &mut App| {
-        if let Some(first) = import(&doc, &ok_paths, c, after, keep_files, cx) {
-            opened(first, window, cx);
-        }
+    let on_ok = move |c: Choice, _: &mut Window, cx: &mut App| {
+        import(&doc, &ok_paths, c, after, keep_files, cx);
     };
     // A CAD file tab's own Import… has no Join adjacent surfaces (live2 2403).
     show(paths, false, keep_files, Rc::new(on_ok), window, cx);
@@ -301,50 +298,72 @@ fn wrapped_lines(text: &str, bold: usize, breaks: &[usize]) -> Vec<(String, Stri
 /// document, appearances), its tabs right after the active tab, the same toast; no modal.
 pub fn reimport(doc: &Entity<DocModel>, path: PathBuf, cx: &mut App) {
     let after = doc.read(cx).session.active_tab;
-    let _ = import(doc, &[path], Choice { appearances: true, ..Default::default() }, after, false, cx);
+    import(doc, &[path], Choice { appearances: true, ..Default::default() }, after, false, cx);
 }
 
-fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<TabId>, keep_files: bool, cx: &mut App) -> Option<TabId> {
+/// The files read on a background thread (the dialog closes at once; live shows no progress either, the tabs come when
+/// translated), then their tabs added after `after` and live's bubble: "<file> has been imported. Open document", or
+/// for a file that didn't translate "<file> uploaded but failed to translate. Open document" with the file kept in CAD
+/// Imports (live import-export-1118); the reason goes to the Notifications bell (live IM3).
+pub(crate) fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<TabId>, keep_files: bool, cx: &mut App) {
     use noshape_ops::import as imp;
     let units = doc.read(cx).session.doc.settings.units;
     let choice = c.ops();
-    let (inputs, errors) = imp::read_inputs(paths, &choice, keep_files, &units);
-    for e in errors {
-        // The toast, and the reason in the Notifications bell (live IM3).
-        crate::notifications::push(cx, format!("Import {} failed", import_name(&e).unwrap_or_default()), e.clone(), true);
-        doc.update(cx, |_, cx| cx.emit(DocEvent::Error(failed_toast(&e))));
-    }
-    // A file Onshape couldn't translate still gets its file tab.
-    if inputs.is_empty() {
-        return None;
-    }
-    let description = imp::description(&inputs.label);
-    let mut first = None;
-    let mut errors = Vec::new();
-    doc.update(cx, |doc, cx| {
-        doc.edit_document(&description, cx, |d| (first, errors) = imp::apply(d, inputs, &choice, after, &units));
-        let ok = errors.is_empty();
-        for e in errors {
-            crate::notifications::push(cx, format!("Import {} failed", import_name(&e).unwrap_or_default()), e.clone(), true);
-            cx.emit(DocEvent::Error(failed_toast(&e)));
-        }
-        // Live's bell entry: "Import <file>" with its steps done.
-        if ok && first.is_some() {
-            for p in paths {
-                let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                crate::notifications::push(cx, format!("Import {name}"), format!("Uploaded · Translated · Post-processing done · Created {name}"), false);
-            }
-        }
-        // Live: "onshape-cone.sat has been imported. Open document ×"; the link shows what it made.
-        if let ([p], true, Some(tab)) = (paths, ok, first) {
-            let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-            let me = cx.entity().downgrade();
-            doc.info_with_link(format!("{name} has been imported."), "Open document", move |_, cx| {
-                let _ = me.update(cx, |_, cx| cx.emit(DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(tab))));
-            }, cx);
-        }
-    });
-    first
+    let (doc, paths) = (doc.downgrade(), paths.to_vec());
+    cx.spawn(async move |cx| {
+        let read = {
+            let paths = paths.clone();
+            cx.background_spawn(async move { imp::read_inputs(&paths, &choice, keep_files, &units) }).await
+        };
+        cx.update(|cx| {
+            let Some(doc) = doc.upgrade() else { return };
+            let (inputs, mut errors) = read;
+            let mut first = None;
+            doc.update(cx, |doc, cx| {
+                if !inputs.is_empty() {
+                    let description = imp::description(&inputs.label);
+                    let mut failed = Vec::new();
+                    doc.edit_document(&description, cx, |d| (first, failed) = imp::apply(d, inputs, &choice, after, &units));
+                    errors.extend(failed);
+                }
+                for e in &errors {
+                    crate::notifications::push(cx, format!("Import {} failed", import_name(e).unwrap_or_default()), e.clone(), true);
+                }
+                // Live's bell entry: "Import <file>" with its steps done.
+                if errors.is_empty() && first.is_some() {
+                    for p in &paths {
+                        let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                        crate::notifications::push(cx, format!("Import {name}"), format!("Uploaded · Translated · Post-processing done · Created {name}"), false);
+                    }
+                }
+                // The bubble's link shows what the import made: the new tab, or the kept file of one that failed.
+                let (notice, tab) = match (paths.as_slice(), errors.first()) {
+                    ([p], None) => (format!("{} has been imported.", file_name(p)), first),
+                    (_, Some(e)) => (failed_toast(e), import_name(e).and_then(|n| kept_file(&doc.session.doc, &n))),
+                    _ => return,
+                };
+                match tab {
+                    Some(tab) => {
+                        let me = cx.entity().downgrade();
+                        doc.info_with_link(notice, "Open document", move |_, cx| {
+                            let _ = me.update(cx, |_, cx| cx.emit(DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(tab))));
+                        }, cx);
+                    }
+                    None => cx.emit(DocEvent::Info(notice)),
+                }
+            });
+        });
+    })
+    .detach();
+}
+
+fn file_name(p: &std::path::Path) -> String {
+    p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
+/// The newest file tab named `name` (an import keeps its files in CAD Imports).
+fn kept_file(d: &noshape_model::Document, name: &str) -> Option<TabId> {
+    d.tabs.iter().rev().find(|t| t.name == name && matches!(t.content, noshape_model::document::TabContent::File(_))).map(|t| t.id)
 }
 
 /// Live's toast for a file that didn't translate ("g47-3parts-unique.zip

@@ -4191,6 +4191,54 @@ fn export_dialog_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
     assert_eq!((asm.format, asm.y_up), (PartFormat::Parasolid, true));
 }
 
+/// Live import-export-1118: the Export dialog opens with the focus on the dialog, not in File name (a key typed
+/// changes no name); Esc closes it and exports nothing; Enter in File name exports at once, with the name typed.
+#[gpui::test]
+fn export_dialog_keys_as_live(cx: &mut TestAppContext) {
+    struct Page;
+    impl Render for Page {
+        fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+            div().size_full()
+        }
+    }
+    cx.update(gpui_kit::init);
+    crate::part_studio_hooks::register_for_tests();
+    let options = WindowOptions { window_bounds: Some(WindowBounds::Windowed(Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) })), ..Default::default() };
+    let (window, _) = cx.update(|cx| crate::os_menu::open_window(options, cx, |_, cx| cx.new(|_| Page))).unwrap();
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    let names = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+    let open = |cx: &mut TestAppContext| {
+        let names = names.clone();
+        let run: super::super::export::RunExport = std::rc::Rc::new(move |_, name, _, _| names.borrow_mut().push(name));
+        cx.update_window(window, |_, w, cx| super::super::export::open_export_modal("Part Studio 1".into(), false, run, w, cx)).unwrap();
+        draw(cx, window);
+    };
+    let shown = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| gpui_kit::component::WindowExt::has_active_dialog(w, cx)).unwrap();
+    open(cx);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("x");
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let ok = vcx.debug_bounds("modal-ok").expect("Export");
+    vcx.simulate_click(ok.center(), Modifiers::default());
+    draw(cx, window);
+    cx.run_until_parked();
+    assert_eq!(names.borrow_mut().drain(..).collect::<Vec<_>>(), ["Part Studio 1".to_string()], "the key typed on opening went to no field");
+    open(cx);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    assert!(!shown(cx) && names.borrow().is_empty(), "Esc closed the dialog, nothing exported");
+    open(cx);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let field = vcx.debug_bounds("ex-file").expect("File name");
+    vcx.simulate_click(field.center(), Modifiers::default());
+    vcx.simulate_keystrokes("end 2 enter");
+    draw(cx, window);
+    assert!(!shown(cx), "Enter in File name closed the dialog");
+    cx.run_until_parked();
+    assert_eq!(names.borrow().as_slice(), ["Part Studio 12".to_string()], "exported at once, with the name typed");
+}
+
 /// Opening a feature's dialog redraws only its toolbar button (now active); the other tools keep their cached views
 /// (the whole toolbar was drawn again: ~6-10 ms of the open's frame on a big studio).
 #[gpui::test]
