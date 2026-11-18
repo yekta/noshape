@@ -1875,9 +1875,13 @@ fn sheet_metal_model_adds_std_s_flip_manipulator() {
     let r = s.ok();
     let state = r.display.feature_state(start).expect("state");
     let [(key, m)] = state.manipulators.as_slice() else { panic!("one manipulator: {:?}", state.manipulators) };
-    // (On the sheet's first face: ours is a side face, live's the sheet's own face; skasm.md "From psui" 11-01.)
-    let noshape_model::display::FeatureManipulator::Flip { flipped, .. } = m else { panic!("a flip arrow: {m:?}") };
+    // On the definition sheet at its middle, pointing up (std's qCreatedBy(id, BODY) inside the feature: the sheet, not
+    // the part built at its end; live smflip-1118: the arrow at the plate's middle, +z). The sheet is std's extrude's
+    // START cap, `startDepth` -(clearance + thickness): the plate's top, the material below it.
+    let noshape_model::display::FeatureManipulator::Flip { flipped, base, direction, .. } = m else { panic!("a flip arrow: {m:?}") };
     assert!(!flipped, "{m:?}");
+    assert!((*base - glam::DVec3::new(0.03, 0.02, 0.002)).length() < 1e-6, "base {base:?}");
+    assert!((direction.normalize() - glam::DVec3::Z).length() < 1e-9, "direction {direction:?}");
     let mut moved = m.clone();
     if let noshape_model::display::FeatureManipulator::Flip { flipped, .. } = &mut moved {
         *flipped = true;

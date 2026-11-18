@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 12:17 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 13:09 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -23,15 +23,21 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   wins, a curve lights within 6.5 px, else what the pick finds without it (`shown_sketch_hover_id`, viewport
   `pick_at_pointer_without`); re-resolved on each move (`ui.shown_sketch_gpu_hover`); clicks take the same. Faces /
   edges keep their own pick (a point behind a part stays hidden). psui has the plane rows.
-- Sheet metal model arrow: needs live's face order: REQUESTS 12:16 (fs probe of qCreatedBy(id, BODY)'s faces).
+- Queued 6389133a (13:5x): sketch toolbar search highlight + hover reach outside sketch mode (live2 / qa told).
+- Sheet metal model arrow (in the worktree, testing): live smflip-1118: std's qCreatedBy(id, BODY) inside the feature
+  is the definition sheet (live builds the part at the feature's end). `CtxState::sm_built` (parts
+  updateSheetMetalGeometry made in this feature) left out of CREATED_BY for bodies, the hidden definitions in. Arrow
+  now at the plate's middle, +z, on the sheet = std's START cap at z = thickness (live's "z 0" was inferred).
+  model tests 525 ok; SM suite docs 12/13 to the end as before, cf-sheet-metal-model-plus 11/14 -> 14/14. Queued.
+- c2-surf-intro-mutualtrim Title (live 13:3x: same frame as ours; live solves the baseline COINCIDENT to JHV):
+  /root/skasm-scratch/held/title-text-ends.patch maps `<text>.sketch_text.baseline/left.start/.end` and counts a
+  text's start in off_live_points. The solve then lands 3.7 mm off live's in x: our text box's height is free (only
+  Horizontal + LengthRatio), so the solve scales the text; live translates it, size kept. Next: hold the box's size
+  in constructive placement (like hold_size for circles), then suite-check every doc with text constraints.
 
 ## Waiting on live (REQUESTS)
-- 11:12 c2-surf-intro-mutualtrim "Title" (feature 4, its first difference): the text sketch is on face JHG (y = 0,
-  normal +y); our face frame (origin 0, x -X, y +Z) leaves the text off the face (12 loose parts; live 1). On the -y
-  faces (fill, ruled) ours matches live. Asked for live's frame of that sketch; its baseline COINCIDENT to JHV is
-  untranslated (no text point of ours).
-- 06:2x wave-washer sketches.json (Sketch 4's rectangles stored inconsistently; ours solves them outward).
-- 06:4x surf-intro Derived 1 sources (5 docs stop at Derived 1 NOT BUILT).
+- Answered 11-18 13:xx: wave-washer sketches.json (Sketch 4 / 3 solved inward) and surf-intro Derived 1 sources
+  (c2-surf-intro-*/derived/<id>/, live.jsonl by rollback): rerun wave-washer and the surf-intro docs.
 
 ## Next, in order
 0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
