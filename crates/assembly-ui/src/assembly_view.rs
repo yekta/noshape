@@ -303,6 +303,9 @@ fn feature_row_color(inactive: bool, ok: bool, hidden: bool) -> Rgba {
     let pal = p();
     if inactive {
         pal.text_faint
+    } else if !ok && hidden {
+        // A hidden mate in error: faded red (live2 errors-1118 tips: rgb(196, 139, 148)).
+        gpui_kit::rgb(0xc48b94)
     } else if !ok {
         pal.text_invalid
     } else if hidden {
@@ -4246,7 +4249,8 @@ impl AssemblyView {
                         }))
                     }),
             )
-            .child(crate::ui::tree_icon(icon, suppressed || hidden, cx))
+            // In error: the red ! badge on its icon, as a failing mate's (live2 errors-1118 oe15).
+            .child(div().relative().flex_none().child(crate::ui::tree_icon(icon, suppressed || hidden, cx)).when(error.is_some(), |d| d.child(div().absolute().right(px(-4.)).bottom(px(-4.)).child(crate::assets::icon(&icon_path("error"), 10., cx)))))
             .child(match self.rename_field(behaviors::RenameRow::Instance(top), cx).filter(|_| is_top) {
                 Some(field) => field,
                 // The state glyphs follow the name (Onshape), not the row's right edge.
@@ -4292,7 +4296,6 @@ impl AssemblyView {
             // In-context arrows (Assembly contexts of its Part Studio).
             .when(is_top, |d| d.children(self.context_icons(top, cx)))
             .when_some(warning.filter(|_| error.is_none()), |d, w| d.child(div().id(SharedString::from(format!("warn-{}", top.0))).child(crate::assets::icon(&icon_path("warning"), 12., cx)).tooltip(move |win, cx| gpui_kit::component::tooltip::Tooltip::new(w.clone()).build(win, cx))))
-            .when_some(error.clone().map(|e| if e.is_empty() { name.to_string() } else { format!("{name} has error: {e}") }), |d, e| d.child(div().id(SharedString::from(format!("err-{}", top.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
             .when_some(versioned.filter(|_| is_top), |d, own| {
                 // Another document's Assembly (live 1742 (B)): "Versioned assembly from other document".
                 let noun = if node.is_some_and(|n| n.linked.is_some()) { "assembly" } else { "part" };
@@ -4643,8 +4646,9 @@ impl AssemblyView {
                 )
             })
             // No row tooltip while a context menu is open (it would cover the menu).
-            // A mate's: its flyout (live2 asm-feel (1)); an error's or another row's: the plain tooltip.
-            .map(|d| match (tip.filter(|_| !crate::os_menu::is_open(cx)), flyout.filter(|_| message.is_none())) {
+            // A mate's, in error too: its flyout under its tooltip's first line (live2 asm-feel (1), errors-1118 tips);
+            // another row's: the plain tooltip.
+            .map(|d| match (tip.filter(|_| !crate::os_menu::is_open(cx)), flyout) {
                 (Some(m), Some((head, rows))) => crate::assembly_flyout::with_mate_flyout(d, head, rows, m),
                 (Some(m), None) => d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)).tooltip_show_delay(crate::ui::ROW_TIP_DELAY),
                 (None, _) => d,
@@ -4880,7 +4884,8 @@ impl AssemblyView {
         let mut rows = vec![FlyRow::Text(t.name().to_string())];
         let set = |e: &Option<ExprValue>| e.as_ref().is_some_and(|e| !e.text.trim().is_empty());
         let offset = set(&m.offset_x) || set(&m.offset_y) || set(&m.offset_z) || set(&m.rotation);
-        if !(offset || !m.limits.is_empty() || m.simulation_connection) {
+        // (A Fastened lists its two at their defaults too: live errors-1118 tips, 10-24 "Fastened 1 (Hidden)".)
+        if !(offset || !m.limits.is_empty() || m.simulation_connection || t == MateType::Fastened) {
             return (head, rows);
         }
         let (ox, oy, oz, orot) = noshape_model::assembly::eval::offset_axes(t);
@@ -7567,7 +7572,7 @@ mod tests {
         let pal = p();
         assert_eq!(feature_row_color(false, true, true), pal.text_faint);
         assert_eq!(feature_row_color(false, true, false), pal.text);
-        assert_eq!(feature_row_color(false, false, true), pal.text_invalid);
+        assert_eq!(feature_row_color(false, false, false), pal.text_invalid);
         assert_eq!(pal.text_invalid, gpui_kit::rgb(0xaa252d));
         assert_eq!(pal.text_faint, gpui_kit::rgb(0x999999));
     }
@@ -7583,6 +7588,13 @@ pub fn suppressed_text(d: Div, suppressed: bool) -> Div {
 #[cfg(test)]
 mod suppressed_text_tests {
     use super::*;
+
+    #[::core::prelude::v1::test]
+    fn a_hidden_mate_in_error_is_faded_red() {
+        assert_eq!(feature_row_color(false, false, true), gpui_kit::rgb(0xc48b94));
+        assert_eq!(feature_row_color(false, false, false), p().text_invalid);
+        assert_eq!(feature_row_color(false, true, true), p().text_faint);
+    }
 
     #[::core::prelude::v1::test]
     fn suppressed_rows_are_italic_and_struck_through() {

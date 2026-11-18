@@ -264,7 +264,7 @@ per matrix (17:18 UTC): **mates 26 / 28, views 14 / 15, instance list 21 / 22, 3
 | Row drop | reorders, one undo step | the same ("Reorder instances") | – | = |
 | Hidden mate | grey name and icon | the same | `hidden_mate_rows_are_grey` | = |
 | Suppressed mate | grey italic struck through; "Fastened 1 (Suppressed)" | the same (17:18: the tooltip) | – | = |
-| Failed mate's colour | rgb(170,37,45) | the same (17:18; was #bd3039) | `hidden_mate_rows_are_grey` | = |
+| Failed mate's colour | rgb(170,37,45); hidden, rgb(196,139,148) (live2 errors-1118 tips) | the same (17:18; was #bd3039; hidden faded red since 11-18, was the strong red) | `hidden_mate_rows_are_grey`, `a_hidden_mate_in_error_is_faded_red` | = |
 | Failed mate's marks | red "!" on the icon, "Fastened 1 has error: …", red Mate features icon and root overlay, ⚠ on the fixed instances | the same | – | = |
 
 ### 3D in an assembly (3d.json `assembly`): 11 / 11
