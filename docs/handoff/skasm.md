@@ -85,10 +85,10 @@ Our solver keeps links' waist arcs on live's branch (probe /root/skasm-scratch/p
 - c2-surf-workshop-manualblend Sweep 2 (11/19): Sketch 5's CONCENTRIC to vertex JNE now kept (anchors_off counts a
   CONCENTRIC in the plane, within 10 µm when the stored was 0.1 mm+ off); our sweep now lies where live's does (x
   −60.9…−26.3), but it takes the path's name "Curve 2" and the wire becomes "Surface 3": Sweep's body identity (core).
-- c2-sm-rocker-enclosure-body Extrude 6 (15/28): Sketch 6's solve is taken back ("COINCIDENT on
-  R4oICkWq6xtC.cCircle.center, oKC7s6ob7uli.0.center by 1.974 mm"; also "CIRCULAR_PATTERN: the instances aren't
-  copies of the seeds"), so our hexagon-and-lines stays as stored: one region of 107.106 mm² where live has two
-  (84.163 + 22.943, refs.jsonl) at the solved place; the cut removes 115 mm³ more than live's and has one face more.
+- c2-sm-rocker-enclosure-body Extrude 6 (15/28): Sketch 6 now kept (its hexagon's pattern centre COINCIDENT with
+  the Use of JRR's centre, which live's refs `center` has; the stored was 2.8 mm off). Extrude 6's counts now match
+  (39/97/58); volume 379696 vs live 379830 mm³, area 85398 vs 85317 (were 379715 / 85478): the cut's regions next.
+  Sketch 5 still taken back (57 mm, first COINCIDENT f3C7mDTbYgiG.center on aHSQXvBb1hEh.0.center).
 
 
 ## Agents (lead's roster 11-17 10:30; only these ids)

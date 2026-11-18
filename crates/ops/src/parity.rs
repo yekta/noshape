@@ -72,6 +72,8 @@ pub struct LiveRef {
     pub self_made: bool,
     /// An edge's ends (refs.jsonl `start`, `end`).
     pub ends: Option<[[f64; 3]; 2]>,
+    /// A circular edge's centre (refs.jsonl `center`).
+    pub center: Option<[f64; 3]>,
 }
 
 /// What became of one Onshape feature.
@@ -324,7 +326,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         // A curved face's normal is its tangent plane's at a point: no filter for planar faces of ours (c2-hunting-knife's
         // Extrude 10 took the blade's flat spine for the handle's B-spline side through the same point).
         let normal = f3(&v["normal"]).filter(|_| v["surfaceType"].as_str().is_none_or(|t| t.eq_ignore_ascii_case("plane")));
-        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")), ends: f3(&v["start"]).zip(f3(&v["end"])).map(|(a, b)| [a, b]) };
+        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")), ends: f3(&v["start"]).zip(f3(&v["end"])).map(|(a, b)| [a, b]), center: f3(&v["center"]) };
         let key = (k as usize, id.to_string());
         if let Some(old) = out.remove(&key) {
             r.constraints = old.constraints;
@@ -5255,6 +5257,32 @@ impl<'a> Translator<'a> {
             } else {
                 (0..3).map(|i| (p[i] - live[i]).powi(2)).sum::<f64>().sqrt()
             };
+            worst = Some(worst.map_or(d, |w| w.max(d)));
+        }
+        // A point coincident with the centre of a circle the sketch uses from the model: live's refs have that centre
+        // (c2-sm-rocker-enclosure-body's Sketch 6: a hexagon's pattern centre on its Use of JRR, stored 2.8 mm off it).
+        let used_centres: HashMap<String, [f64; 3]> = f["constraints"]
+            .as_array()?
+            .iter()
+            .filter(|c| c["constraintType"] == "PROJECTED")
+            .filter_map(|c| {
+                let params = c["parameters"].as_array()?;
+                let local = params.iter().find(|p| p["parameterId"] == "localFirst")?["value"].as_str()?;
+                let q = params.iter().find(|p| p["parameterId"] == "externalSecond")?["queries"].as_array()?.first()?;
+                let [id] = q["deterministicIds"].as_array()?.as_slice() else { return None };
+                let centre = self.refs.get(&(k, id.as_str()?.to_string())).filter(|r| r.kind == "EDGE")?.center?;
+                Some((format!("{local}.center"), centre))
+            })
+            .collect();
+        for c in f["constraints"].as_array()?.iter().filter(|c| c["constraintType"] == "COINCIDENT") {
+            let params = c["parameters"].as_array().map(Vec::as_slice).unwrap_or_default();
+            let locals: Vec<&str> = params.iter().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("local"))).filter_map(|p| p["value"].as_str()).collect();
+            let [a, b] = locals.as_slice() else { continue };
+            let Some((point, live)) = used_centres.get(*b).map(|l| (*a, l)).or_else(|| used_centres.get(*a).map(|l| (*b, l))) else { continue };
+            let Some(at) = self.sketch_entities.get(&(oid.to_string(), point.to_string())).and_then(|e| ours.get(e.as_str())) else { continue };
+            let rel = [0, 1, 2].map(|i| live[i] - (o[i] + at[0] * x[i] + at[1] * y[i]) * u);
+            let along = |v: [f64; 3]| (0..3).map(|i| rel[i] * v[i]).sum::<f64>();
+            let d = (along(x).powi(2) + along(y).powi(2)).sqrt();
             worst = Some(worst.map_or(d, |w| w.max(d)));
         }
         // A PIERCE whose external edge (live's) ends on the sketch plane: that end is where it pierces, so how far our
