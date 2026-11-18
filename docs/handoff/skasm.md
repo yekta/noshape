@@ -40,6 +40,11 @@ Uses are OK in live: unchanged).
 - Dimension box (live dimbox-1118 answered 19:2x): only a double-click opens it; a slow second click deselects, a drag
   keeps it selected: ours the same; scene test + feel row.
 
+## Hover outside sketch mode (feel P0, live2 / qa 548d795f, 20:4x)
+A curve lights within 7.5 px and holds to 10.5 (live retake 7 / 9–11: `CURVE_HOLD`, the lit curve kept while the pick
+finds no other sketch curve / face / edge); a hovered shown point draws a 10 px #f8c488 disc (`midpoint_overlay`).
+psui narrows its midpoint rule (a shown curve's midpoint only with a dialog open).
+
 ## Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
 regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).
 

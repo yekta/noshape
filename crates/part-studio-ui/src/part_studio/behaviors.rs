@@ -3773,7 +3773,8 @@ impl PartStudioView {
     }
 
     /// Midpoint marker of the hovered edge or sketch curve (no sketch open;
-    /// with a dialog open only when its field takes points, like Onshape).
+    /// with a dialog open only when its field takes points, like Onshape);
+    /// a hovered shown sketch point's disc.
     pub(super) fn midpoint_overlay(&self, cx: &App) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineSegment, PointData, PointSprite};
         let mut points = Vec::new();
@@ -3801,6 +3802,15 @@ impl PartStudioView {
             Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if self.sketch.is_none() && self.ui.select_other.is_none() => {
                 if let Some(m) = self.edge_midpoint(on) {
                     marker(&mut points, m, crate::theme::viewport::POINT_HOVER);
+                }
+            }
+            // A shown sketch's point outside sketch mode: a ~10 px light orange disc (live2 11-18 hover-p0 pt.png; at
+            // rest a corner isn't drawn).
+            Some(r @ Reference::SketchEntity { .. })
+                if self.sketch.is_none() && self.ui.select_other.is_none() && self.ui.hover_pick.as_ref().is_some_and(|t| t.kind == PickKind::SketchPoint && t.reference == *r) =>
+            {
+                if let Some(at) = self.ui.hover_pick.as_ref().and_then(|t| t.anchor) {
+                    points.push(sprite(at, crate::theme::viewport::POINT_HOVER[0], 10.0, 0));
                 }
             }
             // Live (qa4-r5-s9-6a/6b): hovering anywhere on the edge shows a

@@ -123,8 +123,9 @@ fn sketch_hover_reach_and_priority_as_live(cx: &mut TestAppContext) {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
-/// Live2 hover-p0 (ours-1118, qa FEEL-SKETCH-REACH-OUTSIDE): outside sketch mode a shown sketch's line lights to 6 px
-/// (7 and 8 px: not), a point to 9 px, and 8 px off a corner along its diagonal the corner point lights, not its lines.
+/// Live2 hover-p0 (ours-1118, qa FEEL-SKETCH-REACH-OUTSIDE) and live "feel (3D) retaken 11-18": outside sketch mode a
+/// shown sketch's line lights from 7 px (8: not) and stays lit to 10 px on the way out (12: not), a point to 9 px, and
+/// 8 px off a corner along its diagonal the corner point lights, not its lines, drawn as a disc.
 #[gpui::test]
 fn a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -152,7 +153,7 @@ fn a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live(cx: &mut Tes
         if n.dot((*a + *b) * 0.5 - centre) < 0.0 {
             n = -n;
         }
-        for (d, want) in [(0.0, true), (6.0, true), (-6.0, true), (7.0, false), (8.0, false), (-8.0, false)] {
+        for (d, want) in [(14.0, false), (8.0, false), (7.0, true), (0.0, true), (-6.0, true), (9.0, true), (10.0, true), (12.0, false), (-14.0, false), (-8.0, false), (-7.0, true)] {
             pointer.move_to(cx, &view, mid + n * d);
             let got = hovered(cx, &view);
             if is_line(&got, *id) != want {
@@ -172,6 +173,10 @@ fn a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live(cx: &mut Tes
         });
         if point != want {
             wrong.push(format!("{d} px off a corner: lit {got:?}"));
+        }
+        // (Lit, its disc: live2 11-18 pt.png, ~10 px light orange; at rest a corner isn't drawn.)
+        if want && cx.update(|cx| view.read(cx).midpoint_overlay(cx).is_empty()) {
+            wrong.push(format!("{d} px off a corner: no disc"));
         }
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));

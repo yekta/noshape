@@ -833,12 +833,14 @@ impl PartStudioView {
     }
 
     /// The GPU's hover pick outside sketch mode, held to live's reach for the shown sketches (live2 11-18 hover-p0
-    /// ours-1118): a sketch point within 9 px of the pointer on screen wins (over its lines at a corner too), a curve
-    /// lights within 6.5 px (the 5 px pick square reached a slanted line at 8–9). A curve out of reach gives way to
-    /// what the pick finds without it. Faces and edges keep their own pick (a sketch point behind a part stays hidden).
+    /// ours-1118, live "feel (3D) retaken 11-18"): a sketch point within 9 px of the pointer on screen wins (over its
+    /// lines at a corner too), a curve lights within 7 px and stays lit to 10 (the 5 px pick square reached a slanted
+    /// line at 8–9). A curve out of reach gives way to what the pick finds without it. Faces and edges keep their own
+    /// pick (a sketch point behind a part stays hidden).
     pub(super) fn shown_sketch_hover_id(&self, id: Option<u32>, cx: &App) -> Option<u32> {
         const POINT_REACH: f64 = 9.5;
-        const CURVE_REACH: f64 = 6.5;
+        const CURVE_REACH: f64 = 7.5;
+        const CURVE_HOLD: f64 = 10.5;
         if self.sketch.is_some() {
             return id;
         }
@@ -869,9 +871,15 @@ impl PartStudioView {
             pts.chunks(2).map(|w| at.distance(closest_on_segment(at, w[0], w[1]))).min_by(f64::total_cmp)
         };
         let out_of_reach = |i: u32| built.picks.get(i).and_then(|t| curve_distance(&t.reference)).is_some_and(|d| d > CURVE_REACH);
-        match id {
+        let picked = match id {
             Some(i) if out_of_reach(i) => vp.pick_at_pointer_without(&out_of_reach).flatten(),
             _ => id,
+        };
+        // The lit curve holds unless the pick found another sketch curve, a face or an edge.
+        let open = |i: Option<u32>| i.and_then(|i| built.picks.get(i)).is_none_or(|t| !matches!(t.reference, Reference::SketchEntity { .. } | Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)));
+        match self.hover.as_ref().filter(|h| open(picked) && curve_distance(h).is_some_and(|d| d <= CURVE_HOLD)) {
+            Some(h) => built.picks.ids_for(h).first().copied().or(picked),
+            None => picked,
         }
     }
 
