@@ -1924,3 +1924,42 @@ fn a_view_whose_part_is_gone_goes_blank_with_failed_to_resolve_part(cx: &mut Tes
         assert!(!b.geometry.texts.iter().any(|t| Some(t.pick) == view_pick), "no text in the blank view");
     });
 }
+
+/// Live2 errors-1118: a diameter dimension whose circle is lost keeps its value, red-orange, with the red-orange dot at
+/// the lost circle's centre (not at its leader's end on the old circle).
+#[gpui::test]
+fn a_lost_diameters_dot_sits_at_the_circles_centre(cx: &mut TestAppContext) {
+    use noshape_model::drawing::{Annotation, AnnotationKind, AnnotationRef, PointRef, ViewKind};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-lost-diameter");
+    real_sheet(cx, window, &editor);
+    let (view, centre) = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let view = e.drawing.sheets[e.sheet].views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).map(|v| v.id).expect("a base view");
+            let g = e.geoms.get(&view).cloned().expect("geometry");
+            let mut gone = g.snaps.iter().find_map(|s| s.point.clone()).expect("a snap point");
+            let (PointRef::Vertex { body, .. } | PointRef::Center { body, .. } | PointRef::Midpoint { body, .. } | PointRef::Quadrant { body, .. } | PointRef::Intersection { body, .. } | PointRef::Thread { body, .. }) = &mut gone;
+            body.index += 1000;
+            let center = [(g.min[0] + g.max[0]) / 2.0, (g.min[1] + g.max[1]) / 2.0];
+            let sheet = e.sheet;
+            e.edit("Lost diameter", cx, |d| {
+                let s = &mut d.sheets[sheet];
+                let id = s.next_annotation_id();
+                s.annotations.push(Annotation {
+                    id,
+                    kind: AnnotationKind::RadialDimension { view, center, radius: 0.002, diameter: true, angle: 0.8, dim_line: false, knee: None },
+                    refs: vec![AnnotationRef { slot: 0, point: gone }],
+                    ..Default::default()
+                });
+            });
+            (view, center)
+        })
+    });
+    draw(cx, window);
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        let want = e.placement(view).expect("placed").to_sheet(centre);
+        let dots = e.lost_dots();
+        assert!(matches!(dots.as_slice(), [(p, rgb)] if (p[0] - want[0]).hypot(p[1] - want[1]) < 1e-9 && *rgb == [221, 82, 40, 255]), "at the centre: {dots:?} for {want:?}");
+    });
+}

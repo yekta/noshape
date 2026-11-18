@@ -1554,6 +1554,24 @@ impl DrawingEditor {
         }));
     }
 
+    /// A lost reference's red-orange grip where it was (help D40; drag it onto new geometry to re-attach); a radial or
+    /// diameter dimension's at its lost circle's centre (live2 errors-1118: rgb(221,82,40)).
+    pub(crate) fn lost_dots(&self) -> Vec<([f64; 2], [u8; 4])> {
+        let Some(b) = &self.built else { return Vec::new() };
+        let pk = self.pk();
+        b.lost
+            .iter()
+            .filter_map(|(id, slot)| {
+                let a = b.resolved.annotations.iter().find(|a| a.id == *id)?;
+                let at = match &a.kind {
+                    AnnotationKind::RadialDimension { view, center, .. } => pk.placement(*view).map(|pl| pl.to_sheet(*center)),
+                    _ => pk.attach_points(a).into_iter().find(|(k, _)| *k == *slot as usize).map(|(_, p)| p),
+                };
+                at.map(|p| (p, [0xdd, 0x52, 0x28, 255]))
+            })
+            .collect()
+    }
+
     fn rebuild_overlay(&mut self) {
         let mut overlay = self.overlay.clone();
         overlay.points.extend(self.selection_handles());
@@ -1562,17 +1580,7 @@ impl DrawingEditor {
         self.leader_overlay(&mut overlay);
         self.detail_circle_overlay(&mut overlay);
         self.table_grip_overlay(&mut overlay);
-        // A lost reference: a red grip where it was (help D40; drag it onto
-        // new geometry to re-attach).
-        if let Some(b) = &self.built {
-            let pk = self.pk();
-            for (id, slot) in &b.lost {
-                let Some(a) = b.resolved.annotations.iter().find(|a| a.id == *id) else { continue };
-                if let Some((_, p)) = pk.attach_points(a).into_iter().find(|(k, _)| *k == *slot as usize) {
-                    overlay.dots.push((p, [0xdd, 0x28, 0x28, 255]));
-                }
-            }
-        }
+        overlay.dots.extend(self.lost_dots());
         // An automatic centermark's arm pulled short of its default: a red ⊘ at the pointer (live2 drw-centermark).
         if let Drag::AutoCentermarkArm { refused: true, .. } = &self.drag {
             let (c, r) = (self.cursor, 7.0 / self.zoom.max(1e-6));
