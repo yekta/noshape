@@ -595,11 +595,11 @@ Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png
 - Drawing note: typed "Qz7" shows in the editor; Escape closes the Note panel and leaves no note (live: the same; live also leaves an empty
   editor box drawn). Pass. Drawing hover timing: live's is a server round trip (nothing to copy).
 - Assembly Snap mode release: Part 3 goes connector onto Part 1's top-face corner, flush, and stays there after Escape, as live.
-- [ ] 587cd164 (asm 07:15: queued; reach = a 57 px square in x and y, live2's completed rule, so ~75 px along this approach's direction; qa-wait-587c re-runs) **P1 FEEL-SNAPMODE-REACH (asm)**: dragging in Snap mode toward Part 1's top-face corner along the face diagonal in 2 px steps
+- [ ] 80a647256 (= 587cd164; qa 08:10 on green 80a64725, 1 px steps: straight up the connector jumps at 56 px (square rule 57: match); 45° up-left at 74 px (a 57 px square reaches 80.6); the face diagonal (0.65, 0.76) at 70 px (square: 75). The diagonals are still short, as if a ~74 px circle cut by the square; qa-scratch/af/s3up, s3ul, sm5) **P1 FEEL-SNAPMODE-REACH (asm)**: dragging in Snap mode toward Part 1's top-face corner along the face diagonal in 2 px steps
   (0.25 s each), the dragged connector jumps onto the corner at 70 px (at 72 px still at the pointer). Live: 57 px (at 58 still at
   the pointer; behaviours "assembly Snap mode drag", retried 06:28-06:42). Lag could only make ours read later, so ours reaches ~13 px
   further.
-- [ ] 5de8e450 (asm 07:15: landed 07:12, after cafe3c2af; re-run with 587cd164) **P1 FEEL-SNAPMODE-RELEASE-DIALOG (asm)**: the release snaps the part but opens nothing (Mate features (0), no dialog, no
+- [x] 5de8e450 (verified qa 08:10 on green 80a64725: release opens an uncommitted Fastened 1 with both connectors and the floating Fastened bar; Escape leaves Mate features (0), the part where it snapped) **P1 FEEL-SNAPMODE-RELEASE-DIALOG (asm)**: the release snaps the part but opens nothing (Mate features (0), no dialog, no
   heads-up toolbar). Live opens the mate dialog "Fastened 1" with both connectors and the heads-up toolbar, uncommitted (features 0);
   Escape closes it with no mate and the part stays.
 - [ ] **P1 FEEL-ROW-DBLCLICK-DISTANCE (psui)**: two clicks 80 px apart along the Extrude 1 row, 200 or 330 ms apart, open nothing.
