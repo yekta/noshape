@@ -1844,3 +1844,39 @@ fn the_surface_finish_symbol_follows_the_pointer_before_and_after_a_click(cx: &m
     let free = [mid[0] + 25.0, a[1] + out * 25.0];
     assert_eq!(shown(cx, free).map(|s| s.0), Some(free), "the next symbol at the pointer");
 }
+
+/// Live2 ann-1118 (GTOL retake): a click on the lit edge anchors a leader with its arrow at the point clicked; the
+/// frame then follows the pointer on it and a second click places frame and leader.
+#[gpui::test]
+fn a_geometric_tolerance_clicked_on_an_edge_follows_on_a_leader_until_the_second_click(cx: &mut TestAppContext) {
+    use noshape_model::drawing::AnnotationKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-gdt-leader");
+    real_sheet(cx, window, &editor);
+    let (a, b, out) = horizontal_edge(cx, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Gdt, cx)));
+    draw(cx, window);
+    let gdts = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing_sheet().annotations.iter().filter(|x| matches!(x.kind, AnnotationKind::Gdt { .. })).cloned().collect::<Vec<_>>());
+    let mid = [(a[0] + b[0]) / 2.0, a[1]];
+    click_sheet(cx, window, &editor, mid);
+    assert!(gdts(cx).is_empty(), "the first click on the edge places nothing");
+    let far = [mid[0] + 40.0, a[1] + out * 30.0];
+    cx.update_window(window, |_, _, cx| {
+        editor.update(cx, |e, cx| {
+            e.cursor = far;
+            e.update_preview(cx);
+        })
+    })
+    .unwrap();
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        let tip = e.note_leader.as_ref().and_then(|l| Some(e.placement(l.view?)?.to_sheet(l.point))).expect("a leader anchored");
+        assert!((tip[0] - mid[0]).hypot(tip[1] - mid[1]) < 0.05, "its arrow at the point clicked: {tip:?} for {mid:?}");
+        let shown = e.preview.as_ref().and_then(|d| d.sheets.get(e.sheet)).and_then(|s| s.annotations.last()).cloned().expect("the frame previewed");
+        assert!(matches!(&shown.kind, AnnotationKind::Gdt { leaders, .. } if leaders.len() == 1), "on its leader: {:?}", shown.kind);
+        assert!(e.overlay.lines.is_empty(), "no rubber band");
+    });
+    click_sheet(cx, window, &editor, far);
+    let placed = gdts(cx);
+    assert!(matches!(placed.as_slice(), [g] if matches!(&g.kind, AnnotationKind::Gdt { leaders, .. } if leaders.len() == 1)), "placed with its leader: {placed:?}");
+}

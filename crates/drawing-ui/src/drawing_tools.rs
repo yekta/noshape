@@ -579,9 +579,14 @@ impl DrawingEditor {
             Tool::Datum { anchor: None } => Some(Annotation { kind: AnnotationKind::Datum { anchor: c, label: self.datum_dialog_label(), on: None, at: None }, position: [c[0] + 8.0, c[1]], ..Default::default() }),
             // The next symbol at the pointer, on the edge or extension line under it (live2 ann-1118).
             Tool::SurfaceFinish if self.note_leader.is_none() && matches!(self.panel, Some(Panel::SurfaceFinish { edit: None, .. })) => Some(self.surface_finish_symbol(c, cx)),
+            // With its leader once the first click anchored one (live2 ann-1118: the arrow at the point clicked).
             Tool::Gdt if self.gdt_dlg.as_ref().is_some_and(|d| d.edit.is_none()) => {
                 let (frame, extra) = self.gdt_values(cx).unwrap_or_else(|| (vec![noshape_scene::drawing_tools::GDT_TYPES[0].0.to_string(), String::new()], Default::default()));
-                Some(noshape_scene::drawing_tools::gdt(0, c, frame, extra))
+                let mut a = noshape_scene::drawing_tools::gdt(0, c, frame, extra);
+                if let (Some(l), AnnotationKind::Gdt { leaders, .. }) = (self.note_leader.clone(), &mut a.kind) {
+                    leaders.push(l);
+                }
+                Some(a)
             }
             _ => None,
         }
@@ -856,7 +861,7 @@ impl DrawingEditor {
             Tool::Sketch { .. } => self.sketch_overlay(&mut overlay),
             Tool::Weld => self.weld_overlay(&mut overlay),
             Tool::EdgeCondition => self.edge_condition_overlay(&mut overlay),
-            Tool::Note | Tool::Gdt | Tool::SurfaceFinish if self.note_leader.is_some() => {
+            Tool::Note | Tool::SurfaceFinish if self.note_leader.is_some() => {
                 if let Some(a) = self.note_leader.as_ref().and_then(|l| Some(self.placement(l.view?)?.to_sheet(l.point))) {
                     overlay.lines.push((vec![a, self.cursor], true));
                 }

@@ -195,9 +195,9 @@ impl DrawingEditor {
 
     /// A click with the tool (the dialog stays open; help A41): on a
     /// dimension the frame goes under its value and follows it (grouped);
-    /// on a view snap the click anchors a leader and the next click places
-    /// the frame; on an edge the frame goes there, without a leader, and
-    /// moves with the view; elsewhere it goes on the sheet.
+    /// on a view snap or an edge the click anchors a leader (its arrow at the
+    /// point clicked) and the next click places the frame (live2 ann-1118);
+    /// elsewhere it goes on the sheet.
     pub fn gdt_click(&mut self, cx: &mut Context<Self>) -> bool {
         if !matches!(self.tool, Tool::Gdt) {
             return false;
@@ -241,12 +241,22 @@ impl DrawingEditor {
             cx.notify();
             return true;
         }
-        // On an edge: no leader, moves with the view.
-        if let Some(view) = self.pk().hovered_edge().map(|(v, _)| v) {
-            let mut a = noshape_scene::drawing_tools::gdt(id, c, frame, extra);
-            a.view_group = Some(view);
-            self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(a));
-            cx.notify();
+        // On an edge: a leader with its arrow at the point clicked on it (live2 ann-1118).
+        if let Some((view, me)) = self.pk().hovered_edge()
+            && let Some(pl) = self.placement(view)
+        {
+            let at = pl.to_view(c);
+            let point = match me.geom {
+                noshape_model::drawing::views::EdgeGeom::Line { a, b } => {
+                    let d = [b[0] - a[0], b[1] - a[1]];
+                    let t = (((at[0] - a[0]) * d[0] + (at[1] - a[1]) * d[1]) / (d[0] * d[0] + d[1] * d[1]).max(1e-18)).clamp(0.0, 1.0);
+                    [a[0] + d[0] * t, a[1] + d[1] * t]
+                }
+                _ => at,
+            };
+            self.note_leader = Some(noshape_model::drawing::Leader { view: Some(view), point, ..Default::default() });
+            self.leader_ref = None;
+            self.update_preview(cx);
             return true;
         }
         // Inside a face region: a leader from a dot there (live request 1624).
