@@ -25,6 +25,7 @@ pub fn ops() -> Vec<Op> {
                 opt("generate_part_numbers", json!({ "type": "boolean" }), "Generate part numbers for the items without one (Company settings' sequential numbering scheme)."),
                 opt("revert", strings(), "Items (names or part ids) reverted to their last released revision (the State column's Revert)."),
                 opt("parts", strings(), "Part Studio: only these parts (ids or names)."),
+                opt("all_configurations", json!({ "type": "boolean" }), "Part Studio with `parts`: each part once per configuration (the part's Release all configurations…; the list inputs' options combined, at most 100). Every row is named as the part; `part_numbers` / `revisions` name one as its tooltip reads, \"Part 1 / Size / Small\"."),
                 opt("instance", s(), "Assembly: only this instance's (its Release…): its part, another document's part at its version (linked to that version), or a subassembly's contents."),
                 opt("name", s(), "Release name (the version's name); required unless `from_draft` names it."),
                 opt("notes", s(), "Release notes (the version's description)."),
@@ -216,6 +217,14 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         items = keep;
     }
+    if a.bool_or("all_configurations", false)? {
+        let tab = tab.filter(|t| matches!(od.doc().tab(*t).map(|t| &t.content), Some(TabContent::PartStudio(_))));
+        let (Some(tab), true) = (tab, a.opt_array("parts")?.is_some()) else { return Err(OpError::param("all_configurations", "parts of a Part Studio `tab`, named in `parts`")) };
+        items = items.iter().flat_map(|it| match &it.part {
+            Some(b) => rel::all_configuration_items(&od.session, tab, b, &it.name),
+            None => vec![it.clone()],
+        }).collect();
+    }
     let mut left_out = Vec::new();
     if a.bool_or("include_drawings", false)? {
         let (found, skipped) = rel::associated_drawings_split(&od.session, &*provider, &items);
@@ -225,7 +234,7 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let pick = |field: &str, items: &mut Vec<noshape_model::release::ReleaseItem>, set: &dyn Fn(&mut noshape_model::release::ReleaseItem, String)| -> Result<(), OpError> {
         for (k, v) in a.object(field)?.into_iter().flatten() {
-            let it = items.iter_mut().find(|it| it.part.as_ref().is_some_and(|b| crate::refs::body_id(b) == *k) || it.name == *k).ok_or_else(|| OpError::param(field, &format!("no item `{k}`")))?;
+            let it = items.iter_mut().find(|it| it.part.as_ref().is_some_and(|b| crate::refs::body_id(b) == *k) || it.name == *k || rel::config_tooltip(&od.session, it).as_deref() == Some(k.as_str())).ok_or_else(|| OpError::param(field, &format!("no item `{k}`")))?;
             set(it, v.as_str().ok_or_else(|| OpError::param(field, "text values"))?.trim().to_string());
         }
         Ok(())

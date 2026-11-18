@@ -202,6 +202,7 @@ impl DrawingEditor {
                 tool("dr-balloon", "callout", "Callout", matches!(t, Tool::Balloon { .. }), || Tool::Balloon { anchor: None }),
                 tool("dr-table", "table", "Table", is_table(TableTool::General), table(TableTool::General)),
                 tool("dr-bomtable", "drawing-bom", "BOM table", is_table(TableTool::Bom), table(TableTool::Bom)),
+                // Only with release management's managed workflows on (live uidiff-1118; see the end).
                 tool("dr-revtable", "revision-table", "Revision table", is_table(TableTool::Revision), table(TableTool::Revision)),
                 tool("dr-cutlist", "drawing-cutlist-table", "Cut list table", is_table(TableTool::CutList), table(TableTool::CutList)),
                 tool("dr-holetable", "drawing-hole-table", "Hole table", is_table(TableTool::Hole), table(TableTool::Hole)),
@@ -240,6 +241,11 @@ impl DrawingEditor {
             }),
             tb("dr-inspection-hide", "inspection-hide", "Hide inspection items", self.drawing.props.hide_inspection, |e, _, cx| e.toggle_hide_inspection(cx)),
         ]);
+        if !noshape_ops::release_settings::managed_workflows() {
+            for g in &mut groups {
+                g.retain(|t| t.id != "dr-revtable");
+            }
+        }
         groups
     }
 

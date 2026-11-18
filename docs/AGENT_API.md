@@ -7039,6 +7039,7 @@ Examples:
 | `generate_part_numbers` | boolean |  | Generate part numbers for the items without one (Company settings' sequential numbering scheme). |
 | `revert` | array of string |  | Items (names or part ids) reverted to their last released revision (the State column's Revert). |
 | `parts` | array of string |  | Part Studio: only these parts (ids or names). |
+| `all_configurations` | boolean |  | Part Studio with `parts`: each part once per configuration (the part's Release all configurations…; the list inputs' options combined, at most 100). Every row is named as the part; `part_numbers` / `revisions` name one as its tooltip reads, "Part 1 / Size / Small". |
 | `instance` | string |  | Assembly: only this instance's (its Release…): its part, another document's part at its version (linked to that version), or a subassembly's contents. |
 | `name` | string |  | Release name (the version's name); required unless `from_draft` names it. |
 | `notes` | string |  | Release notes (the version's description). |

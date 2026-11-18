@@ -1991,6 +1991,8 @@ impl Render for ReleaseDialog {
             };
             let removable = self.mode != Mode::Review && !self.dependents.contains(&(row.item.tab, row.item.part.clone()));
             let picture = self.thumbs.get(&crate::release_thumbs::key(&row.item)).cloned();
+            // A configured item's name reads plainly; its configuration is in the name's tooltip (live release-gaps-1118).
+            let config_tip = noshape_ops::release::config_tooltip(&self.doc.read(cx).session, &row.item);
             let main = h_flex()
                 .h(px(46.))
                 .flex_none()
@@ -2014,7 +2016,7 @@ impl Render for ReleaseDialog {
                                 .min_w_0()
                                 .child(h_flex().gap(px(4.)).child(crate::assets::icon(icon, 16., cx)).child({
                                     // Live (release.json): a click on the name does nothing (the dialog stays).
-                                    div().id(SharedString::from(format!("rel-name-{i}"))).truncate().child(row.item.name.clone())
+                                    div().id(SharedString::from(format!("rel-name-{i}"))).truncate().child(row.item.name.clone()).when_some(config_tip, |d, t| d.tooltip(crate::ui::tooltip(t)))
                                 })
                                 // Help (add-item-version2): an item linked from another
                                 // version shows the version icon after its name.

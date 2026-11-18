@@ -5,6 +5,11 @@
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-07: the revision table's rows; live's Free account has no Revision table tool, asked whether another can record)",
   "start": "block-drawing",
+  "config_files": {
+    "release_settings.json": {
+      "managed_workflows": true
+    }
+  },
   "steps": [
     {
       "do": "click",

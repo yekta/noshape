@@ -4699,6 +4699,8 @@ impl PartStudioView {
         // its menu still has Revision history…, live2 feel/release/part-menu-after-release.png).
         let log = crate::part_studio_hooks::release_log(self.doc.read(cx));
         let part_number = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty()).or_else(|| log.part_number_released(self.tab, Some(&b.id)));
+        // A configured Part Studio (a List input): its parts' menus have Release all configurations… (live release-gaps-1118).
+        let configured = self.studio(cx).is_some_and(|s| s.configuration.inputs.iter().any(|i| matches!(i.kind, noshape_model::configuration::ConfigInputKind::List { .. })));
         let part_icon = match b.kind {
             _ if b.composite.is_some() => "composite-part",
             // Onshape's svg-icon-part-mesh (live G27).
@@ -4917,6 +4919,16 @@ impl PartStudioView {
                             let t = targets(this, &b);
                             let names: Vec<String> = t.iter().map(|id| this.display.body(id).map(|d| d.name.clone()).unwrap_or_default()).collect();
                             let items = crate::part_studio_hooks::release_part_items(this.doc.read(cx), this.tab, &t, &names, &this.config_values);
+                            crate::part_studio_hooks::open_release_candidate(this.doc.clone(), items, w, cx);
+                        }
+                    }))))
+                    // Live (release-gaps-1118): right after Release…, one part, a configured Part Studio: the same dialog with
+                    // one row per configuration.
+                    .when(noshape_ops::release_settings::managed_workflows() && !others && configured, |m| m.item(item("Release all configurations…", Box::new({
+                        let id = b.clone();
+                        let name = part_name.clone();
+                        move |this, w, cx| {
+                            let items = noshape_ops::release::all_configuration_items(&this.doc.read(cx).session, this.tab, &id, &name);
                             crate::part_studio_hooks::open_release_candidate(this.doc.clone(), items, w, cx);
                         }
                     }))));

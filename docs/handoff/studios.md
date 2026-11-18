@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 13:51 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 15:57 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -22,18 +22,23 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
 - Help popover texts (55beaa52): 45 tools in our own words, live's titles / step counts / facts (DECISIONS 11-18;
   steps inferred from live's flattened text: first sentence the intro, the rest numbered; prose-only where the
   popover height fits); the popover hides the title tooltip (vendored gpui-component `tooltip::hide_tooltip`).
-- Landed c63dab06 (section label 3.02 mm) as 350cceaa, 4e2717b5 (driver: tool:Undo / Redo) as 9e996a66.
-- Queued 1db85fba (13:5x): toolbar tooltips 450 ms (live2 ours-1118: live 0.47 s, ours 0.70 s on the kit's 500 ms)
-  and read "title / title help" as live's recorder (runner compares the title part); Edit detail… keeps the detail's
-  circle orange in its parent until another shape (drw-detail-id-profile-tips s7–s15, EDGE+ for 11-15+ recorders).
-- Local, testing (run17): Show/hide › Hide/Show auto centermarks only on a view with circles (block's Front none:
-  drw-toolbar-tips-view-showhide); runner: a clicked view's late dark frame holds until the pointer moves (s6 after a
-  1 s wait still EDGE live).
-- Full run drw1118c (vibex6, ~/agents/studios-keep/drw1118c): 333/341. Left: drw-detail-id-profile-tips s6 (live VIEW
-  Detail + EDGE Top on a right-click at the detail's centre, the plate's corner; ours picks an edge there: EDGE Detail);
-  drw-section-exclude-from-cut s4 / drw-view-properties-projected-from-section s4 (label 2.5 mm lower in live on the
-  pin-block assembly at placement: asked live2 13:5x for a plain assembly vs part section DXF); not targets:
-  inspection-table-iso-scrolled s2, revision-table-delete s8, replicate-region-place s21 (server toast).
+- Landed 1db85fba + 7f7172ce as 708cf617 14:37: toolbar tooltips 450 ms, read "title / title help"; Edit detail…
+  keeps the parent's circle lit; Show/hide auto centermarks only with circles; runner late-frame rule.
+- Landing (2eb64993 + the next commit): Select on a view's edge selects the view; Edit detail… × → "Select closed
+  profile" (tooltip, own field id), Esc closes, also from the View label field; no tool read while editing; section
+  label gap by cut (horizontal 5.81 mm, vertical 3.02; live2 sec-label-1118, residuals 0.65 / 0.5 unexplained); Edit
+  section: Section id field read, rows placed by live's clicks (input y 121, flip 153, Exclude 234), Excluded parts
+  named inside its box with one chip per row (× "Delete <part>" at the right), Esc from the Section id field closes;
+  View properties' "Apply parent view section cut" last and read; Revision table tool only with managed workflows
+  (the 8 drw-revision-* set config_files); Release all configurations… (live release-gaps-1118: part menu after
+  Release…, one row per configuration named as the part, tooltip "Part 1 / Size / Small"; op release_create
+  `all_configurations`, e2e). run19–22: drw-detail-* all match, drw-section-exclude-from-cut 22/23 before the Esc fix.
+- Next: release dialog's associated drawings as live (child row under its part with an expander, the button stays
+  pressed, a funnel filter appears; the red "Drawing has a pending update" box under the drawing row, which blocks
+  Submit / Release: ours appends drawings at the end); a full drawing run after the land.
+- Full run drw1118d (vibex6, ~/agents/studios-keep/drw1118d): 333/341. Not targets: inspection-table-iso-scrolled s2,
+  revision-table-delete s8, replicate-region-place s21 (server toast); drw-canvas-zoom-to-sheet / drw-ref-pin-reference
+  have no usable recording.
 - live2's drw-bom-table / drw-note-editor retakes match (run16).
 - uip-mine.sh on vibex6 takes exact names too (`$p.json` and `$p-*.json`).
 - FS / VS timings (live fsvs-feel-1118) re-checked: every row as live (230 / 1891 / 275 / 526 ms; the add row's

@@ -472,6 +472,15 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-detail-dlg")
+                // Edit detail…: Esc with its View label field focused closes it too, unapplied (live2
+                // drw-detail-id-profile-tips s19: the field typed in at s10).
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                    if e.keystroke.key == "escape" && this.detail_dlg.as_ref().is_some_and(|d| d.edit.is_some()) {
+                        cx.stop_propagation();
+                        this.close_detail_edit(false, cx);
+                        window.focus(&this.focus, cx);
+                    }
+                }))
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
@@ -514,7 +523,8 @@ impl DrawingEditor {
                 // Live drawing/127: 5 px under the field to the View scale row.
                 .child(
                     div()
-                        .id("dd-profile-field")
+                        // (Its own id while picking: the tooltip shown before the × isn't reused.)
+                        .id(if self.detail_dlg.as_ref().is_some_and(|d| d.pick_region) { "dd-profile-field-pick" } else { "dd-profile-field" })
                         .map(|d| crate::ui_script::mark(d, || "button:Create closed profile for detail view boundary".into()))
                         // Picking a closed profile with none picked yet (live2 drw-detail-id-profile-tips s18).
                         .tooltip(crate::ui::tooltip(if self.detail_dlg.as_ref().is_some_and(|d| d.pick_region) { "No closed profile selected." } else { "Create closed profile for detail view boundary" }))

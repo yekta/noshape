@@ -234,6 +234,27 @@ impl Configuration {
         v
     }
 
+    /// The configurations Release all configurations… lists: every list input's options combined in their order (the
+    /// first input slowest), the other inputs at their defaults; at most `max` (Onshape help: up to 100).
+    pub fn list_combinations(&self, max: usize) -> Vec<ConfigValues> {
+        let mut out = vec![self.defaults()];
+        for i in &self.inputs {
+            let ConfigInputKind::List { options, .. } = &i.kind else { continue };
+            out = out
+                .into_iter()
+                .flat_map(|v| {
+                    options.iter().map(move |o| {
+                        let mut v = v.clone();
+                        v.0.insert(i.id.clone(), o.id.clone());
+                        v
+                    })
+                })
+                .take(max)
+                .collect();
+        }
+        out
+    }
+
     /// Effective value string of an input: its chosen value or default,
     /// after the visibility conditions ([`Configuration::effective`]).
     pub fn value_of<'a>(&'a self, values: &'a ConfigValues, input: &str) -> Option<String> {

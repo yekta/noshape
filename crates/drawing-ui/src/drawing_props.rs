@@ -820,6 +820,7 @@ impl DrawingEditor {
         let parent = sheet.parent_of(props.view);
         let has_parent = parent.is_some();
         let parent_is_section = parent.and_then(|p| sheet.view(p)).is_some_and(|p| matches!(p.kind, ViewKind::Section { .. }));
+        let parent_cut_row = parent_is_section && multi.is_none() && matches!(v.kind, ViewKind::Projected { .. });
         let has_children = sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(props.view));
         let ink = gpui_kit::rgb(0x333333);
         let field_ink = gpui_kit::rgb(0x555555);
@@ -1041,9 +1042,6 @@ impl DrawingEditor {
         if multi.is_none() && matches!(v.kind, ViewKind::Projected { .. }) {
             rows.push(check("vp-sync-breaks", "Synchronize breaks from parent", props.sync_breaks, |p, on| p.sync_breaks = on, cx));
         }
-        if parent_is_section && multi.is_none() && matches!(v.kind, ViewKind::Projected { .. }) {
-            rows.push(check("vp-parent-cut", "Apply parent view section cut", props.parent_cut, |p, on| p.parent_cut = on, cx));
-        }
         // Rotation angle (0–360) with the reverse-direction button: editable
         // only without parent and children, or with the parent alignment
         // suppressed (help H:views).
@@ -1234,6 +1232,9 @@ impl DrawingEditor {
                 if !is_asm {
                     t.text("Cut list table reference").options([cut.clone()]);
                 }
+                if parent_cut_row {
+                    t.text("Apply parent view section cut");
+                }
                 crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "View properties" }), t.0)
             });
         }
@@ -1261,6 +1262,10 @@ impl DrawingEditor {
         rows.push(row("BOM table reference", select("vp-bom", bom, bom_items, bom_on && multi.is_none())));
         if !is_asm {
             rows.push(row("Cut list table reference", select("vp-cut", cut, cut_items, cut_on && multi.is_none())));
+        }
+        // A projected view of a section view: last (live2 drw-view-properties-projected-from-section s14).
+        if parent_cut_row {
+            rows.push(check("vp-parent-cut", "Apply parent view section cut", props.parent_cut, |p, on| p.parent_cut = on, cx));
         }
         Some(
             v_flex()

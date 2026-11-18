@@ -7722,6 +7722,27 @@ fn company_release_settings_and_numbering_schemes() {
 /// The Release candidate dialog's drafts and row actions through the API (Onshape help "Typical Release Workflow"):
 /// Save draft keeps a candidate without its checks, Release drafts lists it, Review Release releases it (and the draft
 /// goes), the State column's Revert keeps the released revision, Delete draft.
+/// Live release-gaps-1118: a configured part's Release all configurations…: one row per configuration in the list's
+/// order, every one named as the part, each its own object with its own revision and part number; a row is named by its
+/// tooltip ("Part 1 / Size / Large").
+#[test]
+fn release_all_configurations_of_a_part() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } }));
+    block_with_hole(&mut ctx, "release-configs.noshape");
+    call(&mut ctx, "config_add_input", json!({ "kind": "list", "name": "Size" }));
+    call(&mut ctx, "config_add_option", json!({ "input": "Size", "name": "Large" }));
+    let e = try_call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1", "all_configurations": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("all_configurations"), "{e:?}");
+    let e = try_call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1", "notes": "e2e", "parts": ["Part 1"], "all_configurations": true })).unwrap_err();
+    assert!(e.message.contains("attention"), "two rows without a part number: {e:?}");
+    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "R1", "notes": "e2e", "parts": ["Part 1"], "all_configurations": true, "part_numbers": { "Part 1 / Size / Default": "P-S", "Part 1 / Size / Large": "P-L" } }));
+    let items = r["items"].as_array().cloned().unwrap_or_default();
+    assert_eq!(items.len(), 2, "{r}");
+    assert!(items.iter().all(|i| i["name"] == "Part 1" && i["revision"] == "A"), "{r}");
+    assert_eq!(items.iter().map(|i| i["part_number"].as_str().unwrap_or_default()).collect::<Vec<_>>(), ["P-S", "P-L"], "{r}");
+}
+
 #[test]
 fn release_drafts_revert_and_generate() {
     let mut ctx = Ctx::new();

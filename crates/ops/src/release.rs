@@ -86,6 +86,45 @@ pub fn part_items(session: &Session, tab: TabId, parts: &[BodyId], names: &[Stri
         .collect()
 }
 
+/// Release all configurations… on a part: one item per configuration of its Part Studio (the list inputs' options
+/// combined in order, at most 100), each named as the part and its own object (live release-gaps-1118: every row
+/// "Part 1 / Part", the configuration only in its tooltip, [`config_tooltip`]).
+pub fn all_configuration_items(session: &Session, tab: TabId, part: &BodyId, name: &str) -> Vec<ReleaseItem> {
+    let Some(TabContent::PartStudio(ps)) = session.doc.tab(tab).map(|t| &t.content) else { return Vec::new() };
+    let mut out: Vec<ReleaseItem> = Vec::new();
+    for combo in ps.configuration.list_combinations(100) {
+        // (Inputs excluded from properties are released at their defaults: such combinations are one object.)
+        let config = ps.configuration.for_properties(&combo);
+        if out.iter().any(|i| i.config == config) {
+            continue;
+        }
+        let Some(mut it) = part_items(session, tab, std::slice::from_ref(part), &[name.to_string()], &config).pop() else { continue };
+        it.name = name.to_string();
+        it.config = config;
+        out.push(it);
+    }
+    out
+}
+
+/// A configured item's row tooltip: its name, then each input and its value ("Part 1 / Size / Small", live
+/// release-gaps-1118).
+pub fn config_tooltip(session: &Session, it: &ReleaseItem) -> Option<String> {
+    if it.config.is_empty() {
+        return None;
+    }
+    let Some(TabContent::PartStudio(ps)) = session.doc.tab(it.tab).map(|t| &t.content) else { return None };
+    let mut out = it.name.clone();
+    for input in &ps.configuration.inputs {
+        let Some(v) = it.config.0.get(&input.id) else { continue };
+        let shown = match &input.kind {
+            noshape_model::configuration::ConfigInputKind::List { options, .. } => options.iter().find(|o| &o.id == v).map_or_else(|| v.clone(), |o| o.name.clone()),
+            _ => v.clone(),
+        };
+        out.push_str(&format!(" / {} / {shown}", input.name));
+    }
+    Some(out)
+}
+
 /// The release item of another document's part at a version (an assembly instance's Release…, live 2464 / help
 /// "Allow adding items from other documents"): its name, number and properties there, the next revision of this
 /// document's releases, linked to that version.

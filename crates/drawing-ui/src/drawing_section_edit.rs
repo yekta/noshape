@@ -278,6 +278,7 @@ impl DrawingEditor {
         let (exclude_on, exclude_picking) = (e.exclude_on, e.exclude_picking);
         let excluded: Vec<(usize, String)> = e.exclude.iter().enumerate().map(|(i, b)| (i, self.part_name_in(e.parent, b))).collect();
         let label = e.label.0.clone();
+        let label_text = e.label_text.clone();
         let (cut_only, flip, up_to, picking, has_ref, offset_flip) = (e.cut_only, e.flip, e.up_to, e.picking, e.depth_ref.is_some(), e.offset_flip);
         let depth = e.depth.as_ref().map(|(st, _)| st.clone());
         let offset = e.offset.as_ref().map(|(st, _)| st.clone());
@@ -286,7 +287,8 @@ impl DrawingEditor {
             // a select, its options left out by live's recorder since 2026-11-17.3.
             let mut t = crate::drawing_panels::PanelText::default();
             t.text("Section view");
-            let mut fields = Vec::new();
+            // Its Section id input, unlabelled (live2 drw-section-exclude-from-cut s7, recorder 2026-11-17.7).
+            let mut fields = vec![serde_json::json!({ "label": "", "kind": "text", "value": label_text, "placeholder": "Section id" })];
             if depth.is_none() {
                 t.text("Show cut geometry only");
                 fields.push(serde_json::json!({ "label": "Show cut geometry only", "kind": "checkbox", "value": cut_only }));
@@ -323,6 +325,15 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-section-edit")
+                // Esc with its Section id field focused closes it too, unapplied (live2 drw-section-exclude-from-cut s22: the
+                // field typed in at s17).
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                    if e.keystroke.key == "escape" {
+                        cx.stop_propagation();
+                        this.close_section_edit(false, cx);
+                        window.focus(&this.focus, cx);
+                    }
+                }))
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
@@ -341,13 +352,15 @@ impl DrawingEditor {
                         .child(div().id("se-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::drawing_chrome::ok_check(16.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(true, cx))))
                         .child(div().id("se-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(false, cx)))),
                 )
-                .child(div().px(px(10.)).pt(px(4.)).child(Input::new(&label).xsmall()))
+                // Rows placed as live's (drw-section-exclude-from-cut / -edit-depth-direction clicks: the input at y 121, the flip
+                // row 153, Exclude from cut 234).
+                .child(div().px(px(10.)).pt(px(8.)).child(Input::new(&label).xsmall()))
                 // The tool button (live 499–504, as in the creating dialog): the cutting line's points are being picked,
                 // so it shows active; Opposite direction at the row's right end (live2 drw-section-edit-depth-direction).
                 .child(
                     h_flex()
                         .px(px(10.))
-                        .pt(px(6.))
+                        .pt(px(8.))
                         .child(
                             div()
                                 .id("se-line")
@@ -372,13 +385,13 @@ impl DrawingEditor {
                             cx.notify();
                         }))),
                 )
-                .when(depth.is_none(), |d| d.child(div().px(px(10.)).pt(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("se-cut-only").label("Show cut geometry only").checked(cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
+                .when(depth.is_none(), |d| d.child(div().px(px(10.)).pt(px(12.)).child(crate::drawing_chrome::DrCheckbox::new("se-cut-only").label("Show cut geometry only").checked(cut_only).on_click(cx.listener(|this, v: &bool, _, cx| {
                     if let Some(e) = &mut this.section_edit {
                         e.cut_only = *v;
                     }
                     this.preview_section_edit(cx);
                 })))))
-                .child(div().px(px(10.)).pt(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("se-depth").label("Section depth").checked(depth.is_some()).on_click(cx.listener(|this, _: &bool, w, cx| this.toggle_edit_depth(None, w, cx)))))
+                .child(div().px(px(10.)).pt(px(if depth.is_none() { 4. } else { 12. })).child(crate::drawing_chrome::DrCheckbox::new("se-depth").label("Section depth").checked(depth.is_some()).on_click(cx.listener(|this, _: &bool, w, cx| this.toggle_edit_depth(None, w, cx)))))
                 .when(depth.is_some(), |d| {
                     d.child(
                         div().px(px(8.)).pt(px(4.)).child(
@@ -472,15 +485,18 @@ impl DrawingEditor {
                         .iter()
                         .map(|(i, name)| {
                             let i = *i;
+                            // One per row, its × at the right (live2 drw-section-exclude-from-cut s16: "Delete Part 2" at x 220).
                             h_flex()
+                                .w_full()
                                 .px(px(4.))
                                 .gap(px(4.))
                                 .bg(gpui_kit::rgb(0xe6e6e6))
                                 .text_size(px(12.))
-                                .child(name.clone())
+                                .child(div().flex_1().child(name.clone()))
                                 .child(
                                     div()
                                         .id(("se-exclude-x", i))
+                                        .px(px(2.))
                                         .cursor_pointer()
                                         .tooltip(crate::ui::tooltip(&format!("Delete {name}")))
                                         .child("×")
@@ -497,21 +513,24 @@ impl DrawingEditor {
                                 .into_any_element()
                         })
                         .collect();
-                    p.child(div().px(px(10.)).pt(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("Excluded parts")).child(
+                    // The field's name inside it, before its chips (live2 drw-section-exclude-from-cut s12: hovered at y 262).
+                    p.child(
                         div()
                             .id("se-exclude")
                             .mx(px(10.))
-                            .my(px(3.))
+                            .mt(px(4.))
+                            .mb(px(3.))
                             .min_h(px(26.))
                             .p(px(3.))
                             .flex()
-                            .flex_wrap()
-                            .gap(px(4.))
+                            .flex_col()
+                            .gap(px(3.))
                             .border_1()
                             .border_color(if exclude_picking { pal.accent } else { gpui_kit::rgb(0xd3d7d9) })
                             .when(exclude_picking, |d| d.bg(gpui_kit::rgb(0xe8f1fb)))
                             .cursor_pointer()
                             .tooltip(crate::ui::tooltip("Select parts to exclude from cut"))
+                            .child(div().text_size(px(12.)).text_color(pal.text_muted).child("Excluded parts"))
                             .children(chips)
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 if let Some(e) = &mut this.section_edit {
