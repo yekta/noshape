@@ -3095,7 +3095,7 @@ impl PartStudioView {
         });
     }
 
-    fn set_config_value(&mut self, input: &str, value: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn set_config_value(&mut self, input: &str, value: String, window: &mut Window, cx: &mut Context<Self>) {
         self.config_values.0.insert(input.to_string(), value);
         crate::part_studio_hooks::note_viewed_config(self.tab, &self.config_values);
         self.schedule_regen(window, cx);

@@ -5285,6 +5285,39 @@ fn enter_in_a_configured_value_moves_down_a_row(cx: &mut TestAppContext) {
     assert_eq!(framed, Some(format!("cp-0-{}", rows[1])), "the cell below framed");
 }
 
+/// Live2 cfg-1118: a second configuration named like the first is accepted (option id "A0", name "A"); a value it can't
+/// take ("abc") is kept with nothing failing while another configuration is active, and fails its feature once it is
+/// switched to.
+#[gpui::test]
+fn a_duplicate_configuration_name_and_a_bad_value_wait_for_their_row(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-dup-bad", &[("width", "30 mm")]);
+    let (input, second) = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let id = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.type_id == "assignVariable")).map(|f| f.id).expect("the variable");
+            let (mut input, mut second) = (String::new(), None);
+            v.edit_config("Configure", cx, |ps| {
+                input = noshape_ops::config::add_input(ps, "List");
+                noshape_ops::config::add_option(ps, &input, "A".into());
+                second = noshape_ops::config::add_option(ps, &input, "A".into());
+                noshape_ops::config::configure_parameter(ps, id, "lengthValue", &input);
+            });
+            (input, second.expect("a second A"))
+        })
+    });
+    assert_eq!(second, "A0", "the duplicate's option id");
+    cx.update(|cx| view.update(cx, |v, cx| v.edit_config("Configure", cx, |ps| noshape_ops::config::set_configured_text(ps, 0, &second, "abc".into()))));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let status = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        let id = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.type_id == "assignVariable")).map(|f| f.id).unwrap();
+        v.display.feature_state(id).map(|s| s.status)
+    });
+    assert_ne!(status(cx), Some(noshape_model::display::FeatureStatus::Error), "abc kept for A0, Default active: nothing fails");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.set_config_value(&input, second.clone(), w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.feature_state(view.read(cx).studio(cx).and_then(|s| s.features.iter().find(|f| f.type_id == "assignVariable")).map(|f| f.id).unwrap()).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Error));
+    assert_eq!(status(cx), Some(noshape_model::display::FeatureStatus::Error), "switched to A0: the variable fails");
+}
+
 /// A new Remove extrude of a circle on Top over a block below Top (psui's start hole-sketch): Remove turns the arrow
 /// into the block (std canSetBooleanFlip), also when the next pick comes before the logic's run for Remove is back,
 /// and the hole goes through. `settle`: wait for the dialog between the picks.

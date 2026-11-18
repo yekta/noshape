@@ -429,6 +429,12 @@ Mass properties (`mass_stays_open_and_bracket_opens_an_empty_measure`): its butt
 Working spinner (live2 11-18, live's JS and CSS): 900 ms after the request (was 1.1 s), a 50 × 50 box white at 75 %,
 radius 10, 40 px above the bottom, the 30 px ring rgb(215,215,215) with its blue quarter turning in 1.1 s (was 0.9 s).
 
+Configurations (live2 cfg-1118): a second row named like another is accepted, stored as "A0" (ours "A_2": fixed,
+`fs_option_identifier`); a value a row can't take waits until that row is active, then its feature fails
+(`a_duplicate_configuration_name_and_a_bad_value_wait_for_their_row`). Already as live: the 712 px docked panel, the
+feature list's Configuration box, the row menu (Switch to / Set as default / Duplicate row / Move up / Move down /
+Delete row), a row click doesn't switch, switching greys no rows.
+
 ## Navigation (matrix)
 
 live2's navigation.json (Linux Chrome, the account's default mouse mapping): wheel, right / middle / Ctrl+right /

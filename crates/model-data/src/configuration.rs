@@ -156,6 +156,16 @@ pub fn fs_identifier(name: &str, taken: &[String]) -> String {
     id
 }
 
+/// A List row's id from its name: [`fs_identifier`], then a counter from 0 when it is taken (live2 cfg-1118: a second
+/// row named "A" is stored as option "A0").
+pub fn fs_option_identifier(name: &str, taken: &[String]) -> String {
+    let base = fs_identifier(name, &[]);
+    if !taken.contains(&base) {
+        return base;
+    }
+    (0..).map(|n| format!("{base}{n}")).find(|id| !taken.contains(id)).unwrap_or(base)
+}
+
 /// One configured feature parameter: its value for each list option or
 /// checkbox state ("true"/"false").
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

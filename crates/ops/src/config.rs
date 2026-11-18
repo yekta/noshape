@@ -131,7 +131,7 @@ pub const ADD_OPTION: &str = "Add configuration";
 pub fn add_option(ps: &mut PartStudio, input: &str, name: String) -> Option<String> {
     if let Some(ConfigInput { kind: ConfigInputKind::List { options, .. }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == input) {
         let taken: Vec<String> = options.iter().map(|o| o.id.clone()).collect();
-        let id = fs_identifier(&name, &taken);
+        let id = noshape_model::configuration::fs_option_identifier(&name, &taken);
         options.push(ListOption { id: id.clone(), name });
         return Some(id);
     }
@@ -184,7 +184,7 @@ pub fn duplicate_option(ps: &mut PartStudio, input: &str, option: &str) -> Optio
     let at = options.iter().position(|o| o.id == option)?;
     let name = format!("Copy of {}", options[at].name);
     let taken: Vec<String> = options.iter().map(|o| o.id.clone()).collect();
-    let id = fs_identifier(&name, &taken);
+    let id = noshape_model::configuration::fs_option_identifier(&name, &taken);
     options.insert(at + 1, ListOption { id: id.clone(), name });
     for c in ps.configuration.configured.iter_mut().filter(|c| c.input == input) {
         if let Some(v) = c.values.get(option).cloned() {
