@@ -8877,9 +8877,13 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     // (Several made by it: the one its part id's order names, else the one not taken nearest live's
                     // volume: asm-suspension's Body from an Extrude of two regions; asm-pattern-std's AR-S1 / AR-S2 of
                     // one Extrude, alike in volume, by their ids.)
+                    // (Never a sliver of ours for a part of live's volume: asm-tvc-mount's Inner Ring, 11789 mm³, went to a
+                    // 0.014 mm³ "Part 3" its first feature left in ours while our ring came from a later one.)
+                    let floor = volume_band(p).map_or(0.0, |(lo, _)| lo * 0.01);
+                    let by_creator = || by_creator().filter(|id| solids.iter().any(|s| &s.2 == id && s.1 >= floor));
                     let by_maker = maker.and_then(|f| t.feature_ids.get(f)).and_then(|ours| {
                         let head = format!("body:{ours}.");
-                        let made: Vec<_> = solids.iter().filter(|s| s.2.starts_with(&head)).collect();
+                        let made: Vec<_> = solids.iter().filter(|s| s.2.starts_with(&head) && s.1 >= floor).collect();
                         if let [one] = made.as_slice() {
                             return Some(one.2.clone());
                         }
@@ -8890,7 +8894,12 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                         let mid = volume_band(p).map(|(lo, hi)| (lo + hi) * 0.5).or_else(|| p["volume"].as_f64())?;
                         made.into_iter().filter(|s| !taken.contains(&s.2)).min_by(|a, b| (a.1 - mid).abs().total_cmp(&(b.1 - mid).abs())).map(|s| s.2.clone())
                     });
-                    match by_maker.or_else(|| by_centroid(p, &taken)) {
+                    // (Then the nearest in volume within 10 %, not taken, not another's fit: the Inner Ring, ours 4 % short.)
+                    let by_volume = || {
+                        let mid = volume_band(p).map(|(lo, hi)| (lo + hi) * 0.5)?;
+                        solids.iter().filter(|s| !taken.contains(&s.2) && !fitting.contains(&s.2) && (s.1 - mid).abs() < mid * 0.1).min_by(|a, b| (a.1 - mid).abs().total_cmp(&(b.1 - mid).abs())).map(|s| s.2.clone())
+                    };
+                    match by_maker.or_else(|| by_centroid(p, &taken)).or_else(by_volume) {
                         Some(n) => n,
                         None => match by_creator() {
                             Some(n) if fitting.contains(&n) => solids.iter().map(|s| &s.2).find(|n| !taken.contains(n) && !fitting.contains(n)).cloned().unwrap_or(n),

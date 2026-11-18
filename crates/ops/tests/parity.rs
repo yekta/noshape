@@ -4031,6 +4031,41 @@ fn parts_of_one_extrude_are_ours_by_live_lines_volume() {
     assert_eq!((r.bom_matching, r.bom_rows), (2, 2), "{r:?}");
 }
 
+/// A live part whose first feature leaves only a sliver in ours, our part of it coming from a later feature and off
+/// live's volume band (asm-tvc-mount's Inner Ring, 11789 mm³ in live, ours 4 % short; the first feature's 0.014 mm³
+/// "Part 3" took it and three mates lost their ends): ours is the part nearest live's volume, never the sliver.
+#[test]
+fn a_live_part_is_never_ours_by_a_sliver() {
+    let circle = |id: &str, x: f64, r: f64| json!({ "btType": "BTMSketchCurve-4", "entityId": id, "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": r, "xCenter": x, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } });
+    let sketch = |f: &str, name: &str, c: Value| json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": f, "name": name,
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+        "entities": [c], "constraints": [] });
+    let extrude = |f: &str, name: &str, of: &str, depth: &str| json!({ "btType": "BTMFeature-134", "featureType": "extrude", "featureId": f, "name": name, "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": of, "entityType": "FACE" }] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+        { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": depth }] });
+    // Ours: a 0.0008 mm³ sliver from Extrude 1, the 2262 mm³ ring from Extrude 2; live's ring 4 % more.
+    let ring = std::f64::consts::PI * 0.006 * 0.006 * 0.02 * 1.04;
+    let parts = json!([{ "partId": "JHD", "name": "Ring", "volume": [ring * 0.9995, ring * 1.0005] }]);
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        sketch("FS1", "Sketch 1", circle("c1", 0.05, 0.0005)), extrude("FE1", "Extrude 1", "FS1", "0.001 mm"),
+        sketch("FS2", "Sketch 2", circle("c2", 0.0, 0.006)), extrude("FE2", "Extrude 2", "FS2", "20 mm"),
+    ], "live": [{ "index": 1, "name": "Extrude 1", "featureId": "FE1", "status": "OK", "parts": [{ "partId": "JHD", "name": "Ring" }] }] });
+    let at = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    let asm = json!({
+        "rootAssembly": { "instances": [{ "id": "IA", "name": "Ring <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }], "occurrences": [{ "path": ["IA"], "fixed": true, "transform": at }] },
+        "features": { "features": [], "featureStates": {} } });
+    let mut ctx = Ctx::new();
+    rebuild_assembly(&mut ctx, &scratch("never-a-sliver.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    let run = |ctx: &mut Ctx, tool: &str, args: Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap().value;
+    let list = run(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    let source = list["instances"].as_array().unwrap().iter().find(|i| i["name"] == "Ring <1>").unwrap_or_else(|| panic!("no Ring <1>: {list}"))["source"].clone();
+    let q = run(&mut ctx, "query_parts", json!({ "tab": source["part_studio"] }));
+    let volume = q["parts"].as_array().unwrap().iter().find(|p| p["id"] == source["part"]).and_then(|p| p["volume"].as_f64()).unwrap_or_else(|| panic!("{source} in {q}"));
+    assert!(volume > 2000.0, "the ring, not the sliver: {volume} mm³ ({source})");
+}
+
 /// A subassembly rebuilt from live's definition: "Sub" holds the cylinder (fixed inside it); the root has a fixed
 /// cylinder and Sub's instance, turned 30° and stacked on it by a Revolute from the root cylinder's top edge to the
 /// nested cylinder's bottom edge (its connector's path through Sub). Every occurrence, the nested one too, placed as
