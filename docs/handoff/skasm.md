@@ -24,7 +24,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   cache no longer keyed on editing; its points ON_TOP as well. Model test a_sketch_not_edited_carries_its_constraint_states.
 
 - live2 sktools-1118 / sk-feel2-1118: Trim reach 6.5 px (`in_sketch_reach`) and tan #D6BD95 (`TRIM_PIECE`); glyph hover
-  margin 4 px (`GLYPH_MARGIN`, lit to 14 px; live's 16 px slide hold not done); fillet drag and the Offset drag across
+  margin 4 px (`GLYPH_MARGIN`, lit to 14 px), 6 px once lit (live's 16 px slide hold); fillet drag and the Offset drag across
   the curve already live's; a new dimension's label has no snap (test). Rows filled in interaction-feel.
 
 ## config-parts (07:40 run, ut-0800.log): links 35/35, linear-rail 26/26, pulleys 22/22, sprockets 24/24, standoffs
@@ -105,6 +105,10 @@ qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, asm d8d597e0-675c-497b-a804-544ceab99bb
   Booleans, surface-pattern sphere cuts (bool); setback fillet (blend); hex-bookcase mesh Uses (dx).
 
 ## Open questions (none blocking)
+- Sheet metal model arrow (live2 sm-feel2-1118: Thicken plate, white arrow at the plate's middle): std puts it on the first
+  face of qCreatedBy(id, BODY); ours hides the definition so that is the solid, whose first face (OCCT fuse order) is a
+  side face. A fix orders the built solid's faces (offset faces first, as Parasolid's) or lets qCreatedBy see the
+  definition sheet: either touches std's other nth-element queries; needs a suite run.
 - hat15b Sketch 1 (inserted in the doc's last microversion 1229, 11-17 ~17:30): its used point 19 (Vertex ref) was
   stored at (33.679, 45.182) mm but resolves to the vertex at x 34.75 in 0.4.43…main; nothing of the model lies at the
   stored x in any build. Not upstream geometry (not core's). Not reproduced: today's snap there stores 34.749999642 (the
