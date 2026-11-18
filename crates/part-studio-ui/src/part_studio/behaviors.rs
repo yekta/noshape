@@ -486,6 +486,10 @@ pub struct UiState {
     pub list_collapsed: bool,
     /// Mass properties panel on its Face tab.
     pub mass_faces: bool,
+    /// Mass properties values clicked to the unit's highest precision (live: a second click turns it back).
+    pub mass_precise: std::collections::HashSet<&'static str>,
+    /// The Measure, Analysis tools and Mass properties buttons' keyboard focus, Tab's stops from the graphics.
+    pub eval_stops: Vec<FocusHandle>,
     /// Mass properties: "Mate connector for reference frame" is the active
     /// field (a mate connector picked in the list or graphics fills it), and
     /// the connector it holds.
@@ -926,6 +930,8 @@ impl UiState {
             show_part_props: crate::part_studio_hooks::parts_list_properties(),
             list_collapsed: false,
             mass_faces: false,
+            mass_precise: Default::default(),
+            eval_stops: Vec::new(),
             com: None,
             com_task: None,
             mass_ref_active: false,

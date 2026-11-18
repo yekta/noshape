@@ -1319,14 +1319,20 @@ impl PartStudioView {
         let thickness_on = self.ui.thickness.is_some();
         let curvature_on = matches!(self.ui.analysis, Some(super::analysis::Analysis::Curvature));
         let analysis_on = self.ui.analysis.is_some() || self.ui.analysis_tool.is_some() || self.ui.zebra.is_some() || self.ui.reflection.is_some() || self.ui.thickness.is_some();
+        // Live (keys-1118): Tab from the graphics walks the three buttons (the flat view's copies aren't stops).
+        let stops = if mass { self.eval_stops(cx) } else { Vec::new() };
+        let stop = |d: Stateful<Div>, i: usize| match stops.get(i) {
+            Some(h) => focus_ring(d.key_context("EvalButton").track_focus(h)),
+            None => d,
+        };
         let mut out = vec![
-            div()
-                .id(id("measure-tip"))
-                .child(btn(id("measure"), "measure", measure_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+            stop(div().id(id("measure-tip")), 0)
+                .child(btn(id("measure"), "measure", measure_on, cx))
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.ui.measure_pinned = !this.ui.measure_pinned;
                     this.set_show_mass(false, cx);
                     cx.notify();
-                })))
+                }))
                 .tip("Show measure details ([)", TipSide::Above)
                 .into_any_element(),
             // Onshape's "Show analysis tools" menu (Help: Analysis tools), in its order.
@@ -1336,7 +1342,7 @@ impl PartStudioView {
             // for", in this menu; the free account's capture has 10 items).
             div()
                 .id(id("analysis-tip"))
-                .child(btn(id("analysis"), "analysis-tools", analysis_on, cx).os_dropup_menu(id("analysis-menu"), move |m, _, _| {
+                .child(stop(btn(id("analysis"), "analysis-tools", analysis_on, cx).os_dropup_menu(id("analysis-menu"), move |m, _, _| {
                     use super::analysis_tools::ToolKind as K;
                     let tool = |label: &'static str, kind: K| {
                         let v = view.clone();
@@ -1363,20 +1369,49 @@ impl PartStudioView {
                         m.item(crate::os_menu::OsMenuItem::new("Thickness analysis…").on_click(move |_, w, cx| v9.update(cx, |this, cx| this.toggle_analysis_tool(K::Thickness, w, cx))))
                     };
                     m.item(tool("Flatten surfaces…", K::Flatten))
-                }))
+                }), 1))
                 .tip("Show analysis tools", TipSide::Above)
                 .into_any_element(),
         ];
         if mass {
             out.push(
-                div()
-                    .id(id("mass-tip"))
-                    .child(btn(id("mass"), "mass-properties", mass_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_mass(cx))))
+                stop(div().id(id("mass-tip")), 2)
+                    .child(btn(id("mass"), "mass-properties", mass_on, cx))
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_mass(cx)))
                     .tip("Display mass and section properties", TipSide::Above)
                     .into_any_element(),
             );
         }
         out
+    }
+
+    /// The bottom-right buttons' focus handles, in Tab order.
+    pub(super) fn eval_stops(&mut self, cx: &mut Context<Self>) -> Vec<FocusHandle> {
+        if self.ui.eval_stops.is_empty() {
+            self.ui.eval_stops = (0..3).map(|_| cx.focus_handle()).collect();
+        }
+        self.ui.eval_stops.clone()
+    }
+
+    /// Tab (`forward`) or Shift+Tab from the graphics or a bottom-right button (live keys-1118): graphics → Measure →
+    /// Analysis tools → Mass properties → out to the top bar; Shift+Tab walks back to the graphics. False elsewhere.
+    pub(super) fn eval_tab(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let stops = self.eval_stops(cx);
+        let at = stops.iter().position(|h| h.is_focused(window));
+        match (at, forward) {
+            (None, true) if self.focus.is_focused(window) => window.focus(&stops[0], cx),
+            (Some(i), true) if i + 1 < stops.len() => window.focus(&stops[i + 1], cx),
+            (Some(_), true) => {
+                // The workspace takes it to the top bar; alone (a test window) the focus leaves.
+                window.dispatch_action(Box::new(crate::actions::FocusNavbar), cx);
+                window.blur(cx);
+            }
+            (Some(0), false) => window.focus(&self.focus, cx),
+            (Some(i), false) => window.focus(&stops[i - 1], cx),
+            _ => return false,
+        }
+        cx.notify();
+        true
     }
 
     /// The pointer came onto (`on`) or left a measurement's value or row.
@@ -1496,7 +1531,19 @@ impl PartStudioView {
                 // 20/10/5 from a connector on its corner at 40/20/10 reads
                 // -20/-10/-5).
                 let c = frame.map_or(mp.center_of_mass, |f| in_frame(mp.center_of_mass, f));
-                let l = |x: f64| self.fmt(Quantity::new(x, Dim::LENGTH), cx);
+                // A value clicked to high precision (live `supportsClickToChangePrecisionForReadonly`): the account's
+                // highest for its unit (mm 5, cm 6, m 8, in 6, ft / yd 7; areas, volumes and kg 8, g 5).
+                let doc_units = self.doc.read(cx).session.doc.settings.units;
+                let precise = |k: &str| self.ui.mass_precise.contains(k);
+                let fine = |q: Quantity, k: &str| {
+                    if !precise(k) {
+                        return self.fmt(q, cx);
+                    }
+                    let mut p = doc_units;
+                    p.length_precision = if q.dim == Dim::LENGTH { max_precision(doc_units.length) } else { 8 };
+                    noshape_units::format_quantity(q, &p)
+                };
+                let l = |x: f64, k: &str| fine(Quantity::new(x, Dim::LENGTH), k);
                 // Onshape lists the moments of inertia about the center of mass
                 // (needs a material, like the mass).
                 let units = self.doc.read(cx).session.doc.settings.units;
@@ -1528,7 +1575,8 @@ impl PartStudioView {
                 // Live: in the document's mass unit (Workspace units › Mass).
                 let (msym, mfac) = crate::properties_dialog::mass_unit(&units);
                 let scale_of = [i.x_axis.x, i.y_axis.y, i.z_axis.z].into_iter().fold(0.0f64, |a, x| a.max(x.abs())) * mfac / f;
-                let v = |x: f64| mass_number(x * mfac / f, scale_of);
+                let mass_max = if msym == "g" { 5 } else { 8 };
+                let v = |x: f64, k: &str| if precise(k) { noshape_units::format_value(x * mfac / f, 8) } else { mass_number(x * mfac / f, scale_of) };
                 // Show calculation variance (live skasm G31): "28919.247 mm³ ±
                 // 9.422e-1 mm³" after each value, the inertia cells without a
                 // unit; an overridden value has none.
@@ -1545,21 +1593,27 @@ impl PartStudioView {
                 let var_i = var.as_ref().map(|b| b.inertia * scale);
                 let len_f = units.si_factor(Dim::LENGTH);
                 let overridden = edit.unwrap_or(stored).is_some();
-                let cell = |x: f64, b: Option<f64>| match b {
-                    Some(b) => format!("{} {}", v(x), crate::quantity_field::plus_minus(b * mfac / f)),
-                    None => v(x),
+                let cell = |x: f64, b: Option<f64>, k: &str| match b {
+                    Some(b) => format!("{} {}", v(x, k), crate::quantity_field::plus_minus(b * mfac / f)),
+                    None => v(x, k),
                 };
                 let ib = |r: usize, c: usize| var_i.map(|m| m.col(c)[r]);
                 mass_view = Some(MassView {
                     override_part: single.map(|b| (b, edit.unwrap_or(stored).is_some(), shown.unwrap_or(0.0))),
                     changed: edit.is_some_and(|e| e != stored && e.is_none_or(|v| v > 0.0)),
-                    volume: with_pm(self.fmt(Quantity::new(mp.volume, len3), cx), var.as_ref().map(|b| b.volume / units.si_factor(len3))),
-                    area: with_pm(self.fmt(Quantity::new(mp.surface_area, len2), cx), var.as_ref().map(|b| b.surface_area / units.si_factor(len2))),
-                    mass: shown.filter(|_| has_mass).map(|m| with_pm(format!("{} {msym}", mass_number(m * mfac, m * mfac)), var.as_ref().and_then(|b| b.mass).filter(|_| !overridden).map(|b| b * mfac))),
+                    volume: with_pm(fine(Quantity::new(mp.volume, len3), "volume"), var.as_ref().map(|b| b.volume / units.si_factor(len3))),
+                    area: with_pm(fine(Quantity::new(mp.surface_area, len2), "area"), var.as_ref().map(|b| b.surface_area / units.si_factor(len2))),
+                    mass: shown.filter(|_| has_mass).map(|m| {
+                        let text = if precise("mass") { noshape_units::format_value(m * mfac, mass_max) } else { mass_number(m * mfac, m * mfac) };
+                        with_pm(format!("{text} {msym}"), var.as_ref().and_then(|b| b.mass).filter(|_| !overridden).map(|b| b * mfac))
+                    }),
                     // Without a material Onshape leaves the center of mass empty.
-                    center: if has_mass { [with_pm(l(c.x), var_c.map(|b| b.x / len_f)), with_pm(l(c.y), var_c.map(|b| b.y / len_f)), with_pm(l(c.z), var_c.map(|b| b.z / len_f))] } else { Default::default() },
+                    center: if has_mass { [with_pm(l(c.x, "cx"), var_c.map(|b| b.x / len_f)), with_pm(l(c.y, "cy"), var_c.map(|b| b.y / len_f)), with_pm(l(c.z, "cz"), var_c.map(|b| b.z / len_f))] } else { Default::default() },
                     inertia_unit: format!("{msym} {sym}²"),
-                    inertia: has_mass.then(|| [[cell(i.x_axis.x, ib(0, 0)), cell(i.y_axis.x, ib(0, 1)), cell(i.z_axis.x, ib(0, 2))], [cell(i.x_axis.y, ib(1, 0)), cell(i.y_axis.y, ib(1, 1)), cell(i.z_axis.y, ib(1, 2))], [cell(i.x_axis.z, ib(2, 0)), cell(i.y_axis.z, ib(2, 1)), cell(i.z_axis.z, ib(2, 2))]]),
+                    inertia: has_mass.then(|| {
+                        let n = MOMENT_NAMES;
+                        [[cell(i.x_axis.x, ib(0, 0), n[0][0]), cell(i.y_axis.x, ib(0, 1), n[0][1]), cell(i.z_axis.x, ib(0, 2), n[0][2])], [cell(i.x_axis.y, ib(1, 0), n[1][0]), cell(i.y_axis.y, ib(1, 1), n[1][1]), cell(i.z_axis.y, ib(1, 2), n[1][2])], [cell(i.x_axis.z, ib(2, 0), n[2][0]), cell(i.y_axis.z, ib(2, 1), n[2][1]), cell(i.z_axis.z, ib(2, 2), n[2][2])]]
+                    }),
                     parts: if bodies.is_empty() { Vec::new() } else { bodies.iter().filter_map(|b| self.display.body(b).map(|d| d.name.clone())).collect() },
                     reference,
                 });
@@ -1697,6 +1751,28 @@ impl PartStudioView {
                 }))
         };
         // Label and right-aligned read-only value on an underline (12 px `#666` label).
+        // A Mass properties value: a click toggles the unit's highest precision.
+        let precise_value = |key: &'static str, value: String, cx: &mut Context<Self>| {
+            div()
+                .id(key)
+                .debug_selector(move || format!("mass-value-{key}"))
+                .flex_1()
+                .h(px(24.))
+                .flex()
+                .items_center()
+                .justify_end()
+                .border_b_1()
+                .border_color(pal.border)
+                .text_size(px(13.33))
+                .text_color(pal.text)
+                .child(value)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if !this.ui.mass_precise.remove(key) {
+                        this.ui.mass_precise.insert(key);
+                    }
+                    cx.notify();
+                }))
+        };
         let value_row = |label: SharedString, value: String| {
             h_flex()
                 .h(px(28.))
@@ -1776,7 +1852,8 @@ impl PartStudioView {
                 }
                 (None, Some(m)) => {
                     let ref_active = self.ui.mass_ref_active;
-                    if crate::ui_script::active() {
+                    // (Unit tests read it too.)
+                    if crate::ui_script::active() || cfg!(test) {
                         self.ui.mass_state = Some(mass_ui_state(&m, self.ui.mass_faces, ref_active, self.ui.mass_variance));
                     }
                     body = body
@@ -1819,21 +1896,20 @@ impl PartStudioView {
                                 let kg = *kg;
                                 div().id("mass-override-value").flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).cursor_text().child(text.clone()).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.edit_mass_override(body.clone(), kg, text.clone(), window, cx))).into_any_element()
                             }
-                            _ => div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(m.mass.clone().unwrap_or_default()).into_any_element(),
+                            _ => precise_value("mass", m.mass.clone().unwrap_or_default(), cx).mr(px(5.)).into_any_element(),
                         }))
-                        .child(value_row("Volume".into(), m.volume.clone()).mt(px(2.)).h(px(26.)))
-                        .child(value_row("Surface area".into(), m.area.clone()).mt(px(2.)).h(px(26.)))
+                        .child(h_flex().h(px(26.)).mt(px(2.)).child(div().pl(px(5.)).pr(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Volume")).child(precise_value("volume", m.volume.clone(), cx).mr(px(5.))))
+                        .child(h_flex().h(px(26.)).mt(px(2.)).child(div().pl(px(5.)).pr(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Surface area")).child(precise_value("area", m.area.clone(), cx).mr(px(5.))))
                         .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(disabled_check("com-override")))
-                        .children([("X", 0xbd3039u32, "axis-arrow-x"), ("Y", 0x009400, "axis-arrow-y"), ("Z", 0x1651b0, "axis-arrow-z")].into_iter().zip(m.center.iter()).enumerate().map(|(k, ((l, c, g), v))| {
-                            h_flex().mt(px(if k == 0 { 3. } else { 2. })).h(px(29.)).child(axis(l, c, g)).child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v.clone()))
+                        .children([("X", 0xbd3039u32, "axis-arrow-x", "cx"), ("Y", 0x009400, "axis-arrow-y", "cy"), ("Z", 0x1651b0, "axis-arrow-z", "cz")].into_iter().zip(m.center.iter()).enumerate().map(|(k, ((l, c, g, key), v))| {
+                            h_flex().mt(px(if k == 0 { 3. } else { 2. })).h(px(29.)).child(axis(l, c, g)).child(precise_value(key, v.clone(), cx).mr(px(5.)))
                         }))
                         .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({})", m.inertia_unit))).child(disabled_check("moi-override")));
-                    let names = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
-                    for (r, row_names) in names.iter().enumerate() {
+                    for (r, row_names) in MOMENT_NAMES.iter().enumerate() {
                         let mut row = h_flex().mt(px(2.)).h(px(26.)).px(px(5.)).gap(px(8.));
-                        for (c, n) in row_names.iter().enumerate() {
+                        for (c, &n) in row_names.iter().enumerate() {
                             let v = m.inertia.as_ref().map(|i| i[r][c].clone()).unwrap_or_default();
-                            row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v)));
+                            row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(n)).child(precise_value(n, v, cx)));
                         }
                         body = body.child(row);
                     }
@@ -2593,6 +2669,20 @@ mod mass_parts_tests {
 /// the assembly's `number`): up to 3 decimals without trailing zeros
 /// ("1.999", "5.77", "2"), one that would read 0.000 in e-notation
 /// ("-3.307e-4"); float noise next to the largest value (`scale`) is "0".
+/// The mass moments of inertia's names, row by row.
+const MOMENT_NAMES: [[&str; 3]; 3] = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
+
+/// The account's highest display precision for a length (live `unitsMaximumDisplayPrecision`).
+fn max_precision(unit: noshape_units::LengthUnit) -> u8 {
+    use noshape_units::LengthUnit as L;
+    match unit {
+        L::Millimeter => 5,
+        L::Centimeter | L::Inch => 6,
+        L::Foot | L::Yard => 7,
+        _ => 8,
+    }
+}
+
 fn mass_number(x: f64, scale: f64) -> String {
     if x.abs() <= scale.abs() * 1e-9 {
         return "0".into();
@@ -2612,7 +2702,7 @@ mod mass_reference_tests {
 
     #[::core::prelude::v1::test]
     fn mass_numbers_read_as_live() {
-        for (x, shown) in [(1.99933, "1.999"), (5.7700001, "5.77"), (2.0, "2"), (0.04797, "0.048"), (-0.0003307, "-3.307e-4"), (-0.001, "-0.001"), (0.0, "0"), (3e-19, "0"), (-9.5948, "-9.595")] {
+        for (x, shown) in [(1.99933, "1.999"), (5.7700001, "5.77"), (2.0, "2"), (0.04797, "0.048"), (-0.0003307, "-3.307e-4"), (-0.001, "-0.001"), (0.0, "0"), (3e-19, "0"), (-9.5948, "-9.595"), (46_429_380.25, "4.643e+7"), (999_999.0, "999999")] {
             assert_eq!(mass_number(x, 7.995), shown);
         }
     }
@@ -2659,4 +2749,10 @@ fn measured_si(m: &Measurement) -> Option<(f64, Dim)> {
         Measurement::Angle(x) => Some((x, Dim::ANGLE)),
         Measurement::Point(_) | Measurement::Percent(_) => None,
     }
+}
+
+/// A bottom-right button's keyboard focus: a 1.5 px `#1651b0` ring, as the dialogs' help link.
+fn focus_ring(d: Stateful<Div>) -> Stateful<Div> {
+    let blue: Hsla = gpui_kit::rgb(0x1651b0).into();
+    d.focus(move |s| s.rounded(px(5.)).shadow(vec![BoxShadow { color: blue, offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.5), inset: false }]))
 }

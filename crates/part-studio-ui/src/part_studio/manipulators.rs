@@ -877,8 +877,9 @@ impl PartStudioView {
                 };
                 value = deg.to_radians();
                 let units = self.doc.read(cx).session.doc.settings.units;
+                // Live's updateFromManipulator: formatValue at the workspace's precision (3: 42.4154 → "42.415 deg").
                 let text = if matches!(units.angle, noshape_units::AngleUnit::Degree) {
-                    format!("{} deg", format!("{deg:.4}").trim_end_matches('0').trim_end_matches('.'))
+                    format!("{} deg", noshape_units::format_number(deg, units.angle_precision))
                 } else {
                     noshape_units::format_quantity(Quantity::new(value, Dim::ANGLE), &units)
                 };

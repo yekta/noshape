@@ -305,13 +305,15 @@ pub struct RichTooltip {
     expanded: bool,
     /// The tool's bounds: the tooltip is centered under it.
     anchor: Bounds<Pixels>,
+    /// The title-only box's width, measured on its first frame (drawn hidden until then).
+    width: std::rc::Rc<std::cell::Cell<Option<Pixels>>>,
 }
 
 /// Width of the expanded tooltip (live).
 const RICH_TOOLTIP_W: f32 = 400.;
 
 impl Render for RichTooltip {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // Live's recorder reads the whole tooltip, title then description (fs-co-complete-off, fs-ps-ws-feature-tooltip).
         if crate::ui_script::active() {
             let text = if self.description.is_empty() { self.title.to_string() } else { format!("{} {}", self.title, self.description) };
@@ -336,13 +338,32 @@ impl Render for RichTooltip {
         } else {
             title.into_any_element()
         };
-        let content = div().font_family(cx.theme().font_family.clone()).text_size(px(12.)).text_color(pal.text).shadow(shadow).child(body);
+        let measured = self.width.clone();
+        let w = if self.expanded { Some(px(RICH_TOOLTIP_W)) } else { self.width.get() };
+        let content = div()
+            .debug_selector(|| "rich-tooltip".into())
+            .relative()
+            .flex_none()
+            .font_family(cx.theme().font_family.clone())
+            .text_size(px(12.))
+            .text_color(pal.text)
+            .shadow(shadow)
+            .child(body)
+            .child(canvas(move |b, window, _| {
+                if measured.get() != Some(b.size.width) {
+                    measured.set(Some(b.size.width));
+                    window.request_animation_frame();
+                }
+            }, |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+            .when(w.is_none(), |c| c.opacity(0.));
+        // Live (tooltips-1118): centred on the tool, its top 3 px under it, kept inside the page only when it would
+        // leave it (a fixed 400 px centering strip snapped to the window put a left tool's short tip ~185 px off).
         let a = self.anchor;
-        // The title-only box's width isn't known before layout: center it
-        // with a 400 px strip whose content is centered.
-        let at = point(a.center().x - px(RICH_TOOLTIP_W * 0.5), a.bottom() + px(3.));
+        let win = window.viewport_size().width;
+        let x = w.map_or(a.left(), |w| (a.center().x - w * 0.5).min(win - w - px(2.)).max(px(2.)));
+        let at = point(x, a.bottom() + px(3.));
         // Never drawn over an open context menu (QA3: a stale tooltip covered its items).
-        div().when(!crate::os_menu::is_open(cx), |d| d.child(anchored().position(at).snap_to_window().child(div().w(px(RICH_TOOLTIP_W)).flex().justify_center().child(content))))
+        div().when(!crate::os_menu::is_open(cx), |d| d.child(anchored().position(at).snap_to_window().child(content)))
     }
 }
 
@@ -407,7 +428,7 @@ pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<Share
                 })
                 .detach();
             }
-            RichTooltip { title: title.clone(), description: description.clone(), expanded: false, anchor }
+            RichTooltip { title: title.clone(), description: description.clone(), expanded: false, anchor, width: Default::default() }
         });
         view.into()
     }
@@ -769,8 +790,11 @@ pub fn with_rich_tooltip(id: impl Into<ElementId>, title: impl Into<SharedString
     let a2 = anchor.clone();
     let title: SharedString = title.into();
     let name = title.clone();
+    let id: ElementId = id.into();
+    let selector = id.to_string();
     div()
         .id(id)
+        .debug_selector(move || selector)
         .map(|d| crate::ui_script::mark(d, || format!("button:{name}")))
         .flex_none()
         .relative()

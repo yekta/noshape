@@ -396,6 +396,7 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | A part hovered in the graphics (live2 parts-list-1118 c1) | its row gets no hover or related tint (list → graphics only) | the same | = (new) |
 | While a sketch is edited (live2 sketch-entry-1118) | the rows after it grey italic, Parts (2) -> Parts (1), ✗ brings them back; another feature row clicked does nothing | the rows and parts the same; a row click selected the feature; now nothing | = (fixed) |
 | Delete on a used sketch (live2 keys-1118) | no dialog; its user red, the tooltip "Extrude 1 did not regenerate properly: Select face or sketch region to extrude." + "1 missing selection" | the same | = (new) |
+| Tab from the graphics (live2 keys-1118 (2)) | after a click on empty graphics: Show measure details → Show analysis tools → Display mass and section properties → out of the page, then Share; Shift+Tab back; Space / Enter press the focused button; no list row or toolbar button is a stop | Tab did nothing; now those three stops, then the top bar (`StudioTab`, `eval_tab`), Space / Enter their click | = (fixed) |
 | Not yet in the matrix | the 6 px drag threshold (Chrome's, not Onshape's); an empty new folder's caret (live featurelist-gaps 11-16: shown, collapsed, on "New folder (0)"); the insertion line (live featurelist-gaps: rgb(22, 81, 176), 2 px, the row's width, a ~6 px ring filled rgb(202, 216, 237) at its left end, centred on the boundary above the hovered row in its upper half, below in its lower half; ours the same, the ring's fill was white) | – | – |
 
 ## Measure (matrix)
@@ -431,6 +432,12 @@ toward each one's middle (a sloped face and y = 0: 33.690°, was 146.310°; conf
 "Perp axes angle" alone (was with Max / Min dist); a circle and its face keep the distances after "Face tangent angle".
 Mass properties (`mass_stays_open_and_bracket_opens_an_empty_measure`): its button again leaves it open (was a toggle);
 `[` over it opens Measure empty, the parts deselected (the selection was kept).
+Number display (live numfmt-1118, live's `formatValue`; units `live_format_tests`): a value rounds as
+`Math.round(v·10^p)/10^p` (12.3455 → "12.346", −2.5 at 0 → "-2"; ours rounded half away from zero), trailing zeros
+dropped (the measure readouts keep `toFixed`'s, nudged by 1e-10); |v| ≥ 1e6, ≤ 1e-5 or rounding to 0 reads in exponent form ("4.643e+7"); compound units sorted and spaced
+("deg mm", "mm⁴"); a dragged angle's box at the angle precision (3); a Mass properties value clicked shows the unit's
+highest precision (mm 5, cm / in 6, ft / yd 7, m, areas, volumes and kg 8, g 5), clicked again as before
+(`a_clicked_mass_value_toggles_the_highest_precision`). Before: no exponent form, "mm*deg", no toggle.
 Working spinner (live2 11-18, live's JS and CSS): 900 ms after the request (was 1.1 s), a 50 × 50 box white at 75 %,
 radius 10, 40 px above the bottom, the 30 px ring rgb(215,215,215) with its blue quarter turning in 1.1 s (was 0.9 s).
 
@@ -506,7 +513,7 @@ debugging rows, left out. Ours binds besides live's map, in those scopes: the de
 Close window, Quit (secondary-n / o / w / q) and the dialog Tab / Enter / Shift+Enter keys live's client handles
 outside its map (its "client side entries").
 
-**Chrome: 22 / 22** (11-16 07:11 UTC: the tooltip's fade-out from chrome-gaps; the toolbar states row (11-16) checked by screenshot, not in the matrix; 21 / 21 at 11-13 15:51 UTC, 18 / 18 at 14:01; 14:01 UTC, was 17 / 17 at 13:33 UTC; 7 / 11 at the first run, then 5 rows added: 1 / 5 matched).
+**Chrome: 23 / 23** (11-18 04:04 UTC: live2 tooltips-1118's placement row, fixed; 22 / 22 at 11-16 07:11 UTC: the tooltip's fade-out from chrome-gaps; the toolbar states row (11-16) checked by screenshot, not in the matrix; 21 / 21 at 11-13 15:51 UTC, 18 / 18 at 14:01; 14:01 UTC, was 17 / 17 at 13:33 UTC; 7 / 11 at the first run, then 5 rows added: 1 / 5 matched).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -514,6 +521,7 @@ outside its map (its "client side entries").
 | Warm switch | while one shows, or within ~200 ms of it going, the next button's shows at once | always the full wait; now at once (gpui `tooltip_warm`, executor clock) | = (fixed) |
 | Cold again | after a pause, the 400 ms wait again | the same | = |
 | Longer help | a toolbar tooltip's description 2000 ms after it shows | 1500; now 2000 (`ui::TOOLTIP_EXPAND_DELAY`; a menu row's side tooltip keeps 1500: live fs-ps-ws-feature-tooltip) | = (fixed) |
+| Toolbar tooltip place (live2 tooltips-1118) | 3 px under the button, centred on it; expanded 400 px wide, centred, the same top, clamped at the page edge only if needed; no image; stays while hovered (12 s) | the same for middle tools, but centred through a 400 px strip snapped to the window: a left tool's short tip sat off-centre; now centred by its measured width (`RichTooltip::width`) | = (fixed) |
 | Feature dialog place | graphics area's top left, 3 px down | the same | = |
 | Feature dialog drag | clamped inside the graphics area; within ~10 px of the top / right / bottom it snaps (3 / 0 / 2 px); the left doesn't | could leave the area by all but 80 × 40 px, no snap; now live's (`behaviors::place_feature_dialog`) | = (fixed) |
 | Select other place | pointer + (100, 51) | the same | = |

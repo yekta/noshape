@@ -49,16 +49,10 @@ pub fn mass_unit(units: &noshape_units::UnitPrefs) -> (&'static str, f64) {
     }
 }
 
-/// A Mass and section properties value as Onshape writes it (live 738–739):
-/// three decimals without trailing zeros ("5.77", "11000"), and values that
-/// would read 0.000 in exponent form ("-3.307e-4").
+/// A Mass and section properties value as Onshape writes it (live 738–739, formatValue): three decimals without
+/// trailing zeros ("5.77", "11000"), and in exponent form from 1e6 or when it would read 0 ("4.643e+7", "-3.307e-4").
 pub fn mass_number(x: f64) -> String {
-    let fixed = noshape_units::to_fixed(x, 3);
-    if x != 0.0 && fixed.trim_start_matches('-') == "0.000" {
-        return format!("{x:.3e}");
-    }
-    let t = fixed.trim_end_matches('0').trim_end_matches('.');
-    if t == "-0" { "0".into() } else { t.to_string() }
+    noshape_units::format_value(x, 3)
 }
 
 /// A drawing's own fields, after Title 3 (live doc-tab-properties-drawing).

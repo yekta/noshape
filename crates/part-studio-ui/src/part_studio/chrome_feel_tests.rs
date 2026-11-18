@@ -203,6 +203,52 @@ fn rows() -> Vec<Row> {
         Row { id: "tooltip / longer help after 2 s", live: "data-expand-delay 2000 ms after it shows (measured 2.25-2.5 s from arrival)", gap: false, check: |_, _| {
             near(crate::ui::TOOLTIP_EXPAND_DELAY.as_millis() as f32, 2000., "ms")
         } },
+        Row { id: "tooltip / under its tool, centred; 400 px expanded; stays while hovered", live: "Extrude's 3 px under the button, centred on it; expanded 400 px wide, centred, same top, clamped at the page edge only if needed; still shown after 12 s (live2 tooltips-1118)", gap: false, check: |c, cx| {
+            let (window, _view) = part_studio_from(cx, "chrome-tool-tips", None);
+            let scale = cx.update_window(c.tips, |_, w, _| w.scale_factor()).unwrap();
+            cx.update_window(window, |_, w, _| w.set_scale_factor(scale)).unwrap();
+            draw(cx, window);
+            let at = |cx: &mut TestAppContext, sel: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel);
+            let step = |cx: &mut TestAppContext, ms: u64, by: u64| {
+                for _ in 0..ms / by {
+                    cx.executor().advance_clock(std::time::Duration::from_millis(by));
+                    draw(cx, window);
+                }
+            };
+            let win = cx.update_window(window, |_, w, _| f32::from(w.viewport_size().width)).unwrap();
+            let mut off = Vec::new();
+            for tool in ["tt-sketch", "tt-extrude"] {
+                let b = at(cx, tool).ok_or("no tool")?;
+                gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(point(px(600.), px(500.)), None, NONE);
+                step(cx, 1000, 10);
+                gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(b.center(), None, NONE);
+                step(cx, 600, 10);
+                let short = at(cx, "rich-tooltip").ok_or("no tooltip")?;
+                step(cx, 2100, 10);
+                let long = at(cx, "rich-tooltip").ok_or("no expanded tooltip")?;
+                step(cx, 12_000, 100);
+                let kept = at(cx, "rich-tooltip").is_some();
+                // Centred on the tool and kept 2 px inside the window: where its left edge belongs.
+                let left = |w: f32| (f32::from(b.center().x) - w * 0.5).min(win - w - 2.).max(2.);
+                // (Within the pixel the layout snaps to.)
+                let px1 = |x: f32| x.abs() < 1.;
+                let gap = |t: gpui_kit::Bounds<Pixels>| f32::from(t.top()) - f32::from(b.bottom());
+                let short_w = f32::from(short.size.width);
+                let row = (
+                    px1(f32::from(short.left()) - left(short_w)),
+                    px1(gap(short) - 3.),
+                    px1(f32::from(long.left()) - left(400.)),
+                    px1(gap(long) - 3.),
+                    px1(f32::from(long.size.width) - 400.),
+                    kept,
+                );
+                if row != (true, true, true, true, true, true) {
+                    off.push(format!("{tool}: (short centred, 3 px under; long centred, 3 px under, 400 px; shown after 12 s) {row:?}: short {short:?}, long {long:?}, tool {b:?}"));
+                }
+            }
+            cx.update_window(window, |_, w, _| w.remove_window()).unwrap();
+            if off.is_empty() { Ok(()) } else { Err(off.join("; ")) }
+        } },
         Row { id: "feature dialog / default place", live: "top left of the graphics area, 3 px below its top", gap: false, check: |_, _| {
             let (x, y) = dropped(0., 3.);
             near(x, 0., "x")?;

@@ -561,6 +561,46 @@ fn rows() -> Vec<Row> {
             let value = cx.update(|cx| l.view.read(cx).ui.part_renaming.as_ref().map(|(_, st, _)| st.read(cx).value().to_string()));
             expect((f2, value), (false, Some("Part 1".to_string())), "(renaming after F2, the box after Shift+N)")
         } },
+        Row { id: "keys / Tab from the graphics: Measure, Analysis tools, Mass properties, then out; Shift+Tab back", live: "after a click on empty graphics: Tab -> Show measure details -> Show analysis tools -> Display mass and section properties -> out of the page (then Share); Shift+Tab walks back; no list row or toolbar button is a stop (live2 keys-1118 (2))", gap: false, check: |l, cx| {
+            let at = |cx: &mut TestAppContext| {
+                cx.update_window(l.window, |_, w, cx| {
+                    let v = l.view.read(cx);
+                    if v.focus.is_focused(w) {
+                        return Some("graphics");
+                    }
+                    v.ui.eval_stops.iter().position(|h| h.is_focused(w)).map(|i| ["measure", "analysis", "mass"][i])
+                })
+                .unwrap()
+            };
+            let canvas = l.canvas(cx);
+            l.press(cx, canvas, MouseButton::Left, NONE, 1);
+            let start = at(cx);
+            let mut forward = Vec::new();
+            for _ in 0..4 {
+                l.keys(cx, "tab");
+                forward.push(at(cx));
+            }
+            l.press(cx, canvas, MouseButton::Left, NONE, 1);
+            l.keys(cx, "tab tab tab");
+            let mut back = Vec::new();
+            for _ in 0..3 {
+                l.keys(cx, "shift-tab");
+                back.push(at(cx));
+            }
+            // Space on the focused Measure button pins the measure panel (GPUI clicks on the release); Enter likewise.
+            l.keys(cx, "tab space");
+            l.event(cx, gpui_kit::KeyUpEvent { keystroke: gpui_kit::Keystroke::parse("space").unwrap() });
+            draw(cx, l.window);
+            let pinned = cx.update(|cx| l.view.read(cx).ui.measure_pinned);
+            // Enter on Mass properties opens it.
+            l.keys(cx, "tab tab enter");
+            l.event(cx, gpui_kit::KeyUpEvent { keystroke: gpui_kit::Keystroke::parse("enter").unwrap() });
+            draw(cx, l.window);
+            let mass = cx.update(|cx| l.view.read(cx).show_mass);
+            let want_forward = vec![Some("measure"), Some("analysis"), Some("mass"), None];
+            let want_back = vec![Some("analysis"), Some("measure"), Some("graphics")];
+            expect((start, forward, back, pinned, mass), (Some("graphics"), want_forward, want_back, true, true), "(focus after the click, after each Tab, after each Shift+Tab from Mass, Measure pinned by Space, Mass open by Enter)")
+        } },
         Row { id: "Parts list / a part hovered in the graphics leaves its row as is", live: "Part 2 outlined in the graphics, its row gets no hover or related tint: the link runs list -> graphics only (live2 parts-list-1118 c1)", gap: false, check: |l, cx| {
             cx.update(|cx| {
                 l.view.update(cx, |v, cx| {

@@ -23,8 +23,9 @@ actions!(
         DialogTab,
         DialogTabPrev,
         FocusNavbar,
-        // Shift+Tab with the focus on the Part Studio itself (Onshape's
-        // <body>): it stays there.
+        // Tab / Shift+Tab with the focus on the Part Studio's graphics
+        // (Onshape's <body>) or its bottom-right buttons.
+        StudioTab,
         StudioTabPrev,
         Cancel,
         RenameSelected,
@@ -200,6 +201,9 @@ fn key_bindings_for(mac: bool) -> Vec<KeyBinding> {
         KeyBinding::new("delete", DeleteSelection, doc),
         KeyBinding::new("backspace", DeleteSelection, doc),
         KeyBinding::new("space", ClearSelection, doc),
+        // A focused bottom-right button (Measure, Analysis tools, Mass) takes Space and Enter as its click, as a browser's.
+        KeyBinding::new("space", gpui_kit::NoAction, Some("EvalButton")),
+        KeyBinding::new("enter", gpui_kit::NoAction, Some("EvalButton")),
         KeyBinding::new("escape", Cancel, doc),
         // A focused dropdown button opens its menu (os_ui::os_dropdown_menu).
         KeyBinding::new("enter", crate::os_ui::OpenDropdown, Some(crate::os_ui::DROPDOWN_CONTEXT)),
@@ -220,6 +224,7 @@ fn key_bindings_for(mac: bool) -> Vec<KeyBinding> {
         KeyBinding::new("shift-tab", AppearancePrevField, Some("AppearanceEditor > Input")),
         KeyBinding::new("tab", DialogTab, Some("FeatureDialog")),
         KeyBinding::new("shift-tab", DialogTabPrev, Some("FeatureDialog")),
+        KeyBinding::new("tab", StudioTab, Some("PartStudio && !Sketch")),
         KeyBinding::new("shift-tab", StudioTabPrev, Some("PartStudio")),
         // Live (ui 10-22 b): Change configuration… leaves the focus on the
         // page, and the first Tab goes to the top bar (Share).

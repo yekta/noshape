@@ -7290,11 +7290,16 @@ impl Render for PartStudioView {
                     cx.stop_propagation();
                 }
             }))
-            // Shift+Tab on <body> stays there (live psb 10-19 h); elsewhere in
-            // the Part Studio it moves back as usual.
+            // Shift+Tab on <body> stays there (live psb 10-19 h); from the
+            // bottom-right buttons it walks back; elsewhere it moves back as usual.
             .on_action(cx.listener(|this, _: &crate::actions::StudioTabPrev, window, cx| {
-                if !this.focus.is_focused(window) {
+                if !this.focus.is_focused(window) && !this.eval_tab(false, window, cx) {
                     window.focus_prev(cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &crate::actions::StudioTab, window, cx| {
+                if !this.eval_tab(true, window, cx) {
+                    cx.propagate();
                 }
             }))
             // Live (CTRL-C-PART): Ctrl+C copies a selected part like its menu's "Copy Part 1". Selected feature rows

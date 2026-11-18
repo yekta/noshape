@@ -390,3 +390,41 @@ fn mass_stays_open_and_bracket_opens_an_empty_measure(cx: &mut TestAppContext) {
     });
     assert_eq!(state, (false, true, 0), "(Mass open, Measure open, selected) after [");
 }
+
+/// Live (behaviours "number and unit display rules", 11-18): a click on a Mass properties value shows it at the unit's
+/// highest precision (mm 5, mm³ 8), a second click as before (3).
+#[gpui::test]
+fn a_clicked_mass_value_toggles_the_highest_precision(cx: &mut TestAppContext) {
+    let b = Bench::open(cx, "mass-precise", 1.0);
+    // Part 1 (its hole, fillet and chamfer): a volume with decimals (Part 2's 6000 mm³ has none to add).
+    let part = b.reference(cx, E::Part("Part 1")).unwrap();
+    cx.update(|cx| b.view.update(cx, |v, cx| {
+        v.selection = vec![part.clone()];
+        v.open_mass(cx);
+    }));
+    let texts = |cx: &mut TestAppContext| {
+        draw(cx, b.window);
+        let state = cx.update(|cx| b.view.read(cx).ui.mass_state.clone()).unwrap_or_default();
+        let fields = state["fields"].as_array().cloned().unwrap_or_default();
+        let text = fields.iter().find(|f| f["label"] == "Volume").and_then(|f| f["text"].as_str().map(str::to_string)).unwrap_or_default();
+        let decimals = text.split_whitespace().next().and_then(|n| n.split_once('.')).map_or(0, |(_, d)| d.len());
+        (decimals, text)
+    };
+    // The values are worked out off the UI thread: the panel blank until then.
+    let volume = |cx: &gpui_kit::App| {
+        let state = b.view.read(cx).ui.mass_state.clone().unwrap_or_default();
+        state["fields"].as_array().is_some_and(|f| f.iter().any(|f| f["label"] == "Volume" && f["text"].as_str().is_some_and(|t| !t.is_empty())))
+    };
+    wait_until(cx, b.window, volume);
+    let before = texts(cx);
+    let click = |cx: &mut TestAppContext, key: &str| {
+        let at = gpui_kit::VisualTestContext::from_window(b.window, cx).debug_bounds(Box::leak(format!("mass-value-{key}").into_boxed_str())).expect("the value").center();
+        gpui_kit::VisualTestContext::from_window(b.window, cx).simulate_click(at, Modifiers::default());
+    };
+    click(cx, "volume");
+    let precise = texts(cx);
+    click(cx, "volume");
+    let back = texts(cx);
+    let state = cx.update(|cx| b.view.read(cx).ui.mass_state.clone());
+    assert!(precise.0 > before.0 && precise.0 <= 8 && back == before, "the volume: {before:?}, clicked {precise:?}, again {back:?} (state {state:?})");
+}
