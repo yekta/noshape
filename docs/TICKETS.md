@@ -683,6 +683,17 @@ per-feature rows below are owners' leads, not gaps (superseded 18:2x).**
 | Shell Gehäuse | 809 | 28 | ×29 | bool |
 | Flansch (vorne) verbreitern (Move face) | 601 | 5 | ×120 | core |
 
+## User-flow timings vs live (qa 18:2x; live: behaviours "qa (11-18 ~18:00, user-flow feel)" + ui-speed-1118, 10 rounds, settled ms)
+Ours: green 87edba24 on vibe2 (load 18-44: hints; 2 rounds, settle range), qa-scratch/flow (frame log, lat-steps.py). The valid run is
+tonight's 02:00 window on vibex7 with v0.4.59 (qa-flow-night, 5 rounds). No row is slower than live; nothing to ticket.
+| step | ours settled | live settled |
+|---|---|---|
+| enter sketch on a face / exit (✓) | 505 (497-513) / 397 (319-475) | 1291 / 889 |
+| Extrude: dialog / preview / commit | 538 (313-764) / 1187 (723-1651) / 235 (194-276) | 1320 / 2004 / 1115 |
+| Fillet: dialog / edge -> preview / commit | 690 (550-831) / 634 (554-714) / 498 (429-566) | 1690 / 2561 / 1473 |
+| Fastened: dialog / second face -> solved / commit | 192 (123-262) / 352 (202-501) / 288 (189-386) | 856 / 1997 / 967 |
+| Drawing: Insert view dialog / base view placed / projected placed | 71 (56-86) / 248 (110-385) / 209 (166-252) | 260 / ~1641 / ~1617 (±0.5 s) |
+
 ## Slower than live per feature: live's rollback step costs (live 14:1x, live/qa/rbstep-1118/tables2.md) vs ours today (qa 14:5x)
 **Superseded 18:2x by DECISIONS 11-18 (user: human scale, 9e5b481d4): per-feature ratios are not gaps; the rows below are owners' leads
 only.** Whole-document rebuilds, ours = release build of 80a64725 on vibe2 at nice 10, load ~20 (two passes, the range), live = step
