@@ -976,6 +976,14 @@ impl Context {
         self.bodies.iter().find(|b| &b.id == id)
     }
 
+    /// A part property a custom feature set with `setProperty` (live's propertySource 2: a wire clip's Description),
+    /// by FeatureScript's PropertyType name ("DESCRIPTION", "PART_NUMBER"), as text.
+    pub fn feature_property(&self, body: &BodyId, kind: &str) -> Option<String> {
+        let r = Reference::Body(body.clone());
+        let (_, v) = self.fs_attributes.iter().rev().find(|(e, v)| *e == r && v.get("name").get("property").as_str().as_deref() == Some(kind) && v.get("name").get("custom").is_undefined())?;
+        v.get("attribute").as_str().map(|s| s.to_string())
+    }
+
     /// A sketch's result: of its pieces, the one holding its regions first.
     pub fn sketch(&self, f: FeatureId) -> Option<&Arc<SketchResult>> {
         self.sketches.iter().find(|s| s.feature == f && s.holds_sheet()).or_else(|| self.sketches.iter().find(|s| s.feature == f))

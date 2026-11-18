@@ -97,6 +97,13 @@ fn part_props<'a>(doc: &'a Document, studio: TabId, body: &BodyId, config: &Conf
     }
 }
 
+/// The property `kind` a custom feature gave `line`'s part (its first instance's Part Studio result).
+fn feature_property(result: &AssemblyResult, line: &BomLine, kind: &str) -> Option<String> {
+    let BomSource::Part { body, .. } = &line.source else { return None };
+    let path = line.instances.first()?;
+    result.occurrences.iter().find(|o| &o.path == path && &o.body == body)?.context.feature_property(body, kind)
+}
+
 /// A part of another document's properties, from its pinned document.
 fn external_props<'a>(result: &'a AssemblyResult, key: &str, body: &BodyId, config: &ConfigValues) -> Option<std::borrow::Cow<'a, PartProperties>> {
     let (d, tab) = result.external_docs.get(key)?;
@@ -403,9 +410,14 @@ pub fn cell(doc: &Document, result: &AssemblyResult, line: &BomLine, col: BomCol
             let owned = part.flatten();
             let props = owned.as_deref();
             let meta = props.map(|p| &p.meta);
+            // A value the user set wins over one a custom feature set (live bjr wire clip: "OPG006"'s Description).
+            let or_feature = |own: Option<&String>, kind: &str| match own {
+                Some(v) => BomCell::Text(v.clone()),
+                None => BomCell::Text(feature_property(result, line, kind).unwrap_or_default()),
+            };
             match col {
-                BomColumn::PartNumber => t(props.and_then(|p| p.part_number.as_ref())),
-                BomColumn::Description => t(props.and_then(|p| p.description.as_ref())),
+                BomColumn::PartNumber => or_feature(props.and_then(|p| p.part_number.as_ref()), "PART_NUMBER"),
+                BomColumn::Description => or_feature(props.and_then(|p| p.description.as_ref()), "DESCRIPTION"),
                 BomColumn::Revision => t(props.and_then(|p| p.revision.as_ref())),
                 BomColumn::State => BomCell::Text(meta.map_or(RELEASE_STATES[0], |m| m.state()).into()),
                 BomColumn::Vendor => t(meta.and_then(|m| m.vendor.as_ref())),

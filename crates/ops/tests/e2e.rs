@@ -9414,3 +9414,46 @@ fn a_bare_assembly_imports_only_as_an_upload() {
     assert_eq!(r["parts"].as_array().map(Vec::len), Some(0), "{r}");
     assert!(r["first"].is_string(), "{r}");
 }
+
+/// Live bjr wire clip: a custom feature's `setProperty` Description and Part number fill a part's BOM cells (live's
+/// propertySource 2: "OPG006"); a value the user sets wins.
+#[test]
+fn a_custom_features_part_properties_fill_the_bom() {
+    const CLIP: &str = r#"FeatureScript 2384;
+import(path : "onshape/std/geometry.fs", version : "2384.0");
+
+annotation { "Feature Type Name" : "Clip block" }
+export const clipBlock = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        fCuboid(context, id + "b", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(10, 6, 4) * millimeter });
+        const body = qCreatedBy(id + "b", EntityType.BODY);
+        setProperty(context, { "entities" : body, "propertyType" : PropertyType.NAME, "value" : "OPG006" });
+        setProperty(context, { "entities" : body, "propertyType" : PropertyType.DESCRIPTION, "value" : "Open grommet" });
+        setProperty(context, { "entities" : body, "propertyType" : PropertyType.PART_NUMBER, "value" : "G-6" });
+    });
+"#;
+    let mut ctx = Ctx::new();
+    let path = scratch("fs-bom-props");
+    let _ = std::fs::remove_file(format!("{}.noshape", path.display()));
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    let e = call(&mut ctx, "featurestudio_edit", json!({ "source": CLIP }));
+    assert!(e["notices"].as_array().unwrap().iter().all(|n| n["severity"] != "error"), "{e}");
+    let c = call(&mut ctx, "featurestudio_commit", json!({}));
+    let ty = c["feature_types"].as_array().unwrap().iter().find(|t| t["name"] == "Clip block").unwrap_or_else(|| panic!("{c}"))["type"].as_str().unwrap().to_string();
+    let f = call(&mut ctx, "feature_add", json!({ "tab": "Part Studio 1", "type": ty, "params": {} }));
+    assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "OPG006" }));
+    call(&mut ctx, "assembly_bom_settings", json!({ "columns": ["Item", "Quantity", "Part number", "Description"] }));
+    let row = |ctx: &mut Ctx| {
+        let bom = call(ctx, "assembly_bom", json!({}));
+        let r = bom["rows"].as_array().unwrap().iter().find(|r| r["name"] == "OPG006").unwrap_or_else(|| panic!("{bom}")).clone();
+        (r["cells"]["Part number"].clone(), r["cells"]["Description"].clone())
+    };
+    assert_eq!(row(&mut ctx), (json!("G-6"), json!("Open grommet")));
+    call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "OPG006", "description": "Grommet, 6 mm" }));
+    assert_eq!(row(&mut ctx), (json!("G-6"), json!("Grommet, 6 mm")), "the user's value wins");
+}
