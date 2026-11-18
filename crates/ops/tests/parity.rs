@@ -3700,7 +3700,19 @@ fn parity_assemblies() {
             studios[i].1["derivedSources"][e.as_str()] = src;
         }
         let mut ctx = Ctx::new();
-        let r = rebuild_assembly(&mut ctx, &scratch(&format!("asm-{name}")), &asm, &studios);
+        let path = scratch(&format!("asm-{name}"));
+        let r = rebuild_assembly(&mut ctx, &path, &asm, &studios);
+        // NOSHAPE_PARITY_SAVE=<dir>: keep each rebuilt assembly there as <name>.noshape (qa's heavy-assembly feel runs).
+        if let Some(keep) = std::env::var_os("NOSHAPE_PARITY_SAVE").map(PathBuf::from) {
+            drop(ctx);
+            std::fs::create_dir_all(&keep).unwrap();
+            let made = [path.clone(), path.with_extension("noshape")].into_iter().find(|p| p.is_file());
+            for (from, ext) in made.iter().flat_map(|m| ["", "-wal", "-shm"].map(|ext| (PathBuf::from(format!("{}{ext}", m.display())), ext))) {
+                if from.is_file() {
+                    std::fs::copy(&from, keep.join(format!("{name}.noshape{ext}"))).unwrap();
+                }
+            }
+        }
         docs += 1;
         if r.differences.is_empty() && r.untranslated.is_empty() {
             matching += 1;
