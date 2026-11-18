@@ -80,7 +80,7 @@ pub const PART_STUDIO: &[(&str, &str)] = &[
     ("Split", "Select entities to split. For parts and surfaces, specify whether to keep or remove the split tool. For faces, select a sketch curve, curve, surface, or plane to use as the split tool."),
     ("Sweep", "Create, add to, subtract from, or intersect parts and surfaces (by sweeping sketch regions, planar faces, lines or curves along a path), or thin parts (by sweeping sketch regions, planar faces, lines, or curves along a path). Add optional profile control (by orientation, lock faces or lock direction), twist (by turns, angle or pitch), and scale."),
     ("Tab", "Add a tab to a sheet metal flange, remove interfering material, or bridge 2 flanges from the same sheet metal model."),
-    ("Tag", "Tag entities for use in Frames, Sheet metal forms, or PCB Studio holes. Select geometry, define orientation, add properties."),
+    ("Tag", "Tag entities for use in Frames, Sheet metal forms, PCB Studio holes, or Standard content. Select geometry, define orientation, add properties."),
     ("Thicken", "Create, add to, subtract from, or intersect parts by thickening surfaces or faces of solids."),
     ("Transform", "Move, rotate, copy, or scale a part. Transform by mate connectors or translate by line, distance, or XYZ."),
     ("Trim curve", "Trim or extend existing curves by a distance or to a bounding entity."),

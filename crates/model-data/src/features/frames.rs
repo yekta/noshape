@@ -174,8 +174,9 @@ pub fn tag() -> FeatureType {
     let form = |v: &ParamValues| v.is("tagPurpose", "FORM");
     let pcb = |v: &ParamValues| v.is("tagPurpose", "PCB_HOLES");
     let hole = move |v: &ParamValues| pcb(v) && v.is("pcbEntityType", "HOLE");
+    let standard_content = |v: &ParamValues| v.is("tagPurpose", "STANDARD_CONTENT");
     let mut p = vec![
-        ParamSpec::enum_("tagPurpose", "Tag purpose", &[("FRAME", "Frame"), ("FORM", "Form"), ("PCB_HOLES", "PCB holes")])
+        ParamSpec::enum_("tagPurpose", "Tag purpose", &[("FRAME", "Frame"), ("FORM", "Form"), ("PCB_HOLES", "PCB holes"), ("STANDARD_CONTENT", "Standard content")])
             .hints(Hints::REMEMBER_PREVIOUS_VALUE),
         ParamSpec::query1("sketch", "Sketch profile", QueryFilter::FEATURE | QueryFilter::SKETCH).hints(Hints::INITIAL_FOCUS).visible(frame),
     ];
@@ -199,6 +200,8 @@ pub fn tag() -> FeatureType {
         ParamSpec::query1("negativePart", "Part to remove", QueryFilter::SOLID_BODY).visible(form),
         ParamSpec::query1("flatFormSketch", "Sketch for flat view", QueryFilter::FEATURE | QueryFilter::SKETCH).visible(form),
         ParamSpec::query1("cSysMateConnector", "Form origin mate connector", QueryFilter::MATE_CONNECTOR).describe("If none selected, this feature will create one at Origin").visible(form),
+        // Standard content (std 3112 defineStandardContentTagParams: a solid or composite part, one pick).
+        ParamSpec::query1("standardContentPart", "Standard content part", QueryFilter::SOLID_BODY).visible(standard_content),
         // PCB holes (std definePcbHolesTagParams; std runs Tag).
         ParamSpec::enum_("pcbEntityType", "PCB entity type", &[("HOLE", "Holes"), ("CUTOUT", "Cutouts")]).hints(Hints::SHOW_LABEL).visible(pcb),
         ParamSpec::bool("plated", "Plated", false).visible(pcb),
