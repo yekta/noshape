@@ -8330,7 +8330,7 @@ fn a_radial_hole_gets_its_centermark() {
     let region = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }))["regions"][0]["id"].as_str().unwrap().to_string();
     call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "40 mm" } }));
     let hole = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }))["sketch"].as_str().unwrap().to_string();
-    call(&mut ctx, "sketch_draw", json!({ "sketch": hole, "tool": "circle", "points": [[0, 20, 0], [0, 20, 3]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": hole, "tool": "circle", "points": [[0, 20], [3, 20]] }));
     let disc = call(&mut ctx, "sketch_get", json!({ "sketch": hole }))["regions"][0]["id"].as_str().unwrap().to_string();
     call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [disc], "operationType": "REMOVE", "endBound": "THROUGH_ALL", "symmetric": true } }));
     let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "suggested_views": true }));

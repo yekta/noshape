@@ -2847,8 +2847,8 @@ fn cylinder_axes(shapes: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]> {
 /// widest edge: a countersink), where the group's faces go round (holes and
 /// bosses, not corner rounds; see [`centermarked`]).
 fn cylinder_ends(shapes: &[Shape], frame: &ViewFrame) -> Vec<([f64; 2], f64)> {
-    // (projected axis point, largest radius, angular intervals, those of holes)
-    type Group = ([f64; 2], f64, Vec<(f64, f64)>, Vec<(f64, f64)>);
+    // (projected axis point, largest radius, angular intervals of the faces' edges)
+    type Group = ([f64; 2], f64, Vec<(f64, f64)>);
     let mut groups: Vec<Group> = Vec::new();
     for shape in shapes {
         for f in shape.faces() {
@@ -2864,36 +2864,43 @@ fn cylinder_ends(shapes: &[Shape], frame: &ViewFrame) -> Vec<([f64; 2], f64)> {
             if axis.dot(frame.dir).abs() < 1.0 - 1e-9 || radius <= 0.0 {
                 continue;
             }
-            let Ok(uv) = f.uv_bounds() else { continue };
             let c = frame.project(origin);
-            let iv = (uv[0].min(uv[1]), uv[0].max(uv[1]));
-            // A hole's wall faces its axis.
-            let (um, vm) = ((uv[0] + uv[1]) / 2.0, (uv[2] + uv[3]) / 2.0);
-            let hole = f.point_at_uv(um, vm).ok().zip(f.normal_at_uv(um, vm).ok()).is_some_and(|(p, n)| n.dot((p - origin) - axis * (p - origin).dot(axis)) < 0.0);
             let i = match groups.iter().position(|g| (g.0[0] - c[0]).hypot(g.0[1] - c[1]) < 1e-9) {
                 Some(i) => i,
                 None => {
-                    groups.push((c, radius, Vec::new(), Vec::new()));
+                    groups.push((c, radius, Vec::new()));
                     groups.len() - 1
                 }
             };
             let g = &mut groups[i];
             g.1 = g.1.max(radius);
-            g.2.push(iv);
-            if hole {
-                g.3.push(iv);
-            }
+            g.2.extend(f.edges().iter().filter_map(|e| edge_sweep(&sample_edge(e, 32), frame, c, radius * 1e-3)));
         }
     }
-    groups.into_iter().filter(|g| centermarked(&g.2, &g.3)).map(|g| (g.0, g.1)).collect()
+    groups.into_iter().filter(|g| centermarked(&g.2)).map(|g| (g.0, g.1)).collect()
 }
 
-/// Whether cylinders seen end-on (their angular intervals, `holes` those of hole walls) get a centermark: all the way
-/// round together (a hole in pieces, a boss), or a hole's wall half way at least (a radial hole's bore through a boss,
-/// live 1857); not quarter rounds, nor two of them on one axis (c2-sm-louver's bends), nor a boss's wall part way
-/// round (c2-variable-fillet-faceblend's rounded ends: live marks none).
-fn centermarked(iv: &[(f64, f64)], holes: &[(f64, f64)]) -> bool {
-    angular_coverage(iv) >= std::f64::consts::TAU - 1e-6 || holes.iter().any(|(a, b)| b - a >= std::f64::consts::PI - 1e-6)
+/// The angles round `c` (in the view) that an edge's points sweep, as (start, end) radians: a full turn for a hole's
+/// rim or a radial hole's saddle, none for a seam along the axis.
+fn edge_sweep(points: &[DVec3], frame: &ViewFrame, c: [f64; 2], near: f64) -> Option<(f64, f64)> {
+    let angles: Vec<f64> = points.iter().map(|p| frame.project(*p)).filter(|q| (q[0] - c[0]).hypot(q[1] - c[1]) > near).map(|q| (q[1] - c[1]).atan2(q[0] - c[0])).collect();
+    let first = *angles.first()?;
+    let (mut at, mut lo, mut hi) = (first, first, first);
+    for w in angles.windows(2) {
+        let d = (w[1] - w[0] + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI;
+        at += d;
+        lo = lo.min(at);
+        hi = hi.max(at);
+    }
+    (hi > lo).then_some((lo, hi))
+}
+
+/// Whether cylinders seen end-on (the angular intervals their edges sweep round the axis) get a centermark: all the
+/// way round together (a hole whole or in pieces, a boss, a radial hole's bore whose saddle edges go round, live 1857);
+/// not quarter rounds, nor two of them on one axis (c2-sm-louver's bends), nor a wall part way round, a boss's or a
+/// pocket's (c2-variable-fillet-faceblend's rounded ends and its pocket's: live marks none).
+fn centermarked(iv: &[(f64, f64)]) -> bool {
+    angular_coverage(iv) >= std::f64::consts::TAU - 1e-3
 }
 
 /// Total angle covered by a set of angular intervals (radians, union,
@@ -4256,20 +4263,19 @@ mod tests {
         assert!(covered.ends.is_empty(), "{:?}", covered.ends);
     }
 
-    /// Centermarks: a hole whole or in pieces, a radial hole's half bore; not a quarter round, nor c2-sm-louver's two
-    /// quarter bends on one axis (exchange suite: 24 CENTERMARKS lines in ours, live none), nor a boss's wall part way
-    /// round (c2-variable-fillet-faceblend's rounded ends: 18 lines, live none).
+    /// Centermarks: a hole whole or in pieces; not a quarter round, nor c2-sm-louver's two quarter bends on one axis
+    /// (exchange suite: 24 CENTERMARKS lines in ours, live none), nor a wall part way round (c2-variable-fillet-
+    /// faceblend's rounded ends and pocket ends: 18 then 12 lines, live none).
     #[test]
     fn centermarks_go_on_holes_not_on_bends() {
         use std::f64::consts::{FRAC_PI_2, PI, TAU};
-        assert!(centermarked(&[(0.0, TAU)], &[]));
-        assert!(centermarked(&[(0.0, PI), (PI, TAU)], &[]));
-        assert!(centermarked(&[(3.0 * FRAC_PI_2, 5.0 * FRAC_PI_2)], &[(3.0 * FRAC_PI_2, 5.0 * FRAC_PI_2)]));
-        assert!(!centermarked(&[(0.0, FRAC_PI_2)], &[(0.0, FRAC_PI_2)]));
-        assert!(!centermarked(&[(3.0 * FRAC_PI_2, TAU), (0.0, FRAC_PI_2)], &[]));
-        // A boss's wall three quarters round (a rounded end) isn't marked; a hole's is.
-        assert!(!centermarked(&[(0.0, 3.0 * FRAC_PI_2)], &[]));
-        assert!(centermarked(&[(0.0, 3.0 * FRAC_PI_2)], &[(0.0, 3.0 * FRAC_PI_2)]));
+        assert!(centermarked(&[(0.0, TAU)]));
+        assert!(centermarked(&[(0.0, PI), (PI, TAU)]));
+        assert!(centermarked(&[(-PI, 0.0), (0.0, PI)]));
+        assert!(!centermarked(&[(0.0, FRAC_PI_2)]));
+        assert!(!centermarked(&[(3.0 * FRAC_PI_2, TAU), (0.0, FRAC_PI_2)]));
+        // A wall three quarters round (a rounded end, a pocket's end) isn't marked.
+        assert!(!centermarked(&[(0.0, 3.0 * FRAC_PI_2)]));
     }
 
     /// Live drw-crop-spline (dx 11-15): a spline crop through points on a block's bottom and top edges keeps those
