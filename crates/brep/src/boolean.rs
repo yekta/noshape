@@ -3984,13 +3984,11 @@ impl Ctx<'_> {
             return self.section(f1, f2, Path::Circle(k), th0, th0 + TAU);
         }
         if dl <= GREY * tol {
-            if (r1 - r2).abs() <= tol {
-                // One surface: their pieces on each other are coincident, like coplanar faces'.
+            // One surface within the tolerance, or the two faces' own where that's more (OCCT's rule, as planes'):
+            // their pieces on each other are coincident, like coplanar faces'. Apart past it (c2-wire-clip-imported's
+            // bends of 2.10 and 2.11 mm, faces of 2.5 um).
+            if (r1 - r2).abs() <= tol.max(self.faces[f1].t + self.faces[f2].t) {
                 self.coplanar.push((f1, f2));
-                return Ok(());
-            }
-            if (r1 - r2).abs() <= GREY * tol {
-                return Err(Decline("cylinders nearly coincident"));
             }
             return Ok(());
         }
