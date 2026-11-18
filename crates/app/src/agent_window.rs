@@ -44,6 +44,7 @@ impl Workspace {
                 cx.notify();
             }
             R::Restore { to, name } => noshape_history_ui::open_restore(self.doc.clone(), to, name, window, cx),
+            R::ReferenceManager => crate::doc_dialogs::reference_manager(self.doc.clone(), window, cx),
             R::TabManager(search) => {
                 if search.is_some() != self.tab_manager.is_some() {
                     self.toggle_tab_manager(window, cx);

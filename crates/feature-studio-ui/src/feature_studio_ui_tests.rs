@@ -100,6 +100,52 @@ fn a_typed_run_undoes_in_one_step(cx: &mut TestAppContext) {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Live vs-fs-feel-1117: an error shows while typing, within 0.5 s and before the text is saved.
+#[gpui::test]
+fn a_typing_error_shows_before_the_save(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    let dir = std::env::temp_dir().join(format!("noshape-ui-fs-check-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))).unwrap().id;
+    let (window, view, doc) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1600.), px(900.)) };
+        let mut view = None;
+        let d = doc.clone();
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| FeatureStudioView::new(d, tab, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap(), doc)
+    });
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
+    pause(cx, window, 2000);
+    let saved = cx.update(|cx| text_of(&doc, tab, cx)).unwrap();
+    assert!(cx.update(|cx| view.read(cx).notices.iter().all(|n| !n.error)), "the new studio has no error");
+    for k in ["x", "x", "x"] {
+        type_key(cx, window, k);
+    }
+    for _ in 0..40 {
+        pause(cx, window, 10);
+    }
+    assert!(cx.update(|cx| view.read(cx).notices.iter().any(|n| n.error)), "the error shows 400 ms after the last key");
+    assert_eq!(cx.update(|cx| text_of(&doc, tab, cx)).unwrap(), saved, "before the save");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Live2 studios.json featureStudioEditor (Ace's keys, fs0.json): Ctrl+/ comments the line with `// ` and takes it
 /// away again, Alt+↑ moves the line up, Ctrl+Shift+D duplicates it, Ctrl+D removes it; each one undo step.
 #[gpui::test]

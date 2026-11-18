@@ -25,6 +25,22 @@ pub enum OutdatedKind {
     /// A Drawing's views and tables of another document's version (the drawing tab, that document at that version;
     /// pinned ones are left out).
     Drawing(TabId, ExternalRef),
+    /// A custom feature from another document's version (tab, feature id, its Feature Studio there, the feature's
+    /// FeatureScript name).
+    CustomFeature(TabId, FeatureId, ExternalRef, String),
+}
+
+/// A custom feature from another document's version: its Feature Studio there and its FeatureScript name (Add custom
+/// features from a version).
+pub fn linked_feature(type_id: &str) -> Option<(ExternalRef, &str)> {
+    let (studio, name) = noshape_model::custom::parse_type_id(type_id)?;
+    Some((ExternalRef::parse(studio)?, name))
+}
+
+/// The features of `ps` from another document's version that has a newer one (live2 custom-feature-1118: the row's
+/// blue update indicator). Reads the other documents: call off the UI thread.
+pub fn outdated_features(ps: &noshape_model::PartStudio) -> std::collections::HashSet<FeatureId> {
+    ps.features.iter().filter(|f| linked_feature(&f.type_id).is_some_and(|(x, _)| derived::newer_version(&x).is_some())).map(|f| f.id).collect()
 }
 
 /// The history text of [`apply`].
@@ -58,6 +74,14 @@ pub fn outdated(doc: &Document) -> Vec<Outdated> {
                     let Some(x) = ExternalRef::parse(f.params.text("partStudio")) else { continue };
                     if let Some(v) = derived::newer_version(&x) {
                         out.push(Outdated { label: format!("{} in {}", derived::describe_external(&x), t.name), from: String::new(), to: v, kind: OutdatedKind::Derived(t.id, f.id, x) });
+                    }
+                }
+                for f in &ps.features {
+                    let Some((x, name)) = linked_feature(&f.type_id) else { continue };
+                    if let Some(v) = derived::newer_version(&x) {
+                        let doc_name = derived::external_doc_info(&x.path).map(|i| i.name).unwrap_or_default();
+                        let from = version_label(&x).unwrap_or_default();
+                        out.push(Outdated { label: format!("{doc_name} ({}) in {}", f.name, t.name), from, to: v, kind: OutdatedKind::CustomFeature(t.id, f.id, x, name.to_string()) });
                     }
                 }
             }
@@ -158,6 +182,13 @@ pub fn apply(o: &Outdated, doc: &mut Document) {
                 f.params.set("partStudio", noshape_model::params::ParamValue::Text(key));
             }
         }
+        OutdatedKind::CustomFeature(tab, fid, x, name) => {
+            if let Some(TabContent::PartStudio(ps)) = doc.tab_mut(*tab).map(|t| &mut t.content)
+                && let Some(f) = ps.feature_mut(*fid)
+            {
+                f.type_id = noshape_model::custom::studio_type_id(&ExternalRef { microversion: o.to.microversion, ..x.clone() }.key(), name);
+            }
+        }
         OutdatedKind::Drawing(tab, x) => {
             let name = derived::external_doc_info(&x.path).map(|i| i.name).unwrap_or_default();
             if let Some(TabContent::Drawing(d)) = doc.tab_mut(*tab).map(|t| &mut t.content) {
@@ -198,6 +229,7 @@ pub fn version_refs(doc: &Document) -> Vec<(TabId, ExternalRef)> {
             TabContent::PartStudio(ps) => {
                 studios(&ps.variable_studios.inserted);
                 out.extend(ps.features.iter().filter(|f| f.type_id == "importDerived").filter_map(|f| ExternalRef::parse(f.params.text("partStudio"))).map(|x| (t.id, x)));
+                out.extend(ps.features.iter().filter_map(|f| linked_feature(&f.type_id)).map(|(x, _)| (t.id, x)));
             }
             TabContent::Assembly(a) => {
                 studios(&a.variable_studios.inserted);

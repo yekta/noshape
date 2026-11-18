@@ -3905,7 +3905,34 @@ impl PartStudioView {
 
     /// The features list's rows, in their own cached slice (see `PsSlices`);
     /// the head is `render_feature_list_head`.
+    /// Look again (off the UI thread) for features from another document's version that has a newer one, when the
+    /// list's linked features changed.
+    fn refresh_outdated_linked(&mut self, cx: &mut Context<Self>) {
+        let Some(studio) = self.studio(cx) else { return };
+        let linked: Vec<(FeatureId, String)> = studio.features.iter().filter(|f| noshape_ops::workspace_update::linked_feature(&f.type_id).is_some()).map(|f| (f.id, f.type_id.clone())).collect();
+        if linked == self.ui.linked_read {
+            return;
+        }
+        self.ui.linked_read = linked;
+        if self.ui.linked_read.is_empty() {
+            self.ui.linked_task = None;
+            self.ui.outdated_linked.clear();
+            return;
+        }
+        let ps = studio.clone();
+        self.ui.linked_task = Some(cx.spawn(async move |this, cx| {
+            let outdated = cx.background_spawn(async move { noshape_ops::workspace_update::outdated_features(&ps) }).await;
+            let _ = this.update(cx, |this, cx| {
+                if this.ui.outdated_linked != outdated {
+                    this.ui.outdated_linked = outdated;
+                    cx.notify();
+                }
+            });
+        }));
+    }
+
     fn render_feature_list(&mut self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
+        self.refresh_outdated_linked(cx);
         let pal = p();
         // The model is only borrowed (not cloned): walk it into what the rows
         // are, then build them.
@@ -4563,7 +4590,7 @@ impl PartStudioView {
         // The selection's size only shows on a selected row (its drag pill's "2 items").
         let selected = self.selected_features.contains(&id) || self.row_ctx.picked.contains(&id);
         (i >= self.row_ctx.rollback, self.rolled_to(id, cx), selected, selected.then_some(self.selected_features.len())).hash(&mut h);
-        (self.row_ctx.related.contains(&id), self.row_ctx.pending.contains(&id), self.ui.derived_open.contains(&id)).hash(&mut h);
+        (self.row_ctx.related.contains(&id), self.row_ctx.pending.contains(&id), self.ui.derived_open.contains(&id), self.ui.outdated_linked.contains(&id)).hash(&mut h);
         // The open dialog shows in a row only through these two (the edited row itself is drawn inline).
         self.edit_uses(id, cx).hash(&mut h);
         Some(h.finish())
@@ -5981,6 +6008,25 @@ impl PartStudioView {
             })
             // In-context arrow (features referencing an Assembly context).
             .children(self.context_arrow(f, cx))
+            // A feature from another document's version with a newer one: the blue update indicator, which opens the
+            // Reference manager (live2 custom-feature-1118 e2 / e4).
+            .when(self.ui.outdated_linked.contains(&id), |d| {
+                let doc = self.doc.clone();
+                d.child(
+                    div()
+                        .id(SharedString::from(format!("feat-update-{id}")))
+                        .debug_selector(move || format!("feat-update-{id:?}"))
+                        .map(|d| crate::ui_script::mark(d, || "button:Change version of linked document".into()))
+                        .flex_none()
+                        .cursor_pointer()
+                        .tooltip(crate::ui::tooltip("Change version of linked document"))
+                        .child(crate::assets::icon("inserted-version-update", 16., cx))
+                        .on_click(move |_, _, cx| {
+                            cx.stop_propagation();
+                            doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Ui(noshape_ops::UiRequest::ReferenceManager)));
+                        }),
+                )
+            })
             // Onshape's expression glyph on features with dynamic suppression,
             // suppressed or not (live ui 10-25 c: a grey #888 italic "fx" at the
             // row's right, tooltip "Dynamic suppression: {#s == 0}").
@@ -6180,6 +6226,8 @@ impl PartStudioView {
         // ROLL-LAST; `behaviors::roll_items`).
         let (here, to_end) = self.studio(cx).map(|s| behaviors::roll_items(i, s.rollback_index(), s.features.len())).unwrap_or((false, false));
         let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, typed_name(g)))));
+        let linked_doc = noshape_ops::workspace_update::linked_feature(&f.type_id).map(|(x, _)| x.path);
+        let linked_outdated = self.ui.outdated_linked.contains(&id);
         let feature_name = f.name.clone();
         // A Derived feature's source studio ("Switch to qa5 src", live "qa5
         // derived" (6)).
@@ -6328,6 +6376,17 @@ impl PartStudioView {
             // <feature>…, which opens its normal edit dialog.
             if errored {
                 m = m.item(item(&format!("Edit healthy moment of {feature_name}…"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
+            }
+            // Live2 custom-feature-1118: a feature from another document's version offers Update linked document… (the
+            // Reference manager, with a newer version) and Open linked document.
+            if let Some(path) = linked_doc.clone() {
+                if linked_outdated {
+                    let doc = view.read(cx).doc.clone();
+                    m = m.item(item("Update linked document…", Box::new(move |_, _, cx| doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Ui(noshape_ops::UiRequest::ReferenceManager))))));
+                }
+                m = m.item(item("Open linked document", Box::new(move |this, _, cx| {
+                    let _ = crate::part_studio_hooks::open_document_window(path.clone(), this.gpu.clone(), cx);
+                })));
             }
             if let Some((sid, sname)) = source_sketch.clone() {
                 // Live (de-sc-4): „Sketch 1 [Skizze]“ bearbeiten …, the sketch's

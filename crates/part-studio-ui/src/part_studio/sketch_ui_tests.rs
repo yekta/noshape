@@ -5576,3 +5576,178 @@ fn a_click_on_a_configuration_row_doesnt_switch_to_it(cx: &mut TestAppContext) {
     assert_ne!(after.as_deref(), Some(rows[1].as_str()), "the click didn't switch to A");
     assert_eq!(after, before);
 }
+
+const PROBE_FS: &str = r#"FeatureScript 3095;
+import(path : "onshape/std/geometry.fs", version : "3095.0");
+
+export enum ProbeMode
+{
+    annotation { "Name" : "First mode" }
+    FIRST,
+    annotation { "Name" : "Second mode" }
+    SECOND
+}
+
+export enum ProbeSide
+{
+    annotation { "Name" : "Left" }
+    LEFT,
+    annotation { "Name" : "Right" }
+    RIGHT
+}
+
+const probeTable = {
+        "name" : "size", "displayName" : "Size",
+        "entries" : {
+            "Small" : { "name" : "grade", "displayName" : "Grade", "entries" : { "A" : 1, "B" : 2 } },
+            "Large" : { "name" : "grade", "displayName" : "Grade", "entries" : { "A" : 3, "B" : 4 } }
+        }
+    };
+
+annotation { "Feature Type Name" : "Probe all", "Feature Type Description" : "live2 probe" }
+export const probeAll = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Faces", "Filter" : EntityType.FACE, "MaxNumberOfPicks" : 2 }
+        definition.faces is Query;
+        annotation { "Name" : "Mode" }
+        definition.mode is ProbeMode;
+        annotation { "Name" : "Side", "UIHint" : UIHint.HORIZONTAL_ENUM }
+        definition.side is ProbeSide;
+        annotation { "Name" : "Length" }
+        isLength(definition.len, LENGTH_BOUNDS);
+        annotation { "Name" : "Angle" }
+        isAngle(definition.ang, ANGLE_360_BOUNDS);
+        annotation { "Name" : "Count" }
+        isInteger(definition.count, POSITIVE_COUNT_BOUNDS);
+        annotation { "Name" : "Ratio" }
+        isReal(definition.ratio, POSITIVE_REAL_BOUNDS);
+        annotation { "Name" : "Label" }
+        definition.label is string;
+        annotation { "Name" : "Flip", "UIHint" : UIHint.OPPOSITE_DIRECTION }
+        definition.flip is boolean;
+        annotation { "Name" : "Fail on purpose" }
+        definition.fail is boolean;
+        annotation { "Name" : "More options" }
+        definition.more is boolean;
+        if (definition.more)
+        {
+            annotation { "Name" : "Extra length", "UIHint" : UIHint.REMEMBER_PREVIOUS_VALUE }
+            isLength(definition.extra, LENGTH_BOUNDS);
+        }
+        annotation { "Name" : "Size", "Lookup Table" : probeTable }
+        definition.size is LookupTablePath;
+    }
+    {
+        if (definition.fail)
+            throw regenError("Probe failure on purpose", ["len"]);
+    });
+"#;
+
+/// A Part Studio with Feature Studio "Probe" (`PROBE_FS`) and the dialog of its "Probe all" open.
+fn probe_dialog(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    let (window, view) = part_studio(cx, name);
+    let fs = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let mut id = None;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_document("Add tabs", cx, |d| id = Some(d.add_tab("Probe", noshape_model::TabContent::FeatureStudio(noshape_model::custom::FeatureStudio::new(PROBE_FS)))));
+                let _ = doc.custom_features();
+            });
+            id.expect("the tab")
+        })
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature(&noshape_model::custom::type_id(fs, "probeAll"), w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    (window, view)
+}
+
+/// Live2 custom-feature-1118 (b1, b3, b4): a custom feature's generated dialog: a plain enum is a select without a
+/// label, HORIZONTAL_ENUM tabs, defaults from the bounds, the OPPOSITE_DIRECTION boolean a flip, a lookup table one
+/// select per level; ticked, the conditional field shows under its checkbox; a regenError naming `len` turns the title
+/// red and Length pink, its message only in the title's tooltip.
+#[gpui::test]
+fn a_custom_features_dialog_is_generated_and_fails_as_live(cx: &mut TestAppContext) {
+    let (window, view) = probe_dialog(cx, "cf-probe");
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    let state = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| dialog.read(cx).ui_state(w, cx)).unwrap();
+    let fields = |s: &serde_json::Value| -> Vec<(String, String, String)> {
+        s["fields"].as_array().into_iter().flatten().map(|f| (f["label"].as_str().unwrap_or("-").to_string(), f["text"].as_str().unwrap_or_default().to_string(), f["state"].as_str().unwrap_or_default().to_string())).collect()
+    };
+    let s = state(cx);
+    assert_eq!(s["tabs"].as_array().map(|t| t.iter().map(|t| t["label"].as_str().unwrap_or_default().to_string()).collect::<Vec<_>>()), Some(vec!["Left".to_string(), "Right".to_string()]));
+    let labels: Vec<String> = fields(&s).into_iter().map(|f| format!("{} {}", f.0, f.1).trim().to_string()).collect();
+    assert_eq!(labels, ["Faces", "- First mode", "Length 25 mm", "Angle 30 deg", "Count 2", "Ratio 1", "Label", "toggle", "Fail on purpose", "More options", "Size Small", "Grade A"]);
+    dialog.update(cx, |d, cx| {
+        d.set_value("more", noshape_model::ParamValue::Bool(true), cx);
+        d.set_value("fail", noshape_model::ParamValue::Bool(true), cx);
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.schedule_regen(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && dialog.read(cx).status.is_some());
+    draw(cx, window);
+    let s = state(cx);
+    let f = fields(&s);
+    assert_eq!(s["titleState"], "error", "the title red");
+    assert!(f.iter().any(|f| f.0 == "Length" && f.2 == "error"), "Length pink: {f:?}");
+    let more = f.iter().position(|f| f.0 == "More options").expect("More options");
+    assert_eq!(f.get(more + 1).map(|f| f.0.as_str()), Some("Extra length"), "under its checkbox");
+    let title = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("dialog-title").expect("the title");
+    crate::ui_script::clear_tooltip();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(gpui_kit::point(title.origin.x + px(20.), title.center().y), None, Modifiers::default());
+    for _ in 0..50 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(10));
+        draw(cx, window);
+    }
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Probe all 1 did not regenerate properly: Probe failure on purpose A parameter value is not valid."));
+}
+
+/// Live2 custom-feature-1118 (e2, e4): a custom feature from another document's V1 once that document has a V2: the
+/// row's blue update indicator ("Change version of linked document") and, in its menu, Update linked document… and
+/// Open linked document.
+#[gpui::test]
+fn a_linked_feature_behind_a_newer_version_shows_the_update_indicator(cx: &mut TestAppContext) {
+    let dir = std::env::temp_dir().join(format!("noshape-ui-linked-lib-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let lib = dir.join("lib.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", lib.display()));
+    }
+    let lib_s = lib.to_str().unwrap().to_string();
+    let mut ctx = noshape_ops::Ctx::new();
+    let mut call = |tool: &str, args: serde_json::Value| noshape_ops::registry::run(&mut ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+    call("document_create", serde_json::json!({ "path": lib_s }));
+    call("tab_create", serde_json::json!({ "kind": "featurestudio", "name": "Probe" }));
+    call("featurestudio_edit", serde_json::json!({ "tab": "Probe", "source": PROBE_FS }));
+    call("featurestudio_commit", serde_json::json!({ "tab": "Probe" }));
+    call("history_create_version", serde_json::json!({ "name": "V1" }));
+    let types = call("feature_types", serde_json::json!({ "document": lib_s, "version": "V1" }));
+    let ty = types["feature_studios"][0]["features"][0]["type"].as_str().expect("Probe all").to_string();
+    call("featurestudio_edit", serde_json::json!({ "tab": "Probe", "source": PROBE_FS.replace("live2 probe", "probe, edited") }));
+    call("featurestudio_commit", serde_json::json!({ "tab": "Probe" }));
+    call("history_create_version", serde_json::json!({ "name": "V2" }));
+    let (window, view) = part_studio_with(cx, "linked-update", |path| {
+        let session = crate::session::Session::create(path, crate::user_units::new_document()).unwrap();
+        drop(session);
+        let mut ctx = noshape_ops::Ctx::new();
+        let mut call = |tool: &str, args: serde_json::Value| noshape_ops::registry::run(&mut ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call("document_open", serde_json::json!({ "path": path.to_str().unwrap() }));
+        call("feature_add", serde_json::json!({ "tab": "Part Studio 1", "type": ty }));
+        drop(ctx);
+        crate::session::Session::open(path).unwrap()
+    });
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui.outdated_linked.is_empty());
+    draw(cx, window);
+    let id = cx.update(|cx| view.read(cx).studio(cx).and_then(|s| s.features.last().map(|f| f.id))).expect("Probe all 1");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    assert!(vcx.debug_bounds(Box::leak(format!("feat-update-{id:?}").into_boxed_str())).is_some(), "the update indicator");
+    let row = vcx.debug_bounds(Box::leak(format!("feature-row-{id:?}").into_boxed_str())).expect("the row");
+    let at = gpui_kit::point(row.origin.x + px(40.), row.center().y);
+    vcx.simulate_mouse_down(at, gpui_kit::MouseButton::Right, Modifiers::default());
+    vcx.simulate_mouse_up(at, gpui_kit::MouseButton::Right, Modifiers::default());
+    draw(cx, window);
+    let labels = cx.update(|cx| crate::os_menu::open_labels(cx));
+    assert!(labels.iter().any(|l| l == "Update linked document…") && labels.iter().any(|l| l == "Open linked document"), "{labels:?}");
+}
+

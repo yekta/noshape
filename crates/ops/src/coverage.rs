@@ -564,6 +564,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:New sketch…", Op("sketch_create")),
     ("partStudio:None", Op("context_show")),
     ("partStudio:Open linked document", Op("document_open")),
+    ("partStudio:Update linked document…", Op("document_update_references")),
     ("partStudio:Remove", Op("ui_toolbar")),
     ("partStudio:Offset plane…", Op("feature_add")),
     ("partStudio:Extrude…", Op("feature_add")),

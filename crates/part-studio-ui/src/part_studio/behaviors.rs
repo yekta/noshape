@@ -233,6 +233,11 @@ pub struct UiState {
     pub isolate: Option<Isolation>,
     /// Derived rows whose derived sketches are listed under them (▸ open).
     pub derived_open: std::collections::HashSet<FeatureId>,
+    /// Features from another document's version that has a newer one (the row's update indicator), and the type ids
+    /// they were read for; read off the UI thread.
+    pub outdated_linked: std::collections::HashSet<FeatureId>,
+    pub linked_read: Vec<(FeatureId, String)>,
+    pub linked_task: Option<gpui_kit::Task<()>>,
     /// The open dialog's feature info shown as the graphics bubble.
     pub dialog_info: Option<String>,
     /// Cameras before discrete view changes (Previous view).
@@ -791,6 +796,9 @@ impl UiState {
             context_arrow_hover: None,
             isolate: None,
             derived_open: Default::default(),
+            outdated_linked: Default::default(),
+            linked_read: Vec::new(),
+            linked_task: None,
             dialog_info: None,
             cam_history: Vec::new(),
             pointer: None,

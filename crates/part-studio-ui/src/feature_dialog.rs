@@ -4403,6 +4403,10 @@ impl Render for FeatureDialog {
         } else if range_invalid {
             let base = status.as_ref().map(|s| s.1.clone()).filter(|m| m != VALUE_NOT_VALID).unwrap_or_default();
             Some((FeatureStatus::Error, format!("{base} {VALUE_NOT_VALID}")))
+        } else if let Some((FeatureStatus::Error, msg)) = status.as_ref().filter(|s| !self.faulty.is_empty() && !s.1.ends_with(VALUE_NOT_VALID)) {
+            // An error naming fields appends it too (live2 custom-feature-1118 b4: "…: Probe failure on purpose A
+            // parameter value is not valid."; Revolute limits, Linear pattern distance).
+            Some((FeatureStatus::Error, format!("{msg} {VALUE_NOT_VALID}")))
         } else {
             status
         };

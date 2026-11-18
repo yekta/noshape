@@ -103,6 +103,10 @@ pub fn bind_keys(cx: &mut App) {
 /// Pause after the last keystroke before the text is saved (not committed).
 const SAVE_DELAY: Duration = Duration::from_millis(700);
 
+/// Pause after the last keystroke before the typed text is checked (live vs-fs-feel-1117: an error's gutter x and
+/// squiggle within 0.5 s, before saving).
+const CHECK_DELAY: Duration = Duration::from_millis(300);
+
 /// Requests for the workspace.
 pub enum FeatureStudioEvent {
     /// Open (or focus) the Search Feature Studios pane.
@@ -576,6 +580,8 @@ pub struct FeatureStudioView {
     /// Notices of the saved text (`studio_notices`), shown as squiggles.
     notices: Vec<Notice>,
     save_task: Option<Task<()>>,
+    /// The typed text's check ([`CHECK_DELAY`]).
+    check_task: Option<Task<()>>,
     compile_task: Option<Task<()>>,
     /// Module outline popover: its "Search symbols…" field.
     outline: Option<Entity<InputState>>,
@@ -733,7 +739,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, check_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, _subs: subs };
         this.recompile(source, cx);
         // std's names, read for the completion list off the UI thread before the first key needs them.
         cx.background_spawn(async {
@@ -1156,6 +1162,13 @@ impl FeatureStudioView {
         self.save_task = Some(cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(SAVE_DELAY).await;
             let _ = this.update(cx, |this: &mut Self, cx| this.save(cx));
+        }));
+        self.check_task = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(CHECK_DELAY).await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                let src = this.editor.read(cx).value().to_string();
+                this.recompile(src, cx);
+            });
         }));
         cx.notify();
     }

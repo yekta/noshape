@@ -45,6 +45,8 @@ pub enum UiRequest {
     CloseHistory,
     /// Restore the workspace to a history point (a viewed change's Restore to Main): the restore dialog.
     Restore { to: MicroversionId, name: String },
+    /// The Reference manager (a linked feature's update indicator, Update linked document…).
+    ReferenceManager,
 }
 
 /// A list change as the list's menus make it.
@@ -302,7 +304,7 @@ impl WindowState {
             UiRequest::Compare(c) => self.compare = c.clone(),
             UiRequest::Repair(r) => self.repair = r.clone(),
             // view_camera, view_display, ui_select and ui_list keep their state themselves.
-            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } | UiRequest::Select { .. } | UiRequest::List { .. } | UiRequest::ReloadToolbars | UiRequest::CloseHistory | UiRequest::Restore { .. } => {}
+            UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } | UiRequest::Select { .. } | UiRequest::List { .. } | UiRequest::ReloadToolbars | UiRequest::CloseHistory | UiRequest::Restore { .. } | UiRequest::ReferenceManager => {}
         }
     }
 }

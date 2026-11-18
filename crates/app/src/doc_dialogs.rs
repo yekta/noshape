@@ -247,87 +247,6 @@ pub fn move_to(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
     });
 }
 
-/// One reference to another document that has a newer version.
-#[derive(Clone)]
-struct Outdated {
-    label: String,
-    from: String,
-    to: crate::derived::VersionChoice,
-    kind: OutdatedKind,
-}
-
-#[derive(Clone)]
-enum OutdatedKind {
-    /// A Derived feature (tab, feature id) pinned to `ExternalRef`.
-    Derived(noshape_model::document::TabId, noshape_model::reference::FeatureId, crate::derived::ExternalRef),
-    /// A Variable Studio table from another document (element / studio tab, studio id).
-    Variables(noshape_model::document::TabId, noshape_model::document::TabId),
-}
-
-/// References of this workspace to other documents' versions with a newer
-/// version available.
-fn outdated_references(doc: &noshape_model::Document) -> Vec<Outdated> {
-    use noshape_model::variables::VariableStudioRefs;
-    let mut out = Vec::new();
-    for t in &doc.tabs {
-        let mut studio_refs = |owner: noshape_model::document::TabId, refs: &[noshape_model::variables::StudioRef]| {
-            for r in refs {
-                let Some(e) = &r.external else { continue };
-                let Ok(mv) = e.microversion.parse() else { continue };
-                let x = crate::derived::ExternalRef { path: e.path.clone(), microversion: mv, tab: String::new() };
-                if let Some(v) = crate::derived::newer_version(&x) {
-                    let doc_name = crate::derived::external_doc_info(&e.path).map(|i| i.name).unwrap_or_default();
-                    out.push(Outdated { label: format!("{doc_name} (Variable Studio) in {}", t.name), from: e.version.clone(), to: v, kind: OutdatedKind::Variables(owner, r.studio) });
-                }
-            }
-        };
-        match &t.content {
-            TabContent::PartStudio(ps) => {
-                let VariableStudioRefs { inserted, .. } = &ps.variable_studios;
-                studio_refs(t.id, inserted);
-                for f in ps.features.iter().filter(|f| f.type_id == "importDerived") {
-                    let Some(x) = crate::derived::ExternalRef::parse(f.params.text("partStudio")) else { continue };
-                    if let Some(v) = crate::derived::newer_version(&x) {
-                        out.push(Outdated { label: format!("{} in {}", crate::derived::describe_external(&x), t.name), from: String::new(), to: v, kind: OutdatedKind::Derived(t.id, f.id, x) });
-                    }
-                }
-            }
-            TabContent::Assembly(a) => studio_refs(t.id, &a.variable_studios.inserted),
-            TabContent::VariableStudio(v) => studio_refs(t.id, &v.inserted),
-            _ => {}
-        }
-    }
-    out
-}
-
-/// Point one outdated reference at its newest version.
-fn apply_update(o: &Outdated, doc: &mut noshape_model::Document) {
-    match &o.kind {
-        OutdatedKind::Derived(tab, fid, x) => {
-            if let Some(TabContent::PartStudio(ps)) = doc.tab_mut(*tab).map(|t| &mut t.content)
-                && let Some(f) = ps.feature_mut(*fid)
-            {
-                let key = crate::derived::ExternalRef { microversion: o.to.microversion, ..x.clone() }.key();
-                f.params.set("partStudio", noshape_model::params::ParamValue::Text(key));
-            }
-        }
-        OutdatedKind::Variables(owner, studio) => {
-            let refs: Option<&mut Vec<noshape_model::variables::StudioRef>> = match doc.tab_mut(*owner).map(|t| &mut t.content) {
-                Some(TabContent::PartStudio(ps)) => Some(&mut ps.variable_studios.inserted),
-                Some(TabContent::Assembly(a)) => Some(&mut a.variable_studios.inserted),
-                Some(TabContent::VariableStudio(v)) => Some(&mut v.inserted),
-                _ => None,
-            };
-            if let Some(r) = refs.and_then(|refs| refs.iter_mut().find(|r| r.studio == *studio))
-                && let Some(e) = &mut r.external
-            {
-                e.microversion = o.to.microversion.to_string();
-                e.version = o.to.label.clone();
-            }
-        }
-    }
-}
-
 /// ☰ › Update workspace…: the workspace's feature library goes to the latest; noshape ships one, so live's toast says
 /// it already is.
 pub fn update_workspace(doc: Entity<DocModel>, cx: &mut App) {
@@ -337,7 +256,7 @@ pub fn update_workspace(doc: Entity<DocModel>, cx: &mut App) {
 /// The Reference manager (a tab's "Newer versions of linked documents available" icon): references to other
 /// documents with newer versions, updated together (Update to latest).
 pub fn reference_manager(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
-    let outdated = outdated_references(&doc.read(cx).session.doc);
+    let outdated = noshape_ops::workspace_update::outdated(&doc.read(cx).session.doc);
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
         let rows: Vec<AnyElement> = if outdated.is_empty() {
@@ -369,7 +288,7 @@ pub fn reference_manager(doc: Entity<DocModel>, window: &mut Window, cx: &mut Ap
             )
             .on_ok(move |_, _, cx| {
                 let list = list.clone();
-                doc.update(cx, |d, cx| d.edit_document(noshape_ops::workspace_update::DESCRIPTION, cx, |document| list.iter().for_each(|o| apply_update(o, document))));
+                doc.update(cx, |d, cx| d.edit_document(noshape_ops::workspace_update::DESCRIPTION, cx, |document| list.iter().for_each(|o| noshape_ops::workspace_update::apply(o, document))));
                 true
             })
     });
