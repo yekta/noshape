@@ -57,7 +57,7 @@ impl PartStudioView {
         }), window, cx);
     }
 
-    fn run_part_export(&mut self, s: ExportSettings, name: String, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn run_part_export(&mut self, s: ExportSettings, name: String, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(msg) = missing_writer(s.format) {
             self.flash_info(msg, cx);
             return;

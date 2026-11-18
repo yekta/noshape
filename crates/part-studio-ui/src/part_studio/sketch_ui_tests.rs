@@ -5094,6 +5094,8 @@ mod sketch_label;
 mod sketch_glyph;
 #[path = "sketch_box_feel_tests.rs"]
 mod sketch_box;
+#[path = "export_feel_tests.rs"]
+mod export_feel;
 
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.
