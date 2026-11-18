@@ -85,10 +85,6 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Queued to land
 
-- Landed 11-17 10:28 as a14ef99e (queued as 15a48786): Search tools' toolbar highlight as live (psui/toolbar-highlight: `.is-highlighted` on the
-  button, #fcda7f + `inset 0 0 0 2px #fab601`, no border, nothing moves; a dropdown member lights the ⌄ alone).
-  ui.rs `search_highlight`, part_studio/mod.rs `found` / `in_menu`, T1 `toolbar_highlight::` (fails with the old
-  border: Sketch 99 → 103 px).
 - live's timings (11-17, live/psui/timings-1117, SwiftShader lanes): click → selected face drawn 57–67 ms (ours 8.5),
   "Area" readout 167–185 ms; Extrude 1 double-click → dialog 322–448 ms (ours 17), preview 0.73–2.2 s. Put into the
   latency test's TARGETS comments when next touched.
@@ -133,7 +129,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - 07:35: landing the list's own row double-click (same row within 400 ms, anywhere on it: live2 consts-1118 pinned) and
   a test for the new feature's row while its dialog is open (live workflow-1118). FEEL-FL-AUTOSCROLL-DROP verified by qa.
 - 07:43 landed 850ae7f3 (row double-click by time, new-feature row test).
-- 07:55 in the worktree (lead 07:4x order: hover, then the audit's P0 rows): `Viewport::pick_on_move` (set by
+- 08:35 landed as 4c5eba9f (lead 07:4x order: hover, then the audit's P0 rows): `Viewport::pick_on_move` (set by
   `push_tool_cursor` / `set_tool` while a sketch tool is active; the delay no longer reads `tool_captures_left`, so a
   plane ring and assembly parts keep the pause); viewport move / pick times on the executor clock. Glyph rows: the
   glyphs drawn last frame (`ui.glyph_boxes`) take the hover from the geometry under them, gaps between a row's glyphs
@@ -146,7 +142,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - live 11-18 key parity: Sketch tooltip "Create new sketch (shift+s)" (`tool_tooltip`, test), Tab manager "Tab manager
   (alt/⌥+t)". Plane reach: ours passes 6 px but lights at 8 across iso's slanted edges (5 px pick square + 5 px border
   band; live 8 → nothing; live's older 3d.json level border 7–8): a pick-shape change touches every reach matrix, open.
-- Next: the audit's other P0 rows (hover-pick-1120 connector reach 22/13 px (test written, first run pending); sel-feel two-block counts, region relates
+- Queued 08:4x 7be7ced4 (live2 mass-appear-1118): Mass keeps the old totals while an added part is measured
+  (`ui.mass_shown`), the colour mixer's square changes only on a drag; tests. Connector reach fixed in 4c5eba9f.
+- Next: the audit's other P0 rows ( sel-feel two-block counts, region relates
   only its sketch; measure-mass panel place 440×521; nav Ctrl+wheel / pinch; manip Ctrl / Alt, triad drag look).
 
 ## Next queue
