@@ -120,14 +120,24 @@ docs/DECISIONS.md (read first; it wins over anything here).
   500 / 250 / 125 ms animations, part rows toggle on Ctrl or Cmd; live2's (b) Ctrl-only box deselect (ours Ctrl or
   Cmd; live's Cmd unverified): left.
 
+## 11-18 00:4x
+- Landed 591643fc / 403bbe0b: feature-list rows, graphics menus over a selection. Queued 8d2e0056: measure angles toward
+  middles + Mass button / `[` (live2 measure-mass-1118), spinner as live (900 ms, 50 px box, 1.1 s turn), rollback bar
+  back to live2's rb-followup (over Default geometry → top; blue-grey only hovered; qa told), viewport offset test.
+- VIEWPORT OFFSET (skasm, lead P0): not reproduced on green. hat15b (copy on vibex6, deleted), 1440 × 900, list at its
+  end, Sketch 1, n, 14 wheel steps: the line under the pointer lights and a click selects it. ±10 px is the reach (and the
+  screw hole's rim). The perceived offset is latency: at load 27 on llvmpipe the highlight shows 1.2–2.2 s after the
+  rest, so a moving pointer sees what it left. Test sketch_hover::the_pointer_lights_the_line_under_it_whatever_the_window_and_list.
+  Rig: /root/psui-scratch/offset (run.sh / step*.sh, DOC=… for another document; vibex6 :665).
+
 ## Next queue
-1. live2's document-level rows still open: the regeneration spinner (from ~0.75 s a 50 × 50 box at the viewport's
-   bottom centre, blue arc pulsing 30 ↔ 42 px, until the display catches up; old model drawn, rows grey italic);
-   the tab-switch order is studios'.
-2. Graphics / row menus vs ctx-menus-1117 menus-a.json, case by case (row-top-plane, row-part, edge, vertex, empty,
-   plane-top-graphics, sketch2-line) and menus-sk.json (sketch mode, skasm's tools); open times are faster than live.
-3. SELFEEL-PART-ROW: qa re-checks in the quiet window.
-4. Rollback bar colour has no matrix row (a colour readout of the bar's 7 px strip would do).
+1. Lead 11-18: pixel parity of hover / select highlights vs live crops (face fill, edge colour / width hover vs select,
+   silhouettes, hidden edges, selected part amber, sketch entity hover / select). live's numbers: behaviours
+   "EDGE-HIGHLIGHT-LOOK" (10-27); scene tests/edge_looks.rs already checks the edge band and faces; next: selected part
+   amber, silhouettes / hidden edges at hover, sketch entity hover / select widths; ask live2 for crops it lacks.
+2. qa P2 HOVER-LEAVES-WINDOW: a face hovered just before the pointer leaves the window stays outlined.
+3. live2's (b): box deselect with Ctrl only (ours Ctrl or Cmd; live's Cmd unverified): left.
+4. Menus vs ctx-menus-1117 menus-sk.json (sketch mode).
 
 ## Current order (lead 11-17 ~14:05)
 
