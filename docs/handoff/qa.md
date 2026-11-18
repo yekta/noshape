@@ -205,15 +205,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 ## Open items
 - **Speed (P0)**: owners got their slower-than-live documents 11-15 (blend, core, bool, bool2, dx, skasm; archive has the
   list). Re-list what is still slower after each valid nightly row.
-- **Interaction latency**: absolute numbers only from the nightly (DECISIONS 11-15). Send owners only what the nightly
-  confirms slow, or > 3x a PLAN 2.7 target. psui owns the hat15 fillet edit (Tab not applying a variable-bound Radius).
-- dx: c2-rings-loft x_t import works since 0.4.56 but 9-10 s vs live 8.6 (sent to dx, queue item).
-- bool: knife Mirror 1 128 / 220 / 140 ms (0.4.53 / 0.4.55 / 35baa32f): bool's 846aace6a says fixed; check in the next valid nightly.
+- **Speed rule**: DECISIONS 9e5b481d4 (>= 100 ms and >= 2x on a user action; P0 = >= 20 % and >= 100 ms, A/B >= 5 runs on one host).
 - Agent ids changed 11-17 09:25 / 10:35 (psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2
   e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios 58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6,
   live2 79ae5cdb-42a4-4025-b43a-da61a4f92ad7 (11-17 13:2x); bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core d30002ca-d013-4435-b7d9-7da9cb564cec (11-18 20:0x),
   blend de66e481-56e2-4005-a5d3-9fa897ca5fde (11-18 20:0x), dx 2108c2b7-2f48-43a7-87a0-3f652e3cda6d (11-17 18:4x)). No qa script holds agent ids.
-- QUIT-ABORT-DOCK: verified fixed (80e16e42d); guarded by the nightly and rel-published.
 
 ## Expected userdocs differences (not regressions)
 - none against 0.4.56. hat15 vs 0.4.43 always DIFFs (Fan Riser +5.83 mm³, STEP reference 51188.66 -> .65): known.
