@@ -32,6 +32,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 Our solver keeps links' waist arcs on live's branch (probe /root/skasm-scratch/probes/links-waist-probe.patch).
 
 ## Waiting on live (REQUESTS)
+- 11:12 c2-surf-intro-mutualtrim "Title" (feature 4, its first difference): the text sketch is on face JHG (y = 0,
+  normal +y); our face frame (origin 0, x -X, y +Z) leaves the text off the face (12 loose parts; live 1). On the -y
+  faces (fill, ruled) ours matches live. Asked for live's frame of that sketch; its baseline COINCIDENT to JHV is
+  untranslated (no text point of ours).
 - 06:2x wave-washer sketches.json (Sketch 4's rectangles stored inconsistently; ours solves them outward).
 - 06:4x surf-intro Derived 1 sources (5 docs stop at Derived 1 NOT BUILT).
 
