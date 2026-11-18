@@ -656,6 +656,28 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - Equal to live (live2): 1294, 1296, 1297. live2 next: the non-P0 "?" rows (ui-speed 1088-1093, prefs, numfmt, 1199, 1236, 893,
   1114, 1163); snap-diag 1303 stays qa's (Snap reach, on hold for asm).
 
+## Slower than live per feature: live's rollback step costs (live 14:1x, live/qa/rbstep-1118/tables2.md) vs ours today (qa 14:5x)
+Ours: release build of 80a64725 (qa's 08:53 sweep, vibe2 at nice 10, loaded: hints), two passes; live: step ms (≈ its full-regen
+per-feature time). Each owner re-times on the Mac (DECISIONS 11-16) before and after a fix.
+| document | feature | ours ms | live step ms | × | owner |
+|---|---|---|---|---|---|
+| cf-snap-hook | Fillet 6 | 112-121 | 9 | ×13 | blend |
+| cf-snap-hook | Snap Hook 1 / 2 | 234-266 | 82 / 86 | ×3 | bool (its cuts) |
+| c2-fan-blade-sweep | Boolean 2 | 1032-1119 | 377 | ×2.8 | bool |
+| c2-fan-blade-sweep | Extrude 8 | 119-127 | 10 | ×12 | core |
+| c2-fan-blade-sweep | Derived 1 | 155-169 | 51 | ×3.2 | core |
+| motor-mount-jack | Fillet 2 / Fillet 1 | 30-46 / 35-69 | 2.5 / 5 | ×12 / ×7 | blend |
+| motor-mount-jack | Extrude 2 | 72-133 | 9 | ×8 | core |
+| c2-bottle-split | Shell 1 | 28-51 | 4 | ×7 | bool |
+| c2-bottle-split | Revolve 2 / Split 1 | 50-53 / 16-18 | 6.5 / 3 | ×8 / ×5 | core |
+| learning-center-michael | Fillet 2 | 290-675 | 47 | ×6 | blend (bool's cylinder x torus pairs) |
+| c2-variable-fillet-faceblend | Face blend 1 | 99-115 | 26 | ×4 | blend |
+| c2-rings-loft | Shell 1 | 667-921 | 224 | ×3 | bool |
+| c2-rings-loft | Circular pattern 1 / 2 | 692-1132 / 166-302 | 692 / 172 | ×1-1.6 | core |
+| c2-tpd-fillet-variable | Fillet 1 | 139-166 | 38.5 | ×3.9 | blend |
+| c2-helical-sweep | Sweep 1 | 125-128 | 27.5 | ×4.6 | bool2 |
+| cf-spur-gear | whole document | 1913-2343 | 720 | ×2.9 | dx (gears share one name) |
+
 ## Interaction feel: live2's "Ours" cells, batch 8 (ui-speed rows 1090-1093: 2 equal, 2 not; live2 13:3x, green c7d388e8, landed 0f833da72)
 - [ ] **P1 ROLLBACK-DROP-INPLACE (psui)**: the rollback bar lands 0.14-0.24 s after the drop; live's ~0.1 s (live UI shown 134 / 91 ms).
 - [ ] **P1 MASS-VALUES-DELAY (psui)**: Mass properties' values appear 313 ms after the part is picked; live's 154 ms.
