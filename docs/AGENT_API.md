@@ -7396,7 +7396,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
-| `format` | one of `PARASOLID`, `ACIS`, `STEP`, `IGES`, `PVZ`, `JT`, `RHINO`, `GLTF`, `GLB`, `OBJ`, `3MF`, `STL` | required | File format. |
+| `format` | one of `PARASOLID`, `ACIS`, `STEP`, `IGES`, `PVZ`, `JT`, `RHINO`, `GLTF`, `GLB`, `OBJ`, `3MF`, `STL`, `Inspection list` | required | File format ("Inspection list": a part's, with `parts`: its Part Studio's Model definitions Characteristics as CSV, as a part row's Export…). |
 | `file` | string |  | Output path; without an extension the format's is added ("part" -> "part.x_t"); individual files go in a .zip. Required unless `options` is "store" (then only its name is used; default "<tab>.<ext>"). |
 | `options` | one of `download`, `download_and_store`, `store` |  | Options: write `file` (Download), and / or keep the file as a file tab right after the tab (Store file in a new tab; one edit "Store <file>"). |
 | `parts` | array of string |  | Part ids (`body:…`) or names; default all visible parts. |
