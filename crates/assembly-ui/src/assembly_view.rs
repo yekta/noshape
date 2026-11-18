@@ -841,7 +841,7 @@ impl AssemblyView {
             // A new mate brings its connectors together (free values zero;
             // live qa5 A4: Slider flip turns the block over onto the plate).
             if s.editing.is_none() && !s.solve_all {
-                opts.hold_values.extend(noshape_model::assembly::eval::new_mate_holds(&m));
+                opts.hold_values.extend(noshape_model::assembly::eval::new_mate_holds(&m, &self.units(cx)));
             }
             match s.editing.and_then(|id| asm.mates.iter().position(|x| x.id == id)) {
                 Some(i) => asm.mates[i] = m,

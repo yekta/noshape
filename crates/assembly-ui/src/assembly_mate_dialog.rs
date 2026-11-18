@@ -739,6 +739,16 @@ impl MateDialog {
 
     /// The primary-axis alignment chosen when both connectors of a new mate
     /// are picked (`flip_primary`: true = the Z axes agree).
+    /// Ticks Limits and types `text` into a limit box, as a user does.
+    #[cfg(test)]
+    pub fn type_limit(&mut self, key: &str, max: bool, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.use_limits = true;
+        let (lo, hi) = self.limits[key].clone();
+        let field = if max { hi } else { lo };
+        field.update(cx, |s, cx| s.set_value(text.to_string(), window, cx));
+        cx.emit(MateDialogEvent::Changed);
+    }
+
     pub fn set_flip(&mut self, flip_primary: bool, cx: &mut Context<Self>) {
         if self.flip_primary != flip_primary {
             self.flip_primary = flip_primary;

@@ -1147,6 +1147,45 @@ fn a_faces_connector_takes_a_dot_within_50_px_else_its_centroid(cx: &mut TestApp
     .unwrap();
 }
 
+/// Live asm/feel3-1118 r1–r4: a new Revolute's typed min "30" turns the preview from 0° to 30° at once (clamped into the
+/// range); a max of 60 then leaves it at 30°.
+#[gpui::test]
+fn a_typed_limit_turns_the_new_mates_preview_into_range(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "limit-preview");
+    let angle = |cx: &mut TestAppContext| {
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+        cx.run_until_parked();
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let id = v.mate.as_ref().unwrap().dialog.read(cx).to_mate(cx).unwrap().id;
+            let m = v.result.mates.iter().find(|m| m.id == id).expect("the previewed mate");
+            assert!(m.ok, "{:?}", m.message);
+            m.values[0].to_degrees()
+        })
+    };
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Revolute, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+        });
+    })
+    .unwrap();
+    assert!(angle(cx).abs() < 1e-6, "the connectors meet at 0°");
+    let limit = |max: bool, text: &'static str, cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| {
+            let dialog = view.read(cx).mate.as_ref().unwrap().dialog.clone();
+            dialog.update(cx, |d, cx| d.type_limit("rz", max, text, w, cx));
+        })
+        .unwrap();
+    };
+    limit(false, "30 deg", cx);
+    assert!((angle(cx) - 30.0).abs() < 1e-6, "turned to the minimum");
+    limit(true, "60 deg", cx);
+    assert!((angle(cx) - 30.0).abs() < 1e-6, "stays at 30°");
+}
+
 /// Live asm/feel-1117 c-a-rowhover: hovering an instance's row outlines the part in the graphics, in hover orange, with
 /// no tint on its faces (was: the accent fill).
 #[gpui::test]

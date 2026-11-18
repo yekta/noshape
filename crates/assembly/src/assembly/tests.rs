@@ -337,6 +337,44 @@ fn slider_respects_limits() {
     assert!((o.z - 0.025).abs() < 1e-3, "inside range: {o:?}");
 }
 
+/// Live asm/feel3-1118: a Revolute limited to 30°..60° (Part 1 fixed) stops exactly at 60° on a long drag one way and
+/// at 30° the other way, with no message.
+#[test]
+fn a_revolute_drag_stops_at_its_limits() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let mut m = mate(10, MateType::Revolute, conn(2, bottom, Inference::Centroid), conn(1, top, Inference::Centroid));
+    m.limits = vec![("rz".into(), Limits { min: Some(ExprValue::new("30 deg")), max: Some(ExprValue::new("60 deg")) })];
+    let asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.0, 0.0, 0.02), false),
+        ],
+        mates: vec![m],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+    let start = res.mates[0].values[0].to_degrees();
+    assert!((30.0 - 1e-6..=60.0 + 1e-6).contains(&start), "starts inside the range: {start}");
+    // Block <2>'s local origin, a bottom corner, in the world.
+    let corner = DVec3::from(res.solved.placement(InstanceId(2)).unwrap().translation);
+    let axis = DVec3::new(0.02, 0.01, 0.01);
+    // As the view drags: each pointer step solved from the drag's start, seen from the top; the pointer 100° round.
+    let start: std::collections::HashMap<InstanceId, Placement> = res.solved.placements.iter().cloned().collect();
+    let drag_to = |turn: f64| {
+        let target = axis + DQuat::from_rotation_z(turn.to_radians()) * (corner - axis);
+        let opts = SolveOptions { drags: vec![(InstanceId(2), DVec3::ZERO, target)], drag_view: Some(DVec3::Z), start: Some(start.clone()), ..Default::default() };
+        res.prepared.solve_drag(&opts, &[corner], true).0.mate_values[&MateId(10)][0].to_degrees()
+    };
+    let ends = [100.0, -100.0].map(drag_to);
+    let (lo, hi) = (ends[0].min(ends[1]), ends[0].max(ends[1]));
+    assert!((lo - 30.0).abs() < 1e-3 && (hi - 60.0).abs() < 1e-3, "stops at 30° and 60°: {ends:?}");
+}
+
 /// A drag step one solve lands takes that solve (a Slider's block pulled
 /// along its axis); one the mates hold off its pointer reports it and takes
 /// the substeps from the drag's start (`Prepared::solve_drag`).
@@ -884,7 +922,7 @@ fn slider_flip_primary_turns_the_part_over() {
     assert!(z.z < -0.999, "turned over onto the base after the flip: {z:?}");
     // The new mate's preview holds its free value at zero: the connectors
     // meet, so the turned-over block sits on the base (not below it).
-    let opts = SolveOptions { hold_values: eval::new_mate_holds(&asm.mates[0]), ..Default::default() };
+    let opts = SolveOptions { hold_values: eval::new_mate_holds(&asm.mates[0], &UnitPrefs::default()), ..Default::default() };
     let res = ev.evaluate(&f.doc, &asm, &opts, None);
     let (fa, fb) = (res.mates[0].frame_a.unwrap(), res.mates[0].frame_b.unwrap());
     assert!((fa.origin - fb.origin).length() < 1e-6, "connectors meet: {:?} {:?}", fa.origin, fb.origin);

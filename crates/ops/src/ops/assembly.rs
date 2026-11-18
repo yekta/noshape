@@ -956,10 +956,10 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // dialog does (live "qa4 round 5 s3 mate flip": Cylindrical and Planar
     // land at t (0,0,−30), the connectors coincident).
     if editing.is_none() && opts.only_mate.is_some() {
-        opts.hold_values.extend(noshape_model::assembly::eval::new_mate_holds(&m));
+        let units = od.doc().settings.units;
+        opts.hold_values.extend(noshape_model::assembly::eval::new_mate_holds(&m, &units));
         // Two free parts: the one live keeps in place (the dialog's rule).
         if opts.hold.len() == 1 && m.mate_type != MateType::Width {
-            let units = od.doc().settings.units;
             let current = od.evaluate_assembly(&sa::effective(&asm, &asm.configuration.defaults()), &SolveOptions::default());
             opts.hold = vec![noshape_model::assembly::eval::new_mate_stays(&current, &m, &units)];
         }

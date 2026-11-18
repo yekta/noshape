@@ -1524,10 +1524,22 @@ pub fn new_mate_stays(_result: &AssemblyResult, m: &super::Mate, _units: &UnitPr
 /// A new mate's preview holds: every free value at zero, so the moving
 /// instance lands with its mate connector on the other one (Onshape brings
 /// the connectors together; qa5 A4: a flipped Slider turns the block over
-/// onto the plate instead of sliding it below). For
+/// onto the plate instead of sliding it below), clamped into the mate's
+/// limits (live feel3-1118: min 30 deg turns the part to 30°). For
 /// [`SolveOptions::hold_values`].
-pub fn new_mate_holds(m: &super::Mate) -> Vec<(MateId, usize, f64)> {
-    mate_dofs(m.mate_type).iter().map(|(ix, _)| (m.id, *ix, 0.0)).collect()
+pub fn new_mate_holds(m: &super::Mate, units: &UnitPrefs) -> Vec<(MateId, usize, f64)> {
+    let keys = limit_keys(m.mate_type);
+    let clamp = |ix: usize| {
+        let dim = if ix == 0 { Dim::ANGLE } else { Dim::LENGTH };
+        let Some((_, l)) = m.limits.iter().find(|(key, _)| limit_index(key) == Some(ix) && keys.contains(&key.as_str())) else { return 0.0 };
+        let (lo, hi) = (eval_opt(&l.min, dim, units), eval_opt(&l.max, dim, units));
+        if lo.zip(hi).is_some_and(|(a, b)| a > b) {
+            return 0.0;
+        }
+        let v = lo.map_or(0.0, |a| a.max(0.0));
+        hi.map_or(v, |b| v.min(b))
+    };
+    mate_dofs(m.mate_type).iter().map(|(ix, _)| (m.id, *ix, clamp(*ix))).collect()
 }
 
 /// Degrees of freedom of a mate type that can be driven (Animate, named
