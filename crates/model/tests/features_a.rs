@@ -7,7 +7,7 @@ use noshape_model::configuration::ConfigValues;
 use noshape_model::display::FeatureStatus;
 use noshape_model::params::{ParamValue, ParamValues};
 use noshape_model::partstudio::PartStudio;
-use noshape_model::reference::{BodyId, DatumPlane, FeatureId, Reference};
+use noshape_model::reference::{BodyId, DatumPlane, FeatureId, Reference, Role, TopoName};
 use noshape_model::regen::context::{Body, Context};
 use noshape_model::regen::{RegenOptions, RegenResult, Regenerator};
 use noshape_model::sketch_feature::SketchData;
@@ -1937,6 +1937,34 @@ fn a_part_left_open_is_named_as_a_surface() {
     assert_eq!(names, ["Surface 1", "Part 1"]);
 }
 
+/// Move face's Offset of a plane moves it along its normal, its sloping neighbours running on to it (c2-impeller-loft's
+/// Flansch (vorne) verbreitern): a 20 mm block drafted 10° grown 5 mm at its top is the frustum 15 mm high.
+#[test]
+fn move_face_offset_of_a_plane_between_sloping_sides() {
+    let mut t = T::new();
+    let (_, x) = t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
+    t.set(x, "hasDraft", b(true));
+    t.set(x, "draftAngle", e("10 deg"));
+    let res = t.ok();
+    // The side at height h: 20 mm narrowed or widened by the draft on both sides.
+    let frustum = |h: f64, s: f64| {
+        let k = 2.0 * s * 10f64.to_radians().tan();
+        let side = |z: f64| 0.02 - k * z;
+        h * (side(0.0).powi(2) + side(0.0) * side(h) + side(h).powi(2)) / 3.0
+    };
+    let v = total_volume(&res.context);
+    let s = if near(v, frustum(0.01, 1.0), 1e-9) { 1.0 } else { -1.0 };
+    assert!(near(v, frustum(0.01, s), 1e-9), "drafted block {v}");
+    let top = face_with_normal(&res.context.bodies[0], DVec3::Z);
+    t.add("moveFace", &[("moveFaces", q(vec![top])), ("offsetDistance", e("5 mm"))]);
+    let res = t.ok();
+    let body = &res.context.bodies[0];
+    assert!(body.shape.is_valid());
+    assert_eq!(body.faces.len(), 6);
+    let v = total_volume(&res.context);
+    assert!(near(v, frustum(0.015, s), 1e-9), "grown {v}, expected {}", frustum(0.015, s));
+}
+
 #[test]
 fn move_face_offset_and_translate() {
     let mut t = T::new();
@@ -1957,23 +1985,45 @@ fn move_face_offset_and_translate() {
     assert_eq!(res.display.features[2].status, FeatureStatus::Error);
 }
 
-/// Move face Offset names the part's faces as it always has, so references saved before still find them
-/// (c2-impeller-loft: its Flansch (vorne) verbreitern named another way left Move face 2's face, Delete face 2 and a
-/// fillet's edges unresolved, IMPELLER-MOVE-FACE-2-REF): every face is the Offset of the one it was.
+/// References saved when OCCT's offset made a Move face Offset name every face the Offset of the one it was
+/// (IMPELLER-MOVE-FACE-2-REF): a fillet on the edge between two sides by those names still finds it.
 #[test]
-fn move_face_offset_keeps_the_parts_face_names() {
+fn move_face_offset_keeps_references_by_occts_offset_names() {
     let mut t = T::new();
     t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
     let res = t.ok();
-    let before: Vec<String> = res.context.bodies[0].faces.iter().map(|n| format!("{n:?}")).collect();
-    let top = face_with_normal(&res.context.bodies[0], DVec3::Z);
-    t.add("moveFace", &[("moveFaces", q(vec![top])), ("offsetDistance", e("5 mm"))]);
+    let b = &res.context.bodies[0];
+    let (Reference::Face(top), Reference::Face(bottom)) = (face_with_normal(b, DVec3::Z), face_with_normal(b, -DVec3::Z)) else { panic!("faces") };
+    let Some(TopoName::Edge { faces: [x, y], ordinal }) = b.edges.iter().map(|n| (**n).clone()).find(|n| matches!(n, TopoName::Edge { faces: [x, y], .. } if ![x, y].iter().any(|f| ***f == top || ***f == bottom))) else { panic!("an upright edge") };
+    let top_ref = face_with_normal(b, DVec3::Z);
+    let m = t.add("moveFace", &[("moveFaces", q(vec![top_ref])), ("offsetDistance", e("5 mm"))]);
+    let offset = |f: &std::sync::Arc<TopoName>| std::sync::Arc::new(TopoName::face(m, Role::Offset(f.clone())));
+    let edge = Reference::Edge(TopoName::edge(offset(&x), offset(&y), ordinal));
+    t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("1 mm"))]);
+    let res = t.regen();
+    let f = &res.display.features[3];
+    assert_eq!((&f.status, f.message.as_deref()), (&FeatureStatus::Ok, None));
+}
+
+/// References saved when the booleans made a Move face Offset (OCCT's offset failed: v0.4.58's c2-impeller-loft
+/// Flansch (vorne) verbreitern) named the moved face's neighbours as they were: a fillet on the edge between two of them
+/// still finds it (it lost 2 of its edges: "2 missing selections").
+#[test]
+fn move_face_offset_keeps_references_to_its_neighbours_old_names() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
     let res = t.ok();
-    let after: Vec<String> = res.context.bodies[0].faces.iter().map(|n| format!("{n:?}")).collect();
-    assert_eq!(after.len(), before.len());
-    for b in &before {
-        assert!(after.iter().any(|a| a.contains(&format!("role: Offset({b})"))), "no Offset of {b} in {after:#?}");
-    }
+    let b = &res.context.bodies[0];
+    let (Reference::Face(top), Reference::Face(bottom)) = (face_with_normal(b, DVec3::Z), face_with_normal(b, -DVec3::Z)) else { panic!("faces") };
+    // An upright edge: between two sides, both beside the top.
+    let upright = b.edges.iter().find(|n| matches!(&***n, TopoName::Edge { faces: [x, y], .. } if ![x, y].iter().any(|f| ***f == top || ***f == bottom))).expect("an upright edge");
+    let edge = Reference::Edge((**upright).clone());
+    let top_ref = face_with_normal(b, DVec3::Z);
+    t.add("moveFace", &[("moveFaces", q(vec![top_ref])), ("offsetDistance", e("5 mm"))]);
+    t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("1 mm"))]);
+    let res = t.regen();
+    let f = &res.display.features[3];
+    assert_eq!((&f.status, f.message.as_deref()), (&FeatureStatus::Ok, None));
 }
 
 /// A face moved through the far side of the part fails with Onshape's
