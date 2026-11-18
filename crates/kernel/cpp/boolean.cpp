@@ -1974,6 +1974,78 @@ TopoDS_Shape recut_arc_seams(const TopoDS_Shape& s, HHist& hist)
   return out;
 }
 
+// Whether every face USD's `u` made of two or more of `in`'s is on an elementary surface.
+static bool merges_elementary(const TopoDS_Shape& in, ShapeUpgrade_UnifySameDomain& u)
+{
+  const occ::handle<BRepTools_History> h = u.History();
+  if (h.IsNull())
+    return false;
+  NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> from;
+  for (TopExp_Explorer x(in, TopAbs_FACE); x.More(); x.Next())
+    for (const TopoDS_Shape& m : h->Modified(x.Current()))
+      if (int* n = from.ChangeSeek(m))
+        ++*n;
+      else
+        from.Bind(m, 1);
+  for (NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher>::Iterator it(from); it.More(); it.Next())
+  {
+    if (it.Value() < 2)
+      continue;
+    occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(it.Key()));
+    while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(g))
+      g = t->BasisSurface();
+    if (g.IsNull() || !g->IsKind(STANDARD_TYPE(Geom_ElementarySurface)))
+      return false;
+  }
+  return true;
+}
+
+// Whether every face USD made of two or more lies, at each piece's points (its vertices and a 5 x 5 grid over its
+// parameters), within `tol` of the merged face's surface.
+static bool pieces_within(const TopoDS_Shape& in, ShapeUpgrade_UnifySameDomain& u, double tol)
+{
+  const occ::handle<BRepTools_History> h = u.History();
+  if (h.IsNull())
+    return false;
+  NCollection_DataMap<TopoDS_Shape, ShapeList, TopTools_ShapeMapHasher> from;
+  for (TopExp_Explorer x(in, TopAbs_FACE); x.More(); x.Next())
+    for (const TopoDS_Shape& m : h->Modified(x.Current()))
+    {
+      if (ShapeList* l = from.ChangeSeek(m))
+        l->Append(x.Current());
+      else
+        from.Bind(m, ShapeList{x.Current()});
+    }
+  for (NCollection_DataMap<TopoDS_Shape, ShapeList, TopTools_ShapeMapHasher>::Iterator it(from); it.More(); it.Next())
+  {
+    if (it.Value().Extent() < 2)
+      continue;
+    const occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(it.Key()));
+    if (g.IsNull())
+      return false;
+    for (const TopoDS_Shape& piece : it.Value())
+    {
+      const TopoDS_Face&  f = TopoDS::Face(piece);
+      std::vector<gp_Pnt> pts;
+      for (TopExp_Explorer v(f, TopAbs_VERTEX); v.More(); v.Next())
+        pts.push_back(BRep_Tool::Pnt(TopoDS::Vertex(v.Current())));
+      double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+      BRepTools::UVBounds(f, u0, u1, v0, v1);
+      BRepAdaptor_Surface sf(f);
+      for (int i = 0; i < 5; ++i)
+        for (int j = 0; j < 5; ++j)
+          pts.push_back(sf.Value(u0 + (u1 - u0) * (i + 0.5) / 5, v0 + (v1 - v0) * (j + 0.5) / 5));
+      for (const gp_Pnt& p : pts)
+      {
+        GeomAPI_ProjectPointOnSurf pr(p, g);
+        if (!pr.IsDone() || pr.NbPoints() == 0 || pr.LowerDistance() > tol)
+          return false;
+      }
+    }
+  }
+  return true;
+}
+
 // Whether a usd_kept_volume on this thread since unify_in reset it found the faces' order doesn't change USD's
 // rejected merge (the same one three times running).
 thread_local bool t_usd_order_moot = false;
@@ -2114,7 +2186,12 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
     const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag, &memo);
-    if (!keeps_volume(change, u.Shape()))
+    // (Or every merged piece on its merged face's surface itself (within 1e-7 m), each an elementary surface, within
+    // 1e-8 of the volume: the change then only its edges', as 850efe's Extrude 5, coaxial cylinders of one radius in
+    // pieces, 3e-9 of its volume; live one face each.)
+    const double need  = change ? std::abs(*change) : 0;
+    const auto   roomy = [&] { return change && need <= 1e-8 * std::abs(volume0()) && (need == 0 || (merges_elementary(in, u) && pieces_within(in, u, Precision::Confusion()))); };
+    if (!keeps_volume(change, u.Shape()) && !roomy())
     {
       // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
       // rest: cf-spur-gear's Boolean 2 tried eight, 86 ms each. A notched cylinder fused with its mirror is kept at
@@ -8765,6 +8842,248 @@ struct TrimAfter
   ~TrimAfter() { trim_if_grown(start); }
 };
 
+// A Boolean's solid without its faces narrower than Parasolid's 1e-5 m, as live's (live/bool/q-union-merge: the step
+// face between two blocks' tops 0.1 to 10 um apart is gone, the tops stay two faces; at 20 um it stays; asm-isaac-ball
+// e54410's 2 um step). Such a face: one wire of two long edges within 1e-5 m of each other all along and short ones (at
+// most 1e-5 m long) between their ends. (A face as narrow only in part stays: a04711's 0.05 mm² wedge, 1 to 110 um
+// wide, kept by live.) Its first long edge then stands for both, its short edges go and their ends join; the result
+// kept only valid.
+static TopoDS_Shape drop_strip_faces(const TopoDS_Shape& s, HHist& hist, std::vector<TopoDS_Vertex>& joined)
+{
+  constexpr double tol = 1e-5 * (1 + 1e-9);
+  if (!TopExp_Explorer(s, TopAbs_SOLID).More() || TopExp_Explorer(s, TopAbs_FACE, TopAbs_SHELL).More())
+    return s;
+  auto length = [](const TopoDS_Edge& e) { return GCPnts_AbscissaPoint::Length(BRepAdaptor_Curve(e)); };
+  // The largest distance from `a`'s points to `b`, past `tol` soon given up.
+  auto apart = [&](const TopoDS_Edge& a, const TopoDS_Edge& b) {
+    BRepAdaptor_Curve  ca(a), cb(b);
+    ShapeAnalysis_Curve sa;
+    double             worst = 0;
+    for (int i = 0; i <= 8 && worst <= tol; ++i)
+    {
+      gp_Pnt proj;
+      double par;
+      const gp_Pnt p = ca.Value(ca.FirstParameter() + (ca.LastParameter() - ca.FirstParameter()) * i / 8);
+      worst          = std::max(worst, sa.Project(cb, p, Precision::Confusion(), proj, par, true));
+    }
+    return worst;
+  };
+  // (Its maps only once a face may be one: most results have none.)
+  ShapeAncMap ef, ve;
+  bool        mapped = false;
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
+  ShapeIMap                      touched;
+  std::vector<TopoDS_Vertex>     made;
+  BRep_Builder                   bb;
+  int                            dropped = 0;
+  for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(fx.Current());
+    // (Cheap first: every vertex of it near another of it.)
+    ShapeIMap vs;
+    TopExp::MapShapes(f, TopAbs_VERTEX, vs);
+    if (vs.Extent() < 4 || vs.Extent() % 2 != 0)
+      continue;
+    bool paired = true;
+    for (int i = 1; i <= vs.Extent() && paired; ++i)
+    {
+      const gp_Pnt p    = BRep_Tool::Pnt(TopoDS::Vertex(vs(i)));
+      bool         close = false;
+      for (int j = 1; j <= vs.Extent() && !close; ++j)
+        close = j != i && p.Distance(BRep_Tool::Pnt(TopoDS::Vertex(vs(j)))) <= tol;
+      paired = close;
+    }
+    if (!paired)
+      continue;
+    int nw = 0;
+    for (TopExp_Explorer wx(f, TopAbs_WIRE); wx.More(); wx.Next())
+      ++nw;
+    if (nw != 1)
+      continue;
+    std::vector<TopoDS_Edge> lng, shrt;
+    bool                     ok = true;
+    for (TopExp_Explorer ex(f, TopAbs_EDGE); ex.More() && ok; ex.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(ex.Current());
+      ok                   = !BRep_Tool::Degenerated(e) && !BRep_Tool::IsClosed(e, f) && !touched.Contains(e);
+      if (ok)
+        (length(e) <= tol ? shrt : lng).push_back(e);
+      ok = ok && lng.size() <= 2;
+    }
+    if (!ok || lng.size() != 2 || shrt.empty() || lng[0].IsSame(lng[1]))
+      continue;
+    if (!mapped)
+    {
+      TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+      TopExp::MapShapesAndAncestors(s, TopAbs_VERTEX, TopAbs_EDGE, ve);
+      mapped = true;
+    }
+    const TopoDS_Edge &keep = lng[0], &drop = lng[1];
+    const int          ik = ef.FindIndex(keep), id = ef.FindIndex(drop);
+    if (ik == 0 || id == 0 || ef(ik).Extent() != 2 || ef(id).Extent() != 2)
+      continue;
+    const TopoDS_Face f1 = TopoDS::Face(ef(ik).First().IsSame(f) ? ef(ik).Last() : ef(ik).First());
+    const TopoDS_Face f2 = TopoDS::Face(ef(id).First().IsSame(f) ? ef(id).Last() : ef(id).First());
+    if (f1.IsSame(f2) || f1.IsSame(f) || f2.IsSame(f))
+      continue;
+    // (Between two planes only: live keeps e54410's 2.3 um flat between two cylinders, Extrude 17.)
+    if (BRepAdaptor_Surface(f1, false).GetType() != GeomAbs_Plane || BRepAdaptor_Surface(f2, false).GetType() != GeomAbs_Plane)
+      continue;
+    const double d = std::max(apart(keep, drop), apart(drop, keep));
+    if (d > tol)
+      continue;
+    TopoDS_Vertex a0, a1, b0, b1;
+    TopExp::Vertices(keep, a0, a1);
+    TopExp::Vertices(drop, b0, b1);
+    if (a0.IsSame(a1) || b0.IsSame(b1))
+      continue;
+    const gp_Pnt pa0 = BRep_Tool::Pnt(a0), pa1 = BRep_Tool::Pnt(a1);
+    const bool   same = pa0.Distance(BRep_Tool::Pnt(b0)) <= pa0.Distance(BRep_Tool::Pnt(b1));
+    const TopoDS_Vertex m0 = same ? b0 : b1, m1 = same ? b1 : b0;
+    for (const TopoDS_Shape& x : {TopoDS_Shape(a0), TopoDS_Shape(a1), TopoDS_Shape(m0), TopoDS_Shape(m1)})
+      ok = ok && !touched.Contains(x);
+    if (!ok)
+      continue;
+    // The joined ends: each keep's vertex where it was, wide enough for the dropped one's edges, with its parameters
+    // on those edges.
+    TopoDS_Vertex nv[2];
+    const TopoDS_Vertex olds[2][2] = {{a0, m0}, {a1, m1}};
+    for (int k = 0; k < 2; ++k)
+    {
+      const TopoDS_Vertex &va = olds[k][0], &vb = olds[k][1];
+      const double         t  = std::max(BRep_Tool::Tolerance(va), BRep_Tool::Tolerance(vb) + BRep_Tool::Pnt(va).Distance(BRep_Tool::Pnt(vb))) * (1 + 1e-9);
+      nv[k]                   = rs->CopyVertex(va, t);
+      const int iv            = ve.FindIndex(vb);
+      for (const TopoDS_Shape& e : iv ? ve(iv) : ShapeList())
+      {
+        double par;
+        if (BRep_Tool::Parameter(vb, TopoDS::Edge(e), par))
+          bb.UpdateVertex(nv[k], par, TopoDS::Edge(e), t);
+      }
+    }
+    TopoDS_Edge ne = TopoDS::Edge(keep.Oriented(TopAbs_FORWARD).EmptyCopied());
+    bb.Add(ne, nv[0].Oriented(TopAbs_FORWARD));
+    bb.Add(ne, nv[1].Oriented(TopAbs_REVERSED));
+    bb.UpdateEdge(ne, std::max(BRep_Tool::Tolerance(keep), BRep_Tool::Tolerance(drop) + d) * (1 + 1e-9));
+    // (Its curve on the dropped edge's face too.)
+    ShapeFix_Edge().FixAddPCurve(ne, f2, false, BRep_Tool::Tolerance(ne));
+    made.push_back(nv[0]);
+    made.push_back(nv[1]);
+    rs->Replace(keep.Oriented(TopAbs_FORWARD), ne);
+    rs->Replace(drop.Oriented(TopAbs_FORWARD), (same ? ne : TopoDS::Edge(ne.Reversed())));
+    for (int k = 0; k < 2; ++k)
+    {
+      rs->Replace(olds[k][0].Oriented(TopAbs_FORWARD), nv[k].Oriented(TopAbs_FORWARD));
+      rs->Replace(olds[k][1].Oriented(TopAbs_FORWARD), nv[k].Oriented(TopAbs_FORWARD));
+    }
+    for (const TopoDS_Edge& e : shrt)
+      rs->Remove(e);
+    rs->Remove(f);
+    for (const TopoDS_Shape& x : {TopoDS_Shape(keep), TopoDS_Shape(drop), TopoDS_Shape(a0), TopoDS_Shape(a1), TopoDS_Shape(m0), TopoDS_Shape(m1), TopoDS_Shape(f1), TopoDS_Shape(f2)})
+      touched.Add(x);
+    for (const TopoDS_Edge& e : shrt)
+      touched.Add(e);
+    ++dropped;
+  }
+  if (dropped == 0)
+    return s;
+  const TopoDS_Shape out = rs->Apply(s);
+  int                n0 = 0, n1 = 0;
+  for (TopExp_Explorer x(s, TopAbs_SOLID); x.More(); x.Next())
+    ++n0;
+  for (TopExp_Explorer x(out, TopAbs_SOLID); x.More(); x.Next())
+    ++n1;
+  if (out.IsNull() || n0 != n1 || !BRepCheck_Analyzer(out).IsValid())
+    return s;
+  if (hist.IsNull())
+    hist = new BRepTools_History();
+  hist->Merge(rs->History());
+  // (The ends joined before, as they are now, and these.)
+  for (TopoDS_Vertex& v : joined)
+  {
+    const TopoDS_Shape now = rs->Value(v);
+    if (!now.IsNull() && now.ShapeType() == TopAbs_VERTEX)
+      v = TopoDS::Vertex(now);
+  }
+  joined.insert(joined.end(), made.begin(), made.end());
+  return out;
+}
+
+static TopoDS_Shape collapse_short_edges(const TopoDS_Shape& out, HHist& hist, const std::vector<TopoDS_Vertex>& joined)
+{
+  constexpr double tol    = 1e-5 * (1 + 1e-9);
+  auto             length = [](const TopoDS_Edge& e) { return GCPnts_AbscissaPoint::Length(BRepAdaptor_Curve(e)); };
+  BRep_Builder     bb;
+  // A straight edge of at most 1e-5 m left at a joined end between two planes (the step's other side's jog:
+  // e54410's 1.2 and 2 um edges, live's none): its ends one.
+  ShapeAncMap ef2, ve2;
+  TopExp::MapShapesAndUniqueAncestors(out, TopAbs_EDGE, TopAbs_FACE, ef2);
+  TopExp::MapShapesAndAncestors(out, TopAbs_VERTEX, TopAbs_EDGE, ve2);
+  ShapeIMap at;
+  for (const TopoDS_Vertex& v : joined)
+    at.Add(v);
+  occ::handle<BRepTools_ReShape> r2 = new BRepTools_ReShape();
+  ShapeIMap                      used;
+  int                            collapsed = 0;
+  for (int i = 1; i <= ef2.Extent(); ++i)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(ef2.FindKey(i));
+    if (ef2(i).Extent() != 2 || BRep_Tool::Degenerated(e) || BRepAdaptor_Curve(e).GetType() != GeomAbs_Line || length(e) > tol)
+      continue;
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    if (v0.IsSame(v1) || (!at.Contains(v0) && !at.Contains(v1)) || used.Contains(v0) || used.Contains(v1))
+      continue;
+    if (BRepAdaptor_Surface(TopoDS::Face(ef2(i).First()), false).GetType() != GeomAbs_Plane
+        || BRepAdaptor_Surface(TopoDS::Face(ef2(i).Last()), false).GetType() != GeomAbs_Plane)
+      continue;
+    const TopoDS_Vertex& stay = at.Contains(v0) ? v0 : v1;
+    const TopoDS_Vertex& go   = stay.IsSame(v0) ? v1 : v0;
+    const double         t    = std::max(BRep_Tool::Tolerance(stay), BRep_Tool::Tolerance(go) + BRep_Tool::Pnt(stay).Distance(BRep_Tool::Pnt(go))) * (1 + 1e-9);
+    const TopoDS_Vertex  nv   = r2->CopyVertex(stay, t);
+    const int            iv   = ve2.FindIndex(go);
+    for (const TopoDS_Shape& x : iv ? ve2(iv) : ShapeList())
+    {
+      double par;
+      if (!x.IsSame(e) && BRep_Tool::Parameter(go, TopoDS::Edge(x), par))
+        bb.UpdateVertex(nv, par, TopoDS::Edge(x), t);
+    }
+    r2->Replace(stay.Oriented(TopAbs_FORWARD), nv.Oriented(TopAbs_FORWARD));
+    r2->Replace(go.Oriented(TopAbs_FORWARD), nv.Oriented(TopAbs_FORWARD));
+    r2->Remove(e);
+    used.Add(v0);
+    used.Add(v1);
+    ++collapsed;
+  }
+  if (collapsed == 0)
+    return out;
+  const TopoDS_Shape out2 = r2->Apply(out);
+  if (out2.IsNull() || !BRepCheck_Analyzer(out2).IsValid())
+    return out;
+  hist->Merge(r2->History());
+  return out2;
+}
+
+static TopoDS_Shape without_strips(const TopoDS_Shape& s, HHist& hist)
+{
+  static const bool keep = std::getenv("NOSHAPE_BOOL_KEEP_STRIPS") != nullptr;
+  if (keep)
+    return s;
+  const KernelTimer timer("boolean.strips");
+  // (Again while it drops one: two strips sharing a face are dropped one at a time, as e54410's step and the 1.2 um
+  // wide piece of a bottom next to it.)
+  TopoDS_Shape               out = s;
+  std::vector<TopoDS_Vertex> joined;
+  for (int pass = 0; pass < 4; ++pass)
+  {
+    const TopoDS_Shape again = drop_strip_faces(out, hist, joined);
+    if (again.IsSame(out))
+      break;
+    out = again;
+  }
+  return joined.empty() ? out : collapse_short_edges(out, hist, joined);
+}
+
 static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts);
 
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
@@ -8919,7 +9238,10 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     if (done)
       t_bool_path = "fuse_slabs";
     if (done)
+    {
+      out = without_strips(out, h);
       return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
+    }
   }
   // A tool standing on a face of the target (a boss): built directly.
   // Two solids meeting on a whole planar face each (fuse_glued): first where either has free-form faces (noshape's
@@ -8952,6 +9274,7 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     if (!done)
       return std::nullopt;
     t_bool_path = "glued";
+    out = without_strips(out, h);
     return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
   };
   if (glue_first)
@@ -8969,7 +9292,10 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     if (done)
       t_bool_path = "on_face";
     if (done)
+    {
+      out = without_strips(out, h);
       return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
+    }
   }
   // One tool where it meets a large target: the faces it reaches only.
   if ((op == 0 || op == 1) && a.size() == 1 && t.size() == 1 && facets.source.empty() && opts.fuzzy <= 0 && opts.glue == 0)
@@ -8986,12 +9312,18 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     if (done)
     {
       t_bool_path = "local";
+      // (Its scope and maps not for a result without strips: the whole unify then.)
+      const TopoDS_Shape made = out;
+      out                     = without_strips(out, h);
+      const bool stripped     = !out.IsSame(made);
+      if (stripped)
+        scope.reset();
       // Where the unify (here or op_unify's) has to look (UnifyScope).
       bool clean = false;
       if (opts.unify)
         out = unify_in(out, h, scope.get(), &clean);
       std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("boolean.local_result");
-      OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &srcs, opts.unify ? nullptr : &maps);
+      OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &srcs, opts.unify || stripped ? nullptr : &maps);
       if (opts.unify)
         r.shape->myUnifyClean = clean;
       else
@@ -9014,7 +9346,10 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     if (done)
       t_bool_path = "through_holes";
     if (done)
+    {
+      out = without_strips(out, h);
       return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
+    }
   }
   // noshape's own Boolean (crates/brep) where it takes the inputs.
   if (rust_boolean_on() && (!facets.source.empty() || opts.fuzzy > 1e-6))
@@ -9073,7 +9408,10 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
       t_bool_path = "rust";
       // A target known to have nothing to merge: the unify (here or op_unify's) looks only where it changed.
       std::shared_ptr<const UnifyScope> scope;
-      if (!one_by_one && rs[0] != nullptr && rs[0]->myUnifyClean && unify_local_on())
+      const TopoDS_Shape made = out;
+      out                     = without_strips(out, h);
+      const bool stripped     = !out.IsSame(made);
+      if (!stripped && !one_by_one && rs[0] != nullptr && rs[0]->myUnifyClean && unify_local_on())
         scope = rust_unify_scope(*rs[0]);
       bool clean = false;
       if (opts.unify)
@@ -9086,7 +9424,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
       if (!opts.unify)
       {
         r.shape->myUnifyScope = scope;
-        rust_boolean_keep(*r.shape);
+        if (!stripped)
+          rust_boolean_keep(*r.shape);
       }
       return r;
     }
@@ -9104,7 +9443,10 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     if (done)
       t_bool_path = "cut_slabs";
     if (done)
+    {
+      out = without_strips(out, h);
       return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
+    }
   }
   // Many tools (not a pattern's checked glue, which handles its own): the
   // ones apart from each other as one argument each group.
@@ -9226,6 +9568,7 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     if (trimmed)
     {
       t_bool_path = "trimmed";
+      res  = without_strips(res, hist);
       res  = remesh_facets(opts.unify ? unify(res, hist) : res, facets, hist);
       return make_result(concat(args.items, tools.items), res, hist.get(), &srcs);
     }
@@ -9553,6 +9896,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     whole->Merge(hist);
     hist = whole;
   }
+  if (facets.source.empty())
+    res = without_strips(res, hist);
   res = remesh_facets(res, facets, hist);
   const KernelTimer timer("boolean.result");
   return make_result(inputs, res, hist.get(), &srcs);
