@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-17 12:34 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-18 10:00 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -25,7 +25,7 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   its_mirror_adds_whole (data blend/f197-chamfer3-input.brep). Before landing: userdocs + f197 + Hole docs + every
   ~/qa/tickets doc + qa's compat v0443 docs SAME (bin/ud-nk3.sh, the release-candidate set), g13 OK. GearLab
   (b2e0cbd71) landed.
-- qa P0 speed (11-17, vibe7 A/B v0.4.48 -> v0.4.53): knife Chamfer 2 10.7 -> 67.9, Fillet 5 18.8 -> 95, Fillet 3 136
+- qa P0 speed (11-17, vibex7 A/B v0.4.48 -> v0.4.53): knife Chamfer 2 10.7 -> 67.9, Fillet 5 18.8 -> 95, Fillet 3 136
   -> 188 ms; impeller Stevenrohr zum Halter 0.6 -> 2610 ms (fixed by 29c1841df, after .53; Mac main 2 ms). v0.4.53
   predates the 11-16 speed lands; to do: Mac A/B v0.4.48 vs main on those three (bin/ab-mac.sh; commit WIP first).
 - Knife blends left (Mac): Fillet 8 65 (live 12: OCCT's working-scale round 45 after the as-is fails 7; split-line
@@ -38,7 +38,7 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - Landed 11-16: d7f9264c9 impeller chamfer end edge joined (impeller 26 -> 27/48 on main; strict suite 127/127, userdocs
   SAME). Core told.
 - Scale-first blend6 4b2f94289 (base 3178c98b5): release suite strict-identical 127/127, userdocs ALL-SAME; assemblies
-  (vibe6, asm-sf-base.log / asm-sf.log, unit blend-seq-sf3) running; land when identical.
+  (vibex6, asm-sf-base.log / asm-sf.log, unit blend-seq-sf3) running; land when identical.
 - Live's knife times (11-16): Fillet 1-8 8/9/10/6/9/27/7/12 ms, studio 622; 11-17 (live/blend/knife-regen-1117.json):
   Chamfer 1 19, Chamfer 2 7, Fillet 2 10, Fillet 3 10, Fillet 8 12, studio 597-693. Lead: Fillet 5 at or below live is P0.
 - impeller Fillet 3: 4efe95564 landed (be6f0ca8, 34/93/60). 3df3608b1 landed 13:58 as f6274d94 (core told):
@@ -63,11 +63,11 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   79ae5cdb-42a4-4025-b43a-da61a4f92ad7, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core 6692ae35-758a-4442-81c8-29f67be2e21a, qa
   132756b3-e48d-4b9f-8a0e-3d4f23629c8b, psui 4973e295-9e92-463f-a13f-2ec5258bc5f9.
 - Queued from asm (after the current items): asm-gearbox-std 6a912b / a470167 Fillet 2 (EDGE fillet of 2 faces' edges,
-  tangent, 0.125 in: ours 38/92/56, live 38/88/52, -12.1 mm3; repro vibe6/7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/mgb
+  tangent, 0.125 in: ours 38/92/56, live 38/88/52, -12.1 mm3; repro vibex6/7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/mgb
   NOSHAPE_PARITY_ONLY=m6a912b); asm-scissor-lift fed22d Fillet 3 (Top - Side 2 45/110/64 vs 48/116/64; Motor Mount Live (q-gearbox-f2/corner.json): each corner a torus (27.55 mm2, its edge on the vertical round the
   whole r 6.35 quarter) + one 3-sided blend face (29.11 mm2); no 2.158 arc, no vertex along that edge (ours 61.4 mm2 vs
   56.66).
-  69/128/50 vs 66/121/46), then Fillets 4, 5, 15 fail (repro vibe7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/ms
+  69/128/50 vs 66/121/46), then Fillets 4, 5, 15 fail (repro vibex7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/ms
   ~/agents/dx-keep/ops-gB3; on main + cf49196a it differs at feature 6 Mirror 1 already: parked until dx's translator
   work lands). Gearbox: live's corner topology asked (REQUESTS 14:02); ours at each of 4 corners an OCCT 48.7 mm2
   B-spline patch + a 4-sided 12.72 mm2 torus.
@@ -87,7 +87,7 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   frame_at's 45 deg probes all classify outside ("could not orient a face at the edge", 10 ms). With the face's own
   normal as fallback (parked/f3-wedge-frame-wip.patch) the conic cut leaves 2 solids, 2.1 s; live removes 280 mm3,
   33/86/54 -> 34/95/62. Fillet Stevenrohr zum Halter (29) follows from it (its edges are Fillet 3's). Probe
-  parked/zz_probe_f3.rs, dumps vibe5 ~/tmp/blend/im3 (fillet-16 = the part after the chamfer). Live (live.jsonl
+  parked/zz_probe_f3.rs, dumps vibex7 ~/tmp/blend/im3 (fillet-16 = the part after the chamfer). Live (live.jsonl
   26 -> 27): removes the bore strip Jee, both lips' Extrude faces trimmed (840 -> 604 mm2, x to 54.7), the chamfer's
   two 6.18 mm2 tool faces -> 12.68 mm2; two conic faces JfC / JfG (177 mm2, y 0..+-1.02, z -43.9..-46.77) meet in a
   ridge JfZ along y = 0 at z -43.9 (below the bore's bottom -43.47): each round overflows the strip, touches its wall
@@ -110,14 +110,66 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## Next, in order
 
-1. P0 Halter (live's rule from live's capture, never guessed); tell core when it builds (core's Extrude impellerraum
-   input 35 faces vs live 39 waits on it).
-2. P0 speed: impeller Fillet 3 (Mac ~4-5 s vs live 0.1 s), profile with bin/sample-mac.sh.
-3. P2 asm: GearLab 1e81ca opFillet FILLET_FAILED (repro vibe7 NOSHAPE_FS_TRACE=1 NOSHAPE_PARITY_MODELS=
+1. Landed 11-18 06:27: Fillet 3 speed as 0451fe40 (core told). Lead's order 11-18: (a) impeller Fillet 4 (3a2 below)
+   and the merged-body Fillet 3 (3a: its dump fillet-26 succeeds at kernel level on main: valid, 34 faces, 34.56 mm3
+   off, live f28 34.77; recheck the whole feature on main), then report Fillet 3 on main vs live 103 ms; (b) knife
+   re-time on main, take what's still >5x live (4c); (c) Halter. Fillet 4 work: branch blend-f4 in blend9 (probe
+   crash_inputs::zz_fillet_edge: edge, faces, edges at its ends, radii 100..20 %), dumps in ~/tmp/blend/f3m on
+   vibex8 / vibe2. core: a 0.47 mm2 sliver on the x = 6 plane at z -3.96 beside JOV where live's round runs (Move
+   face 2 picks it too); live is capturing whether live's input has it.
+2. Halter (multi-day, lead; land in gated steps; tests: Fillet Stevenrohr zum Halter, core's Extrude impellerraum
+   input). Branch blend-halter (blend10). tighten_tolerances does NOT land (one more raw face behind equal shown
+   counts); keep it only if Halter needs it.
+   State (blend10 uncommitted on 1aabb5b68, 21:54): corner_run (spec.run_on + cornered chain): one loft per edge;
+   at a corner end the section runs straight on 2R; at a free end (the tip) a run of its own: continued_on_faces
+   marches the supports' crossing (Newton on both tangent planes: OCCT's section of the two extended B-splines at
+   ~20 deg came back empty), sections spaced as the edge's stations, lofted apart from the edge's loft (one loft
+   through the tip's turn bulged to 200,000 mm3), outward (negative volume reversed), fused to it, handed to
+   closed_run_on as the run (no plane split for fills). Runs 0.031 mm3, tools 3.31 mm3; each run meets only the wall
+   (faces 1 / 12, as live). Fails at the final Fuse (now caught: "the result lost the body", a volume guard for corner
+   runs). In situ (ZZINSITU): fills 0/1 (x 5 rounds) and 2 fuse valid alone; fill 3 (tip, mirror of 2) alone invalid
+   -19 mm3 even on the unrefaced body; fill 2 overlaps the body 0.40 mm3, fill 3 only touches. Tried, no: re-loft
+   instead of reversed() (kept), fuzzy 1e-7/1e-6, glue shift/full (fills stay separate solids), corners pushed into the
+   part (ZZ_INTO=0.3: x 5 rounds fine, tip fills lose the body: the tip is a sliver). Next idea: build the tip fills
+   so they cross the supports transversally only where the part is thick, or trim fill 3 against the body first.
+   Debug prints ZZ* / ZZ_INTO to strip before landing. Paused 11-18 05:50 for the lead's order below.
+3. P2 asm: GearLab 1e81ca opFillet FILLET_FAILED (repro vibex7 NOSHAPE_FS_TRACE=1 NOSHAPE_PARITY_MODELS=
    ~/agents/asm-keep/m1e ~/agents/asm-keep/bin/ops-c03 parity::parity_models); isaac-ball a2e4a2 f23 Chamfer 2
-   (TWO_OFFSETS 5.5/6, ours 51/124/68 40986.25 vs live 53/126/68 41594.02; repro NOSHAPE_PARITY_MODELS=
-   ~/agents/asm-keep/ma2v7 ~/agents/asm-keep/bin/ops-c04, DIFFERING; tell asm if the edge as sent looks wrong).
-4. qa's speed A/B (knife Chamfer 2 / Fillet 3 / Fillet 5), then the parked knife Fillet 8 join.
+   (one edge, TWO_OFFSETS 5.5/6, oppositeDirection false, tangentPropagation true; ours 51/124/68 40986.25 vs live
+   53/126/68 41594.02: 608 mm3 more removed, 2 faces fewer; Extrude 12 then leaves 403 of 40911, ~24 isaac mates lost
+   incl. Fastened 33; repro vibex8 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/ma2 ~/agents/asm-keep/bin/ops-c19
+   parity::parity_models --ignored --nocapture, trace ma2/tr19.log l.105); asm 21:5x: c3fdd4 (isaac Part 2 <7>) f11
+   Fillet 1 "Failed to fillet selections." (live OK), reachable after asm's Extrude 7 fix; repro vibex8
+   ~/agents/asm-keep/mc3. Also e54410 f51 Chamfer 1 (Part 1, one edge, TWO_OFFSETS 2/5, tangentPropagation true)
+   "Failed to chamfer selections." (live OK; before 46/116/68, live after 47/119/70, ~138 mm3 off): likely the same
+   TWO_OFFSETS cause as a2e4a2; costs Ball 13/14, Revolute 17; repro vibex8 ~/agents/asm-keep/me5 (bin/ops-c21,
+   trace me5/tr.log).
+3a. After Halter (lead 11-18): impeller Fillet 3 on bool2's merged body (33 faces, the two r 10 cylinder halves one face,
+   as live after Chamfer 26) fails "unfilleted edge overlapped by fillet" in OCCT's path (live 34/99/66, 71096.12 mm3).
+   Input vibex8 ~/agents/bool2-keep/fillet3/fillet-26.{brep,txt}: edge 81 (full circle r 6, centre (120,0,-34) mm, axis
+   X, on plane x = 120), r 2. Replay: NOSHAPE_REPLAY=<dir>/fillet-26 cargo test --release -p noshape-kernel --test all
+   crash_inputs::replay_one -- --ignored --nocapture; occt-chamfer-fillet-28 (35 faces, unmerged) succeeds. Lead: the
+   face cleanup stays; the fillet must take the merged face.
+3a2. impeller Fillet 4 (f35, r 5, edge JOV, 54.8675 mm, mid (23.724, 0.003, -4) mm; faces plane 556.109 / extruded
+   222.876 mm2, as live's JOm / JOW): ERROR "Failed to fillet selections." on core-bis a08b41153's part (live 105929.0
+   mm3). Mine (core 11-18). Dump vibex7 ~/agents/core-keep/f4/fillet-32.{brep,txt} (edge 49, r 5 mm).
+3b. core 11-18 (main 55fc929c): c2-surf-workshop-knifehandle: Fillet 3 Blade 7/15/10 vs live 6/12/8, then Chamfer 1
+   20/36/21 vs 7/15/10, 9285.8 vs 10423.8 mm3 returned OK (wrong geometry), Fillet 2 ERROR. Mine (Chamfer 1 likely
+   follows Fillet 3). Repro NOSHAPE_PARITY_ONLY=c2-surf-workshop-knifehandle.
+4. Low (asm): asm-robotic-arm eed029 "nắp đế" Fillet 1 (f21) 44/93/44 vs live 44/95/46 (area -0.16 mm2), Draft 1
+   then fails; repro vibex7 ~/agents/asm-keep/mra/run.sh <bin tag> (NOSHAPE_PARITY_MODELS=~/agents/asm-keep/mra).
+4a. dx 11-18 (exchange suite, DXF counts; files vibex8 ~/tmp/dx/exs-m5/<doc>/{ours,live}-drawing.dxf):
+   c2-variable-fillet-faceblend Fillet 1/3 (FULL_ROUND, tangent): our full round's boundary edges are exact circles,
+   live's B-splines (sheet ELLIPSE 25/13, SPLINE 8/23). c2-extension-spring Fillet 1: ours 10/24/16 vs live 11/27/18
+   (live splits each hook-end swept edge into curve + short straight end: LINE 120/117, SPLINE 37/47).
+4c. qa 11-18 (main 7db466c62, vibex8 relative; raw /root/qa-scratch/feat3/ab.jsonl) features >5x live: impeller Fillet 3
+   12364 vs 103, Chamfer Stevenrohr Halterung 1430 vs 16, Fillet Bohrungssitz Ansaugflasch 3388 vs 242 (ours Error),
+   Fillet Flansch zum Stroemungskanal 1140 vs 66.5, Fillet 1 322 vs 39, Fillet Stevenrohr einnschub 156 vs 30; knife
+   Fillet 2 188 vs 8, Fillet 8 156 vs 11, Chamfer 1 203 vs 17.5, Fillet 3 109 vs 10, Chamfer 2 72 vs 7.5, Fillet 5 54 vs 9.
+4b. live 11-18 (behaviours.md "per-feature cost by rolling the bar forward", live/qa/rbstep-1118/): live.jsonl
+   per_feature_ms is a valid per-feature target. Live: impeller Fillet 3 103 ms; knife Chamfer 1 17.5, Fillet 2 8,
+   Fillet 3 10. (qa's "ours" there, 39 s / 492 / 344 / 316 ms, are loaded-host numbers; judge on the Mac.)
+5. qa's speed A/B (knife Chamfer 2 / Fillet 3 / Fillet 5), then the parked knife Fillet 8 join.
 
 ## Parked (with where)
 
@@ -135,10 +187,13 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## How to run
 
-- Builds and crate tests: the Mac only, from blend10 (`NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c '...'`; env
-  inside the quotes). One Mac slot, shared.
-- Kernel C++ with g++-13 before landing: /root/blend-scratch/bin/g13.sh <worktree> <log> (vibe5).
-- Pairs / asm on vibe5 (lead 19:50), through `~/bin/slot` there (my scripts call it): bin/host-pair.sh <tag> <host> <base wt>
+- Builds and crate tests on vibex7 (lead 21:23; rb-hosts), from blend10: bin/imp-x7.sh <ENV=..> runs the impeller
+  with debug env (log -> /root/blend-scratch/imp.log). The Mac (bin/imp-mac.sh) for speed numbers only. vibe2: land
+  queue (NOSHAPE_LAND_QUEUE_HOST=vibe2) and the user's own server: only ~ngyekta there, no more heavy runs.
+- Never kill a process tree from a computed pid (11-17 21:00 a ppid of 1 took the main machine down): systemctl stop
+  own units, kill only own $! pids.
+- Kernel C++ with g++-13 before landing: /root/blend-scratch/bin/g13.sh <worktree> <log> (vibex7).
+- Pairs / asm on vibex7 (lead 19:50), through `~/bin/slot` there (my scripts call it): bin/host-pair.sh <tag> <host> <base wt>
   <new wt> (logs suite-<tag>-{base,new}.log, .cmp, .walls), bin/asm-one.sh <wt> <log> <host>. Long runs as systemd-run
   units with flags /root/blend-scratch/<tag>.done.
 - Release timing on the Mac: `NOSHAPE_KERNEL_PROFILE=1 NOSHAPE_PARITY_ONLY=<doc>` parity_models --release; macOS
@@ -148,5 +203,5 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   blend10/sg/st).
 - Debug env: NOSHAPE_BLEND_DEBUG (sections, rolling balls), NOSHAPE_BLEND_DIRECT_DEBUG (direct build, per-section
   times), NOSHAPE_FREE_DEBUG (bool's per-pair outcomes).
-- Worktrees: blend10 (Mac builds), blend4 / blend6 / blend8 (vibe6 gate copies; blend8's target deleted), blend9
+- Worktrees: blend10 (Mac builds), blend4 / blend6 / blend8 (vibex6 gate copies; blend8's target deleted), blend9
   (handoff), blend-ch3-wip branch.
