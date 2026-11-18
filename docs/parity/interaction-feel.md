@@ -1379,7 +1379,8 @@ Replayed in ours with the UI-script runner (qa-scratch/session/mksession.py, ste
 behaviours, 1 (no turn to the plane), 3 (box with the full-precision value selected), 4 (Enter keeps the field focused, text selected),
 5 (the extruded sketch hidden), 6 (Add + Merge scope on a face sketch), 8 (Part pattern first), 9 (Mirror turns to Add), 10 (Sketch 1
 edit rolls later features back, Parts (0)), 11 (undo takes back the bar move) and 12 (Rename selects the whole name) are =; 7's fillet
-3 mm is live's remembered radius (ours opened at the fresh 5 mm, = behaviours "sketch fillet default"). Final part: ours 30133.35 mm³ /
+3 mm is live's remembered radius (spec default 5 mm, live 23:00): ours opens at the fresh 5 mm and, after an R3 Fillet ✓, the next
+Fillet opens at 3 mm (qa-scratch/session/fillet-mem.json), =. Final part: ours 30133.35 mm³ /
 30650.90 mm² against live's 29505.03 / 30273.90, from the pattern row below.
 
 | Finding | Ours | Test |
