@@ -86,18 +86,33 @@ pub struct InstanceDrag {
 pub const LIST_DROP: u32 = 0x1651b0;
 
 impl Render for InstanceDrag {
-    /// Live2 (as6-drag-hover.png): a dark-blue pill with the name in white bold, below and right of the pointer.
+    /// Live2 (as6-drag-hover.png): a dark-blue pill with the name in white bold, right of the pointer and 5 px below it
+    /// (asm-feel3-1118).
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().pl(self.offset.x + px(30.)).pt(self.offset.y + px(8.)).child(
+        div().pl(self.offset.x + px(30.)).pt(self.offset.y + px(5.)).child(
             div().px(px(12.)).h(px(24.)).flex().items_center().rounded_full().bg(rgb(LIST_DROP)).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child(crate::ui::user_text(self.label.clone())),
         )
     }
 }
 
-/// The insertion line where a dragged row lands: 2 px, a ring at its left end (live2 as6-drag-hover.png).
-pub fn list_drop_line() -> AnyElement {
+/// A dragged instance row starts its drag past 7 px (live asm-feel3-1118: none at 4 or 6, a drag at 8).
+pub const LIST_DRAG_PX: f32 = 7.;
+
+/// The instance a row dragged by the row `top` lands before: `top` itself, or (`after`, the pointer below its middle)
+/// the next one in the list order (None: the end).
+pub fn list_drop_before(order: &[InstanceId], id: InstanceId, top: InstanceId, after: bool) -> Option<InstanceId> {
+    if !after {
+        return Some(top);
+    }
+    order.iter().skip_while(|i| **i != top).skip(1).find(|i| **i != id).copied()
+}
+
+/// The insertion line where a dragged row lands, in the gap above the row or (`after`) below it: 2 px, a ring at its
+/// left end (live2 as6-drag-hover.png).
+pub fn list_drop_line(after: bool) -> AnyElement {
     let ring = div().absolute().left(px(-1.)).top(px(-3.)).size(px(8.)).rounded_full().border_1().border_color(rgb(LIST_DROP)).bg(rgb(0xffffff));
-    div().absolute().left_0().right_0().top(px(-1.)).h(px(2.)).bg(rgb(LIST_DROP)).child(ring).into_any_element()
+    let line = div().absolute().left_0().right_0().h(px(2.)).bg(rgb(LIST_DROP)).child(ring);
+    (if after { line.bottom(px(-1.)) } else { line.top(px(-1.)) }).into_any_element()
 }
 
 /// Mate feature row being dragged in the list (reorder).
@@ -273,7 +288,8 @@ pub struct AsmUi {
     /// Instance row under the cursor in the list (highlighted in the viewport).
     pub list_hover: Option<InstanceId>,
     /// The instance row a dragged row would land above (its insertion line).
-    pub list_drop: Option<InstanceId>,
+    /// The row a dragged instance would land by, and whether below it (the pointer past the row's middle).
+    pub list_drop: Option<(InstanceId, bool)>,
     /// The instances of the explode step row under the pointer (outlined orange, live2 asm-views.json activate).
     pub step_hover: Vec<InstanceId>,
     /// Last clicked instance row: the anchor of Shift+click ranges.
@@ -1048,11 +1064,13 @@ impl AssemblyView {
         })
     }
 
-    /// Shift+N: rename the selected instance or mate feature.
+    /// Shift+N: rename the selected instance; a selected mate feature's row is renamed only from its menu (live
+    /// asm-feel3-1118: F2 and Shift+N on it do nothing).
     pub(super) fn rename_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(m) = self.selected_mate {
-            self.start_row_rename(RenameRow::Feature(m), window, cx);
-        } else if let Some(&id) = self.selected.first() {
+        if self.selected_mate.is_some() {
+            return;
+        }
+        if let Some(&id) = self.selected.first() {
             self.start_row_rename(RenameRow::Instance(id), window, cx);
         }
     }

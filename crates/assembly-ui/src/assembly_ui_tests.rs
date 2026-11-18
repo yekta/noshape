@@ -1106,12 +1106,12 @@ fn two_selected_instances_have_lives_list_menu(cx: &mut TestAppContext) {
     .unwrap();
 }
 
-/// Live asm/feel-1117 (reach-corner-strip; its client's COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX = 50): over a planar
-/// face the preview connector jumps to a dot within 50 px of the pointer (a corner 3 px away), else it sits at the
-/// face's centroid (the pointer 51 px from the nearest dot); with Shift locking the face's points the nearest is taken
-/// at any distance.
+/// Live asm/feel-1117 (reach-corner-strip) and asm-feel3-1118: over a planar face the preview connector jumps to a dot
+/// within a 47.5 px square around the pointer (a corner 3 px away; kept at (25, 46) and (47, 40), lost at (26, 48) and
+/// (49, 42)), else it sits at the face's centroid; with Shift locking the face's points the nearest is taken at any
+/// distance.
 #[gpui::test]
-fn a_faces_connector_takes_a_dot_within_50_px_else_its_centroid(cx: &mut TestAppContext) {
+fn a_faces_connector_takes_a_dot_within_a_48_px_square_else_its_centroid(cx: &mut TestAppContext) {
     use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
     let (window, view) = pattern_assembly(cx, "face-centroid");
     cx.update_window(window, |_, w, cx| {
@@ -1130,11 +1130,17 @@ fn a_faces_connector_takes_a_dot_within_50_px_else_its_centroid(cx: &mut TestApp
             v.pointer = at(v, corner, cx) + glam::DVec2::new(3.0, 3.0);
             v.update_inference(cx);
             assert!(matches!(cands[v.infer_choice.expect("a choice")].reference, Reference::Implicit { inference: Inference::Vertex, .. }), "the corner 3 px away");
-            // From the corner straight toward the centroid until the nearest dot is 51 px away.
+            let corner_ix = cands.iter().position(|c| c.frame.origin == corner).unwrap();
+            for (off, kept) in [((25.0, 46.0), true), ((47.0, 40.0), true), ((26.0, 48.0), false), ((49.0, 42.0), false)] {
+                v.pointer = at(v, corner, cx) + glam::DVec2::from(off);
+                v.update_inference(cx);
+                assert_eq!(v.infer_choice != Some(corner_ix), !kept, "the corner at {off:?}: kept {kept}");
+            }
+            // From the corner straight toward the centroid until every dot is out of the square.
             let dots: Vec<glam::DVec2> = cands.iter().skip(1).map(|c| at(v, c.frame.origin, cx)).collect();
             let (c0, c1) = (at(v, corner, cx), at(v, cands[0].frame.origin, cx));
-            let far = (0..=100).map(|i| c0 + (c1 - c0) * (i as f64 / 100.0)).find(|p| dots.iter().all(|d| d.distance(*p) > 51.0));
-            let Some(far) = far else { panic!("the face is too small on screen for a point 51 px from every dot") };
+            let far = (0..=100).map(|i| c0 + (c1 - c0) * (i as f64 / 100.0)).find(|p| dots.iter().all(|d| (*d - *p).abs().max_element() > 48.0));
+            let Some(far) = far else { panic!("the face is too small on screen for a point 48 px from every dot") };
             v.pointer = far;
             v.update_inference(cx);
             assert_eq!(v.infer_choice, Some(0), "the centroid");
@@ -1343,6 +1349,49 @@ fn a_snap_mode_drag_lands_aligned_and_opens_an_uncommitted_fastened(cx: &mut Tes
         let (a, b) = (face_connector(v, "Part 2 <1>", true, cx), face_connector(v, "Part 1 <1>", true, cx));
         assert!(v.result.connector_world(&a, &units).unwrap().origin.distance(v.result.connector_world(&b, &units).unwrap().origin) < 1e-9, "stays where it snapped");
     });
+}
+
+/// Live asm-feel3-1118: Shift+N on a selected mate row does nothing (its menu's Rename renames it); on a selected
+/// instance it renames.
+#[gpui::test]
+fn shift_n_renames_a_selected_instance_but_not_a_mate(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "shift-n");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Revolute, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            v.accept_mate(w, cx);
+        });
+    })
+    .unwrap();
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selected_mate = v.assembly(cx).unwrap().mates.first().map(|m| m.id);
+            v.rename_selected(w, cx);
+            assert!(v.ui.rename.is_none(), "a mate: nothing");
+            v.selected_mate = None;
+            v.selected = vec![instance(v, "Part 1 <1>", cx)];
+            v.rename_selected(w, cx);
+            assert!(v.ui.rename.is_some(), "an instance: renamed");
+        })
+    })
+    .unwrap();
+}
+
+/// Live asm-feel3-1118: a dragged instance row lands above the row under the pointer, or below it past the row's
+/// middle (the drop line switches there); the drag starts past 7 px (8 drags, 6 doesn't).
+#[test]
+fn a_dragged_instance_row_lands_by_the_rows_middle() {
+    use super::behaviors::{LIST_DRAG_PX, list_drop_before};
+    let [a, b, c] = [1, 2, 3].map(InstanceId);
+    let order = [a, b, c];
+    assert_eq!(list_drop_before(&order, c, a, false), Some(a), "upper half of A: above A");
+    assert_eq!(list_drop_before(&order, c, a, true), Some(b), "lower half of A: between A and B");
+    assert_eq!(list_drop_before(&order, b, a, true), Some(c), "B onto A's lower half: skips itself");
+    assert_eq!(list_drop_before(&order, a, c, true), None, "lower half of the last row: the end");
+    const { assert!(6.0 <= LIST_DRAG_PX && LIST_DRAG_PX < 8.0) };
 }
 
 /// Live snapmode-1118: a snap drag's reach is a 57 px square around the pointer (an edge midpoint at (57, −33), 66 px

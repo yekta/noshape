@@ -175,9 +175,10 @@ pub fn bind_keys(cx: &mut App) {
 }
 
 /// The relation dialog's types, in the live select's order.
-/// How near (px) the pointer brings a hovered face's connector to one of its inference dots (live's client:
-/// COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX), and a hovered edge's to one of its ends (asm/feel-1117).
-const INFERENCE_PICK_RADIUS_PX: f64 = 50.0;
+/// How near (px) the pointer brings a hovered face's connector to one of its inference dots, in x and in y (a square:
+/// live asm-feel3-1118 kept a dot at (25, 46) and (47, 40), lost it at (26, 48) and (49, 42)), and a hovered edge's to
+/// one of its ends (asm/feel-1117).
+const INFERENCE_PICK_RADIUS_PX: f64 = 47.5;
 const EDGE_END_PICK_RADIUS_PX: f64 = 15.0;
 const RELATION_KINDS: [RelationType; 4] = [RelationType::Gear, RelationType::RackAndPinion, RelationType::Screw, RelationType::Linear];
 
@@ -2736,6 +2737,7 @@ impl AssemblyView {
         let Some(o) = self.result.occurrences.get(*occ) else { return false };
         let vp = self.viewport.read(cx);
         let mut best: Option<(usize, f64)> = None;
+        let mut in_square: Option<(usize, f64)> = None;
         for (i, p) in cands.iter().enumerate() {
             let w = o.transform.transform_point3(p.frame.origin);
             if let Some(s) = vp.project(w) {
@@ -2743,10 +2745,14 @@ impl AssemblyView {
                 if best.is_none_or(|(_, bd)| d < bd) {
                     best = Some((i, d));
                 }
+                let off = (s - self.pointer).abs();
+                if off.x.max(off.y) <= INFERENCE_PICK_RADIUS_PX && in_square.is_none_or(|(_, bd)| d < bd) {
+                    in_square = Some((i, d));
+                }
             }
         }
-        // Live (asm/feel-1117 reach-corner-strip, its client's COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX = 50): over a
-        // planar face the connector jumps to a dot within 50 px of the pointer, else it sits at the face's centroid;
+        // Live (asm/feel-1117 reach-corner-strip, asm-feel3-1118): over a planar face the connector jumps to a dot within
+        // the 47.5 px square around the pointer, else it sits at the face's centroid;
         // over an edge at its midpoint (a circle's centre) unless an end is within 15 px (the strip: the end at 15 px,
         // the midpoint at 18). Shift (locked points) takes the nearest at any distance.
         let primary = |r: &Reference| match r {
@@ -2755,8 +2761,8 @@ impl AssemblyView {
             _ => false,
         };
         if !locked && matches!(key.1, Reference::Face(_) | Reference::Edge(_)) && cands.first().is_some_and(|c| primary(&c.reference)) {
-            let reach = if matches!(key.1, Reference::Face(_)) { INFERENCE_PICK_RADIUS_PX } else { EDGE_END_PICK_RADIUS_PX };
-            self.infer_choice = Some(best.filter(|&(_, d)| d <= reach).map_or(0, |b| b.0));
+            let near = if matches!(key.1, Reference::Face(_)) { in_square } else { best.filter(|&(_, d)| d <= EDGE_END_PICK_RADIUS_PX) };
+            self.infer_choice = Some(near.map_or(0, |b| b.0));
             return old != self.infer_choice;
         }
         self.infer_choice = best.map(|b| b.0);
@@ -4328,20 +4334,22 @@ impl AssemblyView {
         // Drag and drop: reorder (drives BOM order), joining the target's folder.
         let row = row
             .relative()
+            .drag_threshold(behaviors::LIST_DRAG_PX)
             .on_drag(behaviors::InstanceDrag { id: top, label: name.clone().into(), offset: Point::default() }, |d, offset, _, cx| cx.new(|_| behaviors::InstanceDrag { offset, ..d.clone() }))
             .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<behaviors::InstanceDrag>, _, cx| {
-                let over = e.bounds.contains(&e.event.position);
-                if over && this.ui.list_drop != Some(top) {
-                    this.ui.list_drop = Some(top);
+                // Live asm-feel3-1118: the line moves from the gap above the row to the one below at the row's middle.
+                let at = e.bounds.contains(&e.event.position).then(|| (top, e.event.position.y > e.bounds.center().y));
+                if at.is_some() && this.ui.list_drop != at {
+                    this.ui.list_drop = at;
                     cx.notify();
-                } else if !over && this.ui.list_drop == Some(top) {
+                } else if at.is_none() && this.ui.list_drop.is_some_and(|(r, _)| r == top) {
                     this.ui.list_drop = None;
                     cx.notify();
                 }
             }))
-            .when(self.ui.list_drop == Some(top) && cx.has_active_drag(), |d| d.child(behaviors::list_drop_line()))
+            .when_some(self.ui.list_drop.filter(|(r, _)| *r == top && cx.has_active_drag()), |d, (_, after)| d.child(behaviors::list_drop_line(after)))
             .on_drop(cx.listener(move |this, d: &behaviors::InstanceDrag, _, cx| {
-                this.ui.list_drop = None;
+                let after = this.ui.list_drop.take().is_some_and(|(r, after)| r == top && after);
                 if d.id == top {
                     return;
                 }
@@ -4351,7 +4359,10 @@ impl AssemblyView {
                     let ids = if this.selected.contains(&id) { this.selected.clone() } else { vec![id] };
                     this.move_into_subassembly(ids, top, cx);
                 } else {
-                    this.edit("Reorder instances", cx, |a| a.move_instance(id, Some(top)));
+                    this.edit("Reorder instances", cx, |a| {
+                        let order: Vec<InstanceId> = a.instances.iter().map(|i| i.id).collect();
+                        a.move_instance(id, behaviors::list_drop_before(&order, id, top, after))
+                    });
                 }
             }));
         let view = cx.entity();
