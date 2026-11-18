@@ -610,7 +610,7 @@ Delete Part 1… and keeps Delete Extrude 1; "Where used for Part 1…" after Ex
 menu starts "Confirm Sketch 1", with the Line tool "Escape line" above it; long menus flip up at the window's bottom.
 Navigation: one wheel event = x1.058-1.059 about the pointer (5 events x1.333; live x1.0595 / x1.335); Shift+1 / Shift+5 / Shift+7 / F
 animate ~550-690 ms from the first frame to the last (500 ms + a frame on this debug build), arrows ~300 ms (250 ms + a frame).
-- [ ] **P1 SMFEEL-FLANGE-BROAD-FACE (skasm)**: in Flange's "Edges or side faces to flange" the front wall's broad face lights (outlined
+- [x] a3974c745 **verified 5076e98c** (qa 01:22: the wall's broad face hovered in Flange lights nothing, its bend strip lights) **P1 SMFEEL-FLANGE-BROAD-FACE (skasm)**: in Flange's "Edges or side faces to flange" the front wall's broad face lights (outlined
   orange) at its centre; live never lights the walls' or the bottom's broad faces there.
 - [ ] **P2 MENUFEEL-FACE-EDGE (psui)**: a face + an edge selected: no "Add appearance to face…" (live keeps it). psui: fixed in 2234f511.
 - [ ] **P2 HOVER-LEAVES-WINDOW (psui)**: a face hovered just before the pointer leaves the window stays outlined (twice, sm-box and
@@ -619,6 +619,7 @@ animate ~550-690 ms from the first frame to the last (500 ms + a frame on this d
   Other joints; Type offers Bend, Rip (= live); Rip -> Bend puts it back in Bends as "Bend A" within 1 s, flat view redrawn, but the
   list keeps one "Modify joint 1" (live adds a Modify joint per change; skasm to confirm). Hovering the Joint A row lights nothing in
   either view (live: the rip in 3D and both edges in the flat): skasm's f90cf944 (land queue) adds it, with SMFEEL-FLANGE-BROAD-FACE.
+  qa 01:25 on 5076e98c (59cad3c05): the Joint A row hovered lights the rip's face along the wall's bottom in 3D (fl/re5/r01.png).
 - Not judged: hover per box in the Sheet metal model dialog (our start is a Thicken model, live's a Convert).
 - Mitred corner: live (11-18 00:22) lists no row for a Flange's miter seam, neither under Other joints nor under Bends; sm-box's empty
   Other joints matches live (skasm agrees).
@@ -684,7 +685,7 @@ the line 6 -> 10 (6-7 -> 8-10); circle centre 4 -> 7 (5-8 -> 7-12). The yellow s
 frame behind here). Own H / V band: lights at 7 px off the axis, lets go at 8 (H) / 9-10 (V), the same at 40, 80 and 160 px, with
 the dashed preview and "—" / "|" by the pointer (= live). Shift held: no snap, a line 2 px off H stays tilted, an end 1 px from a
 point gets no coincident (= live). Ending on a point / midpoint: COINCIDENT (shared point) / MIDPOINT created (= live).
-- [ ] **P0 SKSNAP-MODEL-EDGE (skasm)**: a model edge on the sketch plane lights (orange) within 4-5 px but shows no coincident glyph
+- [ ] (qa 01:25 on 5076e98c, 085fa6af1: the on-edge glyph shows while drawing and a coincident glyph stays after the click; reach sweep re-running on vibex8) **P0 SKSNAP-MODEL-EDGE (skasm)**: a model edge on the sketch plane lights (orange) within 4-5 px but shows no coincident glyph
   by the pointer, offers no midpoint at its middle, and a click 2 px off it leaves the end 0.5 mm off the edge with no constraint
   (live row 1 / 3: coincident on the edge at 7 px, midpoint at the middle at 6 px; COINCIDENT (end, edge) after the click).
 - [ ] **P0 SKSNAP-ALIGN-WOKEN-POINT (skasm)**: after resting on Sketch 2's point, no vertical alignment to it is offered at 60 or
@@ -694,7 +695,7 @@ point gets no coincident (= live). Ending on a point / midpoint: COINCIDENT (sha
   qa 11-18 00:31 (green 0f7610c83, Show constraints ticked, sk/run4): "—", "|", coincident and midpoint glyphs stay after each line
   as live; it was Show constraints off in our start. The model-edge end shows none here: re-check with SKSNAP-MODEL-EDGE (085fa6af1).
 - [ ] **P2 SKSNAP-REACH (skasm)**: a point lights at 5 px along x (live 6-7) and a circle centre at 4 px (live 5-8).
-- [ ] **P2 SKSNAP-SHIFT-ICON (skasm)**: with Shift held near the point a black cube icon shows by the pointer (live: nothing).
+- [ ] b6f5e810 (skasm 01:33: one Coincident, no use glyph, per live2 use-glyph-1118; re-check on its green) **P2 SKSNAP-SHIFT-ICON (skasm)**: with Shift held near the point a black cube icon shows by the pointer (live: nothing).
 - Not run: a local point beating an external one 1 px apart.
 
 ## Part Studio selection feel vs live2's 11-17 capture (qa 22:47, green 592b0fc9, vibex6 Xvfb, load ~24, real xdotool pointer)
@@ -708,7 +709,7 @@ the plane; Extrude 1 row click selects the feature, part drawn amber, Part 1 rel
 Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctrl+click opens the menu and selects nothing.
 - [x] a65a2d3cf **verified 591643fc** (qa 00:57: m-rC3 0 related rows after the empty click) **P0 SELFEEL-RELATED-STAYS (skasm, lead 22:48 split)**: after a double-click on Part 2's top, an empty click (and every later hover) leaves
   Sketch 2 + Extrude 2 related (state rows related, 40 s later too). Live row 2/5: an empty click clears both sides.
-- [ ] **P0 SELFEEL-DBLCLICK-FACE-SKETCH (skasm)**: double-click on a face doesn't show its feature's sketch (live row 3: Sketch 2's
+- [ ] 4a4f7e0e (skasm 01:33: drawn through the part, 2 px blue with corner dots; re-check on its green) **P0 SELFEEL-DBLCLICK-FACE-SKETCH (skasm)**: double-click on a face doesn't show its feature's sketch (live row 3: Sketch 2's
   rectangle drawn blue at Part 2's base); the face shows amber 1.2 s after (state: nothing selected, as live).
   qa 00:57 on 591643fc (a65a2d3cf): still open: Sketch 2 / Extrude 2 related and the face amber, no rectangle at the base
   (qa-keep/sel-feel/selfeel-c2-591643fc.png, sent to skasm 01:03).
