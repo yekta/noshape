@@ -2577,8 +2577,14 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }).flatten();
             let (lo, hi, gap) = match profile {
                 Some((lo, hi)) => (lo, hi, 5.3),
-                // live2 labels-1118 drw-section-vertical.dxf: SECTION A - A's top 0.1191 in (3.02 mm) under the geometry.
-                None => (pl.min, pl.max, if auto_label || aux_label { 3.02 } else { 6.0 }),
+                // A section's label top under its lowest geometry: 5.81 mm for a horizontal cut, 3.02 mm for a vertical
+                // one (live2 sec-label-1118, five DXFs: horizontal 5.81 / 5.81 / 5.16, vertical 3.02 / 3.52; neither
+                // the click, the width nor the height alone explains the rest). Auxiliary views as a vertical cut.
+                None => (pl.min, pl.max, match &v.kind {
+                    ViewKind::Section { line, .. } if horizontal_cut(line) => 5.81,
+                    _ if auto_label || aux_label => 3.02,
+                    _ => 6.0,
+                }),
             };
             let mut y = lo[1] - gap;
             let label_mark = g.texts.len();
@@ -3165,6 +3171,12 @@ pub fn foot_on_line(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
     }
     let t = ((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / l2;
     [a[0] + d[0] * t, a[1] + d[1] * t]
+}
+
+/// A cutting line running mostly across its parent view (its ends further apart in x than in y).
+fn horizontal_cut(line: &[[f64; 2]]) -> bool {
+    let (Some(a), Some(b)) = (line.first(), line.last()) else { return false };
+    (b[0] - a[0]).abs() > (b[1] - a[1]).abs()
 }
 
 #[cfg(test)]

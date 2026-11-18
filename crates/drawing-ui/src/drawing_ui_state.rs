@@ -681,6 +681,7 @@ impl DrawingEditor {
         if matches!(self.tool, Tool::GdtLeader { .. })
             || self.break_dlg.as_ref().is_some_and(|d| d.edit.is_some())
             || self.crop_dlg.as_ref().is_some_and(|d| d.edit.is_some())
+            || self.detail_dlg.as_ref().is_some_and(|d| d.edit.is_some())
             || self.hatch_dlg.as_ref().is_some_and(|d| d.edit.is_some() && d.sections.is_none())
         {
             return None;

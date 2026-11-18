@@ -516,7 +516,8 @@ impl DrawingEditor {
                     div()
                         .id("dd-profile-field")
                         .map(|d| crate::ui_script::mark(d, || "button:Create closed profile for detail view boundary".into()))
-                        .tooltip(crate::ui::tooltip("Create closed profile for detail view boundary"))
+                        // Picking a closed profile with none picked yet (live2 drw-detail-id-profile-tips s18).
+                        .tooltip(crate::ui::tooltip(if self.detail_dlg.as_ref().is_some_and(|d| d.pick_region) { "No closed profile selected." } else { "Create closed profile for detail view boundary" }))
                         .mx(px(3.))
                         .mt(px(1.))
                         .mb(px(5.))
@@ -533,14 +534,17 @@ impl DrawingEditor {
                                 h_flex()
                                     .h(px(22.))
                                     .child(div().flex_1().text_size(px(14.)).text_color(pal.text).child("Profile"))
-                                    .child(div().id("dd-profile-clear").px(px(4.)).cursor_pointer().text_color(gpui_kit::rgb(0x999999)).child("×").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                        let parent = this.detail_dlg.as_ref().and_then(|d| d.view);
+                                    // × drops the profile: the field asks for a closed profile to pick, no shape pressed
+                                    // (live2 drw-detail-id-profile-tips s16: "Select closed profile", no tool).
+                                    .child(div().id("dd-profile-clear").debug_selector(|| "dd-profile-clear".into()).px(px(4.)).cursor_pointer().text_color(gpui_kit::rgb(0x999999)).child("×").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                         if let Some(d) = &mut this.detail_dlg {
                                             d.profile = None;
                                             d.pts.clear();
                                             d.picked.clear();
+                                            d.view = None;
+                                            d.pick_region = true;
                                         }
-                                        this.tool = Tool::Detail { parent, center: None, radius: None };
+                                        this.tool = Tool::Detail { parent: None, center: None, radius: None };
                                         this.update_preview(cx);
                                         cx.notify();
                                     }))),

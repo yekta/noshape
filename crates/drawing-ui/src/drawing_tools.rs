@@ -115,8 +115,9 @@ impl DrawingEditor {
             self.place_hole_table(cx);
             return;
         }
-        // Edit detail (not redrawing its profile): Esc discards it.
-        if self.detail_dlg.as_ref().is_some_and(|d| d.edit.is_some()) && !matches!(self.tool, Tool::Detail { .. }) {
+        // Edit detail (not redrawing its profile, or picking a closed profile after its × : live2
+        // drw-detail-id-profile-tips s19): Esc discards it.
+        if self.detail_dlg.as_ref().is_some_and(|d| d.edit.is_some() && (d.pick_region || !matches!(self.tool, Tool::Detail { .. }))) {
             self.close_detail_edit(false, cx);
             return;
         }
@@ -487,6 +488,16 @@ impl DrawingEditor {
     /// view whose rectangle contains the point.
     pub fn sel_at(&self, pick: Option<u32>, s: [f64; 2]) -> Option<Sel> {
         self.pk().sel_at(pick, s)
+    }
+
+    /// What a Select click or right-click at `s` selects: a view's edge selects the view (live: a right-click on a
+    /// detail view at the part's corner, on its edges, reads VIEW Detail, drw-detail-id-profile-tips s6; no take shows
+    /// one edge selected by a click).
+    fn select_target(&self, pick: Option<u32>, s: [f64; 2]) -> Option<Sel> {
+        match self.sel_at(pick, s) {
+            Some(Sel::Edge(v, _)) => Some(Sel::View(v)),
+            sel => sel,
+        }
     }
 
     /// Snap point (vertex / circle center) of a view near a sheet point.
@@ -1933,7 +1944,7 @@ impl DrawingEditor {
             self.redraw(cx);
             return;
         }
-        let sel = self.sel_at(pick, self.cursor);
+        let sel = self.select_target(pick, self.cursor);
         if self.table_cell_click(sel, m.shift, cx) {
             return;
         }
@@ -2206,7 +2217,7 @@ impl DrawingEditor {
 
     fn context_menu_rows(&mut self, pick: Option<u32>, cx: &mut Context<Self>) -> Vec<MenuEntry> {
         self.placed_table = None;
-        let mut sel = self.sel_at(pick, self.cursor);
+        let mut sel = self.select_target(pick, self.cursor);
         // The empty sheet with one note selected: the note's menu (live2 drw-note-copy-paste s8).
         if sel.is_none()
             && let [Sel::Annotation(id)] = self.selection[..]

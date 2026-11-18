@@ -878,6 +878,42 @@ fn a_toolbar_tools_help_shows_after_3_s_under_the_toolbar(cx: &mut TestAppContex
     assert!(shown(cx).is_none(), "Undo has none");
 }
 
+/// Live2 drw-detail-id-profile-tips (s7–s19): Edit detail… reads no tool and lights the detail's circle in its parent;
+/// the profile chip's × asks for a closed profile to pick ("Select closed profile", "No closed profile selected.", no
+/// tool, the parent no longer lit), and Esc then closes the panel.
+#[gpui::test]
+fn edit_detail_clear_profile_picks_a_region_and_esc_closes(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let front = g["views"].as_array().and_then(|v| v.iter().find(|v| v["orientation"] == "front").cloned()).expect("Front");
+        call(ctx, "drawing_detail_view", json!({ "drawing": dw, "parent": front["id"], "center": [0, 0], "radius": 8, "position": [300, 200] }));
+    }));
+    let (window, editor) = drawing(cx, "feel-detail-edit-clear");
+    let (detail, parent) = cx.update(|cx| {
+        let s = editor.read(cx).current_sheet();
+        s.views.iter().find_map(|v| match v.kind { noshape_model::drawing::ViewKind::Detail { parent, .. } => Some((v.id, parent)), _ => None }).expect("the detail")
+    });
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_detail_edit(detail, w, cx))).unwrap();
+    assert!(cx.update(|cx| editor.read(cx).detail_dlg.as_ref().is_some_and(|d| d.edit == Some(detail) && d.view == Some(parent))), "the panel open on the detail");
+    draw(cx, window);
+    let after = cx.update(|cx| editor.read(cx).detail_dlg.as_ref().map(|d| (d.edit, d.view, d.pick_region)));
+    assert_eq!(after, Some((Some(detail), Some(parent), false)), "still open after a frame");
+    let state = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).ui_state(cx));
+    let parent_name = cx.update(|cx| editor.read(cx).ui_view_name(parent));
+    let s = state(cx);
+    assert_eq!(s["drawing"]["tool"], Value::Null, "no tool while editing");
+    assert!(s["drawing"]["selection"].as_array().is_some_and(|a| a.iter().any(|x| x["kind"] == "EDGE" && x["owner"] == parent_name.as_str())), "the parent lit: {s}");
+    press(cx, window, "dd-profile-clear");
+    let s = state(cx);
+    assert_eq!(s["drawing"]["tool"], Value::Null, "still no tool");
+    assert_eq!(s["drawing"]["selection"], json!([]), "the parent no longer lit");
+    assert!(cx.update(|cx| editor.read(cx).detail_dlg.as_ref().is_some_and(|d| d.pick_region)));
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    draw(cx, window);
+    assert!(cx.update(|cx| editor.read(cx).detail_dlg.is_none()), "Esc closes the panel");
+}
+
 /// Live2 drw-centermark (behaviours "studios (11-17, P0 drawing feel)"): a hole's centre mark lights from its circle, its
 /// centre or an arm (its view not framed), its circle light blue, its grips shown; hovering the view alone shows none;
 /// with the view selected the grips show and the circle is the view's orange; a press on the circle drags the view.
