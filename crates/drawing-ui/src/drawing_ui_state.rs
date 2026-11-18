@@ -475,10 +475,12 @@ impl DrawingEditor {
                 // A segment's length inside the box (a leader crossing a view into it counts: live2 drw-leader-add-node s10).
                 let len_in = |a: [f64; 2], b: [f64; 2]| clipped_len(a, b, pl.min, pl.max);
                 let mut px = 0.0;
-                // (Highlighted lines are 2 px wide: render_style.)
+                // (Highlighted lines are 2 px wide: render_style; a hovered annotation's are drawn tan over the
+                // orange, about half of it read: live2 drw-dimension-radius s4, its leader into Top read nothing.)
                 for l in b.geometry.lines.iter().filter(|l| (lit(l.pick) && !callout_lines.contains(&l.pick)) || selected_view(l.pick, v.id)) {
+                    let width = if self.hover.is_some_and(|h| self.sel_of_pick(h).is_some_and(|s| self.picks_of(s).contains(&l.pick))) { 1.0 } else { 2.0 };
                     for w in l.points.windows(2) {
-                        px += len_in(w[0], w[1]) * self.zoom * 2.0;
+                        px += len_in(w[0], w[1]) * self.zoom * width;
                     }
                 }
                 // (A text's ink: about one and a half times its height a character.)

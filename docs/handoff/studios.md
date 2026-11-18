@@ -31,10 +31,18 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   Reset ordinate, note copy-paste menu, note editor closing, sheet properties zones, view adjust linestyle rows,
   replicate region panel, detail-id label position, section exclude-from-cut, synchronize-breaks Gap distance,
   simplification-absolute BOM row name, toolbar Undo tip take, drw-gtol-type-list, drw-hatch-panel s29.
-- Full drawing run drw1118b on vibex8 (started 03:38, build of bfc56d3e; ~/agents/studios-keep/drw1118b, memguard on
-  pgid 1876976): compare against drw1118a's diffs; includes live2's newer takes.
+- Full drawing run drw1118b on vibex8 (build of bfc56d3e; ~/agents/studios-keep/drw1118b): 317/341 (drw1118a
+  288/334). Its one regression, drw-dimension-radius s4 (the reader counted a hovered dimension's leader at 2 px), is
+  fixed by the reader counting a hovered annotation's lines at 1 px. New live2 takes differing, to check:
+  drw-dprops-sketch-points-sharps-chamfer s15, drw-hole-table-empty-tips s1 ("Views" tip), drw-inspection-table-iso-
+  scrolled s2 (selection 0 / ours 1), drw-note-leader-edge-first s3 (field 7 enabled).
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
+- live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
+  #e2e2e2, tan frame; 2f21d086); the BOM row's part tan in the views and its callouts blue were ours already. Left:
+  one click on a table selects the table (h3: a click on a line; inside a cell unconfirmed, ours selects a cell); a double-click on a BOM cell selects it and opens
+  the floating Cell panel with Override, focus on Font (ours: open_cell_panel returns for a BOM); the "︿" chevron;
+  Split below's gap; Update from this workspace enabling ~3 s after the assembly's BOM changes.
 - live2 drawing tables (behaviours "studios (lead 11-18 ~03:36, feel): drawing tables", live/studios/tables-1118/):
   (1) hovering a BOM row shades it darker grey and draws its part tan in every view; a selected table has a small "︿"
   chevron centred under it. (2) the BOM tool places on one click (no ✓), panel closes, table stays selected. (3)
