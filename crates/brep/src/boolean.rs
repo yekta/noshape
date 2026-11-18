@@ -5033,16 +5033,21 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     Geo::Nurbs { id, t0, t1 } => (0..=64).map(|k| cx.ncurves[id as usize].c.at(t0 + (t1 - t0) * k as f64 / 64.0)).collect(),
                     _ => Vec::new(),
                 };
+                // (All the angles it passes, not only from its start to its end: a closed B-spline round a patch on
+                // the cylinder comes back to its start.)
                 if pts.len() > 1 {
                     let ang = |p: DVec3| (p - o).dot(y).atan2((p - o).dot(x));
                     let (first, mut prev, mut acc) = (ang(pts[0]), ang(pts[0]), 0.0);
+                    let (mut lo, mut hi) = (0.0f64, 0.0f64);
                     for &p in &pts[1..] {
                         let a = ang(p);
                         acc += (a - prev + PI).rem_euclid(TAU) - PI;
                         prev = a;
+                        lo = lo.min(acc);
+                        hi = hi.max(acc);
                     }
-                    if acc.abs() > 1e-9 {
-                        covered.push(if acc > 0.0 { (first, acc) } else { (first + acc, -acc) });
+                    if hi - lo > 1e-9 {
+                        covered.push((first + lo, hi - lo));
                     }
                     helix_round |= acc.abs() >= TAU - 0.05;
                 }

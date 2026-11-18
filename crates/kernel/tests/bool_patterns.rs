@@ -3104,3 +3104,10 @@ fn a_cone_over_a_bore_notched_at_its_seam_cuts_as_occt() {
     assert!(ours.is_valid());
     assert!((ours.volume().unwrap() - occt.volume().unwrap()).abs() <= 1e-9 * occt.volume().unwrap());
 }
+
+/// A fuse with a cylinder's face bounded by one closed B-spline round a patch of it, not going round (recorded; OCCT's
+/// 87 ms): the face's angles from all those the curve passes (it declined "a cylinder face without curved edges").
+#[test]
+fn a_patch_of_a_cylinder_in_one_closed_curve_fuses_as_occt() {
+    recorded_as_occt("34b7e564b3047b96", 1e-9);
+}
