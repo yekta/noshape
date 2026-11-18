@@ -1086,6 +1086,9 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   // profile's footprint can cut it: a part as the target (Up to next / part) gives those alone (c2-fan-blade-sweep's
   // Extrude 8, up to the next of a fan's blades: 106 ms of split by every face).
   TopoDS_Shape tool = until.shape;
+  // The faces over the footprint not wholly behind the profile, by where they start along the direction (their
+  // geometry's box: a B-spline's poles only bring one sooner).
+  std::vector<std::pair<double, TopoDS_Shape>> ahead;
   {
     ShapeIMap tf;
     TopExp::MapShapes(until.shape, TopAbs_FACE, tf);
@@ -1114,6 +1117,22 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
       BRepBndLib::Add(base, pb, true);
       double px0, py0, px1, py1;
       across(pb, px0, py0, px1, py1);
+      auto along_range = [&](const Bnd_Box& b, double& z0, double& z1) {
+        double a0, b0, c0, a1, b1, c1;
+        b.Get(a0, b0, c0, a1, b1, c1);
+        z0 = 1e300;
+        z1 = -1e300;
+        for (const double x : {a0, a1})
+          for (const double y : {b0, b1})
+            for (const double z : {c0, c1})
+            {
+              const double d = gp_XYZ(x, y, z).Dot(dir.XYZ());
+              z0             = std::min(z0, d);
+              z1             = std::max(z1, d);
+            }
+      };
+      double pz0, pz1;
+      along_range(pb, pz0, pz1);
       std::vector<TopoDS_Shape> meeting;
       for (int i = 1; i <= tf.Extent(); ++i)
       {
@@ -1123,11 +1142,20 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
         fb.Enlarge(Precision::Confusion());
         double fx0, fy0, fx1, fy1;
         across(fb, fx0, fy0, fx1, fy1);
-        if (fx1 >= px0 && fx0 <= px1 && fy1 >= py0 && fy0 <= py1)
-          meeting.push_back(tf(i));
+        if (!(fx1 >= px0 && fx0 <= px1 && fy1 >= py0 && fy0 <= py1))
+          continue;
+        meeting.push_back(tf(i));
+        Bnd_Box gb;
+        BRepBndLib::Add(tf(i), gb, false);
+        gb.Enlarge(Precision::Confusion());
+        double z0, z1;
+        along_range(gb, z0, z1);
+        if (z1 >= pz0)
+          ahead.emplace_back(z0, tf(i));
       }
       if (!meeting.empty() && (int)meeting.size() < tf.Extent())
         tool = compound_of(meeting);
+      std::stable_sort(ahead.begin(), ahead.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
     }
   }
   // One target face much larger than the prism's footprint: split by the patch of its surface the prism meets (the same
@@ -1149,17 +1177,79 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
       }
     }
   }
-  BRepAlgoAPI_Splitter sp;
-  sp.SetArguments(single(longPrism));
-  sp.SetTools(single(tool));
-  sp.SetRunParallel(bop_parallel());
-  sp.SetNonDestructive(true);
-  {
+  auto split_by = [&](const TopoDS_Shape& t) {
+    auto s = std::make_unique<BRepAlgoAPI_Splitter>();
+    s->SetArguments(single(longPrism));
+    s->SetTools(single(t));
+    s->SetRunParallel(bop_parallel());
+    s->SetNonDestructive(true);
     const noshape::KernelTimer timer("prism_until.split");
-    sp.Build(new_cancel_indicator()->Start());
+    s->Build(new_cancel_indicator()->Start());
+    if (s->HasErrors())
+      fail_op("up-to extrude: split failed: " + algo_errors(*s));
+    return s;
+  };
+  std::unique_ptr<BRepAlgoAPI_Splitter> spp;
+  // Through a row of parts: split by the nearest faces first, more only while the kept pieces reach the end or a face
+  // left out could meet them (c2-fan-blade-sweep's Extrude 8, a 7.5 mm pin before 9 parts' 41 faces: 137 -> 5 ms).
+  if (patched.IsNull() && !sheet_profile && ahead.size() > 8)
+  {
+    size_t n = 8;
+    for (;;)
+    {
+      std::vector<TopoDS_Shape> nearest;
+      for (size_t i = 0; i < n; ++i)
+        nearest.push_back(ahead[i].second);
+      const TopoDS_Shape t = compound_of(nearest);
+      spp                  = split_by(t);
+      ShapeIMap start, end;
+      auto      images = [&](const TopoDS_Shape& cap, ShapeIMap& into) {
+        for (TopExp_Explorer e(cap, TopAbs_FACE); e.More(); e.Next())
+        {
+          const auto& m = spp->Modified(e.Current());
+          if (!m.IsEmpty())
+            for (const TopoDS_Shape& x : m)
+              into.Add(x);
+          else if (!spp->IsDeleted(e.Current()))
+            into.Add(e.Current());
+        }
+      };
+      images(prism.FirstShape(), start);
+      images(prism.LastShape(), end);
+      bool   toEnd = false;
+      double reach = -1e300;
+      for (TopExp_Explorer e(spp->Shape(), TopAbs_SOLID); e.More(); e.Next())
+      {
+        bool touchesStart = false;
+        for (TopExp_Explorer f(e.Current(), TopAbs_FACE); f.More() && !touchesStart; f.Next())
+          touchesStart = start.Contains(f.Current());
+        if (!touchesStart)
+          continue;
+        for (TopExp_Explorer f(e.Current(), TopAbs_FACE); f.More(); f.Next())
+          toEnd = toEnd || end.Contains(f.Current());
+        Bnd_Box kb;
+        BRepBndLib::Add(e.Current(), kb, false);
+        double a0, b0, c0, a1, b1, c1;
+        kb.Get(a0, b0, c0, a1, b1, c1);
+        for (const double x : {a0, a1})
+          for (const double y : {b0, b1})
+            for (const double z : {c0, c1})
+              reach = std::max(reach, gp_XYZ(x, y, z).Dot(dir.XYZ()));
+      }
+      size_t need = n;
+      while (need < ahead.size() && ahead[need].first <= reach + Precision::Confusion())
+        ++need;
+      if ((!toEnd && need == n) || n == ahead.size())
+      {
+        tool = t;
+        break;
+      }
+      n = std::max(need, std::min(ahead.size(), 2 * n));
+    }
   }
-  if (sp.HasErrors())
-    fail_op("up-to extrude: split failed: " + algo_errors(sp));
+  else
+    spp = split_by(tool);
+  BRepAlgoAPI_Splitter& sp = *spp;
   HHist spH = history_of({longPrism, patched.IsNull() ? until.shape : tool}, sp);
   merge_into(hist, spH);
   // (The patch's pieces as the target face's.)

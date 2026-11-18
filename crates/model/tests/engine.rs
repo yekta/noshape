@@ -717,6 +717,41 @@ fn extrude_second_direction_up_to_next() {
     assert!(near(nb.shape.volume().unwrap(), 1e-4 * 0.025, 1e-6), "{}", nb.shape.volume().unwrap());
 }
 
+/// Up to next before a row of parts stops at the nearest part's face, and through a part's hole goes on to the next
+/// (op_prism_until splits by the nearest faces first, more while the piece reaches the end or a face left out).
+#[test]
+fn extrude_up_to_next_before_a_row_of_parts() {
+    let reach = |hole: bool| {
+        let mut t = T::new();
+        for k in 0..5 {
+            let p = t.top_plane(&format!("{} mm", 10 + 20 * k));
+            let s = t.sketch(Reference::FeaturePlane(p), rect(0.0, 0.0, 0.02, 0.02));
+            let r = t.regions(s)[0].clone();
+            t.extrude(r, "10 mm", "NEW");
+        }
+        if hole {
+            // A 12 mm hole through the first part.
+            let p = t.top_plane("10 mm");
+            let s = t.sketch(Reference::FeaturePlane(p), rect(0.004, 0.004, 0.016, 0.016));
+            let r = t.regions(s)[0].clone();
+            t.extrude(r, "10 mm", "REMOVE");
+        }
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.005, 0.005, 0.015, 0.015));
+        let r = t.regions(s)[0].clone();
+        let x = t.extrude(r, "10 mm", "NEW");
+        t.set(x, "endBound", en("UP_TO_NEXT"));
+        let res = t.ok();
+        let nb = res.context.bodies.iter().find(|b| b.id.feature == x).unwrap();
+        let bb = nb.shape.bounding_box(true).unwrap();
+        (bb.min.z, bb.max.z, nb.shape.volume().unwrap(), nb.faces.len())
+    };
+    let (lo, hi, v, f) = reach(false);
+    assert!(lo.abs() < 1e-7 && (hi - 0.01).abs() < 1e-7 && near(v, 1e-4 * 0.01, 1e-6) && f == 6, "{lo} {hi} {v} {f}");
+    // The 10 mm square passes the hole and stops at the second part.
+    let (lo, hi, v, f) = reach(true);
+    assert!(lo.abs() < 1e-7 && (hi - 0.03).abs() < 1e-7 && near(v, 1e-4 * 0.03, 1e-6) && f == 6, "{lo} {hi} {v} {f}");
+}
+
 /// std extrude: both flips are against the sketch normal, so a flipped
 /// first direction with a flipped second one extrudes the slab between the
 /// two depths on one side (live: cf-sheet-metal-model-plus Extrude 1).
