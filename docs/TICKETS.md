@@ -602,6 +602,18 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - Tab Part Studio → Assembly, list / graphics settled: live 3894 / 4317, ours 138 / 294. Assembly → Part Studio: live 3114 / 3429, ours 139 / 296.
 - Right-click → menu: live 666, ours 148. Feature row hover → part highlight: live 679, ours 349.
 
+## Interaction feel: live2's "Ours" cells on the P0 rows (live2 12:1x, green 4a69d55b, Xvfb :125, real pointer; evidence live/psui/ours-1118/)
+- [ ] **P1 FEEL-EDGE-VS-FACE-HOLD (psui)** (hover-pick-1120): a part edge over the face behind it lights at 6 px but the face takes
+  over at 8 px (the edge holds only to 7); live lights at 5-6 and holds to 8-10 px.
+- [ ] **P1 FEEL-PLANE-FIRST-MOVE (psui)** (sel-feel): press on empty space, first move onto a default plane: ours draws the crossing
+  box on that move and no plane lights; live lights the plane and shows no box until the next move.
+- [ ] **P1 FEEL-MASS-PANEL-PLACE (psui)** (measure-mass-1118): Mass properties opens under the feature list, only its right part
+  showing (right edge x 405, bottom ~y 288); live puts it over the list at (214, 79), 440 x 521.
+- [ ] **P1 FEEL-HIDE-TIMING (psui)** (ps-feel2-1118, 60 fps capture): Y: row 269 ms, part gone 669 ms (live 73 / 436); Shift+Y 408 /
+  774 ms (live 108 / 562).
+- [ ] **P1 FEEL-SKETCH-REACH-OUTSIDE (psui + skasm)** (hover-p0): outside sketch mode a sketch line lights from 8 px and holds to 9; at
+  a corner the whole line lights at 6 and the point never lights alone; live: line 6-7 px, point 9 px (the point beats the line).
+
 ## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:10, green cafe3c2af, vibex8 Xvfb, real pointer)
 Sessions opened without the UI runner (stable view): asm-feel (Part 1 40x30x10, Part 3 20x20x5), block-fillet, hole-plate-drawing.
 Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png (vibex8 ~/agents/qa-keep/feel-1118/).
@@ -613,7 +625,7 @@ Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png
 - Drawing note: typed "Qz7" shows in the editor; Escape closes the Note panel and leaves no note (live: the same; live also leaves an empty
   editor box drawn). Pass. Drawing hover timing: live's is a server round trip (nothing to copy).
 - Assembly Snap mode release: Part 3 goes connector onto Part 1's top-face corner, flush, and stays there after Escape, as live.
-- [ ] 80a647256 (= 587cd164; qa 07:54 on green 80a64725, 1 px steps: straight up the connector jumps at 56 px (square rule 57: match); 45° up-left at 74 px (a 57 px square reaches 80.6); the face diagonal (0.65, 0.76) at 70 px (square: 75). The diagonals are still short, as if a ~74 px circle cut by the square; qa-scratch/af/s3up, s3ul, sm5) **P1 FEEL-SNAPMODE-REACH (asm)**: dragging in Snap mode toward Part 1's top-face corner along the face diagonal in 2 px steps
+- [ ] 80a647256 (= 587cd164; qa 07:54 on green 80a64725, 1 px steps: straight up the connector jumps at 56 px (square rule 57: match); 45° up-left at 74 px (a 57 px square reaches 80.6); the face diagonal (0.65, 0.76) at 70 px (square: 75). The diagonals are still short, as if a ~74 px circle cut by the square; qa-scratch/af/s3up, s3ul, sm5) live2 11:40 retake (behaviours "Diagonal reach"): live is NOT a 57 px square: 50 px straight up, 72 px at 45° up-left over the top face (56 along the side face's diagonal, 49 down-right); so ours (56 up / 74 at 45°) is 6 px long straight up and 2 px long at 45° (qa 12:21) **P1 FEEL-SNAPMODE-REACH (asm)**: dragging in Snap mode toward Part 1's top-face corner along the face diagonal in 2 px steps
   (0.25 s each), the dragged connector jumps onto the corner at 70 px (at 72 px still at the pointer). Live: 57 px (at 58 still at
   the pointer; behaviours "assembly Snap mode drag", retried 06:28-06:42). Lag could only make ours read later, so ours reaches ~13 px
   further.
