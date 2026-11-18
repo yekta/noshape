@@ -71,12 +71,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    (only when both logs have CHECK lines); qa-suites.sh copies those to qa-alerts. bool's gate 2d5bf386 does the same.
    Compat: v0.4.56's CLI query parts has no "check"; once cfd943d5 is in a release CLI, add it to sig.py's part tuple.
    (suites-models.sh was moved to bin/retired by mistake at 16:35 and restored 18:28; the hosts kept their copy meanwhile.)
-0. **05:00 cut**: TICKETS "Release blockers for the 2026-11-18 05:00 release". cut-verdict.sh reads /root/qa-scratch/cut-must.txt
-   (commit or grep:<pattern> per line) and says HOLD if the green lacks one: psui 40a994a16 / db4ff933c / 65ceee7f2 / ea25d544e
-   (verified 20:40 on 0cc996f7) and core's revert of c064b550a (c2-loft-paths-guides Mirror 1 wrong-volume Ok, shipped in
-   v0.4.57); 00:25 added (lead): f824d120b, psui 5e498ffb, skasm a6236ed3a (stack: a65a2d3cf sel feel, snaps, a3974c745 Flange,
-   59cad3c05 joint hover); green 0f7610c83 has the first two, not a6236ed3a. hats/dock + f197 = cut-check's userdocs. **qa-lp-verify** (lp/lp-verify.sh) waits for that revert on a green, runs the document alone on vibex6 -> lp/run.txt +
-   qa-alerts. Rewrite cut-must.txt after each cut.
 0i. **Re-checks owed on the greens with** (landed shas): skasm a65a2d3cf (= da22ce56; sel-feel C2/C3/B1/D: qa-wait-da22, re-keyed
    00:24 after its old grep fired on 0f7610c83 without it), skasm 085fa6af1/fe7ac8832/b8234063a snaps (sweep.py / hv.py; glyphs.py
    SHOWC=1 = Show constraints ticked, gbatch.sh -> sk/run4; first run 00:30 on 0f7610c83), skasm a3974c745 + 59cad3c05 (Flange broad
@@ -110,25 +104,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    actions", live/psui/ui-speed-1118/table.md): open document 12231 ms settled, tab switch 2291-2733, enter sketch 1291 (dialog 226),
    exit 889, undo 903-1011, open Extrude 1320 (dialog 221), first preview 2004, commit 1115, rollback drop 918-1094, context menu 117,
    Mass dialog 161. Use it with the nightly / release-build timings.
-0o. **Compat loop vs the window (02:53)**: compat-loop started a run on vibex7 at 02:41 (green 85abf64a), inside the nightly window;
-   stopped, own userdocs.py killed, loop restarted with a 02:00-04:05 skip. Tonight's latency rows overlapped it 02:41-02:53: read
-   them as possibly loaded. Green 08597f71a has core's 55fc929c: faces-pattern-slots comes from the loop after 04:05 / cut-check 04:15.
-   SKSNAP-REACH closed not a bug (02:50, sub-pixel targets).
-0p. **Nightly 11-18 done (03:06)**: SCORE row 584e957c6 by hand (the script looked for "vibex7" in the heading; heading renamed, so
-   tomorrow's push works): load 1.4-3.5, 60/84 faster than live, sum 54.8 s (live 41.1), dock cold 7.51 s, reopen 3.46 s; quit
-   guard 5/5. Selection latency (v0.4.57 release, polled crop): face 216 / plane 153 / list row 163 / box release 218 ms medians.
-   Tab A/B at load < 1.2: return to an open tab settles 73-87 ms on 0.4.53 vs ~700 ms in 4 of 6 on 0.4.57 (sent to psui 03:08).
-   SELFEEL-PART-ROW verified on 08597f71 at load 0.2.
-0q. **17:00 cut must carry** psui fff088e5 (= 67ebc10a; P0 DOCK-TAB-SWITCH-TRAILING-FRAMES, from 2219c4373; unit qa-wait-67eb reruns the A/B on vibex7
-   on its first green vs 0.4.53, 3 rounds -> nightly/tab67-*.txt). Known on 05:00 (lead 03:28). Put fff088e5 in cut-must.txt after the 05:00 cut.
-0r. **05:00 cut GO (04:46, green 9c015658)**; cut-must.txt rewritten for 17:00 (fff088e5; old list cut-must-0500.txt). compat/accepted.txt
-   holds lead-accepted differences (sk211-step89), filtered from compat alerts (loop restarted 04:47). qa-suites-resume restarts the suites loop when qa-rest-redo ends (19/24 at 04:50).
-0s. **06:25 state**: v0.4.58 tagged bc1bc18e4 (9c015658 + docs, no fff088e5); qa-pub-0458 (bin/pub0458.sh) runs the published check
-   when release.yml publishes (candidate = the newest green, so later commits may differ: judge by hand) and moves the baseline.
-   qa-wait-67eb: fff088e5 green (debug) vs 0.4.53 at vibex7 load < 2 (at 5-7 0.4.53 shows the late frames too).
-   qa-feat3 (bin/feat3.sh): release CLI of main 7db466c62 built on vibex8 (slot), ab-feat.py 3 runs vs 0.4.57 on impeller /
-   valve-config / hunting-knife, then bin/feat3-pair.py vs live's rbstep-1118 tables: features > 5x live go to blend / core / bool.
-   ASMFEEL x4 verified on 8b4812511 (06:20). 17:00 list written (TICKETS); cut-must.txt: fff088e5 + Ctrl+Enter fix when it lands.
 0t. **Compat now covers the corpus (06:40)**: compat-check.sh section "corpus models" = vibex7 ~/qa/corpus/*.noshape (127 saved by the
    models suite; refresh from vibex6 ~/qa-parity/saved after a models run). cut-verdict lists corpus changes with the tickets (read
    them: a status that gets worse is a HOLD unless accepted). cut-must.txt: fff088e5, 120ee19c, Ctrl+Enter fix when it lands.
