@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 10:46 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 10:52 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -38,6 +38,8 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
 - Queued (10:4x): Sheet properties › Size › Custom read as live (Zones, Horizontal / Vertical zones, Include border),
   zones shown only with the border, Custom starts at 4 x 4 zones (live A: template 2 x 2; other sizes asked live2);
   op drawing_sheet the same, e2e. custom-zones 12/12.
+- Local, to land: VS value tooltip centred over the cell (qa VSFEEL, test); Derived's Select Part Studio panel: the
+  first Esc / Enter close only the panel (live docs-import-feel-1118; dialogs matrix row).
 - Open: drw-bom-table-properties s7 (Esc in BOM table properties: today's retake deselects, the old take kept it;
   asked live2 10:24); drw-hatch-panel s31 (Pattern list covers its field; asked live2 09:23).
 - Checked against live 08:4x, already as live: documents search on Enter only; version row menu (View in repair,
@@ -91,7 +93,7 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   "Last change by <user> at <time>" (needs the last microversion per tab per side); switch's centred "Loading
   workspace…" spinner (ours switches at once: not a target unless slow); Create workspace and edit properties ->
   Properties modal fields (Name *, Description, Category "Onshape Workspace" greyed, Apply / Save greyed, Close):
-  check ours.
+  ours already (version_properties).
 - live2 drawing creation (behaviours "studios (lead 11-18 ~02:07, feel): drawing creation", live/studios/
   drw-create-1118/): Create Drawing shows in 237 ms on "Recently opened" with "Retrieving templates…", OK disabled
   while it loads, no focus, Options Suggested / No views remembered; Enter after the list loaded creates (tab 1.9 s).
@@ -103,18 +105,15 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   Part Studio regenerates by itself ~1.1 s, an open dialog does NOT relabel: check ours.
 - live VS / FS (live/studios/vs-fs-feel-1117/): VS add-row focus to the next Name, duplicate -> "w_0"; FS
   autocomplete Enter inserts, Tab closes + inserts a tab, Esc keeps text; FS errors while typing (<0.5 s) red x at
-  gutter line 1 + squiggle, Ctrl/Cmd+S commits, Commit pales, a fixed error greys ~150 ms, gone ~500 ms. qa VSFEEL
-  bubble position: ours at the pointer, live above the cell.
+  gutter line 1 + squiggle, Ctrl/Cmd+S commits, Commit pales, a fixed error greys ~150 ms, gone ~500 ms. VSFEEL bubble:
+  centred over the cell (done 11-18).
 - qa HISTFEEL "sticky hover" (mm.png): the tint there is #b2ddf6, the viewed change's selection (live selects it too),
   not the #def1fb hover: no change.
-- live2 drawing creation: Options remembered (done, drawing_create_options.txt); first view centre on the pointer, no
-  sheet-centre snap: ours already (position = cursor); no Auto-dimension: ours has none; "Retrieving templates…" /
-  OK disabled while loading: ours loads at once (not a target).
 - live documents / Import / Derived + Insert (live/studios/docs-import-feel-1118/): search on Enter only; sort A-Z,
   Z-A, default; row hover icons; double-click opens; inline Rename; Delete -> "Send to trash" (Enter nothing, Esc
   closes) + toast with Restore; New document Enter creates. Import: "CAD Imports" tab ~1.8 s, the Part Studio tab
-  ~6.9 s, active tab unchanged, blue bar, toast. Derived / Insert search ~350 ms after the last key, Enter nothing;
-  Derived Enter 1 closes the panel, 2 commits; Esc 1 closes, 2 cancels.
+  ~6.9 s, active tab unchanged, blue bar, toast. Derived / Insert search ~350 ms after the last key (live's server debounce, not a
+  target; ours filters at once), Enter nothing; Derived Enter / Esc 1 close the panel, 2 commit / cancel (done 11-18).
 - live2 document level (live/feel/doc-level-1117/): tab switch order (URL, old list / canvas gone at once, toolbar,
   list, 3D last; no spinner); undo / redo as ours; regen spinner is psui's.
 
@@ -127,9 +126,9 @@ against live with a feel scenario; share psui's pick code (`Viewport::pick_prior
 - Assembly already as live (checked 11-17): box select rule, glyph click selects the mate (related rows, mated faces
   amber, dashed connector line), graphics hover lights no list row, list hover outlines the parts.
 
-## Agents (lead's roster 11-17 10:30; only these ids)
-psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, core 6692ae35-758a-4442-81c8-29f67be2e21a,
-blend 0e6e9942-0713-46c1-ae55-132fbbb4a14b, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4,
+## Agents (lead's roster 11-17 10:30, core / blend 11-18; only these ids)
+psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, core e8af89fe-d460-49b3-b0bb-9572da230fed,
+blend 0672fa20-964d-4fde-a19c-c5b4363729ba (11-18; 6692ae35 / 0e6e9942 stopped), bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4,
 dx 2108c2b7-2f48-43a7-87a0-3f652e3cda6d (11-17 19:49; f93a1292 stopped), qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b,
 asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm 18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6,
 bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios 58e9bca8-346c-4847-8012-e15006ae61ef,

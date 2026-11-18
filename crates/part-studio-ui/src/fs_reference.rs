@@ -200,6 +200,10 @@ impl FeatureDialog {
             .child(
                 h_flex()
                     .id(SharedString::from(format!("ref-{path}")))
+                    .debug_selector({
+                        let path = path.to_string();
+                        move || format!("ref-{path}")
+                    })
                     .h(px(27.))
                     .p(px(2.))
                     .gap(px(4.))
@@ -232,6 +236,16 @@ impl FeatureDialog {
                     })),
             )
             .into_any_element()
+    }
+
+    /// Closes the open Select … panel; false when none was open. The first Esc or Enter does this, the second cancels
+    /// or commits the dialog (live docs-import-feel-1118: Derived's Select Part Studio).
+    pub fn close_reference_panel(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.ref_picker.take().is_none() {
+            return false;
+        }
+        cx.notify();
+        true
     }
 
     fn open_reference_picker(&mut self, path: String, kind: ReferenceKind, window: &mut Window, cx: &mut Context<Self>) {

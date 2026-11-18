@@ -125,3 +125,21 @@ fn a_length_in_another_unit_shows_in_the_documents() {
     let inch = noshape_units::UnitPrefs { length: noshape_units::LengthUnit::Inch, ..mm };
     assert!(!foreign_length("2 in", &inch) && foreign_length("10 mm", &inch));
 }
+
+/// Live vs-fs-feel-1117 v2-06 (qa VSFEEL): a value cell's tooltip ("10 mm", or "Error regenerating.") is centred over
+/// the cell, 4 px above it on the column header, not at the pointer.
+#[gpui::test]
+fn a_value_cells_tooltip_sits_over_the_cell(cx: &mut TestAppContext) {
+    let (window, _view) = studio(cx, "value-tip");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let cell = vcx.debug_bounds("vs-val-0").expect("the value cell");
+    vcx.simulate_mouse_move(gpui_kit::point(cell.left() + px(10.), cell.center().y), None, gpui_kit::Modifiers::default());
+    for _ in 0..4 {
+        vcx.executor().advance_clock(std::time::Duration::from_millis(300));
+        draw(&mut vcx, window);
+    }
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("10 mm"));
+    let tip = vcx.debug_bounds("placed-tooltip").expect("the tooltip");
+    assert!((tip.bottom() - (cell.top() - px(4.))).abs() < px(1.), "4 px above the cell: {tip:?} {cell:?}");
+    assert!((tip.center().x - cell.center().x).abs() < px(1.), "centred on it, not on the pointer: {tip:?} {cell:?}");
+}

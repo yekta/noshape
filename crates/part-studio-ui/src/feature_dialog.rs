@@ -4464,7 +4464,12 @@ impl Render for FeatureDialog {
             // Live registers feature dialogs with its panel layout manager:
             // moved panels snap to their edges too.
             .child(crate::ui::panel_probe("feature-dialog"))
-            .on_action(cx.listener(|_, _: &crate::actions::Accept, _, cx| cx.emit(DialogEvent::Accept { repeat: false })))
+            // With a Select … panel open, the first Enter closes only the panel (live docs-import-feel-1118: Derived).
+            .on_action(cx.listener(|this, _: &crate::actions::Accept, _, cx| {
+                if !this.close_reference_panel(cx) {
+                    cx.emit(DialogEvent::Accept { repeat: false });
+                }
+            }))
             // Tab / Shift+Tab walk the controls in paint (DOM) order; past
             // either end the focus leaves the dialog (live psb 10-19 h).
             .on_action(cx.listener(|this, _: &crate::actions::DialogTab, window, cx| {
@@ -4498,7 +4503,12 @@ impl Render for FeatureDialog {
                     this.set_value("secondaryAxisType", ParamValue::Enum(order[(cur + 1) % 4].to_string()), cx);
                 }
             }))
-            .on_action(cx.listener(|_, _: &crate::actions::Cancel, _, cx| cx.emit(DialogEvent::Cancel)))
+            // With a Select … panel open, the first Esc closes only the panel (live docs-import-feel-1118: Derived).
+            .on_action(cx.listener(|this, _: &crate::actions::Cancel, _, cx| {
+                if !this.close_reference_panel(cx) {
+                    cx.emit(DialogEvent::Cancel);
+                }
+            }))
             .child(
                 // Live: 28 px plus the 1 px bottom border.
                 h_flex()

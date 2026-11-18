@@ -1244,13 +1244,16 @@ impl VariableStudioView {
                     let tip = if error.is_some() { "Error regenerating.".to_string() } else { noshape_units::localize(&v.expr.text) };
                     cell_div(2)
                         .id(("vs-val", i))
+                        .debug_selector(move || format!("vs-val-{i}"))
                         .px(px(7.))
                         .track_focus(&fh)
                         // (Red when it fails: live vs-fs-feel-1117 v2-06.)
                         .when(selected, |d| d.border_2().border_color(if error.is_some() { p().error } else { rgb(0x1651b0) }).px(px(6.)))
                         // Live2 vs-drag.png: a value that fails sits on live's invalid-field pink, its text unchanged.
                         .when(error.is_some(), |d| d.bg(crate::theme::themed(0xf9ebec, 0x4a2326)))
-                        .tooltip(crate::ui::tooltip(tip))
+                        // (Its tooltip centred over the cell, on the column header: live vs-fs-feel-1117 v2-06, qa
+                        // VSFEEL; not at the pointer.)
+                        .map(|d| crate::ui::with_tip(d, tip, crate::ui::TipSide::Above))
                         .child(div().min_w_0().truncate().child(text))
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| {
                             this.cell_selected = Some(format!("e{i}"));

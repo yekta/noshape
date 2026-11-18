@@ -525,6 +525,7 @@ impl Render for PlacedTooltip {
         // 400 px wide, under the title.
         let extra = self.expanded.as_ref().filter(|(_, shown)| *shown).map(|(text, _)| div().max_w(px(RICH_TOOLTIP_W)).p(px(4.)).line_height(px(18.)).bg(gpui_kit::rgb(0xffffff)).italic().child(text.clone()));
         let content = div()
+            .debug_selector(|| "placed-tooltip".into())
             .font_family(cx.theme().font_family.clone())
             .text_size(px(12.))
             .text_color(pal.text)

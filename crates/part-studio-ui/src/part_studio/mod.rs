@@ -7466,8 +7466,11 @@ impl Render for PartStudioView {
                     this.choose_select_other(None, cx);
                 } else if this.sketch.is_some() {
                     cx.propagate();
-                } else if this.edit.is_some() {
-                    this.accept_edit(false, window, cx);
+                } else if let Some(e) = &this.edit {
+                    // A Select … panel open: the first Enter closes it, the dialog stays (live docs-import-feel-1118).
+                    if !e.dialog.clone().update(cx, |d, cx| d.close_reference_panel(cx)) {
+                        this.accept_edit(false, window, cx);
+                    }
                 }
                 // Enter on a selected feature row opens nothing (live 11-03, behaviours request 1839).
             }))

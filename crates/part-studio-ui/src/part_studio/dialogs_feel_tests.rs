@@ -345,6 +345,30 @@ fn rows() -> Vec<Row> {
             wait_until(cx, window, |cx| !view.read(cx).ui_busy());
             expect(cx.update(|cx| view.read(cx).edit.is_some()), false, "dialog open")
         } },
+        Row { id: "Derived / Select Part Studio panel: Esc and Enter", live: "with the panel open, the first Esc closes only the panel, the second cancels; the first Enter closes only the panel (live docs-import-feel-1118)", gap: false, check: |cx| {
+            let (window, view) = block(cx, "dlg-derived-keys");
+            let panel_open = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).ref_picker.is_some()));
+            let open_panel = |cx: &mut TestAppContext| -> Result<(), String> {
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("importDerived", w, cx))).unwrap();
+                wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+                draw(cx, window);
+                let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+                let field = vcx.debug_bounds("ref-partStudio").ok_or("no Part Studio field")?;
+                vcx.simulate_click(field.center(), Modifiers::default());
+                draw(cx, window);
+                Ok(())
+            };
+            open_panel(cx)?;
+            let opened = panel_open(cx);
+            keys(cx, window, &["escape"]);
+            let after_one = panel_open(cx);
+            keys(cx, window, &["escape"]);
+            let after_two = panel_open(cx);
+            open_panel(cx)?;
+            keys(cx, window, &["enter"]);
+            let after_enter = panel_open(cx);
+            expect((opened, after_one, after_two, after_enter), (Some(true), Some(false), None, Some(false)), "panel open, after Esc, after a second Esc (None: no dialog), after Enter")
+        } },
         Row { id: "Properties / Enter and Esc do nothing", live: "Enter in a text field neither applies nor closes; Esc doesn't close (clean or changed)", gap: false, check: |cx| {
             let (window, view) = block(cx, "dlg-props-keys");
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
