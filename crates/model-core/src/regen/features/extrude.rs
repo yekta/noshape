@@ -18,11 +18,14 @@ enum End {
 pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     // Onshape's EXTRUDE_FAILED for a failing geometry operation (live
     // "Contrast: a failed EXTRUDE", 10-22): the kernel's reason isn't shown.
+    // Up to next that finds nothing to stop at: EXTRUDE_UPTO_NEXT_NO_DIVISION (live err18).
+    let next = ev.is("endBound", "UP_TO_NEXT") || (ev.bool("hasSecondDirection") && ev.is("secondDirectionBound", "UP_TO_NEXT"));
     eval_inner(ev).map_err(|e| {
         // (A Boolean noshape's declined with NOSHAPE_BOOL_FALLBACK=0: its reason kept.)
         if e.message.starts_with(crate::regen::eval::KERNEL_FAILURE) && !e.message.contains("noshape's Boolean declined") {
             log::debug!("extrude: {}", e.message);
-            crate::regen::eval::FeatureError { message: "Failed to extrude selections, check input.".into(), ..e }
+            let message = if next { "Up to next termination problem, consider switching it to up to part." } else { "Failed to extrude selections, check input." };
+            crate::regen::eval::FeatureError { message: message.into(), ..e }
         } else {
             e
         }

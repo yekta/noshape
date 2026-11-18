@@ -1153,6 +1153,11 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         let [spine] = wires.as_slice() else { return crate::regen::eval::err_at(&["spine"], "Loft path must be a contiguous set of curves.") };
         opts.path = Some((spine.clone(), ev.integer("sectionCount")?.max(1) as usize));
     }
+    // Onshape's LOFT_DIRECTION_ERROR: profiles all in one plane, with no path to run along (live err18: a circle and a
+    // square both sketched on Top).
+    if opts.path.is_none() && sections.iter().all(|s| s.profile.is_some()) && Shape::compound(&shapes).find_plane(1e-7)?.is_some() {
+        return err("Could not determine loft direction.");
+    }
     // Onshape's LOFT_CONNECTION_MATCHING: every connection needs a point on
     // each profile (point profiles excepted).
     if ev.bool("matchConnections") {

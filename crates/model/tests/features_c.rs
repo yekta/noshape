@@ -1762,6 +1762,51 @@ fn failed_extrude_reads_onshape_text() {
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Failed to extrude selections, check input.".to_string()));
 }
 
+/// Live's texts (err18, docs/parity/error-wording.md): Up to next with nothing ahead, a revolve whose axis crosses
+/// its profile, and a loft of two profiles sketched on one plane.
+#[test]
+fn up_to_next_revolve_and_loft_failures_read_onshape_text() {
+    let mut s = block();
+    s.ok();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(mm(100.0), mm(100.0)), mm(5.0));
+    let far = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let circle = s.region(far);
+    let mut t = Studio { ps: s.ps.clone(), ..Studio::new() };
+    let c = circle.clone();
+    t.add("extrude", move |p| {
+        p.set("entities", q(c));
+        p.set("endBound", en("UP_TO_NEXT"));
+        p.set("operationType", en("NEW"));
+    });
+    assert_eq!(t.last_status(), (FeatureStatus::Error, "Up to next termination problem, consider switching it to up to part.".to_string()));
+
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(60.0, 40.0), (70.0, 40.0), (70.0, 50.0), (60.0, 50.0)], true);
+    let rs = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let square = s.region(rs);
+    // (The axis in a sketch of its own, as live's: in the square's sketch it would split the region.)
+    let mut sk = noshape_sketch::Sketch::new();
+    let ax = sk.add_line(DVec2::new(mm(65.0), mm(30.0)), DVec2::new(mm(65.0), mm(60.0))).0;
+    let axs = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let mut t = Studio { ps: s.ps.clone(), ..Studio::new() };
+    let sq = square.clone();
+    t.add("revolve", move |p| {
+        p.set("entities", q(sq));
+        p.set("axis", q(Reference::SketchEntity { sketch: axs, entity: ax }));
+    });
+    assert_eq!(t.last_status(), (FeatureStatus::Error, "Revolve would create self-intersecting part.".to_string()));
+
+    s.add("loft", move |p| {
+        p.set("sheetProfilesArray", ParamValue::Array([circle, square].into_iter().map(|r| {
+            let mut v = ParamValues::default();
+            v.set("sheetProfileEntities", q(r));
+            v
+        }).collect()));
+    });
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Could not determine loft direction.".to_string()));
+}
+
 /// sweep.fs: "Lock profile direction" checks its direction before the
 /// wall and the path (live p1audit sweep-lockdir: "Direction to lock" pink).
 #[test]

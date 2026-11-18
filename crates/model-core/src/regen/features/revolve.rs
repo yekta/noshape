@@ -53,7 +53,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     let mut tools = Vec::new();
     for p in &profiles {
         if full {
-            let res = k::revolve_turned(&p.shape, origin, axis)?;
+            let res = k::revolve_turned(&p.shape, origin, axis).map_err(revolve_failed)?;
             let names = sweep_names(ev, p, &res, false, false);
             tools.push(NamedShape::new(res.shape, names));
             continue;
@@ -95,7 +95,7 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
         let key = edge_sources.first().cloned().unwrap_or(crate::reference::Source::Index(i as u32));
         let p = Profile { shape: w, frame, edge_sources, key, from_face: false };
         if ev.bool("fullRevolve") {
-            let res = k::revolve(&p.shape, origin, axis, TAU)?;
+            let res = k::revolve(&p.shape, origin, axis, TAU).map_err(revolve_failed)?;
             let names = sweep_names(ev, &p, &res, false, false);
             tools.push(NamedShape::new(res.shape, names));
         } else {
@@ -110,6 +110,16 @@ enum Side {
     Angle(f64),
     /// Split the sweep by this shape.
     Tool(Shape),
+}
+
+/// Onshape's REVOLVE_FAILED for a revolve the kernel can't make (live err18: the axis across the profile); the kernel's
+/// reason isn't shown.
+fn revolve_failed(e: k::KernelError) -> FeatureError {
+    if e.to_string().contains("cancelled") {
+        return e.into();
+    }
+    log::debug!("revolve: {e}");
+    fe("Revolve would create self-intersecting part.")
 }
 
 fn fe(m: &str) -> FeatureError {
@@ -226,7 +236,7 @@ fn revolve_side(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, side: Sid
     match side {
         Side::Angle(a) => {
             let (axis, a) = if a < 0.0 { (-axis, -a) } else { (axis, a) };
-            let res = k::revolve(&p.shape, origin, axis, a.min(TAU))?;
+            let res = k::revolve(&p.shape, origin, axis, a.min(TAU)).map_err(revolve_failed)?;
             Ok(NamedShape::new(res.shape.clone(), side_names(ev, p, &res, &far_role(p))))
         }
         Side::Tool(tool) => {
@@ -292,21 +302,21 @@ fn partial(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3) -> FResult<Nam
     let blind = ev.is("endBound", "BLIND");
     if blind && ev.bool("symmetric") {
         let a = ev.angle("angle")?;
-        let res = k::revolve_between(&p.shape, origin, axis, -a * 0.5, a * 0.5)?;
+        let res = k::revolve_between(&p.shape, origin, axis, -a * 0.5, a * 0.5).map_err(revolve_failed)?;
         return Ok(NamedShape::new(res.shape.clone(), sweep_names(ev, p, &res, true, true)));
     }
     let first = side_end(ev, p, origin, axis, true)?;
     let second = if ev.bool("hasStartBound") { Some(side_end(ev, p, origin, -axis, false)?) } else { None };
     match (first, second) {
         (Side::Angle(a), None) => {
-            let res = k::revolve(&p.shape, origin, axis, a)?;
+            let res = k::revolve(&p.shape, origin, axis, a).map_err(revolve_failed)?;
             Ok(NamedShape::new(res.shape.clone(), sweep_names(ev, p, &res, true, true)))
         }
         // Two blind angles: one revolve from the start angle to the end
         // (start 45°, end 90°: 45° to 90°; start 330°, end 30°: −30° to 30°).
         (Side::Angle(a), Some(Side::Angle(_))) if ev.is("startBound", "BLIND") => {
             let start = ev.angle("angleBack")?.rem_euclid(TAU);
-            let res = k::revolve_between(&p.shape, origin, axis, if start < a { start } else { start - TAU }, a)?;
+            let res = k::revolve_between(&p.shape, origin, axis, if start < a { start } else { start - TAU }, a).map_err(revolve_failed)?;
             Ok(NamedShape::new(res.shape.clone(), sweep_names(ev, p, &res, true, true)))
         }
         (first, None) => revolve_side(ev, p, origin, axis, first, true),
