@@ -559,7 +559,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
-## Configurations vs live2's 11-18 capture (qa 01:25, green 5076e98c, vibex6 Xvfb, real pointer and keys)
+## Configurations vs live2's 11-18 capture (qa 01:15, green 5076e98c, vibex6 Xvfb, real pointer and keys)
 two-blocks with a List "Configuration" (Default / A / B, Extrude 1 Depth 20 / 25 / 40 mm, CLI), then the UI. Sheet: qa-scratch/
 tickets/cfg-feel-sheet.png (vibex6 ~/agents/qa-keep/cfg-feel). Match live: the panel docks at the right, ~695 of 1440 px, full height,
 the strip at its left edge (it is the strip's 2nd button, as live's highlighted one; live2's "3rd" is a miscount); the feature list's
