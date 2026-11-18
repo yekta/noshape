@@ -5,6 +5,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa, 2026-11-18 (heavy-model feel prep)
+- [ ] **P1 DRIVEN-PATTERN-SWEEP (core)**: c2-loft-guide-curves-driven-pattern's last feature Sweep 1 fails on ours ("Could not create
+  valid swept body, check input."; green 80a64725's release build and v0.4.57 alike), live makes it OK (125 bodies after it, ours 124:
+  122 surfaces + 2 curves). It is live's heavy-model feel reference (live 11-18), so the feel rows compare 124 vs 125 bodies.
+
 ## dx, 2026-11-17
 - [ ] P2 SWEEP-SEAM-KINK (core, lead 11-17; dx 2026-11-17 09:17) cf-hose-routing's hoses (Festo PUN 6 x 1, a sweep of
   an annulus along the routing curve): each tube face's closed section is one degree-12 B-spline span whose seam isn't
