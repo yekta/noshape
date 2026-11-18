@@ -229,7 +229,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     }
     // Text glyph outlines follow their (solved) text boxes.
     data.add_text_outlines(&mut sk);
-    let (regions, imprinted, split, joints) = imprint(ev, &frame, &sk, sk.regions());
+    let (regions, imprinted, split) = imprint(ev, &frame, &sk, sk.regions());
     let wires = sk.wires();
     let mut dimension_text = BTreeMap::new();
     for c in sk.constraints() {
@@ -264,7 +264,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         .iter()
         .map(|i| crate::regen::context::SketchResultImage { id: i.id, box_points: i.box_points.clone(), data_base64: i.data_base64.clone() })
         .collect();
-    ev.ctx.sketches.push(Arc::new(SketchResult { feature: ev.feature, name, frame, sketch: sk, report, regions, imprinted, split, joints, wires, dimension_text, images, legacy_edge_directions: ev.ctx.legacy_edge_directions, bodies: None }));
+    ev.ctx.sketches.push(Arc::new(SketchResult { feature: ev.feature, name, frame, sketch: sk, report, regions, imprinted, split, wires, dimension_text, images, legacy_edge_directions: ev.ctx.legacy_edge_directions, bodies: None }));
     Ok(())
 }
 
@@ -278,10 +278,9 @@ pub fn is_imprint_entity(id: u32) -> bool {
 
 /// The sketch's regions with its plane's face imprinted, as live unless Disable imprinting: the face's edges split the
 /// sketch's own regions, and the face's pieces outside them are regions too (sketch faces that qSketchRegion leaves
-/// out). The regions, which of them are such pieces, the sketch's own regions that were split, and the joints its arcs
-/// keep ([`imprint_joints`]).
-fn imprint(ev: &EvalCtx, frame: &crate::display::PlaneFrame, sk: &noshape_sketch::Sketch, own: Vec<Region>) -> (Vec<Region>, Vec<bool>, Vec<Region>, Vec<glam::DVec2>) {
-    let plain = |own| (own, Vec::new(), Vec::new(), Vec::new());
+/// out). The regions, which of them are such pieces, and the sketch's own regions that were split.
+fn imprint(ev: &EvalCtx, frame: &crate::display::PlaneFrame, sk: &noshape_sketch::Sketch, own: Vec<Region>) -> (Vec<Region>, Vec<bool>, Vec<Region>) {
+    let plain = |own| (own, Vec::new(), Vec::new());
     use crate::reference::{Reference, Source};
     let Some(plane) = ev.query("sketchPlane").first().cloned() else { return plain(own) };
     // (Not in a studio saved before imprinting: its references name the regions it had then.)
@@ -300,7 +299,6 @@ fn imprint(ev: &EvalCtx, frame: &crate::display::PlaneFrame, sk: &noshape_sketch
         let Some(c) = face_edge_curve(e, frame) else { return plain(own) };
         extra.push((noshape_sketch::EntityId(IMPRINT_ENTITY + i as u32), c));
     }
-    let joints = imprint_joints(&extra, sk);
     let ids: std::collections::HashSet<&noshape_sketch::regions::RegionId> = own.iter().map(|o| &o.id).collect();
     // (A first filter only, `contains` decides: control-point boxes and polygons made once; exact spline boxes and
     // a tessellation per test were most of an imprint, 3-11 ms a sketch on a face.)
@@ -324,46 +322,7 @@ fn imprint(ev: &EvalCtx, frame: &crate::display::PlaneFrame, sk: &noshape_sketch
     let (mut first, mut pieces): (Vec<_>, Vec<_>) = regions.into_iter().zip(imprinted).partition(|(_, p)| !p);
     first.append(&mut pieces);
     let (regions, imprinted) = first.into_iter().unzip();
-    (regions, imprinted, split, joints)
-}
-
-/// Where a sketch arc lying along an imprinted arc of the face keeps that arc's end: live splits the sketch circle's
-/// wall there (c2-impeller-loft's Extrude impellerraum: circles over the flange face's rim of 4 arcs, 4 side faces,
-/// which its Move face 1 picks). Only where the face's arcs go all round the circle, as there (no evidence yet for a
-/// circle leaving the rim).
-fn imprint_joints(extra: &[(noshape_sketch::EntityId, noshape_sketch::Curve2)], sk: &noshape_sketch::Sketch) -> Vec<glam::DVec2> {
-    use noshape_sketch::Curve2;
-    let circles: Vec<(glam::DVec2, f64)> = sk
-        .entities()
-        .filter(|e| !e.construction)
-        .filter_map(|e| match sk.curve(e.id) {
-            Some(Curve2::Circle { center, radius } | Curve2::Arc { center, radius, .. }) => Some((center, radius)),
-            _ => None,
-        })
-        .collect();
-    let tol = 1e-9 * sk.bbox().size().max_element().max(1.0);
-    let mut out: Vec<glam::DVec2> = Vec::new();
-    for (o, r) in &circles {
-        let arcs: Vec<(glam::DVec2, f64, f64, f64)> = extra
-            .iter()
-            .filter_map(|(_, c)| match c {
-                Curve2::Arc { center, radius, start_angle, end_angle } if (*o - *center).length() <= tol && (r - radius).abs() <= tol => Some((*center, *radius, *start_angle, *end_angle)),
-                _ => None,
-            })
-            .collect();
-        if arcs.len() < 2 || arcs.iter().map(|a| a.3 - a.2).sum::<f64>() < std::f64::consts::TAU - 1e-6 {
-            continue;
-        }
-        for (c, radius, a0, a1) in arcs {
-            for t in [a0, a1] {
-                let p = c + glam::DVec2::new(t.cos(), t.sin()) * radius;
-                if !out.iter().any(|q| (*q - p).length() <= tol) {
-                    out.push(p);
-                }
-            }
-        }
-    }
-    out
+    (regions, imprinted, split)
 }
 
 /// A planar face's edge in its sketch: lines and arcs as such, other curves as their exact B-spline.
