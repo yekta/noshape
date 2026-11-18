@@ -4,15 +4,18 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-18 05:05 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
+Updated 11-18 06:08 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
 (NOSHAPE_GATE_HOST=vibe2); Mac for crate tests, probes and speed numbers (NOSHAPE_RB_HOST=mac; vibex8 runs ~x10 slower at
 load 26); land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs on vibex7 ~/lead-private (hat8, hat15,
 hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree from a computed pid (lead 21:06):
 `systemctl stop <unit>`; kill only own pids > 1.
 
 ## In flight
-- GATE unit bool-gate-b5b566884 on vibex7, queued behind bool2's gate c9c3759aa (lead 11-18: run wherever starts
-  first) -> /root/bool-hat-scratch/chain-b5b566884.out. Then private docs (udoc-ab8.sh b5b566884),
+- LANDING 7378bd2c (queued 06:05, alone off main): Shell's drop_clear_offset_pairs shared one FClass2d across
+  threads; NCollection_Sequence::Value writes its node cache, torn -> SIGSEGV (rings-loft Shell 1 crashed 2 of 10 runs
+  on the Mac, on main since 3bba9d430 11-15). One task per face now: 20/20 clean, Shell 1 217 ms as before.
+- GATE unit bool-gate-05e180ea5 on vibex7 (the stack + the crash fix as 14.), queued behind bool2's gate c9c3759aa
+  (lead 11-18: run wherever starts first) -> /root/bool-hat-scratch/chain-05e180ea5.out. Then private docs (udoc-ab8.sh 05e180ea5),
   list relabelled / seam cases per condition (c), knurls ours-only, land, tell dx (2108c2b7-2f48-43a7-87a0-3f652e3cda6d),
   core, blend, asm. Branch bool-shared2 (bool-hat) on main f6274d94e, 13 commits, all g++-13 OK:
   1-10. as before: e61278b1d usd room; 8a9351e4b shared shapes (lead conditions (a) suite identical, (b) hats/dock
@@ -25,7 +28,10 @@ hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree 
   12. 8ba7c6dcc strips (lead 11-18: match live's 1e-5): drop_strip_faces / collapse_short_edges / without_strips on
      every op_boolean path; unify keeps merges whose pieces lie on the merged surface (pieces_within, 1e-7) within 1e-8
      of the volume. e54410 Extrude 22 14 faces as live; 850efe Extrude 5 36 as live, doc 300 s -> 1.7 s, 12/18.
-     Not matched: q-union-merge's overlap variant (face coincidence, not a strip). 850efe Extrude 6 33 vs 28 (live
+     Not matched: q-union-merge's overlap variant (face coincidence, not a strip; ours 8/18/12 tops 90/100, live
+     8/22/16 tops 100/90). OCCT fuzzy 1e-5 gives live's faces there, but over the corpora (5873 cases) parallel
+     planes 1e-7..1e-5 apart overlapping occur in 7 only, and fuzzy there drops faces (2), leaves 7 faces unmerged
+     (3) or empties a parity56 cut (ce4e3c99): not taken. Detector: /root/bool-scratch/near-planes-detector.diff. 850efe Extrude 6 33 vs 28 (live
      merges with 2e-6 of volume change: not ours to take). Kernel T1 496/496 on the Mac.
   13. b5b566884 fan-blade P0: an offset face grazing another argument's circle declined first (offset_grazes_a_circle,
      rust_boolean.cpp): 36 -> 0.4 ms on the Mac; not where one of its edges lies on the circle (impeller halves).
