@@ -486,7 +486,8 @@ impl DrawingEditor {
         self.edit_sheet(name, cx, |s| s.tables.push(t));
         self.table_dlg = None;
         self.tool = Tool::Select;
-        // Placed, not selected (live: a new BOM table isn't drawn orange, drw-bom-table).
+        // Placed, not selected (live: a new BOM table isn't drawn orange, drw-bom-table; live2 tables-1118 d3 saw it
+        // selected: a retake is asked).
         self.selection.clear();
         cx.notify();
         true

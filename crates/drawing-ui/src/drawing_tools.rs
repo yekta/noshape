@@ -2192,7 +2192,14 @@ impl DrawingEditor {
     }
 
     fn context_menu_rows(&mut self, pick: Option<u32>, cx: &mut Context<Self>) -> Vec<MenuEntry> {
-        let sel = self.sel_at(pick, self.cursor);
+        let mut sel = self.sel_at(pick, self.cursor);
+        // The empty sheet with one note selected: the note's menu (live2 drw-note-copy-paste s8).
+        if sel.is_none()
+            && let [Sel::Annotation(id)] = self.selection[..]
+            && self.current_sheet().annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Note { .. }))
+        {
+            sel = Some(Sel::Annotation(id));
+        }
         // A section line's menu leaves the selection as it was (live drw-section-flip-direction: nothing orange).
         let on_cut_line = pick.and_then(|p| self.built.as_ref()?.picks.get(p as usize)).is_some_and(|t| matches!(t, PickTarget::SectionLine(_)));
         if let Some(s) = sel

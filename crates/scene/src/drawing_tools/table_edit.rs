@@ -190,8 +190,8 @@ pub fn split_at(t: &Table, l: &TableLayout, r: usize) -> Option<usize> {
 }
 
 /// Split … below: the rows after `split` go to a new part beside this one
-/// (to the right, else to the left); a hole table's goes under it, 3 mm
-/// apart, its left edge in line (live2 drw-hole-table-split s15). Returns its id.
+/// (to the right, else to the left); a hole table's and a BOM's go under it, 3 mm
+/// apart, its left edge in line (live2 drw-hole-table-split s15, tables-1118 m2). Returns its id.
 pub fn split_table(s: &mut Sheet, id: u64, l: &TableLayout, split: usize) -> Option<u64> {
     let orig = s.table(id)?.clone();
     let [a, b] = shown_rows(&orig, l);
@@ -202,7 +202,7 @@ pub fn split_table(s: &mut Sheet, id: u64, l: &TableLayout, split: usize) -> Opt
     second.rows = Some([split, b]);
     let head = l.title as usize + 1;
     let cut = l.ys.get(head + split.saturating_sub(a)).copied();
-    if let (TableKind::Hole { bottom_to_top: false, .. }, Some(cut), Some(&top), Some(&bottom), Some(&head_y)) = (&second.kind, cut, l.ys.first(), l.ys.last(), l.ys.get(head)) {
+    if let (TableKind::Hole { bottom_to_top: false, .. } | TableKind::Bom { bottom_to_top: false, .. }, Some(cut), Some(&top), Some(&bottom), Some(&head_y)) = (&second.kind, cut, l.ys.first(), l.ys.last(), l.ys.get(head)) {
         let new_top = cut - 3.0;
         second.position[1] = match second.corner {
             TableCorner::TopLeft | TableCorner::TopRight => new_top,

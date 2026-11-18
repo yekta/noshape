@@ -1359,6 +1359,10 @@ def compare(live, ours, whole_document=True):
                 tx, ty = x.get("text") or [], y.get("text") or []
                 if len(tx) > 1 and tx[0] == "Drawing properties" and ty and ty[0] == tx[1] and ty[0] != "Drawing properties":
                     x["text"], x["title"] = tx[1:], y.get("title")
+                    # (The footer comes with the header reading.)
+                    footer = ["Update properties from a template...", "Lock drawing properties"]
+                    if x["text"][-2:] == footer and ty[-2:] != footer:
+                        x["text"] = x["text"][:-2]
         if isinstance(da, dict) and isinstance(db, dict) and da.get("kind") == "drawing-panel" and ("fields" in da) != ("fields" in db):
             da.pop("fields", None)
             db.pop("fields", None)
@@ -1426,7 +1430,13 @@ def compare(live, ours, whole_document=True):
                 # A drawing of live's start studio is named after it, as its dialogs' texts above ("start frame-drawing
                 # Copy 1 Drawing 1", live2 drw-cut-list-table-properties).
                 dr["tab"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)? ", "Part Studio 1 ", dr["tab"])
-                # A tab name live's lane document already had gets " (1)" (live2 drw-detail-view).
+                # A tab name live's lane document already had gets " (1)" (live2 drw-detail-view), and so does a note
+                # showing it (Insert drawing property › Drawing name, upper case: drw-note-insert-drawing-property).
+                m = re.fullmatch(r"(.*) \(\d+\)", dr["tab"])
+                if m and isinstance(dr.get("annotations"), list):
+                    for x in dr["annotations"]:
+                        if isinstance(x, dict) and isinstance(x.get("text"), str):
+                            x["text"] = re.sub(re.escape(dr["tab"]), lambda t: t.group(0)[:len(m.group(1))], x["text"], flags=re.IGNORECASE)
                 dr["tab"] = re.sub(r" \(\d+\)$", "", dr["tab"])
         # A view's menu names its source as the dialogs do ("Insert custom table of start block Copy 1 ...", "Switch to
         # start block Copy 1": live2 drw-view-align-horizontally).

@@ -391,8 +391,11 @@ impl DrawingEditor {
             let mut text: Vec<String> = vec!["Hole table".into(), "Show location data".into()];
             // Location off: Collapse tags instead of the precision, no origin or directions (live2
             // drw-hole-table-no-location).
+            // (Each select's options: read by recorders before 2026-11-17.3 only.)
+            let mut options: Vec<usize> = Vec::new();
             if show {
                 text.push("Location precision".into());
+                options.extend(text.len()..text.len() + PRECISIONS.len());
                 text.extend(PRECISIONS.iter().map(|(l, _)| l.to_string()));
             } else {
                 text.push("Collapse tags".into());
@@ -417,8 +420,11 @@ impl DrawingEditor {
             }
             text.push("Sheet".into());
             text.extend(self.drawing.sheets.iter().map(|s| s.name.clone()));
-            text.extend(["Order", "Top to bottom", "Bottom to top", "Select fixed corner"].map(String::from));
-            serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text })
+            text.push("Order".into());
+            options.extend([text.len(), text.len() + 1]);
+            text.extend(["Top to bottom", "Bottom to top", "Select fixed corner"].map(String::from));
+            let lines = text.into_iter().enumerate().map(|(i, t)| (t, options.contains(&i))).collect();
+            crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Hole table" }), lines)
         });
         Some(
             v_flex()
@@ -438,7 +444,16 @@ impl DrawingEditor {
                     h_flex()
                         .h(px(28.))
                         .pl(px(11.))
-                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Hole table"))
+                        // With no view picked the title is invalid: red, its tooltip the rule (live2 drw-hole-table-empty-tips s3).
+                        .child(
+                            div()
+                                .id("hole-table-title")
+                                .flex_1()
+                                .text_size(px(13.))
+                                .font_weight(FontWeight::MEDIUM)
+                                .when(view_name.is_none(), |d| d.text_color(pal.error).tooltip(crate::ui::tooltip("All views in a hole table must be of a common singular part")))
+                                .child("Hole table"),
+                        )
                         // Live: ✓ stays disabled until an origin is picked (a click places the table).
                         .child(
                             div()

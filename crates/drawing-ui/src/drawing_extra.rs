@@ -2196,8 +2196,8 @@ impl DrawingEditor {
             self.open_revision_cell(&t, window, cx);
             return;
         }
-        // Live2 (tables_live2_1013 bomTable): a BOM's cells aren't edited in the drawing (no editor on a double-click;
-        // the menu's Switch to BOM takes edits to the assembly).
+        // Live2 (tables_live2_1013 bomTable): a BOM's cells aren't typed in the drawing (the menu's Switch to BOM takes
+        // edits to the assembly): a double-click is one click, its cell and Cell panel (live cferr-bomclk-1118 (b)).
         if let TableKind::Bom { .. } = t.kind {
             return;
         }

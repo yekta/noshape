@@ -488,9 +488,10 @@ impl DrawingEditor {
                     toggle("Underline", st.underline, true),
                     toggle("Strikethrough", st.strikethrough, true),
                     menu("Line spacing", true),
-                    menu("Horizontal alignment", true),
+                    // (Greyed for a note with a leader: live2 drw-note-leader-edge-first s3.)
+                    menu("Horizontal alignment", free),
                     menu("List", true),
-                    menu("Vertical alignment", true),
+                    menu("Vertical alignment", free),
                     menu("Note order", true),
                     menu("Insert symbol", true),
                     menu("Insert drawing property", true),

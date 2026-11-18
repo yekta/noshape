@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 02:33 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 06:18 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -33,16 +33,24 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   simplification-absolute BOM row name, toolbar Undo tip take, drw-gtol-type-list, drw-hatch-panel s29.
 - Full drawing run drw1118b on vibex8 (build of bfc56d3e; ~/agents/studios-keep/drw1118b): 317/341 (drw1118a
   288/334). Its one regression, drw-dimension-radius s4 (the reader counted a hovered dimension's leader at 2 px), is
-  fixed by the reader counting a hovered annotation's lines at 1 px. New live2 takes differing, to check:
-  drw-dprops-sketch-points-sharps-chamfer s15, drw-hole-table-empty-tips s1 ("Views" tip), drw-inspection-table-iso-
-  scrolled s2 (selection 0 / ours 1), drw-note-leader-edge-first s3 (field 7 enabled).
+  fixed by the reader counting a hovered annotation's lines at 1 px (d2eb5c15). New live2 takes, local: dprops footer
+  (runner: the footer goes with the header reading), hole-table / inspection-table select options marked as options,
+  a note with a leader reads its alignment buttons greyed, the hole table's title red + tooltip with no view, a note
+  quoting the lane's "(1)" tab name (runner), the empty sheet's menu with one note selected = the note's (drw-note-
+  copy-paste s8; its pasted note then lands 13 mm off live's: check). drw-note-editor s5: live's typed keys missed its
+  editor (recorder artifact).
+  drw-inspection-table-iso-scrolled s2 left: px clicks on the ISO A4 portrait sheet land 2.1 mm apart from live's
+  (dimension 237.8 vs 239.9), so live's first click took no edge; needs live's sheet-to-pixel at open.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell
-  #e2e2e2, tan frame; 2f21d086); the BOM row's part tan in the views and its callouts blue were ours already. Left:
-  one click on a table selects the table (h3: a click on a line; inside a cell unconfirmed, ours selects a cell); a double-click on a BOM cell selects it and opens
-  the floating Cell panel with Override, focus on Font (ours: open_cell_panel returns for a BOM); the "︿" chevron;
-  Split below's gap; Update from this workspace enabling ~3 s after the assembly's BOM changes.
+  #e2e2e2, tan frame; 37ecb60c); the BOM row's part tan in the views and its callouts blue were ours already. Local:
+  one click on a BOM cell selects it and opens the Cell panel (sizes + formats + a greyed Override), a double-click the
+  same (live cferr-bomclk-1118 (b)); Split BOM table below puts the second part 3 mm under the first, same x and width.
+  Left: the "︿" chevron (unknown role); a placed BOM staying selected (live2 d3) contradicts the drw-bom-* takes (7 read
+  no EDGE after placing, though a selected BOM over Isometric reads EDGE): kept unselected, retake asked. Update from
+  this workspace enabling ~3 s late is live's server latency, not a target. Custom feature ✓ with a field error:
+  live (a) confirms ours (pale, Enter no-op; no field named: ✓ commits).
 - live2 drawing tables (behaviours "studios (lead 11-18 ~03:36, feel): drawing tables", live/studios/tables-1118/):
   (1) hovering a BOM row shades it darker grey and draws its part tan in every view; a selected table has a small "︿"
   chevron centred under it. (2) the BOM tool places on one click (no ✓), panel closes, table stays selected. (3)
@@ -64,8 +72,9 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   viewing its branched-from version ("…and navigate you to V1."), notice "Deleted workspace B2." + Restore, ops
   history_delete_branch / history_restore_branch; Branch dialog's "Name is required and cannot exceed 256
   characters." with Create off, default name from the live workspaces; a Merge deletes what the source deleted even if
-  the target edited it (model-core merge.rs); navbar workspace name's tooltip. Left: duplicate workspace names
-  (live accepts a second "Main"; our store refuses BranchNameTaken: decision asked); merge preview "Edited" tooltip
+  the target edited it (model-core merge.rs); navbar workspace name's tooltip. Duplicate names (lead 11-18,
+  DECISIONS): local, the store's unique index dropped on a writable open (no version bump), ops' `branch` by id or a
+  unique name, an ambiguous name lists the ids. Left: merge preview "Edited" tooltip
   "Last change by <user> at <time>" (needs the last microversion per tab per side); switch's centred "Loading
   workspace…" spinner (ours switches at once: not a target unless slow); Create workspace and edit properties ->
   Properties modal fields (Name *, Description, Category "Onshape Workspace" greyed, Apply / Save greyed, Close):

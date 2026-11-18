@@ -36,7 +36,8 @@ impl DrawingEditor {
         let t = self.current_sheet().table(cs.table)?;
         // A revision table's cell too (live2 drw-revision-*: its merge icons disabled).
         // And a hole table's (live drw-hole-table-cell-format: its formats only).
-        (matches!(t.kind, TableKind::General { .. } | TableKind::Revision { .. } | TableKind::Hole { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select)).then_some(cs)
+        // And a BOM's, from one click (live cferr-bomclk-1118 (b)).
+        (matches!(t.kind, TableKind::General { .. } | TableKind::Revision { .. } | TableKind::Hole { .. } | TableKind::Bom { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select)).then_some(cs)
     }
 
     /// Create / drop the panel's state as the cell selection changes (from render).
@@ -215,9 +216,10 @@ impl DrawingEditor {
                 b.on_click(table_op("Size rows equally", std::rc::Rc::new(move |t: &mut Table| t.row_height = tallest), Some((0, 0)))).into_any_element()
             }
         };
-        // A hole table's and a revision table's cells: sizes and formats only (live drw-hole-table-cell-format, live2
-        // drw-revision-cell-format 11-17).
-        let sizes_only = matches!(t.kind, TableKind::Hole { .. } | TableKind::Revision { .. });
+        // A hole table's, a revision table's and a BOM's cells: sizes and formats only (live drw-hole-table-cell-format,
+        // live2 drw-revision-cell-format 11-17, tables-1118 e1).
+        let bom = matches!(t.kind, TableKind::Bom { .. });
+        let sizes_only = bom || matches!(t.kind, TableKind::Hole { .. } | TableKind::Revision { .. });
         let row1 = if sizes_only { h_flex().h(px(30.)).pl(px(1.)).gap(px(2.)).child(size_cols).child(size_rows) } else { h_flex()
             .h(px(30.))
             .pl(px(1.))
@@ -357,7 +359,9 @@ impl DrawingEditor {
             .child(toggle("cp-s", "note-strike", "Strikethrough", strike, |f, v| f.strikethrough = v, cx))
             .child(popup_btn("cp-spacing", "note-line-spacing", "Line spacing", false, cx))
             .child(crate::ui_script::mark(popup_btn("cp-align", align_icon, "Horizontal alignment", true, cx), || "dropdown:Horizontal alignment".into()).os_dropdown_menu("cp-align-dd", false, fmt_menu(align)))
-            .child(crate::ui_script::mark(popup_btn("cp-valign", valign_icon, "Vertical alignment", true, cx), || "dropdown:Vertical alignment".into()).os_dropdown_menu("cp-valign-dd", false, fmt_menu(valign)));
+            .child(crate::ui_script::mark(popup_btn("cp-valign", valign_icon, "Vertical alignment", true, cx), || "dropdown:Vertical alignment".into()).os_dropdown_menu("cp-valign-dd", false, fmt_menu(valign)))
+            // A BOM cell's Override, greyed: a drawing BOM's cells aren't overridden (live cferr-bomclk-1118 (b)).
+            .when(bom, |r| r.child(div().pl(px(6.)).text_size(px(12.)).child(crate::drawing_chrome::DrCheckbox::new("cp-override").native().label("Override").checked(false).disabled(true))));
 
         // Live's recorder since 2026-11-15.1 reads its controls (live drw-hole-table-cell-format); the runner takes `old`, the
         // panel's texts, for older takes (live2 drw-revision-cell-*).
@@ -388,6 +392,9 @@ impl DrawingEditor {
                 menu("Horizontal alignment", true),
                 menu("Vertical alignment", true),
             ]);
+            if bom {
+                fields.push(serde_json::json!({ "label": "Override", "kind": "checkbox", "value": false, "enabled": false }));
+            }
             serde_json::json!({
                 "kind": "cell-format",
                 "title": "Cell",

@@ -564,6 +564,51 @@ fn a_hovered_table_keeps_its_ink_and_shades_the_cell_under_the_pointer(cx: &mut 
     assert_eq!(tables, vec![(id, Some((0, 0)))], "the table and the cell under the pointer are shaded");
 }
 
+/// Live cferr-bomclk-1118 (b): one click on a BOM cell selects that cell (blue) and opens the floating Cell panel for
+/// its formats, the table still selected; a double-click is the same, the cell not typed in.
+#[gpui::test]
+fn a_click_on_a_bom_cell_opens_the_cell_panel_and_a_double_click_adds_nothing(cx: &mut TestAppContext) {
+    use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-bom-cell");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let id = e.current_sheet().tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+            let view = e.current_sheet().views[0].id;
+            let kind = noshape_model::drawing::TableKind::Bom { view, structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template: true, source: None };
+            e.edit_sheet("BOM table", cx, |s| s.tables.push(noshape_model::drawing::Table::new(id, kind, [60.0, 200.0])));
+            id
+        })
+    });
+    draw(cx, window);
+    let cell = cx.update(|cx| {
+        let l = editor.read(cx).built.as_ref().expect("built").table_layout(id).expect("the BOM laid out");
+        let first = l.title as usize + 1;
+        [(l.xs[0] + l.xs[1]) / 2.0, (l.ys[first] + l.ys[first + 1]) / 2.0]
+    });
+    let at = at_window(cx, &editor, cell);
+    let press = |cx: &mut TestAppContext, counts: std::ops::RangeInclusive<usize>| {
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+            e.on_mouse_move(&MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }, w, cx);
+            for n in counts {
+                e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n, first_mouse: false }, w, cx);
+                e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n }, w, cx);
+            }
+        }))
+        .unwrap();
+        draw(cx, window);
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            (e.cell_sel.map(|c| (c.table, c.a, c.b)), e.selection.clone(), e.cell_panel.is_some(), e.panel.is_none())
+        })
+    };
+    let one = press(cx, 1..=1);
+    assert_eq!(one, (Some((id, (1, 0), (1, 0))), vec![Sel::Table(id)], true, true), "one click: the cell, the table, the Cell panel, no editor");
+    cx.executor().advance_clock(std::time::Duration::from_millis(600));
+    assert_eq!(press(cx, 1..=2), one, "a double-click: the same");
+}
+
 /// Live2 feel/drawing.json D5: a dimension's text moves from 5 px of drag (4 px is a click, which selects it); no hold
 /// needed.
 #[gpui::test]

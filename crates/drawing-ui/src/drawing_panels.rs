@@ -321,7 +321,9 @@ impl DrawingEditor {
                     rows(&mut text, &chars);
                 }
             }
-            serde_json::json!({ "kind": "drawing-panel", "title": "Inspection table", "text": text, "fields": [{ "label": "View:", "kind": "select", "value": shown }] })
+            // (The View: select's options, read by recorders before 2026-11-17.3 only.)
+            let lines = text.into_iter().enumerate().map(|(i, t)| (t, matches!(i, 2 | 3))).collect();
+            panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Inspection table", "fields": [{ "label": "View:", "kind": "select", "value": shown }] }), lines)
         });
         let datums_body = if datums.is_empty() { info.into_any_element() } else { table(&datums, "it-d", cx) };
         let chars_body = if chars.is_empty() { chars_info.into_any_element() } else { table(&chars, "it-c", cx) };

@@ -6083,8 +6083,10 @@ fn drawing_bom_split_and_unsplit() {
     assert_eq!(a["part_rows"], json!([0, 1]), "{a}");
     assert_eq!(b["part_rows"], json!([1, 2]), "{b}");
     assert_eq!((a["rows"].as_array().unwrap().len(), b["rows"].as_array().unwrap().len()), (1, 1), "{a} {b}");
-    // Beside the first part, not on it.
-    assert!(num(&b["bounds"]["min"][0]) >= num(&a["bounds"]["max"][0]) || num(&b["bounds"]["max"][0]) <= num(&a["bounds"]["min"][0]), "{a} {b}");
+    // Under the first part, 3 mm apart, same left edge and width (live2 tables-1118 m2: ~12 px at 4.3 px/mm).
+    let gap = num(&a["bounds"]["min"][1]) - num(&b["bounds"]["max"][1]);
+    assert!((gap - 3.0).abs() < 0.01, "gap {gap}: {a} {b}");
+    assert!((num(&a["bounds"]["min"][0]) - num(&b["bounds"]["min"][0])).abs() < 0.01 && (num(&a["bounds"]["max"][0]) - num(&b["bounds"]["max"][0])).abs() < 0.01, "{a} {b}");
     // The first part can't be unsplit; the second goes back.
     let e = try_call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "unsplit" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("action"), "{e:?}");

@@ -1197,13 +1197,13 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         _ => None,
     }).expect("Move to ▸");
     assert_eq!(layers, [("Border frame".into(), false), ("Border zones".into(), false), ("Title block".into(), false), ("Drawing".into(), true)]);
-    // The empty sheet with an annotation selected ends with Delete (live2 drw-datum-copy-paste s6).
+    // The empty sheet with the note selected: the note's menu (live2 drw-note-copy-paste s8).
     let rows = cx.update(|cx| editor.update(cx, |e, cx| {
         e.cursor = [5.0, 5.0];
         e.hover = None;
         e.context_menu_entries(None, cx)
     }));
-    assert_eq!(flat(&rows), ["Paste", "Copy", "Paste as table", "——", "Clear selection", "Zoom to fit", "Delete"]);
+    assert_eq!(&flat(&rows)[..4], ["Edit note...", "Explode note", "Paste", "Copy"]);
     // A title block field right-clicked with the note selected: the field joins it, their rows (live2 rmb-probe).
     let (pick, at) = cx.update(|cx| {
         let e = editor.read(cx);
