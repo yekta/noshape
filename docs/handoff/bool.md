@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-18 18:27 UTC. Hosts (lead 11-18): builds + probes on the Mac (NOSHAPE_RB_HOST=mac), gates on vibex7
+Updated 11-18 20:12 UTC. Hosts (lead 11-18): builds + probes on the Mac (NOSHAPE_RB_HOST=mac), gates on vibex7
 (NOSHAPE_GATE_HOST=vibex7 via /root/bool-scratch/gate-chain-own.sh <sha> as a systemd-run unit; off 02:00-04:00);
 land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs vibex7 ~/lead-private (hat8, hat15, hat15b,
 AppleWatchDock). Never kill a process tree from a computed pid: `systemctl stop <unit>`; kill only own pids > 1.
@@ -25,14 +25,25 @@ live (e8549719) captures at feature level ("bool truth (11-18)" in behaviours.md
 Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are internal Booleans (no live analogue).
 
 ## In flight
-- GATE unit bool-gate-123e6b177 on vibex7 (18:22, queued behind bool2's k25 gate) -> /root/bool-hat-scratch/
-  chain-123e6b177.out; wait: /root/bool-scratch/gate-wait.sh. bool-hat (branch bool-shared2) on main 57e701c03:
-  the commits below + d04c232c8 (pattern checked glue reaching in -> plain fuse at once; impeller Bohrungssitz
-  Ansaugflansch 1000 -> 295 ms Mac) + 8086f188b (offset_grazes_a_circle only within 1 um of the radius: parity56) +
-  619037c8c (a union that lost its biggest argument's body: fuzzy retry, else error, never Ok: core's walls) +
-  123e6b177 (Shell's tangent-extension try in parallel where a kept face is an open B-spline: Gehaeuse 178 -> 135 ms;
-  both tries leave the input unchanged, checked over the suite). Decision pending (lead): 846db3d0c cf-surface-pattern
-  386/259 -> 385/258. On land: private docs, tell dx / core (walls) / blend / asm.
+- GATE unit bool-gate-d7721f84a on vibex7 (19:53) -> /root/bool-hat-scratch/chain-d7721f84a.out; wait:
+  /root/bool-scratch/gate-wait.sh. bool-hat (branch bool-shared2) on main 57e701c03: the commits below + d04c232c8
+  (pattern checked glue reaching in -> plain fuse at once; impeller Bohrungssitz Ansaugflansch 1000 -> 295 ms Mac) +
+  8086f188b (offset_grazes_a_circle only within 1 um of the radius: parity56) + 619037c8c (a union that lost its
+  biggest argument's body: fuzzy retry, else error, never Ok: core's walls) + 123e6b177 (Shell's tangent-extension try
+  in parallel where a kept face is an open B-spline: Gehaeuse 178 -> 135 ms; both tries leave the input unchanged,
+  checked over the suite) + ea1b5ac9f (local after ours: 37 recorded cases ours) + d7721f84a (on_face / through_holes
+  after ours: 92 distinct cases ours; same f/e/v/volume; history = OCCT's whole Boolean in 88, the direct builds left
+  out the solid's Modified and the tools' Deleted / Generated records). Expect the gate's replay to show these as
+  history differences against main's recordings (taken: the direct / local histories were the odd ones). Decision
+  pending (lead): 846db3d0c cf-surface-pattern 386/259 -> 385/258. On land: private docs, tell dx / core (walls) /
+  blend / asm.
+- shfall (129 declines): no parity-suite Shell reaches slabs now (34 Shells: quadrics 20, smooth 8, regions 6), and
+  16 of its 17 "near two vertices" have input vertex tolerances 0.2 mm..1 m: low value. Its 11 "piece's point on
+  another solid's face": zero-area input faces (two coincident edges), a 0.2 mm triangle tangent to a cylinder.
+- qa's speed backlog (TICKETS a3ff6d481): standoffs Revolve 2 / Boolean 1 / Boolean 2 (OCCT 450-980 ms each, ours
+  declines "a piece's point on another solid's face"), wire-clip / gamma Boolean 1 (87-tool fuse, ours "cylinders
+  nearly coincident", OCCT 2.0-2.9 s) and Boolean 2 (23 tools, "piece's point on another solid's face"). Cases Mac
+  ~/noshape-host/bool-keep/rec-<doc>; trace /root/bool-scratch/dbg-near-on.diff (DBG_ON / DBG_NEAR2, scratch only).
 - Earlier gates of the stack: /root/bool-hat-scratch/chain-{4cf4ce0ca,8086f188b}.out. bool-hat rebased on main 1e21f28e8: the 13 below +
   14. Shell race fix (on main as 7b8bb249) + 15. param_of cache + 16. Shell add_pcurve analysis cache + 17. offset fit
   cache + 18. volume_possible's cut lower bound + 19. project_along tangent-corner sliver (britatap) + 20. 4cf4ce0ca
@@ -41,7 +52,7 @@ Gehaeuse / Fillet 3, nuts Sweep 1; shfall / gpf / sp-cut differences are interna
   run (rings-loft 51-slot cut 331fd52c 246 -> 211 ms Mac, same result) + 16. c0a72a695 Shell's add_pcurve keeps a
   surface's ShapeAnalysis_Surface per thread (impeller Shell Gehäuse 235 -> 199 ms, same result). Then private docs
   (udoc-ab8.sh c0a72a695), list relabelled / seam cases per condition (c), knurls ours-only, land, tell dx (2108c2b7-2f48-43a7-87a0-3f652e3cda6d),
-  core (e8af89fe-d460-49b3-b0bb-9572da230fed since 11-18 ~11:00), blend (0672fa20-964d-4fde-a19c-c5b4363729ba), asm. Branch bool-shared2 (bool-hat) on main f6274d94e, 13 commits, all g++-13 OK:
+  core (d30002ca-d013-4435-b7d9-7da9cb564cec since 11-18 ~11:00), blend (de66e481-56e2-4005-a5d3-9fa897ca5fde), asm. Branch bool-shared2 (bool-hat) on main f6274d94e, 13 commits, all g++-13 OK:
   17. offset_as_bspline keeps its last 32 fits (impeller Boolean 2 55 -> 35, Boolean 3 41 -> 21 ms Mac; doc's fits
   587 -> 330 ms; kernel T1 496/496).
   1-10. as before: e61278b1d usd room; 8a9351e4b shared shapes (lead conditions (a) suite identical, (b) hats/dock
