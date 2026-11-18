@@ -3374,12 +3374,14 @@ impl Renderer {
                     pass.set_bind_group(3, &*compare_none, &[]);
                     draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, &bind_inst, DrawMode { hover_mask: true, ..Default::default() });
                 }
-                // Live: the silhouette line's two pixels at 1× (psui/parthover crops), 2–3 on a slant.
+                // Live: the silhouette line's two pixels (psui/parthover crops), 2–3 on a slant, at any pixel ratio: its
+                // overlay looks at the ±1 device px neighbours, unscaled (behaviours "viewport shading and highlight
+                // shaders" 4).
                 let rgb = match req.scene.hover_outline_rgb {
                     Some(c) => c.map(|v| f32::from(v) / 255.0),
                     None => globals.hover.map(|c| linear_to_srgb(c) as f32 / 255.0)[..3].try_into().expect("rgb"),
                 };
-                band.encode(device, queue, &mut encoder, &mask, color_view, rgb, dpr);
+                band.encode(device, queue, &mut encoder, &mask, color_view, rgb, 1.0);
                 Some(mask)
             }
             None => None,

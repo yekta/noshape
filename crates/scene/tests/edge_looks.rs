@@ -95,7 +95,8 @@ fn profiles(dpr: f32, before: u32, after: u32) -> Option<Vec<Profile>> {
     let x = w / 2;
     let row = cam.project(glam::DVec3::new(0.15, 0.0, THICK as f64), glam::DVec2::new(w as f64, h as f64), 1.0).unwrap().y as u32;
     let (from, to) = (row - before, row + after);
-    let states: [(&str, Vec<Reference>, Option<Reference>); 7] = [
+    let part = Reference::Body(display.bodies[0].id.clone());
+    let states: [(&str, Vec<Reference>, Option<Reference>); 9] = [
         ("rest", vec![], None),
         ("edge hovered", vec![], Some(edge.clone())),
         ("edge selected", vec![edge.clone()], None),
@@ -103,6 +104,9 @@ fn profiles(dpr: f32, before: u32, after: u32) -> Option<Vec<Profile>> {
         ("face hovered", vec![], Some(top.clone())),
         ("face selected", vec![top.clone()], None),
         ("face selected + hovered", vec![top.clone()], Some(top.clone())),
+        ("part hovered", vec![], Some(part.clone())),
+        // As the app's `highlighted_selection`: the part's faces, then the part.
+        ("part selected", display.bodies[0].face_refs.iter().cloned().chain([part.clone()]).collect(), None),
     ];
     let mut out = Vec::new();
     for (name, sel, hover) in states {
@@ -127,7 +131,7 @@ fn profiles(dpr: f32, before: u32, after: u32) -> Option<Vec<Profile>> {
 fn print_edge_profiles() {
     for dpr in [1.0f32, 2.0] {
         let k = dpr as u32;
-        let Some(p) = profiles(dpr, 8 * k, 9 * k) else { return };
+        let Some(p) = profiles(dpr, 8 * k, 30 * k) else { return };
         println!("== {dpr}x");
         for (name, col) in p {
             println!("{name:>24}: {}", col.iter().map(|c| format!("({},{},{})", c[0], c[1], c[2])).collect::<Vec<_>>().join(" "));
@@ -160,16 +164,18 @@ fn edge_and_face_highlights_look_as_live() {
     const SELECT: [u8; 3] = [0xFF, 0xA9, 0x0A];
     for dpr in [1.0f32, 2.0] {
         let k = dpr as usize;
-        let (before, after) = (8 * k, 9 * k);
-        let Some(p) = profiles(dpr, before as u32, after as u32) else { return };
+        // (Down the front face to the bottom silhouette and the background under it.)
+        let before = 8 * k;
+        let Some(p) = profiles(dpr, before as u32, 30 * k as u32) else { return };
         let get = |name: &str| p.iter().find(|(n, _)| *n == name).map(|(_, c)| c.clone()).unwrap();
         let rest = get("rest");
-        let (top, side) = (rest[0], rest[rest.len() - 1]);
+        let (top, side) = (rest[0], rest[before + 4 * k]);
         let show = |c: &[[u8; 3]]| c.iter().map(|&x| hex(x)).collect::<Vec<_>>().join(" ");
         // The plain edge: dark at its middle, about 1 CSS px (live look.json: at 1× its darkest pixel ~L 60, it
         // straddles two rows).
-        let dark = rest.iter().filter(|c| c.iter().all(|&v| v < 0x60)).count();
-        assert!(rest.iter().any(|c| c.iter().all(|&v| v < 0x48)) && dark <= k + 1, "{dpr}x plain edge: {}", show(&rest));
+        let edge_rows = &rest[..before + 4 * k];
+        let dark = edge_rows.iter().filter(|c| c.iter().all(|&v| v < 0x60)).count();
+        assert!(edge_rows.iter().any(|c| c.iter().all(|&v| v < 0x48)) && dark <= k + 1, "{dpr}x plain edge: {}", show(edge_rows));
         for (name, colour) in [("edge hovered", HOVER), ("edge selected", SELECT)] {
             let col = get(name);
             // The band: the rows that differ from the plain render.
@@ -206,6 +212,18 @@ fn edge_and_face_highlights_look_as_live() {
         assert!(close(fs[0], [0xE5, 0xA2, 0x22], 4), "{dpr}x selected face {} (live E5A222)", hex(fs[0]));
         assert!(fs.contains(&SELECT), "{dpr}x face selected boundary: {}", show(&fs));
         assert_eq!(get("face selected + hovered"), fs, "{dpr}x: hovering a selected face changes nothing");
+        // A whole part hovered (its Parts-list row): no tint and its own edges as at rest; its silhouette outline
+        // 2 device px of #FFC685 at any ratio (live's overlay: the ±1 device px neighbours, unscaled).
+        let ph = get("part hovered");
+        let outline = ph.iter().filter(|&&c| c == HOVER).count();
+        assert!(ph[..before + 2 * k] == rest[..before + 2 * k] && outline == 2, "{dpr}x part hovered ({outline} outline px): {}", show(&ph));
+        // A whole part selected: lit #FFC04C with no specular, then #FFC04C over it at 50 % (live 10570.glsl /
+        // 94943.glsl: top 0.95 × #FFC04C, the shaded front 0.81 × #FFC04C here).
+        let ps = get("part selected");
+        let lit = |c: [u8; 3]| (c[2] as f32 - c[0] as f32) / 80.0;
+        let want = |f: f32| [255.0f32, 192.0, 76.0].map(|v| (v * (0.5 * f + 0.5)).round() as u8);
+        let (front_rest, front_sel) = (rest[before + 4 * k], ps[before + 4 * k]);
+        assert!(close(ps[0], want(lit(top)), 4) && close(front_sel, want(lit(front_rest)), 4), "{dpr}x part selected: top {} (live {}), front {} (live {})", hex(ps[0]), hex(want(lit(top))), hex(front_sel), hex(want(lit(front_rest))));
     }
 }
 

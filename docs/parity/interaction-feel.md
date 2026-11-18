@@ -528,6 +528,9 @@ beside it, times its slope (/root/psui-scratch/chrome/ink.py, ink2.py on screens
 | Planes, origin, axes | fill #cedbe5 0.2, outline #1d60aa 0.35, text #1651b0; origin #000; X #cd0000, Y #009400, Z #0000d0 | the same | = | – |
 | Mate connectors | 36 px, 4 px ring | MATE_CONNECTOR_DIAMETER_PX 36, RING 4 | = | – |
 | In-context references | rgba(212,3,249,0.3) / 0.6 | calibrated on live's screenshots (assembly/504–706: #c573e4 fill, #dc62f7 outline) | = | – |
+| A whole part hovered (its Parts-list row; lead 11-18 pixel parity) | no tint, its edges as at rest, its silhouette outline #FFC685 2 device px at any ratio (live's overlay looks at the ±1 device px neighbours, unscaled; face hover measured 2 device px at DPR 1 and 2) | 2 px at 1×, 4 device px at 2× (the band's reach scaled with the ratio); now 1 at any ratio | = (fixed) | scene `edge_and_face_highlights_look_as_live` |
+| A whole part selected | lit #FFC04C, no specular, then #FFC04C over it at 50 % (10570 / 94943.glsl): the plate's top 0.95 × #FFC04C, its shaded front 0.81 × | top (240,182,72) vs (242,182,72), front (203,154,61) vs (205,155,61) | = | the same test |
+| Asked live2 (11-18) | a selected part's internal edges (plain, #FFC04C or #FFA90A: ours #FFA90A) and its silhouette's width (ours 3–4 px at 1×); a selected face with its part selected; sketch line / point at rest, hovered, selected, DPR 1 and 2 | – | ? | – |
 | Not compared | filtered-out entities (no selection filter in the Part Studio for live's account); a selected feature's related part (part-studio/110 compared when the feature list was done) | – | – | – |
 
 Seen on the way: live's start "block" sketch shows all four rectangle lines blue (the rectangle not tied to the
