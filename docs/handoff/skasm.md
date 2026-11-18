@@ -15,7 +15,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Sticky snap target (live getInference lastInferenceTarget): `SketchEditor::snap_target` + `Inference::targets`;
   scene test `the_line_snapped_to_last_stays_over_a_point_by_it`; feel row. live REQUESTS 11-18 03:46 asks for the
   real-pointer check (a line slid into its own end).
-- Queued f45661ff: the sticky target above.
+- Queued (re-queued 04:4x after the export test was parked): the sticky target above.
 - Solver (regeneration's constructive pass): a circle / ellipse Coincident with a Fixed point / model vertex
   translates with its size kept, a free point comes onto the curve (live coincident.json); was carried centre-onto-
   point (r 0). `carry_onto_placed` carries only point-point Coincidents; `kept_first_in` keeps a Fixed member and the
@@ -37,7 +37,8 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
    (its edge doesn't end on the plane), first difference Sweep 2 area (core); britatap Split topology (core);
    manualblend Sketch 5 Concentric 128 mm (upstream JNE), Sketch 6 / 7 INTERSECTED geometry not found. A circle or
    ellipse Coincident with something fixed: done 11-18 (Pierce of a 3D point not checked).
-3. core's sketch cases below. 4. tablet-stand Flange 2. 5. Remaining dropped constraints (see archive).
+3. core's sketch cases below (links 35/35 now; wave-washer: live REQUESTS 11-18 04:1x asks what bodies JHk / JH4
+   are). 4. Remaining dropped constraints: suite on vibex7 with ops-b (built 11-18 04:1x). tablet-stand 16/16 now.
 
 ## core's sketch cases (2026-11-16), queue item 3
 - c2-sm-rocker-enclosure-sm Extrude 2 (now its first difference once core's split-face attributes fix lands, 8/14):
