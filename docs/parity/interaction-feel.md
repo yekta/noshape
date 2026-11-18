@@ -1283,8 +1283,8 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 
 | Finding | Ours | Test |
 |---|---|---|
-| Display states: a toolbar tool; a floating panel at (246, 79) with "New display state name" focused, "+", "No display states created"; name + Enter saves the current visibility; then a native select "Select a display state" with ↻ / ✎ / ⊗; Esc closes the panel | ? | missing |
-| Applying a display state: the instance rows at ~0.3 s, the graphics in one frame at ~0.85 s, not animated | ? | missing |
+| Display states: a toolbar tool; a floating panel at (246, 79) with "New display state name" focused, "+", "No display states created"; name + Enter saves the current visibility; then a native select "Select a display state" with ↻ / ✎ / ⊗; Esc closes the panel | the same panel (toolbar tool, name box + "+", "No display states created", then the select with update / rename / delete; Esc closes); the name box focused on opening (asm, 11-18) | display_states_opens_with_its_name_box_focused |
+| Applying a display state: the instance rows at ~0.3 s, the graphics in one frame at ~0.85 s, not animated | the rows and the graphics in the same frame, not animated | missing |
 | Form: the dialog at 0.95 s, "Preparing form…" with a spinner at the graphics' bottom centre for ~4.4 s; a sketch point fills Location(s) and Target face(s) by itself; the emboss preview ~5 s after the first point, ~1.5 s after the next; a placed location can't be dragged | ? | missing |
 
 ### studios-1118 answers (drawing feel, live2 11-18 11:22) [studios]
@@ -1300,7 +1300,7 @@ feel): Hole dialog follow-up"; times on live's software-GL lane (preview times a
 
 | Finding | Ours | Test |
 |---|---|---|
-| Snap mode corner reach is not a square: over the top face 45° up-left 72 px (51, 51), straight up 50; over the side face along the face diagonal 56 (26, 49), 45° down-right 49 (both land side-face aligned); off the part 50, the connector frozen at its last face spot and a release there moves nothing (corrects "57 px square") | ? (74 / 70, qa) | missing |
+| Snap mode corner reach is not a square: over the top face 45° up-left 72 px (51, 51), straight up 50; over the side face along the face diagonal 56 (26, 49), 45° down-right 49 (both land side-face aligned); off the part 50, the connector frozen at its last face spot and a release there moves nothing (corrects "57 px square") | a dot of the face under the pointer within 51 px in x and y (up-left (51, 51), straight up 50); off every part the connector stays and a release moves nothing (asm, 11-18) | a_snap_drags_reach_is_51_px_in_x_and_y, a_snap_mode_drag_keeps_its_move_through_esc_and_stays_in_snap_mode |
 
 ### field-keys-1118 + search-tools-1118 (value field keys, the "#" list's Tab, Search tools, live2 11-18 11:55) [psui, skasm]
 

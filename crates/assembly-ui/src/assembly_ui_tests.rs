@@ -1468,6 +1468,21 @@ fn a_dragged_instance_row_lands_by_the_rows_middle() {
     const { assert!(6.0 <= LIST_DRAG_PX && LIST_DRAG_PX < 8.0) };
 }
 
+/// Live asm-dstates-1118: Display states opens with its "New display state name" box focused.
+#[gpui::test]
+fn display_states_opens_with_its_name_box_focused(cx: &mut TestAppContext) {
+    use gpui_kit::Focusable as _;
+    let (window, view) = pattern_assembly(cx, "ds-focus");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.toggle_display_states(w, cx);
+            let st = v.ui.ds_name.clone().expect("the name box");
+            assert!(st.read(cx).focus_handle(cx).is_focused(w), "focused");
+        })
+    })
+    .unwrap();
+}
+
 /// Live snap-diag-1118 (retaken): a dot of the face under the pointer takes a snap drag's connector within 51 px in x
 /// and in y (45° up-left at (51, 51), straight up at 50); 52 px either way doesn't.
 #[test]

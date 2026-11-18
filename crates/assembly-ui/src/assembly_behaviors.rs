@@ -4084,6 +4084,10 @@ impl AssemblyView {
         if self.ui.ds_name.is_none() {
             self.ui.ds_name = Some(cx.new(|cx| InputState::new(window, cx).placeholder("New display state name")));
         }
+        // Live asm-dstates-1118: the name box has the keyboard (name + Enter saves the current visibility).
+        if let Some(st) = self.ui.ds_name.clone().filter(|_| self.ui.display_states) {
+            st.update(cx, |s, cx| s.focus(window, cx));
+        }
         cx.notify();
     }
 
