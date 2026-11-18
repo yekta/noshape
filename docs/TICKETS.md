@@ -780,13 +780,15 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
 ## Release blockers for the 2026-11-18 17:00 release (qa list 06:25, newest checked green 8b4812511; the latest release is v0.4.58)
 - **Must carry (qa-cut-1615 blocks the cut if the candidate lacks one; list in qa-scratch cut-must.txt)**: psui fff088e5, the fix of
   P0 DOCK-TAB-SWITCH-TRAILING-FRAMES (returns to an open tab settled ~700 ms from v0.4.54, 2219c4373); psui's macOS Ctrl+Enter fix
-  7b8bb249 with 2549be00 (v0.4.58 marks that matrix row a gap).
-- **Must carry (lead 06:40)**: skasm 120ee19c, the fix of the v0.4.58 regression from 2f93c018c (a sheet metal model with a rolled wall
+  8f6424b40 + 459976266 (v0.4.58 marks that matrix row a gap). All four are on main and in green b5c4ccc4 (qa 07:55; cut-must.txt now
+  matches by subject: land.sh rebases, so the pre-rebase shas 120ee19c / 7b8bb249 / 2549be00 never match).
+- **Must carry (lead 06:40)**: skasm 7b8bb2491 (pre-rebase 120ee19c), the fix of the v0.4.58 regression from 2f93c018c (a sheet metal model with a rolled wall
   joined by a bend: "Sheet metal model cannot be unfolded.", no flat; cf-sheet-metal-model-plus "Sheet Metal Up to Part" was Info in
   0.4.57). qa's compat missed it: the document is a parity-corpus model, in none of the compat sets (user / ticket / authored). Closed
   06:40: compat-check.sh now also runs the corpus' 127 saved documents (vibex7 ~/qa/corpus) against the release (316 s); the trial on
   green 8b4812511 flags exactly this feature (Info -> Warning "cannot be unfolded"), plus two changes for the better (c2-loft-paths-
-  guides: core's revert; c2-surf-workshop-knifehandle: Move face 1 / 2 Error -> Ok as live).
+  guides: core's revert; c2-surf-workshop-knifehandle: Move face 1 / 2 Error -> Ok as live). Verified 07:55: cf-sheet-metal-model-plus
+  is SAME as 0.4.57 on green 6dbd91f3's real app (contains b5c4ccc4); the cfc031fa compat's Warning came from a stale app copy (fixed).
 - No other open release blocker at 06:25. v0.4.58 = 9c015658 + docs (qa GO 04:46); its published check runs when release.yml publishes.
 - Re-checks owed on the candidate: the dock tab return at vibex7 load < 2 (qa-wait-67eb: fff088e5 green vs 0.4.53), the hover flow
   (uh/uh2.sh, release check 4), user documents + f197 + tickets vs 0.4.58 (cut-check at 16:15).
