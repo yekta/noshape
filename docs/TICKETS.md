@@ -5,6 +5,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## bool, 2026-11-18
+- [ ] P3 A04711-TOOL-SLIVER (bool; 2026-11-18 02:05 UTC) asm-isaac-ball a04711 Extrude 4: Part 3 is 8/17/11
+  faces/edges/vertices, live 9/22/15 (Extrude 5: 8/17/11, live 9/20/13); volume, area and every other face as live's. Live
+  keeps a 0.05 mm² sliver (live.jsonl JT6), about 10 um wide, between two nearly coincident section curves of the two
+  tools (4.914 mm each; edges of 1.1 / 3.5 / 3.7 um); ours (OCCT's cut on text-round-tripped copies, path
+  occt_rounded_copies) has that hole wall as one face. OCCT's cut of the inputs as they are is non-manifold there.
+
 ## dx, 2026-11-17
 - [ ] P2 SWEEP-SEAM-KINK (core, lead 11-17; dx 2026-11-17 09:17) cf-hose-routing's hoses (Festo PUN 6 x 1, a sweep of
   an annulus along the routing curve): each tube face's closed section is one degree-12 B-spline span whose seam isn't

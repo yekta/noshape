@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <sstream>
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -9439,6 +9440,70 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
         h->Merge(cancellable_history(concat(a2, {fuse.Shape()}), cut));
         hist = h;
         res  = cut.Shape();
+      }
+    }
+  }
+  // Still an edge on more than two faces where no input has one (asm-isaac-ball a04711's Extrude 4: two tools meeting
+  // the part in a spot so nearly degenerate that OCCT kept 421.8 of its 423 mm³; live's part is 213.95 and manifold, as
+  // OCCT's cut of the same inputs written out as text and read back, their last digits rounded; a fuzzy value of 10 um
+  // instead merges a face away): again on such copies, kept when manifold and possible, its history taken back to the
+  // inputs (a shape OCCT keeps, its copy).
+  if (op == 1 && t_bool_path == std::string("occt") && first.glue == 0 && first.fuzzy <= 0 && facets.source.empty() && all_solids(inputs)
+      && non_manifold(res) && std::none_of(inputs.begin(), inputs.end(), [](const TopoDS_Shape& x) { return non_manifold(x); }))
+  {
+    const KernelTimer         timer("boolean.rounded_copies");
+    std::vector<TopoDS_Shape> copies;
+    for (const TopoDS_Shape& x : inputs)
+    {
+      std::stringstream ss;
+      BRepTools::Write(x, ss, false, false, TopTools_FormatVersion_CURRENT);
+      TopoDS_Shape back;
+      BRep_Builder bb;
+      BRepTools::Read(back, ss, bb);
+      copies.push_back(back);
+    }
+    ShapeIMap orig, copy;
+    for (size_t i = 0; i < inputs.size(); ++i)
+    {
+      TopExp::MapShapes(inputs[i], orig);
+      TopExp::MapShapes(copies[i], copy);
+    }
+    if (orig.Extent() == copy.Extent())
+    {
+      const size_t                                   na = inputs.size() - n_tools;
+      std::unique_ptr<BRepAlgoAPI_BooleanOperation> b2 = make();
+      b2->SetArguments(to_list(std::vector<TopoDS_Shape>(copies.begin(), copies.begin() + static_cast<long>(na))));
+      b2->SetTools(to_list(std::vector<TopoDS_Shape>(copies.begin() + static_cast<long>(na), copies.end())));
+      apply_opts(*b2, first);
+      build_cancellable(*b2);
+      fail_if_cancelled();
+      const std::vector<TopoDS_Shape> ca(copies.begin(), copies.begin() + static_cast<long>(na)), ct(copies.begin() + static_cast<long>(na), copies.end());
+      if (!b2->HasErrors() && b2->IsDone() && !non_manifold(b2->Shape()) && volume_possible(op, ca, ct, b2->Shape()))
+      {
+        HHist h = new BRepTools_History();
+        for (int i = 1; i <= orig.Extent(); ++i)
+        {
+          if ((i & 0xFF) == 0)
+            fail_if_cancelled();
+          const TopoDS_Shape &o = orig(i), &c = copy(i);
+          if (!BRepTools_History::IsSupportedType(o))
+            continue;
+          if (b2->IsDeleted(c))
+          {
+            h->Remove(o);
+            continue;
+          }
+          const auto& m = b2->Modified(c);
+          for (const TopoDS_Shape& x : m)
+            h->AddModified(o, x);
+          if (m.IsEmpty())
+            h->AddModified(o, c);
+          for (const TopoDS_Shape& g : b2->Generated(c))
+            h->AddGenerated(o, g);
+        }
+        t_bool_path = "occt_rounded_copies";
+        hist        = h;
+        res         = b2->Shape();
       }
     }
   }
