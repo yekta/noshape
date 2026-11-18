@@ -1116,12 +1116,8 @@ impl PartStudioView {
         let mut out = Vec::new();
         for r in &self.selection {
             match r {
-                // The part itself too: the builder gives its faces the
-                // whole-part amber (live selection/09).
-                Reference::Body(b) => {
-                    out.extend(self.body_geometry(b));
-                    out.push(r.clone());
-                }
+                // The part: the builder gives its faces the whole-part amber (live selection/09) and outlines it.
+                Reference::Body(_) => out.push(r.clone()),
                 Reference::Sketch(f) | Reference::Feature(f) => out.extend(self.feature_geometry(*f)),
                 _ => out.push(r.clone()),
             }

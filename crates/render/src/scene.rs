@@ -683,6 +683,9 @@ pub mod state {
     /// dialog field can't take, so what lies under it can be picked (a
     /// shown sketch line on a part edge for Fillet's edges).
     pub const NO_PICK: u32 = 1024;
+    /// With OUTLINE on a whole selected part's faces (Part Studio): outlined by the 2 device px screen-space band
+    /// (`Scene::body_outline`, hover_outline.rs) instead of the pushed-out back faces (live2 hl-pixels-1118).
+    pub const BAND: u32 = 2048;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -938,6 +941,8 @@ pub struct Scene {
     pub hover_outline: bool,
     /// The band's sRGB colour when not the hover colour (an assembly part's silhouette: #FFC20E, live2 asm-feel2 (c)).
     pub hover_outline_rgb: Option<[u8; 3]>,
+    /// Whole selected parts carry `SELECTED | BODY | OUTLINE | BAND`: the renderer draws their #FFC04C band.
+    pub body_outline: bool,
     /// No ambient occlusion: Onshape darkens shaded opaque faces only (not Hidden line or Translucent).
     pub no_occlusion: bool,
     pub clip: Option<ClipPlane>,
@@ -1128,7 +1133,7 @@ impl Scene {
             (i.pick_base, i.hatch_id, i.reflection.is_some(), i.compare, i.body, i.mesh_lod, i.line_lod, i.lod_box, i.see_through_self, i.outline_through).hash(&mut h);
         }
         self.states.hash(&mut h);
-        (self.hover_outline, self.hover_outline_rgb, self.no_occlusion, self.clip_selected, self.clip_hovered, self.section_interference).hash(&mut h);
+        (self.hover_outline, self.hover_outline_rgb, self.body_outline, self.no_occlusion, self.clip_selected, self.clip_hovered, self.section_interference).hash(&mut h);
         format!("{:?}{:?}{:?}{:?}", self.clip, self.clip_extra, self.compare, self.preview_mix).hash(&mut h);
         h.finish()
     }

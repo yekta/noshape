@@ -60,6 +60,7 @@ const QUERY: u32 = 64u;
 const OUTLINE: u32 = 128u;
 const TINT: u32 = 512u;
 const NO_PICK: u32 = 1024u;
+const BAND: u32 = 2048u;
 // Entity of a hovered dialog selection row (Onshape, live: #f2ff80).
 const QUERY_COLOR: vec3<f32> = vec3<f32>(0.888, 1.0, 0.216);
 
@@ -474,7 +475,8 @@ fn vs_outline(v: MeshIn, @builtin(instance_index) slot: u32) -> MeshOut {
 fn fs_outline(i: MeshOut) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     let st = state_of(i.pick);
-    if ((st & OUTLINE) == 0u || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    // A Part Studio's whole selected part: its band instead (`fs_body_mask`, hover_outline.wgsl).
+    if ((st & OUTLINE) == 0u || (st & (HIDDEN | BAND)) != 0u || clipped(i.world)) { discard; }
     var v: vec3<f32>;
     if (g.camera_pos.w > 0.5) {
         v = normalize(g.camera_pos.xyz - i.world);
@@ -500,6 +502,16 @@ fn fs_hover_mask(i: MeshOut) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     let st = state_of(i.pick);
     if (!hover_outlined(st) || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    return vec4(1.0);
+}
+
+/// The mask of the whole selected parts' images (state BAND; depth ignored: their outline shows through the parts in
+/// front, live2 11-14).
+@fragment
+fn fs_body_mask(i: MeshOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
+    let st = state_of(i.pick);
+    if ((st & BAND) == 0u || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
     return vec4(1.0);
 }
 
@@ -1032,10 +1044,10 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     if ((inst.params.x & 1u) != 0u) { base = srgb_to_linear(l.color.rgb); alpha = l.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
     if ((st & DIM) != 0u) { alpha = alpha * 0.3; }
     // A selected part's edges are a darker amber, so the part reads as one
-    // amber body (live assembly/04-insert-ghost: (156,117,47), about a third
-    // of the body amber in linear light; ASM-SELECTED-EDGES-DARK: the dark
-    // edge let through at 0.68 gave (73,55,22)).
-    if ((st & (BODY | HOVER | SELECTED)) == BODY) { base = BODY_SELECTED * 0.335; }
+    // amber body: half the part amber in sRGB, 806026 where a 2× edge covers
+    // its pixel (live2 hl-pixels-1118), 9D772F on a 1× edge's antialiased
+    // pixel (and live assembly/04-insert-ghost's (156,117,47)).
+    if ((st & (BODY | HOVER | SELECTED)) == BODY) { base = BODY_SELECTED * 0.216; }
     // Hovering a selected part edge or face keeps the selection's look (live).
     let keep_selected = (own_edge || face_band) && (st & SELECTED) != 0u;
     o.color = vec4(select(highlight_stroke(base, st), g.select.rgb, keep_selected), alpha);

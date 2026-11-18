@@ -3574,12 +3574,13 @@ fn surface_deviation_measures_to_measure_against_the_source(cx: &mut TestAppCont
     assert_eq!((swapped(cx, false), swapped(cx, true).1), ((Some("-5 mm".to_string()), true), false), "signed, then absolute");
 }
 
-/// Live2 (11-14, feel/hidden-part-selection.png): a part selected whole has its outline drawn through the parts in
-/// front (the renderer's `outline_through` on its meshes); nothing selected, none.
+/// Live2 (11-14, feel/hidden-part-selection.png; hl-pixels-1118): a part selected whole has its outline drawn through
+/// the parts in front (the renderer's band over its image's mask, depth ignored: `Scene::body_outline`); nothing
+/// selected, none.
 #[gpui::test]
 fn a_selected_part_outlines_through_parts_in_front(cx: &mut TestAppContext) {
     let (window, view, _, _) = block_part(cx, "outline-through");
-    let through = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).viewport.read(cx).scene().instances.iter().any(|i| i.outline_through));
+    let through = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).viewport.read(cx).scene().body_outline);
     let before = through(cx);
     cx.update(|cx| view.update(cx, |v, cx| {
         let body = v.display.bodies[0].id.clone();

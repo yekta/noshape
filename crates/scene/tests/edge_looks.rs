@@ -96,7 +96,7 @@ fn profiles(dpr: f32, before: u32, after: u32) -> Option<Vec<Profile>> {
     let row = cam.project(glam::DVec3::new(0.15, 0.0, THICK as f64), glam::DVec2::new(w as f64, h as f64), 1.0).unwrap().y as u32;
     let (from, to) = (row - before, row + after);
     let part = Reference::Body(display.bodies[0].id.clone());
-    let states: [(&str, Vec<Reference>, Option<Reference>); 9] = [
+    let states: [(&str, Vec<Reference>, Option<Reference>); 10] = [
         ("rest", vec![], None),
         ("edge hovered", vec![], Some(edge.clone())),
         ("edge selected", vec![edge.clone()], None),
@@ -105,8 +105,8 @@ fn profiles(dpr: f32, before: u32, after: u32) -> Option<Vec<Profile>> {
         ("face selected", vec![top.clone()], None),
         ("face selected + hovered", vec![top.clone()], Some(top.clone())),
         ("part hovered", vec![], Some(part.clone())),
-        // As the app's `highlighted_selection`: the part's faces, then the part.
-        ("part selected", display.bodies[0].face_refs.iter().cloned().chain([part.clone()]).collect(), None),
+        ("part selected", vec![part.clone()], None),
+        ("face + part selected", vec![top.clone(), part.clone()], None),
     ];
     let mut out = Vec::new();
     for (name, sel, hover) in states {
@@ -224,6 +224,17 @@ fn edge_and_face_highlights_look_as_live() {
         let want = |f: f32| [255.0f32, 192.0, 76.0].map(|v| (v * (0.5 * f + 0.5)).round() as u8);
         let (front_rest, front_sel) = (rest[before + 4 * k], ps[before + 4 * k]);
         assert!(close(ps[0], want(lit(top)), 4) && close(front_sel, want(lit(front_rest)), 4), "{dpr}x part selected: top {} (live {}), front {} (live {})", hex(ps[0]), hex(want(lit(top))), hex(front_sel), hex(want(lit(front_rest))));
+        // live2 hl-pixels-1118: its internal top-front edge stays the plain dark edge under the tint (9D772F / 806026),
+        // never a face border; its silhouette a #FFC04C outline of 2 device px at any ratio.
+        const PART: [u8; 3] = [0xFF, 0xC0, 0x4C];
+        let edge = &ps[before - k..before + 2 * k];
+        let dark = if k == 1 { [0x9D, 0x77, 0x2F] } else { [0x80, 0x60, 0x26] };
+        assert!(edge.iter().any(|&c| close(c, dark, 8)) && !edge.contains(&SELECT), "{dpr}x part selected: internal edge {} (live's darkest {})", show(edge), hex(dark));
+        let outline = ps.iter().filter(|&&c| c == PART).count();
+        assert_eq!(outline, 2, "{dpr}x part selected: silhouette outline px: {}", show(&ps));
+        // A face selected with its part: the face's colour and its #FFA90A border; the part's silhouette as above.
+        let fp = get("face + part selected");
+        assert!(close(fp[0], [0xE5, 0xA2, 0x22], 4) && fp[before - k..before + 2 * k].contains(&SELECT) && fp.iter().filter(|&&c| c == PART).count() == 2, "{dpr}x face + part selected: {}", show(&fp));
     }
 }
 

@@ -1360,7 +1360,7 @@ pub struct Highlighting {
 pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, mode: Highlighting, up: &Uploader) -> Scene {
     let Highlighting { error, dialog } = mode;
     let _t = noshape_render::perf::scope("s.with_highlights");
-    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, hover_outline_rgb: None, no_occlusion: built.scene.no_occlusion };
+    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, hover_outline_rgb: None, body_outline: false, no_occlusion: built.scene.no_occlusion };
     let mut overlay_pts = PointData::default();
     let mut overlay_regions: Vec<(MeshData, [f32; 4], bool)> = Vec::new();
     let mut overlay_lines = LineData::default();
@@ -1496,14 +1496,21 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                 mark(e, if error { state::ERROR } else { state::SELECTED }, &mut scene);
             }
         }
-        // A part given by reference (its faces listed beside it): its faces
-        // take the whole-part amber.
+        // A whole part: its faces take the part amber, their boundaries the plain edges under it (live2
+        // hl-pixels-1118: the internal top-front edge stays dark, only the silhouette is outlined); a face selected
+        // itself as well keeps a selected face's look and border.
         if !error
             && let Reference::Body(b) = r
             && let Some(body) = display.body(b)
         {
-            for f in &body.face_refs {
+            for f in body.face_refs.iter().filter(|f| !selection.contains(f)) {
                 for &id in built.picks.ids_for(f) {
+                    scene.add_flag(id, state::SELECTED | state::BODY);
+                }
+            }
+            // Its edges: the plain dark edge under the part's tint (the edge shader's BODY amber).
+            for e in body.edge_refs.iter().filter(|e| !selection.contains(e)) {
+                for &id in built.picks.ids_for(e) {
                     scene.add_flag(id, state::BODY);
                 }
             }
@@ -1563,24 +1570,15 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     for id in silhouette {
         scene.add_flag(id, state::OUTLINE);
     }
-    // A part selected whole: a light-orange silhouette round it, drawn through the parts in front too, never over
-    // its own image (live2 11-14, feel/hidden-part-selection.png; the renderer's `outline_through`), as an assembly's
-    // selected instance. Its edges keep their selection colour (the boundary pass above).
+    // A part selected whole: a #FFC04C silhouette round it, 2 device px, drawn through the parts in front too, never
+    // over its own image (live2 11-14 feel/hidden-part-selection.png, hl-pixels-1118): the renderer's band over the
+    // mask of its image (state BAND, `Scene::body_outline`). Its edges stay plain dark under its tint.
     let whole = state::SELECTED | state::BODY;
     let part_faces: Vec<u32> = (1..scene.states.len() as u32).filter(|&id| scene.states[id as usize] & whole == whole && built.picks.get(id).is_some_and(|t| t.kind == PickKind::Face)).collect();
     for &id in &part_faces {
-        scene.add_flag(id, state::OUTLINE);
+        scene.add_flag(id, state::OUTLINE | state::BAND);
     }
-    let bases: std::collections::HashSet<u32> = part_faces
-        .iter()
-        .copied()
-        .filter_map(|id| built.picks.face_at(id).map(|(_, fi, _)| id - fi as u32 - 1))
-        .collect();
-    if !bases.is_empty() {
-        for inst in scene.instances[..built.static_instances].iter_mut().filter(|i| matches!(i.drawable, Drawable::Mesh(_)) && i.pickable && !i.pick_only && bases.contains(&i.pick_base)) {
-            inst.outline_through = true;
-        }
-    }
+    scene.body_outline = !part_faces.is_empty();
     // Selected faces drawn again at SELECTION_OVER_PLANES over the planes in
     // front of them (live selection/04: under one plane (229,170,56), two
     // (228,176,73); the plane alone over the face gives (224,174,73)). Only

@@ -500,6 +500,8 @@ struct TargetState {
     compare: Option<CompareTextures>,
     /// A hovered whole part's mask (while one is hovered).
     hover_mask: Option<crate::hover_outline::HoverMask>,
+    /// The selected whole parts' mask (while one is selected).
+    body_mask: Option<crate::hover_outline::HoverMask>,
     /// Camera-dependent geometry, and its instances for the last view built.
     camera_geometry: Vec<Arc<dyn crate::camera_geometry::CameraGeometry>>,
     camera_geometry_built: Option<(crate::camera_geometry::View, Vec<Instance>)>,
@@ -1161,6 +1163,8 @@ struct DrawMode<'a> {
     outline: bool,
     /// The mask of a hovered whole part's visible faces (hover_outline.rs).
     hover_mask: bool,
+    /// The mask of the selected whole parts' faces (their outline band, hover_outline.rs).
+    body_mask: bool,
     /// The visible-depth sample pass (Onshape's `DepthSamplingPass`): faces
     /// and points with true depth (no pick depth bias), no lines.
     depth_samples: bool,
@@ -1210,7 +1214,7 @@ fn indexed_lines() -> bool {
 }
 
 fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Instance], pipelines: &Pipelines, bind_inst: &wgpu::BindGroup, mode: DrawMode) {
-    let DrawMode { pick, mask, caps, outline, hover_mask, depth_samples, planes_write_depth } = mode;
+    let DrawMode { pick, mask, caps, outline, hover_mask, body_mask, depth_samples, planes_write_depth } = mode;
     pass.set_bind_group(1, bind_inst, &[]);
     /// Records the color pass's draw calls (`r.draw_calls`) when done.
     struct Calls(std::cell::Cell<u32>, bool);
@@ -1279,6 +1283,10 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
     }
     if hover_mask {
         draw(pass, &lists.opaque, &pipelines.mesh_hover_mask);
+        return;
+    }
+    if body_mask {
+        draw(pass, &lists.opaque, &pipelines.mesh_body_mask);
         return;
     }
     if pick {
@@ -2060,6 +2068,7 @@ struct Pipelines {
     section_cap_pick: Lazy,
     /// A hovered whole part's mask (hover_outline.rs).
     mesh_hover_mask: Lazy,
+    mesh_body_mask: Lazy,
     mesh_transparent: wgpu::RenderPipeline,
     /// Feature previews (see-through): their back faces before the other
     /// transparent meshes, their front faces after (`draw_lists`).
@@ -2129,6 +2138,7 @@ impl Pipelines {
             &self.section_cap,
             &self.section_cap_pick,
             &self.mesh_hover_mask,
+            &self.mesh_body_mask,
             &self.mesh_reflect,
             &self.mesh_transparent_back,
             &self.mesh_transparent_front,
@@ -2210,6 +2220,8 @@ pub struct Renderer {
     ao: Option<crate::ao::AoPass>,
     /// A hovered whole part's outline band (built when first used).
     hover_outline: Option<crate::hover_outline::HoverOutline>,
+    /// The selected whole parts' band (its own uniform: both bands go into one encoder).
+    body_outline: Option<crate::hover_outline::HoverOutline>,
     globals_color: wgpu::Buffer,
     globals_pick: wgpu::Buffer,
     /// Globals of the visible-depth sampling pass (its own, so it can share a
@@ -2646,6 +2658,7 @@ impl Renderer {
             pipelines: None,
             ao: None,
             hover_outline: None,
+            body_outline: None,
             globals_color,
             globals_pick,
             globals_sample,
@@ -2804,6 +2817,7 @@ impl Renderer {
         let compare_dn = lazy(LayoutKind::Main, P { label: "compare-dn", vs: "vs_mesh", fs: "fs_compare_dn", buffers: MESH_BUFFERS, format: COMPARE_DN_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }, PLAIN);
         // The whole silhouette, depth ignored: live draws a hovered part's outline through the parts in front.
         let mesh_hover_mask = lazy(LayoutKind::Main, P { label: "hover-mask", vs: "vs_mesh", fs: "fs_hover_mask", buffers: MESH_BUFFERS, format: crate::hover_outline::MASK_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: face, samples: msaa }, PLAIN);
+        let mesh_body_mask = lazy(LayoutKind::Main, P { label: "body-mask", vs: "vs_mesh", fs: "fs_body_mask", buffers: MESH_BUFFERS, format: crate::hover_outline::MASK_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: face, samples: msaa }, PLAIN);
         let compare_mix = lazy(LayoutKind::Main, P { label: "compare-mix", vs: "vs_background", fs: "fs_compare_mix", buffers: &[], format: PRESENT_FORMAT, blend: alpha, depth: None, bias: none, samples: 1 }, PLAIN);
         self.pipelines = Some(Pipelines {
             background,
@@ -2816,6 +2830,7 @@ impl Renderer {
             section_cap,
             section_cap_pick,
             mesh_hover_mask,
+            mesh_body_mask,
             mesh_reflect,
             mesh_transparent,
             mesh_transparent_back,
@@ -3202,10 +3217,15 @@ impl Renderer {
         if hover_band && self.hover_outline.is_none() {
             self.hover_outline = Some(crate::hover_outline::HoverOutline::new(&self.device, COLOR_FORMAT));
         }
+        // Selected whole parts: their #FFC04C outline the same way (live2 hl-pixels-1118: 2 device px at any ratio).
+        let body_band = req.scene.body_outline;
+        if body_band && self.body_outline.is_none() {
+            self.body_outline = Some(crate::hover_outline::HoverOutline::new(&self.device, COLOR_FORMAT));
+        }
         drop(t_prep);
 
         let t_encode = perf::scope("r.encode_submit");
-        let Self { device, queue, pipelines, targets, bind_color, pending, ao, hover_outline, timer, overlay_gpu, text_shading, section_caps, compare_none, .. } = self;
+        let Self { device, queue, pipelines, targets, bind_color, pending, ao, hover_outline, body_outline, timer, overlay_gpu, text_shading, section_caps, compare_none, .. } = self;
         let ao_on = ao_strength > 0.001 && ao.is_some() && !perf_overrides().skip_ao;
         let timer_slot = timer.as_ref().and_then(|t| t.free_slot());
         let pipelines = pipelines.as_ref().expect("pipelines");
@@ -3382,6 +3402,41 @@ impl Renderer {
                     None => globals.hover.map(|c| linear_to_srgb(c) as f32 / 255.0)[..3].try_into().expect("rgb"),
                 };
                 band.encode(device, queue, &mut encoder, &mask, color_view, rgb, 1.0);
+                Some(mask)
+            }
+            None => None,
+        };
+        ts.body_mask = match body_outline.as_ref().filter(|_| body_band) {
+            Some(band) => {
+                let mask = crate::hover_outline::HoverOutline::mask(device, ts.body_mask.take(), width, height, msaa);
+                {
+                    let (view, resolve) = match &mask.msaa {
+                        Some(v) => (v, Some(&mask.resolved)),
+                        None => (&mask.resolved, None),
+                    };
+                    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("body-mask"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view,
+                            depth_slice: None,
+                            resolve_target: resolve,
+                            ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: if resolve.is_some() { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store } },
+                        })],
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: &tex.depth,
+                            depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store }),
+                            stencil_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Discard }),
+                        }),
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                        multiview_mask: None,
+                    });
+                    pass.set_bind_group(0, bind_color, &[]);
+                    pass.set_bind_group(3, &*compare_none, &[]);
+                    draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, &bind_inst, DrawMode { body_mask: true, ..Default::default() });
+                }
+                // Live's PART_HIGHLIGHT_COLOR_BORDER rgba(255, 192, 76, 1).
+                band.encode(device, queue, &mut encoder, &mask, color_view, [1.0, 192.0 / 255.0, 76.0 / 255.0], 1.0);
                 Some(mask)
             }
             None => None,
