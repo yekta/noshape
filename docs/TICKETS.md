@@ -575,6 +575,27 @@ Parts (1), cell bold; switching back clears at once and never greys rows (6 shot
 - [ ] **P3 CFGFEEL-DUP-ID (studios)**: CLI config add_option "A" twice gives the id "A_2"; live stores "A0" (FeatureScript ids).
 - Not judged: a row added after a parameter is configured shows an empty Depth cell in ours (live2 added its rows before configuring).
 
+## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:20, green cafe3c2af, vibex8 Xvfb, real pointer)
+Sessions opened without the UI runner (stable view): asm-feel (Part 1 40x30x10, Part 3 20x20x5), block-fillet, hole-plate-drawing.
+Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png (vibex8 ~/agents/qa-keep/feel-1118/).
+- Context menus: a feature row's menu is up while the right button is still held; the graphics menu only after the release. As live
+  (behaviours "feel constants … context-menu timing"). Pass.
+- Feature row double-click: same spot 200 ms opens the dialog; 150 px apart or 450 ms apart doesn't (live: 120 px / 420 ms don't). Pass
+  for those; see the ticket for 80 px.
+- Drawing view drag: the view drawn orange in its frame, no alignment line at 30 / 6 / 0 px from the other view's row (live: none). Pass.
+- Drawing note: typed "Qz7" shows in the editor; Escape closes the Note panel and leaves no note (live: the same; live also leaves an empty
+  editor box drawn). Pass. Drawing hover timing: live's is a server round trip (nothing to copy).
+- Assembly Snap mode release: Part 3 goes connector onto Part 1's top-face corner, flush, and stays there after Escape, as live.
+- [ ] **P1 FEEL-SNAPMODE-REACH (asm)**: dragging in Snap mode toward Part 1's top-face corner along the face diagonal in 2 px steps
+  (0.25 s each), the dragged connector jumps onto the corner at 70 px (at 72 px still at the pointer). Live: 57 px (at 58 still at
+  the pointer; behaviours "assembly Snap mode drag", retried 06:28-06:42). Lag could only make ours read later, so ours reaches ~13 px
+  further.
+- [ ] **P1 FEEL-SNAPMODE-RELEASE-DIALOG (asm)**: the release snaps the part but opens nothing (Mate features (0), no dialog, no
+  heads-up toolbar). Live opens the mate dialog "Fastened 1" with both connectors and the heads-up toolbar, uncommitted (features 0);
+  Escape closes it with no mate and the part stays.
+- [ ] **P1 FEEL-ROW-DBLCLICK-DISTANCE (psui)**: two clicks 80 px apart along the Extrude 1 row, 200 or 330 ms apart, open nothing.
+  Live opens the dialog for two clicks on the same row within ~370-400 ms at any distance along it (30 and 80 px did, 120 px didn't).
+
 ## Interaction feel vs live2's 11-18 06:0x numbers (qa 06:55, green cafe3c2af, vibex8 Xvfb at load 8-14, real xdotool pointer; llvmpipe)
 Method: the block (block-fillet) and a sketch-only document, fast sweeps of 4 moves 8 ms apart, one screen crop d ms after the stop per
 run (import takes ~60-100 ms), lit = the light-orange outline; feature list: 45 sketches built by CLI. Data qa-scratch/hv2 (r1-r6).
