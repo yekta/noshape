@@ -8464,7 +8464,8 @@ pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityI
 }
 
 /// Symmetric on two lines (a lines-only mirror): the second line moves onto the first's mirror image, keeping its
-/// length and its place along it (live2 mirror-sym-1118: B jumps onto A's mirrored line, its length and place kept).
+/// length and direction, its start at the foot of its perpendicular there (live2 mirror-sym-1118; live re-measured
+/// 11-18: B (70, -5)-(85, 15) to (81.538, 2.692)-(67.671, 23.494) for A (30, -10)-(50, 20) about x = 60).
 fn mirror_second_line(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
     if c != ConstraintTool::Symmetric {
         return;
@@ -8480,12 +8481,11 @@ fn mirror_second_line(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
     let mirror = |p: DVec2| x0 + u * (2.0 * (p - x0).dot(u)) - (p - x0);
     let (m0, m1) = (mirror(a0), mirror(a1));
     let Some(dir) = (m1 - m0).try_normalize() else { return };
-    let (mid, half) = ((b0 + b1) * 0.5, (b1 - b0).length() * 0.5);
     let dir = if dir.dot(b1 - b0) >= 0.0 { dir } else { -dir };
-    let on = m0 + dir * (mid - m0).dot(dir);
+    let on = m0 + dir * (b0 - m0).dot(dir);
     let Some((s, e)) = sk.endpoints(b) else { return };
-    let _ = sk.set_point(s, on - dir * half);
-    let _ = sk.set_point(e, on + dir * half);
+    let _ = sk.set_point(s, on);
+    let _ = sk.set_point(e, on + dir * (b1 - b0).length());
 }
 
 /// A text box's corner made coincident with what can't move (a model edge or vertex, a fixed point): the whole box is
@@ -11373,6 +11373,21 @@ mod tests {
         assert!(sk.drag(&[(noshape_sketch::DragHandle::Point(start), v(-0.02, 0.01))]).is_solved());
         let (c0, c1) = ends(&sk, b);
         assert!((c0 - b0).length() < 1e-9 && (c1 - b1).length() < 1e-9, "shortening the first leaves the second: {c0} {c1}");
+    }
+
+    /// Live re-measured 11-18 (live2's case): B's start goes to the foot of its perpendicular on A's mirrored line.
+    #[test]
+    fn symmetric_lines_put_the_seconds_start_at_its_foot_as_live() {
+        let mut sk = Sketch::new();
+        let axis = sk.add_line(v(0.06, -0.05), v(0.06, 0.05));
+        sk.add_constraint(ConstraintKind::Fix { entity: axis }).unwrap();
+        let a = sk.add_line(v(0.03, -0.01), v(0.05, 0.02));
+        let b = sk.add_line(v(0.07, -0.005), v(0.085, 0.015));
+        let ids = [a, b, axis];
+        assert!(apply_constraint(&mut sk, ConstraintTool::Symmetric, &ids).is_ok_and(|n| n == 1));
+        assert!(solve_after_constraint(&mut sk, ConstraintTool::Symmetric, &ids));
+        let Some(Curve2::Line { a: b0, b: b1 }) = sk.curve(b) else { panic!("a line") };
+        assert!((b0 - v(0.081538, 0.002692)).length() < 1e-6 && (b1 - v(0.067671, 0.023494)).length() < 1e-6, "{b0} {b1}");
     }
 
     /// Live (c2-surf-intro-mutualtrim's Title, live title-frame-1118): a text box's corner made coincident with a fixed
