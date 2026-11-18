@@ -16,6 +16,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   **every viewport frame renders in 46.7-49.4 s** (1674x974, 4x MSAA). CPU: 72% llvmpipe JIT shaders + 12% lvp (= rasterising the
   drawn scene), 11% our meshing. Repro: copy of vibex8 ~/agents/asm-keep/qa-save/asm-xdev-subs.noshape, release app, Xvfb 1920x1080,
   open, Assembly 1 tab, one wheel notch (qa-scratch/heavy/hvs.sh DOC=asm-xdev-subs, runperf.sh); data heavy/perf1, heavy/prof1.
+  Load vs live (qa 12:35; live 12:3x, behaviours "qa (11-18 11:2x): asm-xdev-subs … load time"): live's cold page open -> assembly
+  drawn 83-94 s (median 84.5). Ours after the tab click (perf1): cached display ready in 1.2 s but its frame renders 48 s -> drawn at
+  51 s; full display (regen 19.8 s) drawn at 101 s. The earlier "43-200 s / 3 min 20 s" was a first run at load 22: the load path is
+  fine, the frame render time is the P0 (asm 12:2x: angle display mesh 7.76 M triangles vs 1.05 M chord; with psui).
   **Timing heavy scenes: NOSHAPE_FRAME_LOG's "present" lines are the window's (UI) frames, not the 3D view's**: here they showed 2 fps
   / 513 ms frames while the screen's graphics didn't change for 40-70 s (the viewport frame is read back later). Time heavy scenes on
   the screen (crop diffs), as live does.
