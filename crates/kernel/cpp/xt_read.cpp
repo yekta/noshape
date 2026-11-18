@@ -1360,10 +1360,12 @@ struct Builder
           exact.insert(exact.begin(), added.rbegin(), added.rend());
       }
     }
+    // Densified where the cubic strays from the surfaces by over 10 nm (Parasolid's precision), segment by segment:
+    // a point in every segment each round made c2-rings-loft's blend edges 161 points (their pcurves 661 knots).
     occ::handle<Geom_BSplineCurve> c = bspline_through(exact);
     for (int round = 0; round < 4; ++round)
     {
-      double              worst = 0;
+      bool                added = false;
       std::vector<gp_Pnt> more;
       for (size_t i = 0; i + 1 < exact.size(); ++i)
       {
@@ -1374,14 +1376,14 @@ struct Builder
         gp_Pnt       q;
         // A point that jumps (to another branch, another turn of a helix)
         // is not this segment's.
-        if (refine(on, gp_Vec(exact[i], exact[i + 1]), q) && q.Distance(on) < exact[i].Distance(exact[i + 1]) / 2)
+        if (refine(on, gp_Vec(exact[i], exact[i + 1]), q) && q.Distance(on) < exact[i].Distance(exact[i + 1]) / 2 && q.Distance(on) > 1e-8)
         {
-          worst = std::max(worst, q.Distance(on));
           more.push_back(q);
+          added = true;
         }
       }
       more.push_back(exact.back());
-      if (worst < 1e-10)
+      if (!added)
         break;
       exact = more;
       c     = bspline_through(exact);
