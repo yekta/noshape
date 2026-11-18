@@ -99,7 +99,7 @@ pub fn ops() -> Vec<Op> {
                 req("sketch", s(), "Sketch feature id or name."),
                 opt("tool", json!({ "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Drawing tool (required without `shapes`)."),
                 opt("points", json!({ "type": "array", "items": click_point.clone() }), "The clicks, in order: [[x, y], ...] in sketch coordinates, or [[x, y, z], ...] model positions (required without `shapes`)."),
-                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } }, "start_derivative": click_point.clone(), "end_derivative": click_point.clone(), "degree": { "type": "integer", "minimum": 1 }, "knots": { "type": "array", "items": { "type": "number" } }, "weights": { "type": "array", "items": { "type": "number" } }, "direction": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. A line's `direction` [x, y] with its two clicks at one point: a line a sketch fillet consumed, which keeps that direction."),
+                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } }, "apart": { "type": "array", "items": { "type": "integer" } }, "start_derivative": click_point.clone(), "end_derivative": click_point.clone(), "degree": { "type": "integer", "minimum": 1 }, "knots": { "type": "array", "items": { "type": "number" } }, "weights": { "type": "array", "items": { "type": "number" } }, "direction": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. A line's `direction` [x, y] with its two clicks at one point: a line a sketch fillet consumed, which keeps that direction."),
                 opt("construction", json!({ "type": "boolean" }), "Make the new geometry construction geometry."),
                 opt("sides", json!({ "type": "integer", "minimum": 3, "maximum": 1000 }), "Polygon sides."),
                 opt("start_derivative", click_point.clone(), "spline: the open spline's derivative at its start, [x, y] (per unit of its 0–1 parameter, as Onshape stores `startDerivative`; its end handle placed for it). With `end_derivative`."),
@@ -108,6 +108,7 @@ pub fn ops() -> Vec<Op> {
                 opt("knots", json!({ "type": "array", "items": { "type": "number" } }), "bezier: its knot vector, clamped (control points + degree + 1 values, as Onshape stores a B-spline's)."),
                 opt("weights", json!({ "type": "array", "items": { "type": "number" } }), "bezier: a rational B-spline's weights, one per control point."),
                 opt("tangent_arc_switch", json!({ "type": "array", "items": { "type": "integer", "minimum": 1 } }), "line: press the Line/tangent arc switch (Shift+A) before these clicks (0-based): that click draws a tangent arc, then the chain goes on with lines (as in Onshape)."),
+                opt("apart", json!({ "type": "array", "items": { "type": "integer", "minimum": 0 } }), "These clicks (0-based) don't snap onto existing points: an end placed on another's, kept a point of its own (it may still snap onto a curve there)."),
             ],
             mutates: true,
             destructive: false,
@@ -719,6 +720,7 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 let sides = obj.get("sides").map(|v| v.as_u64().ok_or_else(|| OpError::param(&format!("{p}sides"), "an integer"))).transpose()?;
                 let construction = obj.get("construction").map(|v| v.as_bool().ok_or_else(|| OpError::param(&format!("{p}construction"), "true or false"))).transpose()?.unwrap_or(false);
                 let switches = switch_list(obj.get("tangent_arc_switch"), &format!("{p}tangent_arc_switch"))?;
+                let apart = switch_list(obj.get("apart"), &format!("{p}apart"))?;
                 let ends = end_derivatives(obj.get("start_derivative"), obj.get("end_derivative"), &units, &p)?;
                 let knots = knot_args(obj.get("degree"), obj.get("knots"), obj.get("weights"), &p)?;
                 let direction = obj
@@ -729,7 +731,7 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                         _ => Err(OpError::param(&format!("{p}direction"), "two numbers [x, y]")),
                     })
                     .transpose()?;
-                draw_shape(&mut t, &units, &p, tool, points, sides, construction, &switches, ends, knots, direction)?;
+                draw_shape(&mut t, &units, &p, tool, points, sides, construction, (&switches, &apart), ends, knots, direction)?;
             }
         }
         None => {
@@ -737,7 +739,8 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let switches = switch_list(a.get("tangent_arc_switch"), "tangent_arc_switch")?;
             let ends = end_derivatives(a.get("start_derivative"), a.get("end_derivative"), &units, "")?;
             let knots = knot_args(a.get("degree"), a.get("knots"), a.get("weights"), "")?;
-            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?, &switches, ends, knots, None)?;
+            let apart = switch_list(a.get("apart"), "apart")?;
+            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?, (&switches, &apart), ends, knots, None)?;
         }
     }
     let (id, tab) = (t.id, t.tab);
@@ -786,9 +789,9 @@ fn switch_list(v: Option<&Value>, param: &str) -> Result<Vec<usize>, OpError> {
 
 /// One drawing tool run on its clicks with a fresh editor, as one
 /// `sketch_draw` call does (`p`: the parameter prefix for errors).
-/// `switches`: the line tool's Shift+A before those clicks.
+/// `switches`: the line tool's Shift+A before those clicks; `apart`: clicks that don't snap onto existing points.
 #[allow(clippy::too_many_arguments)]
-fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool, switches: &[usize], ends: Option<(DVec2, DVec2)>, knots: Option<Knots>, direction: Option<DVec2>) -> Result<(), OpError> {
+fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool, (switches, apart): (&[usize], &[usize]), ends: Option<(DVec2, DVec2)>, knots: Option<Knots>, direction: Option<DVec2>) -> Result<(), OpError> {
     let tool = DRAW_TOOLS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| {
         let names: Vec<&str> = DRAW_TOOLS.iter().map(|t| t.0).collect();
         OpError::param(&format!("{p}tool"), &format!("`{name}` is not a drawing tool{}; tools: {}", crate::error::did_you_mean(name, names.iter().copied()), names.join(", ")))
@@ -851,6 +854,7 @@ fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, poin
         for _ in switches.iter().filter(|s| **s == k) {
             ed.toggle_tangent_arc();
         }
+        ed.no_point_snap = apart.contains(&k);
         click(&mut ed, &mut t.data, *c);
     }
     // Commit what the tool still holds (spline, slot, polygon), then leave it.

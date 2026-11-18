@@ -3588,6 +3588,26 @@ fn elliptical_arcs_take_vertical_and_coincident() {
     assert!((num(&e[0]["minor_radius"]) - num(&e[1]["minor_radius"])).abs() < 1e-6, "{} / {}", e[0], e[1]);
 }
 
+/// `apart`: a line started on a rectangle's corner keeps a point of its own there, on the side it snaps to (the parity
+/// translator's end live ties to a curve only: asm-suspension's Sketch 13); without it the corner is shared.
+#[test]
+fn sketch_draw_apart_keeps_an_end_off_an_existing_point() {
+    let mut ctx = Ctx::new();
+    for apart in [false, true] {
+        let sk = new_sketch(&mut ctx, &format!("apart-{apart}.noshape"), "plane:top");
+        call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [30, 20]] }));
+        let mut line = json!({ "sketch": sk, "tool": "line", "points": [[30, 20], [50, 20]] });
+        if apart {
+            line["apart"] = json!([0]);
+        }
+        call(&mut ctx, "sketch_draw", line);
+        let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+        let points = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "point" && e["at"][0].as_f64().is_some_and(|x| (x - 30.0).abs() < 1e-9) && e["at"][1].as_f64().is_some_and(|y| (y - 20.0).abs() < 1e-9)).count();
+        assert_eq!(points, if apart { 2 } else { 1 }, "apart {apart}: {g}");
+        assert!(g["status"].as_str().is_some_and(|s| !s.starts_with("over")), "{g}");
+    }
+}
+
 #[test]
 fn sketch_draw_many_shapes_in_one_edit() {
     let mut ctx = Ctx::new();

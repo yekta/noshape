@@ -1518,6 +1518,7 @@ Examples:
 | `knots` | array of number |  | bezier: its knot vector, clamped (control points + degree + 1 values, as Onshape stores a B-spline's). |
 | `weights` | array of number |  | bezier: a rational B-spline's weights, one per control point. |
 | `tangent_arc_switch` | array of integer |  | line: press the Line/tangent arc switch (Shift+A) before these clicks (0-based): that click draws a tangent arc, then the chain goes on with lines (as in Onshape). |
+| `apart` | array of integer |  | These clicks (0-based) don't snap onto existing points: an end placed on another's, kept a point of its own (it may still snap onto a curve there). |
 
 #### sketch_constrain
 

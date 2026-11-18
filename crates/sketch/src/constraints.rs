@@ -702,7 +702,9 @@ impl Sketch {
                     }
                     (1, 2) => {
                         if let (Some((l0, l1)), Some(c)) = (self.line_pts(a), self.center_pos(b)) {
-                            h.sign = sgn(signed_line_dist(c, l0, l1));
+                            let d = signed_line_dist(c, l0, l1);
+                            h.sign = sgn(d);
+                            h.internal = *mode == DistanceMode::Minimum && self.radius_of(b).is_some_and(|r| d.abs() < r);
                         }
                     }
                     (2, 2) => {

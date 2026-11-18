@@ -898,6 +898,7 @@ impl PartStudioView {
                 this.perf_script_note(if refine { "preview result in" } else { "result in" });
                 this.context = Some(result.context.clone());
                 this.take_solved_draft(cx);
+                this.update_conflicts();
                 scene_builder::log_regen_perf(if refine { "preview" } else { "full" }, &result.display, &studio);
                 this.note_open_display(!refine, result.display.regen_ms);
                 let display = Arc::new(result.display);
@@ -955,6 +956,7 @@ impl PartStudioView {
                     }
                     this.end_pending(seq, cx);
                     this.context = Some(fine.context.clone());
+                    this.update_conflicts();
                     scene_builder::log_regen_perf("refine", &fine.display, &studio);
                     this.note_open_display(true, fine.display.regen_ms);
                     let display = Arc::new(fine.display);

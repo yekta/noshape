@@ -1862,7 +1862,13 @@ impl<'a> Translator<'a> {
             }
         }
         let at = |key: &str| Some([c[key][0].as_f64()? * map.k, c[key][1].as_f64()? * map.k]);
-        let reversed = match (ends, at("start")) {
+        // A B-spline's start is its first pole (asm-suspension's Sketch 2: a Use of an edge ours makes a B-spline,
+        // live's arc running the other way, its `.end` taken for ours).
+        let first = || {
+            let p = c["points"].as_array().or(c["control_points"].as_array())?.first()?;
+            Some([p[0].as_f64()? * map.k, p[1].as_f64()? * map.k])
+        };
+        let reversed = match (ends, at("start").or_else(first)) {
             (Some([s, e]), Some(p)) => {
                 let d = |q: [f64; 2]| (q[0] - p[0]).hypot(q[1] - p[1]);
                 d(map.local(e)) < d(map.local(s)) - 1e-9
@@ -4937,6 +4943,10 @@ impl<'a> Translator<'a> {
         // Where live's solve put them (`sketches` geomEntities): stored geometry can lag its variables
         // (cf-parameter-pattern).
         let mut entities: Vec<Value> = f["entities"].as_array().into_iter().flatten().map(|e| self.solved_entity(&oid, e).unwrap_or_else(|| e.clone())).collect();
+        // Line ends live ties to curves only, never to another point: drawn apart from a point they lie on (ours
+        // shared it: asm-suspension 995636's Sketch 13, a rectangle's corner on another's side at its end, its 65 mm
+        // then over-defined).
+        let loose = loose_ends(f);
         smooth_use_splines(&mut entities, &projected);
         for e in &entities {
             let eid = e["entityId"].as_str().unwrap_or("").to_string();
@@ -4967,7 +4977,12 @@ impl<'a> Translator<'a> {
                 "BTCurveGeometryLine" => {
                     let (t0, t1) = (e["startParam"].as_f64().unwrap_or(0.0), e["endParam"].as_f64().unwrap_or(0.0));
                     let (px, py, dx, dy) = (num("pntX"), num("pntY"), num("dirX"), num("dirY"));
-                    Some(json!({ "tool": "line", "points": [at(px + t0 * dx, py + t0 * dy), at(px + t1 * dx, py + t1 * dy)], "construction": construction }))
+                    let apart: Vec<usize> = ["start", "end"].iter().enumerate().filter(|(_, k)| loose.contains(&format!("{eid}.{k}"))).map(|(i, _)| i).collect();
+                    let mut shape = json!({ "tool": "line", "points": [at(px + t0 * dx, py + t0 * dy), at(px + t1 * dx, py + t1 * dy)], "construction": construction });
+                    if !apart.is_empty() {
+                        shape["apart"] = json!(apart);
+                    }
+                    Some(shape)
                 }
                 "BTCurveGeometryCircle" => {
                     let (cx, cy, r, xd, yd) = (num("xCenter"), num("yCenter"), num("radius"), num("xDir"), num("yDir"));
@@ -6426,6 +6441,19 @@ fn imprint_query_words(text: &str) -> (Option<String>, Vec<String>) {
 }
 
 /// Where polylines `a` and `b` cross, in order along `a`.
+/// Sketch `f`'s line ends (`<id>.start` / `<id>.end`) that its COINCIDENTs tie to curves only, never to another point.
+fn loose_ends(f: &Value) -> std::collections::HashSet<String> {
+    let curves: std::collections::HashSet<&str> = f["entities"].as_array().into_iter().flatten().filter(|e| e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchCurve"))).filter_map(|e| e["entityId"].as_str()).collect();
+    let pairs: Vec<[&str; 2]> = f["constraints"].as_array().into_iter().flatten().filter(|c| c["constraintType"] == "COINCIDENT").filter_map(|c| {
+        let par = |n: &str| c["parameters"].as_array()?.iter().find(|p| p["parameterId"] == n)?["value"].as_str();
+        Some([par("localFirst")?, par("localSecond")?])
+    }).collect();
+    let end = |s: &str| s.strip_suffix(".start").or_else(|| s.strip_suffix(".end")).is_some_and(|l| curves.contains(l));
+    let on_curve: std::collections::HashSet<&str> = pairs.iter().flat_map(|[a, b]| [(*a, *b), (*b, *a)]).filter(|(p, o)| end(p) && curves.contains(o)).map(|(p, _)| p).collect();
+    let to_point: std::collections::HashSet<&str> = pairs.iter().flat_map(|[a, b]| [(*a, *b), (*b, *a)]).filter(|(p, o)| end(p) && !curves.contains(o)).map(|(p, _)| p).collect();
+    on_curve.difference(&to_point).map(|s| s.to_string()).collect()
+}
+
 fn crossings(a: &[[f64; 2]], b: &[[f64; 2]]) -> Vec<[f64; 2]> {
     let mut out: Vec<(f64, [f64; 2])> = Vec::new();
     for (i, p) in a.windows(2).enumerate() {

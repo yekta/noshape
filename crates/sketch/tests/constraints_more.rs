@@ -386,6 +386,51 @@ fn a_dimension_the_tangencies_already_fix_over_defines() {
     }
 }
 
+/// asm-welding-config 9c7704's Sketch 13 (live keeps it): an arc whose ends lie on two horizontal lines tangent to a
+/// Ø15.875 circle, its centre level with the circle's, then Ø15.875 itself. The rest only leaves the ends' dx, which
+/// the Ø takes to 0 at a singular point: not a dimension the rest already fixes, unlike live 1862's above.
+#[test]
+fn a_dimension_meeting_the_rest_at_a_singular_point_solves() {
+    let mut sk = Sketch::new();
+    let r = 0.0079375;
+    let c1 = sk.add_point(v(0.0, 0.0));
+    sk.add_constraint(ConstraintKind::Fix { entity: c1 }).unwrap();
+    let circle = sk.add_circle_at(c1, r).unwrap();
+    sk.add_constraint(ConstraintKind::Diameter { curve: circle, value: 2.0 * r }).unwrap();
+    let (top, bottom) = (sk.add_point(v(-0.055, r)), sk.add_point(v(-0.055, -r)));
+    let (t1, b1) = (sk.add_point(v(0.0, r)), sk.add_point(v(0.0, -r)));
+    let l1 = sk.add_line_between(top, t1).unwrap();
+    let l2 = sk.add_line_between(bottom, b1).unwrap();
+    for l in [l1, l2] {
+        sk.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
+        sk.add_constraint(ConstraintKind::Tangent { a: l, b: circle }).unwrap();
+    }
+    let c2 = sk.add_point(v(-0.055, 0.0));
+    let arc = sk.add_arc_between(c2, top, bottom).unwrap();
+    sk.add_constraint(ConstraintKind::Horizontal { a: c2, b: Some(c1) }).unwrap();
+    solved(&mut sk);
+    sk.add_constraint(ConstraintKind::Diameter { curve: arc, value: 2.0 * r }).unwrap();
+    solved(&mut sk);
+}
+
+/// asm-suspension 995636's Sketch 4 (live): a hexagon side 8 mm inside an r22.25 rim, a minimum DISTANCE between them:
+/// from the line out to the rim, r - d (ours took d - r, -8, and pulled the side 18.5 mm out).
+#[test]
+fn a_minimum_distance_from_a_line_inside_a_circle_is_to_its_rim() {
+    let mut sk = Sketch::new();
+    let c = sk.add_point(v(0.0, 0.0));
+    sk.add_constraint(ConstraintKind::Fix { entity: c }).unwrap();
+    let rim = sk.add_circle_at(c, 0.02225).unwrap();
+    sk.add_constraint(ConstraintKind::Radius { curve: rim, value: 0.02225 }).unwrap();
+    let side = sk.add_line(v(-0.0082, -0.01425), v(0.0082, -0.01425));
+    sk.add_constraint(ConstraintKind::Horizontal { a: side, b: None }).unwrap();
+    let d = sk.add_constraint(ConstraintKind::Distance { a: side, b: rim, value: 0.008, mode: DistanceMode::Minimum }).unwrap();
+    solved(&mut sk);
+    let Some(Curve2::Line { a, .. }) = sk.curve(side) else { panic!("a line") };
+    assert!((a.y + 0.01425).abs() < 1e-9, "the side stays: {a}");
+    assert!((sk.measure(d).unwrap() - 0.008).abs() < 1e-12);
+}
+
 #[test]
 fn a_minimum_distance_between_overlapping_circles_is_their_overlap() {
     // c2-hunting-knife's Sketch 8 (live): two mirrored R60.65 arcs 108.8 mm apart, a 12.5 mm Distance between them

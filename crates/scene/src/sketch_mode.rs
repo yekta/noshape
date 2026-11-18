@@ -755,6 +755,9 @@ pub struct SketchEditor {
     pub otf_typing: bool,
     /// Curves the cursor passed over while drawing, and points it rested on (wake-up inferences).
     pub woken: Vec<EntityId>,
+    /// The next click doesn't snap onto existing points (the agent API's `apart`: the parity translator draws an end live
+    /// keeps apart from a point it lies on, only coincident with a curve).
+    pub no_point_snap: bool,
     /// Lines whose midpoint a snap landed on while drawing, the newest first ([`WOKEN_MIDS`]; live align-mid-1118: it
     /// gives alignment, the click making a point there, MIDPOINT on the line).
     pub woken_mids: Vec<EntityId>,
@@ -1480,6 +1483,7 @@ impl SketchEditor {
             otf_typing: false,
             woken: Vec::new(),
             woken_mids: Vec::new(),
+            no_point_snap: false,
             edge_acquiring: None,
             edge_seen: None,
             woken_edge: None,
@@ -1738,6 +1742,9 @@ impl SketchEditor {
             screen: self.screen_metric(),
         };
         let mut all = noshape_sketch::infer(sk, p, &ctx);
+        if self.no_point_snap {
+            all.retain(|i| i.kind != InferenceKind::Endpoint);
+        }
         if let Some(i) = self.woken_edge_perpendicular(p, anchor) {
             all.push(i);
             all.sort_by(|x, y| x.priority.cmp(&y.priority).then(x.distance.total_cmp(&y.distance)));
@@ -5574,6 +5581,12 @@ impl SketchEditor {
     /// angles, line lengths); radii, diameters and arc lengths must be positive.
     pub fn apply_dimension(&mut self, data: &mut SketchData, cid: ConstraintId, text: &str, units: &UnitPrefs, vars: &dyn noshape_units::VariableScope) -> Result<(), String> {
         let Some(c) = data.sketch.constraint(cid).cloned() else { return Err("Dimension no longer exists".into()) };
+        // A new dimension the Dimension tool added driven (it over-defined the sketch) takes a typed value as a driving
+        // one: the sketch then can't be solved and shows so (live errors-1118: a redundant 40 or a conflicting 50 on a
+        // rectangle's opposite side, accepted, the sketch red).
+        if !c.driving && self.dim_edit.as_ref().is_some_and(|d| d.constraint == cid && d.created) {
+            data.sketch.set_driving(cid, true).map_err(|e| e.to_string())?;
+        }
         // The shape to keep when the new value can't be solved.
         let solved = data.sketch.clone();
         let dim = dim_unit(&c.kind);
@@ -11013,6 +11026,35 @@ mod tests {
             ed.pointer_move(&mut d, v(203.0 * PX, 120.0 * PX), false, false);
             let aligned = ed.inference.as_ref().is_some_and(|i| i.constraints.iter().any(|c| matches!(c, AutoConstraint::VerticalWith(p) if *p == pt)));
             assert_eq!(aligned, snapped, "passed {off} px off the point: {:?}", ed.inference);
+        }
+    }
+
+    /// Live errors-1118: a dimension the Dimension tool added driven (it over-defines a dimensioned rectangle) takes a
+    /// typed value as a driving dimension, the redundant 40 as the conflicting 50: kept, the sketch not solved, its
+    /// shape as it was. Enter on the untouched box (no value typed) leaves it driven (live qa4 r5 s5).
+    #[test]
+    fn a_typed_value_makes_an_over_defining_dimension_driving() {
+        for typed in ["40", "50"] {
+            let (mut ed, mut d) = editor(Tool::Dimension);
+            let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.03));
+            let [bottom, right, top, _left] = [r.curves[0], r.curves[1], r.curves[2], r.curves[3]];
+            d.sketch.add_constraint(ConstraintKind::Length { curve: bottom, value: 0.04 }).unwrap();
+            d.sketch.add_constraint(ConstraintKind::Length { curve: right, value: 0.03 }).unwrap();
+            let corner = d.sketch.endpoints(bottom).unwrap().0;
+            d.sketch.add_constraint(ConstraintKind::Fix { entity: corner }).unwrap();
+            assert!(d.sketch.solve().is_solved());
+            let cid = add_dimension(&mut d, ConstraintKind::Length { curve: top, value: 0.0 }, None, None).unwrap();
+            assert!(!d.sketch.constraint(cid).unwrap().driving, "placed driven");
+            ed.dim_edit = Some(DimEdit { constraint: cid, text: "40 mm".into(), created: true });
+            let shape: Vec<DVec2> = r.points.iter().map(|p| d.sketch.point(*p).unwrap()).collect();
+            let res = ed.apply_dimension(&mut d, cid, typed, &UnitPrefs::default(), &noshape_units::EmptyScope);
+            assert_eq!(res, Err(SKETCH_NOT_SOLVED.to_string()), "{typed}");
+            let c = d.sketch.constraint(cid).unwrap();
+            assert!(c.driving && (c.kind.value().unwrap() - typed.parse::<f64>().unwrap() * 1e-3).abs() < 1e-12, "{typed}: {c:?}");
+            assert!(!d.sketch.solve().is_solved());
+            for (p, was) in r.points.iter().zip(&shape) {
+                assert!((d.sketch.point(*p).unwrap() - *was).length() < 1e-9, "{typed}: the shape stays");
+            }
         }
     }
 

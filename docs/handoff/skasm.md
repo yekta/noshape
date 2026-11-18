@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 21:31 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 22:47 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -25,26 +25,25 @@ Symmetric on two lines = one lines-only mirror (second line onto the first's mir
 quadrant's snap wakes no alignment source (ours aligns with points only).
 
 ## Landed / queued 11-18 evening
-- Landed: cce30a1a (welding Sketch 8 warns, 22/37), f6ea6d5c (Modify joint reuse: `sheetmetal::bend_joint_edit`, the
-  joint the bend's faces are named by once it rebuilt it; the panel calls ops' edit_bend / convert_to_rip).
-- Queued: 89704074 (hover outside sketch mode: curve 7.5 px / hold 10.5 `CURVE_HOLD`; a hovered point's 10 px
-  #f8c488 disc in `midpoint_overlay`; psui narrows its midpoint rule), 0437383a (Symmetric: B's start at its foot on
-  A's mirrored line), then Trim near a chain's corner (`trim_near`, 1.5 px: crossings with the corner's two curves
-  don't count when the curve passes within it) + the dimension box's focus assertion.
-- Live rechecks (live 21:xx): dimension box look = (its Xvfb window wasn't focused); Trim / Symmetric recheck on green.
+- Landed: cce30a1a (welding Sketch 8 warns, 22/37), f6ea6d5c (Modify joint reuse: `sheetmetal::bend_joint_edit`),
+  a535927a (hover outside sketch mode: curve 7.5 px / hold 10.5 `CURVE_HOLD`; a hovered point's 10 px disc in
+  `midpoint_overlay`; psui narrows its midpoint rule), 303e9d91 (Symmetric: B's start at its foot; Trim near a chain's
+  corner `trim_near` 1.5 px; a passed midpoint's alignment `woken_mids` / `link_woken_mids`). live rechecks on green.
 
-## In flight 21:31 (uncommitted; debug traces ZZ_DIM in parity.rs / solver.rs to strip)
-- Solver: a redundant driving dimension is checked on a nearby configuration (`redundant_nearby`): one meeting the rest
-  only at a singular point is kept (welding-config 9c7704 Sketch 13's Ø: an arc's ends at two heights, its centre
-  midway); live 1862's stays redundant. Test `a_dimension_meeting_the_rest_at_a_singular_point_solves`. Needs a full
-  model-suite run before landing (it changes which dimensions translate).
-- Translator: a Use'd edge ours makes a B-spline (live: an arc) maps its `.start` / `.end` by its first pole
-  (asm-suspension 805e29 Sketch 2: "Sketch could not be solved.", its COINCIDENT ends 36 / 10 mm apart). Repro
-  vibe2 `~/tmp/skasm/asmz.sh asm-suspension` (copy of ~/parity/models). Then tell asm (it reruns the pair). Our edges
-  there are B-splines where live's are r40 circles: core's.
-- asm-suspension 995636 Sketch 4 (DISTANCE 8 mm on gShlSVgxaABK.seed moves 18.5 mm) and Sketch 13: next.
-- Alignment with a passed midpoint (live align-mid-1118): the click makes a point `<new>.endSnap0` at the midpoint,
-  MIDPOINT on L, HORIZONTAL / VERTICAL to the new end; circles offer no quadrant. Not started.
+## Committed, not landed (df427f1b, 22:4x): waits for suite B3
+- Error sweep P1 (live errors-1118, lead 22:3x): "Sketch could not be solved." follows the edited sketch's solve
+  (`update_conflicts`, also after background regens; it was cleared on the row's Warning); conflicts red whatever
+  Show errors says (live: the box changes nothing seen); a Dimension-tool dimension placed driven takes a typed value
+  as driving (`apply_dimension`); regeneration warns and keeps the last shape on any unsolved report (was only
+  Overconstrained). Show expressions row withdrawn by live (options remembered as live).
+- Solver `redundant_nearby` (welding 9c7704 Sketch 13's singular Ø kept; live 1862's stays redundant); translator: a
+  Use'd B-spline's ends by its first pole (asm-suspension 805e29 Sketch 2 solves); line across a circle: minimum
+  distance r - d (`h.internal`, 995636 Sketch 4); `sketch_draw` shape `apart` + translator `loose_ends` (995636
+  Sketch 13's 65 mm). AGENT_API regenerated.
+- Suites: A (old) vs B (nearby + B-spline ends): identical, 90/126, 1325/1585. B3 (everything) running on vibe2
+  ~/agents/skasm-keep/ab-B3.log; compare with `cmpsuite.sh ab-A.log ab-B3.log` (copies in /root/skasm-scratch).
+- Then land; rerun asm-suspension (vibe2 ~/tmp/skasm/asmz.sh) and welding (cfg.sh); tell asm (it reruns the pair).
+  asm-suspension's Fillet 3 / 4 and 3 instance offsets: our edges are B-splines where live's are r40 circles (core).
 
 ## Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
 regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).

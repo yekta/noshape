@@ -1673,6 +1673,9 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 let e = match mode {
                     DistanceMode::Center => Lin::new().pl(h.sign, cc, &l),
                     DistanceMode::Centerline => Lin::new().pl(2.0 * h.sign, cc, &l),
+                    // A line across the circle: from the line out to the rim (asm-suspension's Sketch 4: a hexagon's
+                    // side 8 mm inside an r22.25 rim; live's halfSpace pair).
+                    DistanceMode::Minimum if h.internal => Lin::new().pl(-h.sign, cc, &l).rad(1.0, &r),
                     DistanceMode::Minimum => Lin::new().pl(h.sign, cc, &l).rad(-1.0, &r),
                     DistanceMode::Maximum => Lin::new().pl(h.sign, cc, &l).rad(1.0, &r),
                 };

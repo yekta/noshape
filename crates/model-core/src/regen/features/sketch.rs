@@ -224,7 +224,9 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     };
     // Live (qa4 DIM-UNSOLVED-GEOM): a sketch that can't be solved keeps its
     // last solved shape, not the rest solved around the conflict.
-    if matches!(report.status, noshape_sketch::SolveStatus::Overconstrained { .. }) {
+    // (Nor one whose solve fails: live errors-1118's triangle with a side typed longer than the other two, the row red.)
+    let unsolved = !report.is_solved();
+    if unsolved {
         sk = last_solved;
     }
     // Text glyph outlines follow their (solved) text boxes.
@@ -251,7 +253,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             dimension_text.insert(c.id.0, text);
         }
     }
-    if let noshape_sketch::SolveStatus::Overconstrained { .. } = report.status {
+    if unsolved {
         ev.warnings.push("Sketch could not be solved.".into());
     }
     if !problems.is_empty() {
@@ -1002,6 +1004,40 @@ mod text_expression_tests {
         assert!(res.report.conflicting().contains(&lb), "{:?}", res.report.status);
         let len = res.sketch.curve(b).unwrap().length();
         assert!((len - 0.032).abs() < 1e-12, "the last solved shape stays: {len}");
+    }
+
+    /// Live errors-1118: a triangle with two 100 mm sides and the third typed 300 can't be solved: the row says so
+    /// ("Sketch could not be solved.", ours said nothing) and the last shape stays.
+    #[test]
+    fn a_sketch_whose_solve_fails_says_so() {
+        use crate::configuration::ConfigValues;
+        use crate::partstudio::PartStudio;
+        use crate::reference::{DatumPlane, Reference};
+        use crate::regen::{RegenOptions, Regenerator};
+        use crate::sketch_feature::SketchData;
+        use glam::DVec2;
+        let units = noshape_units::UnitPrefs::default();
+        let mut sk = noshape_sketch::Sketch::new();
+        let p: Vec<_> = [DVec2::new(0.0, 0.0), DVec2::new(0.1, 0.0), DVec2::new(0.05, 0.0866)].iter().map(|q| sk.add_point(*q)).collect();
+        let a = sk.add_line_between(p[0], p[1]).unwrap();
+        let b = sk.add_line_between(p[1], p[2]).unwrap();
+        let c = sk.add_line_between(p[2], p[0]).unwrap();
+        sk.add_constraint(ConstraintKind::Length { curve: a, value: 0.1 }).unwrap();
+        sk.add_constraint(ConstraintKind::Length { curve: b, value: 0.1 }).unwrap();
+        let lc = sk.add_constraint(ConstraintKind::Length { curve: c, value: 0.1 }).unwrap();
+        assert!(sk.solve().is_solved());
+        let before = sk.curve(c).unwrap().length();
+        sk.set_dimension_value(lc, 0.3).unwrap();
+        let mut ps = PartStudio::new();
+        let mut f = ps.new_feature("sketch", &units).unwrap();
+        let id = f.id;
+        f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+        ps.features.push(f);
+        let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+        let st = r.display.feature_state(id).unwrap();
+        assert!(st.message.as_deref().is_some_and(|m| m.contains("Sketch could not be solved.")), "{st:?}");
+        assert!((r.context.sketches[0].sketch.curve(c).unwrap().length() - before).abs() < 1e-9, "the last shape stays");
     }
 
     #[test]

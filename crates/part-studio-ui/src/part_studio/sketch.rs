@@ -430,11 +430,21 @@ impl PartStudioView {
         }
     }
 
-    /// Copy the solver's conflicting constraints into the editor (red glyphs/dims).
-    fn update_conflicts(&mut self) {
+    /// Copy the solver's conflicting constraints into the editor (red glyphs/dims), and show "Sketch could not be
+    /// solved." while the edited sketch doesn't solve, clearing it once it does (live errors-1118: the yellow bubble as
+    /// an over-constrained sketch opens and after an edit leaves it so; live2 sketch-state (4)).
+    pub(super) fn update_conflicts(&mut self) {
         let Some(ed) = &mut self.sketch else { return };
         let f = ed.feature;
-        ed.conflicting = self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == f)).map(|s| s.report.conflicting().to_vec()).unwrap_or_default();
+        let report = self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == f)).map(|s| &s.report);
+        ed.conflicting = report.map(|r| r.conflicting().to_vec()).unwrap_or_default();
+        let failed = report.is_some_and(|r| !r.is_solved());
+        let shown = self.message.as_ref().is_some_and(|(_, m)| m == crate::sketch_mode::SKETCH_NOT_SOLVED);
+        if failed && self.message.is_none() {
+            self.message = Some((FeatureStatus::Warning, crate::sketch_mode::SKETCH_NOT_SOLVED.into()));
+        } else if !failed && shown {
+            self.message = None;
+        }
     }
 
     fn ui_mut(&mut self) -> Option<&mut SketchUi> {
@@ -516,13 +526,6 @@ impl PartStudioView {
         self.apply_display(Arc::new(result.display), window, cx);
         // The profile inspector follows every edit (resolved issues disappear).
         self.update_profile_issues(cx);
-        // "Sketch could not be solved." goes once the sketch solves again (live2 sketch-state (4)).
-        if let Some(id) = editing_sketch
-            && self.message.as_ref().is_some_and(|m| m.1 == crate::sketch_mode::SKETCH_NOT_SOLVED)
-            && self.display.feature_state(id).is_some_and(|s| s.status != noshape_model::display::FeatureStatus::Error)
-        {
-            self.message = None;
-        }
     }
 
     /// The opened sketch's draft takes the geometry the regeneration solved and shows (hat15b's Sketch 1, 1.1 mm off
@@ -4333,7 +4336,8 @@ impl PartStudioView {
             let selected = ed.selected_constraints.contains(&cid);
             let hovered = ed.hover_constraint == Some(cid);
             let margin = if hovered { GLYPH_HOLD_MARGIN } else { GLYPH_MARGIN };
-            let conflict = ed.show_errors && ed.conflicting.contains(&cid);
+            // (Red whether or not Show errors is ticked: live errors-1118's Sketch HV, unticked.)
+            let conflict = ed.conflicting.contains(&cid);
             // Onshape constraint boxes (§1.9): white, hover `#fcda7f`, selected
             // `#fab601`; blue tints for external references; red boxes with
             // white glyphs for conflicts. No outline.
@@ -5724,7 +5728,7 @@ fn dimension_label_colors(ed: &SketchEditor, cid: noshape_sketch::ConstraintId, 
     } else {
         // Dark (live dk-933): white values, driven #ccc, conflicts #ff6b6b.
         use crate::theme::{pick, viewport as l, viewport_dark as d};
-        let hex = if ed.show_errors && ed.conflicting.contains(&cid) {
+        let hex = if ed.conflicting.contains(&cid) {
             pick(l::SKETCH_OVER, d::SKETCH_OVER)
         } else if driving {
             pick(l::SKETCH_FULL, d::SKETCH_FULL)

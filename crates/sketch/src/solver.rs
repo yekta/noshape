@@ -1045,6 +1045,7 @@ fn run_weighted(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow
         let mut conflicting = conflicting;
         if let Some(a) = &analysis {
             let dims: Vec<ConstraintId> = a.redundant.iter().copied().filter(|c| sk.constraint(*c).is_some_and(|c| c.driving && c.kind.is_dimension())).collect();
+            let dims = if dims.is_empty() { dims } else { redundant_nearby(sk, dims) };
             if !dims.is_empty() {
                 conflicting = dedup_sorted(conflicting.into_iter().chain(dims).collect());
             }
@@ -1087,6 +1088,40 @@ fn run_weighted(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow
             }
         return report;
     }
+}
+
+/// Of the driving dimensions `dims` the rest already fixes here, those it still fixes on a nearby configuration: the
+/// rest settled from a nudged start with the dimension driven, then the dimension driving at what it measures there.
+/// One that only meets the rest at a singular point is kept, as live keeps it (asm-welding-config 9c7704's Sketch 13:
+/// an arc's ends held at two heights, its centre midway, its Ø their gap: only their dx = 0 is left to it); one the
+/// rest fixes everywhere stays redundant (live 1862: a Ø10 circle tangent to two lines 10 mm apart, 10 dimensioned).
+fn redundant_nearby(sk: &Sketch, dims: Vec<ConstraintId>) -> Vec<ConstraintId> {
+    thread_local! { static INSIDE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) }; }
+    if INSIDE.with(|c| c.get()) {
+        return dims;
+    }
+    INSIDE.with(|c| c.set(true));
+    let size = sk.bbox().size().max_element().max(1e-3);
+    let kept = dims
+        .into_iter()
+        .filter(|&c| {
+            let mut probe = sk.clone();
+            if probe.set_driving(c, false).is_err() {
+                return true;
+            }
+            let points: Vec<(EntityId, DVec2)> = probe.entities().filter(|e| !e.external && e.kind() == EntityKind::Point).filter_map(|e| Some((e.id, probe.point(e.id)?))).collect();
+            for (k, (id, p)) in points.into_iter().enumerate() {
+                let t = (k as f64 + 1.0) * 0.618_033_988_75;
+                let _ = probe.set_point(id, p + DVec2::new(t.fract() - 0.5, (t * 1.7).fract() - 0.5) * size * 1e-3);
+            }
+            if !probe.solve_with(&SolveOptions { analyze: false, ..Default::default() }).is_solved() || probe.set_driving(c, true).is_err() {
+                return true;
+            }
+            probe.solve_with(&SolveOptions::default()).redundant.contains(&c)
+        })
+        .collect();
+    INSIDE.with(|c| c.set(false));
+    kept
 }
 
 /// The driving dimension equation `eq` comes from, if any.

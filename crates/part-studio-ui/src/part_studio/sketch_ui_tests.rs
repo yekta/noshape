@@ -1947,6 +1947,16 @@ fn an_open_sketchs_state_follows_its_constraints(cx: &mut TestAppContext) {
     assert_eq!(bubble(cx).as_deref(), Some("Sketch could not be solved."), "the bubble");
     let now = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.curve(line));
     assert_eq!(now, at, "the line stays where it was");
+    // Accepted and opened again: the bubble shows as it opens (live errors-1118's Sketch HV), over later regenerations.
+    let id = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && !view.read(cx).ui_busy());
+    assert_eq!(bubble(cx), None, "it goes with the sketch");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    settle(cx);
+    assert_eq!(bubble(cx).as_deref(), Some("Sketch could not be solved."), "the bubble as it opens");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    settle(cx);
     delete(cx, true);
     fixed(cx, "the conflict deleted");
     assert_eq!(bubble(cx), None, "the bubble goes");
