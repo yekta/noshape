@@ -864,6 +864,12 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   User documents (vibex7, mode-600 copies, deleted): hat8 / hat15 / hat15b / the dock regen and open even (27.7 vs 27.4 s summed); the dock's
   tab return even (settle of A 738 / 754 ms). qa-scratch/speed/80a64725.
 - Dock tab return (lead 09:00 P0): psui's 9595bbf05 verified 13:06 (tab drawn 111 vs v0.4.53 151 ms, no trailing frames); in cut-must.txt by subject.
+- 17:00 pre-check (qa 13:20, compat of green 185c4caf vs v0.4.58, finished; 422aacaa running): user documents ALL-SAME, ticket and
+  authored documents ALL-SAME, hat15 vs 0.4.43 as before. Corpus 5 differ, none unexplained: c2-impeller-loft (Fillet 4 / Move face 2 /
+  Fillet Ansaugflansch lose their selections, Delete face 2 Ok -> Error: the known renames until core's revert lands); c2-config-parts-pulleys
+  Circular pattern 1 Error -> Ok, part as live (155 / 350 / 192, 7182.19 mm3); cf-sheet-metal-model-plus back to 0.4.57's Info (skasm
+  7b8bb2491); c2-surf-intro-simple 3 -> 4 bodies (core 4ca9526a1 "one surface per chain", live 6); c2-loft-paths-guides Part 1 44/103/65
+  -> 34/93/67, volume +20 mm3 (core e841ff485 path loft; live 38/94/64, 6388074 mm3: neither build matches live yet).
 - No other open release blocker at 06:25. v0.4.58 = 9c015658 + docs (qa GO 04:46); its published check runs when release.yml publishes.
 - Re-checks owed on the candidate: the dock tab return at vibex7 load < 2 (qa-wait-67eb: fff088e5 green vs 0.4.53), the hover flow
   (uh/uh2.sh, release check 4), user documents + f197 + tickets vs 0.4.58 (cut-check at 16:15).
