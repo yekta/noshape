@@ -1235,6 +1235,29 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | "#" opens the variable list on the next frame: the matching variables (icon, name, grey value) and "New variable…", the first highlighted; it filters per key; a plain letter opens it too | ? | missing |
 | Enter on "New variable…": the "Create variable" panel beside the dialog, the name prefilled from the typed text; its Enter adds "#wa = <the field's value>" before the feature | ? | missing |
 
+### sm-feel2-1118 (sheet metal panel, Sheet metal model arrow, Tab, Form, live2 11-18 09:12) [skasm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Sheet metal table and flat view: graphics shrink 0.40 s, panel 0.75 s, table text 2.6 s, flat part drawn 2.9 s; the strip moves to the panel's left edge; close in one frame at 1.0 s | ? | missing |
+| Bend row hover: the bend lit in 3D and flat at 0.59 s, the row tint at 0.69 s | ? | sheet metal matrix "a row hovered" (the timing: missing) |
+| Sheet metal model edit: a white arrow at the plate's middle (blue when hovered); a click flips it and ticks "Flip direction up" | ? | missing |
+| Flange edit: no manipulator in the graphics (only the Bend angle flip button) | ? | sheet metal matrix "Flange" |
+| Tab: a picked profile fills "Flange to merge" by itself ("Face of Sheet metal model 1"), Subtraction offset 0.02 mm; the flat view shows the tab at once; no arrows | ? | missing |
+| Form: "Preparing form…" with a spinner at the graphics' bottom centre while loading; Location(s) takes points, a face click leaves it empty | ? | missing |
+
+### asm-views2-1118 (exploded, named positions, section, live2 11-18 09:19) [asm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Explode arrow drag: the step's Distance = the pointer's travel at the screen scale, rounded to 0.1 mm (13 px → 1 mm … 60 px → 4.4 mm at ≈ 13.6 px/mm); 4–10 px drags give a 0 mm step | ? | missing |
+| Explode step: Enter keeps it; Esc removes it and ends the explode editing | ? | exploded table "✓ / Esc on the step" (ending the editing: missing) |
+| No explode player or slider: Activate shows the exploded state in one jump (1.3–1.7 s); the steps' rollback bar moves the parts in one frame (1.4–1.7 s), not animated | ? | missing |
+| Named position row menu: Apply / Edit / Duplicate / Update named position, Delete; a click or double-click on the row applies nothing | ? | missing |
+| Apply named position: the parts jump in one frame (0.57 s), no animation; the row then selected | ? | missing |
+| Display states: a toolbar tool, not a right-strip panel | ? | missing |
+| Assembly section arrow drag: a focused value box at the arrow during the drag (0.1 mm steps), tan hatched caps on every instance; the box stays after release, text selected | ? | missing |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
