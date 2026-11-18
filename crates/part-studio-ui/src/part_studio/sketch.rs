@@ -181,6 +181,8 @@ fn glyph_linger_redraw(cx: &mut Context<PartStudioView>) -> Task<()> {
 /// The clear margin round a constraint glyph's 20 px tile that still hovers it (live2 sktools-1118: lit to 14 px from
 /// its centre, off at 15–16).
 const GLYPH_MARGIN: f32 = 4.0;
+/// The margin while it is hovered: a slide holds it to 16 px (a jump there lights nothing).
+const GLYPH_HOLD_MARGIN: f32 = 6.0;
 
 /// How long a left entity's glyphs stay shown after its orange goes, so the pointer can reach them (live2 feel-1417:
 /// 0.4–0.7 s).
@@ -4264,6 +4266,7 @@ impl PartStudioView {
             boxes.push((cid, gent, x + dx, y + dy));
             let selected = ed.selected_constraints.contains(&cid);
             let hovered = ed.hover_constraint == Some(cid);
+            let margin = if hovered { GLYPH_HOLD_MARGIN } else { GLYPH_MARGIN };
             let conflict = ed.show_errors && ed.conflicting.contains(&cid);
             // Onshape constraint boxes (§1.9): white, hover `#fcda7f`, selected
             // `#fab601`; blue tints for external references; red boxes with
@@ -4283,13 +4286,13 @@ impl PartStudioView {
                 div()
                     .id(SharedString::from(format!("glyph-{}-{}", cid.0, g.entity.0)))
                     .debug_selector(move || format!("glyph-{}-{}", cid.0, gent.0))
-                    // Lit to 14 px from the tile's centre, 4 px past its edge (live2 sktools-1118): a clear margin round
-                    // the tile takes the hover and the clicks.
+                    // Lit to 14 px from the tile's centre, 4 px past its edge, and once lit held to 16 (live2 sktools-1118):
+                    // a clear margin round the tile takes the hover and the clicks.
                     .absolute()
-                    .left(px(x + dx - GLYPH_MARGIN))
-                    .top(px(y + dy - GLYPH_MARGIN))
-                    .size(px(20. + 2. * GLYPH_MARGIN))
-                    .p(px(GLYPH_MARGIN))
+                    .left(px(x + dx - margin))
+                    .top(px(y + dy - margin))
+                    .size(px(20. + 2. * margin))
+                    .p(px(margin))
                     .cursor_pointer()
                     // Live sketch/28: plain 20 px boxes, 18 px icons.
                     .child(div().size(px(20.)).flex().items_center().justify_center().bg(bg).child(icon_px(g.icon, 18.0, fg)))
