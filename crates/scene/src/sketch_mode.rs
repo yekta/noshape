@@ -431,8 +431,15 @@ const DRAG_START_PX: f64 = 5.0;
 /// The square round a snapped point: its 1 px sides 8 px from the point (live qsnap/za-p2p-d8: 17 px outside), #FFC92A.
 const SNAP_SQUARE_HALF_PX: f64 = 8.0;
 const SNAP_SQUARE_COLOR: [u8; 4] = [0xff, 0xc9, 0x2a, 0xff];
-/// The offset arrow's drag step (live 11-18 sketch-tools: 10.1 mm).
-const OFFSET_DRAG_STEP: f64 = 1e-4;
+/// A manipulator's drag step (live getLinearSnapValue, as the feature arrows' `linear_step`): 10^(round(log10(100 px
+/// in mm)) − 2) mm; 0.1 mm at live's sketch-tools-1118 scale (5.31 px/mm: 10.1 mm), 1 mm zoomed out.
+fn drag_step(m_per_px: f64) -> f64 {
+    let span = 100.0 * m_per_px / 1e-3;
+    if !(span.is_finite() && span > 0.0) {
+        return 1e-4;
+    }
+    10f64.powf(span.log10().round() - 2.0) * 1e-3
+}
 
 /// Glyph ids of "Use" links (Onshape's use glyph on projected geometry):
 /// not solver constraints but the entity's link in `SketchData::external_refs`.
@@ -4418,10 +4425,11 @@ impl SketchEditor {
                     return EditOutcome::none();
                 }
                 self.drag = Some(DragState::OffsetArrow { start, moved: true, from });
-                // The offset at the press moved by the drag along the normal, on 0.1 mm steps (live 11-18
+                // The offset at the press moved by the drag along the normal, on the manipulators' steps (live 11-18
                 // sketch-tools: 5 mm and a 27 px = 5.08 mm drag gave 10.1 mm).
                 if let Some((_, n)) = self.offset_frame(&data.sketch) {
-                    let d = ((from + (p - start).dot(n)) / OFFSET_DRAG_STEP).round() * OFFSET_DRAG_STEP;
+                    let step = drag_step(self.world_per_px);
+                    let d = ((from + (p - start).dot(n)) / step).round() * step;
                     if d.abs() > self.world_per_px {
                         self.offset_distance = d.abs();
                         self.offset_flip = ((d < 0.0) != self.offset_flip_base(&data.sketch)) != self.offset_out;
@@ -9619,6 +9627,13 @@ mod tests {
         assert!(ed.place(&mut data, end, true).changed);
         let curve = data.sketch.entities().find(|e| e.kind() == EntityKind::BSpline).unwrap().id;
         assert_eq!(data.sketch.bezier_degree(curve), Some(15));
+    }
+
+    #[test]
+    fn the_offset_arrow_steps_as_the_feature_arrows() {
+        // Live 11-18 sketch-tools at 5.31 px/mm: 0.1 mm (10.1 mm); the triad / feature rule zoomed out: 1 mm.
+        let step = |mm_per_px: f64| drag_step(mm_per_px * 1e-3) * 1e3;
+        assert!((step(1.0 / 5.31) - 0.1).abs() < 1e-12 && (step(1.0) - 1.0).abs() < 1e-12 && (step(0.0288) - 0.01).abs() < 1e-12);
     }
 
     #[test]
