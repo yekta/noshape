@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-18 07:44 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
+Updated 11-18 11:26 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
 (NOSHAPE_GATE_HOST=vibe2); Mac for crate tests, probes and speed numbers (NOSHAPE_RB_HOST=mac; vibex8 runs ~x10 slower at
 load 26); land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs on vibex7 ~/lead-private (hat8, hat15,
 hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree from a computed pid (lead 21:06):
@@ -14,13 +14,16 @@ hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree 
 - LANDING 7378bd2c (queued 06:05, alone off main): Shell's drop_clear_offset_pairs shared one FClass2d across
   threads; NCollection_Sequence::Value writes its node cache, torn -> SIGSEGV (rings-loft Shell 1 crashed 2 of 10 runs
   on the Mac, on main since 3bba9d430 11-15). One task per face now: 20/20 clean, Shell 1 217 ms as before.
-- GATE unit bool-gate-5e89c7e7b on vibe2 (07:43; vibex7's slot held it 50 min) -> /root/bool-hat-scratch/chain-5e89c7e7b.out:
-  the 13 below + 17. 5d7ea16fd offset fit cache + 18. 5e89c7e7b volume_possible's cut lower bound (v >= va - vt) and
+- GATE unit bool-gate-c390b06fa on vibex8 (lead 10:00: moved off vibe2's slot; restarted 11:19 with 19.) ->
+  /root/bool-hat-scratch/chain-c390b06fa.out: the 13 below + 17. 5d7ea16fd offset fit cache + 18. 5e89c7e7b
+  volume_possible's cut lower bound (v >= va - vt) + 19. c390b06fa project_along drops a tangent corner's sliver
+  (britatap Touch screen split 2/7/6 -> live 2/6/5, britatap 4 -> 8/22 features; T1 projection::a_line_projected_from_a_tangent_corner_is_one_curve_to_it). bool-hat
+  rebased onto main 11:3x (435e43579 top; the gated one kept as branch bool-stack-c390). And
   + 14. 05e180ea5 the Shell race fix (as 7378bd2c) + 15. 4d499486d NurbsCurve::param_of keeps its sample points per span
   run (rings-loft 51-slot cut 331fd52c 246 -> 211 ms Mac, same result) + 16. c0a72a695 Shell's add_pcurve keeps a
   surface's ShapeAnalysis_Surface per thread (impeller Shell Gehäuse 235 -> 199 ms, same result). Then private docs
   (udoc-ab8.sh c0a72a695), list relabelled / seam cases per condition (c), knurls ours-only, land, tell dx (2108c2b7-2f48-43a7-87a0-3f652e3cda6d),
-  core, blend, asm. Branch bool-shared2 (bool-hat) on main f6274d94e, 13 commits, all g++-13 OK:
+  core (e8af89fe-d460-49b3-b0bb-9572da230fed since 11-18 ~11:00), blend (0672fa20-964d-4fde-a19c-c5b4363729ba), asm. Branch bool-shared2 (bool-hat) on main f6274d94e, 13 commits, all g++-13 OK:
   17. offset_as_bspline keeps its last 32 fits (impeller Boolean 2 55 -> 35, Boolean 3 41 -> 21 ms Mac; doc's fits
   587 -> 330 ms; kernel T1 496/496).
   1-10. as before: e61278b1d usd room; 8a9351e4b shared shapes (lead conditions (a) suite identical, (b) hats/dock
@@ -49,6 +52,10 @@ hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree 
   one OCCT offset x extrusion section 135 ms of it, OCCT's walk + tolerance PSO), Boolean 1 (unify 66: usd.check 38 =
   made_valid decision, usd.volume 27 borderline-only), knife Split 4 (project_along 41). Cases Mac
   ~/noshape-host/bool-keep/{imprec,impdump,rlrec2}.
+- live's suite-truth-1118 first differences (behaviours "core + bool + skasm (lead 11-18)"): rocker-enclosure-body
+  Extrude 6 not the Boolean (ours = OCCT; the tool's hex pocket centred (-79.16, 36.16) vs live's (-77.85, 34.85): the
+  sketch/placement, skasm/core); britatap fixed (19.); parting-line Split 3: the Mac stops at Draft 1 ("Select parting
+  edges", same model files: platform), Linux run on vibe2 (.spx.sh); fan-blade #48 sent to bool2.
 - core's nut thread cut (c2-config-parts-nuts Sweep 1, vibex8 ~/agents/core-keep/nuts/nutcut{0,}.bin, Mac
   ~/noshape-host/bool-keep/nuts): the thread's crest lies on the bore (coincident, same side): ours declines, OCCT's
   wrong ((a) default options 121.40 mm3 valid, below object - tool = 131.99, main the same; (b) 157.7 invalid). Asked
