@@ -9,28 +9,30 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 23:37 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30.
+Updated 2026-11-18 00:56 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
 tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh`; drawing runs vibex8.
-- Landed 11-17 22:23: ec42bd22 (as 0cb2e893): dprops footer / headers, Styles gap, datum target panel, weld captions,
-  hole callout palette names, matrix refresh (1046/1875 =).
-- Queued on vibe2: a4502066 (Edge condition symbols, weld Seam / Spot centered joints, hatch Esc, hole callout dual
-  row; re-carries d88c2f5d / 8593c064, failed on psui's flaky part-studio test), 4014c1fd (P1: a press on a hovered
-  mate glyph is its click; the flaky a_mate_glyph_wins_… test waits for hover / result, 0/12 failures).
-- Working: drawing right-click on a leader: the note is selected but the hover stayed tan over it; the menu now drops
-  the canvas hover (drawing_tools.rs open_context_menu) + feel test
-  a_right_click_on_a_leader_selects_its_note_and_drops_the_hover. Then drw-leader-add-node / -remove-node on vibex6.
-- Still differing (table / note / leader list, in order): leader add / remove node selection, table cell-format panel
-  (drw-table-cells-*), table menus' disabled rows, ordinate add-to-group / Reset ordinate, note copy-paste menu, note
-  editor closing, sheet properties zones, view adjust linestyle rows, replicate region panel, detail-id label
-  position, section exclude-from-cut, synchronize-breaks Gap distance, simplification-absolute BOM row name, toolbar
-  Undo tip take.
-- Run when landed (vibex8): live2's drw-gtol-type-list (73a49af1), drw-hole-table-empty-tips,
-  drw-view-properties-projected-from-section, drw-view-replicate-region-place, the 8 drw-revision-* retakes.
-- Full drawing run 11-17: ~/agents/studios-keep/drw1117c and drwredo on vibex8; local /root/studios-scratch/m1117.
+- Landed 11-17: ec42bd22 22:23, a4502066 23:37 (Edge condition symbols, weld centered joints, hatch Esc, hole callout
+  dual row), 4014c1fd 23:43 (mate glyph press = its click; deterministic test).
+- To land (committed, takes checking on vibex6): 4ea1aa5d (leader right-click selects the note, Add / Remove node keep
+  it; Cell panel for ranges / merged cells as live; revision Cell panel sizes only; tables' Send to back; reader
+  emulation: lines clipped to the view box at 2 px, a hovered note not counted), 740891f7 (documents list Ctrl or Cmd
+  toggles), 7077f4c2 (VS: invalid name red / Enter nothing / Esc drops; foreign length shown in document unit; error
+  tooltip "Error regenerating." + red border), b91c30b4 (view drag alone + aligned follow on release, Esc mid-drag puts
+  back, 200 ms double-click on views, Esc mid-box nothing, Add revision callout unlit until placed).
+- Full drawing run 11-18 00:00 on vibex8 (~/agents/studios-keep/drw1118a, build before the cell / VS / feel fixes;
+  memguard pgid verified): its selection diffs came from a wider hover rule since narrowed to notes.
+- Still differing (next, in order): drw-revision-table-delete s8 (after Delete live reads Top lit, ours Front: the
+  hover-after-menu rule), ordinate add-to-group / Reset ordinate, note copy-paste menu, note editor closing, sheet
+  properties zones, view adjust linestyle rows, replicate region panel, detail-id label position, section
+  exclude-from-cut, synchronize-breaks Gap distance, simplification-absolute BOM row name, toolbar Undo tip take,
+  drw-gtol-type-list (new take: pending annotation), drw-hatch-panel s29 list highlight, vs-cfg-delete-input s4 message
+  (old take, likely pre-existing).
+- Run when landed (vibex8): live2's drw-hole-table-empty-tips, drw-view-properties-projected-from-section,
+  drw-view-replicate-region-place.
 
 ## Feel rows to take (11-17 23:3x, gaps only; check ours against each, fix with a feel test)
 - live, VS / FS editing (behaviours "Variable Studio and Feature Studio editing", live/studios/vs-fs-feel-1117/):
@@ -40,6 +42,17 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   selected. FS autocomplete: Enter inserts the snippet, Tab closes the list and inserts a tab, Esc keeps the typed
   text. FS errors while typing (<0.5 s, before saving): red x at gutter line 1 with a tooltip, squiggle on the token;
   Ctrl/Cmd+S commits, the Commit button pales; a fixed error greys ~150 ms, gone ~500 ms.
+- qa HISTFEEL (11-18, TICKETS 16b1c4255; sheet vibex6 ~/agents/qa-keep/history-feel): P1 CHANGE-CLICK (a click on a
+  change row opens nothing; live opens it with the bar "History changes are view only. Viewing <change>" [Restore to
+  Main] [Return to Main]); P1 CHANGE-BAR (Open shows an orange VIEWING HISTORY badge, no bar; live: navbar "V3", the
+  panel header only compare and x); P2 EXPANDED ("Hide changes..." vs live "15 changes"; rows 26 px white with a time vs
+  30 px grey, no time); P2 SCROLL (search / toggles / legend fixed, lines over the legend; live scrolls all but the
+  Name | Modified header, legend at the end); P2 CHANGE-TOOLTIP (none on change rows).
+- live2, Configurations (behaviours "psui + studios (lead 11-18 ~00:30, feel): Configurations", live/feel/cfg-1118/;
+  also sent to psui, who owns the Part Studio panel): row menu Switch to "X" / Set as default / Duplicate row / Move
+  up / Move down / Delete row, a plain row click doesn't switch; duplicate row names accepted (id A0, shown "A"); bad
+  cells pink + bold only once their row is active; no greyed rows on a switch, spinner after ~1.2 s. Mine: check the
+  Variable Studio configuration panel against it.
 - live, history panel (behaviours "Versions and history panel: hover, a change row, scrolling a long history",
   live/studios/history-feel-1117/): hover never previews (row tints #def1fb + tooltip; a change row's "<tab> :: Update
   feature : Extrude 1: Change by <user> at <time>"; graphics / navbar stay the workspace's). Change rows 30 px, only

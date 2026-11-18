@@ -126,3 +126,22 @@ fn compare_from_a_version_rows_menu_starts_at_once_against_the_workspace(cx: &mu
     assert_eq!(Some(target), v1_mv.map(crate::compare_mode::Side::Entry), "V1 is the target");
     assert_eq!(cx.update(|cx| doc.read(cx).session.viewing_version()), None, "the workspace stays open");
 }
+
+/// Live history-feel-1117 (qa HISTFEEL-CHANGE-CLICK): a click on a change row under an expanded version opens that
+/// change.
+#[gpui::test]
+fn a_click_on_a_change_row_opens_that_change(cx: &mut TestAppContext) {
+    let (window, view, doc) = panel(cx, "change-click");
+    let changes = bounds(cx, window, "hist-changes V2");
+    click(cx, window, changes.center(), 1);
+    assert_eq!(cx.update(|cx| view.read(cx).expanded.len()), 1, "V2's changes listed");
+    let name = cx.update(|cx| {
+        let s = &doc.read(cx).session;
+        let g = s.store.graph().expect("the graph");
+        let v2 = s.store.list_versions().expect("versions").into_iter().find(|v| v.name == "V2").expect("V2");
+        g.microversions.iter().find(|m| m.id == v2.microversion).map(|m| m.description.clone()).expect("V2's change")
+    });
+    let row = bounds(cx, window, Box::leak(format!("hist-change {name}").into_boxed_str()));
+    click(cx, window, point(row.origin.x + px(170.), row.center().y), 1);
+    assert!(cx.update(|cx| doc.read(cx).session.viewing.is_some()), "the change opened");
+}

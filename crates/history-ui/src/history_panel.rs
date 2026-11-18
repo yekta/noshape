@@ -1410,9 +1410,11 @@ impl Render for HistoryPanel {
             let (v, d, cur) = (view.clone(), doc.clone(), current_name.clone());
             let row_packages = if r.kind == RowKind::Version { listed_at.get(&mv).cloned().unwrap_or_default() } else { Vec::new() };
             let row = if pl.change {
+                let selector = format!("hist-change {}", r.name);
                 h_flex()
                     .id(SharedString::from(format!("hist-{}", r.key)))
                     .map(|d| crate::ui_script::mark(d, || format!("history_row:{}", r.name)))
+                    .debug_selector(move || selector)
                     .h(px(CHANGE_H))
                     .flex_none()
                     .cursor_pointer()
