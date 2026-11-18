@@ -177,6 +177,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    CLIs on vibe2 -> vibex7 ~/tmp/qa/apps/noshape-bis); reverted 125e4d410. After the publish: `systemd-run --unit qa-pub-0459 -E HOME=/root
    -E PATH=$PATH bash /root/qa-scratch/bin/rel-pub-all.sh 0.4.58 0.4.59 /home/ngyekta/qa-speed/bin/noshape` (the compat app = 51510232;
    check it still is), then the spot-check rows 17-24 and the hover flow. cut-must.txt: clear it for the 05:00 cut.
+2. **User-flow timings (lead 18:00)**: qa-scratch/flow: mkflow.py (block: sketch on a face / Fillet / Extrude; two-blocks: tab +
+   Fastened mate; block-drawing-empty: Insert view, base + projected placed; one file per round, the runner stops at 180 s), flow.sh
+   (frame log + lat-steps.py, flowsum.py). Unit qa-flow-night runs it in the 02:00 window after NIGHTLY-DONE on v0.4.59 (vibex7 :673)
+   -> qa-alerts. Live's Fillet / mate / drawing numbers asked of live 17:5x. DECISIONS 11-18 (user): a gap counts at >= 100 ms and
+   >= 2x on a whole user action / rebuild; a regression >= 20 % and >= 100 ms, A/B-confirmed; report spread + load; feel rows vs live.
+   Waiters: qa-wait-c031 (sketch reach), qa-heavy-wait (asm-xdev-subs v0.4.59 vs ce832447d's green), qa-pub-0459. Main RED 17:53 (psui).
 3. Suites: the qa-suites loop's next run picks the newest green (4-hourly). Compare each finished run with the previous one
    (suites/<run>/worse.txt from bin/suites-diff.py: models, scenarios, `failure`, `speed`, `newdiff`; assemblies.log
    `^asm-…: … BOM rows` and `^assemblies:`; exchange.log `exchange score` and times over live). Regressions -> owners as P0
