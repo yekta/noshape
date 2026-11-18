@@ -565,7 +565,7 @@ fn rows() -> Vec<Row> {
             let after = (state(cx), cx.update(|cx| dialog.read(cx).feature.params.enum_("endBound").to_string()));
             expect((opened, moved, after), (Some(("Blind".to_string(), true)), Some(("Up to face".to_string(), true)), (None, "BLIND".to_string())), "(highlighted, search focused) opened, after Down Down; (open, End type) after Esc")
         } },
-        Row { id: "keys / Ctrl+Enter in a value field is Enter", live: "the dialog stays open with the value applied, as plain Enter (live2 dialog-keys-1118); on macOS ours leaves the value unapplied (psui)", gap: cfg!(target_os = "macos"), check: |cx| {
+        Row { id: "keys / Ctrl+Enter in a value field is Enter", live: "the dialog stays open with the value applied, as plain Enter (live2 dialog-keys-1118)", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "dlg-ctrl-enter");
             cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
             draw(cx, window);
