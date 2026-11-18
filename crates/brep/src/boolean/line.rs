@@ -64,7 +64,34 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
         match g.g {
             Geo::Apex { .. } => continue,
             Geo::Ell { .. } => return Err(Decline("an argument's ellipse")),
-            Geo::Nurbs { .. } => return Err(Decline("a line and a curved edge")),
+            Geo::Nurbs { .. } => {
+                // (Where it comes nearest the line: from the nearest of 64 samples each side of which the distance
+                // grows, golden-section steps on the curve's parameter.)
+                const N: usize = 64;
+                let s = cx.edge_seg(e);
+                let off = |u: f64| {
+                    let q = cx.seg_at(&s, u);
+                    ((q - a) - d * (q - a).dot(d)).length()
+                };
+                let ds: Vec<f64> = (0..=N).map(|k| off(k as f64 / N as f64)).collect();
+                let reach = (0..N).map(|k| (cx.seg_at(&s, k as f64 / N as f64) - cx.seg_at(&s, (k + 1) as f64 / N as f64)).length()).fold(0.0, f64::max);
+                for k in 0..=N {
+                    if ds[k] > reach + GREY * tol || (k > 0 && ds[k - 1] < ds[k]) || (k < N && ds[k + 1] < ds[k]) {
+                        continue;
+                    }
+                    let (mut lo, mut hi) = ((k.max(1) - 1) as f64 / N as f64, ((k + 1).min(N)) as f64 / N as f64);
+                    let r = 0.5 * (5f64.sqrt() - 1.0);
+                    for _ in 0..80 {
+                        let (x1, x2) = (hi - r * (hi - lo), lo + r * (hi - lo));
+                        if off(x1) <= off(x2) {
+                            hi = x2;
+                        } else {
+                            lo = x1;
+                        }
+                    }
+                    at.push(cx.seg_at(&s, 0.5 * (lo + hi)));
+                }
+            }
             Geo::Line => {
                 let (p0, p1) = (cx.p(g.v[0]), cx.p(g.v[1]));
                 let el = (p1 - p0).length();
@@ -133,8 +160,27 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
     for &f in &sol.faces {
         let g = &cx.faces[f];
         let mut ts: Vec<f64> = Vec::new();
+        let mut uvs: Vec<DVec2> = Vec::new();
         match g.s {
-            Surf::Nurbs { .. } => return Err(Decline("a line and a curved face")),
+            Surf::Nurbs { su, sv, .. } => {
+                let Some(ns) = &g.ns else { return Err(Decline("a line and a curved face")) };
+                if !free::ray_meets(a, d, g.lo, g.hi) {
+                    continue;
+                }
+                // (Along it, a line on the surface: declined.)
+                let on = (1..8).map(|k| a + d * (len * k as f64 / 8.0)).filter(|&q| boxes_meet(q, q, g.lo, g.hi, GREY * tol) && free::whole_surface_distance(g, q) <= GREY * tol).count();
+                if on >= 2 {
+                    return Err(Decline("a line along a curved face"));
+                }
+                for (uv, t) in free::ray_hits(ns, g.patches.get_or_init(|| free::cached_grouped(g)), g.uvbox, a, d) {
+                    let dv = ns.derivs(uv.x, uv.y);
+                    if dv[1].cross(dv[2]).normalize_or_zero().dot(d).abs() < 1e-3 {
+                        return Err(Decline("a line grazing a curved face"));
+                    }
+                    ts.push(t);
+                    uvs.push(DVec2::new(uv.x * su, uv.y * sv));
+                }
+            }
             Surf::Plane { n, d: dn, .. } => {
                 let den = n.dot(d);
                 let dist = dn - n.dot(a);
@@ -184,7 +230,15 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
                 ts.retain(|&t| r0 + k * (h + t * dz) > -tol);
             }
         }
-        for t in ts {
+        // (On a free-form face whose parameters go round: its crossing a whole turn over too, as for rays.)
+        let turns: Vec<DVec2> = match (&g.s, g.ns.as_deref()) {
+            (Surf::Nurbs { su, sv, .. }, Some(ns)) => {
+                let [pu, pv] = ns.periodic();
+                [(pu, DVec2::new(TAU * su, 0.0)), (pv, DVec2::new(0.0, TAU * sv))].into_iter().filter(|x| x.0).map(|x| x.1).collect()
+            }
+            _ => Vec::new(),
+        };
+        for (k, t) in ts.into_iter().enumerate() {
             if t < -GREY * tol || t > len + GREY * tol {
                 continue;
             }
@@ -192,8 +246,11 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
             if !boxes_meet(q, q, g.lo, g.hi, GREY * tol) {
                 continue;
             }
-            let q2 = g.to2(q);
             let bound = cx.bound(f)?;
+            let q2 = match uvs.get(k) {
+                Some(&q0) => std::iter::once(q0).chain(turns.iter().flat_map(|&w| [q0 + w, q0 - w])).find(|&x| inside2(x, bound)).unwrap_or(q0),
+                None => g.to2(q),
+            };
             if distance2(q2, bound) <= GREY * tol {
                 // On its boundary: an edge or vertex has it.
                 if !cuts.iter().any(|c| !matches!(c.1, At::Face(_)) && (c.0 - t).abs() <= GREY * tol) {

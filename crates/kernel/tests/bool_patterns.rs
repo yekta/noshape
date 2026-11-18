@@ -3050,3 +3050,10 @@ fn a_circle_grazing_a_thread_run_out_edge_is_cut_where_it_crosses_it() {
 fn a_thread_root_strip_on_a_bore_split_at_its_seam_each_turn() {
     recorded_as_occt("2a11cb1bac0e81cd", 2e-6);
 }
+
+/// A line's common with a solid bounded by B-spline faces and edges (recorded; OCCT's 21 ms): the line's pieces in it,
+/// where it crosses those faces, as OCCT's (one edge); it declined "a line and a curved edge".
+#[test]
+fn a_line_through_a_free_form_solid_is_cut_as_occt() {
+    recorded_as_occt("091cf0f95b46fa8a", 1e-9);
+}
