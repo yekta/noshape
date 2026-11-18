@@ -491,6 +491,9 @@ pub struct Viewport {
     pub fit_inset_left: f64,
     /// The box being dragged: press point, pointer, crossing.
     box_rect: Option<(DVec2, DVec2, bool)>,
+    /// A box released without a pick ([`Self::box_by_pick`] off), still drawn until a frame submitted after its frame
+    /// `.3` is presented: the selection comes up as the box goes, never a frame of neither (live recheck 5c922906).
+    box_held: Option<(DVec2, DVec2, bool, u64)>,
     anim: Option<CameraAnimation>,
     /// Onshape's canvas view tag for constrained rotate
     /// (`data-view-shown` = `axisRotateCanvasTag`): the view has been levelled
@@ -763,6 +766,7 @@ impl Viewport {
             fit_bounds: None,
             fit_inset_left: 0.0,
             box_rect: None,
+            box_held: None,
             anim: None,
             axis_tag: AxisTag::None,
             _frames: frames,
@@ -980,6 +984,11 @@ impl Viewport {
     /// Always deferred: GPUI ignores `notify` during a window draw (the view
     /// is marked dirty but no redraw is scheduled), so notifying here could
     /// leave a stale frame on screen until the mouse moves.
+    /// A box is drawn: being dragged, or released and waiting for the frame with its selection.
+    pub fn box_shown(&self) -> bool {
+        self.box_rect.is_some() || self.box_held.is_some()
+    }
+
     pub fn request_frame(&mut self, cx: &mut Context<Self>) {
         self.dirty = true;
         if !self.submit_scheduled {
@@ -1603,6 +1612,10 @@ impl Viewport {
             return;
         }
         self.last_presented = seq;
+        if self.box_held.is_some_and(|h| seq > h.3) {
+            self.box_held = None;
+            cx.notify();
+        }
         if let Some(b) = &mut self.bench
             && let Some((t, Some(need))) = b.click
             && seq >= need
@@ -2321,6 +2334,7 @@ impl Viewport {
             crate::nav_trace::input("mouse_down", serde_json::json!({ "at": [local.x, local.y], "debug": format!("{e:?}") }));
         }
         let p = self.local(e.position);
+        self.box_held = None;
         self.buttons.set(e.button, true);
         cx.stop_propagation();
         // A real mouse press: no touch is in progress (the platforms don't
@@ -2586,7 +2600,13 @@ impl Viewport {
             Drag::Pending(MouseButton::Right) if menu => self.context_menu_at(p, e.position, cx),
             Drag::Box => {
                 if let Some((a, b, crossing)) = self.box_rect.take() {
+                    let held = !self.box_by_pick && !self.zoom_window;
+                    // After the event: its owner's new selection is in the frame this asks for.
                     self.finish_box(a, b, crossing, e.modifiers, cx);
+                    if held {
+                        self.box_held = Some((a, b, crossing, self.seq));
+                        self.request_frame(cx);
+                    }
                 }
             }
             Drag::Tool => cx.emit(ViewportEvent::ToolUp { position: p, modifiers: e.modifiers }),
@@ -3162,7 +3182,7 @@ impl Render for Viewport {
         self.submit_if_ready(cx);
 
         let entity = cx.entity();
-        let box_rect = self.box_rect.map(|(a, b, crossing)| (a, b, if self.zoom_window { BoxStyle::Zoom } else if crossing { BoxStyle::Crossing } else { BoxStyle::Window }));
+        let box_rect = self.box_rect.or(self.box_held.map(|(a, b, crossing, _)| (a, b, crossing))).map(|(a, b, crossing)| (a, b, if self.zoom_window { BoxStyle::Zoom } else if crossing { BoxStyle::Crossing } else { BoxStyle::Window }));
         let image = self.image.clone();
         let texture_id = self.texture_id;
         self.rendered = self.shown_texture.as_ref().map(|t| (self.camera, (t.width, t.height)));

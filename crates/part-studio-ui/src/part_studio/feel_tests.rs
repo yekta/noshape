@@ -604,6 +604,19 @@ fn a_box_drag_lights_nothing_and_selects_at_release(cx: &mut TestAppContext) {
     if n != 18 {
         wrong.push(format!("released: {n} selected at once, want live's 18 (6 faces, 12 edges)"));
     }
+    // The box stays until the frame with the selection is up, then goes (live recheck 5c922906: ours showed frames
+    // with neither).
+    let shown = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).viewport.read(cx).box_shown());
+    if !shown(cx) {
+        wrong.push("released: the box went before a frame with the selection".into());
+    }
+    let t = std::time::Instant::now();
+    while shown(cx) && t.elapsed() < std::time::Duration::from_secs(15) {
+        pointer.frames(cx, &view);
+    }
+    if shown(cx) {
+        wrong.push("the box stayed after frames with the selection".into());
+    }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
