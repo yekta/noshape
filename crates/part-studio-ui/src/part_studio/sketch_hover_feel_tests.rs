@@ -436,6 +436,7 @@ fn sketch_lines_and_points_light_as_live(cx: &mut TestAppContext) {
         cx.update_window(window, |_, w, _| w.remove_window()).unwrap();
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
 
 /// qa 11-18 SELFEEL-DBLCLICK-FACE-SKETCH (live2 11-17 sel-feel row 3), through the real pointer and the GPU's pick: a
 /// part's top face double-clicked draws its feature's hidden sketch at the part's base (its curves in the scene) while
