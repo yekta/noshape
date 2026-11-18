@@ -7787,13 +7787,14 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
     }
     let mut free: Vec<&PartState> = ours.iter().collect();
     for l in live {
-        // Ours for live's: the same volume (within 1e-6: a pattern's
-        // instances tie), then the nearest box.
+        // Ours for live's: a body of its kind (a sweep's sheet lies along its path's wire, both of no volume:
+        // c2-surf-workshop-manualblend's Sweep 2), the same volume (within 1e-6: a pattern's instances tie), then the
+        // nearest box.
         let d = |p: &PartState| {
             let (a, b) = (p.volume.unwrap_or(0.0), l.volume.unwrap_or(0.0));
             let volume = (a - b).abs() / b.abs().max(1e-12);
             let apart = p.bbox.zip(l.bbox).map_or(0.0, |(x, y)| (0..2).flat_map(|c| (0..3).map(move |i| (x[c][i] - y[c][i]).powi(2))).sum::<f64>().sqrt());
-            (if volume < 1e-6 { 0.0 } else { volume }, apart)
+            (if p.body_type == l.body_type { 0.0 } else { 1.0 }, if volume < 1e-6 { 0.0 } else { volume }, apart)
         };
         let Some(i) = (0..free.len()).min_by(|a, b| d(free[*a]).partial_cmp(&d(free[*b])).unwrap_or(std::cmp::Ordering::Equal)) else {
             continue;

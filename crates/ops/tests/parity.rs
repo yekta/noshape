@@ -340,6 +340,18 @@ fn carry_volume_bands(banded: &mut HashMap<String, (f64, [f64; 2])>, mut parts: 
     parts
 }
 
+/// Live's wire is compared with our wire, not with the sheet swept along it nearer its box (c2-surf-workshop-manualblend's
+/// Sweep 2: our sheet was reported as live's "Curve 2", our wire as its "Surface 3").
+#[test]
+fn a_wire_pairs_with_our_wire_before_a_sheet_beside_it() {
+    let body = |name: &str, kind: &str, faces: u64, lo: f64| PartState { name: name.into(), body_type: kind.into(), faces, bbox: Some([[lo, 0.0, 0.0], [lo + 0.03, 0.2, 0.03]]), ..Default::default() };
+    let live = [body("Curve 2", "wire", 0, -0.069), body("Surface 3", "sheet", 1, -0.061)];
+    let ours = [body("Curve 2", "wire", 0, -0.09), body("Surface 3", "sheet", 1, -0.061)];
+    let diff = differences(&live, &ours);
+    assert!(diff.iter().all(|d| !d.contains("a sheet body") && !d.contains("a wire body")), "{diff:?}");
+    assert!(diff.iter().any(|d| d.starts_with("\"Curve 2\": box")), "the wire's own difference: {diff:?}");
+}
+
 #[test]
 fn a_volume_band_holds_while_lives_volume_stays() {
     let part = |v: f64, band: Option<[f64; 2]>| PartState { name: "Part 1".into(), volume: Some(v), volume_band: band, ..Default::default() };
