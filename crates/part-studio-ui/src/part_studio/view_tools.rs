@@ -454,7 +454,7 @@ impl PartStudioView {
             to.rotation = glam::DQuat::from_array(v.rotation).normalize();
             to.distance = v.distance;
             to.projection = if v.perspective { noshape_render::Projection::Perspective } else { noshape_render::Projection::Orthographic };
-            vp.animate_to(to, cx);
+            vp.animate_to_named_view(to, cx);
         });
     }
 

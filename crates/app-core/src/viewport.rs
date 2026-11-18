@@ -1085,6 +1085,12 @@ impl Viewport {
         self.animate_to(to, cx);
     }
 
+    /// A named view restored: 250 ms, animated at any frame rate (live2 view-tools ours-1118: three frames over ~240 ms
+    /// on a software GPU, where the view cube's and Shift views jump).
+    pub fn animate_to_named_view(&mut self, to: Camera, cx: &mut Context<Self>) {
+        self.animate_from(to, nav::CAMERA_SHORT_ANIMATION, (self.clock)(), cx);
+    }
+
     pub fn animate_to(&mut self, to: Camera, cx: &mut Context<Self>) {
         // Live (behaviours.md "N"): Onshape's view changes take about half a
         // second (`CAMERA_LONG_ANIMATION_TIME_MS`).
@@ -1108,6 +1114,7 @@ impl Viewport {
 
     /// Animate to `to` over `duration` with Onshape's easing (smootherstep).
     pub fn animate_to_with(&mut self, to: Camera, duration: Duration, cx: &mut Context<Self>) {
+        let duration = nav::view_change_duration(duration, &self.frame_timer);
         self.animate_from(to, duration, (self.clock)(), cx);
     }
 
@@ -1119,7 +1126,6 @@ impl Viewport {
         }
         self.inertia = None;
         self.axis_tag = AxisTag::None;
-        let duration = nav::view_change_duration(duration, &self.frame_timer);
         self.anim = Some(CameraAnimation { from: self.camera, to, start, duration });
         self.dirty = true;
         cx.notify();
@@ -2244,6 +2250,7 @@ impl Viewport {
                 true
             }
             (level, Some(duration)) => {
+                let duration = nav::view_change_duration(duration, &self.frame_timer);
                 self.animate_from(level, duration, at, cx);
                 self.axis_tag = AxisTag::Levelling;
                 false

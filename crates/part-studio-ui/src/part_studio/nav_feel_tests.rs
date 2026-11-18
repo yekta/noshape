@@ -388,6 +388,14 @@ fn rows() -> Vec<Row> {
             }
             Ok(())
         } },
+        Row { id: "named views panel: a restore animates 250 ms", live: "three frames over ~240 ms on a software GPU, where the cube's and Shift views jump (live2 view-tools ours-1118)", gap: false, check: |n, cx| {
+            n.reset(cx);
+            let mut to = n.cam(cx);
+            to.rotation = glam::DQuat::from_rotation_z(0.5) * to.rotation;
+            cx.update(|cx| n.vp.update(cx, |v, cx| v.animate_to_named_view(to, cx)));
+            let (_, d) = cx.update(|cx| n.vp.read(cx).animation()).ok_or("no animation")?;
+            near(d.as_millis() as f64, 250., 0.5, "a restore's ms")
+        } },
         Row { id: "keys / Shift+1..7: the named views", live: "direction / up: Front (0,1,0)/+Z, Back (0,-1,0)/+Z, Left (1,0,0)/+Z, Right (-1,0,0)/+Z, Top (0,0,-1)/+Y, Bottom (0,0,1)/-Y, Shift+7 isometric", gap: false, check: |n, cx| {
             let want = [
                 ("shift-1", DVec3::Y, DVec3::Z),
