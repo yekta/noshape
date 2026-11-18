@@ -82,9 +82,9 @@ Our solver keeps links' waist arcs on live's branch (probe /root/skasm-scratch/p
   Layout moved), and live re-solves it onto JPg. With no sketches.json for that document, the translator takes the
   move back ("moved the geometry by up to 18.798 mm ... taken back"), so our tube runs 18.8 mm off live's. A solve
   that lands an external COINCIDENT exactly on live's recorded refs point could count as `closer`.
-- c2-surf-workshop-manualblend Sweep 2 (11/19): Sketch 5's circle (the profile, on Plane 3) has its CONCENTRIC
-  rejected ("constraints left to the solved geometry: 1 CONCENTRIC rejected"), so it stays where stored, ~100 mm
-  from the path (our Curve 2 matches live's); our swept surface lands at x 67–95 mm, live's at −61…−26.
+- c2-surf-workshop-manualblend Sweep 2 (11/19): Sketch 5's CONCENTRIC to vertex JNE now kept (anchors_off counts a
+  CONCENTRIC in the plane, within 10 µm when the stored was 0.1 mm+ off); our sweep now lies where live's does (x
+  −60.9…−26.3), but it takes the path's name "Curve 2" and the wire becomes "Surface 3": Sweep's body identity (core).
 - c2-sm-rocker-enclosure-body Extrude 6 (15/28): Sketch 6's solve is taken back ("COINCIDENT on
   R4oICkWq6xtC.cCircle.center, oKC7s6ob7uli.0.center by 1.974 mm"; also "CIRCULAR_PATTERN: the instances aren't
   copies of the seeds"), so our hexagon-and-lines stays as stored: one region of 107.106 mm² where live has two
