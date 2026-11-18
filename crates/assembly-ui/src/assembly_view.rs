@@ -2769,8 +2769,11 @@ impl AssemblyView {
         // Shift (lock mate inference) keeps the current entity's points while
         // the cursor moves elsewhere; the nearest one is chosen.
         let locked = self.infer_locked && self.infer.is_some();
+        let mut entered = false;
         if !locked {
             let Some(h) = self.hover.clone() else {
+                // (Off it, so coming back is entering again.)
+                self.infer = None;
                 self.infer_choice = None;
                 return old.is_some();
             };
@@ -2780,6 +2783,7 @@ impl AssemblyView {
                 let cands = self.result.occurrences.get(h.occ).map(|o| inference_candidates(&o.context, Some(&o.body), &h.reference, &units)).unwrap_or_default();
                 self.infer = Some((key, h.occ, cands));
                 self.infer_choice = None;
+                entered = true;
             }
         }
         let Some((key, occ, cands)) = &self.infer else { return false };
@@ -2810,7 +2814,12 @@ impl AssemblyView {
             _ => false,
         };
         if !locked && matches!(key.1, Reference::Face(_) | Reference::Edge(_)) && cands.first().is_some_and(|c| primary(&c.reference)) {
-            let near = if matches!(key.1, Reference::Face(_)) { in_square } else { best.filter(|&(_, d)| d <= EDGE_END_PICK_RADIUS_PX) };
+            // (Entering a face, the centroid; its dots from the next move on: live2 place-1118 21:05.)
+            let near = match key.1 {
+                Reference::Face(_) if entered => None,
+                Reference::Face(_) => in_square,
+                _ => best.filter(|&(_, d)| d <= EDGE_END_PICK_RADIUS_PX),
+            };
             self.infer_choice = Some(near.map_or(0, |b| b.0));
             return old != self.infer_choice;
         }

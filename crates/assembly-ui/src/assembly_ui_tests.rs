@@ -1130,6 +1130,14 @@ fn a_faces_connector_takes_a_dot_within_a_48_px_square_else_its_centroid(cx: &mu
             v.pointer = at(v, corner, cx) + glam::DVec2::new(3.0, 3.0);
             v.update_inference(cx);
             assert!(matches!(cands[v.infer_choice.expect("a choice")].reference, Reference::Implicit { inference: Inference::Vertex, .. }), "the corner 3 px away");
+            // Entering the face there: the centroid first, the corner on the next move (live2 place-1118 21:05).
+            v.hover = None;
+            v.update_inference(cx);
+            v.hover = Some(AsmPickTarget { path: vec![id], reference: (**on).clone(), kind: PickKind::Face, occ, anchor: None });
+            v.update_inference(cx);
+            assert_eq!(v.infer_choice, Some(0), "entering: the centroid");
+            v.update_inference(cx);
+            assert!(matches!(cands[v.infer_choice.expect("a choice")].reference, Reference::Implicit { inference: Inference::Vertex, .. }), "the next move: the corner");
             let corner_ix = cands.iter().position(|c| c.frame.origin == corner).unwrap();
             for (off, kept) in [((25.0, 46.0), true), ((47.0, 40.0), true), ((26.0, 48.0), false), ((49.0, 42.0), false)] {
                 v.pointer = at(v, corner, cx) + glam::DVec2::from(off);
