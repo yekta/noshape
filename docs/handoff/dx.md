@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-17 22:51 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-18 00:37 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -179,13 +179,31 @@ Open, ranked:
   stack-buffer-overflow in work_step under mesh_prepare; the crash guard's longjmp skipped ScopedWork's destructor),
   5015b2e95 / 40a03567d / 8cf411708 x_t mesh export 28.1+ (MESH + .xmm_txt, "minimum version 2801000", <28.1 refused),
   PART_XMT_BLOCK per version (live2: ours at 25.0 / 28.1 / 30.0 / 38.1 import as live's own).
-- Queued now via vibe2 (branch dx-land-stack): 6151d88cd suite (IGES/ACIS drop mesh parts), 2 mrad ACIS guard,
+- Landed 11-17 23:13 (18150e9a): 6151d88cd suite (IGES/ACIS drop mesh parts), 2 mrad ACIS guard,
   LIVE_MESH_SHEETS + PARITY-SUITES note, suite part renames, Parasolid import B-surface -> analytic (cone as live;
   only surfaces just faces / intersections use). Proof: exchange suite A/B on vibex6 (A = main + t_work/x_t, B = the
   stack; logs vibex6 ~/agents/dx-keep/exch-{mainA,fix2}.log, /root/dx-scratch/bin/exdiff.py): ours imports live's
   109 -> 114/130, ours reads ours 148/154 both; only bottle-split / duct-multipart mesh rows, hex-bookcase IGES/SAT
   and hose 0.524m SAT (12/12/0 as live) differ; 0 crashes in 4 full-suite runs and 3 first-six reruns. A first B
   had cf-snap-hook x_t reading back as no parts (offset surface over a converted base): fixed (cbe833343).
+- DXF rows (lead 23:0x), exchange suite drawings 0/10 (vibex6 exch-dxf / exch-fix2 logs, /root/dx-scratch/bin/
+  dxflayercount.py, dxfanntext.py, dxfents.py, dxfsheet.py (two DXFs side by side), hlrplot.py / hlrgrid.py).
+  Landed 00:47 as 5076e98c: empty view-label MTEXT for base / pictorial views off 1:1, no centermark on tangent-only
+  circles, mesh parts out of HLR (crash). Committed in dx-land (46d2c427d, to queue after its proof): mesh parts drawn
+  as live, silhouettes only (live2 q-mesh-drawing: hex-bookcase "imported" alone and the rings Iso show no folds between
+  facets toward the viewer, not even 90 deg: the far half of a hole rim), edge-on facets count as away (MESH_FACING);
+  a B-rep edge glimpsed past mesh facet corners (piece < deflection of a longer edge) dropped; no centermark on a
+  wholly hidden circle; on_conic: ends meeting make a whole circle only past half its length. hex-bookcase now
+  0 CIRCLE / 0 ELLIPSE / 212 LINE / 15 LWPOLYLINE for live's 0 / 2 / 206 / 25. Open: live splits each silhouette loop
+  into ~4 open LWPOLYLINEs at its extremes (ours one per loop; rule unknown), live's 2 Iso ELLIPSEs are B-rep hole rim
+  quarters seen inside the mesh hole (ours hidden: our mesh hole is a polygon inside the true circle). Proof running
+  vibex8 unit dx-mesh2 (~/agents/dx-keep/mesh2.sh: full ops e2e, then the exchange suite; mesh2.out, exch-mesh2.log;
+  baseline drawing rows: exch-fix2 on vibex6).
+  Next: faceblend CENTERMARKS (maybe the hidden-circle rule fixes it), per-document entity counts (archive notes).
+- Queued for later (live 11-18, behaviours "studios + dx (lead 11-18, P0 feel)", live/studios/docs-import-feel-1118/):
+  Import into a document feel: + > Import... opens the OS picker at once (multi), 400 px "Import to Onshape" modal with
+  focus on [Import], folder tab "CAD Imports" at the end at 1.8 s, the Part Studio tab at 6.9 s, active tab unchanged,
+  blue progress bar under the bell, toast "<file> has been imported. Open document x" at 10.1 s for ~5 s.
 - config-parts at live's 18:0x retake: 4/6 to the end (143/156); nuts Sweep 1: core; pulleys Circular pattern 1:
   core's 06ecaff5a (refs are live's); standoffs Threads=true time: bool2 (profile vibex8
   ~/agents/dx-keep/stoff-prof.log).
