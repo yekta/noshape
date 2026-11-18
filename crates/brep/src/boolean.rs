@@ -2980,7 +2980,13 @@ impl Ctx<'_> {
                 if matches!(self.faces[g].s, Surf::Nurbs { .. }) && !boxes_meet(p, p, lo, hi, tol) {
                     continue;
                 }
-                if free::whole_surface_distance_first(&self.faces[g], p) > tol {
+                let gf = &self.faces[g];
+                // (By its patches' boxes first where its distance is measured on the face's patch of it, not on a
+                // whole torus or sphere.)
+                let off = matches!(gf.s, Surf::Nurbs { .. })
+                    && gf.ns.as_deref().is_some_and(|ns| !matches!(ns, FreeSurface::Torus { .. } | FreeSurface::Sphere { .. }))
+                    && free::off_patches(gf.patches.get_or_init(|| free::cached_grouped(gf)), p, tol);
+                if off || free::whole_surface_distance_first(gf, p) > tol {
                     return self.lies_on(fs, ft) || self.lies_on(ft, fs);
                 }
                 n += 1;

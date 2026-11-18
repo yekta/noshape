@@ -773,6 +773,14 @@ pub(super) fn whole_surface_distance(g: &GFace, p: DVec3) -> f64 {
     }
 }
 
+/// Whether `p` lies farther than `d` from every one of a free-form face's patches' boxes (which hold its surface over
+/// the face's parameter box): off that surface there, found without projecting `p` on it (none for a face without
+/// patches).
+pub(super) fn off_patches(patches: &Patches, p: DVec3, d: f64) -> bool {
+    let far = |lo: DVec3, hi: DVec3| (p - p.clamp(lo, hi)).length() > d;
+    !patches.all.is_empty() && patches.groups.iter().enumerate().all(|(k, b)| far(b.0, b.1) || patches.all[k * GROUP..((k + 1) * GROUP).min(patches.all.len())].iter().all(|x| far(x.lo, x.hi)))
+}
+
 /// [`whole_surface_distance`] by a free-form face's point found from its nearest sample alone ([`GFace::uv_first`]):
 /// whether a face's samples lie on another's surface (a knurl's blank against its grooves: the turn retry of
 /// [`GFace::uv_of`] took a third of its Boolean there).
