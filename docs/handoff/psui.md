@@ -1,13 +1,12 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-18 07:35 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-18 07:55 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
 
 - Worktree /root/projects/noshape-wt/psui, branch agent/psui. Commit as yekta (AGENTS.md), subject "psui: …".
-- Builds and crate tests: the Mac slot only, `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh cargo …` (one slot, rb.sh waits).
-  Never cargo on this machine. Test the crate you changed (`--lib <module>::` or `--test all <file>::`).
+- Builds and crate tests: `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh bash -c '~/bin/slot …'` (Mac for Mac-only checks).
 - Scenario / app runs: vibex6, at most 3 app instances (shared with studios). Heavy runs (scenario shards) through
   `~/bin/slot <cmd>` there (one per host, waits for 10 GB free). The app build there OOMs under load: scripts build
   with `-j 4`.
@@ -18,8 +17,6 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Private documents: work on a mode-700 copy in ~/tmp, delete it after.
 - GPUI tests: platform keys as "secondary-…"; marks (`ui_script::mark`) only record while a scenario runs, so tests
   find controls by `debug_selector`.
-- Xvfb app runs: `xdotool windowfocus <w>` after start (no WM: no focus, no blur commits).
-- UI tests: `NOSHAPE_CONFIG_DIR=$(mktemp -d)` keeps them off the shared ~/.config/noshape.
 - psui owns docs/parity/interaction-feel.md (the feel matrices; all matched as of 11-15): keep it current.
 - A new menu label needs its line in crates/ops/src/coverage.rs (`cargo test -p noshape-ops --test all coverage::`).
 
@@ -34,7 +31,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
-- vibex6 can't reach vibe5: `scp -3`. vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
+- vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
 ## In flight
 
@@ -95,12 +92,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - live's timings (11-17, live/psui/timings-1117, SwiftShader lanes): click → selected face drawn 57–67 ms (ours 8.5),
   "Area" readout 167–185 ms; Extrude 1 double-click → dialog 322–448 ms (ours 17), preview 0.73–2.2 s. Put into the
   latency test's TARGETS comments when next touched.
-- Landed 11-17 09:54: 498b96a8 (leak fixes + NOSHAPE_SOAK + spawn_guard allow).
 - The Mac's one build slot can hold a test 10+ min: for a quick single test use NOSHAPE_RB_HOST=vibex6.
-
-## State 11-18 00:2x (summary)
-- Closed: USER-HOVER-STAYS-LIT (qa verified on 7187ac75); feature-list batch, undo/redo keys, wheel / animation times,
-  part rows Ctrl or Cmd all as live. Left: live2's (b) Ctrl-only box deselect (ours Ctrl or Cmd; live's Cmd unverified).
 
 ## 11-18 02:17
 - Landed today: feature-list rows, graphics menus over a selection, measure angles toward middles (confirmed by live2's
@@ -140,13 +132,22 @@ docs/DECISIONS.md (read first; it wins over anything here).
   a_list_scrolled_under_a_still_drag_drops_at_its_line (drops at the slot, live2 fl-autoscroll-1118; fixed).
 - 07:35: landing the list's own row double-click (same row within 400 ms, anywhere on it: live2 consts-1118 pinned) and
   a test for the new feature's row while its dialog is open (live workflow-1118). FEEL-FL-AUTOSCROLL-DROP verified by qa.
-- In progress: hover-time-1118 (patch /root/psui-scratch/pick-on-move2.patch: `Viewport::pick_on_move` only with a sketch
-  tool, move and pick times on the executor clock, glyph boxes take the hover). Blocker: sketch_box
-  midpoint_glyph_and_plane_clicks fails ~1 in 3 full runs: on the way to a glyph the editor's own hit test
-  (`pointer_move` → `apply_outcome`) lights the line under the row, whose `glyph_entity` replaces the first line's
-  lingering row (one slot). Next: keep a lingering row while another line is crossed (or two slots), then land.
-- Next: the audit's missing P0 rows (manipulator arrow drag: nothing lit, Depth focused; sel-feel box drag / relations;
-  hover-pick-1120 connector reach; measure-mass panel place / add-remove / no summary).
+- 07:43 landed 850ae7f3 (row double-click by time, new-feature row test).
+- 07:55 in the worktree (lead 07:4x order: hover, then the audit's P0 rows): `Viewport::pick_on_move` (set by
+  `push_tool_cursor` / `set_tool` while a sketch tool is active; the delay no longer reads `tool_captures_left`, so a
+  plane ring and assembly parts keep the pause); viewport move / pick times on the executor clock. Glyph rows: the
+  glyphs drawn last frame (`ui.glyph_boxes`) take the hover from the geometry under them, gaps between a row's glyphs
+  too (`glyph_under`): the flake was a row placed near a corner, over the other line, whose hover replaced the first
+  line's lingering row. New tests: only_a_sketch_tool_picks_on_every_move, glyph test "nothing else lit",
+  a_box_drag_lights_nothing_and_selects_at_release, a_plane_lights_6_px_past_its_edge_and_not_8, list row "click / a
+  face or edge … relates", mass_hides_the_summary_…, dialogs row "manipulators / an arrow drag lights nothing; Depth
+  has the keyboard". FEEL-FAST-OFF-CLEAR: the clear itself is at the first move off the face's pick (40 px cache); the
+  0-40 ms is the frame (refresh_scene + llvmpipe render): measure `ps.refresh_scene` with NOSHAPE_PERF next.
+- live 11-18 key parity: Sketch tooltip "Create new sketch (shift+s)" (`tool_tooltip`, test), Tab manager "Tab manager
+  (alt/⌥+t)". Plane reach: ours passes 6 px but lights at 8 across iso's slanted edges (5 px pick square + 5 px border
+  band; live 8 → nothing; live's older 3d.json level border 7–8): a pick-shape change touches every reach matrix, open.
+- Next: the audit's other P0 rows (hover-pick-1120 connector reach 22/13 px (test written, first run pending); sel-feel two-block counts, region relates
+  only its sketch; measure-mass panel place 440×521; nav Ctrl+wheel / pinch; manip Ctrl / Alt, triad drag look).
 
 ## Next queue
 0. First-pick test back to T1 (05:01): CI 44210027702 failed the old one-delivery version (its line 214), not the

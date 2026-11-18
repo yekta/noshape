@@ -428,3 +428,39 @@ fn a_clicked_mass_value_toggles_the_highest_precision(cx: &mut TestAppContext) {
     let state = cx.update(|cx| b.view.read(cx).ui.mass_state.clone());
     assert!(precise.0 > before.0 && precise.0 <= 8 && back == before, "the volume: {before:?}, clicked {precise:?}, again {back:?} (state {state:?})");
 }
+
+/// live2 measure-mass-1118: while Mass properties is open the bottom-right summary is gone, a click on empty graphics
+/// keeps the measured parts, and Esc closes the panel keeping the selection.
+#[gpui::test]
+fn mass_hides_the_summary_keeps_its_parts_on_an_empty_click_and_esc_keeps_the_selection(cx: &mut TestAppContext) {
+    let b = Bench::open(cx, "mass-open", 1.0);
+    // A vertex's summary ("Point: …") with the panel closed, none with it open.
+    let before = b.readout(cx, &[V40], &[]).unwrap();
+    cx.update(|cx| b.view.update(cx, |v, cx| v.open_mass(cx)));
+    let open_rows = b.readout(cx, &[V40], &[]).unwrap();
+    assert!(!before.is_empty() && open_rows.is_empty(), "a vertex's summary, the panel closed: {before:?}; open: {open_rows:?}");
+    let parts = vec![b.reference(cx, E::Part("Part 1")).unwrap(), b.reference(cx, E::Part("Part 2")).unwrap()];
+    cx.update(|cx| b.view.update(cx, |v, cx| {
+        v.selection = parts.clone();
+        v.refresh_scene(false, cx);
+    }));
+    draw(cx, b.window);
+    let state = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = b.view.read(cx);
+        (v.show_mass, v.selection.len(), v.ui.measure_readout.len())
+    });
+    let open = state(cx);
+    cx.update_window(b.window, |_, w, cx| b.view.update(cx, |v, cx| {
+        let vp = v.viewport.clone();
+        v.on_viewport_event(&vp, &ViewportEvent::Click { pick: None, position: glam::DVec2::new(40., 40.), modifiers: Modifiers::default() }, w, cx);
+    }))
+    .unwrap();
+    draw(cx, b.window);
+    let clicked = state(cx);
+    let focus = cx.update(|cx| b.view.read(cx).focus.clone());
+    cx.update_window(b.window, |_, w, cx| w.focus(&focus, cx)).unwrap();
+    gpui_kit::VisualTestContext::from_window(b.window, cx).simulate_keystrokes("escape");
+    draw(cx, b.window);
+    let closed = state(cx);
+    assert_eq!((open, clicked, (closed.0, closed.1)), ((true, 2, 0), (true, 2, 0), (false, 2)), "(Mass open, selected, summary rows) when opened, after an empty click; (open, selected) after Esc");
+}

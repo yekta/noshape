@@ -636,6 +636,47 @@ fn rows() -> Vec<Row> {
             let want_back = vec![Some("analysis"), Some("measure"), Some("graphics")];
             expect((start, forward, back, pinned, mass), (Some("graphics"), want_forward, want_back, true, true), "(focus after the click, after each Tab, after each Shift+Tab from Mass, Measure pinned by Space, Mass open by Enter)")
         } },
+        Row { id: "click / a face or edge in the graphics relates its feature and part rows", live: "the face's (edge's) feature row and its part's row related rgb(236,240,244), neither selected (live2 11-17 sel-feel)", gap: false, check: |l, cx| {
+            let mut got = Vec::new();
+            for edge in [false, true] {
+                l.keys(cx, "space");
+                cx.update_window(l.window, |_, w, cx| l.view.update(cx, |v, cx| {
+                    let b = v.display.bodies.iter().find(|b| b.name == "Part 1").unwrap();
+                    let r = if edge { b.edge_refs.first().cloned() } else { b.face_refs.first().cloned() };
+                    let pick = r.and_then(|r| v.built.as_ref().and_then(|bt| bt.picks.ids_for(&r).first().copied()));
+                    let vp = v.viewport.clone();
+                    v.on_viewport_event(&vp, &ViewportEvent::Click { pick, position: glam::DVec2::new(500., 300.), modifiers: NONE }, w, cx);
+                }))
+                .unwrap();
+                draw(cx, l.window);
+                got.push(cx.update(|cx| {
+                    let v = l.view.read(cx);
+                    let b = v.display.bodies.iter().find(|b| b.name == "Part 1").cloned().unwrap();
+                    let mut related: Vec<String> = v.studio(cx).map(|s| s.features.iter().filter(|f| v.row_ctx.related.contains(&f.id)).map(|f| f.name.clone()).collect()).unwrap_or_default();
+                    related.sort();
+                    (v.selection.len(), v.selected_features.len(), related, v.part_row_flags(&b, cx))
+                }));
+            }
+            let want = (1, 0, names(&["Extrude 1"]), (false, true));
+            expect(got, vec![want.clone(), want], "(selected in the graphics, rows selected, rows related, Part 1's row (selected, related)) after a face's click, an edge's")
+        } },
+        Row { id: "click / a sketch region relates only its sketch", live: "Sketch 1's row related, not the Extrude that used it nor the part on it; no row selected (live2 11-17 sel-feel)", gap: false, check: |l, cx| {
+            l.keys(cx, "space");
+            cx.update(|cx| l.view.update(cx, |v, cx| {
+                let sk = v.display.sketches.iter().find(|s| v.studio(cx).and_then(|st| st.feature(s.feature)).is_some_and(|f| f.name == "Sketch 1")).unwrap();
+                v.selection = vec![Reference::SketchRegion { sketch: sk.feature, key: sk.regions.first().unwrap().key.clone() }];
+                v.refresh_scene(false, cx);
+                cx.notify();
+            }));
+            draw(cx, l.window);
+            let got = cx.update(|cx| {
+                let v = l.view.read(cx);
+                let b = v.display.bodies.iter().find(|b| b.name == "Part 1").cloned().unwrap();
+                let related: Vec<String> = v.studio(cx).map(|s| s.features.iter().filter(|f| v.row_ctx.related.contains(&f.id)).map(|f| f.name.clone()).collect()).unwrap_or_default();
+                (v.selected_features.len(), related, v.part_row_flags(&b, cx))
+            });
+            expect(got, (0, names(&["Sketch 1"]), (false, false)), "(rows selected, rows related, Part 1's row (selected, related))")
+        } },
         Row { id: "Parts list / a part hovered in the graphics leaves its row as is", live: "Part 2 outlined in the graphics, its row gets no hover or related tint: the link runs list -> graphics only (live2 parts-list-1118 c1)", gap: false, check: |l, cx| {
             cx.update(|cx| {
                 l.view.update(cx, |v, cx| {

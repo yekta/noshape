@@ -3561,11 +3561,7 @@ impl PartStudioView {
     }
 
     fn tool_button_main(&mut self, ty: &'static FeatureType, group: &'static [&'static str], cx: &mut Context<Self>) -> AnyElement {
-        // Onshape: "Extrude (shift+e)", "Mate connector (ctrl+m)".
-        let tooltip: SharedString = match ty.shortcut {
-            Some(s) => format!("{} ({})", ty.name, s.replace('-', "+").to_lowercase()).into(),
-            None => ty.name.into(),
-        };
+        let tooltip: SharedString = tool_tooltip(ty).into();
         let id = ty.id;
         // Onshape: a tool whose dialog is open shows the "running" fill.
         let active = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == id);
@@ -5592,12 +5588,20 @@ impl PartStudioView {
     /// tool cursor after every viewport event (it applies it on render).
     fn push_tool_cursor(&self, cx: &mut Context<Self>) {
         let (tool_cursor, overlay_cursor) = (self.viewport_tool_cursor(), self.viewport_overlay_cursor());
+        let pick_on_move = self.sketch_tool_active();
         self.viewport.update(cx, |vp, cx| {
+            vp.pick_on_move = pick_on_move;
             if (vp.tool_cursor, vp.overlay_cursor) != (tool_cursor, overlay_cursor) {
                 (vp.tool_cursor, vp.overlay_cursor) = (tool_cursor, overlay_cursor);
                 cx.notify();
             }
         });
+    }
+
+    /// Live picks on every move while a sketch tool is active (`alwaysPreHighlightOnMouseMove`, live2 hover-time-1118);
+    /// with no tool it waits for a fast sweep to pause, as elsewhere.
+    fn sketch_tool_active(&self) -> bool {
+        self.sketch.as_ref().is_some_and(|ed| ed.tool != crate::sketch_mode::Tool::Select)
     }
 
     /// Cursors of overlays over the graphics area: a sketch dimension value
@@ -8223,4 +8227,28 @@ fn several_parts_menu(menu: crate::os_menu::OsMenu, view: &Entity<PartStudioView
         })
         .separator()
         .item(item("Delete".into(), selecting(|this, w, cx| this.start_feature("deleteBodies", w, cx))).icon_name("menu-delete"))
+}
+
+/// A toolbar tool's tooltip title. Onshape: "Extrude (shift+e)", "Mate connector (ctrl+m)"; the Sketch button "Create
+/// new sketch (shift+s)" (live keys-1118, the same under every OS).
+fn tool_tooltip(ty: &FeatureType) -> String {
+    let name = if ty.id == "sketch" { "Create new sketch" } else { ty.name };
+    match ty.shortcut {
+        Some(s) => format!("{name} ({})", s.replace('-', "+").to_lowercase()),
+        None => name.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tool_tooltip_tests {
+    use super::{features, tool_tooltip};
+    use std::prelude::v1::test;
+
+    /// Live keys-1118 (the same under a Mac, Linux and Windows user agent): the Sketch button's tooltip names the
+    /// action; the others their tool.
+    #[test]
+    fn toolbar_tooltips_read_as_live() {
+        let tip = |id: &str| tool_tooltip(features::get(id).unwrap());
+        assert_eq!((tip("sketch"), tip("extrude")), ("Create new sketch (shift+s)".to_string(), "Extrude (shift+e)".to_string()));
+    }
 }

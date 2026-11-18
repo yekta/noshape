@@ -68,7 +68,8 @@ impl PartStudioView {
 
     /// The glyphs (per frame) and the lit connectors' owner-part overlays.
     pub(super) fn connector_overlays(&self, selection: &[Reference], cx: &App) -> (Option<std::sync::Arc<scene_builder::ConnectorGlyphs>>, Vec<Instance>) {
-        let glyphs = scene_builder::connector_glyphs(&self.display, |r| self.connector_look(r, selection));
+        let pick = |r: &Reference| self.built.as_ref().and_then(|b| b.picks.ids_for(r).first().copied()).unwrap_or(0);
+        let glyphs = scene_builder::connector_glyphs(&self.display, |r| self.connector_look(r, selection), pick);
         let owners: Vec<Instance> = self
             .display
             .connectors

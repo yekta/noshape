@@ -1107,19 +1107,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     }
 
     // ---------------------------------------------------------------- connectors
+    // (Drawn and picked by `connector_glyphs` for each frame's camera.)
     for mc in &display.connectors {
-        let id = picks.push(PickTarget { reference: mc.reference.clone(), kind: PickKind::Connector, anchor: Some(mc.origin) });
-        let o: [f32; 3] = mc.origin.as_vec3().into();
-        let y = mc.z.cross(mc.x);
-        // Drawn by `connector_glyphs` for each frame's camera; these short
-        // axes only take the picks.
-        let mut l = LineData::default();
-        let len = 0.004f64;
-        for axis in [mc.x, y, mc.z, -mc.x, -y] {
-            let tip: [f32; 3] = (mc.origin + axis * len).as_vec3().into();
-            l.segments.push(LineSegment { a: o, b: tip, color: [0, 0, 0, 0], pick_id: id, width: 12.0, style: LineSegment::ON_TOP });
-        }
-        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&l))).per_primitive_color().pick_only().ignore_clip().layer(12));
+        picks.push(PickTarget { reference: mc.reference.clone(), kind: PickKind::Connector, anchor: Some(mc.origin) });
     }
 
     let mut planes = opts.section.iter().map(|(n, d)| noshape_render::ClipPlane::new(n.as_vec3(), *d as f32));
@@ -1946,7 +1936,6 @@ fn pick_disc(o: DVec3, x: DVec3, y: DVec3, z: DVec3, r: f64, pick: u32) -> MeshD
     d
 }
 
-/// The mate connectors' glyphs: `lit` gives each one's look.
 /// A sketch curve's line style. A shown sketch's curves win the tie with the part edges they lie on (live2 11-17
 /// sel-feel 3: the double-clicked face's sketch drawn blue along the part's base edges).
 fn sketch_curve_style(c: &noshape_model::display::SketchCurveDisplay, editing: bool) -> u32 {
@@ -1954,9 +1943,11 @@ fn sketch_curve_style(c: &noshape_model::display::SketchCurveDisplay, editing: b
     LineSegment::CORE | lifted | if c.handle { LineSegment::ON_TOP } else if c.construction { LineSegment::CONSTRUCTION } else { 0 }
 }
 
-pub fn connector_glyphs(display: &StudioDisplay, lit: impl Fn(&Reference) -> ConnectorLook) -> Option<Arc<ConnectorGlyphs>> {
-    let items: Vec<_> = display.connectors.iter().map(|c| (c.origin, c.x, c.z.cross(c.x), c.z, lit(&c.reference))).collect();
-    (!items.is_empty()).then(|| Arc::new(ConnectorGlyphs { items, picks: Vec::new() }))
+/// The mate connectors' glyphs: `lit` gives each one's look, `pick` its pick id (0: none); the whole disc takes the
+/// pointer, as in an assembly (live hover-pick-1120: 22 px across, 13–14 up and down in the iso view).
+pub fn connector_glyphs(display: &StudioDisplay, lit: impl Fn(&Reference) -> ConnectorLook, pick: impl Fn(&Reference) -> u32) -> Option<Arc<ConnectorGlyphs>> {
+    let (items, picks): (Vec<_>, Vec<_>) = display.connectors.iter().map(|c| ((c.origin, c.x, c.z.cross(c.x), c.z, lit(&c.reference)), pick(&c.reference))).unzip();
+    (!items.is_empty()).then(|| Arc::new(ConnectorGlyphs { items, picks }))
 }
 
 /// Mate connector inference while hovering (live behaviours 1327, 33725, psui/hole-mc-1851/4): the hovered

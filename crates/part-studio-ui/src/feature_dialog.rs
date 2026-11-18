@@ -2673,6 +2673,13 @@ impl FeatureDialog {
         stop.or_else(|| self.inputs.iter().find(|(_, st)| st.read(cx).focus_handle(cx).is_focused(window)).map(|(p, _)| format!("in:{p}")))
     }
 
+    /// A text field's text and its selected part.
+    #[cfg(test)]
+    pub(crate) fn input_text(&self, path: &str, cx: &App) -> Option<(String, String)> {
+        let st = self.inputs.get(path)?.read(cx);
+        Some((st.value().to_string(), st.selected_value().to_string()))
+    }
+
     /// Make `d` a Tab stop. Space activates it through `d`'s click handler
     /// (GPUI turns Space / Enter on the focused element into a keyboard
     /// click; a key handler of its own toggled a checkbox twice,

@@ -548,3 +548,162 @@ fn a_dialogs_active_box_filters_what_lights(cx: &mut TestAppContext) {
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// Live2 sel-feel (11-17 22:12): while a box is dragged across a part nothing lights under the pointer, its faces and
+/// edges included; on release what the box takes is selected at once (live's window box round a block: 18).
+#[gpui::test]
+fn a_box_drag_lights_nothing_and_selects_at_release(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, _top, _) = block_part(cx, "box-drag-hover");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let (lo, hi) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let vp = v.viewport.read(cx);
+        let s: Vec<DVec2> = b.mesh.positions.iter().filter_map(|q| vp.project(glam::DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64))).collect();
+        (s.iter().fold(DVec2::splat(f64::MAX), |m, p| m.min(*p)), s.iter().fold(DVec2::splat(f64::MIN), |m, p| m.max(*p)))
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).hover.clone());
+    // The part lights at rest under the pointer first (the test can see a hover).
+    pointer.move_to(cx, &view, (lo + hi) * 0.5);
+    assert!(lit(cx).is_some(), "the part's middle lights at rest");
+    // A start beside the part where nothing lights.
+    let start = [DVec2::new(lo.x - 40.0, lo.y - 40.0), DVec2::new(hi.x + 40.0, lo.y - 40.0), DVec2::new(lo.x - 40.0, hi.y + 40.0), DVec2::new(hi.x + 40.0, hi.y + 40.0)]
+        .into_iter()
+        .find(|s| {
+            pointer.move_to(cx, &view, *s);
+            lit(cx).is_none()
+        })
+        .expect("a spot beside the part where nothing lights");
+    let end = DVec2::new(if start.x < lo.x { hi.x + 40.0 } else { lo.x - 40.0 }, if start.y < lo.y { hi.y + 40.0 } else { lo.y - 40.0 });
+    let at = pointer.window_point(cx, start);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+    let mut wrong = Vec::new();
+    for i in 1..=12 {
+        let p = start + (end - start) * (i as f64 / 12.0);
+        let win = pointer.window_point(cx, p);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, Some(gpui_kit::MouseButton::Left), Modifiers::default());
+        // (A person's slow drag: frames and picks come back between moves.)
+        pointer.frames(cx, &view);
+        let got = lit(cx);
+        if got.is_some() {
+            wrong.push(format!("box drag step {i} at {p:?}: lit {got:?}"));
+        }
+    }
+    let win = pointer.window_point(cx, end);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: win, modifiers: Modifiers::default(), click_count: 1 });
+    // (The box's pick comes back from the GPU's thread: a loaded software GPU can take a while.)
+    let t = std::time::Instant::now();
+    while cx.update(|cx| view.read(cx).selection.is_empty()) && t.elapsed() < std::time::Duration::from_secs(15) {
+        pointer.frames(cx, &view);
+    }
+    let n = cx.update(|cx| view.read(cx).selection.len());
+    if n != 18 {
+        wrong.push(format!("released: {n} selected, want live's 18 (6 faces, 12 edges)"));
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// Live2 hover-p0 (11-17 12:35): a plane lights over its whole inside and up to 6 px out past its edge (8 px out,
+/// nothing: ours reaches further across a slanted edge, printed). Checked on an outer edge of each default plane in
+/// the iso view, where no other plane is near, coming in from outside.
+#[gpui::test]
+fn a_plane_lights_6_px_past_its_edge(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = part_studio(cx, "plane-edge-reach");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let quads: Vec<(Reference, [DVec2; 4])> = cx.update(|cx| {
+        let v = view.read(cx);
+        let vp = v.viewport.read(cx);
+        v.display.planes.iter().filter(|p| !p.hidden).filter_map(|p| Some((p.reference.clone(), [vp.project(p.corner(-1., -1.))?, vp.project(p.corner(1., -1.))?, vp.project(p.corner(1., 1.))?, vp.project(p.corner(-1., 1.))?]))).collect()
+    });
+    assert_eq!(quads.len(), 3, "the three default planes shown");
+    let inside = |q: &[DVec2; 4], p: DVec2| {
+        let s: Vec<f64> = (0..4).map(|k| (q[(k + 1) % 4] - q[k]).perp_dot(p - q[k])).collect();
+        s.iter().all(|x| *x >= 0.0) || s.iter().all(|x| *x <= 0.0)
+    };
+    let seg_dist = |a: DVec2, b: DVec2, p: DVec2| {
+        let t = ((p - a).dot(b - a) / (b - a).length_squared()).clamp(0.0, 1.0);
+        (a + (b - a) * t - p).length()
+    };
+    let pointer = Pointer::new(cx, window, &view);
+    let mut wrong = Vec::new();
+    for (plane, q) in &quads {
+        let centre = q.iter().sum::<DVec2>() / 4.0;
+        // A spot on an outer edge whose 20 px outside touches no other plane and is in the viewport.
+        let size = cx.update(|cx| pointer.vp.read(cx).size());
+        let spot = (0..4).flat_map(|k| [0.3, 0.5, 0.7].map(|t| (k, t))).find_map(|(k, t)| {
+            let (a, b) = (q[k], q[(k + 1) % 4]);
+            let on = a + (b - a) * t;
+            let mut n = (b - a).perp().normalize();
+            if n.dot(on - centre) < 0.0 {
+                n = -n;
+            }
+            let far = on + n * 20.0;
+            let clear = quads.iter().all(|(r, o)| {
+                let edges = (0..4).map(|j| seg_dist(o[j], o[(j + 1) % 4], far)).fold(f64::MAX, f64::min);
+                (r == plane || (!inside(o, on + n * 4.0) && !inside(o, on - n * 20.0))) && !inside(o, far) && edges > 15.0
+            });
+            (clear && far.x > 20.0 && far.y > 20.0 && far.x < size.x - 20.0 && far.y < size.y - 20.0).then_some((on, n))
+        });
+        let Some((on, n)) = spot else {
+            wrong.push(format!("{plane:?}: no outer edge clear of the other planes"));
+            continue;
+        };
+        for (d, want) in [(20.0, false), (6.0, true), (-20.0, true)] {
+            pointer.move_to(cx, &view, on + n * d);
+            let lit = cx.update(|cx| view.read(cx).hover.clone());
+            if (lit.as_ref() == Some(plane)) != want {
+                wrong.push(format!("{plane:?}: {d} px out lit {lit:?}, want {}", if want { "the plane" } else { "nothing" }));
+            }
+        }
+        // (Live's 8 px: nothing. Ours reaches further on a slanted edge, the pick square's corner: interaction-feel.md.)
+        let reach = (6..=14).rev().find(|d| {
+            pointer.move_to(cx, &view, on + n * 30.0);
+            pointer.move_to(cx, &view, on + n * f64::from(*d));
+            cx.update(|cx| view.read(cx).hover.as_ref() == Some(plane))
+        });
+        eprintln!("plane reach {plane:?}: lit to {reach:?} px out across an edge at {:.0}°", n.y.atan2(n.x).to_degrees());
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// Live hover-pick-1120 (11-17 20:41): a mate connector on a face wins over the face across its drawn disc and triad:
+/// lit 22 px out to either side, 13 px up or down, in the iso view.
+#[gpui::test]
+fn a_mate_connector_wins_over_its_face_across_its_disc(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, top, _) = block_part(cx, "connector-reach");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.selection = vec![top.clone()];
+        v.start_feature("mateConnector", w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    wait_until(cx, window, |cx| view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).can_submit()));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.is_none() && !view.read(cx).display.connectors.is_empty());
+    draw(cx, window);
+    let o = cx.update(|cx| {
+        let v = view.read(cx);
+        v.viewport.read(cx).project(v.display.connectors[0].origin).unwrap()
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    let lit = |cx: &mut TestAppContext, at: DVec2| {
+        pointer.move_to(cx, &view, o + DVec2::new(0.0, 60.0));
+        pointer.move_to(cx, &view, at);
+        cx.update(|cx| view.read(cx).hover.clone())
+    };
+    let mut wrong = Vec::new();
+    for (d, want) in [(DVec2::new(22.0, 0.0), true), (DVec2::new(-22.0, 0.0), true), (DVec2::new(0.0, 13.0), true), (DVec2::new(0.0, -13.0), true), (DVec2::new(27.0, 0.0), false), (DVec2::new(0.0, 18.0), false)] {
+        let got = lit(cx, o + d);
+        if matches!(got, Some(Reference::MateConnector { .. })) != want {
+            wrong.push(format!("{d:?} from the connector: lit {got:?}, want {}", if want { "the connector" } else { "the face" }));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}

@@ -266,6 +266,12 @@ pub struct UiState {
     pub midpoint_dwell_task: Option<Task<()>>,
     /// Redraws when a left entity's lingering glyphs are due to go (nothing else may draw then).
     pub glyph_linger_task: Option<Task<()>>,
+    /// Entities left whose glyph rows linger, each from when it was left (the app's clock).
+    pub glyph_linger: Vec<(noshape_sketch::EntityId, std::time::Instant)>,
+    /// Where each line's glyph row was placed: the pointer's spot on the plane when its hover started.
+    pub glyph_row_places: std::collections::HashMap<noshape_sketch::EntityId, DVec2>,
+    /// The constraint glyphs drawn last frame: (constraint, its entity, top-left in viewport px; 20 px boxes).
+    pub glyph_boxes: Vec<(noshape_sketch::ConstraintId, noshape_sketch::EntityId, f32, f32)>,
     /// Mate connector inference points of the hovered entity (inference.rs) and their computation.
     pub inference: Option<super::inference::InferenceHover>,
     pub inference_task: Option<Task<()>>,
@@ -819,6 +825,9 @@ impl UiState {
             dblclick_drawn: Vec::new(),
             midpoint_dwell_task: None,
             glyph_linger_task: None,
+            glyph_linger: Vec::new(),
+            glyph_row_places: std::collections::HashMap::new(),
+            glyph_boxes: Vec::new(),
             inference: None,
             inference_task: None,
             select_other: None,

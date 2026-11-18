@@ -1576,7 +1576,7 @@ impl Workspace {
             .border_color(pal.border)
             .when(tm_open, |c| c.child(div().absolute().left_0().top_0().bottom_0().w(px(4.)).bg(pal.accent)).child(crate::ui::glyph("tab-search", 20., pal.accent)))
             .when(!tm_open, |c| c.child(crate::assets::icon("tab-search", 20., cx)))
-            .tooltip("Tab manager (Alt+T)")
+            .tooltip("Tab manager (alt/⌥+t)")
             .map(|d| noshape_app_core::ui_script::mark(d, || "button:Tab manager".into()))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_tab_manager(window, cx)));
         // Onshape's "+" menu (live, document/01): a Bootstrap dropdown opening

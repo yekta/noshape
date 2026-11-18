@@ -176,6 +176,43 @@ fn rows() -> Vec<Row> {
             let open = cx.update(|cx| view.read(cx).edit.is_some());
             expect((dragged, open, depth(cx) == before), (true, false, true), "(the drag changed Depth, the dialog open after Esc, Extrude 1 as before)")
         } },
+        Row { id: "manipulators / an arrow drag lights nothing; Depth has the keyboard, its text selected", live: "live manip-feel-1118 (1, 2): nothing lights under the pointer while the arrow is dragged; Depth focused with its whole text selected, rewritten each update, and so after the release", gap: false, check: |cx| {
+            let (window, view, dialog) = edit_extrude(cx, "dlg-arrow-keys");
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let vp = cx.update(|cx| view.read(cx).viewport.clone());
+            let (at, along) = cx
+                .update(|cx| {
+                    let vp = vp.read(cx);
+                    let &(a, b, _) = vp.manipulators.first()?;
+                    let (a, b) = (vp.project(a)?, vp.project(b)?);
+                    let mid = (a + b) * 0.5;
+                    let o = vp.origin();
+                    Some((gpui_kit::point(o.x + px(mid.x as f32), o.y + px(mid.y as f32)), (b - a).normalize_or_zero()))
+                })
+                .ok_or("no arrow")?;
+            let state = |cx: &mut TestAppContext| {
+                let focused = cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap();
+                let (text, selected) = cx.update(|cx| dialog.read(cx).input_text("depth", cx)).unwrap_or_default();
+                (focused, !text.is_empty() && selected == text, cx.update(|cx| view.read(cx).hover.clone()))
+            };
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
+            vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+            let mut during = Vec::new();
+            let mut last = at;
+            for k in 1..=6 {
+                last = gpui_kit::point(at.x + px((along.x * 10.0 * k as f64) as f32), at.y + px((along.y * 10.0 * k as f64) as f32));
+                gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: last, pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: Modifiers::default() });
+                draw(cx, window);
+                during.push(state(cx));
+            }
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: last, modifiers: Modifiers::default(), click_count: 1 });
+            draw(cx, window);
+            let after = state(cx);
+            let want = (Some("in:depth".to_string()), true, None);
+            expect((during, after), (vec![want.clone(); 6], want), "(focused, Depth's whole text selected, lit) at each drag move, after the release")
+        } },
         Row { id: "drag / the length step follows the zoom", live: "10^(round(log10(100 px in the unit)) − 2): 0.1 mm at 0.25 mm/px, 1 mm at 0.414", gap: false, check: |_| {
             let mm = 0.001;
             expect(((linear_step(0.25 * mm, mm) / mm * 1e6).round() / 1e6, (linear_step(0.414 * mm, mm) / mm * 1e6).round() / 1e6), (0.1, 1.0), "steps (mm)")

@@ -363,6 +363,9 @@ pub struct Viewport {
     /// The clock the press rules (a drag's 50 ms, the menu's hold, a double middle release) and camera animations
     /// read; tests drive it.
     clock: Rc<dyn Fn() -> Instant>,
+    /// Pick and move times: the executor's clock (the test clock in tests, so a pause or a pick's measured time never
+    /// depends on the machine).
+    exec: BackgroundExecutor,
     /// The last middle release that wasn't the second of a double click.
     middle_released: Option<Instant>,
     press_travel: f64,
@@ -394,6 +397,9 @@ pub struct Viewport {
     hover: Option<u32>,
     /// When true, left-drag goes to the active tool instead of box select.
     pub tool_captures_left: bool,
+    /// Every move picks at once, no pause (live's `alwaysPreHighlightOnMouseMove`): only while a sketch creation tool
+    /// is active (live2 hover-time-1118); everywhere else a fast move's pick waits for the pause.
+    pub pick_on_move: bool,
     /// A left press on a pick id under this (the model's own geometry) goes to the tool too, read from the pick
     /// buffer at the press: before a hover event marked it (a press right after the pointer got there).
     pub capture_picks_below: Option<u32>,
@@ -688,6 +694,7 @@ impl Viewport {
             press_pos: DVec2::ZERO,
             press_at: Instant::now(),
             clock: Rc::new(Instant::now),
+            exec: cx.background_executor().clone(),
             middle_released: None,
             press_travel: 0.0,
             press_path: (0.0, DVec2::ZERO),
@@ -703,6 +710,7 @@ impl Viewport {
             cursor_platform: true,
             hover: None,
             tool_captures_left: false,
+            pick_on_move: false,
             capture_picks_below: None,
             capture_probe: None,
             tool_hover: false,
@@ -1215,7 +1223,7 @@ impl Viewport {
     fn request_pick(&mut self, rect: PickRect, purpose: PickPurpose) {
         let token = self.next_pick_token;
         self.next_pick_token += 1;
-        self.pick_requests.insert(token, (self.pick_epoch, self.pick_layout_epoch, purpose, Instant::now()));
+        self.pick_requests.insert(token, (self.pick_epoch, self.pick_layout_epoch, purpose, self.exec.now()));
         self.gpu.pick(self.target_id, token, rect);
     }
 
@@ -1248,7 +1256,8 @@ impl Viewport {
 
     fn on_pick(&mut self, token: u64, result: Result<Arc<PickBuffer>, String>, cx: &mut Context<Self>) {
         let Some((epoch, layout_epoch, purpose, asked)) = self.pick_requests.remove(&token) else { return };
-        noshape_render::perf::record("v.pick_latency", asked.elapsed());
+        let took = self.exec.now().saturating_duration_since(asked);
+        noshape_render::perf::record("v.pick_latency", took);
         let buf = match result {
             Ok(b) => Some(b),
             Err(e) => {
@@ -1271,7 +1280,7 @@ impl Viewport {
         let s = self.scale as f64;
         match purpose {
             PickPurpose::Hover => {
-                self.avg_pick_ms = average_pick_ms(self.avg_pick_ms, asked.elapsed().as_secs_f64() * 1000.0);
+                self.avg_pick_ms = average_pick_ms(self.avg_pick_ms, took.as_secs_f64() * 1000.0);
                 // An older answer (a newer one is on its way): only what it shows where the pointer is now.
                 let newest = token == self.hover_query_newest.0;
                 if !newest {
@@ -2401,12 +2410,13 @@ impl Viewport {
             Drag::None | Drag::Pending(_) => {
                 let label = if self.pointer_inside { self.label_at(p) } else { None };
                 self.set_hover_label(label, cx);
-                let now = Instant::now();
-                let ms = self.last_move_at.replace(now).map(|t| now.duration_since(t).as_secs_f64() * 1000.0);
+                // (The executor's clock: the test clock in tests, so a move's speed never depends on the machine.)
+                let now = self.exec.now();
+                let ms = self.last_move_at.replace(now).map(|t| now.saturating_duration_since(t).as_secs_f64() * 1000.0);
                 self.paused_hover = None;
                 // Measured live in plain selection; a tool's own hover
                 // (sketch snapping) follows the pointer.
-                let delay = if self.tool_captures_left { None } else { prehighlight_delay(delta.length() * f64::from(self.scale), ms, self.avg_pick_ms) };
+                let delay = if self.pick_on_move { None } else { prehighlight_delay(delta.length() * f64::from(self.scale), ms, self.avg_pick_ms) };
                 match delay {
                     None => match self.pick_at(p) {
                         Some(id) => self.set_hover(id, cx),

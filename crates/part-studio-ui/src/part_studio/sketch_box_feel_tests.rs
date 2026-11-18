@@ -213,6 +213,11 @@ fn midpoint_glyph_and_plane_clicks_in_a_sketch_as_live(cx: &mut TestAppContext) 
             }).collect();
             wrong.push(format!("glyph {} under the pointer at {to:?}: {under:?}, want {cid:?}; {state}; row {rows:?}", k + 1));
         }
+        // Over a glyph nothing else lights (live2 hover-p0), whatever line runs under the row.
+        let lit = cx.update(|cx| (view.read(cx).hover.clone(), view.read(cx).sketch.as_ref().unwrap().hover));
+        if lit != (None, None) {
+            wrong.push(format!("glyph {} hovered: also lit {lit:?}", k + 1));
+        }
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
         vcx.simulate_click(to, Modifiers::default());
         draw(cx, window);

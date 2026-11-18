@@ -87,7 +87,7 @@ two zooms, A 0.2754 / B 0.2316 mm/px; where they differ both are given).
 | Constraint glyph selection (live2 glyph-select 11-17) | one glyph at a time: a click (Shift too) on another replaces it, Delete takes only it; a glyph click drops selected curves, a curve click drops the glyph; Shift+click on the selected glyph or an empty click deselects | the same (were additive, kept with curves) | scene `constraint_glyphs_select_one_at_a_time_as_lives` | = (fixed) |
 | Constraint glyph hover (live2 sktools-1118) | its 20 px tile turns yellow rgb(252, 218, 127), its line lit; lit to 14 px from the tile's centre (≈ 4 px past its edge), off at 15–16; a continuous slide holds it a little longer (16 px), a jump there misses it | – | – | – |
 | A point and a circle / ellipse made coincident | the point fixed (a model vertex, a Fix): the curve shifts the shortest way, radii kept; the point free: the point moves onto the curve (live2 11-17, REQUESTS (d)) | the same (`what_moves`: the curve's centre or the point is what the solve moves) | scene `a_circle_coincident_with_a_fixed_point_shifts_and_a_free_point_moves` | = (fixed 11-17) |
-| Hover timing (no tool) | the highlight ≈ 270–300 ms after the pointer stops; with the Dimension tool ≈ 30 ms: live's rule (live2 hover-time-1118: `alwaysPreHighlightOnMouseMove` only while a sketch creation tool is active) | every sketch move picks at once (`tool_captures_left` is set for the whole sketch session, a plane ring and assembly parts too) | missing | ≠ (in progress: the fix waits on a glyph row the editor's own hit test replaces) |
+| Hover timing (no tool) | the highlight ≈ 270–300 ms after the pointer stops; with the Dimension tool ≈ 30 ms: live's rule (live2 hover-time-1118: `alwaysPreHighlightOnMouseMove` only while a sketch creation tool is active) | the same (`Viewport::pick_on_move`, set while a sketch tool is active) | sketch_hover_feel_tests::only_a_sketch_tool_picks_on_every_move | = (fixed 11-18) |
 | Nothing recoloured under the pointer mid-draw | the target line doesn't recolour | the same (`SketchEditor::mid_draw`) | – | = |
 | Hovered point look | a 10–11 px translucent orange disc, centred | the same; whole on a slanted plane | offscreen `a_hovered_sketch_point_on_a_slanted_face_draws_its_whole_disc`, `a_sketch_point_is_drawn_as_lives_in_each_state` | = |
 | Per-entity colour: a line | the line black, its free end blue; black once dimensioned; a construction line through the origin black, ends blue | a line by its own geometry (`line_motion_queries`) | sketch `a_line_with_a_free_length_is_defined_and_its_free_end_is_not`, `a_line_whose_end_moves_off_it_is_under_defined` | = |
@@ -777,10 +777,10 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | A sketch line wins over any plane, in front of it or behind it on screen | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live, a_sketch_line_lights_over_the_planes_behind_it_and_lets_go |
 | A sketch point beats its lines within its reach | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live |
 | The region beats the planes behind it | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live |
-| Over a constraint glyph nothing else hovers (its entities in the secondary pre-selection) [skasm] | ? | missing |
+| Over a constraint glyph nothing else hovers (its entities in the secondary pre-selection) [skasm] | = (fixed: a row's span, gaps included, takes the hover from the geometry under it) | sketch_box_feel_tests::midpoint_glyph_and_plane_clicks_in_a_sketch_as_live |
 | The sketch's own plane never hovers in sketch mode; other planes do | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live |
 | Reach in sketch mode: line 7 px, point 10 px | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live, a_sketch_circle_and_its_centre_light_over_the_planes |
-| A plane hovers over its whole interior plus 6 px outside its edge (8 px: nothing) | ? | missing |
+| A plane hovers over its whole interior plus 6 px outside its edge (8 px: nothing) | ≠ (6 px and the inside as live; ours still lit at 8 px across iso's slanted edges: the 5 px pick square's corner + the 5 px border band; live's 3d.json level border lights at 7–8) | feel_tests::a_plane_lights_6_px_past_its_edge (prints the reach) |
 | Reach outside sketch mode: line 6–7 px, point 9 px; Top hovers like any plane; the nearer plane wins where planes overlap | ? | missing |
 | Hover timing: under 0.15 px/ms picks at once; faster clears and picks min(5 × average pick, 250 ms) after the last move | = | app-core viewport::prehighlight_tests::prehighlight_waits_for_a_pause_as_live |
 | No stale hover: only what is under the pointer's last spot | = | sketch_hover_feel_tests::a_quick_sweep_off_a_line_leaves_nothing_lit, the_first_pick_at_rest_lights_what_is_under_the_pointer |
@@ -822,7 +822,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 |---|---|---|
 | A part edge vs the face behind / below it: lights at 5–6 px, stays to 8–10; the face never beats the edge inside reach | ? | feel_tests::a_click_beside_an_edge_selects_what_is_lit (reach in iso: missing) |
 | A sketch point takes over from its line 8 px before the end; beyond the end 6 px; a line 5–7 px, the sketch's plane beyond | = | sketch_hover_feel_tests::sketch_hover_reach_and_priority_as_live |
-| A mate connector wins across its drawn triad: 22 px horizontally, 13–14 px vertically, over the face | ? | missing |
+| A mate connector wins across its drawn triad: 22 px horizontally, 13–14 px vertically, over the face | = (fixed: the Part Studio picked fixed 4 mm axis stubs; now the drawn disc, as the assembly) | feel_tests::a_mate_connector_wins_over_its_face_across_its_disc |
 | Through a transparent default plane geometry behind it always wins; the plane lights only where nothing is behind | = | feel_tests::a_block_behind_the_front_plane_lights_through_it, part_faces_and_vertices_light_over_the_planes_behind |
 | A block edge behind the Front plane: 5–6 px from the plane side, 4 px from the face side | = | feel_tests::a_block_behind_the_front_plane_lights_through_it |
 | Timing: a fast jump lights after the pause (min(5 × average pick, 250 ms)) then one pick | = | app-core viewport::prehighlight_tests::prehighlight_waits_for_a_pause_as_live |
@@ -831,7 +831,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| During a box drag nothing lights; on release the result is selected at once | = | app-core viewport (no hover while `Drag::Box`): missing as a test |
+| During a box drag nothing lights; on release the result is selected at once | = | feel_tests::a_box_drag_lights_nothing_and_selects_at_release |
 | Window box counts on two blocks (28 / 21); a block's 18 / 5 / crossing 13 | = | feel_tests::box_select_takes_what_live_takes (one block; the two-block counts missing) |
 | A press whose first move ends over a default plane lights the plane and draws no box until the next move | ? | missing |
 | A click on a default plane selects it, a second adds; a face then a plane gives both; an empty click clears all | = | sketch_box_feel_tests::midpoint_glyph_and_plane_clicks_in_a_sketch_as_live (sketch mode); list matrix "click / a default plane: Default geometry related" |
@@ -841,8 +841,8 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | A part row hovered: the same plus its eye icon and a "Part 2" tooltip | = | list matrix "hover / the row's tooltip" |
 | A hidden sketch row hovered: drawn in place, lit; "Sketch 1 (Hidden) is not fully defined" | = | list matrix "hover / a hidden sketch: drawn in place, lit" |
 | A feature row clicked: selected rgb(178,221,246), its part related rgb(236,240,244), the part drawn selected | = | list matrix "click / toggles, others kept" (the colours: Look rows) |
-| A viewport face / edge clicked relates its feature and part rows, never selects them | ? | missing |
-| A sketch region on a face relates only its sketch; its look a pale fill with an orange outline | ? | missing |
+| A viewport face / edge clicked relates its feature and part rows, never selects them | = | list matrix "click / a face or edge in the graphics relates its feature and part rows" |
+| A sketch region on a face relates only its sketch; its look a pale fill with an orange outline | = | list matrix "click / a sketch region relates only its sketch" (the look: missing) |
 | A default plane clicked: its row selected, Default geometry related | = | list matrix "click / a default plane: Default geometry related" |
 | Space or an empty click clears both sides | = | list matrix "clearing / a click on empty canvas" |
 
@@ -973,8 +973,8 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Finding | Ours | Test |
 |---|---|---|
 | A plain click on Extrude's arrow flips the direction; again flips back | = | dialogs matrix "manipulators / a click on Extrude's arrow flips it" |
-| While a feature arrow is dragged nothing lights under the pointer; Depth is the pointer projected on the arrow's line; the arrow blue | ? | missing |
-| During the drag Depth has the keyboard with its text selected, rewritten each update; on release it stays focused and selected | ? | missing |
+| While a feature arrow is dragged nothing lights under the pointer; Depth is the pointer projected on the arrow's line; the arrow blue | = | dialogs matrix "manipulators / an arrow drag lights nothing; Depth has the keyboard, its text selected" (nothing lit; the projection and the blue: missing) |
+| During the drag Depth has the keyboard with its text selected, rewritten each update; on release it stays focused and selected | = | dialogs matrix "manipulators / an arrow drag lights nothing; Depth has the keyboard, its text selected" |
 | Ctrl or Alt held changes nothing; Shift unrounded | = | manipulators::tests::a_dragged_length_steps_with_the_zoom_as_live (Shift); Ctrl / Alt: missing |
 | Esc during an arrow drag, button held, cancels the whole dialog; the release then does nothing | = | dialogs matrix "manipulators / Esc with the button held cancels the dialog" |
 | The length step 10^(round(log10(100 px in mm)) − 2); angles 5° near a multiple, 0.1° between (0.4·step·(1 + level/3)) | = | dialogs matrix "drag / the length step follows the zoom", "drag / the angle step"; manipulators::tests::a_dragged_angle_snaps_by_its_radius_as_live |
@@ -1054,7 +1054,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Mass properties opens top-left over the list, (214, 79), 440 × 521; inertia in the account's mass unit | ? | missing |
 | Mass and section properties timing (live2 mass-appear-1118, software GL): panel +466 ms, values +555; a part added: chip +494, totals +1026, the old totals shown until then (no blank or spinner); removed: chip +96, totals +210 | – | – |
 | A face click adds its part, a measured part clicked again leaves; volume / area summed; trailing zeros dropped | = | app-core properties_dialog mass_number tests (the add / remove: missing) |
-| While Mass is open: no bottom-right summary, an empty click keeps its parts; Esc closes it keeping the selection | ? | missing |
+| While Mass is open: no bottom-right summary, an empty click keeps its parts; Esc closes it keeping the selection | = (fixed: the summary showed) | measure_feel_tests::mass_hides_the_summary_keeps_its_parts_on_an_empty_click_and_esc_keeps_the_selection |
 | Its button again leaves it open; `[` over it opens Measure empty, the parts deselected | = | measure_feel_tests::mass_stays_open_and_bracket_opens_an_empty_measure |
 | A clicked Mass value shows the unit's highest precision (numfmt-1118) | = | measure_feel_tests::a_clicked_mass_value_toggles_the_highest_precision |
 
@@ -1178,7 +1178,15 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | 3D, no tool, any entity: a fast sweep lights at stop + min(5 × average pick, 250 ms) + one pick | = | app-core viewport::prehighlight_tests::prehighlight_waits_for_a_pause_as_live |
 | A fast move off clears at once (remove-only pick); nothing new until the pause | = | sketch_hover_feel_tests::a_quick_sweep_off_a_line_leaves_nothing_lit |
 | Slow (< 0.15 px/ms): the highlight follows the pointer, one pick per move | = | app-core viewport::prehighlight_tests::prehighlight_waits_for_a_pause_as_live |
-| Every move picks at once only while a sketch creation tool (Line, Dimension) is active; a sketch with no tool, feature dialogs, mates and Measure keep the pause | ≠ (ours picks at once in a sketch with no tool, over a draggable plane ring and over assembly parts; in progress) | missing |
+| Every move picks at once only while a sketch creation tool (Line, Dimension) is active; a sketch with no tool, feature dialogs, mates and Measure keep the pause | = (fixed: `Viewport::pick_on_move` only while a sketch tool is active; it was `tool_captures_left`, set for the whole sketch, a plane ring and assembly parts) | sketch_hover_feel_tests::only_a_sketch_tool_picks_on_every_move |
+
+### keys-1118 mac (macOS key parity, live 11-18; live/keys-1118)
+
+| Finding | Ours | Test |
+|---|---|---|
+| The shortcut list, key map and tooltips are the same under Mac, Linux and Windows user agents | = (bindings) | – |
+| The Sketch button's tooltip "Create new sketch (shift+s)" | = (fixed: was "Sketch (shift+s)") | part_studio tool_tooltip_tests::toolbar_tooltips_read_as_live |
+| The Tab manager button's tooltip "Tab manager (alt/⌥+t)" | = (fixed: was "Tab manager (Alt+T)") | – (a literal) |
 
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;

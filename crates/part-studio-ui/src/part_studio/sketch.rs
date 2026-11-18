@@ -153,15 +153,28 @@ const CM_TYPES: [(&str, &str); 22] = [
     ("Projected", "use"),
     ("Dimension", "dimension"),
 ];
-/// A left entity's glyphs linger while this timer is pending (on the app's clock, so a test drives it); it ends the
-/// linger with a redraw (nothing else may draw then).
+/// Left entities' glyphs linger (`ui.glyph_linger`, each for its own [`GLYPH_LINGER`] on the app's clock, so a test
+/// drives it); this timer redraws as each one ends and stops after the last (nothing else may draw then).
 fn glyph_linger_redraw(cx: &mut Context<PartStudioView>) -> Task<()> {
     cx.spawn(async move |this, cx| {
-        cx.background_executor().timer(GLYPH_LINGER + std::time::Duration::from_millis(5)).await;
-        let _ = this.update(cx, |this, cx| {
-            this.ui.glyph_linger_task = None;
-            cx.notify();
-        });
+        loop {
+            let next = this.update(cx, |this, cx| {
+                let now = cx.background_executor().now();
+                let before = this.ui.glyph_linger.len();
+                this.ui.glyph_linger.retain(|(_, t)| now.saturating_duration_since(*t) < GLYPH_LINGER);
+                if this.ui.glyph_linger.len() != before {
+                    cx.notify();
+                }
+                let next = this.ui.glyph_linger.iter().map(|(_, t)| (*t + GLYPH_LINGER).saturating_duration_since(now)).min();
+                if next.is_none() {
+                    this.ui.glyph_linger_task = None;
+                    cx.notify();
+                }
+                next
+            });
+            let Ok(Some(wait)) = next else { break };
+            cx.background_executor().timer(wait + std::time::Duration::from_millis(5)).await;
+        }
     })
 }
 
@@ -387,7 +400,7 @@ impl PartStudioView {
             if self.message.as_ref().is_some_and(|(_, m)| m == crate::sketch_mode::SKETCH_NOT_SOLVED) {
                 self.message = None;
             }
-            self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
+            self.viewport.update(cx, |vp, _| (vp.tool_captures_left, vp.pick_on_move) = (false, false));
             if let Some(f) = &self.flat_view {
                 let fvp = f.read(cx).viewport.clone();
                 fvp.update(cx, |vp, _| vp.tool_captures_left = false);
@@ -518,6 +531,34 @@ impl PartStudioView {
             self.refresh_scene(false, cx);
         }
         cx.notify();
+    }
+
+    /// A left entity's glyph row lingers for [`GLYPH_LINGER`], each left one for its own (a row the pointer heads for
+    /// stays while another line is crossed on the way).
+    fn linger_glyphs(&mut self, e: noshape_sketch::EntityId, cx: &mut Context<Self>) {
+        let now = cx.background_executor().now();
+        if let Some(ed) = &mut self.sketch {
+            ed.glyph_entity = Some((e, std::time::Instant::now()));
+        }
+        self.ui.glyph_linger.retain(|(x, _)| *x != e);
+        self.ui.glyph_linger.push((e, now));
+        if self.ui.glyph_linger_task.is_none() {
+            self.ui.glyph_linger_task = Some(glyph_linger_redraw(cx));
+        }
+    }
+
+    /// The constraint glyph drawn under a viewport point, and whether the point is on a glyph row at all (its glyphs'
+    /// span, the 2 px gaps between them included).
+    fn glyph_under(&self, at: DVec2) -> (Option<noshape_sketch::ConstraintId>, bool) {
+        let (x, y) = (at.x as f32, at.y as f32);
+        let boxes = &self.ui.glyph_boxes;
+        let on = boxes.iter().find(|(_, _, bx, by)| (*bx..=*bx + 20.0).contains(&x) && (*by..=*by + 20.0).contains(&y)).map(|(c, ..)| *c);
+        let row = on.is_some()
+            || boxes.iter().any(|(_, e, bx, by)| {
+                (*by..=*by + 20.0).contains(&y)
+                    && boxes.iter().any(|(_, f, cx, cy)| f == e && cy == by && *cx > *bx && (*bx..=*cx + 20.0).contains(&x))
+            });
+        (on, row)
     }
 
     fn hovered_sketch_entity(&self, cx: &App) -> Option<noshape_sketch::EntityId> {
@@ -864,8 +905,8 @@ impl PartStudioView {
     fn sketch_hover(&mut self, gpu_id: Option<u32>, vp: &Entity<Viewport>, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let id = &self.sketch_hover_id(gpu_id, cx);
         self.ui.sketch_gpu_hover = Some((gpu_id, *id));
-        // While a glyph/label is hovered, the geometry under it isn't.
-        if self.sketch.as_ref().is_some_and(|s| s.hover_constraint.is_some()) {
+        // While a glyph/label is hovered (or the pointer is between a row's glyphs), the geometry under it isn't.
+        if self.sketch.as_ref().is_some_and(|s| s.hover_constraint.is_some()) || self.glyph_under(vp.read(cx).pointer_position()).1 {
             if self.hover.take().is_some() {
                 self.refresh_scene(false, cx);
             }
@@ -901,13 +942,14 @@ impl PartStudioView {
                 _ => None,
             };
             if ed.hover != ent {
-                if let Some(old) = ed.hover {
-                    ed.glyph_entity = Some((old, std::time::Instant::now()));
-                    self.ui.glyph_linger_task = Some(glyph_linger_redraw(cx));
-                }
+                let old = ed.hover;
                 ed.hover = ent;
                 if let (Some(e), Some(c)) = (ent, ed.cursor) {
                     ed.glyph_row_at = Some((e, c));
+                    self.ui.glyph_row_places.insert(e, c);
+                }
+                if let Some(old) = old {
+                    self.linger_glyphs(old, cx);
                 }
                 cx.notify();
             }
@@ -1041,18 +1083,29 @@ impl PartStudioView {
                             None => eprintln!("snap-trace pointer ({:.3}, {:.3}) none", position.x, position.y),
                         }
                     }
-                    let hov = self.hovered_sketch_entity(cx);
+                    // Over a constraint glyph it alone hovers, nothing under it (live: the pre-selection is empty
+                    // there), whatever the pick under the pointer says; between a row's glyphs neither.
+                    let (on_glyph, on_row) = self.glyph_under(*position);
+                    let hov = if on_row { None } else { self.hovered_sketch_entity(cx) };
+                    if on_row {
+                        self.hover = None;
+                    }
+                    let mut left = None;
                     if let Some(ed) = &mut self.sketch {
+                        if on_glyph.is_some() {
+                            ed.hover_constraint = on_glyph;
+                        }
                         // (The row is placed where the hover starts and stays: live2 feel-1417 follow-up.)
                         if let Some(e) = hov.filter(|_| ed.hover != hov) {
                             ed.glyph_row_at = Some((e, p));
+                            self.ui.glyph_row_places.insert(e, p);
                         }
                         // A line left: its glyphs linger (onto one of them, too).
-                        if let Some(old) = ed.hover.filter(|_| ed.hover != hov) {
-                            ed.glyph_entity = Some((old, std::time::Instant::now()));
-                            self.ui.glyph_linger_task = Some(glyph_linger_redraw(cx));
-                        }
+                        left = ed.hover.filter(|_| ed.hover != hov);
                         ed.hover = hov;
+                    }
+                    if let Some(old) = left {
+                        self.linger_glyphs(old, cx);
                     }
                     self.update_use_preview();
                     self.apply_outcome(out, window, cx);
@@ -1499,6 +1552,7 @@ impl PartStudioView {
         if let Some(ed) = &mut self.sketch {
             ed.set_tool(tool);
         }
+        self.push_tool_cursor(cx);
         if let Some(ui) = self.ui_mut() {
             ui.use_preview_for = None;
         }
@@ -4084,13 +4138,21 @@ impl PartStudioView {
         let all = ed.constraint_glyphs(&data);
         // (A glyph of the row hovered keeps the whole row, live2 feel-1417.)
         let row_hovered = |e: noshape_sketch::EntityId| all.iter().any(|g| g.entity == e && ed.hover_constraint == Some(g.constraint));
-        let recent = ed.glyph_entity.filter(|(e, _)| self.ui.glyph_linger_task.is_some() || row_hovered(*e)).map(|(e, _)| e);
+        let now = cx.background_executor().now();
+        let recent: Vec<noshape_sketch::EntityId> = self
+            .ui
+            .glyph_linger
+            .iter()
+            .filter(|(_, t)| now.saturating_duration_since(*t) < GLYPH_LINGER)
+            .map(|(e, _)| *e)
+            .chain(ed.glyph_entity.map(|(e, _)| e).filter(|e| row_hovered(*e)))
+            .collect();
         let glyphs: Vec<_> = all
             .into_iter()
             .filter(|g| {
                 show_all
                     || ed.hover == Some(g.entity)
-                    || recent == Some(g.entity)
+                    || recent.contains(&g.entity)
                     || ed.selection.contains(&g.entity)
                     || ed.selected_constraints.contains(&g.constraint)
                     || ed.hover_constraint == Some(g.constraint)
@@ -4117,6 +4179,7 @@ impl PartStudioView {
             Some(if ny < -1e-3 || (ny.abs() <= 1e-3 && nx < 0.0) { (-nx, -ny) } else { (nx, ny) })
         };
         let mut per_entity: HashMap<u32, usize> = HashMap::new();
+        let mut boxes = Vec::new();
         for g in glyphs {
             // Dragged glyphs sit centered on their stored offset. Live
             // (sketch/28; SKETCH-GLYPH-LAYOUT-LOST, 45690459 re-applied):
@@ -4132,9 +4195,9 @@ impl PartStudioView {
                 }
                 None => {
                     // A hovered line's row (Show constraints off) at the pointer's spot on it.
-                    let hover_row = !show_all && !g.on_point && !ed.selection.contains(&g.entity) && (ed.hover == Some(g.entity) || recent == Some(g.entity) || !ed.selected_constraints.contains(&g.constraint));
-                    let at = match (ed.glyph_row_at, data.sketch.curve(g.entity)) {
-                        (Some((e, p)), Some(noshape_sketch::Curve2::Line { a, b })) if hover_row && e == g.entity && (b - a).length_squared() > 0.0 => a + (b - a) * ((p - a).dot(b - a) / (b - a).length_squared()).clamp(0.0, 1.0),
+                    let hover_row = !show_all && !g.on_point && !ed.selection.contains(&g.entity) && (ed.hover == Some(g.entity) || recent.contains(&g.entity) || !ed.selected_constraints.contains(&g.constraint));
+                    let at = match (self.ui.glyph_row_places.get(&g.entity), data.sketch.curve(g.entity)) {
+                        (Some(&p), Some(noshape_sketch::Curve2::Line { a, b })) if hover_row && (b - a).length_squared() > 0.0 => a + (b - a) * ((p - a).dot(b - a) / (b - a).length_squared()).clamp(0.0, 1.0),
                         _ => g.anchor,
                     };
                     let Some((x, y)) = project(at) else { continue };
@@ -4150,7 +4213,7 @@ impl PartStudioView {
                         // hovered (Show constraints off): the row sits ~40 px
                         // on the other side, above a horizontal line (live 1938).
                         // (A row shown for its hovered line keeps its place when one of its glyphs is selected.)
-                        let hover_only = !show_all && !ed.selection.contains(&g.entity) && (ed.hover == Some(g.entity) || recent == Some(g.entity) || !ed.selected_constraints.contains(&g.constraint));
+                        let hover_only = !show_all && !ed.selection.contains(&g.entity) && (ed.hover == Some(g.entity) || recent.contains(&g.entity) || !ed.selected_constraints.contains(&g.constraint));
                         let off = if hover_only { -39.0 } else { 20.5 };
                         (x + nx * off, y + ny * off, -10.0 - 11.0 * (n - 1.0) + 22.0 * kf, -10.0)
                     } else if g.icon == "flow" {
@@ -4189,6 +4252,7 @@ impl PartStudioView {
             }
             let cid = g.constraint;
             let gent = g.entity;
+            boxes.push((cid, gent, x + dx, y + dy));
             let selected = ed.selected_constraints.contains(&cid);
             let hovered = ed.hover_constraint == Some(cid);
             let conflict = ed.show_errors && ed.conflicting.contains(&cid);
@@ -4222,12 +4286,10 @@ impl PartStudioView {
                     // Live sketch/28: plain 20 px boxes, 18 px icons.
                     .child(icon_px(g.icon, 18.0, fg))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
-                        if let Some(ed) = &mut this.sketch {
-                            // Off a glyph of a lingering row: the row lingers again (to reach its next glyph).
-                            if !*h && ed.glyph_entity.is_some_and(|(e, _)| e == gent) {
-                                ed.glyph_entity = Some((gent, std::time::Instant::now()));
-                                this.ui.glyph_linger_task = Some(glyph_linger_redraw(cx));
-                            }
+                        // Off a glyph of a lingering row: the row lingers again (to reach its next glyph).
+                        let lingering = this.sketch.as_ref().is_some_and(|ed| ed.glyph_entity.is_some_and(|(e, _)| e == gent)) || this.ui.glyph_linger.iter().any(|(e, _)| *e == gent);
+                        if !*h && lingering {
+                            this.linger_glyphs(gent, cx);
                         }
                         if let Some(ed) = &mut this.sketch {
                             let new = if *h { Some(cid) } else if ed.hover_constraint == Some(cid) { None } else { ed.hover_constraint };
@@ -4257,6 +4319,7 @@ impl PartStudioView {
                     .into_any_element(),
             );
         }
+        self.ui.glyph_boxes = boxes;
 
         // ---- pattern glyphs (right-click: Edit pattern). Live (behaviours
         // "icons2 … sketch Linear pattern", sketch/2222): the glyph left of the

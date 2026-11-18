@@ -479,3 +479,26 @@ fn a_face_double_clicked_draws_its_sketch_through_the_pointer(cx: &mut TestAppCo
     });
     assert_eq!((related, shown, drawn, through), (2, 1, true, 1), "(related rows, sketches shown for now, its curves in the scene, drawn through the parts)");
 }
+
+/// live2 hover-time-1118: every move picks at once only while a sketch creation tool is active (live's
+/// `alwaysPreHighlightOnMouseMove`: Line, Dimension); in a sketch with no tool, and outside a sketch, a fast move's pick
+/// waits for the pause (the sketch's 270–300 ms with no tool vs ~30 ms with Dimension).
+#[gpui::test]
+fn only_a_sketch_tool_picks_on_every_move(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "pick-on-move", Tool::Select);
+    let at_once = |cx: &mut TestAppContext, tool: Option<Tool>| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                match tool {
+                    Some(t) => v.activate_tool(t, w, cx),
+                    None => v.leave_sketch(cx),
+                }
+                v.push_tool_cursor(cx);
+            })
+        })
+        .unwrap();
+        cx.update(|cx| view.read(cx).viewport.read(cx).pick_on_move)
+    };
+    let got = [at_once(cx, Some(Tool::Line)), at_once(cx, Some(Tool::Dimension)), at_once(cx, Some(Tool::Select)), at_once(cx, None)];
+    assert_eq!(got, [true, true, false, false], "(Line, Dimension, no tool, outside the sketch): every move picks at once");
+}
