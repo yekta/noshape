@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 18:18 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 18:46 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -19,28 +19,32 @@ text (carry_text_box); MIRROR of two lines = lines mirrored, ends free (ops "mir
 sketch entity. Suite 1515 (vibe2): 90/126, 1322/1585 (vibe2's cf-sheet-metal-overcut-dogbone 2/10 is its model copy:
 the custom feature doesn't load there; 10/10 on vibex8).
 
-## Queued 17:50
-- Alignment: a point wakes on the first snap onto it (Endpoint / Center, external vertex), no `ACQUIRE_REST` (live
-  feel retaken 11-18); a drag wakes the points it snaps onto and then aligns with them (Drop::Level). ≠ left: a
-  midpoint's / quadrant's snap wakes no alignment source (ours aligns with points only).
-- Symmetric tool on two lines: one lines-only mirror, the second line moved onto the first's mirror image (length and
-  place kept) (live2 mirror-sym-1118). The Mirror tool keeps its ends tied (live: line + end-pair MIRRORs).
+## Landed 18:28 (f1a1c756)
+Alignment wakes on the first snap onto a point (no `ACQUIRE_REST`), a drag aligns with points it snapped onto;
+Symmetric on two lines = one lines-only mirror (second line onto the first's mirror image). ≠ left: a midpoint's /
+quadrant's snap wakes no alignment source (ours aligns with points only).
+
+## Queued 18:46 (8d02aab7, with 53ff668c docs)
+A Use whose live query is empty in a sketch live WARNs about: drawn as stored, pinned to a missing reference (ours warns
+as live's; welding-config 9c7704 Sketch 8, 21 -> 22/37). Gated on live's `featureStates` (hunting-knife's empty-query
+Uses are OK in live: unchanged).
 
 ## Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
 regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).
 
 ## Next
-- core: asm-welding-config studio 9c7704 Sketch 9 region 109.56 vs live 105.68 mm² (prepared on vibe2:
-  ~/tmp/skasm/cfgm/wc-9c7704; run cfg.sh with its models dir).
+- welding-config 9c7704 after core's Extrude 8 fix: Sketch 12 (2 PROJECTED not found), Sketch 13 (DIAMETER "Sketch
+  could not be solved"); repro vibe2 ~/tmp/skasm/cfgm/wc-9c7704 + cfg.sh.
+- Midpoint / quadrant snaps as alignment sources (live feel retaken 11-18).
+- live sktools-1118: a Trim pass ~1 px by a chain's corner isn't a crossing in live; check ours.
+- Convert to rip after a Radius edit (see below); dimension box second click (REQUESTS 18:05).
 - live2 sm-1118: Convert to rip right after a Radius edit adds no second Modify joint in live; ours adds Modify joint 2.
   Tried 18:3x reusing the bend's own Modify joint: after its regeneration the bend's faces are renamed, so neither its
   stored entity nor `label_owners` / `Bend::feature` lead back to it (the same gap would make a second Radius edit
-  add Modify joint 2). Needs the stored entity resolved through the history; not landed. live sktools-1118: a Trim pass ~1 px by a chain's corner isn't a crossing; check ours.
-- Form Location(s): live's second button is Flip direction; ours has it there too (schema `flipDirection` follows
-  `locations`, a trailing flip): row corrected to =.
-- live dimbox-1118: our dimension box opens on the OS double-click; asked live (REQUESTS 18:05) whether a click on an
-  already-selected label opens it after any gap. Palette parts (grip, chevron, field, tolerance, ✓, ✗) present.
-- Handed: surf-intro-simple Loft 1 (core), surf-intro-examples Fill 1 overshoot (lead to route).
+  add Modify joint 2). Needs the stored entity resolved through the history; not landed.
+- Handed: surf-intro-simple Loft 1 (core), surf-intro-examples Fill 1 overshoot (lead to route), welding-config
+  Extrude 8 (core, fixing), manualblend Sweep 2 area / Move boundary (core).
+- Form speed P0 binaries /root/skasm-scratch/apps: delete (done).
 
 ## Waiting on live (REQUESTS)
 - Answered 11-18 13:xx: wave-washer sketches.json (Sketch 4 / 3 solved inward) and surf-intro Derived 1 sources
