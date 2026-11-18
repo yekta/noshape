@@ -628,6 +628,14 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - [x] (closed qa 12:33: live2's fresh-config retake: 220 px (x 246-466), as live; the 392 came from /root's shared config) **P1 FEEL-FILLET-DIALOG-WIDTH (psui)**: the Fillet dialog is ~394 px wide; live 220.
 - Equal to live (live2): the two-feature suppress, the rollback release, chip click / Delete, expressions, Tab in the "#" list.
 
+## Interaction feel: live2's "Ours" cells, batch 3 (manip-feel-1118 rows 981-983; live2 12:42, green e503ca2f, landed 9a3a9c645)
+- [ ] **P1 TRANSFORM-TRIAD-CENTRE (psui)**: the Transform triad sits on the top face's centre; live (and std findCenter) puts it at the
+  bounding-box centre (~24 px lower on the block).
+- [ ] **P1 TRANSFORM-GHOST-LOOK (psui)**: our old place is a tan translucent copy with all edges brown and the preview is the part's
+  blue; live: a light grey ghost with an orange silhouette, the preview dark grey.
+- [ ] **P1 ASM-TRIAD-ARROW-JUMP (asm)**: an arrow drag puts the triad's origin under the pointer (6 px -> 4.3 mm at once); live starts
+  at 0 mm and keeps the grab offset. Minor: the last handle used stays blue after the release.
+
 ## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:10, green cafe3c2af, vibex8 Xvfb, real pointer)
 Sessions opened without the UI runner (stable view): asm-feel (Part 1 40x30x10, Part 3 20x20x5), block-fillet, hole-plate-drawing.
 Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png (vibex8 ~/agents/qa-keep/feel-1118/).
