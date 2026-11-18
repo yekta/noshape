@@ -4443,3 +4443,21 @@ skasm meanwhile; I'll list what I change here before landing.
   deletes stand-in faces. Move face 1 6.6 s -> 28 ms; Delete face 2 replay 16.6 -> 8.1 s (300K bound per feature,
   spent ones kept). OCCT 0034 dropped (/root/core-scratch/occt-0034-extension-cap.diff). Remeasure once blend's
   Fillet 3 / Stevenrohr zum Halter build; measure on the Mac. p6res/branch.all "(spent)" lines = removals past 300K.
+
+## Moved from the handoff 11-18 12:55
+- **Parked: knife Revolve 1's 19th vertex (branch core-pole-v2 in core-bis, not landed).** Our sphere's pole there sits
+  where live's vertex is, (114.5, 0, -12.56), inside the dish. "Pole shown where the face has a boundary" regressed
+  cf-box-dovetail-joint, prize-wheel-tim, cf-surface-pattern; "boundary not only circles round the pole's axis" still
+  regresses prize-wheel-tim's knob (our sphere's poles lie on a horizontal axis, (±4.9, 0, 24.5): our sphere frame,
+  not live's) and cf-surface-pattern (259 -> 344 vertices). Needs live's surface type of the knife's dish
+  (SPHERE or a spun B-spline: Parasolid may keep a vertex where a spun profile meets the axis) before another try.
+- Fill 1 older tries: fair_g1_fill declines (edges share no vertices; midpoint matching patch
+  /root/core-scratch/fair-fill-midpoint.patch gives 22754.7 mm2, -4.5 %).
+- c2-surf-workshop-loft Loft 2: 3-profile surface loft 7e-5 off live's area (interpolation detail); skipped.
+- c2-surf-workshop-britatap Touch screen split (4/22): our projected split curve (BRepProj section, a degree 7
+  B-spline) ends 0.116 mm from the face's corner along the rim, where the sketch edge ends exactly; live ends it on
+  the corner (2/6/5 vs ours 2/7/6). Kernel projection precision at a tangent end; parked.
+- **Handed off 11-16:** c2-config-parts-screws memory (14.8 GB): Revolve 9's unify (usd_kept_volume -> OCCT UnifyFaces)
+  on the invalid body Sweep 1's OCCT fallback left: bool takes Sweep 1's cut, bool2 the unify bound.
+- Extrude 33 (asm-pattern-std 36b90f) P0: 150 ms on main (debug, loaded vibe5 (down 11-17)); re-time once asm's Boolean feature
+  pattern fix lands (Linear pattern 1 still errors upstream).

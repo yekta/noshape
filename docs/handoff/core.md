@@ -134,21 +134,15 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
 - rocker-enclosure-sm Extrude 2 (next): Sketch 4's four Use circles (PROJECTED, live's external edges at x 45-60 mm,
   not on our part) come out as two: Extrude 2 names one region twice and cuts 2 holes of 4. Sketch translation:
   written into docs/handoff/skasm.md (landed 11-16).
-- c2-surf-workshop-britatap Touch screen split (4/22): our projected split curve (BRepProj section, a degree 7
-  B-spline) ends 0.116 mm from the face's corner along the rim, where the sketch edge ends exactly; live ends it on
-  the corner (2/6/5 vs ours 2/7/6). Kernel projection precision at a tangent end; parked.
 - c2-surf-workshop-cpcurves Main pipe (thin sweep, 7/24): (1) Sketch 4's circle kept 18.8 mm off the path (translator
   take-back: in skasm's handoff). (2) Mine: live merges the faces swept along the path's three collinear lines into
   one per wall (6 faces; ours 10: a face per path edge). **Committed b173dc5bb (core-oc, NOT in the vibex7 pair):
   join_collinear_lines joins a sweep path's lines along one line into one edge (first piece's source)**: Main pipe's
   faces = live (only its box differs, the take-back). T1 features_a::a_sweep_along_collinear_lines_has_one_side_face.
-- Fill 1 older tries: fair_g1_fill declines (edges share no vertices; midpoint matching patch
-  /root/core-scratch/fair-fill-midpoint.patch gives 22754.7 mm2, -4.5 %).
 - c2-surf-workshop-split Boundary surface 1 (6/12, parked): 2x2 profiles, defaults; ours 3803.55 mm², live 3762.61
   (+1.1 %). It goes through k::fill_surface (op_fill) but not its plate: a Coons branch for 4 G0 edges placed first
   changed nothing (edge count != 4 or Coons declined; not chased). Experimental coons_fill saved in
   /root/core-scratch/features-coons.cpp (full file, not a patch).
-- c2-surf-workshop-loft Loft 2: 3-profile surface loft 7e-5 off live's area (interpolation detail); skipped.
 - c2-hunting-knife Revolve 1 (46/52, parked): HANDLE 10/27/18, live 10/27/19. Our ring between the handle's B-spline
   face and the dome's sphere is two equal 41 mm edges (vertices at (119.65, 0, 2.99): the B-spline's seam end, and
   (104.36, 0, -27.20): the sphere seam's end), both hidden by the seam-join rule. Live's ring RvBB (81.385 mm) has its
@@ -166,16 +160,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   /root/core-scratch/loft-closed-path-wip.patch closes it round the path but comes out −11279 mm³: two profiles sit
   83 mm off the 26 mm ring, so MakePipeShell's carried sections twist. c2-surf-workshop-pipe: guided loft of more than
   two profiles unsupported (a Gordon surface over n profiles: big kernel item).
-- Extrude 33 (asm-pattern-std 36b90f) P0: 150 ms on main (debug, loaded vibe5 (down 11-17)); re-time once asm's Boolean feature
-  pattern fix lands (Linear pattern 1 still errors upstream).
-- **Handed off 11-16:** c2-config-parts-screws memory (14.8 GB): Revolve 9's unify (usd_kept_volume -> OCCT UnifyFaces)
-  on the invalid body Sweep 1's OCCT fallback left: bool takes Sweep 1's cut, bool2 the unify bound.
-- **Parked: knife Revolve 1's 19th vertex (branch core-pole-v2 in core-bis, not landed).** Our sphere's pole there sits
-  where live's vertex is, (114.5, 0, -12.56), inside the dish. "Pole shown where the face has a boundary" regressed
-  cf-box-dovetail-joint, prize-wheel-tim, cf-surface-pattern; "boundary not only circles round the pole's axis" still
-  regresses prize-wheel-tim's knob (our sphere's poles lie on a horizontal axis, (±4.9, 0, 24.5): our sphere frame,
-  not live's) and cf-surface-pattern (259 -> 344 vertices). Needs live's surface type of the knife's dish
-  (SPHERE or a spun B-spline: Parasolid may keep a vertex where a spun profile meets the axis) before another try.
 - Probe (uncommitted, /root/core-scratch/probe-wip.patch): ops parity::bodies_after_feature_probe (+ NOSHAPE_PROBE_SKETCH: a
   sketch's regions)
   (NOSHAPE_PROBE_DOC = a copy WITH its -wal / -shm, NOSHAPE_PROBE_AFTER, NOSHAPE_PROBE_OUT, NOSHAPE_PROBE_PART,
