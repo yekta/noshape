@@ -28,6 +28,9 @@ use noshape_units::{Dim, Quantity};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// NOSHAPE_SNAP_TRACE: log each pointer move's snap in viewport px.
+static SNAP_TRACE: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| std::env::var_os("NOSHAPE_SNAP_TRACE").is_some());
+
 actions!(sketch_entry, [SketchEntryTab, SketchEntryBackTab, SketchEntryCancel, SketchHintTab, SketchHintBackTab]);
 
 /// Keys of the on-the-fly value box: Tab (the value with its unit,
@@ -985,6 +988,17 @@ impl PartStudioView {
                         && let Some(ed) = &mut self.sketch
                     {
                         ed.apply_external_snap(snap);
+                    }
+                    // NOSHAPE_SNAP_TRACE=1: the pointer and what it snaps to, in continuous viewport px (qa 11-18
+                    // SKSNAP-REACH: a whole-pixel sweep can't tell 6.5 from 7.5).
+                    if *SNAP_TRACE
+                        && let Some(ed) = &self.sketch
+                    {
+                        let at = ed.inference.as_ref().and_then(|i| Some((i.kind, vp.read(cx).project(ed.frame.to_world(i.position))?)));
+                        match at {
+                            Some((kind, q)) => eprintln!("snap-trace pointer ({:.3}, {:.3}) {kind:?} at ({:.3}, {:.3}): d ({:.3}, {:.3}) px", position.x, position.y, q.x, q.y, position.x - q.x, position.y - q.y),
+                            None => eprintln!("snap-trace pointer ({:.3}, {:.3}) none", position.x, position.y),
+                        }
                     }
                     let hov = self.hovered_sketch_entity(cx);
                     if let Some(ed) = &mut self.sketch {
