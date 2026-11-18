@@ -9032,6 +9032,25 @@ mod tests {
         assert!((lo - v(0.005, 0.0075)).length() < 1e-9 && (hi - v(0.055, 0.0325)).length() < 1e-9, "{lo:?} {hi:?}");
     }
 
+    /// Live (qa sellat-1118): a horizontal line off the origin with only its length, 40 -> 50 typed in the editor,
+    /// moves both ends equally (start -5, end +5 mm); the label stays where it was, on the unchanged midpoint.
+    #[test]
+    fn a_free_lines_new_length_moves_both_ends_equally() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let line = d.sketch.add_line(v(0.002, 0.003), v(0.042, 0.003));
+        d.sketch.add_constraint(ConstraintKind::Horizontal { a: line, b: None }).unwrap();
+        let len = d.sketch.add_constraint(ConstraintKind::Length { curve: line, value: 0.04 }).unwrap();
+        assert!(d.sketch.solve().is_solved());
+        d.dimension_labels.insert(len.0, [0.022, 0.008]);
+        ed.apply_dimension(&mut d, len, "50", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+        let c = d.sketch.curve(line).unwrap();
+        assert!((c.start_point() - v(-0.003, 0.003)).length() < 1e-9 && (c.end_point() - v(0.047, 0.003)).length() < 1e-9, "{c:?}");
+        assert_eq!(d.dimension_labels.get(&len.0), Some(&[0.022, 0.008]));
+        ed.apply_dimension(&mut d, len, "40", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+        let c = d.sketch.curve(line).unwrap();
+        assert!((c.start_point() - v(0.002, 0.003)).length() < 1e-9 && (c.end_point() - v(0.042, 0.003)).length() < 1e-9, "back: {c:?}");
+    }
+
     /// Live (qa5 dim conflict, SK1): a value the sketch can't be solved with
     /// is taken (the dimension reads it) but the last solved shape stays,
     /// with Onshape's "Sketch could not be solved.".
