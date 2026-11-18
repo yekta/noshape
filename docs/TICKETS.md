@@ -633,7 +633,7 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
   bounding-box centre (~24 px lower on the block).
 - [ ] **P1 TRANSFORM-GHOST-LOOK (psui)**: our old place is a tan translucent copy with all edges brown and the preview is the part's
   blue; live: a light grey ghost with an orange silhouette, the preview dark grey.
-- [ ] **P1 ASM-TRIAD-ARROW-JUMP (asm)**: an arrow drag puts the triad's origin under the pointer (6 px -> 4.3 mm at once); live starts
+- [x] (verified live2 17:5x on green 87edba24, 3 runs: the X arrow grabbed 35 px out reads 0.4 mm at 6 px, 2 mm at 31 px; not blue after release) **P1 ASM-TRIAD-ARROW-JUMP (asm)**: an arrow drag puts the triad's origin under the pointer (6 px -> 4.3 mm at once); live starts
   at 0 mm and keeps the grab offset. Minor: the last handle used stays blue after the release.
 
 ## Interaction feel: live2's "Ours" cells, batch 4 (view-tools 992-995, field-keys 1309-1313; live2 12:50, green e503ca2f, landed 422aacaa7 / ae075b8eb)
@@ -651,7 +651,7 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - [x] (dropped qa 13:10: a remembered value; live2's fresh config had none yet, after one Form ours opens with Circle emboss as live; row 1288 = in 792d2e7b8) **P1 FORM-DEFAULT-STUDIO (skasm)**: the sheet-metal Form dialog opens with "Form Part Studio" empty; live's opens with Circle emboss. The rest matches.
 
 ## Interaction feel: live2's "Ours" cells, batch 7 (studios rows 1294-1297: 3 equal, 1 not; live2 13:2x, green 9021eeb7a)
-- [ ] **P1 DRW-TOOLBAR-TOOLTIP-DELAY (studios)**: a drawing toolbar button's title tooltip appears 0.70 s after the hover; live's at
+- [ ] (studios 6b91ebbd8 set 450 ms; live2 17:5x on 87edba24, which has it, 3 fresh launches: first hover 687 / 610 / 636 ms, second 629 / 622 / 589, live ~470: still open; the help popover = 3.19-3.29 s, live ~3.1) **P1 DRW-TOOLBAR-TOOLTIP-DELAY (studios)**: a drawing toolbar button's title tooltip appears 0.70 s after the hover; live's at
   ~0.47 s. (studios told by live2.)
 - Equal to live (live2): 1294, 1296, 1297. live2 next: the non-P0 "?" rows (ui-speed 1088-1093, prefs, numfmt, 1199, 1236, 893,
   1114, 1163); snap-diag 1303 stays qa's (Snap reach, on hold for asm).
@@ -704,8 +704,8 @@ per-feature time). Each owner re-times on the Mac (DECISIONS 11-16) before and a
 | cf-spur-gear | whole document | 1913-2343 | 720 | ×2.9 | dx (gears share one name) |
 
 ## Interaction feel: live2's "Ours" cells, batch 8 (ui-speed rows 1090-1093: 2 equal, 2 not; live2 13:3x, green c7d388e8, landed 0f833da72)
-- [ ] **P1 ROLLBACK-DROP-INPLACE (psui)**: the rollback bar lands 0.14-0.24 s after the drop; live's ~0.1 s (live UI shown 134 / 91 ms).
-- [ ] **P1 MASS-VALUES-DELAY (psui)**: Mass properties' values appear 313 ms after the part is picked; live's 154 ms.
+- [x] (live2 17:5x on 87edba24: 115 / 137 / 92 / 143 / 213 / 85 ms, five of six in live's 91-134 band; closed, the 213 ms outlier left as P2 ROLLBACK-DROP-OUTLIER if it recurs) **P1 ROLLBACK-DROP-INPLACE (psui)**: the rollback bar lands 0.14-0.24 s after the drop; live's ~0.1 s (live UI shown 134 / 91 ms).
+- [x] (verified live2 17:5x on 87edba24: 219 / 150 / 117 ms, live 154) **P1 MASS-VALUES-DELAY (psui)**: Mass properties' values appear 313 ms after the part is picked; live's 154 ms.
 - Equal to live (live2): 1090, 1092. Rows 1088 (document open) and 1089 (tab switch) are qa's (screen-timed on live's speed document).
 - SEARCH-TOOLS-TOOLBAR-HIGHLIGHT still missing on c7d388e8 (skasm's 6389133a not in a green yet).
 
