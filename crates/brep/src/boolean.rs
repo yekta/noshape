@@ -1116,6 +1116,9 @@ struct Ctx<'a> {
     /// Sections hooking out over a face's boundary into their end (`intervals_on`'s grazes): the curve, the face,
     /// where it crosses back and its end.
     hooks: std::sync::Mutex<Vec<(u32, usize, f64, f64)>>,
+    /// Whether a pool vertex lies on an edge of a face ([`Ctx::on_an_edge`]), by face, vertex, the vertex's tolerance
+    /// and the face's edge count: a section's ends ask again of the same vertices near them.
+    on_edge_memo: std::sync::Mutex<HashMap<(usize, u32, u64, usize), bool>>,
     src: Option<&'a dyn SectionSource>,
 }
 
@@ -1613,6 +1616,29 @@ impl Ctx<'_> {
             Geo::Apex { .. } => 0.0,
             Geo::Nurbs { id, t0, t1 } => free::length(&self.ncurves[id as usize].c, t0, t1),
         }
+    }
+
+    /// Whether `q` (a point of tolerance `qt`) lies on one of face `f`'s edges, between its ends, within the two's
+    /// tolerances: none where it lies past the face's box (which holds its edges) or a B-spline edge's pieces' boxes.
+    fn on_an_edge(&self, f: usize, q: DVec3, qt: f64) -> bool {
+        let face = &self.faces[f];
+        let most = face.edges.iter().fold(0.0f64, |m, &(e, _)| m.max(self.edges[e].t));
+        if !boxes_meet(q, q, face.lo, face.hi, self.pool.pair(most, qt)) {
+            return false;
+        }
+        face.edges.iter().any(|&(e, _)| {
+            let (s, reach) = (self.edge_seg(e), self.pool.pair(self.edges[e].t, qt));
+            if let Geo::Nurbs { id, t0, t1 } = s.g {
+                let nc = &self.ncurves[id as usize];
+                let (lo, hi) = (t0.min(t1), t0.max(t1));
+                let boxes = nc.boxes.get_or_init(|| nc.c.piece_boxes(8));
+                if !boxes.is_empty() && boxes.iter().filter(|b| b.1 >= lo && b.0 <= hi).all(|b| (q - q.clamp(b.2, b.3)).length() > reach) {
+                    return false;
+                }
+            }
+            let (u, d) = self.seg_param(&s, q);
+            d <= reach && (0.0..=1.0).contains(&u)
+        })
     }
 
     fn edge_seg(&self, e: usize) -> Seg {
@@ -2125,18 +2151,22 @@ impl Ctx<'_> {
             // their corner, both faces' boundaries crossed short of it): that vertex, as OCCT's pave.)
             let corner = |cx: &Ctx, p: DVec3| {
                 let reach = 10.0 * cx.tol.max(stol);
-                let of = |f: usize| cx.faces[f].edges.iter().flat_map(|&(e, _)| cx.edges[e].v).collect::<Vec<u32>>();
-                let (a, b) = (of(fs), of(ft));
-                a.into_iter().filter(|w| b.contains(w)).map(|w| (w, (cx.p(w) - p).length())).filter(|x| x.1 <= reach).min_by(|x, y| x.1.total_cmp(&y.1)).map(|x| x.0).or_else(|| {
+                // (Its own vertices near the point first: a knurl's faces have hundreds of edges.)
+                let of = |f: usize| cx.faces[f].edges.iter().flat_map(|&(e, _)| cx.edges[e].v);
+                let near: Vec<(u32, f64)> = of(fs).map(|w| (w, (cx.p(w) - p).length())).filter(|x| x.1 <= reach).collect();
+                let near: Vec<(u32, f64)> = if near.is_empty() { near } else { near.into_iter().filter(|x| of(ft).any(|w| w == x.0)).collect() };
+                near.into_iter().min_by(|x, y| x.1.total_cmp(&y.1)).map(|x| x.0).or_else(|| {
                     // (Or a vertex where an edge of each crosses the other's (c2-config-parts-sprockets' rim torus and
                     // a tooth gap's cylinder: their section meets the top plane at a grazing angle, each face's end of
                     // it 0.28 um along from that crossing).)
                     let on = |f: usize, w: u32| {
-                        let q = cx.p(w);
-                        cx.faces[f].edges.iter().any(|&(e, _)| {
-                            let (u, d) = cx.seg_param(&cx.edge_seg(e), q);
-                            d <= cx.pool.pair(cx.edges[e].t, cx.pool.t[w as usize]) && (0.0..=1.0).contains(&u)
-                        })
+                        let key = (f, w, cx.pool.t[w as usize].to_bits(), cx.faces[f].edges.len());
+                        if let Some(&known) = cx.on_edge_memo.lock().unwrap_or_else(|p| p.into_inner()).get(&key) {
+                            return known;
+                        }
+                        let got = cx.on_an_edge(f, cx.p(w), cx.pool.t[w as usize]);
+                        cx.on_edge_memo.lock().unwrap_or_else(|p| p.into_inner()).insert(key, got);
+                        got
                     };
                     cx.pool.within(p, reach).into_iter().filter(|x| on(fs, x.0) && on(ft, x.0)).min_by(|x, y| x.1.total_cmp(&y.1)).map(|x| x.0)
                 })
@@ -2154,13 +2184,7 @@ impl Ctx<'_> {
             // crossing, there before or after (the same sprockets' tooth gaps patterned, their crossings found later).)
             let crossing = |cx: &Ctx, p: DVec3| {
                 let reach = 10.0 * cx.tol.max(stol);
-                let on = |f: usize, q: DVec3| {
-                    cx.faces[f].edges.iter().any(|&(e, _)| {
-                        let (u, d) = cx.seg_param(&cx.edge_seg(e), q);
-                        d <= cx.pool.pair(cx.edges[e].t, 0.0) && (0.0..=1.0).contains(&u)
-                    })
-                };
-                [x.1, y.1].into_iter().find_map(|o| if let End::Point(q) = o && (q - p).length() <= reach && on(fs, q) && on(ft, q) { Some(q) } else { None })
+                [x.1, y.1].into_iter().find_map(|o| if let End::Point(q) = o && (q - p).length() <= reach && cx.on_an_edge(fs, q, 0.0) && cx.on_an_edge(ft, q, 0.0) { Some(q) } else { None })
             };
             let v = match end {
                 End::Open => return Ok(None),
@@ -4576,6 +4600,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         on_surface: HashMap::default(),
         ncurves: Vec::new(),
         hooks: Default::default(),
+        on_edge_memo: Default::default(),
         src,
     };
     // (Inputs that carry their own tolerances (the kernel's): OCCT's least, 1e-7, in a pair test.)
