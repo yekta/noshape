@@ -566,7 +566,9 @@ Start with "› Show changes…", 50 px, Main selected; B1's amber line up from 
 version V3"; a single click on a version row opens it ("Versions are view only. Viewing V2." [Return to Main], navbar V2); a change
 row's menu (Open, Open in new browser tab, Compare, View in repair, Create version here…); change text "Edit : Extrude 1" (live's UI
 edits say the same; "Update feature" is its API). Not judged: open / scroll timing (debug build, load ~25).
-- [ ] **P1 HISTFEEL-CHANGE-CLICK (studios)**: a single (or double) click on a change row opens nothing: Main stays selected, no bar.
+- [ ] **P1 HISTFEEL-CHANGE-CLICK (studios)**: a single (or double) click on a change row **under a version** opens nothing (the
+  selection stays where it was, no bar); Main's change rows open on a click (qa 01:12 on 5076e98c, name text clicked, tickets/
+  hist-v3-click.png). The last hovered row also keeps its tint after the pointer leaves the panel.
   Live: the click opens that microversion, the row selected #b2ddf6, with "History changes are view only. Viewing <change>"
   [Restore to Main] [Return to Main].
 - [ ] **P1 HISTFEEL-CHANGE-BAR (studios)**: right-click › Open on a change row opens it (row selected, model changes) but shows an
