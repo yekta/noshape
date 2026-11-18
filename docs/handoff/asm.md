@@ -47,7 +47,7 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
 - P0 HEAVY-ASM-SOFTWARE-FRAME (qa, xDev): cause = angle display mesh density: 7.76 M tris (SCHUNK Gehaeuse 355 faces
   1.17 M, 7 mm bearing 67k, _787261002 691k ×5); chord mesh 1.05 M; headless render 15–18 s -> 2.95 s (vibex8
   ~/tmp/asm/perf, probe /root/tmp/render.rs.main). Handed to psui 11-18 12:3x; assembly side doesn't scale it.
-- Triad grab-point fix re-QUEUED 3ab78c25 (worktree asm-triad; 05b77104 failed on a test-file conflict).
+- LANDED triad 89eca69c. QUEUED: A about Y in an edited mate 8887a5149 (asm-feel), fixed-drag cursor fb5e117d (asm-cursor).
 - Suite pair main vs 28-commit stack (lead: land on the light 20 if none worse): ~/agents/asm-keep/pairlist.sh <tag>
   <dirs>: vibe2 tag a (9: clamp … keyboard; 8 done, none worse, corexy 21->22 mates), vibex8 tag b (linear-limits …
   robot-relations), vibe2 tag b2 (welding, tvc, suspension, robotic-arm; stop b on vibex8 before those) -> pair/
@@ -151,8 +151,8 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
 ### Next, in order
 0. live2 truth (behaviours "asm (lead 11-18 ~13:32)", live/asm/truth-1118/), worked 11-18: pattern-std BOM: live's
    Linear pattern 5 ERROR drops its instances from live's BOM -> scorer live defect (5ef547724). pinslot washer 0.2985
-   mm: std studio 26bb0b Sketch 1 MIRROR of two unequal lines, ours mirrors endpoints -> edits undone, washer stays M5
-   -> skasm taking it. bjr OPG006 Description: 5e35bf's "Wire clip 1" imports an FS missing from the corpus -> REQUESTS
+   mm: MIRROR fixed by skasm (270e489b); next rollback in std studio 26bb0b Sketch 1 is CENTERLINE #ClearanceHole 1.632
+   mm (its config / setData not in the corpus: our std variables, mine; vibex7 asm-keep/pinslot-main.out). bjr OPG006 Description: 5e35bf's "Wire clip 1" imports an FS missing from the corpus -> REQUESTS
    13:55. bjr grubs (UJ <2> 4 mm): live's 103_06_ASM flexible inside each flexible UJ (per-copy angles); ours keeps a sub
    holding a flexible sub rigid (eval.rs prepare_subassembly), `nested` one level -> nested flexible = work item (lead).
    robot-relations ×6: 6 sheets vs our solid, as ruled (11-17). scissor Top <3>: fed22d model side (lead; vibe2 asm-keep/trace-scissor.out). isaac
