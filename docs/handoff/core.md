@@ -1,32 +1,33 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-18 10:38 UTC. History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-18 11:30 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight
-- **Background jobs (11-18 10:37), results land on vibex7 ~/tmp/core:**
-  - Pair 7 `pair7.sh ms mt` (slot queue, full suite): logs p7-ms.log / p7-mt.log, comparison p7-cmp.out, p7.done.
-    ms = core-oc msx (33c575415 + 81de7a342 + 62525922e = the landed pair-6 commits); mt = + e9caeead0 (offset_planes).
-  - Pair `pair5.sh pm pt <42 sheet/wire docs>` (slot queue): logs p4-pm.log / p4-pt.log, comparison p5-cmp.out, p5.done.
-    pm = main 485943a92, pt = + core-rv pairtype 37b1b5cad (parity pairing by body kind).
-  - Kill nothing of these by pid unless it is yours and checked (pid > 1, cmdline mine).
-- **LANDED 11-18:** impeller rim splits 27b7836e0 (09:33); Move face Offset of planes facing one way 77ba403e7 + surface
-  Extrude one surface per chain 4ca9526a1 (pair 6 clean, ~10:30); handoff 3057abcf0.
+- **Background jobs, results on vibex7 ~/tmp/core:** pair 7 `pair7.sh ms mt` (running since 11:12; p7-ms/mt.log,
+  p7-cmp.out, p7.done); pair 5 `pair5.sh pm pt <42 docs>` queued behind it (p4-pm/pt.log, p5-cmp.out, p5.done). After
+  both: `~/bin/slot bash pair8.sh mt fl` (Flansch, p8-cmp.out; copy core-rp's ops build to ~/tmp/core/pair-fl first).
+- **LANDED 11-18:** impeller rim splits 27b7836e0, Extrude impellerraum walls ea269148 (= 52c050e1, 09:33: Move face 1 +
+  Boolean 3 at live's volume); planar offsets 77ba403e7 + surface Extrude chains 4ca9526a1 (~10:30).
+- **Flansch verbreitern (core-rp branch flansch, on e9caeead0, uncommitted):** offset_planes takes linear extrusions too
+  (the profile projected across the direction, run on 10|d| + 10 % past its ends, offset as Geom_OffsetCurve,
+  extruded); extrusions move before planes so a plane moved later still meets them. T1 features_a::
+  move_face_offset_of_an_extruded_spline_wall_and_a_plane (wall exactly 1 mm off, 6 faces). Next: impeller time A/B
+  vs pair-mt (core-rp .imp.sh -> /root/core-scratch/imp.out), g++-13 build, pair 8, land after pair 7's e9caeead0.
+- **DRIVEN-PATTERN-SWEEP (qa P1) is REAL:** main fails Sweep 1 on the suite's own translation too (the suite says
+  "matches to the end" only because live.jsonl's Sweep 1 line is unfetched). OCCT MakePipeShell status 1 at our
+  tolerance (path ~4 mm -> 4.3e-9 m); with SetMaxSegments(1000) it builds 3 faces, valid, ~0.5 s, but keeps the 21.7°
+  tilt: V 0.07543 / side 6.169 vs live 0.07985 / 6.347 (live tilts 21.7° at both caps yet less in between). Probe
+  vibex7 ~/tmp/core/dp/swt3 profile.brep path.brep (src /root/core-scratch/brepq/swt*.cpp). Asked live (REQUESTS
+  11:18) for ROBK's sections along the path. Decision to the lead: land the retry (wrong-as-Ok by 5.5 % V) or wait.
 - **Impeller (lead P0) after 27b7836e0:** Move face 1 and Boolean 3 at live's volume (Boolean 3 43/108/66 vs live 64/189:
   the inner wall's 15 spline pieces not chased). Fillet 4 ERROR = blend's (its input edge JOV + faces JOm/JOW match
   live within 0.05 mm2; dump vibex7 ~/agents/core-keep/f4/fillet-32.*). **Move face 2 waits on Fillet 4:** its pick =
   JOy (226.35 mm2, live 226.37) + a 0.47 mm2 sliver on x 6 mm at z -3.96 beside JOV that live's fillet rounds (blend
   told; dump vibex7 ~/tmp/core/mf2dump/offsetfaces-33, probe vibex8 ~/tmp/core/probefan/offp). Delete face 2 now ERROR
   (was a wrong OK); re-time Delete face 2 / Extrude Bohrungssitz once the 65-face part reaches them.
-- **Pair 7 -> land e9caeead0 (= core-oc movepl ba85efd8c, rebase on main; C++: g++-13 first):** k::offset_planes (planes
-  of any normals offset one after another, a FaceTweak each) + FaceTweak runs a staying edge's trimmed curve (an
-  earlier tweak's) on to the moved face. Without it a +x then +y offset lost a corner wedge (5833 vs 6250 mm3, VALID):
-  any tweak on an already tweaked part could. T1 features_a::move_face_offset_of_three_sides.
-- **Flansch verbreitern (impeller, qa speed list: 126-283 ms, live 10):** offsets 3 faces, 2 planes + 1 linear
-  extrusion, so offset_planes doesn't apply; it stays on the booleans (offset_by_booleans). Next: offset an extrusion
-  face in the tweak (its profile curve offset, extruded). Flansch (vorne) verbreitern done: 835 -> 7-11 ms (live 6).
 - **Parity pairing (core-rv pairtype 37b1b5cad, on main 485943a92):** differences() pairs a live part with ours of its
   body kind first. manualblend Sweep 2 (skasm via lead): live's wire "Curve 2" was paired with our sheet swept along it
   (both volume 0, the sheet's box nearer); our own Curve 2 wire is > 13 mm off live's box: that is the real first
@@ -36,9 +37,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   counts (one face a B-spline where live has a cylinder). Then re-run nuts on main vs live 135.268 mm3 / 29 faces. My
   crest move (core-rp nuts3 59df02227) and exact cylinders (nuts2 7fec58496) are DROPPED (wrong OK without bool2's fix).
   Cases vibex8 ~/agents/core-keep/nuts/ (cutp).
-- **DRIVEN-PATTERN-SWEEP (P1, live 11-18 geo-1118/sweep1-loft-guide-driven-pattern.json):** c2-loft-guide-curves-driven-
-  pattern matches to the end on our 11-18 binary (11/11, Sweep 1 66 ms; live: 3 faces, 0.0798489 mm3, profile 21.7°
-  off normal, profileControl NONE). Nothing open unless someone reports a case.
 - **Live truth at the suite's first differences (live 11-18, for the restart):** behaviours.md "core + bool + skasm (lead
   11-18): live truth at the model suite's first differences", per-face JSON live/suite-truth-1118/<doc>.json. Mine:
   knifehandle Sweep 2 area, singularities Mirror 3 (one sheet), pipe Loft (>2-profile guides), cpcurves fit spline
@@ -95,7 +93,7 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   3269.1654 mm2, straight across (x 20 / x 4 at y 30 both z 10); both guides Normal to guide (m 1, 2):
   BSURF_INCONSISTENT_CONDITIONS_ERROR; guide 1 Tangent, Start Normal to profile (m 1, 2):
   LOFT_START_OR_END_CONDITIONS_WITH_GUIDES_FAILED. First: our result on these 6 (match the errors), then the suite 3.
-- c2-hunting-knife Revolve 1 HANDLE 10/27/19 (live 11-17, behaviours.md "core (01:32): the isolated vertex…", data
+- c2-hunting-knife Revolve 1 HANDLE 10/27/19 (live 11-18 second batch: the new face is a SPHERE r 60, 364.68 mm2, 1 edge; live 11-17, behaviours.md "core (01:32): the isolated vertex…", data
   live/core/q-knife-rev1/): live's extra vertex is the sphere's pole (114.5, 0, -12.563), an ISOLATED vertex (no edges)
   kept where the pole touched HANDLE's end plane RjBK (tangent there) that the subtract removed. Block repro: tangent
   top -> 9 vertices, 0.2 mm off -> 8. A Boolean keeping a removed face's tangent touching point; not started.
