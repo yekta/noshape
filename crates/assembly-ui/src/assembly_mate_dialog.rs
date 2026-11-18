@@ -272,33 +272,7 @@ impl MateDialog {
         // "50 mm", qa4 round 4 S2-a); "No minimum" stays as it is.
         let all: Vec<(Entity<InputState>, noshape_units::Dim)> = limits.iter().flat_map(|(k, (a, b))| [(a.clone(), limit_dim(k)), (b.clone(), limit_dim(k))]).collect();
         for (s, dim) in all {
-            subs.push(cx.subscribe_in(&s, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
-                InputEvent::Change => {
-                    this.touched = true;
-                    cx.emit(MateDialogEvent::Changed);
-                }
-                InputEvent::PressEnter { .. } | InputEvent::Blur => {
-                    let text = st.read(cx).value().to_string();
-                    let rewritten = commit_limit_text(&text, dim, &this.units, &this.variables);
-                    let committed = rewritten.clone().unwrap_or_else(|| text.clone());
-                    if let Some(t) = rewritten {
-                        st.update(cx, |s, cx| s.set_value(t, window, cx));
-                        cx.emit(MateDialogEvent::Changed);
-                    }
-                    // Live (qa5 P2-A2, behaviours "qa5 (10-26 p6)" (2)): Enter
-                    // on a new value applies it and keeps the dialog (the
-                    // value selected); Enter with nothing new accepts.
-                    let applied = this.limit_applied.insert(st.entity_id(), committed.clone());
-                    if matches!(ev, InputEvent::PressEnter { .. }) {
-                        if limit_enter_accepts(applied.as_deref(), &committed) {
-                            cx.emit(MateDialogEvent::Accept);
-                        } else {
-                            st.update(cx, |s, cx| s.select_all(window, cx));
-                        }
-                    }
-                }
-                _ => {}
-            }));
+            subs.push(cx.subscribe_in(&s, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| this.limit_event(st, dim, ev, window, cx)));
         }
         let type_select = cx.new(|_| crate::os_select::OsSelect::new("mate-type"));
         subs.push(cx.subscribe_in(&type_select, window, |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, _, cx| {
@@ -739,14 +713,49 @@ impl MateDialog {
 
     /// The primary-axis alignment chosen when both connectors of a new mate
     /// are picked (`flip_primary`: true = the Z axes agree).
-    /// Ticks Limits and types `text` into a limit box, as a user does.
+    /// A limit box's typing and commit. Live previews a limit on Enter (or leaving the box), not while it is typed
+    /// (feel3-1118; behaviours "While typing (before Enter) there is no live solve").
+    fn limit_event(&mut self, st: &Entity<InputState>, dim: noshape_units::Dim, ev: &InputEvent, window: &mut Window, cx: &mut Context<Self>) {
+        match ev {
+            InputEvent::Change => self.touched = true,
+            InputEvent::PressEnter { .. } | InputEvent::Blur => {
+                let text = st.read(cx).value().to_string();
+                let rewritten = commit_limit_text(&text, dim, &self.units, &self.variables);
+                let committed = rewritten.clone().unwrap_or_else(|| text.clone());
+                if let Some(t) = rewritten {
+                    st.update(cx, |s, cx| s.set_value(t, window, cx));
+                }
+                // Live (qa5 P2-A2, behaviours "qa5 (10-26 p6)" (2)): Enter
+                // on a new value applies it and keeps the dialog (the
+                // value selected); Enter with nothing new accepts.
+                let applied = self.limit_applied.insert(st.entity_id(), committed.clone());
+                if applied.as_deref() != Some(committed.as_str()) {
+                    cx.emit(MateDialogEvent::Changed);
+                }
+                if matches!(ev, InputEvent::PressEnter { .. }) {
+                    if limit_enter_accepts(applied.as_deref(), &committed) {
+                        cx.emit(MateDialogEvent::Accept);
+                    } else {
+                        st.update(cx, |s, cx| s.select_all(window, cx));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Ticks Limits and types `text` into a limit box, as a user does; `enter` then presses Enter.
     #[cfg(test)]
-    pub fn type_limit(&mut self, key: &str, max: bool, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn type_limit(&mut self, key: &str, max: bool, text: &str, enter: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.use_limits = true;
         let (lo, hi) = self.limits[key].clone();
         let field = if max { hi } else { lo };
+        let dim = limit_dim(key);
         field.update(cx, |s, cx| s.set_value(text.to_string(), window, cx));
-        cx.emit(MateDialogEvent::Changed);
+        self.limit_event(&field, dim, &InputEvent::Change, window, cx);
+        if enter {
+            self.limit_event(&field, dim, &InputEvent::PressEnter { secondary: false, shift: false }, window, cx);
+        }
     }
 
     pub fn set_flip(&mut self, flip_primary: bool, cx: &mut Context<Self>) {

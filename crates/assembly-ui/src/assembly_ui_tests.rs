@@ -1147,8 +1147,8 @@ fn a_faces_connector_takes_a_dot_within_50_px_else_its_centroid(cx: &mut TestApp
     .unwrap();
 }
 
-/// Live asm/feel3-1118 r1–r4: a new Revolute's typed min "30" turns the preview from 0° to 30° at once (clamped into the
-/// range); a max of 60 then leaves it at 30°.
+/// Live asm/feel3-1118 r1–r4: a new Revolute's typed min "30" + Enter reads "30 deg" and turns the preview from 0° to
+/// 30° (clamped into the range; nothing while typing); a max of 60 then leaves it at 30°.
 #[gpui::test]
 fn a_typed_limit_turns_the_new_mates_preview_into_range(cx: &mut TestAppContext) {
     let (window, view) = pattern_assembly(cx, "limit-preview");
@@ -1173,16 +1173,19 @@ fn a_typed_limit_turns_the_new_mates_preview_into_range(cx: &mut TestAppContext)
     })
     .unwrap();
     assert!(angle(cx).abs() < 1e-6, "the connectors meet at 0°");
-    let limit = |max: bool, text: &'static str, cx: &mut TestAppContext| {
+    let limit = |max: bool, text: &'static str, enter: bool, cx: &mut TestAppContext| {
         cx.update_window(window, |_, w, cx| {
             let dialog = view.read(cx).mate.as_ref().unwrap().dialog.clone();
-            dialog.update(cx, |d, cx| d.type_limit("rz", max, text, w, cx));
+            dialog.update(cx, |d, cx| d.type_limit("rz", max, text, enter, w, cx));
         })
         .unwrap();
     };
-    limit(false, "30 deg", cx);
-    assert!((angle(cx) - 30.0).abs() < 1e-6, "turned to the minimum");
-    limit(true, "60 deg", cx);
+    limit(false, "30", false, cx);
+    assert!(angle(cx).abs() < 1e-6, "no solve while typing");
+    limit(false, "30", true, cx);
+    assert!((angle(cx) - 30.0).abs() < 1e-6, "turned to the minimum on Enter");
+    assert_eq!(cx.update(|cx| view.read(cx).mate.as_ref().unwrap().dialog.read(cx).to_mate(cx).unwrap().limits[0].1.min.as_ref().unwrap().text.clone()), "30 deg");
+    limit(true, "60", true, cx);
     assert!((angle(cx) - 30.0).abs() < 1e-6, "stays at 30°");
 }
 
