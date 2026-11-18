@@ -37,6 +37,20 @@ live/errors-1118/. Status: **=** same, **≠** differs (owner in brackets).
 | A custom feature's `throw regenError("…")` | row and icon red, tooltip "err Feature 1 did not regenerate properly: err too deep"; dialog title red; Features header red ⓘ; the parameter field not pink | the same form ("uip Feature 1 did not regenerate properly: uip too deep") | = |
 | Compile / parse notices | gutter ✕ + squiggle with the parser's text, {!} navbar icon, notices pane (behaviours "Feature Studio", fs parse cases) | studios' fs-* ui-parity takes | see those takes |
 
+## Release (live2)
+
+Live 2026-11-18 22:39–22:42 UTC: a scratch company-owned document (a block custom feature, then a custom feature that throws), managed
+workflows switched on for the take and restored after (behaviours "Error wording sweep (7)"); Part 1 › Release…, then Close, never submitted.
+Ours: green faf73238b, fs-custom with uip Feature 1 at 40 mm (error), release_settings.json managed_workflows on. Evidence
+live/errors-1118/rel-*.
+
+| Situation | Live | Ours | Status |
+|---|---|---|---|
+| Release… of a part whose Part Studio has an error (company default: "Prevent if a Part Studio feature list contains errors" off) | under Part 1's row an amber box (`alert alert-warning`: bg rgb(255, 248, 230), border rgb(252, 218, 127), text rgb(51, 51, 51)) "Part belongs to a Part Studio that has regeneration errors"; the header "1 item needs attention" | no box, the message isn't anywhere in ours; the header also says "1 item needs attention" | ≠ [studios] |
+| …the item's marks | an amber corner triangle rgb(250, 182, 1) on the thumbnail and on the Revision box; the ✕ (tooltip "Remove from release") full red rgb(189, 48, 57) | the triangles rgb(245, 180, 0); the ✕ pale rgb(212, 119, 125), same tooltip | ≈ / ≠ ✕ colour [studios] |
+| …the footer | "A field required by one or more actions is empty" with a ? whose tooltip is "Submit requires Approvers"; Apply enabled (blue), Save draft disabled; the empty Release name box grey-bordered (only its label's "Required field must not be empty." red rgb(170, 37, 45)) | the same sentence, its ⓘ shows no tooltip; Apply disabled, Save draft enabled; the Release name box red-bordered | ≠ [studios] |
+| …the attention filter (red ⬇ circle) | tooltip "Show only items that need attention" | the same | = |
+
 ## Part Studio features (live)
 
 Live 2026-11-18 21:48–22:01 UTC: a 40 × 30 × 10 block, then each failing feature added by REST to a scratch Part Studio, and each row read in the
