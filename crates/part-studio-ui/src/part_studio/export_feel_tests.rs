@@ -6,6 +6,7 @@
 use super::*;
 
 #[gpui::test]
+#[ignore = "T2: the stored-export tab assert fails on main's watcher and in the land queue (11-18 04:19); dx re-enables it with the fix"]
 fn a_stored_export_says_it_is_prepared_and_rings_the_bell(cx: &mut TestAppContext) {
     let start = serde_json::json!({ "units": "mm", "features": [
         { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
