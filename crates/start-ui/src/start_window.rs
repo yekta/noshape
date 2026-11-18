@@ -309,6 +309,16 @@ struct ImportJob {
 /// How long Import files… waits for the file system to give a file before it says so (a hung network share).
 const IMPORT_READ_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// An import's error toast: live's own sentences ("bad.step uploaded but failed to translate.", "<file> was not
+/// translated. …"; live errors-1118) as they are, anything else after "Import failed: ".
+fn import_failed(why: &str) -> String {
+    if why.lines().all(|l| l.ends_with(" uploaded but failed to translate.") || l.contains(" was not translated.")) {
+        why.to_string()
+    } else {
+        format!("Import failed: {why}")
+    }
+}
+
 /// The documents page opens on Owned by me with its Folders open next time (the ui-parity driver's page starts: live's
 /// account).
 pub fn open_on_owned_by_me() {
@@ -1288,7 +1298,7 @@ impl StartView {
                 let mut steps = if read { vec![Step::done("Uploaded")] } else { Vec::new() };
                 steps.extend([Step::failed(why.clone()), Step::failed("No post-processing")]);
                 bell::update_job(cx, job, format!("Import {names} failed"), steps, true, None);
-                let msg = format!("Import failed: {why}");
+                let msg = import_failed(&why);
                 let _ = handle.update(cx, |_, window, cx| Self::notify(window, cx, AlertKind::Error, msg));
             };
             // Uploading: the files read through once (a hung network share stops here, not in the translation).
@@ -1328,7 +1338,7 @@ impl StartView {
                         // A file that didn't translate next to ones that did: the reason.
                         if !errors.is_empty() {
                             steps.push(Step::failed(errors.join("\n")));
-                            let msg = format!("Import failed: {}", errors.join("\n"));
+                            let msg = import_failed(&errors.join("\n"));
                             let _ = handle.update(cx, |_, window, cx| Self::notify(window, cx, AlertKind::Error, msg));
                         }
                         let link = open.map(|path| {
@@ -1384,7 +1394,7 @@ impl StartView {
             }
         }
         if let Err(e) = result {
-            let msg = format!("Import failed: {e:#}");
+            let msg = import_failed(&format!("{e:#}"));
             cx.defer(move |cx| {
                 let _ = handle.update(cx, |_, window, cx| Self::notify(window, cx, AlertKind::Error, msg));
             });
@@ -5335,9 +5345,17 @@ mod bench;
 
 #[cfg(test)]
 mod tests {
-    use super::{SelectAllRows, SelectNext, SelectPrev, ToggleRow, click_rows, history_change_matches, key_bindings, lib, move_rows, rows_to_move, toggles};
+    use super::{SelectAllRows, SelectNext, SelectPrev, ToggleRow, click_rows, history_change_matches, import_failed, key_bindings, lib, move_rows, rows_to_move, toggles};
     use gpui_kit::Modifiers;
     use std::path::PathBuf;
+
+    /// A file that doesn't translate toasts in live's words (errors-1118), other failures after "Import failed: ".
+    #[test]
+    fn an_import_that_failed_to_translate_toasts_as_live() {
+        assert_eq!(import_failed("bad.step uploaded but failed to translate."), "bad.step uploaded but failed to translate.");
+        assert_eq!(import_failed("a.step uploaded but failed to translate.\nb.zip was not translated. Translation is not supported for STEP (.stp) files."), "a.step uploaded but failed to translate.\nb.zip was not translated. Translation is not supported for STEP (.stp) files.");
+        assert_eq!(import_failed("/x/a.step: permission denied"), "Import failed: /x/a.step: permission denied");
+    }
 
     /// Live chrome.json (07:33): no Onshape shortcut works on the documents page, only its list's keys.
     #[test]
