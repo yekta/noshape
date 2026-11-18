@@ -99,6 +99,26 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "history",
+            verb: "delete_branch",
+            summary: "Delete a workspace (its row's Delete); deleting the current one lands viewing the version it was branched from",
+            description: "The workspace row's Delete (live: \"This will delete workspace B2.\", for the current workspace \"…and navigate you to V1.\"). The default workspace can't be deleted. Its history stays in the graph; history_restore_branch brings it back (☰ › Restore deleted workspaces…). Returns the notice (\"Deleted workspace B2.\") and `viewing`: the version now viewed when the current workspace was deleted.",
+            fields: vec![doc_field(), req("branch", s(), "Workspace name or id.")],
+            mutates: true,
+            destructive: true,
+            run: delete_branch,
+        },
+        Op {
+            group: "history",
+            verb: "restore_branch",
+            summary: "Restore a deleted workspace (☰ › Restore deleted workspaces…, or the delete notice's Restore)",
+            description: "",
+            fields: vec![doc_field(), req("branch", s(), "Deleted workspace name or id.")],
+            mutates: true,
+            destructive: false,
+            run: restore_branch,
+        },
+        Op {
+            group: "history",
             verb: "merge",
             summary: "Merge another branch into the current one",
             description: "Part Studios merge feature by feature. Returns the app's notice (\"Merged B1 into Main.\") and `revert_to`: its \"Revert to before this merge\" is history_restore to that microversion.",
@@ -199,6 +219,26 @@ fn switch_branch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let b = branch_id(od, a.str("branch")?)?;
     od.session.switch_branch(b)?;
     Ok(json!({ "branch": b.to_string() }).into())
+}
+
+fn delete_branch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let b = branch_id(od, a.str("branch")?)?;
+    let info = od.session.store.branch(b).map_err(|e| OpError::new("io", e.to_string()))?;
+    if info.is_default {
+        return Err(OpError::invalid("the default workspace can't be deleted").with_param("branch"));
+    }
+    let viewing = od.session.delete_branch(b)?;
+    Ok(json!({ "deleted": info.name, "message": format!("Deleted workspace {}.", info.name), "viewing": viewing }).into())
+}
+
+fn restore_branch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let key = a.str("branch")?;
+    let deleted: Vec<noshape_store::BranchInfo> = od.session.store.graph().map_err(|e| OpError::new("io", e.to_string()))?.branches.into_iter().filter(|b| b.deleted).collect();
+    let b = deleted.iter().find(|b| b.id.to_string() == key || b.name == key).ok_or_else(|| OpError::not_found(format!("no deleted workspace `{key}`; deleted: {}", deleted.iter().map(|b| b.name.clone()).collect::<Vec<_>>().join(", "))).with_param("branch"))?;
+    od.session.store.restore_branch(b.id).map_err(|e| OpError::invalid(e.to_string()).with_param("branch"))?;
+    Ok(json!({ "restored": b.name, "branch": b.id.to_string() }).into())
 }
 
 fn merge(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

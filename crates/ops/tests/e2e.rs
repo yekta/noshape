@@ -989,6 +989,26 @@ fn a_workspace_branches_from_a_version() {
     assert_eq!(e.param.as_deref(), Some("version"), "{}", e.to_json());
 }
 
+/// Live ws-1118: deleting the workspace you're in lands viewing the version it was branched from ("…and navigate you
+/// to V1."), with the notice "Deleted workspace B1."; Restore brings it back; the default workspace can't be deleted.
+#[test]
+fn deleting_the_current_workspace_lands_on_its_version() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "delete-current-workspace.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[0, 0], [5, 0]] }));
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[20, 0], [25, 0]] }));
+    call(&mut ctx, "history_create_branch", json!({ "name": "B1", "version": "V1" }));
+    let r = call(&mut ctx, "history_delete_branch", json!({ "branch": "B1" }));
+    assert_eq!((r["message"].as_str(), r["viewing"].as_str()), (Some("Deleted workspace B1."), Some("V1")), "{r}");
+    assert_eq!(entities(&mut ctx, &sk, "circle").len(), 1, "viewing V1, not Main's head");
+    let e = try_call(&mut ctx, "history_delete_branch", json!({ "branch": "Main" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("branch"), "{}", e.to_json());
+    let r = call(&mut ctx, "history_restore_branch", json!({ "branch": "B1" }));
+    assert_eq!(r["restored"], "B1", "{r}");
+    call(&mut ctx, "history_switch_branch", json!({ "branch": "B1" }));
+}
+
 /// A Hole's size given through the API is used as given, the schema default's 5 mm too, with or without a Standard's
 /// size or tableSynced: where it differs from the Standard's the hole is overridden as live's are, with Onshape's
 /// "Parameters have been overridden. Check input." (lead 11-15; the model suite's live holes). A Standard's size with
@@ -2846,6 +2866,19 @@ export const slab = defineFeature(function(context is Context, id is Id, definit
     assert_eq!(r["feature_status"]["status"], "Ok", "{r}");
     let v = num(&call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"][0]["volume"]);
     assert!((v - 8000.0).abs() < 1e-3, "volume {v}");
+    // The library's V2 (a taller slab): the feature is behind (live2 custom-feature-1118: the row's update indicator,
+    // the Reference manager's V1 ⇨ V2) until the references are updated.
+    let lib_doc = lib.to_str().unwrap();
+    call(&mut ctx, "featurestudio_edit", json!({ "doc": lib_doc, "tab": "Blocks", "source": src.replace("10 * millimeter)", "20 * millimeter)") }));
+    call(&mut ctx, "featurestudio_commit", json!({ "doc": lib_doc, "tab": "Blocks" }));
+    call(&mut ctx, "history_create_version", json!({ "doc": lib_doc, "name": "V2" }));
+    let user_doc = user.to_str().unwrap();
+    let l = call(&mut ctx, "document_update_references", json!({ "doc": user_doc }));
+    assert_eq!((l["outdated"][0]["from"].as_str(), l["outdated"][0]["to"].as_str()), (Some("V1"), Some("V2")), "{l}");
+    call(&mut ctx, "document_update_references", json!({ "doc": user_doc, "apply": true }));
+    let v = num(&call(&mut ctx, "query_parts", json!({ "doc": user_doc, "tab": "Part Studio 1" }))["parts"][0]["volume"]);
+    assert!((v - 16000.0).abs() < 1e-3, "V2's slab: volume {v}");
+    assert_eq!(call(&mut ctx, "document_update_references", json!({ "doc": user_doc }))["outdated"], json!([]));
 }
 
 /// Add custom features (psui c1cb5e34, live 2361 / 2213): a version's custom features onto the user's toolbar one by

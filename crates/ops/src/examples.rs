@@ -218,6 +218,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("history_publish", &[r##"{"version": "V2"}"##]),
     ("history_create_branch", &[r##"{"name": "experiment"}"##]),
     ("history_switch_branch", &[r##"{"branch": "experiment"}"##]),
+    ("history_delete_branch", &[r##"{"branch": "experiment"}"##]),
+    ("history_restore_branch", &[r##"{"branch": "experiment"}"##]),
     ("history_merge", &[r##"{"branch": "experiment"}"##]),
     ("history_restore", &[r##"{"to": "V1"}"##]),
     // assemblies

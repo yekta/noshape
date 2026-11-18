@@ -824,6 +824,28 @@ impl Session {
         self.reload(head)
     }
 
+    /// The version workspace `b` was branched from (live ws-1118: deleting the workspace you're in navigates to it).
+    pub fn branched_from_version(&self, b: BranchId) -> Option<noshape_store::VersionInfo> {
+        let from = self.store.branch(b).ok()?.created_from?;
+        self.store.list_versions().ok()?.into_iter().find(|v| v.microversion == from)
+    }
+
+    /// A workspace's row › Delete (live ws-1118): the default workspace can't be deleted; deleting the one you're in
+    /// lands viewing the version it was branched from (else the default workspace). Returns that version's name.
+    pub fn delete_branch(&mut self, b: BranchId) -> Result<Option<String>> {
+        let current = self.branch == b;
+        let landing = current.then(|| self.branched_from_version(b)).flatten();
+        self.store.delete_branch(b)?;
+        if current {
+            let main = self.store.default_branch()?;
+            self.switch_branch(main)?;
+            if let Some(v) = &landing {
+                self.view_microversion(Some(v.microversion))?;
+            }
+        }
+        Ok(landing.map(|v| v.name))
+    }
+
     /// Merge another branch into the current one, feature-by-feature for Part Studios.
     pub fn merge_from(&mut self, from: BranchId) -> Result<noshape_store::MergeOutcome> {
         let head = self.store.head(from)?;

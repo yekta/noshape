@@ -3,7 +3,7 @@
 //! Part Studios merge feature-by-feature (matched by feature id): changes
 //! made on only one side are applied; features changed on both sides are
 //! reported as conflicts and keep "ours", or the source's in a Merge
-//! ([`merge_from_source`]: live ver-flow-merge-same-feature, B1's name wins). Assemblies merge item by item
+//! ([`merge_from_source`]: live ver-flow-merge-same-feature, B1's name wins; a feature one side deleted is gone). Assemblies merge item by item
 //! ([`merge_json`]). Other tab kinds merge whole-tab (one-sided changes
 //! win, otherwise ours).
 
@@ -51,12 +51,15 @@ pub fn merge_part_studio_with(base: &PartStudio, ours: &PartStudio, theirs: &Par
                     }
                 }
             }
+            // Deleted in theirs: gone, also when ours edited it in a Merge (live ws-1118: Main renamed Sketch 1, B1
+            // deleted it, merged: gone; deleted in ours and edited in theirs stays deleted, below).
             (Some(of), None) => {
-                if of == bf {
+                if of != bf {
+                    report.conflicts.push(*id);
+                }
+                if of == bf || theirs_wins {
                     result.features.retain(|f| f.id != *id);
                     report.removed.push(*id);
-                } else {
-                    report.conflicts.push(*id);
                 }
             }
             _ => {}
@@ -287,5 +290,19 @@ mod tests {
         let (m, r) = merge_part_studio_with(&base, &ours, &theirs, true);
         assert_eq!(m.features[0].name, "B");
         assert_eq!(r.conflicts.len(), 1);
+    }
+
+    /// Live ws-1118: edited on one side and deleted on the other, a Merge leaves it deleted both ways.
+    #[test]
+    fn a_merge_deletes_what_one_side_deleted_and_the_other_edited() {
+        let base = studio_with(2);
+        let mut edited = base.clone();
+        edited.features[0].name = "Renamed".into();
+        let mut deleted = base.clone();
+        deleted.features.remove(0);
+        let (m, _) = merge_part_studio_with(&base, &edited, &deleted, true);
+        assert_eq!(m.features.len(), 1, "edited in the target, deleted in the source: gone");
+        let (m, _) = merge_part_studio_with(&base, &deleted, &edited, true);
+        assert_eq!(m.features.len(), 1, "deleted in the target, edited in the source: stays deleted");
     }
 }

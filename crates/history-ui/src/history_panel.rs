@@ -35,7 +35,7 @@ const ROW_H: f32 = 50.;
 fn graph_column(key: &str) -> Stateful<Div> {
     div().id(SharedString::from(format!("hist-graph-{key}"))).w(px(GRAPH_W + 5.)).h_full().flex_none().cursor_default().on_click(|_, _, cx| cx.stop_propagation())
 }
-const CHANGE_H: f32 = 26.;
+const CHANGE_H: f32 = 30.;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum RowKind {
@@ -128,6 +128,8 @@ pub struct HistoryPanel {
     /// The rows' top and the visible part of the window around them (window y, px), at the last paint
     /// (`rows_in_view`).
     rows_clip: Rc<std::cell::Cell<Option<(f32, f32, f32)>>>,
+    /// The Name | Modified header has scrolled out of the panel (at the last paint): a copy is pinned on top.
+    header_out: Rc<std::cell::Cell<bool>>,
     /// Result of "Compare": (description of the older point, diff).
     _subs: Vec<Subscription>,
 }
@@ -189,6 +191,7 @@ impl HistoryPanel {
             changed_tabs: HashMap::new(),
             ui_drawn: Default::default(),
             rows_clip: Default::default(),
+            header_out: Default::default(),
             _subs: subs,
         }
     }
@@ -468,25 +471,26 @@ impl HistoryPanel {
         }
     }
 
-    /// Workspace row › Delete, confirmed: the branch is marked deleted (☰ ›
-    /// Restore deleted workspaces… brings it back). Deleting the open
-    /// workspace first switches to the default one, as Onshape redirects.
+    /// Workspace row › Delete, confirmed: the branch is marked deleted (☰ › Restore deleted workspaces… or the
+    /// notice's Restore brings it back); the open one lands viewing the version it was branched from.
     fn delete_workspace(&mut self, b: BranchId, name: String, cx: &mut Context<Self>) {
-        let r = self.doc.update(cx, |d, _| -> anyhow::Result<bool> {
-            let current = d.session.branch == b;
-            if current {
-                let main = d.session.store.default_branch()?;
-                d.session.switch_branch(main)?;
-            }
-            d.session.store.delete_branch(b)?;
-            Ok(current)
-        });
-        match r {
-            Ok(current) => {
+        match self.doc.update(cx, |d, _| d.session.delete_branch(b)) {
+            Ok(_) => {
                 self.after_change(cx);
-                // Onshape's notices (i18n strings).
-                let msg = if current { "Workspace has been deleted. Redirected to your default workspace.".to_string() } else { format!("Deleted workspace {name}.") };
-                self.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(msg)));
+                // Live ws-1118: "Deleted workspace B2. Restore" either way (the one you were in lands on its version).
+                let doc = self.doc.clone();
+                self.doc.update(cx, |d, cx| {
+                    d.info_with_link(format!("Deleted workspace {name}."), "Restore", move |_, cx| {
+                        let r = doc.update(cx, |d, cx| -> anyhow::Result<()> {
+                            d.session.store.restore_branch(b)?;
+                            d.reloaded(cx);
+                            Ok(())
+                        });
+                        if let Err(e) = r {
+                            doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
+                        }
+                    }, cx)
+                });
             }
             Err(e) => self.error(e, cx),
         }
@@ -494,20 +498,23 @@ impl HistoryPanel {
 
 }
 
-/// Workspace row › Delete: Onshape's confirmation (help image
-/// delete-workspace-dialog-01): "Delete workspace?", "This will delete
-/// workspace **B2**.", Delete | Cancel.
+/// Workspace row › Delete: Onshape's confirmation (help image delete-workspace-dialog-01, live ws-1118): "Delete
+/// workspace?", "This will delete workspace **B2**." (the one you're in: "… and navigate you to V1.", the version it was
+/// branched from), Delete | Cancel.
 fn confirm_delete_workspace(view: Entity<HistoryPanel>, b: BranchId, name: String, window: &mut Window, cx: &mut App) {
+    let landing = {
+        let d = view.read(cx).doc.read(cx);
+        (d.session.branch == b).then(|| d.session.branched_from_version(b).map(|v| v.name)).flatten()
+    };
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
         let (view, n) = (view.clone(), name.clone());
+        let text = match &landing {
+            Some(v) => format!("This will delete workspace {name} and navigate you to {v}."),
+            None => format!("This will delete workspace {name}."),
+        };
         os::modal(dialog, "Delete workspace?", 600.)
-            .child(os::modal_body().child(
-                div()
-                    .text_size(px(14.))
-                    .text_color(pal.text)
-                    .child(StyledText::new(format!("This will delete workspace {name}.")).with_highlights([(27..27 + name.len(), FontWeight::BOLD.into())])),
-            ))
+            .child(os::modal_body().child(div().text_size(px(14.)).text_color(pal.text).child(StyledText::new(text).with_highlights([(27..27 + name.len(), FontWeight::BOLD.into())]))))
             .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Delete"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, _, cx| {
                 view.update(cx, |t, cx| t.delete_workspace(b, n.clone(), cx));
@@ -516,9 +523,9 @@ fn confirm_delete_workspace(view: Entity<HistoryPanel>, b: BranchId, name: Strin
     });
 }
 
-/// "1:08 PM Today", "3:40 PM Yesterday", "Oct 12" (local time).
+/// "1:08 PM Today", "3:40 PM Yesterday", "12:47 AM Nov 8" (local time).
 fn history_time(ms: i64) -> String {
-    crate::start_library::format_onshape_time(ms)
+    crate::start_library::format_history_time(ms)
 }
 
 /// Workspace, version and Start rows, newest first (Onshape's order), each
@@ -647,7 +654,7 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
         let done = std::cell::Cell::new(false);
         Rc::new(move |window, cx| {
             let n = name.read(cx).value().trim().to_string();
-            if n.is_empty() {
+            if workspace_name_bad(&n) {
                 return false;
             }
             // Enter reaches both the field and the dialog: create once.
@@ -729,8 +736,10 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
 /// Onshape's "Create workspace from <version>" dialog (Branch to create
 /// workspace…); "Open new workspace" switches to it.
 fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: String, window: &mut Window, cx: &mut App) {
-    let n = doc.read(cx).session.store.graph().map(|g| g.branches.len()).unwrap_or(1);
-    let name = cx.new(|cx| InputState::new(window, cx).placeholder("Name").default_value(format!("B{n}")));
+    // Live ws-1118: "B2" while B1 exists, also with a deleted B2 (the workspaces left count).
+    let live: Vec<String> = doc.read(cx).session.store.graph().map(|g| g.branches.into_iter().filter(|b| !b.deleted).map(|b| b.name).collect()).unwrap_or_default();
+    let first = (live.len().max(1)..).map(|k| format!("B{k}")).find(|n| !live.contains(n)).unwrap_or_default();
+    let name = cx.new(|cx| InputState::new(window, cx).placeholder("Name").default_value(first));
     let desc = cx.new(|cx| TextareaState::new(window, cx).rows(4).placeholder("Description"));
     let open = Rc::new(std::cell::Cell::new(true));
     // "Create workspace and edit properties": open the new workspace's Properties.
@@ -771,10 +780,11 @@ fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: St
         let create = create.clone();
         window
             .subscribe(&name, cx, move |_, ev: &InputEvent, window, cx| {
-                if let InputEvent::PressEnter { .. } = ev
-                    && create(window, cx)
-                {
-                    window.close_dialog(cx);
+                match ev {
+                    InputEvent::PressEnter { .. } if create(window, cx) => window.close_dialog(cx),
+                    // The name rule's line and buttons follow the typing.
+                    InputEvent::Change => window.refresh(),
+                    _ => {}
                 }
             })
             .detach();
@@ -783,14 +793,15 @@ fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: St
     window.open_dialog(cx, move |dialog, _, cx| {
         let create = create.clone();
         let open = open.clone();
+        let bad = workspace_name_bad(&name.read(cx).value());
         let (create2, edit_after) = (create.clone(), edit_after.clone());
         os::modal(dialog, format!("Create workspace from {from_name}"), 950.)
             .title(version_dialog_title("Create workspace from", &from_name))
             .child(version_dialog_body(&name, &desc, Some(open), cx))
             .footer(
                 os::modal_footer()
-                    .child(os::modal_ok(os::primary_button("ok", "Create")))
-                    .child(os::cancel_button("create-edit", "Create workspace and edit properties", cx).on_click(move |_, window, cx| {
+                    .child(os::modal_ok(os::primary_button("ok", "Create").disabled(bad)))
+                    .child(os::cancel_button("create-edit", "Create workspace and edit properties", cx).disabled(bad).on_click(move |_, window, cx| {
                         edit_after.set(true);
                         if create2(window, cx) {
                             window.close_dialog(cx);
@@ -1027,6 +1038,11 @@ fn stale_drawings_warning(doc: &Entity<DocModel>, stale: &Rc<std::cell::RefCell<
 }
 
 /// The fields as live's recorder reads them (2026-11-11.2, live 2481): Name and Description.
+/// A workspace name the Branch dialog refuses (live ws-1118 b2: empty, or over 256 characters).
+fn workspace_name_bad(name: &str) -> bool {
+    name.trim().is_empty() || name.chars().count() > 256
+}
+
 fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, open: Option<Rc<std::cell::Cell<bool>>>, cx: &App) -> AnyElement {
     let pal = p();
     let label = |t: &str| div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(t.to_string());
@@ -1035,6 +1051,11 @@ fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, 
     os::modal_body()
         .gap(px(10.))
         .child(h_flex().gap(px(4.)).child(label("Name:")).child(div().w(px(300.)).child(os::input_h(name_input, 34.).text_size(px(14.)))))
+        // The Branch dialog's name rule (live ws-1118 b2): a red line under the field, Create and Create workspace and
+        // edit properties off.
+        .when(open.is_some() && workspace_name_bad(&name.read(cx).value()), |d| {
+            d.child(div().mt(px(-6.)).text_size(px(14.)).text_color(pal.error).child("Name is required and cannot exceed 256 characters.").map(|d| crate::ui_script::mark_message(d, || "Name is required and cannot exceed 256 characters.".into())))
+        })
         .child(v_flex().gap(px(2.)).child(h_flex().gap(px(8.)).child(label("Description:")).child(div().text_size(px(14.)).child("(Maximum of 10000 characters)"))).child(Textarea::new(desc).h(px(96.)).text_size(px(14.))))
         .when_some(open, |d, open| {
             d.child(
@@ -1051,7 +1072,7 @@ fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, 
 /// An open change list shows this many changes, and as many more per "Show more changes…" (live rp-900).
 const CHANGES_PAGE: usize = 50;
 
-/// A row laid out at `y` (its top); `change` rows are 26 px high.
+/// A row laid out at `y` (its top); `change` rows are 30 px high.
 struct Placed {
     row: Rc<Row>,
     y: f32,
@@ -1421,6 +1442,7 @@ impl Render for HistoryPanel {
                     .cursor_pointer()
                     .text_size(px(13.))
                     .text_color(pal.text_muted)
+                    .bg(crate::theme::themed(0xf5f5f5, 0x333333))
                     // Live: #b2ddf6, dark #092046 (dk-9a0), not the list's #134e96.
                     .when(selected, |d| d.bg(crate::theme::themed(0xb2ddf6, 0x092046)))
                     .when_some(compare_side, |d, (base, _)| {
@@ -1429,9 +1451,11 @@ impl Render for HistoryPanel {
                     })
                     .when(picked, |d| d.bg(rgb(crate::compare_mode::BASE_ROW)))
                     .when(!selected && compare_side.is_none(), |d| d.hover(|d| d.bg(crate::theme::themed(0xdef1fb, 0x666666))))
+                    // Live history-feel-1117 g-03: change rows are grey, the name only, its author and time in the
+                    // tooltip.
+                    .tooltip(crate::ui::user_tooltip(format!("{}: Change by {} at {}", r.name, r.author, history_time(r.time))))
                     .child(graph_column(&r.key))
                     .child(div().w(px(115.)).flex_none().truncate().child(crate::ui::user_text(r.name.clone())))
-                    .child(div().pl(px(3.)).flex_1().min_w_0().truncate().child(history_time(r.time)))
             } else {
                 let changes = r.changes.len();
                 let key = r.key.clone();
@@ -1496,7 +1520,8 @@ impl Render for HistoryPanel {
                                         })
                                         .gap(px(3.))
                                         .child(crate::ui::glyph(if open_changes { "ui-chevron-down" } else { "ui-chevron-right" }, 10., pal.text_muted))
-                                        .child(div().truncate().child(if open_changes { "Hide changes…" } else { "Show changes…" }))
+                                        // Open, the link counts them (live history-feel-1117: "⌄ 15 changes").
+                                        .child(div().truncate().when(open_changes, |d| d.hover(|d| d.underline())).child(if !open_changes { "Show changes…".to_string() } else if changes == 1 { "1 change".to_string() } else { format!("{changes} changes") }))
                                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                             cx.stop_propagation();
                                             if !this.expanded.remove(&key) {
@@ -1577,13 +1602,13 @@ impl Render for HistoryPanel {
                         let dp = d5.clone();
                         let m = m.item(crate::os_menu::OsMenuItem::new("Workspace protection…").on_click(move |_, window, cx| crate::history_hooks::workspace_protection(dp.clone(), b, window, cx)));
                         let m = m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d5.clone(), crate::version_properties::Item::Workspace(b), window, cx)));
-                        // Live (qa5 DOC4): Delete on every other workspace's row; Main can't
-                        // be deleted (help), so it is greyed there.
-                        if b == current_branch {
+                        // Live ws-1118: Delete on every workspace's row but the default one's (none at all there), the
+                        // current one's too (ui-parity ver-wrow-cur-delete: Main has none).
+                        if !deletable {
                             return m;
                         }
                         let (vd, nd) = (v4.clone(), name.clone());
-                        m.separator().item(crate::os_menu::OsMenuItem::new("Delete").disabled(!deletable).on_click(move |_, window, cx| confirm_delete_workspace(vd.clone(), b, nd.to_string(), window, cx)))
+                        m.separator().item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, window, cx| confirm_delete_workspace(vd.clone(), b, nd.to_string(), window, cx)))
                     }
                     _ => {
                         let m = m.item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.view_mv(Some(mv), cx))));
@@ -1751,112 +1776,142 @@ impl Render for HistoryPanel {
             .when(repair_picking, |d| {
                 d.child(div().mx(px(10.)).mt(px(6.)).px(px(15.)).py(px(7.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child("Select a history entry to repair this Part Studio.").map(|d| crate::ui_script::mark_message(d, || "Select a history entry to repair this Part Studio.".into())))
             })
-            .child(
-                // Live document/22: the box with its ▾ (filter panel) and the
-                // square search button, 6 px under the header.
-                h_flex()
-                    .px(px(10.))
-                    .pt(px(6.))
-                    .flex_none()
-                    .child(
-                        div()
-                            .flex_1()
-                            .relative()
-                            .h(px(30.))
-                            .flex()
-                            .items_center()
-                            .border_1()
-                            .border_color(rgb(0xaaaaaa))
-                            .rounded_l(px(4.))
-                            .child(div().flex_1().map(|d| crate::ui_script::mark(d, || "field:Search history".into())).child(Input::new(&self.search).appearance(false).text_size(px(14.)).pl(px(12.))))
-                            .child(
-                                div()
-                                    .id("hist-filter-caret")
-                                    .map(|d| crate::ui_script::mark(d, || "button:Search history filter".into()))
-                                    .w(px(24.))
-                                    .h_full()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .cursor_pointer()
-                                    .child(os::glyph(os::GLYPH_CARET, 10., pal.text))
-                                    .on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
-                                        // The press that just closed it (outside the panel) doesn't reopen it.
-                                        if t.filter_closed_at.take().is_some_and(|at| at.elapsed() < std::time::Duration::from_millis(700)) {
-                                            return;
-                                        }
-                                        t.filter_open = !t.filter_open;
-                                        cx.notify();
-                                    })),
-                            )
-                            .when(self.filter_open, |d| d.child(deferred(div().absolute().top(px(29.)).right(px(-1.)).child(self.render_filter_panel(cx))).with_priority(2))),
-                    )
-                    .child(div().size(px(30.)).flex().items_center().justify_center().border_1().border_l_0().border_color(rgb(0xaaaaaa)).rounded_r(px(4.)).child(crate::assets::icon("search", 20., cx))),
-            )
-            .child(
-                h_flex()
-                    .px(px(12.))
-                    .pt(px(6.))
-                    .gap(px(6.))
-                    .flex_none()
-                    .child(filter_toggle("hist-merges", "hide-merges", self.hide_merges, cx).map(|d| crate::ui_script::mark(d, || merges_tip.into())).tooltip(crate::ui::tooltip(merges_tip.trim_start_matches("button:"))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.hide_merges = !this.hide_merges;
-                        cx.notify();
-                    })))
-                    .child(filter_toggle("hist-auto", "hide-auto-versions", self.hide_auto_versions, cx).map(|d| crate::ui_script::mark(d, || auto_tip.into())).tooltip(crate::ui::tooltip(auto_tip.trim_start_matches("button:"))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.hide_auto_versions = !this.hide_auto_versions;
-                        cx.notify();
-                    }))),
-            )
-            .child(
-                // Live DOM: the header row is 38 px, 1 px `#d0dbe5` under it, rows from y 187.
-                h_flex()
-                    .h(px(38.))
-                    .mt(px(3.))
-                    .flex_none()
-                    .items_end()
-                    .pb(px(5.))
-                    .border_b_1()
-                    .border_color(rgb(0xd0dbe5))
-                    .text_size(px(14.))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(pal.text)
-                    .child(div().w(px(GRAPH_W + 5.)).flex_none())
-                    .child(div().w(px(118.)).flex_none().child("Name"))
-                    .child(div().child("Modified")),
-            )
-            .child(
+            .child({
+                // Live history-feel-1117: everything but the Name | Modified header scrolls as one (search, toggles,
+                // rows, then the legend at the end); the header stays pinned on top.
+                let header = || {
+                    // Live DOM: the header row is 38 px, 1 px `#d0dbe5` under it, rows from y 187.
+                    h_flex()
+                        .h(px(38.))
+                        .mt(px(3.))
+                        .flex_none()
+                        .items_end()
+                        .pb(px(5.))
+                        .border_b_1()
+                        .border_color(rgb(0xd0dbe5))
+                        .text_size(px(14.))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(pal.text)
+                        .child(div().w(px(GRAPH_W + 5.)).flex_none())
+                        .child(div().w(px(118.)).flex_none().child("Name"))
+                        .child(div().child("Modified"))
+                };
+                let out = self.header_out.clone();
+                let header_probe = canvas(
+                    move |b, window, _| {
+                        let gone = b.top() < window.content_mask().bounds.top();
+                        if out.replace(gone) != gone {
+                            window.request_animation_frame();
+                        }
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .top_0()
+                .left_0()
+                .w_full()
+                .h(px(0.));
                 div()
-                    .id("history-rows")
+                    .relative()
                     .flex_1()
                     .min_h_0()
-                    .overflow_y_scroll()
                     .child(
                         div()
-                            .relative()
-                            .w_full()
-                            .h(px(total_h))
-                            .child(probe)
-                            .child(v_flex().children(list))
-                            .children(ghosts.into_iter().map(|(y, h, name)| crate::ui_script::mark(div().absolute().top(px(y)).left_0().w_full().h(px(h)), move || name)))
-                            .child(graph_canvas),
-                    ),
-            )
-            // Legend (live document/22): three centred rows, 14 px semibold; the
-            // workspace label in its chip, "Change" faint. Then the 31 px `#eee`
-            // hint bar.
-            .child(
-                v_flex()
-                    .flex_none()
-                    .items_center()
-                    // Live: rows 33 px apart; the last one 82 px above the hint bar
-                    // (Onshape's cloud "Upgrade" button sits in between).
-                    .gap(px(10.))
-                    .pb(px(71.))
-                    .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-workspace", 20., cx), "Workspace", false)).child(legend_item(crate::assets::icon("legend-version", 20., cx), "Version", false)).child(legend_item(crate::assets::icon("legend-change", 20., cx), "Change", true)))
-                    .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-release-candidate", 20., cx), "Release candidate", false)).child(legend_item(crate::assets::icon("legend-release", 20., cx), "Release", false)))
-                    .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-obsoletion", 20., cx), "Contains obsoletion", false)).child(legend_item(crate::assets::icon("hide-auto-versions", 20., cx), "Automatic version", false))),
-            )
+                            .id("history-rows")
+                            .size_full()
+                            .overflow_y_scroll()
+                            .child(
+                                v_flex()
+                                    .min_h_full()
+                                    .child(
+                                        // Live document/22: the box with its ▾ (filter panel) and the
+                                        // square search button, 6 px under the header.
+                                        h_flex()
+                                            .px(px(10.))
+                                            .pt(px(6.))
+                                            .flex_none()
+                                            .child(
+                                                div()
+                                                    .flex_1()
+                                                    .relative()
+                                                    .h(px(30.))
+                                                    .flex()
+                                                    .items_center()
+                                                    .border_1()
+                                                    .border_color(rgb(0xaaaaaa))
+                                                    .rounded_l(px(4.))
+                                                    .child(div().flex_1().map(|d| crate::ui_script::mark(d, || "field:Search history".into())).child(Input::new(&self.search).appearance(false).text_size(px(14.)).pl(px(12.))))
+                                                    .child(
+                                                        div()
+                                                            .id("hist-filter-caret")
+                                                            .map(|d| crate::ui_script::mark(d, || "button:Search history filter".into()))
+                                                            .w(px(24.))
+                                                            .h_full()
+                                                            .flex()
+                                                            .items_center()
+                                                            .justify_center()
+                                                            .cursor_pointer()
+                                                            .child(os::glyph(os::GLYPH_CARET, 10., pal.text))
+                                                            .on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
+                                                                // The press that just closed it (outside the panel) doesn't reopen it.
+                                                                if t.filter_closed_at.take().is_some_and(|at| at.elapsed() < std::time::Duration::from_millis(700)) {
+                                                                    return;
+                                                                }
+                                                                t.filter_open = !t.filter_open;
+                                                                cx.notify();
+                                                            })),
+                                                    )
+                                                    .when(self.filter_open, |d| d.child(deferred(div().absolute().top(px(29.)).right(px(-1.)).child(self.render_filter_panel(cx))).with_priority(2))),
+                                            )
+                                            .child(div().size(px(30.)).flex().items_center().justify_center().border_1().border_l_0().border_color(rgb(0xaaaaaa)).rounded_r(px(4.)).child(crate::assets::icon("search", 20., cx)))
+                                            .debug_selector(|| "hist-search".into()),
+                                    )
+                                    .child(
+                                        h_flex()
+                                            .px(px(12.))
+                                            .pt(px(6.))
+                                            .gap(px(6.))
+                                            .flex_none()
+                                            .child(filter_toggle("hist-merges", "hide-merges", self.hide_merges, cx).map(|d| crate::ui_script::mark(d, || merges_tip.into())).tooltip(crate::ui::tooltip(merges_tip.trim_start_matches("button:"))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                                this.hide_merges = !this.hide_merges;
+                                                cx.notify();
+                                            })))
+                                            .child(filter_toggle("hist-auto", "hide-auto-versions", self.hide_auto_versions, cx).map(|d| crate::ui_script::mark(d, || auto_tip.into())).tooltip(crate::ui::tooltip(auto_tip.trim_start_matches("button:"))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                                this.hide_auto_versions = !this.hide_auto_versions;
+                                                cx.notify();
+                                            }))),
+                                    )
+                                    .child(header().relative().child(header_probe))
+                                    .child(
+                                        div()
+                                            .relative()
+                                            .w_full()
+                                            .h(px(total_h))
+                                            .child(probe)
+                                            .child(v_flex().children(list))
+                                            .children(ghosts.into_iter().map(|(y, h, name)| crate::ui_script::mark(div().absolute().top(px(y)).left_0().w_full().h(px(h)), move || name)))
+                                            .child(graph_canvas),
+                                    )
+                                    .child(div().flex_1().min_h(px(20.)))
+                                    // Legend (live document/22): three centred rows, 14 px semibold; the
+                                    // workspace label in its chip, "Change" faint. Then the 31 px `#eee`
+                                    // hint bar.
+                                    .child(
+                                        v_flex()
+                                            .flex_none()
+                                            .items_center()
+                                            // Live: rows 33 px apart; the last one 82 px above the hint bar
+                                            // (Onshape's cloud "Upgrade" button sits in between).
+                                            .gap(px(10.))
+                                            .pb(px(71.))
+                                            .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-workspace", 20., cx), "Workspace", false)).child(legend_item(crate::assets::icon("legend-version", 20., cx), "Version", false)).child(legend_item(crate::assets::icon("legend-change", 20., cx), "Change", true)))
+                                            .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-release-candidate", 20., cx), "Release candidate", false)).child(legend_item(crate::assets::icon("legend-release", 20., cx), "Release", false)))
+                                            .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-obsoletion", 20., cx), "Contains obsoletion", false)).child(legend_item(crate::assets::icon("hide-auto-versions", 20., cx), "Automatic version", false))),
+                                    )
+                            ),
+                    )
+                    .when(self.header_out.get(), |d| d.child(header().mt_0().absolute().top_0().left_0().w_full().bg(pal.panel)))
+            })
             .child(
                 h_flex()
                     .h(px(31.))

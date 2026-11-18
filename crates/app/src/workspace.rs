@@ -1033,11 +1033,12 @@ impl Workspace {
                     // branch's place and no banner (its view-only bar is in the toolbar row).
                     // A protected workspace: a lock before its name (live wp-929).
                     .when(protected && viewing_version.is_none(), |d| d.child(div().flex_none().mt(px(6.)).child(crate::assets::icon("lock", 14., cx))))
-                    .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).cursor_text().map(|d| noshape_app_core::ui_script::mark(d, || "navbar:workspace".into())).child(match viewing_version.as_ref().or(change_version.as_ref()) {
-                        // Version and workspace names are the user's; a history entry keeps the workspace's.
-                        Some(v) => crate::ui::user_text(v.clone()).into_any_element(),
-                        None => crate::ui::user_text(branch_name).into_any_element(),
-                    }))
+                    .child({
+                        // Version and workspace names are the user's; a history entry keeps the workspace's. Its
+                        // tooltip is the name; a click does nothing (live ws-1118 h1 / h2).
+                        let shown = viewing_version.clone().or(change_version.clone()).unwrap_or(branch_name);
+                        div().id("navbar-workspace").flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).cursor_text().map(|d| noshape_app_core::ui_script::mark(d, || "navbar:workspace".into())).tooltip(crate::ui::user_tooltip(shown.clone())).child(crate::ui::user_text(shown))
+                    })
                     .child(div().flex_1())
                     .children(self.render_notices_button(cx))
                     .child(self.render_bell(cx))

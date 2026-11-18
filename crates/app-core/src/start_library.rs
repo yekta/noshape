@@ -238,17 +238,28 @@ fn read_entry(path: &Path, stamp: (Option<SystemTime>, Option<SystemTime>, u64),
 /// Onshape's time stamps (live documents list and versions panel): "1:15 PM
 /// Today", "9:02 AM Yesterday", "Oct 12", "Oct 12, 2024", in local time.
 pub fn format_onshape_time(ms: i64) -> String {
+    onshape_time(ms, false, crate::user_units::time_24h())
+}
+
+/// The Versions and history panel's time stamps: as [`format_onshape_time`], older days with their time too ("12:47 AM
+/// Nov 8"; 24 hour "0:00 Nov 7", live2 prefs-1118).
+pub fn format_history_time(ms: i64) -> String {
+    onshape_time(ms, true, crate::user_units::time_24h())
+}
+
+fn onshape_time(ms: i64, clock_always: bool, h24: bool) -> String {
     use chrono::{Datelike as _, Local, TimeZone as _};
     let Some(t) = Local.timestamp_millis_opt(ms).single() else { return "—".into() };
     let today = Local::now().date_naive();
-    // Preferences › Units › Time format; 24 hour without a leading zero (live2 prefs-1118: "2:47 Today", "0:00").
-    let clock = if crate::user_units::time_24h() { t.format("%-H:%M") } else { t.format("%-I:%M %p") }.to_string();
-    match (today - t.date_naive()).num_days() {
-        0 => format!("{clock} Today"),
-        1 => format!("{clock} Yesterday"),
+    // Preferences › Units › Time format: 24 hour is H:mm, no leading zero (live2 prefs-1118: "2:47 Today").
+    let clock = if h24 { t.format("%-H:%M") } else { t.format("%-I:%M %p") }.to_string();
+    let day = match (today - t.date_naive()).num_days() {
+        0 => return format!("{clock} Today"),
+        1 => return format!("{clock} Yesterday"),
         _ if t.year() == today.year() => t.format("%b %-d").to_string(),
         _ => t.format("%b %-d, %Y").to_string(),
-    }
+    };
+    if clock_always { format!("{clock} {day}") } else { day }
 }
 
 #[cfg(test)]
@@ -260,6 +271,11 @@ mod tests {
         assert_eq!(sanitize_name(" a/b:c "), "a-b-c");
         let now = to_ms(SystemTime::now());
         assert!(format_onshape_time(now).ends_with(" Today"));
+        // Live2 prefs-1118: 24 hour is H:mm without a leading zero; history rows keep the time on older days.
+        let midnight = chrono::TimeZone::with_ymd_and_hms(&chrono::Local, 2020, 11, 7, 0, 0, 0).single().unwrap().timestamp_millis();
+        assert_eq!(onshape_time(midnight, true, true), "0:00 Nov 7, 2020");
+        assert_eq!(onshape_time(midnight, true, false), "12:00 AM Nov 7, 2020");
+        assert_eq!(onshape_time(midnight, false, true), "Nov 7, 2020");
         assert!(format_onshape_time(now - 400 * 86_400_000).contains(", "));
     }
 }
