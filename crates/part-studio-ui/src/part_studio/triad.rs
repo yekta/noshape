@@ -100,9 +100,8 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let value = |id: &str| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value))).unwrap_or(0.0);
         let offset = DVec3::new(value("dx"), value("dy"), value("dz"));
-        // Live (part-studio/440): at the centre of the part's top face.
-        let c = (lo + hi) * 0.5;
-        Some(Triad { origin: DVec3::new(c.x, c.y, hi.z) + offset, offset, item: None })
+        // At the parts' bounding box's centre: std's transformCopy.fs findCenter (box3dCenter), live2 manip-feel-1118 m6.
+        Some(Triad { origin: (lo + hi) * 0.5 + offset, offset, item: None })
     }
 
     /// Routing curve's points (index, position) whose reference ours can

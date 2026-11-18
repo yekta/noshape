@@ -375,6 +375,8 @@ pub struct Viewport {
     /// A left press on empty space whose drag-starting move ended over geometry: where (the box waits for a move past
     /// the drag threshold from there).
     box_waits_from: Option<DVec2>,
+    /// That move's spot wasn't picked yet: its hover pick decides (geometry lights, empty space starts the box).
+    box_pick_pending: bool,
     /// The press's summed move path (CSS px) and where it last was: the right-click menu's travel (live sums it).
     press_path: (f64, DVec2),
     last_pos: DVec2,
@@ -705,6 +707,7 @@ impl Viewport {
             left_click_count: 0,
             press_travel: 0.0,
             box_waits_from: None,
+            box_pick_pending: false,
             press_path: (0.0, DVec2::ZERO),
             last_pos: DVec2::ZERO,
             hover_unconfirmed: false,
@@ -1308,6 +1311,23 @@ impl Viewport {
                     return;
                 }
                 self.hover_query = false;
+                // The box's first move, picked now: geometry there lights, empty space starts the box.
+                if self.box_pick_pending && self.drag == Drag::Pending(MouseButton::Left) {
+                    let (x, y) = self.device_px(self.last_pos);
+                    if let Some(b) = buf.as_ref().filter(|b| b.covers(x, y, r)) {
+                        self.box_pick_pending = false;
+                        match b.pick(x, y, r, |id| prio(id)) {
+                            Some(id) => self.set_hover(Some(id), cx),
+                            None => {
+                                self.drag = Drag::Box;
+                                self.box_waits_from = None;
+                                self.box_rect = Some((self.press_pos, self.last_pos, self.last_pos.x <= self.press_pos.x));
+                                cx.notify();
+                            }
+                        }
+                        return;
+                    }
+                }
                 if !self.pointer_inside || self.drag == Drag::Box {
                     self.hover_query_again = false;
                 } else if self.paused_hover.is_some() {
@@ -2285,6 +2305,7 @@ impl Viewport {
         self.press_at = (self.clock)();
         self.press_travel = 0.0;
         self.box_waits_from = None;
+        self.box_pick_pending = false;
         self.press_path = (0.0, p);
         self.last_pos = p;
         if let Some(id) = self.label_at(p) {
@@ -2389,18 +2410,22 @@ impl Viewport {
                 self.zoom_anchor = self.press_pos;
                 self.flush_pending_rotate(cx);
                 self.set_nav_mode(mode, self.press_pos);
-            } else if button == MouseButton::Left
-                && self.box_waits_from.is_none()
-                && self.pick_at(self.press_pos) == Some(None)
-                && let Some(Some(id)) = self.pick_at(p)
-            {
+            } else if button == MouseButton::Left && self.box_waits_from.is_none() && self.pick_at(self.press_pos) == Some(None) && self.pick_at(p) != Some(None) {
                 // Live (sel-feel 11-17, box-e/ltr-from-plane): a press on empty space whose first move ends over a
-                // plane lights it and draws no box; the box comes with a move past the drag threshold from there.
+                // plane lights it and draws no box; the box comes with a move past the drag threshold from there. A
+                // spot not picked yet waits for its pick (`on_pick`).
                 self.box_waits_from = Some(p);
-                self.set_hover(Some(id), cx);
+                match self.pick_at(p) {
+                    Some(Some(id)) => self.set_hover(Some(id), cx),
+                    _ => {
+                        self.box_pick_pending = true;
+                        self.request_hover();
+                    }
+                }
                 cx.notify();
                 return;
             } else {
+                self.box_pick_pending = false;
                 // Dragging from geometry with no tool is a box select too
                 // (Onshape only drags geometry inside sketches/assemblies);
                 // other unbound drags do nothing (and open no menu).

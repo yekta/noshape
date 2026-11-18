@@ -724,3 +724,30 @@ fn the_dialogs_matrix_matches_live(cx: &mut TestAppContext) {
     eprintln!("dialogs matrix: {matched} / {} rows match live\n{}", report.len(), report.join("\n"));
     assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md and the row's gap): {moved:?}");
 }
+
+/// Live2 manip-feel-1118 m6: Transform › Translate by XYZ's triad sits at the centre of the parts' bounding box (std's
+/// transformCopy.fs findCenter, box3dCenter), not on the top face (ours was ~24 px too high on the block).
+#[gpui::test]
+fn the_translate_triad_sits_at_the_parts_box_centre(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-triad");
+    let (part, lo, hi) = cx.update(|cx| {
+        let b = view.read(cx).display.bodies.first().cloned().expect("the block");
+        let lo = b.mesh.positions.iter().fold(glam::DVec3::splat(f64::MAX), |m, p| m.min(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)));
+        let hi = b.mesh.positions.iter().fold(glam::DVec3::splat(f64::MIN), |m, p| m.max(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)));
+        (Reference::Body(b.id.clone()), lo, hi)
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("transform", w, cx))).unwrap();
+    draw(cx, window);
+    cx.update(|cx| view.update(cx, |v, cx| {
+        if let Some(e) = &v.edit {
+            e.dialog.update(cx, |d, _| {
+                d.feature.params.set("transformType", noshape_model::params::ParamValue::Enum("TRANSLATION_3D".into()));
+                d.feature.params.set("entities", noshape_model::params::ParamValue::Query(vec![part.clone()]));
+            });
+        }
+    }));
+    draw(cx, window);
+    let origin = cx.update(|cx| view.read(cx).current_triad(cx).map(|t| t.origin)).expect("the triad");
+    let centre = (lo + hi) * 0.5;
+    assert!(origin.distance(centre) < 1e-6, "triad at {origin:?}, the part's box centre {centre:?}");
+}
