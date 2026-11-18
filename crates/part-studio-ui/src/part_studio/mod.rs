@@ -3992,7 +3992,8 @@ impl PartStudioView {
             }
             dg_gap = false;
             let selected = self.selection.contains(&r);
-            let dimmed = default_row_dimmed(hidden, self.ui.isolate.as_ref());
+            // Grey when hidden only: Isolate leaves the lists as they are (live2 ps-feel2-1118 b1, b3).
+            let dimmed = hidden;
             let r2 = r.clone();
             let r3 = r.clone();
             let icon = if label == "Origin" { "origin" } else { "plane" };
@@ -8003,26 +8004,10 @@ mod feature_count_tests {
     }
 }
 
-/// A Default geometry row drawn gray: hidden, or any while parts are
-/// isolated (Isolate takes the planes away; live qa5 KB3, ui/pn-900).
-fn default_row_dimmed(hidden: bool, isolate: Option<&behaviors::Isolation>) -> bool {
-    hidden || isolate.is_some_and(|i| i.mode == behaviors::IsolateMode::Isolate)
-}
-
 #[cfg(test)]
 mod default_row_tests {
     use super::*;
     use std::prelude::v1::test;
-
-    #[test]
-    fn default_geometry_rows_gray_while_isolating() {
-        let iso = |mode| behaviors::Isolation { mode, bodies: Vec::new(), opacity: 0.0, select_transparent: false, expand: 0 };
-        assert!(!default_row_dimmed(false, None));
-        assert!(default_row_dimmed(true, None));
-        assert!(default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Isolate))));
-        // Make transparent keeps the planes, so their rows stay black.
-        assert!(!default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Transparent))));
-    }
 
     /// qa5 SEL1: a sketch curve goes only into fields that take sketch
     /// curves (fillet.fs / chamfer.fs say `SketchObject.NO`); a model edge
