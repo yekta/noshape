@@ -732,7 +732,13 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
 - **Must carry (qa-cut-1615 blocks the cut if the candidate lacks one; list in qa-scratch cut-must.txt)**: psui fff088e5, the fix of
   P0 DOCK-TAB-SWITCH-TRAILING-FRAMES (returns to an open tab settled ~700 ms from v0.4.54, 2219c4373); psui's macOS Ctrl+Enter fix
   once it lands (v0.4.58 marks that matrix row a gap).
-- No open release blocker at 06:25. v0.4.58 = 9c015658 + docs (qa GO 04:46); its published check runs when release.yml publishes.
+- **Must carry (lead 06:40)**: skasm 120ee19c, the fix of the v0.4.58 regression from 2f93c018c (a sheet metal model with a rolled wall
+  joined by a bend: "Sheet metal model cannot be unfolded.", no flat; cf-sheet-metal-model-plus "Sheet Metal Up to Part" was Info in
+  0.4.57). qa's compat missed it: the document is a parity-corpus model, in none of the compat sets (user / ticket / authored). Closed
+  06:45: compat-check.sh now also runs the corpus' 127 saved documents (vibex7 ~/qa/corpus) against the release (316 s); the trial on
+  green 8b4812511 flags exactly this feature (Info -> Warning "cannot be unfolded"), plus two changes for the better (c2-loft-paths-
+  guides: core's revert; c2-surf-workshop-knifehandle: Move face 1 / 2 Error -> Ok as live).
+- No other open release blocker at 06:25. v0.4.58 = 9c015658 + docs (qa GO 04:46); its published check runs when release.yml publishes.
 - Re-checks owed on the candidate: the dock tab return at vibex7 load < 2 (qa-wait-67eb: fff088e5 green vs 0.4.53), the hover flow
   (uh/uh2.sh, release check 4), user documents + f197 + tickets vs 0.4.58 (cut-check at 16:15).
 

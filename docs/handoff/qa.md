@@ -147,6 +147,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    qa-feat3 (bin/feat3.sh): release CLI of main 7db466c62 built on vibex8 (slot), ab-feat.py 3 runs vs 0.4.57 on impeller /
    valve-config / hunting-knife, then bin/feat3-pair.py vs live's rbstep-1118 tables: features > 5x live go to blend / core / bool.
    ASMFEEL x4 verified on 8b4812511 (06:20). 17:00 list written (TICKETS); cut-must.txt: fff088e5 + Ctrl+Enter fix when it lands.
+0t. **Compat now covers the corpus (06:45)**: compat-check.sh section "corpus models" = vibex7 ~/qa/corpus/*.noshape (127 saved by the
+   models suite; refresh from vibex6 ~/qa-parity/saved after a models run). cut-verdict lists corpus changes with the tickets (read
+   them: a status that gets worse is a HOLD unless accepted). cut-must.txt: fff088e5, 120ee19c, Ctrl+Enter fix when it lands.
+   Live's selection latency with qa's method (behaviours "qa (lead 11-18): live's selection / hover latency"): face 964 / plane 955 /
+   row 693 / box 15321 ms screen medians (software); ours 216 / 153 / 163 / 218: ours faster on every row.
+   feat3 done 06:32: features > 5x live routed (blend 12, core 11, bool 5 rows; messages 06:40).
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
