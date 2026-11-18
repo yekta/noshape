@@ -266,6 +266,35 @@ pub fn associated_drawings_split(session: &Session, provider: &dyn DerivedProvid
     (out, left_out)
 }
 
+/// Include associated drawings' order: each drawing right under the listed part or assembly it shows (its
+/// configuration's first), after that item's other drawings; one showing no single listed object goes last (live
+/// release-gaps-1118: a child row under the part).
+pub fn insert_under_parts(session: &Session, provider: &dyn DerivedProvider, items: &mut Vec<ReleaseItem>, drawings: Vec<ReleaseItem>) {
+    for d in drawings {
+        if items.iter().any(|i| i.same_object(&d)) {
+            continue;
+        }
+        let shown: Vec<ReleaseItem> = tab_items(session, provider, d.tab).into_iter().filter(|it| it.kind != ItemKind::Drawing).collect();
+        let parent = match &shown[..] {
+            [one] => {
+                let listed = |o: &ReleaseItem| o.kind != ItemKind::Drawing && o.tab == one.tab && o.part == one.part;
+                items.iter().position(|o| listed(o) && o.config == one.config).or_else(|| items.iter().position(listed))
+            }
+            _ => None,
+        };
+        match parent {
+            Some(p) => {
+                let mut at = p + 1;
+                while items.get(at).is_some_and(|i| i.kind == ItemKind::Drawing) {
+                    at += 1;
+                }
+                items.insert(at, d);
+            }
+            None => items.push(d),
+        }
+    }
+}
+
 /// Items linked from versions of other documents: their releases go into
 /// those documents' logs too.
 pub fn mark_linked_versions(pkg: &Package) -> anyhow::Result<()> {

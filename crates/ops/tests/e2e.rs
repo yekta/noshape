@@ -7826,6 +7826,25 @@ fn release_submit_approve_and_reject() {
     assert_eq!(r["state"], "Released", "{r}");
 }
 
+/// Include associated drawings puts a drawing of one part right under that part's item (live release-gaps-1118: a
+/// child row under the part), not after the other parts.
+#[test]
+fn release_lists_an_associated_drawing_under_its_part() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "company_release_settings", json!({ "set": { "managed_workflows": true } }));
+    let sk = new_sketch(&mut ctx, "release-assoc-order", "plane:top");
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [20, 20]] }, { "tool": "corner_rectangle", "points": [[40, 0], [60, 20]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "part": "Part 1", "template": "ISO A3", "suggested_views": true }));
+    let r = call(&mut ctx, "release_create", json!({ "tab": "Part Studio 1", "name": "D1", "draft": true, "include_drawings": true }));
+    let kinds: Vec<String> = r["items"].as_array().unwrap().iter().map(|i| format!("{} {}", i["type"].as_str().unwrap(), i["name"].as_str().unwrap())).collect();
+    assert_eq!(kinds.len(), 3, "{r}");
+    assert_eq!(kinds[0], "Part Part 1", "{r}");
+    assert!(kinds[1].starts_with("Drawing "), "{r}");
+    assert_eq!(kinds[2], "Part Part 2", "{r}");
+}
+
 /// Include associated drawings leaves out a drawing made from another workspace's state (Onshape help "Typical Release
 /// Workflow": "drawings referencing a version from another workspace are left out").
 #[test]

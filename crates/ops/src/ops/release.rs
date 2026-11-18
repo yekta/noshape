@@ -229,8 +229,7 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if a.bool_or("include_drawings", false)? {
         let (found, skipped) = rel::associated_drawings_split(&od.session, &*provider, &items);
         left_out = skipped;
-        let extra: Vec<_> = found.into_iter().filter(|d| !items.iter().any(|i| i.same_object(d))).collect();
-        items.extend(extra);
+        rel::insert_under_parts(&od.session, &*provider, &mut items, found);
     }
     let pick = |field: &str, items: &mut Vec<noshape_model::release::ReleaseItem>, set: &dyn Fn(&mut noshape_model::release::ReleaseItem, String)| -> Result<(), OpError> {
         for (k, v) in a.object(field)?.into_iter().flatten() {
