@@ -2674,9 +2674,19 @@ struct BodyTopo {
     /// The edges and vertices Onshape's topology has (no seams, degenerated
     /// edges or vertices on full circles).
     shown: noshape_kernel::ShownTopology,
+    /// Face -> its cylinder's axis and radius (None: not a cylinder), on first use: a face's surface once per view
+    /// (cf-fill-pattern's plate, ~1000 hole rims, rebuilt its surface and UV bounds for each rim).
+    cylinders: HashMap<u32, Option<(DVec3, f64)>>,
 }
 
 impl BodyTopo {
+    fn cylinder(&mut self, shape: &Shape, face: u32) -> Option<(DVec3, f64)> {
+        *self.cylinders.entry(face).or_insert_with(|| match shape.sub_shape(ShapeType::Face, face as usize).and_then(|f| f.face_surface()) {
+            Ok(Surface::Cylinder { axis, radius, .. }) => Some((axis, radius)),
+            _ => None,
+        })
+    }
+
     fn of(shape: &Shape) -> Self {
         let ne = shape.count(ShapeType::Edge);
         let mut ev = vec![Vec::new(); ne];
@@ -2689,7 +2699,7 @@ impl BodyTopo {
                 }
             }
         }
-        BodyTopo { ev, ef: shape.edge_faces().unwrap_or_default(), shown: shape.shown_topology().unwrap_or_default() }
+        BodyTopo { ev, ef: shape.edge_faces().unwrap_or_default(), shown: shape.shown_topology().unwrap_or_default(), cylinders: HashMap::new() }
     }
 }
 
@@ -2729,7 +2739,7 @@ fn conic_of(e: &Shape, t0: f64, t1: f64) -> Option<(DVec3, DVec3, DVec3)> {
     }
 }
 
-fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &BodyTopo) -> Option<ModelEdge> {
+fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &mut BodyTopo) -> Option<ModelEdge> {
     let e = body.shape.sub_shape(ShapeType::Edge, edge_index).ok()?;
     let info = e.edge_info().ok()?;
     let conic3 = match info.curve {
@@ -2761,12 +2771,10 @@ fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &Bod
                 let d = center - mid3;
                 d - axis * d.dot(axis)
             };
-            let bore = topo.ef.get(edge_index).is_some_and(|faces| {
-                faces.iter().any(|&f| {
-                    let Ok(face) = body.shape.sub_shape(ShapeType::Face, f as usize) else { return false };
-                    matches!(face.face_surface(), Ok(Surface::Cylinder { axis: a, radius: rc, .. }) if (rc - radius).abs() <= radius * 1e-6 + 1e-12 && a.normalize().dot(axis).abs() > 1.0 - 1e-6)
-                        && face.normal_at_point(mid3).is_ok_and(|n| n.dot(to_axis) > 0.0)
-                })
+            let faces = topo.ef.get(edge_index).cloned().unwrap_or_default();
+            let bore = faces.into_iter().any(|f| {
+                matches!(topo.cylinder(&body.shape, f), Some((a, rc)) if (rc - radius).abs() <= radius * 1e-6 + 1e-12 && a.normalize().dot(axis).abs() > 1.0 - 1e-6)
+                    && body.shape.sub_shape(ShapeType::Face, f as usize).is_ok_and(|face| face.normal_at_point(mid3).is_ok_and(|n| n.dot(to_axis) > 0.0))
             });
             let mid = frame.project(mid3);
             EdgeGeom::Circle { center: frame.project(center), radius, face_on: axis.dot(frame.dir).abs() > 1.0 - 1e-6, bore, mid }
