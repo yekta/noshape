@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-18 13:20)
+# QA handoff (agent qa; current state only, updated 2026-11-18 16:45)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -171,14 +171,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 0b. **LOADED runs (lead 21:50)**: speed / timing at load > 16 (2 x 8 cores) don't count. suites-diff.py prints "LOADED: …" first,
    skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
    the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.
-1. **17:00 cut (11-18)**: TICKETS "Release blockers for the 2026-11-18 17:00 release". The qa-cut-1615 timer runs cut-verdict.sh at
-   16:15 (cut-must.txt by subject, "subject:<text>|<label>": fff088e5, 7b8bb2491, 8f6424b40, 459976266, 9595bbf05 tab return,
-   a98d25431 Windows double-click, 0a50fd4b5 Windows nav (lead said e7d9df8c), core's revert db96888b of 77ba403e7; missing -> HOLD;
-   13:20: the last two not in green c7d388e8; the revert waits in vibe2's queue: unit qa-imp-wait (bin/imp-wait.sh) runs impeller
-   compat vs 0.4.58 on its first green -> compat/imp-<sha8>.txt + qa-alerts; qa-ci-44311059310 (bin/ci-wait.sh) alerts Windows Test) -> qa-alerts + compat/cut-1118-1615.txt. Read the
-   ticket and corpus sections (a status that gets worse is a HOLD unless in compat/accepted.txt; cf-sheet-metal-model-plus's
-   unfold Warning was a stale app copy: SAME on 6dbd91f3), update the entry with GO / HOLD and its green, commit docs-only. After the publish:
-   `systemd-run --unit qa-pub-<v> -E HOME=/root -E PATH=$PATH bash /root/qa-scratch/bin/rel-pub-all.sh 0.4.58 <v> <cand on vibex7>`.
+1. **17:00 cut (11-18): GO 16:40 on green 515102325 -> v0.4.59** (TICKETS 1f4521120; lead: ship, fix FORM-PREVIEW-SLOWER forward, skasm's
+   app A/B ~17:40). qa-wait-5151 (bin/wait-compat.sh) alerts when 51510232's ticket / authored / corpus sections finish (new DIFF vs the
+   known five -> lead at once). Impeller: core's 27b7836e0 lost the main body at feature 47 (bin/walk-parts.py, p47.py, bis47.sh: release
+   CLIs on vibe2 -> vibex7 ~/tmp/qa/apps/noshape-bis); reverted 125e4d410. After the publish: `systemd-run --unit qa-pub-0459 -E HOME=/root
+   -E PATH=$PATH bash /root/qa-scratch/bin/rel-pub-all.sh 0.4.58 0.4.59 /home/ngyekta/qa-speed/bin/noshape` (the compat app = 51510232;
+   check it still is), then the spot-check rows 17-24 and the hover flow. cut-must.txt: clear it for the 05:00 cut.
 3. Suites: the qa-suites loop's next run picks the newest green (4-hourly). Compare each finished run with the previous one
    (suites/<run>/worse.txt from bin/suites-diff.py: models, scenarios, `failure`, `speed`, `newdiff`; assemblies.log
    `^asm-…: … BOM rows` and `^assemblies:`; exchange.log `exchange score` and times over live). Regressions -> owners as P0
