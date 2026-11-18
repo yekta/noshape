@@ -261,7 +261,14 @@ type Studio = Option<Entity<PartStudioView>>;
 
 /// Where target `t` shows now, in window coordinates.
 fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_view::AssemblyView>>, drawing: &Option<Entity<crate::drawing_view::DrawingEditor>>, cx: &App) -> Result<Point<Pixels>, String> {
-    if let Some(name) = control_name(t) {
+    if let Some(mut name) = control_name(t) {
+        // The shared Undo / Redo buttons are marked as buttons; live names them as the drawing toolbar's tools.
+        if noshape_app_core::ui_script::bounds_of(&name).is_none()
+            && let Some(rest) = name.strip_prefix("tool:")
+            && noshape_app_core::ui_script::bounds_of(&format!("button:{rest}")).is_some()
+        {
+            name = format!("button:{rest}");
+        }
         if let Some(b) = noshape_app_core::ui_script::bounds_of(&name) {
             // A row's top or bottom edge (where a dragged row drops above or below it).
             return Ok(match t.get("edge").and_then(Value::as_str) {
