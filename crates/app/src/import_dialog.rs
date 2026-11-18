@@ -395,7 +395,7 @@ fn kept_file(d: &noshape_model::Document, name: &str) -> Option<TabId> {
 
 /// Live's toast for a file that didn't translate ("g47-3parts-unique.zip
 /// uploaded but failed to translate."; the reason goes to its Notifications
-/// bell, behaviours "qa5 zip import"); the agent API keeps the reason.
+/// bell, behaviours "qa5 zip import"); the import's error already reads so unless live refused the file.
 fn failed_toast(e: &str) -> String {
     match import_name(e) {
         Some(name) => format!("{name} uploaded but failed to translate."),
@@ -405,7 +405,7 @@ fn failed_toast(e: &str) -> String {
 
 /// The file an import error is about.
 fn import_name(e: &str) -> Option<String> {
-    if let Some((n, _)) = e.split_once(" was not translated.") {
+    if let Some((n, _)) = e.split_once(" was not translated.").or_else(|| e.split_once(" uploaded but failed to translate.")) {
         Some(n.to_string())
     } else if let Some(rest) = e.strip_prefix("Import failed: ") {
         let path = rest.split_once(": ").map_or(rest, |(p, _)| p);
@@ -423,6 +423,8 @@ mod tests {
     fn failed_imports_toast_as_live() {
         assert_eq!(super::failed_toast("g47-3parts-unique.zip was not translated. Translation is not supported for STEP (.stp) files."), "g47-3parts-unique.zip uploaded but failed to translate.");
         assert_eq!(super::failed_toast("Import failed: /tmp/x/tri.jt: no geometry"), "tri.jt uploaded but failed to translate.");
+        assert_eq!(super::failed_toast("bad.step uploaded but failed to translate."), "bad.step uploaded but failed to translate.");
+        assert_eq!(super::import_name("bad.step uploaded but failed to translate.").as_deref(), Some("bad.step"));
         assert_eq!(super::failed_toast("Something else"), "Something else");
     }
 

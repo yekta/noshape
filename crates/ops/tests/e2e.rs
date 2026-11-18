@@ -9402,6 +9402,21 @@ fn a_failed_import_feature_is_reported() {
     assert!(errors.iter().any(|e| e.as_str().unwrap().contains("Import 1: Error regenerating.")), "{r}");
 }
 
+/// A file that doesn't translate (a STEP header, then text) answers in live's words, without our reader's error or the
+/// file's path (live errors-1118: "bad.step uploaded but failed to translate."); the file is kept as a tab.
+#[test]
+fn a_broken_step_failed_to_translate_as_live() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("bad-step.noshape") }));
+    let dir = scratch("bad-step");
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("bad.step");
+    std::fs::write(&file, "ISO-10303-21;\nHEADER;\nthis is not a STEP file\n").unwrap();
+    let r = call(&mut ctx, "import_files", json!({ "files": [file] }));
+    assert_eq!(r["errors"], json!(["bad.step uploaded but failed to translate."]), "{r}");
+    assert!(r["tabs"].as_array().unwrap().iter().any(|t| t["name"] == "bad.step" && t["kind"] == "File"), "{r}");
+}
+
 /// A part's Export › Inspection list (live inspection-list-1118): its Part Studio's Model definitions Characteristics
 /// as CSV, UTF-8 with a BOM, every field quoted, CRLF; a plain part the header only; the Part Studio's own Export
 /// doesn't offer it. Extrude 1's Depth 10 mm ± 0.1 (Symmetrical) is live's row.

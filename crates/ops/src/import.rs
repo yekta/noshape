@@ -90,6 +90,12 @@ pub fn import_names(path: &Path) -> (String, String) {
     (stem, file)
 }
 
+/// Live's words for a file that didn't translate (its bubble, live errors-1118: "bad.step uploaded but failed to
+/// translate."), never our reader's error or the file's path.
+pub fn failed_to_translate(file: &str) -> String {
+    format!("{file} uploaded but failed to translate.")
+}
+
 /// A translated CAD file: its shapes as BREP text (a compound, one child per
 /// part when `parts` is set) and what the file says about each part (JSON
 /// list of `ImportPartInfo`, empty when the format names none).
@@ -478,8 +484,8 @@ impl ImportInputs {
     }
 }
 
-/// Read and translate the files (mesh files in the chosen unit); files
-/// that fail give "Import failed: <path>: <why>".
+/// Read and translate the files (mesh files in the chosen unit); a file that doesn't translate gives live's
+/// "<file> uploaded but failed to translate." (one live refuses gives its own "<file> was not translated. …").
 pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units: &UnitPrefs) -> (ImportInputs, Vec<String>) {
     let mut errors = Vec::new();
     if c.upload_only {
@@ -507,16 +513,16 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
                     match read_obj_zip(path, &mesh) {
                         Ok(Some(objs)) => read.extend(objs),
                         Ok(None) => errors.push(format!("{} was not translated. {e}", import_names(path).1)),
-                        Err(err) => errors.push(format!("Import failed: {}: {err:#}", path.display())),
+                        Err(_) => errors.push(failed_to_translate(&import_names(path).1)),
                     }
                 }
                 Err(e) if e == noshape_model::native_assembly::XT_IN_ZIP => match read_xt_zip(path, units, c.iges_post) {
                     Ok(parts) => read.extend(parts),
-                    Err(err) => errors.push(format!("Import failed: {}: {err:#}", path.display())),
+                    Err(_) => errors.push(failed_to_translate(&import_names(path).1)),
                 },
                 // Onshape keeps the zip as a file tab and reports it.
                 Err(e) if e == noshape_model::native_assembly::STEP_IN_ZIP => errors.push(format!("{} was not translated. {e}", import_names(path).1)),
-                Err(e) => errors.push(format!("Import failed: {}: {e:#}", path.display())),
+                Err(_) => errors.push(failed_to_translate(&import_names(path).1)),
             }
             continue;
         }
@@ -528,8 +534,8 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
                     continue;
                 }
                 Ok(None) => {}
-                Err(e) => {
-                    errors.push(format!("Import failed: {}: {e:#}", path.display()));
+                Err(_) => {
+                    errors.push(failed_to_translate(&import_names(path).1));
                     continue;
                 }
             }
@@ -548,8 +554,8 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
                     continue;
                 }
                 Ok(None) => {}
-                Err(e) => {
-                    errors.push(format!("Import failed: {}: {e:#}", path.display()));
+                Err(_) => {
+                    errors.push(failed_to_translate(&import_names(path).1));
                     continue;
                 }
             }
@@ -561,7 +567,7 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
                 let (name, file) = import_names(path);
                 read.push((name, file, foreign));
             }
-            Err(e) => errors.push(format!("Import failed: {}: {e:#}", path.display())),
+            Err(_) => errors.push(failed_to_translate(&import_names(path).1)),
         }
     }
     let mut label = read.iter().map(|r| r.1.clone()).chain(pvz.iter().map(|p| p.file.clone())).chain(assemblies.iter().map(|a| format!("{}.zip", a.zip))).collect::<Vec<_>>().join(", ");
@@ -600,7 +606,7 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
                     at = Some(studio);
                     first.get_or_insert(studio);
                 }
-                Err(e) => errors.push(format!("Import failed: {}: {e}", a.root)),
+                Err(_) => errors.push(failed_to_translate(&format!("{}.zip", a.zip))),
             }
             continue;
         }
@@ -616,7 +622,7 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
                 at = Some(studio);
                 first.get_or_insert(studio);
             }
-            Err(e) => errors.push(format!("Import failed: {}: {e}", a.root)),
+            Err(_) => errors.push(failed_to_translate(&format!("{}.zip", a.zip))),
         }
     }
     for p in &inputs.pvz {
@@ -649,7 +655,7 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
                 at = Some(studio);
                 first.get_or_insert(assembly);
             }
-            Err(e) => errors.push(format!("Import failed: {}: {e}", p.file)),
+            Err(_) => errors.push(failed_to_translate(&p.file)),
         }
     }
     let groups: Vec<Vec<&(String, String, Foreign)>> = if c.combine { vec![inputs.read.iter().collect()] } else { inputs.read.iter().map(|r| vec![r]).collect() };

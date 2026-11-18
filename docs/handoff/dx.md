@@ -100,19 +100,11 @@ Open, ranked:
 ## Next, in order
 P. Parked (lead 21:2x: no OCCT class layout change): FClass2d per-wire boxes (/root/dx-scratch/occt-patch/
    0034-fclass2d-wire-boxes.patch, adds a member): fill-pattern Iso 11.3 -> 1.98 s; land only ABI-neutral.
-N. Drawings not deterministic (lead 21:2x: first). Two causes, both fixed (uncommitted):
-   - OCCT's Contap_HContTool kept a surface's sample bounds in file statics: parallel views' outline tracing raced.
-     patches/occt/0035-contap-thread-local-sample-bounds.patch (thread_local, ABI-neutral; g++-13 / 15, Apple clang).
-     Mac proof (private OCCT root ~/noshape-host/dx-keep/occt35, dvp35.sh): rings-loft + impeller identical over
-     3 parallel runs and one thread, exact work counts too. Staged: x86 vibex8 ~/agents/dx-keep/occt0035/x86/
-     libTKHLR.a (only Contap_HContTool.cxx.o swapped, -march=x86-64, no ymm/fma, sha256 6d9c9d00), arm64 Mac
-     ~/noshape-host/dx-keep/occt35/lib/libTKHLR.a. The lead installs them before the land (DECISIONS 11-15).
-   - mesh_body.cpp faceted(): facet edges ran from the lower vertex address (differs run to run): hex-bookcase's mesh
-     lines varied even on one thread (533-541 edges). Now by vertex creation order.
-   - Proven 22:5x (Mac, dvp35.sh): rings-loft 4522 / impeller 1152 / hex 526 edges, name-stripped dumps identical over
-     3 parallel runs and one thread. Next: kernel / drawing / ops tests + clippy (dvtest35.sh), lead installs the
-     libs, land; then check hex's DXF counts vs live (was LINE 211/206, LWPOLYLINE 17/25).
-C. (lead 21:55) fan-blade (live Front 2.0 / Top 1.7 / Right 1.6 / Iso 2.1, Update 4.4 s; ours ~5.3 s each, Update
+N. Drawings not deterministic: fixed, QUEUED ba3d6cc1 (23:2x; d8ace4d34..6b1a7bc72). OCCT patch 0035 (Contap sample
+   bounds thread_local; libs installed by the lead on every host + Mac, backups .bak-0034) and mesh_body.cpp facet
+   edges by vertex creation order. Proof: Mac dvp35.sh, identical over 3 parallel runs + one thread. After the land:
+   hex-bookcase's DXF counts vs live (was LINE 211/206, LWPOLYLINE 17/25; its mesh edges now run one fixed way).
+C. PARKED (lead 23:2x: no lever without days of OCCT hide-step work). fan-blade (live Front 2.0 / Top 1.7 / Right 1.6 / Iso 2.1, Update 4.4 s; ours ~5.3 s each, Update
    6.5): option (b), Hide in 8 threads over one body's edges, tried 23:0x and DROPPED (scratch /root/dx-scratch/p36:
    OCCT patch 0036 per-thread edge mask + hlr.cpp hide_threaded). Not identical (Mac dvp36.sh, 17 corpus drawings
    one thread vs 8: impeller 4 lines, rings-loft 2, surface-pattern 66, clamp 4 differ: something per face depends on
@@ -128,10 +120,10 @@ Q. (lead 11-18 20:4x, after fan-blade) asm-robot-relations studio 0c3466's Impor
    (110) and the three rods (6 each) runs through #5090's 14 edges. Not why yet: #5090 is exact (edges on its plane
    to 1e-5 mm), loops >= 0.05 mm apart, edge use consistent, no self-intersection (BOPAlgo), curve-on-surface <= 1e-3
    mm. Next: what Parasolid rejects there (ask live2 whether live flags Import 1 faulty?).
-R. (live 11-18 22:3x, docs/parity/error-wording.md "Import / export (live)") a broken STEP via + > Import...: live shows
-   the "Import to Onshape" dialog, then a red bubble "bad.step uploaded but failed to translate. Open document x" and
-   keeps the file tab; ours: "Import failed: <path>: i/o error: could not read STEP file <path>". Evidence
-   live/errors-1118/import/, files /root/live-scratch/err18/files/.
+R. (live 11-18 22:3x; lead 23:2x: next) a broken STEP: the agent API answered "Import failed: <path>: i/o error: could
+   not read STEP file <path>" (live: "bad.step uploaded but failed to translate."; the app's bubble already said so).
+   In progress: ops import's translation failures say failed_to_translate(file) (upload-only's unreadable file keeps
+   its path); app import_name reads it; e2e a_broken_step_failed_to_translate_as_live. Testing on the Mac (dvimp.sh).
 0. Speed vs live (lead 11-18 06:1x; release, vibex8, dx_perf, same run; live behaviours "speed: drawings", "dx speed:
    drawing creation and NIST import", "dx (2026-11-02, P1 drawing speed on big models)"):
    - bracket drawing, cold (no cached view): create 10 ms (live 30.1 s, server 3.0), insert view 7 ms (3.0 s),
