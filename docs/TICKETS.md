@@ -580,8 +580,9 @@ animate ~550-690 ms from the first frame to the last (500 ms + a frame on this d
   Other joints; Type offers Bend, Rip (= live); Rip -> Bend puts it back in Bends as "Bend A" within 1 s, flat view redrawn, but the
   list keeps one "Modify joint 1" (live adds a Modify joint per change; skasm to confirm). Hovering the Joint A row lights nothing in
   either view (live: the rip in 3D and both edges in the flat): skasm's f90cf944 (land queue) adds it, with SMFEEL-FLANGE-BROAD-FACE.
-- Not judged: hover per box in the Sheet metal model dialog (our start is a Thicken model, live's a Convert); whether a mitred corner
-  should list a rip under Other joints (skasm is asking live).
+- Not judged: hover per box in the Sheet metal model dialog (our start is a Thicken model, live's a Convert).
+- Mitred corner: live (11-18 00:22) lists no row for a Flange's miter seam, neither under Other joints nor under Bends; sm-box's empty
+  Other joints matches live (skasm agrees).
 
 ## Feature list, document and Variable / Feature Studio feel vs live2's / live's 11-17 captures (qa 00:04, green 7187ac751, vibex6 Xvfb, real pointer and keys)
 Documents built from starts block-fillet / two-blocks and the louver corpus copy, opened without the runner (qa-scratch/fl: build.sh,
