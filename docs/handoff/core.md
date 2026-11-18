@@ -1,25 +1,29 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-18 16:30 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-18 17:20 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight
-- **P0s for the 17:00 cut: both reverts in green 125e4d410 (15:55).** bcbe6b0f = 77ba403e7 (planar Move face tweak
-  renamed neighbours); 125e4d41 = 27b7836e0 (impeller rim splits: Extrude Bohrungssitz Ansaugflansch's Add dropped the
-  main body silently, 16 parts). The walls come back only with a fix that keeps the body + a clean compat run.
-- **Tweak back, 0.4.58 names: 1fcaaed6 CHECKING (16:13)** (core-p0 branch core-offnames): moved faces Offset(old), others
-  keep names; aliases Split{Offset(old), F, 0} -> moved face (Move face 2), Offset(old) -> face (OCCT era). Compat on
-  main (on5): all SAME but qa's known corpus diffs. Compat tool: vibex7 `bash ~/tmp/core/imp/compat-on.sh <cli> <tag>`.
-- **Shown edges (bool 11-18): 059e271f2 (core-sj branch core-shownjoin):** no-seam B-spline joins only with a periodic
-  face or two analytic faces; parting-line Split 3 13/30/20 -> 13/34/24 = live (bool's dump replayed). No T1 (the
-  part is 420 KB of B-splines; decision asked). Suite pair 9 on vibex8: sjb (main 88b8437d4) vs sjn, slot queue,
-  ~/tmp/core/p9-cmp.out, p9.done. Land if only parting-line changes.
+- **Walls (core-rw branch core-walls2, d010a6d78 = 27b7836e0 re-applied, not landable yet):** with them Move face 2
+  turns Ok, Delete face 2 48 faces / 95977.8 mm3 (main 37 / 96246.4), then Extrude Bohrungssitz Ansaugflansch's Add =
+  OCCT fuse 1 object (65 faces, valid) + 9 seat prisms (valid) -> INVALID 1992 mm3, 55 faces, accepted silently (16 small
+  parts). Fuzzy 1e-8 fuse: valid 96485.5 mm3, 98 faces. Case vibex7 ~/tmp/core/imp/rec47/51a35c85013e91e7.brep, probe
+  ./fz (brepq/fz.cpp). Asked bool 17:15 (retry/refuse invalid fuse in op_boolean). Re-land walls on top of that +
+  compat-on.sh clean. Per-feature parts: vibex7 ~/tmp/core/imp/f47.sh.
+- **Tweak with 0.4.58 names: LANDED 6e19556b (16:34)**; main green e24a63d15.
+- **Shown edges (bool 11-18): 059e271f2 + T1 56e296b14 (core-sj branch core-shownjoin):** parting-line Split 3
+  13/34/24 = live; T1 boolean_groups::sections_between_faces_with_no_seam_keep_their_vertices (zstd 113 KB). Lead: land
+  on pair 9 (vibex8: sjb main 88b8437d4 vs sjn; ~/tmp/core/p9-cmp.out, p9.done; vibe2 if not started by 17:30) when
+  only parting-line changes. g++-13 kernel build: core-sj .g13.sh on vibex7 (~/tmp/core/g13.log).
+- **c2-housing-draft (dx's DXF rows):** model = live at every feature up to Rotieren 1 (lengths; live measures circles
+  polygonally, 96.093 vs 2pi r 96.133). Rotieren 1's torus exact (R 15.2, r 20.72); only difference: 8 floor lines
+  0.144 / 0.337 mm where the torus is within 0.24 um of z=0 (r 15.2-15.3): ours split the side edges there (7.941 +
+  0.144 vs live 8.084; 12.711 + 0.337 vs 13.047). Boolean tangency (bool's, minor). dx's rows are drawing projection
+  (dx). Scripts /root/core-scratch/hdcmp2.sh, brepq/tor.cpp.
 - **surf-intro-simple Loft 1 (skasm): de3b6e082 (core-loft, held):** surface loft takes sketch regions (T1 4/12/8 on
   squares). skasm saw 1 face on the real doc: check against live 4/12/8 once skasm's translator lands, then land.
-- **asm-welding-config 9c7704 (lead):** first difference Sketch 9's region (109.56 vs 105.68 mm2) = skasm; Fillet 1 / 4
-  get sketch-entity edges from the translator. Reported 16:0x.
 - **Impeller Delete face 2 speed (lead, next):** 6968 ms on qa's copy: group 1 4.4 s OCCT defeature, group 2 hits the
   300 K work bound (2.2 s) then the region fallback; live ~12 ms. Needs the local rebuild (brepq/lr2.cpp).
 - **qa 11-18 rollback-step list (speed):** fan-blade Extrude 8 120 vs 10, Derived 1 160 vs 51; motor-mount-jack
@@ -63,14 +67,6 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is t
   b5b566884 drops the wasted Rust attempt; my lever: per-tool offsets' edges 52 + check 24 ms (NOSHAPE_OFFSET_DEBUG=1).
 - **Extrude 4 (impeller, 490 ms vs 41):** op_prism_until's split on one face, a -3 mm offset of a 117x10 bicubic B-spline
   (footprint_patch declines: the face's boundary runs inside the footprint box; probe vibex8 ./pup). Parked.
-- **Fill 1 (surf-intro-examples) research, parked:** live 11-18 (live/core/geo-1118/fill1-surf-intro.json): a trimmed
-  patch of a larger bicubic 14x18 B-spline (uv (0,0) = pole 1, outside the boundary), face edges OTHER on it, box z up
-  to 54.32 > every boundary point (overshoots 13 mm). Our edges = live's (ends, lengths). Tries vs live's centre
-  (1.624, 68.572, 20.921): OCCT plate balloons (61909 mm2); Coons 23786 but box z 89.6; harmonic / biharmonic on the
-  Coons square z 6.1; thin-plate spline z(x,y) over the boundary samples 17.14 (grid median 2.6 mm, max 15):
-  closest, still not it. Probes vibex8 ~/tmp/core/probefan ./fillp, ./edgs; scratch fill1-edges.txt.
-- **Loft 4 PARKED (core-tw 7eb54c0e5):** plane-crossing retry gives live's volume but area +0.35 %, box y -452.45 vs
-  -444.55: wrong rule, not landable. (core-tw also holds the uncommitted fill-dump edit.)
 - knifehandle left: Fillet 3 7/15/10 vs 6/12/8 -> Chamfer 1 wrong as Ok (9286 vs 10424 mm3): blend's (agreed 11-18 03:0x).
   Sweep 2 area 18225.81 vs 18227.26 mm2 (mine, small). TRANSLATE's rigid branch through the tweak; Delete face 2.
 - **(4) local Delete face rebuild** once Delete face 2 sees live's faces (blend's Halter build feeds it); src

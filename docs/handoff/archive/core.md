@@ -4461,3 +4461,15 @@ skasm meanwhile; I'll list what I change here before landing.
   on the invalid body Sweep 1's OCCT fallback left: bool takes Sweep 1's cut, bool2 the unify bound.
 - Extrude 33 (asm-pattern-std 36b90f) P0: 150 ms on main (debug, loaded vibe5 (down 11-17)); re-time once asm's Boolean feature
   pattern fix lands (Linear pattern 1 still errors upstream).
+
+## Moved 11-18 17:20
+- **asm-welding-config 9c7704 (lead):** first difference Sketch 9's region (109.56 vs 105.68 mm2) = skasm; Fillet 1 / 4
+  get sketch-entity edges from the translator. Reported 16:0x.
+- **Fill 1 (surf-intro-examples) research, parked:** live 11-18 (live/core/geo-1118/fill1-surf-intro.json): a trimmed
+  patch of a larger bicubic 14x18 B-spline (uv (0,0) = pole 1, outside the boundary), face edges OTHER on it, box z up
+  to 54.32 > every boundary point (overshoots 13 mm). Our edges = live's (ends, lengths). Tries vs live's centre
+  (1.624, 68.572, 20.921): OCCT plate balloons (61909 mm2); Coons 23786 but box z 89.6; harmonic / biharmonic on the
+  Coons square z 6.1; thin-plate spline z(x,y) over the boundary samples 17.14 (grid median 2.6 mm, max 15):
+  closest, still not it. Probes vibex8 ~/tmp/core/probefan ./fillp, ./edgs; scratch fill1-edges.txt.
+- **Loft 4 PARKED (core-tw 7eb54c0e5):** plane-crossing retry gives live's volume but area +0.35 %, box y -452.45 vs
+  -444.55: wrong rule, not landable. (core-tw also holds the uncommitted fill-dump edit.)
