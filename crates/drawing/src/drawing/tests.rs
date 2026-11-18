@@ -4104,9 +4104,9 @@ fn tangent_circles_get_no_centermark() {
     assert!(smooth.full_circles().is_empty(), "{:?}", smooth.full_circles());
 }
 
-/// A base view and a pictorial projection keep their label in the DXF when it says nothing, an orthographic projection
-/// doesn't (live's exchange-suite drawings: Front and Isometric each one empty MTEXT in -View-Label on ANNOTATION_TEXT,
-/// attached top centre under the view; Right and Top none).
+/// A base view and a pictorial projection at a scale other than 1:1 keep their label in the DXF when it says nothing,
+/// an orthographic projection doesn't (live's exchange-suite drawings at 1:2 to 1:50: Front and Isometric each one
+/// empty MTEXT in -View-Label on ANNOTATION_TEXT, attached top centre under the view; Right and Top none); at 1:1 none.
 #[test]
 fn cad_export_writes_empty_labels_of_base_and_pictorial_views() {
     use super::cad_export::to_dxf_version;
@@ -4119,9 +4119,16 @@ fn cad_export_writes_empty_labels_of_base_and_pictorial_views() {
     drawing.sheets[0].views.push(DrawingView { id: ViewId(3), kind: ViewKind::Projected { parent: ViewId(1), direction: Some([1.0, 1.0]) }, position: [200.0, 200.0], ..Default::default() });
     let sources = regenerate_sources(&doc, &drawing);
     let cache = ViewCache::new();
-    let built = render_sheet(&drawing, 0, &sources, &cache, true).unwrap();
-    let g = export::prepare(&built.geometry, &export::ExportOptions { strokes: true, ..Default::default() });
-    let d = acadrust::DxfReader::from_reader(std::io::Cursor::new(to_dxf_version(&g, 4, DxfVersion::AC1032).unwrap())).unwrap().read().unwrap();
+    let dxf = |drawing: &Drawing| {
+        let built = render_sheet(drawing, 0, &sources, &cache, true).unwrap();
+        let g = export::prepare(&built.geometry, &export::ExportOptions { strokes: true, ..Default::default() });
+        acadrust::DxfReader::from_reader(std::io::Cursor::new(to_dxf_version(&g, 4, DxfVersion::AC1032).unwrap())).unwrap().read().unwrap()
+    };
+    let label_count = |d: &acadrust::CadDocument| d.entities().filter(|e| matches!(e, EntityType::MText(m) if m.style.ends_with("-View-Label"))).count();
+    drawing.sheets[0].scale = 1.0;
+    assert_eq!(label_count(&dxf(&drawing)), 0, "at 1:1");
+    drawing.sheets[0].scale = 0.5;
+    let d = dxf(&drawing);
     let labels: Vec<f64> = d
         .entities()
         .filter_map(|e| match e {
