@@ -12240,6 +12240,19 @@ mod tests {
         assert_eq!(ed.message, None);
         assert!((ed.pattern_center - v(0.045, 0.03)).length() < 1e-9, "the triad sits on the copy's lowest, leftmost end: {}", ed.pattern_center);
         assert!(!ed.paste_clipboard(&mut d, "hello"));
+        // Live2 11-18 keys-1118: a 40 x 30 rectangle's copy lands with its bounding box's centre on the pointer,
+        // selected, Transform's triad on its lowest-left corner, and the constraints among its entities come along.
+        let (mut ed, mut d) = editor(Tool::Select);
+        let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.03));
+        let before = d.sketch.constraints().count();
+        ed.selection = r.curves.clone();
+        let clip = ed.copy_selection(&d).unwrap();
+        ed.pointer_move(&mut d, v(0.1, 0.05), false, false);
+        assert!(ed.paste_clipboard(&mut d, &clip));
+        let b = ed.selection.iter().filter_map(|e| d.sketch.entity_bbox(*e)).reduce(|a, b| a.union(&b)).unwrap();
+        assert!((b.center() - v(0.1, 0.05)).length() < 1e-9, "bbox centre on the pointer: {:?}", b.center());
+        assert_eq!((ed.selection.len(), ed.tool, d.sketch.constraints().count()), (4, Tool::Transform, 2 * before), "(selected, tool, constraints doubled)");
+        assert!((ed.pattern_center - v(0.08, 0.035)).length() < 1e-9, "the triad on the copy's lowest-left corner: {}", ed.pattern_center);
     }
 
     /// qa4 round 5 v3 s6 with live's answers: Normal takes either pick
