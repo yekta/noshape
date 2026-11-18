@@ -656,6 +656,12 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - Equal to live (live2): 1294, 1296, 1297. live2 next: the non-P0 "?" rows (ui-speed 1088-1093, prefs, numfmt, 1199, 1236, 893,
   1114, 1163); snap-diag 1303 stays qa's (Snap reach, on hold for asm).
 
+## Interaction feel: live2's "Ours" cells, batch 8 (ui-speed rows 1090-1093: 2 equal, 2 not; live2 13:3x, green c7d388e8, landed 0f833da72)
+- [ ] **P1 ROLLBACK-DROP-INPLACE (psui)**: the rollback bar lands 0.14-0.24 s after the drop; live's ~0.1 s (live UI shown 134 / 91 ms).
+- [ ] **P1 MASS-VALUES-DELAY (psui)**: Mass properties' values appear 313 ms after the part is picked; live's 154 ms.
+- Equal to live (live2): 1090, 1092. Rows 1088 (document open) and 1089 (tab switch) are qa's (screen-timed on live's speed document).
+- SEARCH-TOOLS-TOOLBAR-HIGHLIGHT still missing on c7d388e8 (skasm's 6389133a not in a green yet).
+
 ## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:10, green cafe3c2af, vibex8 Xvfb, real pointer)
 Sessions opened without the UI runner (stable view): asm-feel (Part 1 40x30x10, Part 3 20x20x5), block-fillet, hole-plate-drawing.
 Sheets tickets/asm-snapmode-sheet.png, row-dblclick-sheet.png, drw-feel-1118.png (vibex8 ~/agents/qa-keep/feel-1118/).
