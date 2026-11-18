@@ -3111,3 +3111,10 @@ fn a_cone_over_a_bore_notched_at_its_seam_cuts_as_occt() {
 fn a_patch_of_a_cylinder_in_one_closed_curve_fuses_as_occt() {
     recorded_as_occt("34b7e564b3047b96", 1e-9);
 }
+
+/// The common of a cylinder's face and a plane's, two sheets crossing (recorded): nothing, as OCCT's (it declined
+/// "sheets that meet").
+#[test]
+fn a_cylinder_sheet_and_a_plane_sheet_have_no_common() {
+    recorded_as_occt("ec7cc4c1dd560d64", 1e-9);
+}
