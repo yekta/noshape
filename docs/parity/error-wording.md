@@ -20,15 +20,15 @@ live/errors-1118/. Status: **=** same, **≠** differs (owner in brackets).
 | Situation | Live | Ours | Status |
 |---|---|---|---|
 | The part changed (out of date) | the toolbar's Update icon yellow, tooltip "Update from this workspace (ctrl+q)"; views unchanged | the same (green 548d795fb) | = |
-| The part gone (its feature suppressed), after Update | a blue info toast "ⓘ Failed to resolve part. ×"; all views vanish (no geometry, no frame) | no toast; each view shows "No parts to show" in a small box | ≠ [studios] |
-| A dimension whose reference is lost (the hole it measured suppressed), after Update | kept with its value, drawn red-orange rgb(221,82,40), a filled dot of that colour at the lost circle's centre; no toast or tooltip | the same colour and value; ≠ the dot at the leader's end on the old circle, not at its centre | ≈ [studios] |
+| The part gone (its feature suppressed), after Update | a blue info toast "ⓘ Failed to resolve part. ×"; all views vanish (no geometry, no frame) | = (fixed 11-18: the blue info toast "Failed to resolve part."; the views go blank, no box; GPUI feel `a_view_whose_part_is_gone_goes_blank_with_failed_to_resolve_part`) | = |
+| A dimension whose reference is lost (the hole it measured suppressed), after Update | kept with its value, drawn red-orange rgb(221,82,40), a filled dot of that colour at the lost circle's centre; no toast or tooltip | = (fixed 11-18: the dot at the lost circle's centre, in the lost colour; GPUI feel `a_lost_diameters_dot_sits_at_the_circles_centre`) | = |
 
 ## Variable Studio (live2)
 
 | Situation | Live | Ours | Status |
 |---|---|---|---|
 | A cycle (a = #b, b = #a) or an invalid expression ("1 +") | the bad cells (and cells depending on them) pink; hover tooltip "Error regenerating." only (no cycle wording) | the same (green 548d795fb) | = |
-| …the cell after Enter | the edited cell stays selected, red border | the selection moves to the next row (blue border) | ≠ [studios] |
+| …the cell after Enter | the edited cell stays selected, red border | = (fixed 11-18: Enter on a value that fails keeps its cell selected; GPUI `enter_on_a_failing_value_keeps_its_cell_selected`) | = |
 
 ## Feature Studio (live2)
 
@@ -46,11 +46,11 @@ live/errors-1118/rel-*.
 
 | Situation | Live | Ours | Status |
 |---|---|---|---|
-| Release… of a part whose Part Studio has an error (company default: "Prevent if a Part Studio feature list contains errors" off) | under Part 1's row an amber box (`alert alert-warning`: bg rgb(255, 248, 230), border rgb(252, 218, 127), text rgb(51, 51, 51)) "Part belongs to a Part Studio that has regeneration errors"; the header "1 item needs attention" | no box, the message isn't anywhere in ours; the header also says "1 item needs attention" | ≠ [studios] |
-| …the item's marks | an amber corner triangle rgb(250, 182, 1) on the thumbnail and on the Revision box; the ✕ (tooltip "Remove from release") full red rgb(189, 48, 57) | the triangles rgb(245, 180, 0); the ✕ pale rgb(212, 119, 125), same tooltip | ≈ / ≠ ✕ colour [studios] |
-| …the footer | "A field required by one or more actions is empty" with a ? whose tooltip is "Submit requires Approvers"; Apply enabled (blue), Save draft disabled; the empty Release name box grey-bordered (only its label's "Required field must not be empty." red rgb(170, 37, 45)) | the same sentence, its ⓘ shows no tooltip; Apply disabled, Save draft enabled; the Release name box red-bordered | ≠ [studios] |
+| Release… of a part whose Part Studio has an error (company default: "Prevent if a Part Studio feature list contains errors" off) | under Part 1's row an amber box (`alert alert-warning`: bg rgb(255, 248, 230), border rgb(252, 218, 127), text rgb(51, 51, 51)) "Part belongs to a Part Studio that has regeneration errors"; the header "1 item needs attention" | = (fixed 11-18: the amber box with live's sentence under the row, live's colours; the header as live; GPUI `a_part_of_a_failing_part_studio_gets_the_regeneration_errors_notice`) | = |
+| …the item's marks | an amber corner triangle rgb(250, 182, 1) on the thumbnail and on the Revision box; the ✕ (tooltip "Remove from release") full red rgb(189, 48, 57) | = (fixed 11-18: the ✕ full red) | = |
+| …the footer | "A field required by one or more actions is empty" with a ? whose tooltip is "Submit requires Approvers"; Apply enabled (blue), Save draft disabled; the empty Release name box grey-bordered (only its label's "Required field must not be empty." red rgb(170, 37, 45)) | ≈ (fixed 11-18: the ? (light blue) shows "Submit requires Approvers"; Apply enabled, Save draft disabled until an edit; the name box grey, its label red) ≠ the tooltip's bold words plain | ≈ [studios] |
 | …the attention filter (red ⬇ circle) | tooltip "Show only items that need attention" | the same | = |
-| The same with "Prevent if a Part Studio feature list contains errors" on (live 22:48–22:53 UTC, the same record / restore) | the same words "Part belongs to a Part Studio that has regeneration errors" in a red box instead (bg rgb(249, 235, 236), border rgb(245, 223, 225), text dark rgb(51, 51, 51)), inset under the row like the amber one; the rest as with it off (Apply still enabled) | other words, "The Part Studio feature list contains errors.", red text rgb(169, 68, 66) on a borderless rgb(242, 222, 222) band the full width of the row | ≠ [studios] |
+| The same with "Prevent if a Part Studio feature list contains errors" on (live 22:48–22:53 UTC, the same record / restore) | the same words "Part belongs to a Part Studio that has regeneration errors" in a red box instead (bg rgb(249, 235, 236), border rgb(245, 223, 225), text dark rgb(51, 51, 51)), inset under the row like the amber one; the rest as with it off (Apply still enabled) | = (fixed 11-18: live's sentence in the red box, live's colours, inset under the row) | = |
 
 ## Part Studio features (live)
 
@@ -133,6 +133,6 @@ Live 2026-11-18 22:20–22:22 UTC: a Variable input Len (Length, 1–100 mm, def
 
 | Situation | Live | Ours | Status |
 |---|---|---|---|
-| Out of range (500, -5) | the field pink rgb(249, 235, 236) with a red underline rgb(189, 48, 57), reading "500 mm" (unit added), its text selected; no message, no tooltip; the model stays at the last valid value | pink with a red underline, "500" (no unit); hovering shows the tooltip "Enter a value between 1 and 100. Current value is 500." | ≠ [studios] |
-| Not a value ("abc", "3 kg") | the same pink field, the text kept, the model unchanged | "abc" accepted as is: the field not marked, the model fails (Features header ⬇ red) | ≠ [studios] |
-| The Variable's box at rest | the value right-aligned (text-align right); no spinner (the ▲ ● ▼ in panel.png was the Configurations box's scrollbar: with Len and a List Size the box cut the Size row and scrolled; with Len alone no bar, panel-len-only.png) | left-aligned | ≠ [studios] |
+| Out of range (500, -5) | the field pink rgb(249, 235, 236) with a red underline rgb(189, 48, 57), reading "500 mm" (unit added), its text selected; no message, no tooltip; the model stays at the last valid value | = (fixed 11-18: pink, "500 mm" kept with its unit and selected, no tooltip; GPUI `the_configurations_box_refuses_a_value_out_of_range_or_not_a_value`) | = |
+| Not a value ("abc", "3 kg") | the same pink field, the text kept, the model unchanged | = (fixed 11-18: pink and refused, the model unchanged; the same test) | = |
+| The Variable's box at rest | the value right-aligned (text-align right); no spinner (the ▲ ● ▼ in panel.png was the Configurations box's scrollbar: with Len and a List Size the box cut the Size row and scrolled; with Len alone no bar, panel-len-only.png) | = (fixed 11-18: right-aligned; with two inputs the box stays one input tall and scrolls; GPUI `the_configurations_box_stays_one_input_tall_with_two`) | = |

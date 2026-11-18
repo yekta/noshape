@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 20:51 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 22:34 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -18,18 +18,20 @@ tools/tiers/land.sh --no-precheck`; builds / drawing-ui tests `NOSHAPE_RB_HOST=v
 the Mac; ui-parity on vibex7 / vibe2 via ~/bin/slot (vibex6 = watcher), one run per host.
 - Landed 11-18 (all): release dialog's associated drawings, dimension value on the pointer, projected / section
   previews grey, section cut on inference points, tooltip fade, FS notice count (f0307a3e), tab switch test (794df283).
-- Queued 150089a4: section cut line grey dash-dot, detail circle black + grey framed preview, ui-parity driver waits
-  for a pending FS error (`ui_busy`), so the 18 fs-* takes read their notice.
-- Local (next land): live2 place-1118 Auxiliary (grey framed preview, no letters / label, fold line midway to the
-  frame, preview over the parent) and Break view (zigzag at the pointer, view broken in the preview after the second
-  click; `build::break_line_points` shared with the renderer: crates/drawing touched, run the full ops e2e first);
-  BOM table placement (fixed corner snaps to the frame's corner within 10 px with a 14 px orange square; the preview
-  table not lit, so black); Crop view spline drawn open and black, closing within 6 px (CROP_CLOSE_REACH_PX); Datum leader square to its edge, Surface finish preview, centerline snap square 9.5 px (live2 ann-1118).
-- Running: r29 full drawing run on vibex7 (~/agents/studios-keep/drw1118g). Next: fs-* rerun after 150089a4 lands.
+- Queued 11-18 23:1x (one stack, rebased on the union merge): section / detail / aux / break / BOM / crop / datum /
+  surface finish / centerline placement (live2 place-1118, ann-1118), GTOL edge leader, part gone → blank + "Failed to
+  resolve part.", lost dot at the centre, VS Enter, Configurations box (refuses, right-aligned, one input tall),
+  release regeneration-errors notice (amber / red) and footer, qa session-1118 14a/b (No views fits 1:2, Insert
+  continuation axis-only, renamed part name); feel / error-wording rows in the last commit.
+- drw1118g (vibex7, 11-18 21:5x): 336/341; the rest are the known non-targets below and two with no recording
+  (drw-break-view-straight, drw-broken-out-offset). Running: fs-* rerun with the ui_busy wait (fs1118b, vibex7).
 - cf-spur-gear 0.4.58 → 0.4.59 (lead 11-18): cold-only, in our Boolean's free-form face grids (Once::call in rayon
   workers 50 → 1028 samples); bool's batch in the range; qa bisects (told). Scratch /root/studios-scratch/prof/s.
 - Not targets: replicate-region-place s21 (server toast), drw-revision-table-delete s8,
   drw-inspection-table-iso-scrolled s2; drw-canvas-zoom-to-sheet / drw-ref-pin-reference have no usable recording.
+- Open (GTOL retake): our ⌖ draws far smaller than live's ⊕ (likely the drawing text face has no ⌖ and sketch
+  `layout_drawing_text` falls back): needs a GD&T glyph in the drawing font path, exports too; the pink alignment line
+  (what it aligns to unclear). Crop ✕ condition unknown (live2), ours shows it while the profile is open.
 - Awaiting live2: Versions panel feel re-take (REQUESTS 11-18 19:53).
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
