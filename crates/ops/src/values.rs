@@ -23,6 +23,24 @@ fn spec<'a>(specs: &'a [ParamSpec], id: &str) -> Option<&'a ParamSpec> {
 /// Apply JSON `params` onto `values` (only the given keys change).
 pub fn apply(specs: &[ParamSpec], values: &mut ParamValues, params: &serde_json::Map<String, Value>, units: &UnitPrefs, doc: &Document) -> Result<(), OpError> {
     for (k, v) in params {
+        // A tolerant quantity's Tolerance options (the dialog's ± by the field): `<param>__tolerance`.
+        if let Some(param) = k.strip_suffix("__tolerance")
+            && let Some(s) = spec(specs, param)
+        {
+            if !s.hints.has(Hints::CAN_BE_TOLERANT) {
+                return Err(OpError::param(k, &format!("`{param}` has no tolerance options")));
+            }
+            match v {
+                Value::Null => {
+                    values.0.shift_remove(k.as_str());
+                }
+                _ => {
+                    let t = tolerance_from_json(v, param.to_lowercase().contains("diameter")).map_err(|e| OpError::param(k, &e))?;
+                    values.set(k, ParamValue::Text(t.encode()));
+                }
+            }
+            continue;
+        }
         let Some(s) = spec(specs, k) else {
             // Stored values the schema no longer lists (feature_get shows
             // them) pass back unchanged.
@@ -312,6 +330,9 @@ pub fn spec_schema(s: &ParamSpec, units: &UnitPrefs, all: &[ParamSpec], defaults
             let d = noshape_model::params::default_expr(n, units).text;
             let range = |x: f64| noshape_units::format_quantity_exact(noshape_units::Quantity::new(x, n.kind.dim()), units);
             desc = format!("{desc}. {what}; range {} to {}", range(n.min), range(n.max));
+            if s.hints.has(Hints::CAN_BE_TOLERANT) {
+                desc = format!("{desc}. Tolerance options (the dialog's ±) as `{}__tolerance`: {{\"type\": {}, \"upper\", \"lower\" (document units), \"precision\" (0-6 or \"workspace\")}}, null clears", s.id, noshape_model::fits::Tolerance::KINDS.join("|"));
+            }
             json!({ "type": ["string", "number"], "default": d })
         }
         ParamKind::Text { default } => json!({ "type": "string", "default": default }),
@@ -353,4 +374,40 @@ pub fn feature_schema(specs: &[ParamSpec], units: &UnitPrefs, defaults: Option<&
         props.insert(s.id.into(), spec_schema(s, units, specs, defaults));
     }
     json!({ "type": "object", "properties": props, "additionalProperties": false })
+}
+
+/// Tolerance options from `{"type": "Symmetrical", "upper": 0.1, "lower": 0, "precision": 3}` (values in the document's
+/// unit as the dialog's fields take them; `precision` decimals, null or "workspace" for Workspace precision); a type
+/// alone keeps the others' defaults (0, workspace precision).
+fn tolerance_from_json(v: &Value, diameter: bool) -> Result<noshape_model::fits::Tolerance, String> {
+    let o = v.as_object().ok_or("an object: {\"type\": \"Symmetrical\", \"upper\": 0.1, \"lower\": 0, \"precision\": 3}")?;
+    let kinds = noshape_model::fits::Tolerance::kinds(diameter);
+    let mut t = noshape_model::fits::Tolerance::default();
+    if let Some(k) = o.get("type") {
+        let k = k.as_str().unwrap_or_default();
+        t.kind = kinds.iter().find(|x| x.eq_ignore_ascii_case(k)).ok_or_else(|| format!("type `{k}` is not one of: {}", kinds.join(", ")))?.to_string();
+    }
+    let text = |key: &str| -> Result<Option<String>, String> {
+        match o.get(key) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::Number(n)) => Ok(Some(n.to_string())),
+            Some(Value::String(s)) => Ok(Some(s.clone())),
+            Some(_) => Err(format!("`{key}`: a number or an expression")),
+        }
+    };
+    if let Some(u) = text("upper")? {
+        t.upper = u;
+    }
+    if let Some(l) = text("lower")? {
+        t.lower = l;
+    }
+    t.precision = match o.get("precision") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(s)) if s.eq_ignore_ascii_case("workspace") => None,
+        Some(p) => Some(p.as_u64().filter(|p| *p <= 6).ok_or("`precision`: 0 to 6 decimals, or \"workspace\"")? as u8),
+    };
+    if let Some(bad) = o.keys().find(|k| !matches!(k.as_str(), "type" | "upper" | "lower" | "precision")) {
+        return Err(format!("unknown field `{bad}`; the tolerance takes type, upper, lower, precision"));
+    }
+    Ok(t)
 }

@@ -74,6 +74,12 @@ impl PartStudioView {
                 .collect();
             s.pmi = noshape_ops::export::studio_pmi(ps, ctx, &ids, &self.doc.read(cx).session.doc.settings.units, s.mbd_text());
         }
+        // Inspection list (live inspection-list-1118): the Part Studio's Characteristics.
+        if s.format == PartFormat::InspectionList
+            && let Some(ps) = self.studio(cx)
+        {
+            s.inspection = noshape_ops::export::inspection_list_csv(ps, &self.doc.read(cx).session.doc.settings.units);
+        }
         let several = if bodies.is_empty() { self.context.as_ref().is_some_and(|c| c.bodies.len() > 1) } else { bodies.len() > 1 };
         match self.export_parts(&s, &bodies) {
             Ok(parts) => self.save_parts_export(s, name, parts, several, window, cx),
@@ -101,6 +107,10 @@ impl PartStudioView {
             self.flash_info("Export failed: the released version is no longer in the document".into(), cx);
             return;
         };
+        let mut s = s;
+        if let (PartFormat::InspectionList, Some(noshape_model::TabContent::PartStudio(ps))) = (s.format, doc.tab(self.tab).map(|t| &t.content)) {
+            s.inspection = noshape_ops::export::inspection_list_csv(ps, &doc.settings.units);
+        }
         self.export_preparing(&name, cx);
         let tab = self.tab;
         let several = bodies.len() > 1;
@@ -240,7 +250,10 @@ fn set_file_format(s: &mut ExportSettings, i: usize) {
 fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, run: RunExport, window: &mut Window, cx: &mut App) {
     let file = cx.new(|cx| InputState::new(window, cx).default_value(base));
     // The last export's format and options (live: exportSolidOptions); a CAD file's, Parasolid unless it was one of its.
-    let st = Rc::new(RefCell::new(noshape_ops::export::SolidExportPrefs::load().settings(assembly)));
+    // A part row's list ends with Inspection list (live inspection-list-1118), the tab's doesn't.
+    let part_row = parts_only && !assembly && !cad_file;
+    let prefs = noshape_ops::export::SolidExportPrefs::load();
+    let st = Rc::new(RefCell::new(if part_row { prefs.settings_in(&PartFormat::part_row_list()) } else { prefs.settings(assembly) }));
     if cad_file && !file_formats().contains(&st.borrow().format) {
         set_file_format(&mut st.borrow_mut(), 0);
     }
@@ -327,15 +340,30 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
             Select { id: &'static str, label: &'static str, opts: Vec<String>, cur: usize, disabled: bool, set: fn(&mut ExportSettings, usize) },
             Check { id: &'static str, label: &'static str, on: bool, set: fn(&mut ExportSettings, bool) },
             Number { label: String, input: Entity<InputState>, error: Option<&'static str> },
+            Note(&'static str),
         }
         let sel = |id, label, opts: &[&str], cur, disabled, set| Row::Select { id, label, opts: opts.iter().map(|o| o.to_string()).collect(), cur, disabled, set };
         let chk = |id, label, on, set| Row::Check { id, label, on, set };
-        let formats = if cad_file { file_formats() } else { PartFormat::list(assembly) };
+        let formats = if cad_file {
+            file_formats()
+        } else if part_row {
+            PartFormat::part_row_list()
+        } else {
+            PartFormat::list(assembly)
+        };
         let labels: Vec<&str> = formats.iter().map(|f| f.label()).collect();
         let units: Vec<&str> = UNITS.iter().map(|u| u.0).collect();
-        let set_format: fn(&mut ExportSettings, usize) = if cad_file { set_file_format } else if assembly { set_asm_format } else { set_part_format };
+        let set_format: fn(&mut ExportSettings, usize) = if cad_file {
+            set_file_format
+        } else if assembly {
+            set_asm_format
+        } else if part_row {
+            noshape_ops::export::set_part_row_format
+        } else {
+            set_part_format
+        };
         let mut rows = vec![sel("ex-format", "Format", &labels, formats.iter().position(|x| *x == f).unwrap_or(0), false, set_format)];
-        if f != PartFormat::Urdf && !cad_file {
+        if !matches!(f, PartFormat::Urdf | PartFormat::InspectionList) && !cad_file {
             rows.push(chk("ex-yup", "Export models oriented Y axis up", s.y_up, |s, v| s.y_up = v));
         }
         match f {
@@ -385,6 +413,7 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
                 }
                 rows.push(sel("ex-res", "Resolution", &RESOLUTIONS, s.resolution, false, |s, i| s.resolution = i));
             }
+            PartFormat::InspectionList => rows.push(Row::Note("Exported csv file will contain an ordered list of all inspection symbols.")),
             PartFormat::Acis | PartFormat::Jt => {}
         }
         // Resolution › Custom: its three fields under the list (STL's, else
@@ -415,6 +444,7 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
                 Row::Select { label, opts, cur, .. } => serde_json::json!({ "label": label, "kind": "select", "value": opts.get(*cur) }),
                 Row::Check { label, on, .. } => serde_json::json!({ "label": label, "kind": "checkbox", "value": on }),
                 Row::Number { label, input, .. } => serde_json::json!({ "label": label, "kind": "input", "value": input.read(cx).value().to_string() }),
+                Row::Note(text) => serde_json::json!({ "kind": "note", "value": text }),
             }));
             serde_json::json!({ "kind": "modal", "title": "Export", "fields": fields, "buttons": ["Export", "Cancel"] })
         });
@@ -484,6 +514,11 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
                             .child(div().mt(px(FIELD_MT)).h(px(34.)).px(px(1.)).flex().items_center().border_1().border_color(gpui_kit::rgb(border)).rounded(px(4.)).bg(pal.panel).child(Input::new(&input).appearance(false).text_size(px(14.))))
                             .when_some(error, |d, e| d.child(div().mt(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xdc3545)).child(e))),
                     )
+                }
+                // (As the drawing Export's note under Format: drawing_export.rs.)
+                Row::Note(text) => {
+                    prev_check = false;
+                    body.child(div().pt(px(6.)).text_size(px(13.33)).child(text))
                 }
                 Row::Check { id, label, on, set } => {
                     let mt = if prev_check { CHECK_GAP } else { CHECK_MT };

@@ -16,7 +16,7 @@ pub fn ops() -> Vec<Op> {
         fields: vec![
             doc_field(),
             tab_field(),
-            req("format", json!({ "type": "string", "enum": PartFormat::ALL.iter().map(|f| f.label()).collect::<Vec<_>>() }), "File format."),
+            req("format", json!({ "type": "string", "enum": PartFormat::ALL.iter().chain(&[PartFormat::InspectionList]).map(|f| f.label()).collect::<Vec<_>>() }), "File format (\"Inspection list\": a part's, with `parts`: its Part Studio's Model definitions Characteristics as CSV, as a part row's Export…)."),
             opt("file", s(), "Output path; without an extension the format's is added (\"part\" -> \"part.x_t\"); individual files go in a .zip. Required unless `options` is \"store\" (then only its name is used; default \"<tab>.<ext>\")."),
             opt("options", json!({ "type": "string", "enum": ["download", "download_and_store", "store"], "default": "download" }), "Options: write `file` (Download), and / or keep the file as a file tab right after the tab (Store file in a new tab; one edit \"Store <file>\")."),
             opt("parts", strings(), "Part ids (`body:…`) or names; default all visible parts."),
@@ -50,16 +50,20 @@ pub fn ops() -> Vec<Op> {
 
 fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let label = a.str("format")?;
-    let format = PartFormat::ALL.into_iter().find(|f| f.label().eq_ignore_ascii_case(label) || f.ext().eq_ignore_ascii_case(label)).ok_or_else(|| {
-        let names: Vec<&str> = PartFormat::ALL.iter().map(|f| f.label()).collect();
+    let format = PartFormat::part_row_list().into_iter().chain([PartFormat::Rhino]).find(|f| f.label().eq_ignore_ascii_case(label) || f.ext().eq_ignore_ascii_case(label)).ok_or_else(|| {
+        let names: Vec<&str> = PartFormat::ALL.iter().chain(&[PartFormat::InspectionList]).map(|f| f.label()).collect();
         OpError::param("format", &format!("`{label}` is not an export format{}; formats: {}", crate::error::did_you_mean(label, names.iter().copied()), names.join(", ")))
     })?;
     // The options not given are the Export dialog's remembered ones.
-    let mut s = SolidExportPrefs::load().settings(false);
-    let Some(row) = PartFormat::list(false).iter().position(|f| *f == format) else {
+    let mut s = SolidExportPrefs::load().settings_in(&PartFormat::part_row_list());
+    let Some(row) = PartFormat::part_row_list().iter().position(|f| *f == format) else {
         return Err(OpError::param("format", "RHINO export is not in this build (it needs openNURBS; releases have it)"));
     };
-    crate::export::set_part_format(&mut s, row);
+    crate::export::set_part_row_format(&mut s, row);
+    // Live lists Inspection list in a part row's Export… only, not the Part Studio tab's.
+    if format == PartFormat::InspectionList && a.opt_array("parts")?.is_none_or(|p| p.is_empty()) {
+        return Err(OpError::param("parts", "Inspection list is a part's export (its row's Export…): give the part"));
+    }
     s.y_up = a.bool_or("y_up", s.y_up)?;
     s.stl_text = a.bool_or("stl_text", s.stl_text)?;
     s.individual = a.bool_or("individual", s.individual)?;
@@ -137,6 +141,9 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let versions = od.session.store.list_versions().map_err(|e| OpError::new("io", format!("{e:#}")))?;
         let id = versions.iter().find(|x| x.name == v || x.id.to_string() == v).map(|x| x.id.to_string()).ok_or_else(|| OpError::param("document_version", &format!("no version named `{v}`")))?;
         let doc = od.session.document_at_version(&id).map_err(|e| OpError::new("io", format!("{e:#}")))?.ok_or_else(|| OpError::param("document_version", "no such version"))?;
+        if let Some(noshape_model::TabContent::PartStudio(ps)) = doc.tab(tab).map(|t| &t.content) {
+            s.inspection = crate::export::inspection_list_csv(ps, &doc.settings.units);
+        }
         let list = crate::export::version_parts(doc, tab, &selected).map_err(|e| OpError::param("document_version", &format!("{e:#}")))?;
         let n = list.len();
         return write_out(od, tab, a, format, n, |file| crate::export::write_export(&s, file, list));
@@ -168,6 +175,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         .collect();
     if let Some(noshape_model::TabContent::PartStudio(ps)) = od.doc().tab(tab).map(|t| &t.content) {
         s.pmi = crate::export::studio_pmi(ps, &r.context, &ids, &od.doc().settings.units, s.mbd_text());
+        s.inspection = crate::export::inspection_list_csv(ps, &od.doc().settings.units);
     }
     let n = list.len();
     write_out(od, tab, a, format, n, |file| crate::export::write_export(&s, file, list))

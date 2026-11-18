@@ -20,6 +20,9 @@ pub enum PartFormat {
     /// Assemblies only: a robot description with its mesh files (zip).
     Urdf,
     Stl,
+    /// A part's only (its row's Export…, after STL; not the Part Studio tab's): the Model definitions
+    /// Characteristics as CSV ([`inspection_list_csv`], live inspection-list-1118).
+    InspectionList,
 }
 
 impl PartFormat {
@@ -37,6 +40,13 @@ impl PartFormat {
         }
     }
 
+    /// A part row's Format list (live inspection-list-1118): the Part Studio's and Inspection list.
+    pub fn part_row_list() -> Vec<PartFormat> {
+        let mut list = Self::list(false);
+        list.push(Self::InspectionList);
+        list
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             Self::Parasolid => "PARASOLID",
@@ -52,6 +62,7 @@ impl PartFormat {
             Self::ThreeMf => "3MF",
             Self::Urdf => "URDF",
             Self::Stl => "STL",
+            Self::InspectionList => "Inspection list",
         }
     }
 
@@ -70,6 +81,7 @@ impl PartFormat {
             Self::ThreeMf => "3mf",
             Self::Urdf => "zip",
             Self::Stl => "stl",
+            Self::InspectionList => "csv",
         }
     }
 
@@ -122,6 +134,8 @@ pub struct ExportSettings {
     pub options: usize,
     /// Resolution › Custom's fields (live dom g39-export-ps-step).
     pub custom: CustomResolution,
+    /// Inspection list: the file's text ([`inspection_list_csv`]).
+    pub inspection: String,
     /// Each part's MBD (index = part; [`studio_pmi`]), written to STEP AP242
     /// as semantic PMI.
     pub pmi: Vec<Option<k::PartPmi>>,
@@ -304,7 +318,7 @@ impl SolidExportPrefs {
             PartFormat::Obj | PartFormat::ThreeMf => self.mesh_resolution = s.resolution,
             PartFormat::Stl => (self.stl_resolution, self.stl_text, self.stl_units) = (s.resolution, s.stl_text, s.units),
             PartFormat::Urdf => (self.mesh_resolution, self.urdf_geometry, self.urdf_stl_text) = (s.resolution, s.urdf_geometry, s.stl_text),
-            PartFormat::Parasolid | PartFormat::Rhino | PartFormat::Acis | PartFormat::Jt => {}
+            PartFormat::Parasolid | PartFormat::Rhino | PartFormat::Acis | PartFormat::Jt | PartFormat::InspectionList => {}
         }
     }
 
@@ -327,7 +341,11 @@ impl SolidExportPrefs {
     /// The Export dialog's settings on opening: the remembered format if
     /// the list has it (else its first) and options.
     pub fn settings(&self, assembly: bool) -> ExportSettings {
-        let list = PartFormat::list(assembly);
+        self.settings_in(&PartFormat::list(assembly))
+    }
+
+    /// [`Self::settings`] for the Format list `list` (a part row's: [`PartFormat::part_row_list`]).
+    pub fn settings_in(&self, list: &[PartFormat]) -> ExportSettings {
         let mut s = ExportSettings { format: list.iter().copied().find(|f| f.label() == self.format).unwrap_or(list[0]), ..Default::default() };
         self.give(&mut s);
         s.memory = Box::new(self.clone());
@@ -388,6 +406,7 @@ impl Default for ExportSettings {
             urdf_geometry: 0,
             options: 0,
             custom: CustomResolution::default(),
+            inspection: String::new(),
             pmi: Vec::new(),
             memory: Box::default(),
             hidden_before_urdf: None,
@@ -449,6 +468,10 @@ pub fn version_parts(doc: noshape_model::Document, tab: noshape_model::document:
 
 pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(String, k::Shape, [f32; 4])>) -> anyhow::Result<std::path::PathBuf> {
     anyhow::ensure!(!parts.is_empty(), "Selected tab contains no supported geometry for export.");
+    if s.format == PartFormat::InspectionList {
+        std::fs::write(path, &s.inspection)?;
+        return Ok(path.to_path_buf());
+    }
     if let Some(msg) = missing_writer(s.format) {
         anyhow::bail!(msg);
     }
@@ -741,6 +764,29 @@ fn switch_format(s: &mut ExportSettings, f: PartFormat) {
 
 pub fn set_part_format(s: &mut ExportSettings, i: usize) {
     switch_format(s, PartFormat::list(false)[i]);
+}
+
+/// A part row's Format list's `i`th ([`PartFormat::part_row_list`]).
+pub fn set_part_row_format(s: &mut ExportSettings, i: usize) {
+    switch_format(s, PartFormat::part_row_list()[i]);
+}
+
+/// A part's Inspection list (live inspection-list-1118): its Part Studio's Model definitions › Characteristics rows
+/// (toleranced parameters of the features before the rollback bar; datums get none) under the table's header, as
+/// live writes it: UTF-8 with a BOM, every field quoted, CRLF.
+/// `"Type","Nominal value","Tolerance","Upper limit","Lower limit"` then e.g. `"Distance","10.000","±0.100","10.100","9.900"`.
+pub fn inspection_list_csv(ps: &noshape_model::PartStudio, units: &noshape_units::UnitPrefs) -> String {
+    let row = |cells: &[&str]| cells.iter().map(|c| format!("\"{}\"", c.replace('"', "\"\""))).collect::<Vec<_>>().join(",") + "\r\n";
+    let mut out = String::from("\u{feff}");
+    out += &row(&["Type", "Nominal value", "Tolerance", "Upper limit", "Lower limit"]);
+    let standard = ps.default_tolerances.as_deref();
+    for c in noshape_model::annotations::characteristics(ps, None, ps.rollback_index()).iter().filter(|c| !c.rolled_back) {
+        let factor = units.si_factor(c.dim);
+        let decimals = usize::from(if c.dim == noshape_units::Dim::ANGLE { units.angle_precision } else { units.length_precision });
+        let [nominal, tol, upper, lower] = c.cells(factor, decimals, standard);
+        out += &row(&[c.kind, &nominal, &tol, &upper, &lower]);
+    }
+    out
 }
 
 /// URDF checks "Include hidden instances in export"; leaving it gives back

@@ -9207,3 +9207,31 @@ fn a_failed_import_feature_is_reported() {
     let errors = r["errors"].as_array().unwrap_or_else(|| panic!("no errors: {r}"));
     assert!(errors.iter().any(|e| e.as_str().unwrap().contains("Import 1: Error regenerating.")), "{r}");
 }
+
+/// A part's Export › Inspection list (live inspection-list-1118): its Part Studio's Model definitions Characteristics
+/// as CSV, UTF-8 with a BOM, every field quoted, CRLF; a plain part the header only; the Part Studio's own Export
+/// doesn't offer it. Extrude 1's Depth 10 mm ± 0.1 (Symmetrical) is live's row.
+#[test]
+fn a_parts_inspection_list_is_its_characteristics() {
+    let mut ctx = Ctx::new();
+    let sketch = new_sketch(&mut ctx, "inspection-list.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }))["regions"][0]["id"].clone();
+    let f = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let extrude = f["feature"].as_str().or(f["id"].as_str()).unwrap().to_string();
+    let header = "\u{feff}\"Type\",\"Nominal value\",\"Tolerance\",\"Upper limit\",\"Lower limit\"\r\n";
+    let csv = |ctx: &mut Ctx, name: &str| {
+        let file = scratch(name);
+        call(ctx, "export_parts", json!({ "format": "Inspection list", "parts": ["Part 1"], "file": file.to_str().unwrap() }));
+        std::fs::read_to_string(&file).unwrap()
+    };
+    assert_eq!(csv(&mut ctx, "plain.csv"), header, "a plain part: the header only");
+    let e = try_call(&mut ctx, "feature_edit", json!({ "feature": extrude, "params": { "depth__tolerance": { "type": "Symmetric" } } })).unwrap_err();
+    assert!(e.param.as_deref() == Some("params.depth__tolerance") && e.message.contains("Symmetrical"), "{e:?}");
+    call(&mut ctx, "feature_edit", json!({ "feature": extrude, "params": { "depth__tolerance": { "type": "Symmetrical", "upper": 0.1 } } }));
+    assert_eq!(csv(&mut ctx, "toleranced.csv"), format!("{header}\"Distance\",\"10.000\",\"±0.100\",\"10.100\",\"9.900\"\r\n"));
+    let e = try_call(&mut ctx, "export_parts", json!({ "format": "Inspection list", "file": scratch("tab.csv").to_str().unwrap() })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("parts"), "{e:?}");
+    call(&mut ctx, "feature_edit", json!({ "feature": extrude, "params": { "depth__tolerance": null } }));
+    assert_eq!(csv(&mut ctx, "cleared.csv"), header, "the tolerance cleared");
+}
