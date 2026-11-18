@@ -99,7 +99,7 @@ pub const COLOR: [&str; 3] = ["Color", "Black and white", "Grayscale"];
 /// DXF / DWG Units: the drawing's, or another (INSUNITS code). Live
 /// dialog-export-drawing-all-formats.
 pub const UNITS: [(&str, u8); 7] = [("Use drawing units", 0), ("Centimeter", 5), ("Foot", 2), ("Inch", 1), ("Meter", 6), ("Millimeter", 4), ("Yard", 10)];
-pub const OPTIONS: [&str; 3] = ["Download", "Download and store…", "Store file in a new tab"];
+pub const OPTIONS: [&str; 3] = ["Download", "Download and store file in a new tab", "Store file in a new tab"];
 
 /// The modal's settings.
 #[derive(Clone, Debug)]
