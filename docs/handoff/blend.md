@@ -130,6 +130,16 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
    closed_run_on-trimmed tools (or close its ends) so the Booleans go. Same run: Chamfer Stevenrohr Halterung 272 (live
    16-20), Fillet Bohrungssitz 938 (242), Flansch zum Stroemungskanal 137 (66.5), Fillet 1 74 (39), einnschub 55 (30),
    Delete face 2 226 (12, core's?).
+   bool 11-18: the Boolean's 680 of 720 ms are 4 edge/face pairs (135-150 ms each): the housing's 141 / 144 mm B-spline
+   edges round its offset face F2 against each tool's strip face lying on F2's surface (another handle and basis);
+   bool's Rust Boolean declines for the same reason. Mac cases ~/noshape-host/bool-keep/imprec. The direct build avoids
+   it: its dump replays in 180 ms (blend10 patch parked/zz-dump-direct.patch: ZZ_DUMP_DIRECT=<dir> on a run,
+   crash_inputs::zz_direct with ZZ_DIRECT=<file>; Mac dumps ~/noshape-host/agents/blend10/f3d/direct-1.brep). Open
+   shell: the tools run x -1.5..78.97 untrimmed; sections blend x part faces 8 / 18 (the 6.10 mm2 chamfer faces live's
+   rounds end on) and the (8 x 6) / (9 x 0) pairs give 0 lines. Lead 12:4x: setback fillet -> core (sent); order: land
+   f4 + speed, then Halterung (rim_chamfer_cut 230 ms: tool 70 = 3 lofts + 3 Booleans, cut 95, unify 31, 2 checks 21;
+   needs the same end trimming for live's 16-20), Bohrungssitz (938 ms all OCCT fallbacks failing on a wrong input:
+   3 parts vs live 1 upstream: skip), then this end trimming.
    (b2) Merged-body Fillet 3 (bool2's fillet-26) recheck: still to do.
    (e) lead 11-18: Fillet Bohrungssitz Ansaugflasch (f48, last feature) text 'Unfilleted edge overlapped by fillet.'
    (v0.4.58) -> 'Failed to fillet selections.' (main): its input moves with every upstream change; the text is whichever
