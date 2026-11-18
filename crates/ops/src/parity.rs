@@ -4917,13 +4917,13 @@ impl<'a> Translator<'a> {
                             // The tool's third click sets the minor radius by its distance across the major axis and the
                             // start by its angle: the click with both, live's b and its start's angle (on the axis: the
                             // start itself).
+                            // (A start on the major axis can't be clicked so, its minor radius 0 there: a start 1e-7 rad
+                            // along the arc, which its constraints then close up; c2-surf-intro-examples' half ellipse
+                            // w1thr3UhX11c from 0 to π.)
+                            let t0 = if t0.sin().abs() < 1e-6 { t0 + 1e-7 * if t1 > t0 { 1.0 } else { -1.0 } } else { t0 };
                             let (c0, s0) = (t0.cos(), sense * t0.sin());
-                            let third = if s0.abs() > 1e-6 {
-                                let (k, m) = (a * c0 / s0.abs(), b * s0.signum());
-                                json!(at(cx + k * xd - m * yd, cy + k * yd + m * xd))
-                            } else {
-                                pt(t0)
-                            };
+                            let (k, m) = (a * c0 / s0.abs(), b * s0.signum());
+                            let third = json!(at(cx + k * xd - m * yd, cy + k * yd + m * xd));
                             Some(json!({ "tool": "elliptical_arc", "points": [at(cx, cy), pt(0.0), third, pt(t1)], "construction": construction }))
                         }
                         _ => Some(json!({ "tool": "ellipse", "points": [at(cx, cy), pt(0.0), pt(std::f64::consts::FRAC_PI_2)], "construction": construction })),

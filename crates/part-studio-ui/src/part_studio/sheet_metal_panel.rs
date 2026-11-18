@@ -737,7 +737,7 @@ impl PartStudioView {
     fn toast_cannot_unfold(&mut self, joints: &[FeatureId], cx: &mut Context<Self>) {
         use noshape_model::display::FeatureStatus;
         let msg = noshape_model::regen::features::sheetmetal_ops::CANNOT_UNFOLD;
-        let failed = |j: &FeatureId| self.display.feature_state(*j).is_some_and(|s| s.status == FeatureStatus::Warning && s.message.as_deref() == Some(msg));
+        let failed = |j: &FeatureId| self.display.feature_state(*j).is_some_and(|s| s.message.as_deref() == Some(msg));
         if joints.iter().any(failed) {
             self.flash_for(FeatureStatus::Warning, msg.into(), std::time::Duration::from_secs(5), cx);
         }

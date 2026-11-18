@@ -2451,8 +2451,9 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 }
             }
             stop_if_cancelled()?;
-            // (The walls a loop of bends can't lay flat.)
-            let clashes = unfold(def, def.k_factor, &topo).map(|u| u.clashes).unwrap_or_default();
+            // (The walls a loop of bends can't lay flat; the placement holds flat walls only: with a rolled wall, none.)
+            let rolled = topo.faces.iter().any(|f| f.face_plane().ok().flatten().is_none());
+            let clashes = if rolled { Vec::new() } else { unfold(def, def.k_factor, &topo).map(|u| u.clashes).unwrap_or_default() };
             for (k, p) in parts.into_iter().enumerate() {
                 let walls: Vec<(usize, Shape)> = wall_flats.iter().filter(|w| p.members.contains(&w.0)).cloned().collect();
                 let own: Vec<Strip> = strips.iter().filter(|s| p.members.contains(&s.wall_a)).cloned().collect();

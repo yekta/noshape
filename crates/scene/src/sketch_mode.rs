@@ -1795,12 +1795,13 @@ impl SketchEditor {
                 best = Some(on.clone());
             }
         }
-        // Live's getInference: the target snapped to last stays while anything under the pointer is on it, ahead of a
-        // stronger snap there (WT@9146346 lastInferenceTarget: a point square over its line's band keeps the line).
+        // Live's getInference: the target snapped to last stays while anything under the pointer is on it (WT@9146346
+        // lastInferenceTarget), among snaps of its rank: a point or a line's end coming into reach still takes over from
+        // the line (live 11-18 sticky-snap, real pointer).
         let held_target = self.snap_target.get().filter(|_| !self.exact_inference);
         if let Some(t) = held_target
-            && best.as_ref().is_some_and(|b| !b.targets().any(|x| x == t))
-            && let Some(on) = all.iter().find(|i| i.targets().any(|x| x == t))
+            && let Some(b) = best.as_ref().filter(|b| !b.targets().any(|x| x == t))
+            && let Some(on) = all.iter().find(|i| i.priority <= b.priority && i.targets().any(|x| x == t))
         {
             best = Some(on.clone());
         }
@@ -11330,24 +11331,27 @@ mod tests {
         assert!(ed.selected_constraints.is_empty() && ed.selection.is_empty(), "an empty click deselects");
     }
 
-    /// Live's getInference (WT@9146346 lastInferenceTarget): where a point's square overlaps a line's band, the line
-    /// snapped to last stays lit; coming in from elsewhere, the point (points over curves).
+    /// Live's getInference (WT@9146346 lastInferenceTarget; live 11-18 sticky-snap, real pointer): between two lines'
+    /// bands the one snapped to last stays though the other is nearer; coming in from elsewhere the nearer one lights; a
+    /// point coming into reach takes over from the line all the same.
     #[test]
-    fn the_line_snapped_to_last_stays_over_a_point_by_it() {
+    fn the_line_snapped_to_last_stays_against_its_rank_not_a_point() {
         let (mut ed, mut d) = editor(Tool::Line);
-        let line = d.sketch.add_line(v(-0.02, 0.0), v(0.02, 0.0));
-        let point = d.sketch.add_point(v(0.004, 12.0 * PX));
+        let low = d.sketch.add_line(v(-0.02, 0.0), v(0.02, 0.0));
+        let high = d.sketch.add_line(v(-0.02, 6.0 * PX), v(0.02, 6.0 * PX));
+        let point = d.sketch.add_point(v(0.012, 9.0 * PX));
         click(&mut ed, &mut d, v(-0.013, -0.031));
         let lit = |ed: &mut SketchEditor, d: &mut SketchData, q: DVec2| {
             ed.pointer_move(d, q, false, false);
             ed.inference.as_ref().map(|i| (i.kind, i.entity))
         };
-        let both = v(0.004, 6.0 * PX);
+        let on = |e| Some((InferenceKind::OnCurve, Some(e)));
+        let between = v(0.004, 2.0 * PX);
         assert_eq!(lit(&mut ed, &mut d, v(0.004, 0.01)), None, "nothing");
-        assert_eq!(lit(&mut ed, &mut d, both), Some((InferenceKind::Endpoint, Some(point))), "from elsewhere: the point");
-        assert_eq!(lit(&mut ed, &mut d, v(-0.01, 2.0 * PX)), Some((InferenceKind::OnCurve, Some(line))), "on the line");
-        assert_eq!(lit(&mut ed, &mut d, both), Some((InferenceKind::OnCurve, Some(line))), "along it into the point's square: the line stays");
-        assert_eq!(lit(&mut ed, &mut d, v(0.004, 11.0 * PX)), Some((InferenceKind::Endpoint, Some(point))), "off the line's band: the point");
+        assert_eq!(lit(&mut ed, &mut d, between), on(low), "from elsewhere: the nearer line");
+        assert_eq!(lit(&mut ed, &mut d, v(-0.01, 8.0 * PX)), on(high), "on the upper line, out of the lower one's band");
+        assert_eq!(lit(&mut ed, &mut d, between), on(high), "along it into the lower one's band: the upper line stays");
+        assert_eq!(lit(&mut ed, &mut d, v(0.012, 5.0 * PX)), Some((InferenceKind::Endpoint, Some(point))), "a point in reach takes over");
     }
 
     /// Live (11-17 sketch-snap-1117): a snap lights at 7 px and holds until the pointer is 9–10 px out (a point; a

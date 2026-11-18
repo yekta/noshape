@@ -316,6 +316,6 @@ fn a_corner_rip_made_a_bend_cannot_unfold_as_lives(cx: &mut TestAppContext) {
         (joint.map(|j| j.0), state, bends, v.message.clone())
     });
     use noshape_model::display::FeatureStatus;
-    assert_eq!(got, (Some("Modify joint 1".into()), Some((FeatureStatus::Warning, Some(msg.into()))), Some(5), Some((FeatureStatus::Warning, msg.into()))), "(the joint, its state, the part's bends, the toast)");
+    assert_eq!(got, (Some("Modify joint 1".into()), Some((FeatureStatus::Error, Some(msg.into()))), Some(5), Some((FeatureStatus::Warning, msg.into()))), "(the joint, its state (live: a WARNING listed as failed), the part's bends, the yellow toast)");
     assert_eq!(flat(cx), Some(false), "no flat");
 }

@@ -695,7 +695,11 @@ impl Regenerator {
                                     ev.warnings.push(missing_text(missing));
                                 }
                                 if !ev.warnings.is_empty() {
-                                    state.status = FeatureStatus::Warning;
+                                    // (Live 11-18 sm-rip-1118: a model that can't be unfolded is a WARNING on the
+                                    // server, its geometry kept, but the list shows the feature as failed: red, "did
+                                    // not regenerate properly".)
+                                    let unfold = ev.warnings.iter().any(|w| w == features::sheetmetal_ops::CANNOT_UNFOLD);
+                                    state.status = if unfold { FeatureStatus::Error } else { FeatureStatus::Warning };
                                     state.message = Some(ev.warnings.join("\n"));
                                 } else if !ev.infos.is_empty() {
                                     state.status = FeatureStatus::Info;
