@@ -389,6 +389,9 @@ pub struct DrawingEditor {
     /// Where the pointer was when a menu row was clicked: what it then hovers reads lit until it moves (live2
     /// drw-note-move-to-title-block s8).
     pub menu_closed_at: Option<[f64; 2]>,
+    /// Esc pressed while a view is dragged: the preview stays while the button is held, the release puts the view back
+    /// (live drawing-feel-1118 C2).
+    pub view_drag_cancelled: bool,
     /// The Projected view tool's parent is drawn picked: the view Insert view just placed (live 2068), until the tool
     /// places a view or ends.
     pub projection_parent_lit: bool,
@@ -760,6 +763,7 @@ impl DrawingEditor {
             hover: None,
             aligned: None,
             menu_closed_at: None,
+            view_drag_cancelled: false,
             projection_parent_lit: false,
             hover_snap: None,
             selection: Vec::new(),

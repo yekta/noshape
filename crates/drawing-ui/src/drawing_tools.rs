@@ -94,6 +94,14 @@ impl DrawingEditor {
     }
 
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
+        if matches!(self.drag, Drag::MoveViews { .. }) {
+            self.view_drag_cancelled = true;
+            return;
+        }
+        // Esc while a box is dragged does nothing: the release still selects (live drawing-feel-1118 F-esc).
+        if matches!(self.drag, Drag::SelectBox { .. }) {
+            return;
+        }
         self.projection_parent_lit = false;
         self.aligned = None;
         // (Nor is the view under the pointer lit any more after a menu: live2 drw-centermark-align s8.)
@@ -1314,8 +1322,9 @@ impl DrawingEditor {
         if e.button == MouseButton::Left && self.hole_dlg.as_ref().is_some_and(|d| (d.x_picking || d.y_picking) && d.table.is_some()) && self.hole_x_dir_click(cx) {
             return;
         }
-        // A dimension's palette opens on a double-click within 200 ms and 3 px (live2 11-13), not the OS's 400 ms.
-        if e.button == MouseButton::Left && e.click_count >= 2 && matches!(self.tool, Tool::Select) && (quick || !self.dimension_under_pointer(cx)) {
+        // A dimension's palette and a view's View properties open on a double-click within 200 ms and 3 px (live2
+        // 11-13; live drawing-feel-1118: 200 ms opens, 250 doesn't), not the OS's 400 ms.
+        if e.button == MouseButton::Left && e.click_count >= 2 && matches!(self.tool, Tool::Select) && (quick || !self.timed_double_click_target(cx)) {
             self.double_click(e.click_count >= 3, window, cx);
             return;
         }
@@ -1392,10 +1401,22 @@ impl DrawingEditor {
                 self.drag = Drag::Pan { last_px: lp };
                 self.redraw(cx);
             }
+            // Only the dragged view moves while the button is held (with what moves with it); the views aligned with it
+            // follow on release (live drawing-feel-1118 drag2: Top stays while Front is dragged, then jumps).
+            Drag::MoveViews { .. } if self.view_drag_cancelled => {}
             Drag::MoveViews { start, view, .. } => {
                 let mut dr = self.drawing.clone();
-                if let Some(s) = dr.sheets.get_mut(self.sheet) {
-                    noshape_model::drawing::drag_view(s, view, sub(self.cursor, start));
+                if let Some(s) = dr.sheets.get_mut(self.sheet)
+                    && let Some((_, p)) = noshape_model::drawing::dragged_view_positions(s, view, sub(self.cursor, start)).into_iter().find(|(v, _)| *v == view)
+                    && let Some(old) = s.view(view).map(|v| v.position)
+                {
+                    let m = sub(p, old);
+                    if let Some(x) = s.view_mut(view) {
+                        x.position = p;
+                    }
+                    for a in s.annotations.iter_mut().filter(|a| a.moves_with_view() == Some(view)) {
+                        a.position = [a.position[0] + m[0], a.position[1] + m[1]];
+                    }
                 }
                 self.set_preview(Some(dr), cx);
             }
@@ -1665,9 +1686,18 @@ impl DrawingEditor {
                 }
             }
             Drag::Pending { button: Button::Right, pick, .. } => self.open_context_menu(pick, e.position, window, cx),
-            Drag::MoveViews { fresh, .. } => {
-                if let Some(p) = self.preview.take() {
-                    self.commit("Move view", p, cx);
+            Drag::MoveViews { .. } if std::mem::take(&mut self.view_drag_cancelled) => {
+                self.set_preview(None, cx);
+                self.selection.clear();
+                self.redraw(cx);
+            }
+            Drag::MoveViews { start, view, fresh } => {
+                if self.preview.take().is_some() {
+                    let mut dr = self.drawing.clone();
+                    if let Some(s) = dr.sheets.get_mut(self.sheet) {
+                        noshape_model::drawing::drag_view(s, view, sub(self.cursor, start));
+                    }
+                    self.commit("Move view", dr, cx);
                 }
                 if fresh {
                     self.selection.clear();
@@ -2023,10 +2053,14 @@ impl DrawingEditor {
     }
 
     /// The pointer is over a dimension.
-    fn dimension_under_pointer(&mut self, cx: &mut Context<Self>) -> bool {
+    /// A dimension or a view under the pointer: their double-click is live's 200 ms one.
+    fn timed_double_click_target(&mut self, cx: &mut Context<Self>) -> bool {
         self.update_hover(cx);
-        let Some(PickTarget::Annotation(id)) = self.hover.and_then(|h| self.built.as_ref().and_then(|b| b.picks.get(h as usize)).cloned()) else { return false };
-        self.current_sheet().annotations.iter().any(|a| a.id == id && a.kind.is_dimension())
+        match self.hover.and_then(|h| self.built.as_ref().and_then(|b| b.picks.get(h as usize)).cloned()) {
+            Some(PickTarget::Annotation(id)) => self.current_sheet().annotations.iter().any(|a| a.id == id && a.kind.is_dimension()),
+            Some(PickTarget::View(_) | PickTarget::Edge { .. }) => true,
+            _ => false,
+        }
     }
 
     /// A double click opens what's under the pointer; a triple click on a

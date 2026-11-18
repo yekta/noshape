@@ -113,9 +113,12 @@ impl DrawingEditor {
     pub fn place_revision_callout(&mut self, revision: String, c: [f64; 2], cx: &mut Context<Self>) {
         let id = self.drawing.sheets[self.sheet].next_annotation_id();
         self.edit_sheet("Revision callout", cx, |s| s.annotations.push(noshape_scene::drawing_tools::revision_callout(id, c, revision)));
-        // Placed, not selected, the tool kept for the next one: the table stays selected, Esc ends the tool alone
-        // (live2 drw-revision-callout-add, feel/callout-placed).
-        cx.notify();
+        // Placed, not selected, the tool kept for the next one: the revision table lit again and kept selected, Esc ends
+        // the tool alone (live2 drw-revision-callout-add, feel/callout-placed).
+        if let Some(t) = self.current_sheet().tables.iter().find(|t| matches!(t.kind, TableKind::Revision { .. })) {
+            self.selection = vec![Sel::Table(t.id)];
+        }
+        self.redraw(cx);
     }
 
     /// Dropping a revision callout onto a dimension's text groups it with
@@ -193,7 +196,11 @@ impl DrawingEditor {
                     }
                 })
             }));
-            out.push(MenuEntry::item("Add revision callout", move |t, _, cx| t.set_tool(Tool::RevisionCallout { revision: callout.clone() }, cx)));
+            // The table goes unlit until a callout is placed (live2 drw-revision-callout-add s7 reads nothing, s8 its table).
+            out.push(MenuEntry::item("Add revision callout", move |t, _, cx| {
+                t.selection.clear();
+                t.set_tool(Tool::RevisionCallout { revision: callout.clone() }, cx);
+            }));
         }
         out.push(MenuEntry::item("Paste as table", |t, _, cx| t.paste_as_table(cx)));
         let cur = t.layer;

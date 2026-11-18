@@ -873,3 +873,108 @@ fn a_right_click_on_a_leader_selects_its_note_and_drops_the_hover(cx: &mut TestA
     assert_eq!(sel, vec![Sel::Annotation(id)], "the note selected");
     assert_eq!(hover, None, "the menu has the pointer: nothing hovered on the sheet");
 }
+
+/// Live drawing-feel-1118 (drag2, C2): while a view is dragged only it moves, the views aligned with it follow on
+/// release; Esc while dragging leaves the preview until the release, which puts the view back.
+#[gpui::test]
+fn a_dragged_view_moves_alone_until_release_and_esc_puts_it_back(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-drag-alone");
+    real_sheet(cx, window, &editor);
+    // The base view and a projected view aligned with it.
+    let (base, child, start) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let s = e.current_sheet();
+        // A view whose drag takes another along (across both axes).
+        let (base, child) = s
+            .views
+            .iter()
+            .find_map(|v| noshape_model::drawing::dragged_view_positions(s, v.id, [30.0, 30.0]).into_iter().find(|(x, _)| *x != v.id).map(|(x, _)| (v.id, x)))
+            .expect("a view with an aligned one");
+        let pl = e.built.as_ref().and_then(|b| b.placements.iter().find(|p| p.id == base).copied()).expect("its parent placed");
+        (base, child, [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0])
+    });
+    let pos = |cx: &mut TestAppContext, id| cx.update(|cx| editor.read(cx).current_sheet().view(id).map(|v| v.position)).expect("the view");
+    let shown = |cx: &mut TestAppContext, id| cx.update(|cx| {
+        let e = editor.read(cx);
+        e.preview.as_ref().and_then(|d| d.sheets.get(e.sheet)).and_then(|s| s.view(id)).map(|v| v.position)
+    });
+    let (b0, c0) = (pos(cx, base), pos(cx, child));
+    let p = at_window(cx, &editor, start);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(p, None, Modifiers::default());
+    v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
+    // Across both axes, so whichever way the child is aligned it would follow.
+    let q = p + Point::new(px(60.), px(60.));
+    v.simulate_mouse_move(q, Some(MouseButton::Left), Modifiers::default());
+    draw(cx, window);
+    assert_ne!(shown(cx, base), Some(b0), "the dragged view follows the pointer");
+    assert_eq!(shown(cx, child).unwrap_or(c0), c0, "the aligned view stays while the button is held");
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_up(q, MouseButton::Left, Modifiers::default());
+    draw(cx, window);
+    assert_ne!(pos(cx, base), b0);
+    assert_ne!(pos(cx, child), c0, "the aligned view follows on release");
+    assert!(cx.update(|cx| editor.read(cx).selection.is_empty()), "the dragged view ends unselected");
+    cx.update(|cx| editor.update(cx, |e, cx| e.doc.update(cx, |d, cx| d.undo(cx))));
+    draw(cx, window);
+    assert_eq!((pos(cx, base), pos(cx, child)), (b0, c0), "one undo puts both back");
+    // Esc while dragging.
+    cx.executor().advance_clock(std::time::Duration::from_millis(600));
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(p, None, Modifiers::default());
+    v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
+    v.simulate_mouse_move(q, Some(MouseButton::Left), Modifiers::default());
+    // Esc is the workspace's Cancel action (the app's key context), which runs `cancel`.
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    draw(cx, window);
+    assert_ne!(shown(cx, base), Some(b0), "the preview stays while the button is held");
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_up(q, MouseButton::Left, Modifiers::default());
+    draw(cx, window);
+    assert_eq!((pos(cx, base), pos(cx, child)), (b0, c0), "the release puts it back");
+    assert_eq!(shown(cx, base), None, "no preview left");
+}
+
+/// Live drawing-feel-1118 (F): Esc while a box is dragged does nothing and the release still selects; a box over empty
+/// sheet keeps what was selected.
+#[gpui::test]
+fn esc_mid_box_does_nothing_and_an_empty_box_keeps_the_selection(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-box-esc");
+    real_sheet(cx, window, &editor);
+    let pl = cx.update(|cx| editor.read(cx).built.as_ref().and_then(|b| b.placements.first().copied())).expect("a view");
+    let pad = 12.0;
+    let (a, b) = ([pl.min[0] - pad, pl.min[1] - pad], [pl.max[0] + pad, pl.max[1] + pad]);
+    let drag_box = |cx: &mut TestAppContext, a: [f64; 2], b: [f64; 2], esc: bool| {
+        cx.executor().advance_clock(std::time::Duration::from_millis(600));
+        let (p, q) = (at_window(cx, &editor, a), at_window(cx, &editor, b));
+        let mut v = VisualTestContext::from_window(window, cx);
+        v.simulate_mouse_move(p, None, Modifiers::default());
+        v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
+        v.simulate_mouse_move(q, Some(MouseButton::Left), Modifiers::default());
+        if esc {
+            cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+        }
+        let mut v = VisualTestContext::from_window(window, cx);
+        v.simulate_mouse_up(q, MouseButton::Left, Modifiers::default());
+        draw(cx, window);
+        cx.update(|cx| editor.read(cx).selection.clone())
+    };
+    // Another view selected first: Esc mid-box doesn't clear it.
+    let other = cx.update(|cx| editor.read(cx).built.as_ref().and_then(|b| b.placements.iter().find(|p| p.id != pl.id).map(|p| p.id))).expect("a second view");
+    cx.update(|cx| editor.update(cx, |e, _| e.selection = vec![Sel::View(other)]));
+    let sel = drag_box(cx, a, b, true);
+    assert!(sel.iter().any(|s| view_of(&Some(*s)) == Some(pl.id)), "Esc mid-box: the release still takes the view: {sel:?}");
+    assert!(sel.contains(&Sel::View(other)), "Esc mid-box clears nothing: {sel:?}");
+    // A box well away from every view, on empty sheet.
+    let far = cx.update(|cx| {
+        let e = editor.read(cx);
+        let ps = &e.built.as_ref().expect("built").placements;
+        let top = ps.iter().map(|p| p.max[1]).fold(f64::MIN, f64::max);
+        let left = ps.iter().map(|p| p.min[0]).fold(f64::MAX, f64::min);
+        ([left, top + 8.0], [left + 10.0, top + 14.0])
+    });
+    let kept = drag_box(cx, far.0, far.1, false);
+    assert_eq!(kept, sel, "an empty box keeps the selection");
+}
