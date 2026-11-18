@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-18 03:49 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-18 05:01 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -132,8 +132,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   app offset; skasm owns the reach rule (qa's integer-pixel distances vs our continuous < 7.5).
 
 ## Next queue
-0. The first-pick T2 after the 05:00 cut. (live2 sketch-entry-1118: skasm checked Shift+S, no dimming, Final; mine
-   the list rows, done in the worktree.)
+0. First-pick test back to T1 (05:01): CI 44210027702 failed the old one-delivery version (its line 214), not the
+   30 s wait c5959e263 put in; 3/3 on the Mac and vibex6. hat15b offset settled with skasm (05:01): their exact case
+   (482,150, sketch, n, zoom) maps input exactly and the line lights where drawn (1474); left: skasm's reach (4 px off
+   lights nothing).
 1. qa P2 HOVER-LEAVES-WINDOW: a face hovered just before the pointer leaves the window stays outlined. GPUI clears
    element hover on X11's LeaveNotify (MouseExited) and the viewport clears its hover there; not reproduced yet. Rig:
    /root/psui-scratch/offset/leave.sh (block doc ~/tmp/psui/off/b.noshape on vibex6 :665).
