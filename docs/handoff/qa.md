@@ -119,6 +119,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Re-checks done 01:20-01:32 on 5076e98c: Flange broad face + joint-row hover fixed (skasm); bar / Mass / `[` pass, measure angle
    x=40 pair open with live2 (psui: live's 123.69 was the second wedge); model-edge glyph after the click fixed; sweep / hv analysis
    pending (sk/sw5, hv5: python3 ana.py sw sw5 / hv hv5).
+0m. **Owed next (01:47)**: on their first greens: skasm 4a4f7e0e (SELFEEL-DBLCLICK-FACE-SKETCH: sf mini C2), b6f5e810 (SHIFT-ICON);
+   studios 6fa3c795 (VSFEEL 1-3) and the HISTFEEL / CFGFEEL fixes as they land; core 55fc929c: faces-pattern-slots SAME vs 0.4.57 in
+   the compat loop, then the must-carry line is satisfied (cut-must.txt pins 55fc929c). Snap sweeps now run on vibex8 (~/tmp/qa/sk,
+   batch.sh python3 sweep.py <out> [targets]; hv.py <out> - al = alignment rows; ana.py's Y test misses the thin dashed line: look).
+   Measure angles: pass (live2's first-wedge capture: 56.31 for slope + x=40). Face+edge menu (591643fc) not re-run yet.
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
