@@ -1468,6 +1468,30 @@ fn a_dragged_instance_row_lands_by_the_rows_middle() {
     const { assert!(6.0 <= LIST_DRAG_PX && LIST_DRAG_PX < 8.0) };
 }
 
+/// Live manip-feel-1118 m9: an arrow drag keeps where the arrow was grabbed: at the press point it reads 0 mm (ours jumped
+/// the instance's origin to the pointer, 4.3 mm after 6 px).
+#[gpui::test]
+fn a_triad_arrow_drag_keeps_its_grab_point(cx: &mut TestAppContext) {
+    use gpui_kit::Modifiers;
+    use crate::viewport::ViewportEvent;
+    let (window, view) = pattern_assembly(cx, "arrow-grab");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selected = vec![instance(v, "Part 2 <1>", cx)];
+            let f = v.manipulator(cx).expect("a triad");
+            let shaft = v.viewport.read(cx).project(f.origin + f.x() * v.manip_size(cx) * 0.6).unwrap();
+            v.manip_hover = Some(ManipHandle::Axis(0));
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: shaft, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+            v.drag.as_mut().expect("an arrow drag").started = true;
+            v.on_viewport_event(&vp, &ViewportEvent::ToolDrag { position: shaft }, w, cx);
+            let value = v.drag.as_ref().unwrap().value;
+            assert!(value.abs() < 1e-9, "0 at the grab point: {value}");
+        })
+    })
+    .unwrap();
+}
+
 /// Live asm-dstates-1118: Display states opens with its "New display state name" box focused.
 #[gpui::test]
 fn display_states_opens_with_its_name_box_focused(cx: &mut TestAppContext) {

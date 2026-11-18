@@ -399,6 +399,15 @@ fn arrow_snap_step_for(px_per_mm: f64, unit_m: f64) -> Option<f64> {
     (px_per_mm > 1e-9 && span.is_finite() && span > 0.0).then(|| 10f64.powf(span.log10().round() - 2.0) * unit_m)
 }
 
+/// Where on the line `point + axis·s` the ray `origin + dir·t` passes closest: `s` (None when they are parallel).
+fn axis_param(point: DVec3, axis: DVec3, origin: DVec3, dir: DVec3) -> Option<f64> {
+    let w = point - origin;
+    let (a, b, c) = (axis.dot(axis), axis.dot(dir), dir.dot(dir));
+    let (dd, e) = (axis.dot(w), dir.dot(w));
+    let den = a * c - b * b;
+    (den.abs() >= 1e-12).then(|| (b * e - c * dd) / den)
+}
+
 /// An explode drag's distance as live rounds it (qa5 EXV5, live 805: "Distance 18.9 mm"): 0.1 mm (0.01 in in
 /// imperial workspaces). A ring's angle snaps as the triad's (`ring_snap`: 5° steps at a usual radius, live2
 /// asm-views.json dragRing; live 810's "55 deg").
@@ -3191,7 +3200,15 @@ impl AssemblyView {
                     let local = pose.inverse().transform_point(f.origin);
                     let start: HashMap<InstanceId, Placement> = ids.iter().filter_map(|id| self.result.solved.placement(*id).map(|p| (*id, p))).collect();
                     let ring_v0 = if matches!(h, ManipHandle::Ring(_)) { self.ring_vector(*position, f.origin, axis, cx).unwrap_or(DVec3::X) } else { DVec3::ZERO };
-                    let grab0 = if matches!(h, ManipHandle::Plane(_) | ManipHandle::Center) { self.ray_plane(*position, f.origin, axis, cx).unwrap_or(f.origin) } else { DVec3::ZERO };
+                    // An arrow keeps its grab point on the axis (live manip-feel-1118 m9: the first update reads 0 mm).
+                    let grab0 = match h {
+                        ManipHandle::Plane(_) | ManipHandle::Center => self.ray_plane(*position, f.origin, axis, cx).unwrap_or(f.origin),
+                        ManipHandle::Axis(_) => {
+                            let (o, dir) = self.viewport.read(cx).ray(*position);
+                            f.origin + axis * axis_param(f.origin, axis, o, dir).unwrap_or(0.0)
+                        }
+                        ManipHandle::Ring(_) => DVec3::ZERO,
+                    };
                     self.manip_value = None;
                     self.drag = Some(DragState {
                         top,
@@ -3339,15 +3356,9 @@ impl AssemblyView {
                     }
                     Some(ManipHandle::Axis(_)) => {
                         let axis = d.plane_normal;
-                        // Closest point on the axis line to the cursor ray.
-                        let w = d.plane_point - origin;
-                        let (a, b, c) = (axis.dot(axis), axis.dot(dir), dir.dot(dir));
-                        let (dd, e) = (axis.dot(w), dir.dot(w));
-                        let den = a * c - b * b;
-                        if den.abs() < 1e-12 {
-                            return;
-                        }
-                        let mut s = (b * e - c * dd) / den;
+                        // Closest point on the axis line to the cursor ray, from where the arrow was grabbed.
+                        let Some(s) = axis_param(d.plane_point, axis, origin, dir) else { return };
+                        let mut s = s - (d.grab0 - d.plane_point).dot(axis);
                         if d.explode {
                             s = explode_drag_round(s, &self.units(cx));
                         } else {
@@ -3770,6 +3781,10 @@ impl AssemblyView {
 
     /// A drag let go: an explode step is made, or the instances' move.
     fn finish_drag(&mut self, d: DragState, window: &mut Window, cx: &mut Context<Self>) {
+        // (The handle used isn't left lit once released; the pointer's next move hovers what is under it.)
+        if d.handle.is_some() {
+            self.manip_hover = None;
+        }
         if d.explode {
             // Live asm-views2-1118: a short drag (4–10 px) makes a 0 mm step too.
             if let Some(step) = self.explode_preview.take() {
