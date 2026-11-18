@@ -302,14 +302,15 @@ pub enum TessQuality {
 
 impl TessQuality {
     pub const ALL: [TessQuality; 5] = [TessQuality::Auto, TessQuality::Coarse, TessQuality::Medium, TessQuality::Fine, TessQuality::VeryFine];
-    /// Segments Onshape draws a full circle with (live 459: the browser's
-    /// mesh is angle based, the same at Ø20, Ø200 and Ø2000; Auto = Fine).
+    /// Segments Onshape draws a full circle with: Coarse 30°, Medium 15°, Fine 5°, Very fine 1.2° (live 459: angle
+    /// based, the same at Ø20, Ø200 and Ø2000; Auto = Fine; live mesh-1118: a Ø20 cylinder's rim fits 72 segments within
+    /// 0.36 px at 808 px/mm, its side is 144 triangles).
     pub fn segments_per_circle(self) -> u32 {
         match self {
-            TessQuality::Auto | TessQuality::Fine => 144,
-            TessQuality::Coarse => 24,
-            TessQuality::Medium => 48,
-            TessQuality::VeryFine => 600,
+            TessQuality::Auto | TessQuality::Fine => 72,
+            TessQuality::Coarse => 12,
+            TessQuality::Medium => 24,
+            TessQuality::VeryFine => 300,
         }
     }
     /// Onshape's display levels, coarsest first (webgl tessellation

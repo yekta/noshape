@@ -35,11 +35,13 @@ fn f3(p: DVec3) -> [f32; 3] {
 }
 
 /// Onshape's display mesh is angle based (live 459): Auto draws a full
-/// circle with 144 segments whatever its size, `quality` scales that angle
-/// (`TessQuality::factor`). The chord tolerance is the body's size (times
-/// `quality`), so the angle alone decides; it still scales with `quality`
-/// because BRepMesh keeps a shape's existing triangulation unless the new
-/// chord tolerance is smaller (a finer quality must re-mesh). `preview`
+/// circle with 72 segments whatever its size (live mesh-1118), `quality`
+/// scales that angle (`TessQuality::factor`). The chord tolerance is the
+/// body's size, so the angle alone decides (live's, half the diagonal ×
+/// (1 − cos(half the turn)), never binds on a circle, but BRepMesh's
+/// deflection test with it gives 78 segments, not 72); it still scales with
+/// `quality` because BRepMesh keeps a shape's existing triangulation unless
+/// the new chord tolerance is smaller (a finer quality must re-mesh). `preview`
 /// meshes (instant feedback while a feature is edited) are Coarse.
 ///
 /// With `NOSHAPE_DISPLAY_MESH=chord` ([`angle_display_mesh`] off) bodies
@@ -54,8 +56,7 @@ pub fn display_deflection(shape: &noshape_kernel::Shape, quality: f64, preview: 
         return if preview { (lin * 4.0, (ang * 1.8).min(0.9)) } else { (lin, ang) };
     }
     let quality = if preview { quality.max(crate::partstudio::TessQuality::Coarse.factor()) } else { quality };
-    // BRepMesh's angular deflection is between a segment and the tangent,
-    // half of the turn per segment.
+    // BRepMesh's angular deflection is twice the turn per segment it gives.
     let auto = 2.0 * std::f64::consts::TAU / f64::from(crate::partstudio::TessQuality::Auto.segments_per_circle());
     (diag * quality, auto * quality)
 }
@@ -63,7 +64,7 @@ pub fn display_deflection(shape: &noshape_kernel::Shape, quality: f64, preview: 
 /// 0: not decided yet, 1: chord based, 2: angle based.
 static DISPLAY_MESH: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
-/// Whether display meshes are Onshape's angle-based ones (live 459, 144
+/// Whether display meshes are Onshape's angle-based ones (live 459, 72
 /// segments per circle in Auto): yes unless `NOSHAPE_DISPLAY_MESH=chord`
 /// (the coarser chord-based mesh from before, an escape hatch for slow
 /// GPUs; docs/handoff/viewport-performance.md has the cost) at start;

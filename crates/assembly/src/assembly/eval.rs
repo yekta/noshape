@@ -1270,8 +1270,8 @@ type SketchKey = (TabId, FeatureId, String);
 /// The studio result a sketch body was built from, and the built body.
 type SketchBodyEntry = (Arc<RegenResult>, Option<Arc<RegenResult>>);
 
-/// Angle factor of "Use best available tessellation": Very fine (600
-/// segments per circle, `TessQuality::VeryFine.factor()` = 144 / 600).
+/// Angle factor of "Use best available tessellation": Very fine (300
+/// segments per circle, `TessQuality::VeryFine.factor()` = 72 / 300).
 pub const BEST_TESSELLATION: f64 = 0.24;
 
 /// Reflect a mesh across the plane through `p` with unit normal `n`

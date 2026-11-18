@@ -1,7 +1,7 @@
 //! Onshape's display mesh is angle based (live 459): a full circle is drawn
-//! with 144 segments in Auto whatever its size (Ø20, Ø200, Ø2000 alike),
-//! and the part's Tessellation quality (Edit appearance) picks 24 / 48 /
-//! 144 / 600 for Coarse / Medium / Fine / Very fine.
+//! with 72 segments in Auto whatever its size (Ø20, Ø200, Ø2000 alike),
+//! and the part's Tessellation quality (Edit appearance) picks 12 / 24 /
+//! 72 / 300 for Coarse / Medium / Fine / Very fine (live mesh-1118).
 
 use glam::DVec2;
 use noshape_model::configuration::ConfigValues;
@@ -65,13 +65,16 @@ fn circles_get_onshapes_segments_at_every_size() {
     noshape_model::regen::set_angle_display_mesh(true);
     for diameter in [0.02, 0.2, 2.0] {
         let r = regen(&cylinder(diameter));
-        assert_eq!(circle_segments(&r), 144, "Ø{} mm in Auto", diameter * 1000.0);
+        assert_eq!(circle_segments(&r), 72, "Ø{} mm in Auto", diameter * 1000.0);
+        // Live's side: two triangles per segment.
+        let side = r.display.bodies[0].mesh.face_ranges.iter().map(|&(_, n)| n as usize / 3).max().unwrap();
+        assert_eq!(side, 144, "Ø{} mm: the side's triangles", diameter * 1000.0);
         // One level: no screen-space LOD outside high quality (live 10-23 a3).
-        assert_eq!(level_segments(&r), [144], "Ø{} mm", diameter * 1000.0);
+        assert_eq!(level_segments(&r), [72], "Ø{} mm", diameter * 1000.0);
     }
     let mut ps = cylinder(0.02);
     let body = regen(&ps).display.bodies[0].id.clone();
-    for (q, n) in [(TessQuality::Coarse, 24), (TessQuality::Medium, 48), (TessQuality::Fine, 144), (TessQuality::VeryFine, 600)] {
+    for (q, n) in [(TessQuality::Coarse, 12), (TessQuality::Medium, 24), (TessQuality::Fine, 72), (TessQuality::VeryFine, 300)] {
         ps.part_properties.insert(body.clone(), PartProperties { tessellation: Some(q), ..Default::default() });
         let r = regen(&ps);
         assert_eq!(circle_segments(&r), n, "{q:?}");
@@ -79,7 +82,7 @@ fn circles_get_onshapes_segments_at_every_size() {
         // View in high quality: its own level up to Very fine, the viewport
         // refining it once large on screen.
         let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &UnitPrefs::default(), &high_quality());
-        let want: Vec<usize> = [24, 48, 144, 600].into_iter().skip(q.level()).collect();
+        let want: Vec<usize> = [12, 24, 72, 300].into_iter().skip(q.level()).collect();
         assert_eq!(level_segments(&r), want, "{q:?} in high quality");
     }
 }
@@ -96,7 +99,7 @@ fn coarser_levels_stay_coarse_after_finer_meshing() {
     let opts = high_quality();
     let mut run = |ps: &PartStudio| regen.regenerate(ps, &ConfigValues::default(), &UnitPrefs::default(), &opts);
     let body = run(&ps).display.bodies[0].id.clone();
-    for (q, want) in [(TessQuality::Fine, vec![144, 600]), (TessQuality::Coarse, vec![24, 48, 144, 600]), (TessQuality::Auto, vec![144, 600])] {
+    for (q, want) in [(TessQuality::Fine, vec![72, 300]), (TessQuality::Coarse, vec![12, 24, 72, 300]), (TessQuality::Auto, vec![72, 300])] {
         ps.part_properties.insert(body.clone(), PartProperties { tessellation: Some(q), ..Default::default() });
         assert_eq!(level_segments(&run(&ps)), want, "{q:?}");
     }
@@ -118,7 +121,7 @@ fn preview_regen_of_an_unchanged_part_keeps_its_refined_mesh() {
     let again = regen.regenerate(&ps, &config, &units, &preview);
     assert!(!again.needs_refine);
     assert!(std::sync::Arc::ptr_eq(&again.display.bodies[0].mesh, &fine.display.bodies[0].mesh));
-    assert_eq!(circle_segments(&again), 144);
+    assert_eq!(circle_segments(&again), 72);
 }
 
 /// A curved body's preview mesh is the coarse one (a refine pass follows).

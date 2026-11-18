@@ -594,8 +594,12 @@ private:
 // their height, so the triangles lie on the surface between the rings,
 // whose sampling (the edges' angular deflection) BRepMesh's Delaunay kept
 // as well; without its per-link bookkeeping (the 400-hole plate's 800 such
-// faces were ~28 % of its display meshing). Any other face (a seam with
-// inner nodes, a degenerated edge, curved trimming) goes to `fallback`.
+// faces were ~28 % of its display meshing). A cone ending at its apex (a
+// drill point: a degenerated edge there) is a fan from its rim to the apex
+// (BRepMesh filled such a 1 mm cone with 275k triangles: a user's gripper
+// housing, lead 11-18); a side's inner nodes (a seam the edge mesher split)
+// split the triangle beside it. Any other face (curved trimming) goes to
+// `fallback`.
 // NOSHAPE_MESH_NO_STRIPS=1 turns it off (tests compare both).
 class StripAlgo : public IMeshTools_MeshAlgo
 {
@@ -634,8 +638,10 @@ private:
       IMeshData::IPCurveHandle P;
       IMeshData::ICurveHandle  C;
       int                      n;
+      bool                     apex;
     };
     std::vector<Side> sides;
+    const occ::handle<BRepAdaptor_Surface>& S = f->GetSurface();
     double            umin = 0, umax = 0, span = 0;
     bool              any  = false;
     for (int w = 0; w < f->WiresNb(); ++w)
@@ -646,11 +652,12 @@ private:
       for (int e = 0; e < W->EdgesNb(); ++e)
       {
         const IMeshData::IEdgeHandle E = W->GetEdge(e);
-        if (E->GetDegenerated())
+        // A degenerated edge: a cone's apex (its nodes are the surface's point there).
+        if (E->GetDegenerated() && (grid || S.IsNull()))
           return false;
         const IMeshData::IPCurveHandle& P = E->GetPCurve(f.get(), W->GetEdgeOrientation(e));
         const int                       n = P->ParametersNb();
-        if (n < 2 || E->GetCurve()->ParametersNb() != n)
+        if (n < 2 || (!E->GetDegenerated() && E->GetCurve()->ParametersNb() != n))
           return false;
         for (int k = 0; k < n; ++k)
         {
@@ -659,7 +666,7 @@ private:
           umax             = any ? std::max(umax, q.X()) : q.X();
           any              = true;
         }
-        sides.push_back({P, E->GetCurve(), n});
+        sides.push_back({P, E->GetCurve(), n, E->GetDegenerated()});
       }
     }
     if (!any || sides.size() < 2 || sides.size() > 64)
@@ -671,6 +678,8 @@ private:
         span             = std::max(span, std::max(std::abs(a.X() - b.X()), std::abs(a.Y() - b.Y())));
       }
     const double tol = 1e-9 * std::max(1.0, std::max(span, umax - umin));
+    // u is an angle on these surfaces: an imported seam can be off by ~1e-6 (a gripper's cone, lead 11-18).
+    const double utol = std::max(tol, 1e-6);
     // (height, nodes) of the rims; (u, (v, point)) of the sides.
     std::vector<std::pair<double, std::vector<Node>>>                       rims;
     std::vector<std::pair<double, std::vector<std::pair<double, gp_Pnt>>>> cols;
@@ -690,11 +699,14 @@ private:
         if (it == rims.end())
           it = rims.insert(rims.end(), {v0, {}});
         for (int k = 0; k < sd.n; ++k)
-          it->second.push_back({sd.P->GetPoint(k).X(), sd.C->GetPoint(k)});
+        {
+          const gp_Pnt2d q = sd.P->GetPoint(k);
+          it->second.push_back({q.X(), sd.apex ? S->Value(q.X(), q.Y()) : sd.C->GetPoint(k)});
+        }
       }
-      else if (u1 - u0 <= tol)
+      else if (u1 - u0 <= utol && !sd.apex)
       {
-        auto it = std::find_if(cols.begin(), cols.end(), [&](const auto& c) { return std::abs(c.first - u0) <= tol; });
+        auto it = std::find_if(cols.begin(), cols.end(), [&](const auto& c) { return std::abs(c.first - u0) <= utol; });
         if (it == cols.end())
           it = cols.insert(cols.end(), {u0, {}});
         for (int k = 0; k < sd.n; ++k)
@@ -715,18 +727,18 @@ private:
       std::sort(nodes.begin(), nodes.end(), [](const Node& a, const Node& b) { return a.u < b.u; });
       std::vector<Node> unique;
       for (const Node& nd : nodes)
-        if (unique.empty() || nd.u - unique.back().u > tol)
+        if (unique.empty() || nd.u - unique.back().u > utol)
           unique.push_back(nd);
-      if (unique.size() < 2 || std::abs(unique.front().u - umin) > tol || std::abs(unique.back().u - umax) > tol)
+      if (unique.size() < 2 || std::abs(unique.front().u - umin) > utol || std::abs(unique.back().u - umax) > utol)
         return false;
       nodes = std::move(unique);
     }
-    // Each side at umin or umax, sorted by v, from vlo to vhi; both sides
-    // with the same heights: the grid's rows.
+    // Each side at umin or umax, sorted by v, from vlo to vhi; on a torus both
+    // sides with the same heights: the grid's rows.
     std::vector<double> rows;
     for (auto& c : cols)
     {
-      if (std::abs(c.first - umin) > tol && std::abs(c.first - umax) > tol)
+      if (std::abs(c.first - umin) > utol && std::abs(c.first - umax) > utol)
         return false;
       auto& pts = c.second;
       std::sort(pts.begin(), pts.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
@@ -737,6 +749,8 @@ private:
       if (unique.size() < 2 || std::abs(unique.front().first - vlo) > tol || std::abs(unique.back().first - vhi) > tol)
         return false;
       pts = std::move(unique);
+      if (!grid)
+        continue;
       std::vector<double> heights;
       for (const auto& pt : pts)
         heights.push_back(pt.first);
@@ -749,46 +763,120 @@ private:
       rows = {vlo, vhi};
     const std::vector<Node>& lo = rims[0].second;
     const std::vector<Node>& hi = rims[1].second;
+    // A rim all at one point: the apex.
+    const auto collapsed = [](const std::vector<Node>& r) {
+      return std::all_of(r.begin(), r.end(), [&](const Node& nd) { return nd.p.Distance(r.front().p) <= Precision::Confusion(); });
+    };
+    const bool lo_apex = collapsed(lo), hi_apex = collapsed(hi);
+    if ((lo_apex || hi_apex) && (grid || (lo_apex ? lo : hi).size() != 2 || (lo_apex && hi_apex)))
+      return false;
     occ::handle<Poly_Triangulation> T;
     std::function<int(const gp_Pnt2d&)> node_of;
-    if (rows.size() == 2)
+    std::vector<std::vector<int>> side_ids;
+    if (!grid || rows.size() == 2)
     {
       // No inner rows (cylinders, cones): zip the rims (counter-clockwise in
-      // uv), advancing on the rim whose next node comes first.
+      // uv), advancing on the rim whose next node comes first. A fan to an
+      // apex (its two nodes, at umin and umax, one point): each rim segment
+      // with the nearer of them, no triangle between the two.
       const int nlo = (int)lo.size(), nhi = (int)hi.size();
-      T             = new Poly_Triangulation(nlo + nhi, nlo + nhi - 2, true);
-      for (int i = 0; i < nlo; ++i)
+      std::vector<std::array<int, 3>> tris;
+      int i = 0, j = 0;
+      if (lo_apex)
       {
-        T->SetNode(i + 1, lo[(size_t)i].p);
-        T->SetUVNode(i + 1, gp_Pnt2d(lo[(size_t)i].u, vlo));
+        for (; j < nhi - 1; ++j)
+          tris.push_back({2 * j < nhi - 1 ? 1 : 2, nlo + j + 2, nlo + j + 1});
+        i = nlo - 1;
       }
-      for (int j = 0; j < nhi; ++j)
+      if (hi_apex)
       {
-        T->SetNode(nlo + j + 1, hi[(size_t)j].p);
-        T->SetUVNode(nlo + j + 1, gp_Pnt2d(hi[(size_t)j].u, vhi));
+        for (; i < nlo - 1; ++i)
+          tris.push_back({i + 1, i + 2, 2 * i < nlo - 1 ? nlo + 1 : nlo + 2});
+        j = nhi - 1;
       }
-      int i = 0, j = 0, t = 0;
       while (i < nlo - 1 || j < nhi - 1)
       {
         const bool on_lo = j == nhi - 1 || (i < nlo - 1 && lo[(size_t)i + 1].u <= hi[(size_t)j + 1].u);
         if (on_lo)
         {
-          T->SetTriangle(++t, Poly_Triangle(i + 1, i + 2, nlo + j + 1));
+          tris.push_back({i + 1, i + 2, nlo + j + 1});
           ++i;
         }
         else
         {
-          T->SetTriangle(++t, Poly_Triangle(i + 1, nlo + j + 2, nlo + j + 1));
+          tris.push_back({i + 1, nlo + j + 2, nlo + j + 1});
           ++j;
         }
       }
-      node_of = [&lo, &hi, vlo, nlo, tol](const gp_Pnt2d& q) -> int {
-        const bool               low = std::abs(q.Y() - vlo) <= tol;
-        const std::vector<Node>& r   = low ? lo : hi;
-        auto it = std::lower_bound(r.begin(), r.end(), q.X() - tol, [](const Node& a, double u) { return a.u < u; });
-        if (it == r.end() || std::abs(it->u - q.X()) > tol)
-          return -1;
-        return (int)(it - r.begin()) + (low ? 1 : nlo + 1);
+      // A side's inner points (a seam the edge mesher split): the triangle on
+      // the side's segment split into a fan from its third node.
+      int nodes = nlo + nhi;
+      for (const auto& c : cols)
+      {
+        const bool       left = std::abs(c.first - umin) <= utol;
+        const int        a = left ? 1 : nlo, b = left ? nlo + 1 : nlo + nhi;
+        std::vector<int> ids{a};
+        for (size_t k = 1; k + 1 < c.second.size(); ++k)
+          ids.push_back(++nodes);
+        ids.push_back(b);
+        if (ids.size() > 2)
+        {
+          const auto has = [&](const std::array<int, 3>& t, int r) { return (t[r] == a && t[(r + 1) % 3] == b) || (t[r] == b && t[(r + 1) % 3] == a); };
+          auto it = std::find_if(tris.begin(), tris.end(), [&](const auto& t) { return has(t, 0) || has(t, 1) || has(t, 2); });
+          if (it == tris.end())
+            return false;
+          const std::array<int, 3> t = *it;
+          tris.erase(it);
+          int r = 0;
+          while (!has(t, r))
+            ++r;
+          std::vector<int> run = ids;
+          if (t[r] == b)
+            std::reverse(run.begin(), run.end());
+          for (size_t k = 0; k + 1 < run.size(); ++k)
+            tris.push_back({run[k], run[k + 1], t[(r + 2) % 3]});
+        }
+        side_ids.push_back(std::move(ids));
+      }
+      T = new Poly_Triangulation(nodes, (int)tris.size(), true);
+      for (int k = 0; k < nlo; ++k)
+      {
+        T->SetNode(k + 1, lo[(size_t)k].p);
+        T->SetUVNode(k + 1, gp_Pnt2d(lo[(size_t)k].u, vlo));
+      }
+      for (int k = 0; k < nhi; ++k)
+      {
+        T->SetNode(nlo + k + 1, hi[(size_t)k].p);
+        T->SetUVNode(nlo + k + 1, gp_Pnt2d(hi[(size_t)k].u, vhi));
+      }
+      for (size_t c = 0; c < cols.size(); ++c)
+        for (size_t k = 1; k + 1 < cols[c].second.size(); ++k)
+        {
+          T->SetNode(side_ids[c][k], cols[c].second[k].second);
+          T->SetUVNode(side_ids[c][k], gp_Pnt2d(cols[c].first, cols[c].second[k].first));
+        }
+      for (size_t k = 0; k < tris.size(); ++k)
+        T->SetTriangle((int)k + 1, Poly_Triangle(tris[k][0], tris[k][1], tris[k][2]));
+      node_of = [&lo, &hi, &cols, &side_ids, vlo, vhi, nlo, tol, utol](const gp_Pnt2d& q) -> int {
+        if (std::abs(q.Y() - vlo) <= tol || std::abs(q.Y() - vhi) <= tol)
+        {
+          const bool               low = std::abs(q.Y() - vlo) <= tol;
+          const std::vector<Node>& r   = low ? lo : hi;
+          auto it = std::lower_bound(r.begin(), r.end(), q.X() - utol, [](const Node& a, double u) { return a.u < u; });
+          if (it == r.end() || std::abs(it->u - q.X()) > utol)
+            return -1;
+          return (int)(it - r.begin()) + (low ? 1 : nlo + 1);
+        }
+        for (size_t c = 0; c < cols.size(); ++c)
+        {
+          if (std::abs(q.X() - cols[c].first) > utol)
+            continue;
+          const auto& pts = cols[c].second;
+          auto it = std::lower_bound(pts.begin(), pts.end(), q.Y() - tol, [](const auto& a, double v) { return a.first < v; });
+          if (it != pts.end() && std::abs(it->first - q.Y()) <= tol)
+            return side_ids[c][(size_t)(it - pts.begin())];
+        }
+        return -1;
       };
     }
     else
@@ -798,13 +886,12 @@ private:
       if (!grid || lo.size() != hi.size() || cols.size() != 2)
         return false;
       for (size_t i = 0; i < lo.size(); ++i)
-        if (std::abs(lo[i].u - hi[i].u) > tol)
+        if (std::abs(lo[i].u - hi[i].u) > utol)
           return false;
-      const occ::handle<BRepAdaptor_Surface>& S = f->GetSurface();
       if (S.IsNull())
         return false;
-      const auto& left  = std::abs(cols[0].first - umin) <= tol ? cols[0].second : cols[1].second;
-      const auto& right = std::abs(cols[0].first - umin) <= tol ? cols[1].second : cols[0].second;
+      const auto& left  = std::abs(cols[0].first - umin) <= utol ? cols[0].second : cols[1].second;
+      const auto& right = std::abs(cols[0].first - umin) <= utol ? cols[1].second : cols[0].second;
       const int   n = (int)lo.size(), k = (int)rows.size();
       T             = new Poly_Triangulation(n * k, 2 * (n - 1) * (k - 1), true);
       for (int j = 0; j < k; ++j)
@@ -833,10 +920,10 @@ private:
           T->SetTriangle(++t, Poly_Triangle(a, b, c));
           T->SetTriangle(++t, Poly_Triangle(a, c, d));
         }
-      node_of = [&lo, &rows, n, tol](const gp_Pnt2d& q) -> int {
+      node_of = [&lo, &rows, n, tol, utol](const gp_Pnt2d& q) -> int {
         auto r = std::lower_bound(rows.begin(), rows.end(), q.Y() - tol);
-        auto c = std::lower_bound(lo.begin(), lo.end(), q.X() - tol, [](const Node& a, double u) { return a.u < u; });
-        if (r == rows.end() || std::abs(*r - q.Y()) > tol || c == lo.end() || std::abs(c->u - q.X()) > tol)
+        auto c = std::lower_bound(lo.begin(), lo.end(), q.X() - utol, [](const Node& a, double u) { return a.u < u; });
+        if (r == rows.end() || std::abs(*r - q.Y()) > tol || c == lo.end() || std::abs(c->u - q.X()) > utol)
           return -1;
         return (int)(r - rows.begin()) * n + (int)(c - lo.begin()) + 1;
       };

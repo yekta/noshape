@@ -29,6 +29,18 @@ fn filleted_boss() -> Shape {
     fillet(&s, &foot, 0.001).unwrap().shape
 }
 
+/// A Ø4 × 3 mm blind hole with a drill point (its apex 1.2 mm under the hole's floor) and a pointed boss (Ø4,
+/// 1.5 mm high): two cones ending at their apex, one below its rim and one above.
+fn drill_point_and_spike() -> Shape {
+    let b = make_box_corners(DVec3::ZERO, DVec3::new(0.02, 0.02, 0.005)).unwrap();
+    let bore = Plane::from_normal(DVec3::new(0.01, 0.01, 0.002), DVec3::Z);
+    let s = cut(&b, &make_cylinder(&bore, 0.002, 0.004, std::f64::consts::TAU).unwrap()).unwrap().shape;
+    let tip = Plane::from_normal(DVec3::new(0.01, 0.01, 0.0008), DVec3::Z);
+    let s = cut(&s, &make_cone(&tip, 0.0, 0.002, 0.0012, std::f64::consts::TAU).unwrap()).unwrap().shape;
+    let foot = Plane::from_normal(DVec3::new(0.005, 0.005, 0.005), DVec3::Z);
+    fuse(&s, &make_cone(&foot, 0.002, 0.0, 0.0015, std::f64::consts::TAU).unwrap()).unwrap().shape
+}
+
 fn mesh(s: &Shape, strips: bool) -> Tessellation {
     // SAFETY: the only test in this binary; nothing else reads the environment meanwhile.
     unsafe {
@@ -120,6 +132,36 @@ fn strips_keep_brepmeshs_edges_sampling_and_tolerance() {
     let (gt, dt) = (face_triangles(&grid, torus), face_triangles(&delaunay, torus));
     assert!(gt.len() <= dt.len(), "torus: {} grid triangles vs {}", gt.len(), dt.len());
     assert!(off_torus(&gt) <= off_torus(&dt) * 1.0001 + 1e-9, "torus: grid deviation {:e} vs BRepMesh {:e}", off_torus(&gt), off_torus(&dt));
+
+    // Cones ending at their apex: a fan from the rim (BRepMesh's nodes, one triangle per rim segment, no more
+    // deviation from the cone than BRepMesh's mesh).
+    let s3 = drill_point_and_spike();
+    let (fan, delaunay) = (mesh(&s3, true), mesh(&s3, false));
+    let mut cones = 0;
+    for (f, face) in s3.faces().iter().enumerate() {
+        let Ok(Surface::Cone { .. }) = face.face_surface() else { continue };
+        cones += 1;
+        // (Axis x, y, the apex's z, radius per mm of height away from the apex.)
+        let (x, y, apex, slope) = if face_points(&fan, f).iter().all(|p| p.x < 0.0075) { (0.005, 0.005, 0.0065, -0.002 / 0.0015) } else { (0.01, 0.01, 0.0008, 0.002 / 0.0012) };
+        let gap = |tris: &[[DVec3; 3]]| {
+            tris.iter()
+                .map(|t| {
+                    let c = (t[0] + t[1] + t[2]) / 3.0;
+                    ((c.z - apex) * slope - DVec3::new(c.x - x, c.y - y, 0.0).length()).abs()
+                })
+                .fold(0.0, f64::max)
+        };
+        let (fp, dp) = (face_points(&fan, f), face_points(&delaunay, f));
+        for p in &fp {
+            assert!(dp.iter().any(|q| q.distance(*p) < 1e-7), "cone {f}: fan node {p} isn't one of BRepMesh's");
+        }
+        let (ft, dt) = (face_triangles(&fan, f), face_triangles(&delaunay, f));
+        let rim = fp.iter().filter(|p| (p.z - apex).abs() > 1e-7).count();
+        assert_eq!(ft.len(), rim - 1, "cone {f}: one triangle per rim segment");
+        assert!(ft.len() <= dt.len(), "cone {f}: {} fan triangles vs {}", ft.len(), dt.len());
+        assert!(gap(&ft) <= gap(&dt) * 1.0001 + 1e-9, "cone {f}: fan deviation {:e} vs BRepMesh {:e}", gap(&ft), gap(&dt));
+    }
+    assert_eq!(cones, 2, "the drill point and the spike");
 
     // BRepMesh's own post-processing: the same triangles and edge polygons.
     // SAFETY: as in `mesh`.
