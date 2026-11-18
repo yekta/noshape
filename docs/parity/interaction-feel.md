@@ -787,7 +787,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | With no tool a line's midpoint hovers the line; a point hovers as a light-orange disc | = | sketch_box_feel_tests::midpoint_glyph_and_plane_clicks_in_a_sketch_as_live, sketch_hover_feel_tests::sketch_lines_and_points_light_as_live |
 | A glyph click selects the constraint, a second glyph click replaces it; a plane click in sketch mode selects the plane | = | sketch_box_feel_tests::midpoint_glyph_and_plane_clicks_in_a_sketch_as_live |
 | A dimension label hovers tan, a click fills it orange, a double-click opens its value box [skasm] | = | sketch_label_feel_tests::a_dimension_label_hovers_tan_selects_on_a_click_and_opens_on_a_double_click |
-| Corner and line drags with no tool: the rectangle stays one, a line moves along its normal [skasm] | ? | missing |
+| Corner and line drags with no tool: the rectangle stays one, a line moves along its normal [skasm] | = | sketch_mode `a_rectangles_corner_and_side_drag_as_lives` (live2's (30, -20) -> (39.19, -14.22) and the right line to x 39.20) |
 | A press on a plane and a drag draws a box; window over the rectangle takes its 4 lines, crossing over the right half 3; press-release on a plane selects it | = | sketch_box_feel_tests::a_box_in_iso_over_the_planes_takes_lines_as_live |
 | With a drawing tool active no plane or region hovers, only snap targets [skasm] | = | sketch_ui_tests::no_plane_lights_while_a_line_is_drawn |
 | Constraint buttons on a two-line selection: applied at the click, selection cleared, the second-picked line moves; refusals in a bubble; Symmetric arms [skasm] | = | scene the_second_picked_line_moves_as_lives, horizontal_and_vertical_turn_both_lines_about_their_midpoints (refusal texts: missing) |
