@@ -792,6 +792,11 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   green 8b4812511 flags exactly this feature (Info -> Warning "cannot be unfolded"), plus two changes for the better (c2-loft-paths-
   guides: core's revert; c2-surf-workshop-knifehandle: Move face 1 / 2 Error -> Ok as live). Verified 07:55: cf-sheet-metal-model-plus
   is SAME as 0.4.57 on green 6dbd91f3's real app (contains b5c4ccc4); the cfc031fa compat's Warning came from a stale app copy (fixed).
+- Speed sweep (qa 08:53, green 80a64725 vs v0.4.57, release builds, interleaved, two passes of 3 runs): no regression. Corpus 127
+  models, regen sum 113.0 -> 101.3 s, faster in both passes on 35. The one model >10% slower in both, c2-config-parts-pulleys
+  (46 -> 259 ms), is a fix: Circular pattern 1 went from Error to Ok and the part now matches live (155 / 350 / 192, 7182.19 mm3).
+  User documents (vibex7, mode-600 copies, deleted): hat8 / hat15 / hat15b / the dock regen and open even (27.7 vs 27.4 s summed); the dock's
+  tab return even (settle of A 738 / 754 ms). qa-scratch/speed/80a64725.
 - No other open release blocker at 06:25. v0.4.58 = 9c015658 + docs (qa GO 04:46); its published check runs when release.yml publishes.
 - Re-checks owed on the candidate: the dock tab return at vibex7 load < 2 (qa-wait-67eb: fff088e5 green vs 0.4.53), the hover flow
   (uh/uh2.sh, release check 4), user documents + f197 + tickets vs 0.4.58 (cut-check at 16:15).
