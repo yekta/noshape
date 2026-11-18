@@ -615,7 +615,7 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
   showing (right edge x 405, bottom ~y 288); live puts it over the list at (214, 79), 440 x 521.
 - [x] (verified live2 20:2x on green 548d795fb / main 7302f8bd4, psui 17:09 batch: HIDE: Y row 128-139 ms, part gone 228-339 (live 73 / 436); Shift+Y row 145, back 329 (live 108 / 562)) (psui 12:4x: fixed with a test, land queue; qa re-runs on its green) **P1 FEEL-HIDE-TIMING (psui)** (ps-feel2-1118, 60 fps capture): Y: row 269 ms, part gone 669 ms (live 73 / 436); Shift+Y 408 /
   774 ms (live 108 / 562).
-- [ ] (skasm 13:05: fixed in 6389133a, queued; live2 re-measures on its green, then close) **P1 FEEL-SKETCH-REACH-OUTSIDE (psui + skasm)** (hover-p0): outside sketch mode a sketch line lights from 8 px and holds to 9; at
+- [ ] (live2 20:4x on green 548d795fb, which has skasm's c0310f32f: still ≠. Toward a line's middle an orange midpoint ring lights from 6 px and the line stays grey to 0 px (psui's midpoint rule ab553a9b applies to sketch curves; live lights the line at 6-7 px, a midpoint with no tool hovers the line); toward the corner only a 1-2 px orange mark at the vertex from 7 px (live: the point alone as a ~10 px light-orange disc from 9 px). Crops live2-scratch/rr/ln.png, pt.png; qa-scratch/hv2/ro73) **P1 FEEL-SKETCH-REACH-OUTSIDE (psui + skasm)** (hover-p0): outside sketch mode a sketch line lights from 8 px and holds to 9; at
   a corner the whole line lights at 6 and the point never lights alone; live: line 6-7 px, point 9 px (the point beats the line).
 
 ## Interaction feel: live2's "Ours" cells, batch 2 (live2 12:3x, landed 8b5439895 / 1eae71e40; evidence live/psui/ours-1118/)
