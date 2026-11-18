@@ -3096,12 +3096,16 @@ fn mark_shared_edges(g: &mut ViewGeometry, models: &ModelEdges, compound: &Shape
     }
 }
 
+/// A view with nothing of its part left to show (the part deleted or suppressed): drawn blank, with Onshape's info notice
+/// on the sheet (live2 errors-1118).
+pub const PART_NOT_RESOLVED: &str = "Failed to resolve part.";
+
 /// HLR projection of bodies (optionally pre-cut) into a view.
 /// `keep(body index, point)` filters the vertex snap points.
 fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: bool, keep: &dyn Fn(usize, DVec3) -> bool) -> ViewGeometry {
     let mut g = ViewGeometry { id, frame: Some(*frame), exact, ..Default::default() };
     if bodies.is_empty() {
-        g.error = Some("No parts to show".into());
+        g.error = Some(PART_NOT_RESOLVED.into());
         g.update_bounds();
         return g;
     }

@@ -1880,3 +1880,47 @@ fn a_geometric_tolerance_clicked_on_an_edge_follows_on_a_leader_until_the_second
     let placed = gdts(cx);
     assert!(matches!(placed.as_slice(), [g] if matches!(&g.kind, AnnotationKind::Gdt { leaders, .. } if leaders.len() == 1)), "placed with its leader: {placed:?}");
 }
+
+/// Live2 errors-1118: a view whose part no longer resolves goes blank (no "No parts to show" box) and the sheet shows
+/// Onshape's blue info notice "Failed to resolve part.".
+#[gpui::test]
+fn a_view_whose_part_is_gone_goes_blank_with_failed_to_resolve_part(cx: &mut TestAppContext) {
+    use noshape_model::drawing::ViewKind;
+    use noshape_model::reference::{BodyId, FeatureId};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-part-gone");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let id = e.drawing.sheets[e.sheet].views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).map(|v| v.id).expect("a base view");
+            let sheet = e.sheet;
+            e.edit("Lose the part", cx, |d| {
+                if let Some(ViewKind::Base { part, .. }) = d.sheets[sheet].view_mut(id).map(|v| &mut v.kind) {
+                    *part = Some(BodyId { feature: FeatureId(u64::MAX - 7), index: 0 });
+                }
+            });
+            e.sources.clear();
+            e.ensure_sources(true, cx);
+            id
+        })
+    });
+    for _ in 0..600 {
+        if cx.update(|cx| editor.read(cx).toast.is_some()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, window);
+    }
+    for _ in 0..100 {
+        draw(cx, window);
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+    }
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert_eq!(e.toast.as_deref(), Some("Failed to resolve part."), "the info notice");
+        let b = e.built.as_ref().expect("built");
+        let view_pick = b.picks.iter().position(|t| *t == noshape_model::drawing::build::PickTarget::View(id)).map(|i| i as u32);
+        assert!(!b.geometry.texts.iter().any(|t| Some(t.pick) == view_pick), "no text in the blank view");
+    });
+}

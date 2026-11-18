@@ -1196,8 +1196,14 @@ impl DrawingEditor {
                     match src {
                         Some(src) => {
                             this.failed_sources.remove(&key);
+                            // A view whose part no longer resolves goes blank, with Onshape's blue info notice (live2
+                            // errors-1118).
+                            let lost = this.drawing.sheets.iter().any(|s| s.views.iter().any(|v| views::view_source(s, v.id).is_some_and(|(k, part)| k == key && views::view_bodies(&src.context, part.as_ref()).is_empty())));
                             this.sources.insert(key, src);
                             this.first_view_scale(cx);
+                            if lost {
+                                this.show_message(views::PART_NOT_RESOLVED, crate::os_ui::BubbleKind::Info, None, cx);
+                            }
                         }
                         // A display state or exploded view deleted from the
                         // assembly: its views go blank, with Onshape's blue

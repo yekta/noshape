@@ -2510,7 +2510,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             color_lines_since(&mut g, break_mark, vt.break_line.color);
             g.cad_since(cad_mark, CadLayer::BreakLines);
-            if let Some(err) = &geo.error
+            // (A part that no longer resolves leaves the view blank: live2 errors-1118.)
+            if let Some(err) = geo.error.as_ref().filter(|e| e.as_str() != super::views::PART_NOT_RESOLVED)
                 && geo.edges.is_empty()
             {
                 g.texts.push(Text2 { pos: pl.position, height: 3.0, text: err.clone(), angle: 0.0, anchor: Anchor::Center, pick: view_pick });
