@@ -794,8 +794,8 @@ impl Sheet<'_> {
         };
         let layer = self.g.cad_line_layer(li).name(self.upper).to_string();
         let (p3, k) = (|p| self.p3(p), self.k);
-        // A free-form model edge stays a spline though it looks like an
-        // ellipse (live 1857: a fillet's B-spline edges are SPLINEs).
+        // A free-form model edge stays a spline though it looks like an ellipse (live 1857: a fillet's B-spline edges
+        // are SPLINEs), as does a torus's outline seen at a slant (live2 drw-truth-1118: c2-bottle-split's shoulder).
         let free = l.points.len() > 2 && self.g.freeform_lines.binary_search(&li).is_ok();
         let poly = l.points.len() > 2 && self.g.polyline_lines.binary_search(&li).is_ok();
         // A mesh part's silhouette or fold: an LWPOLYLINE as live's (with its continuous-linetype flag), a LINE when

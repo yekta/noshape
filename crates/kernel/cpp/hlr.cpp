@@ -47,6 +47,9 @@ enum : uint8_t
   CLS_SEAM    = 3,
 };
 
+// An outline's source when freeform_outline holds for its face (must match crate::hlr).
+constexpr int SOURCE_FREEFORM_OUTLINE = -2;
+
 // Source edges by their 3D curve. HLR's outliner splits edges where a
 // silhouette touches them (the rims of a slightly tilted hole); the pieces
 // are new edges that keep the source edge's curve.
@@ -293,10 +296,33 @@ void draw_edge_data(Emitter& em, HLRBRep_EdgeData& ed, bool visible, uint8_t cls
   }
 }
 
+// A face whose outline seen along `view` is no line or conic: a torus at a slant (along its axis or across it, its
+// outlines are circles and lines), a free-form surface. Live's CAD files write such outlines as SPLINEs, however close
+// to an ellipse (c2-bottle-split's shoulder, c2-snap-hook's tori).
+bool freeform_outline(HLRBRep_FaceData& fd, const gp_Dir& view)
+{
+  const BRepAdaptor_Surface& s = fd.Geometry().Surface();
+  switch (s.GetType())
+  {
+    case GeomAbs_Plane:
+    case GeomAbs_Cylinder:
+    case GeomAbs_Cone:
+    case GeomAbs_Sphere:
+      return false;
+    case GeomAbs_Torus:
+    {
+      const double c = std::abs(s.Torus().Axis().Direction().Dot(view));
+      return c > 1e-9 && c < 1 - 1e-9;
+    }
+    default:
+      return true;
+  }
+}
+
 // Mirrors HLRBRep_HLRToShape::InternalCompound/DrawFace/DrawEdge for the
 // sharp (5), outline (2), smooth (3) and sewn/seam (4) categories, recording
-// the source edge.
-void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool visible)
+// the source edge (an outline whose face freeform_outline holds for: SOURCE_FREEFORM_OUTLINE).
+void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool visible, const gp_Dir& view)
 {
   const int ne = DS->NbEdges();
   const int nf = DS->NbFaces();
@@ -346,7 +372,8 @@ void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool 
         // from the side) are outlines too but keep their source edge.
         if (typ == 5 && itf.OutLine() && smooth)
           cls = CLS_OUTLINE;
-        draw_edge_data(em, edf, visible, cls, src);
+        const bool free = typ == 2 && src < 0 && freeform_outline(DS->FDataArray().ChangeValue(iface), view);
+        draw_edge_data(em, edf, visible, cls, free ? SOURCE_FREEFORM_OUTLINE : src);
         edf.Used(true);
       }
       else
@@ -513,7 +540,7 @@ bool exact_chunked(Emitter& em, const std::vector<TopoDS_Shape>& bodies, const H
       DS->Projector().Scaled(true);
       for (bool visible : {true, false})
         for (int typ : {5, 2, 3, 4})
-          exact_pass(cem, DS, typ, visible);
+          exact_pass(cem, DS, typ, visible, ax.Direction());
       DS->Projector().Scaled(false);
     }
     catch (const Standard_Failure&)
@@ -622,7 +649,7 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
       DS->Projector().Scaled(true);
       for (bool visible : {true, false})
         for (int typ : {5, 2, 3, 4})
-          exact_pass(em, DS, typ, visible);
+          exact_pass(em, DS, typ, visible, ax.Direction());
       DS->Projector().Scaled(false);
       return out;
     }

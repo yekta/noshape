@@ -8,6 +8,9 @@ use crate::ffi::ffi;
 use crate::geom::p3;
 use crate::shape::{Shape, ck};
 
+/// hlr.cpp's source for an outline whose face draws no line or conic in the view (`ProjectedEdge::freeform`).
+const SOURCE_FREEFORM_OUTLINE: i32 = -2;
+
 /// Visibility of a projected edge segment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Visibility {
@@ -38,6 +41,10 @@ pub struct ProjectedEdge {
     /// Index of the source edge in the projected shape's edges (MapShapes
     /// order), when known (`None` for silhouettes).
     pub source_edge: Option<u32>,
+    /// A silhouette that is no line or conic in this view (a torus seen at a slant, a free-form face's): live's CAD
+    /// files write it as a SPLINE however close to an ellipse. Exact HLR only.
+    #[serde(default)]
+    pub freeform: bool,
 }
 
 /// Project `shape` orthographically along `view_dir` (from the eye into the
@@ -94,6 +101,7 @@ pub fn project_hlr_raw(shape: &Shape, view_dir: DVec3, up: DVec3, exact: bool, d
                 },
                 polyline,
                 source_edge: (e.source >= 0).then_some(e.source as u32),
+                freeform: e.source == SOURCE_FREEFORM_OUTLINE,
             }
         })
         .collect())
@@ -264,7 +272,7 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Pr
         for r in runs {
             let len: f64 = r.windows(2).map(|w| w[0].distance(w[1])).sum();
             if len > tol {
-                out.push(ProjectedEdge { visibility: e.visibility, class: e.class, polyline: r, source_edge: e.source_edge });
+                out.push(ProjectedEdge { visibility: e.visibility, class: e.class, polyline: r, source_edge: e.source_edge, freeform: e.freeform });
             }
         }
     }
@@ -278,7 +286,7 @@ pub(crate) fn merge_fragments(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Projec
     // A silhouette has no source edge: its fragments join only along one
     // curve (one face's outline), not across faces (live 1857: a knob's
     // fillet, side and fillet are two ARCs and a LINE).
-    type Key = (Visibility, EdgeClass, Option<u32>, usize);
+    type Key = (Visibility, EdgeClass, Option<u32>, bool, usize);
     let mut curves: Vec<Curve2> = Vec::new();
     let mut groups: Vec<(Key, Vec<Vec<DVec2>>)> = Vec::new();
     let mut index: HashMap<Key, usize> = HashMap::new();
@@ -298,7 +306,7 @@ pub(crate) fn merge_fragments(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Projec
         } else {
             0
         };
-        let k = (e.visibility, e.class, e.source_edge, along);
+        let k = (e.visibility, e.class, e.source_edge, e.freeform, along);
         let gi = *index.entry(k).or_insert_with(|| {
             groups.push((k, Vec::new()));
             groups.len() - 1
@@ -306,7 +314,7 @@ pub(crate) fn merge_fragments(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Projec
         groups[gi].1.push(e.polyline);
     }
     let mut out = Vec::new();
-    for ((visibility, class, source_edge, _), polys) in groups {
+    for ((visibility, class, source_edge, freeform, _), polys) in groups {
         let cell = tol.max(1e-15) * 4.0;
         let q = |p: DVec2| ((p.x / cell).round() as i64, (p.y / cell).round() as i64);
         // End point hash: (poly, is_end).
@@ -378,7 +386,7 @@ pub(crate) fn merge_fragments(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Projec
             }
             let pts = simplify_collinear(chain.into_iter().collect(), tol);
             if pts.len() >= 2 {
-                out.push(ProjectedEdge { visibility, class, polyline: pts, source_edge });
+                out.push(ProjectedEdge { visibility, class, polyline: pts, source_edge, freeform });
             }
         }
     }
@@ -458,6 +466,7 @@ mod tests {
             class: EdgeClass::Sharp,
             polyline: pts.iter().map(|p| DVec2::new(p[0], p[1])).collect(),
             source_edge: src,
+            freeform: false,
         }
     }
 
@@ -475,7 +484,7 @@ mod tests {
     /// pieces of one line or one circle join.
     #[test]
     fn silhouettes_join_along_one_curve() {
-        let outline = |pts: Vec<[f64; 2]>| ProjectedEdge { visibility: Visibility::Visible, class: EdgeClass::Outline, polyline: pts.iter().map(|p| DVec2::new(p[0], p[1])).collect(), source_edge: None };
+        let outline = |pts: Vec<[f64; 2]>| ProjectedEdge { visibility: Visibility::Visible, class: EdgeClass::Outline, polyline: pts.iter().map(|p| DVec2::new(p[0], p[1])).collect(), source_edge: None, freeform: false };
         let arc = |c: [f64; 2], r: f64, a0: f64, a1: f64| (0..=16).map(|i| a0 + (a1 - a0) * i as f64 / 16.0).map(|t| [c[0] + r * t.cos(), c[1] + r * t.sin()]).collect::<Vec<_>>();
         let h = std::f64::consts::FRAC_PI_2;
         // Top arc (centre (5, 10)) into the side x = 0, 0..10, into the bottom arc (centre (5, 0)).

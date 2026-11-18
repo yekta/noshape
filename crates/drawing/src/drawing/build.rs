@@ -1900,7 +1900,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     for piece in map_polyline(&pl, &e.points) {
                         g.lines.push(Polyline2 { points: piece, style, closed: false, pick });
                     }
-                    if e.model.and_then(|m| geo.model_edges.get(m as usize)).is_some_and(|me| me.freeform) {
+                    if e.freeform || e.model.and_then(|m| geo.model_edges.get(m as usize)).is_some_and(|me| me.freeform) {
                         g.freeform_lines.extend(l0..g.lines.len());
                     }
                     if e.model.and_then(|m| geo.model_edges.get(m as usize)).is_some_and(|me| me.shared) {

@@ -9235,3 +9235,41 @@ fn a_parts_inspection_list_is_its_characteristics() {
     call(&mut ctx, "feature_edit", json!({ "feature": extrude, "params": { "depth__tolerance": null } }));
     assert_eq!(csv(&mut ctx, "cleared.csv"), header, "the tolerance cleared");
 }
+
+/// Live (live2 drw-truth-1118: c2-bottle-split's shoulder, c2-snap-hook's tori): a torus's outline seen at a slant is
+/// a SPLINE in a drawing's DXF, never an ELLIPSE however close it comes to one. A filleted cylinder's isometric view.
+#[test]
+fn a_slanted_torus_outline_is_a_dxf_spline() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "torus-outline", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[0, 0], [20, 0]] }));
+    let disc = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [disc], "depth": "40 mm" } }));
+    let rim = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "circle", "near": [20, 0, 40] }))["edges"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": [rim], "radius": "8 mm" } }));
+    let tab = call(&mut ctx, "drawing_create", json!({ "template": "ISO A3" }))["drawing"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "orientation": "isometric", "position": [200, 150], "scale": 2.0 }));
+    let dxf = scratch("torus-outline.dxf");
+    call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "DXF", "version": "2018", "file": dxf.to_str().unwrap() }));
+    // (type, layer) of each entity.
+    let text = std::fs::read_to_string(&dxf).unwrap();
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    let entities = lines.iter().position(|l| *l == "ENTITIES").unwrap();
+    let mut kinds: Vec<(String, String)> = Vec::new();
+    for pair in lines[entities + 1..].chunks(2) {
+        match pair {
+            ["0", "ENDSEC"] => break,
+            ["0", t] => kinds.push((t.to_string(), String::new())),
+            ["8", layer] => {
+                if let Some(k) = kinds.last_mut().filter(|k| k.1.is_empty()) {
+                    k.1 = layer.to_string();
+                }
+            }
+            _ => {}
+        }
+    }
+    let count = |t: &str, layer: &str| kinds.iter().filter(|k| k.0 == t && k.1 == layer).count();
+    assert_eq!(count("SPLINE", "Visible"), 2, "the fillet's outline on either side: {kinds:?}");
+    // The base and the fillet's (tangent) rims are circles: ELLIPSEs seen at a slant.
+    assert_eq!((count("ELLIPSE", "Visible"), count("ELLIPSE", "TANGENT_LINES")), (1, 2), "{kinds:?}");
+}

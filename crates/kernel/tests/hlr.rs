@@ -256,3 +256,26 @@ fn a_short_arc_projects_to_enough_points_to_fit() {
     let arcs: Vec<usize> = edges.iter().filter(|e| e.visibility == Visibility::Visible && e.polyline.len() > 2).map(|e| e.polyline.len()).collect();
     assert!(!arcs.is_empty() && arcs.iter().all(|n| *n >= 8), "{arcs:?}: {}", dump(&edges));
 }
+
+/// A torus seen at a slant has outlines that are no line or conic (live's CAD files write them as SPLINEs: c2-bottle-split's
+/// shoulder); seen along its axis or across it, its outlines are circles and lines, as a cylinder's always are.
+#[test]
+fn a_slanted_torus_outline_is_freeform() {
+    let frame = Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+    let torus = make_torus(&frame, 20.0, 5.0, 2.0 * PI).unwrap();
+    let cylinder = make_cylinder(&frame, 10.0, 30.0, 2.0 * PI).unwrap();
+    let iso = DVec3::new(-1.0, -1.0, -1.0).normalize();
+    let outlines = |s: &Shape, dir: DVec3, up: DVec3| -> Vec<bool> {
+        project_hlr(s, dir, up, true).unwrap().into_iter().filter(|e| e.class == EdgeClass::Outline && e.source_edge.is_none()).map(|e| e.freeform).collect()
+    };
+    let slanted = outlines(&torus, iso, DVec3::Z);
+    assert!(!slanted.is_empty() && slanted.iter().all(|f| *f), "{slanted:?}");
+    for (dir, up) in [(DVec3::NEG_Z, DVec3::Y), (DVec3::Y, DVec3::Z)] {
+        let square = outlines(&torus, dir, up);
+        assert!(!square.is_empty() && square.iter().all(|f| !f), "{dir}: {square:?}");
+    }
+    let cyl = outlines(&cylinder, iso, DVec3::Z);
+    assert!(!cyl.is_empty() && cyl.iter().all(|f| !f), "{cyl:?}");
+    // The polygonal HLR keeps no faces' surfaces: never free-form.
+    assert!(project_hlr(&torus, iso, DVec3::Z, false).unwrap().iter().all(|e| !e.freeform));
+}
