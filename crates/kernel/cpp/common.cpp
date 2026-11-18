@@ -1212,6 +1212,20 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
           };
           sections = analytic(two[0]) && analytic(two[1]);
         }
+        // Else only where a unify took a seam away (a periodic face): between two faces with none live keeps the
+        // vertices (c2-parting-line-draft-parting-line's Split 3: a parting extrusion's sections with its draft faces,
+        // 13/34/24).
+        auto periodic = [&](int j) {
+          for (uint32_t k = ef.first[(size_t)j - 1]; k < ef.first[(size_t)j]; ++k)
+          {
+            const BRepAdaptor_Surface su(TopoDS::Face(fm((int)ef.second[k] + 1)), false);
+            if (su.IsUPeriodic() || su.IsVPeriodic())
+              return true;
+          }
+          return false;
+        };
+        if (!sections && !periodic(two[0]))
+          continue;
       }
       // Going on from each other: their directions away from the vertex opposite.
       const TopoDS_Vertex& v = TopoDS::Vertex(vm(i));
