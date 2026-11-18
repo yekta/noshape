@@ -264,21 +264,6 @@ fn tweak(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> bool {
     true
 }
 
-/// The outward normal the faces share when every one is a plane facing that way.
-fn facing_one_way(faces: &[Shape]) -> Option<DVec3> {
-    let mut way = None;
-    for f in faces {
-        f.face_plane().ok()??;
-        let n = f.normal_at_point(f.centroid().ok()?).ok()?;
-        match way {
-            None => way = Some(n),
-            Some(w) if w.dot(n) > 1.0 - 1e-12 => {}
-            Some(_) => return None,
-        }
-    }
-    way
-}
-
 /// Whether a face in `faces` of `shape` or one sharing an edge with them is a freeform surface (not a plane, cylinder,
 /// cone, sphere or torus).
 fn touches_freeform(shape: &Shape, faces: &[usize]) -> bool {
@@ -404,18 +389,7 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                 continue;
             }
         }
-        // Planes facing one way: their offset is a translation along that way, the neighbours re-trimmed in place
-        // (c2-impeller-loft's Flansch (vorne) verbreitern: OCCT's offset 0.8 s and invalid, then the booleans).
-        let tweaked = if translate_dir.is_none() { facing_one_way(&shapes).and_then(|n| k::tweak_faces(&body.shape, &shapes, &k::Transform::Matrix(DMat4::from_translation(n * dist))).ok()).filter(|r| r.shape.count(ShapeType::Solid) == 1 && r.shape.is_valid()) } else { None };
-        if let Some(r) = tweaked {
-            // Named as OCCT's offset names them: every face the Offset of the one it was.
-            let kept = ev.name_result(&[&body.shape_names()], &r.history, &r.shape, &BTreeMap::new(), None);
-            let roles = kept.into_iter().enumerate().map(|(j, n)| (j as u32, Role::Offset(n))).collect();
-            let names = ev.name_result(&[&body.shape_names()], &r.history, &r.shape, &roles, None);
-            ev.replace_body(bi, r.shape, names);
-            continue;
-        }
-        // Else, faces on or beside the moved ones that aren't planes, cylinders, cones, spheres or tori (a flange's walls
+        // Faces on or beside the moved ones that aren't planes, cylinders, cones, spheres or tori (a flange's walls
         // extruded from a loft's): OCCT's offset worked on them for ~0.6 s and left an invalid solid the booleans
         // then made (c2-impeller-loft's Flansch verbreitern): the booleans first, OCCT's offset if they fail.
         if translate_dir.is_none() && touches_freeform(&body.shape, &faces) && offset_by_booleans(ev, bi, &faces, dist).is_ok() {

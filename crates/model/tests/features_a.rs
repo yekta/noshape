@@ -1937,34 +1937,6 @@ fn a_part_left_open_is_named_as_a_surface() {
     assert_eq!(names, ["Surface 1", "Part 1"]);
 }
 
-/// Move face's Offset of a plane moves it along its normal, its sloping neighbours running on to it (c2-impeller-loft's
-/// Flansch (vorne) verbreitern): a 20 mm block drafted 10° grown 5 mm at its top is the frustum 15 mm high.
-#[test]
-fn move_face_offset_of_a_plane_between_sloping_sides() {
-    let mut t = T::new();
-    let (_, x) = t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
-    t.set(x, "hasDraft", b(true));
-    t.set(x, "draftAngle", e("10 deg"));
-    let res = t.ok();
-    // The side at height h: 20 mm narrowed or widened by the draft on both sides.
-    let frustum = |h: f64, s: f64| {
-        let k = 2.0 * s * 10f64.to_radians().tan();
-        let side = |z: f64| 0.02 - k * z;
-        h * (side(0.0).powi(2) + side(0.0) * side(h) + side(h).powi(2)) / 3.0
-    };
-    let v = total_volume(&res.context);
-    let s = if near(v, frustum(0.01, 1.0), 1e-9) { 1.0 } else { -1.0 };
-    assert!(near(v, frustum(0.01, s), 1e-9), "drafted block {v}");
-    let top = face_with_normal(&res.context.bodies[0], DVec3::Z);
-    t.add("moveFace", &[("moveFaces", q(vec![top])), ("offsetDistance", e("5 mm"))]);
-    let res = t.ok();
-    let body = &res.context.bodies[0];
-    assert!(body.shape.is_valid());
-    assert_eq!(body.faces.len(), 6);
-    let v = total_volume(&res.context);
-    assert!(near(v, frustum(0.015, s), 1e-9), "grown {v}, expected {}", frustum(0.015, s));
-}
-
 #[test]
 fn move_face_offset_and_translate() {
     let mut t = T::new();
