@@ -29,11 +29,12 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   updateSheetMetalGeometry made in this feature) left out of CREATED_BY for bodies, the hidden definitions in. Arrow
   now at the plate's middle, +z, on the sheet = std's START cap at z = thickness (live's "z 0" was inferred).
   model tests 525 ok; SM suite docs 12/13 to the end as before, cf-sheet-metal-model-plus 11/14 -> 14/14. Queued.
-- c2-surf-intro-mutualtrim Title (live 13:3x: same frame as ours; live solves the baseline COINCIDENT to JHV):
-  /root/skasm-scratch/held/title-text-ends.patch maps `<text>.sketch_text.baseline/left.start/.end` and counts a
-  text's start in off_live_points. The solve then lands 3.7 mm off live's in x: our text box's height is free (only
-  Horizontal + LengthRatio), so the solve scales the text; live translates it, size kept. Next: hold the box's size
-  in constructive placement (like hold_size for circles), then suite-check every doc with text constraints.
+- c2-surf-intro-* Title (live title-frame-1118): the translator maps a text's `.sketch_text.baseline/left.start/.end`
+  and counts its start in off_live_points; a text box's corner made coincident with fixed geometry carries the whole box
+  (`carry_text_box`, size kept). Text docs: surf-intro-* +1 each (mutualtrim 3 -> 5/17, simple 10 -> 12/15), others same.
+- Next: the surf-intro Derived 1 sources now resolve: "its source's Isocline Title ... moved 271 mm (first MIDPOINT on
+  H9x2pgUs2VQ4.start)" in boundary / fill / offset / ruled; -moveboundary NOT BUILT; -simple Revolve 1 ("Select sketch
+  curves to revolve."); wave-washer with live's sketches.json.
 
 ## Waiting on live (REQUESTS)
 - Answered 11-18 13:xx: wave-washer sketches.json (Sketch 4 / 3 solved inward) and surf-intro Derived 1 sources

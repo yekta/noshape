@@ -5223,9 +5223,17 @@ impl<'a> Translator<'a> {
         let k = per_unit(&g["units"]);
         let ours: HashMap<&str, [f64; 2]> = g["entities"].as_array()?.iter().filter(|e| e["type"] == "point").filter_map(|e| Some((e["id"].as_str()?, [e["at"][0].as_f64()? * k, e["at"][1].as_f64()? * k]))).collect();
         let mut worst: Option<f64> = None;
-        for e in live.iter().filter(|e| e["entityType"] == "point") {
-            let (Some(eid), Some(p)) = (e["id"].as_str(), e["point"].as_array().and_then(|p| Some([p.first()?.as_f64()?, p.get(1)?.as_f64()?]))) else { continue };
-            let Some(q) = self.sketch_entities.get(&(oid.to_string(), eid.to_string())).and_then(|o| ours.get(o.as_str())) else { continue };
+        // A text by its baseline's start (c2-surf-intro-mutualtrim's Title, coincident with a model edge).
+        let solved = |e: &Value| -> Option<(String, [f64; 2])> {
+            let xy = |p: &Value| Some([p.get(0)?.as_f64()?, p.get(1)?.as_f64()?]);
+            match e["entityType"].as_str()? {
+                "point" => Some((e["id"].as_str()?.to_string(), xy(&e["point"])?)),
+                "sketchText" => Some((format!("{}.sketch_text.baseline.start", e["id"].as_str()?), xy(&e["startPoint"])?)),
+                _ => None,
+            }
+        };
+        for (eid, p) in live.iter().filter_map(solved) {
+            let Some(q) = self.sketch_entities.get(&(oid.to_string(), eid)).and_then(|o| ours.get(o.as_str())) else { continue };
             let l = self.sketch_map.local(p);
             let d = (l[0] - q[0]).hypot(l[1] - q[1]);
             worst = Some(worst.map_or(d, |w| w.max(d)));
@@ -5374,10 +5382,23 @@ impl<'a> Translator<'a> {
         // baseline), for the constraints and dimensions on them (c2-valve-config's height of 4.5 mm, its left side's
         // midpoint). Not the right and top: their place is the text's width, which our font's advances give a hair
         // off live's (c2-hex-bookcase-derived's MIDPOINT on a right side moved it 0.0125 mm).
-        let lines: Vec<String> = made["created"].as_array().into_iter().flatten().filter(|c| c["type"] == "line").filter_map(|c| c["id"].as_str().map(str::to_string)).collect();
+        // Their ends too, the start at the text's corner (c2-surf-intro-mutualtrim's Title: its baseline's start
+        // coincident with edge JHV, which live solves the text onto).
+        let lines: Vec<&Value> = made["created"].as_array().into_iter().flatten().filter(|c| c["type"] == "line").collect();
         if let (Some(tid), [bottom, _, _, left]) = (t["entityId"].as_str(), lines.as_slice()) {
             for (side, line) in [("baseline", bottom), ("left", left)] {
-                self.sketch_entities.insert((oid.to_string(), format!("{tid}.sketch_text.{side}")), line.clone());
+                let name = format!("{tid}.sketch_text.{side}");
+                if let Some(cid) = line["id"].as_str() {
+                    self.sketch_entities.insert((oid.to_string(), name.clone()), cid.to_string());
+                }
+                let off = |key: &str| Some((line[key][0].as_f64()? * map.k - start[0]).hypot(line[key][1].as_f64()? * map.k - start[1]));
+                let reversed = off("end").zip(off("start")).is_some_and(|(e, s)| e < s);
+                let ends = if reversed { [("start", "end_point"), ("end", "start_point")] } else { [("start", "start_point"), ("end", "end_point")] };
+                for (end, key) in ends {
+                    if let Some(pid) = line[key].as_str() {
+                        self.sketch_entities.insert((oid.to_string(), format!("{name}.{end}")), pid.to_string());
+                    }
+                }
             }
         }
         let angle = (ahead[1] - start[1]).atan2(ahead[0] - start[0]);

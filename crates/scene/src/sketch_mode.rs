@@ -8471,6 +8471,7 @@ pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityI
     // Live (live2 11-17 part 2b): the first-picked entity stays, the second-picked moves (placed as live places it).
     place_second_line(sk, c, ids);
     level_lines(sk, c, ids);
+    carry_text_box(sk, c, ids);
     let light = if centers.is_empty() { what_moves(sk, c, ids) } else { centers };
     let report = sk.solve_with(&noshape_sketch::SolveOptions { light, ..Default::default() });
     if !report.is_solved() {
@@ -8478,6 +8479,51 @@ pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityI
         return false;
     }
     true
+}
+
+/// A text box's corner made coincident with what can't move (a model edge or vertex, a fixed point): the whole box is
+/// carried there, its size and direction kept (live c2-surf-intro-mutualtrim's Title: the text's baseline start onto
+/// edge JHV, the text translated 40.46 mm; the solve alone scaled the box, its height free).
+fn carry_text_box(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
+    let [a, b] = ids else { return };
+    if c != ConstraintTool::Coincident {
+        return;
+    }
+    let pinned = |e: EntityId| sk.entity(e).is_some_and(|x| x.external) || sk.constraints().any(|k| k.kind == ConstraintKind::Fix { entity: e });
+    let (corner, target) = if is_point(sk, *a) && pinned(*b) { (*a, *b) } else if is_point(sk, *b) && pinned(*a) { (*b, *a) } else { return };
+    if pinned(corner) {
+        return;
+    }
+    // The box: the lines of its LengthRatio (bottom, left) and the lines sharing their corners (right, top).
+    let sides: Vec<EntityId> = sk.constraints().filter_map(|k| match k.kind {
+        ConstraintKind::LengthRatio { a, b, .. } => Some([a, b]),
+        _ => None,
+    }).find(|[x, y]| [x, y].iter().any(|l| sk.endpoints(**l).is_some_and(|(s, e)| s == corner || e == corner))).map(|s| s.to_vec()).unwrap_or_default();
+    if sides.is_empty() {
+        return;
+    }
+    let mut corners: Vec<EntityId> = sides.iter().filter_map(|l| sk.endpoints(*l)).flat_map(|(s, e)| [s, e]).collect();
+    let more: Vec<EntityId> = sk.entities().filter(|e| e.kind() == EntityKind::Line).filter_map(|e| sk.endpoints(e.id)).filter(|(s, e)| corners.contains(s) || corners.contains(e)).flat_map(|(s, e)| [s, e]).collect();
+    corners.extend(more);
+    corners.sort();
+    corners.dedup();
+    if corners.len() != 4 {
+        return;
+    }
+    let Some(at) = sk.point(corner) else { return };
+    let to = match (sk.point(target), sk.curve(target)) {
+        (Some(q), _) => q,
+        // (On a line: its whole line, as the Coincident holds it.)
+        (None, Some(Curve2::Line { a, b })) if (b - a).length_squared() > 0.0 => a + (b - a) * ((at - a).dot(b - a) / (b - a).length_squared()),
+        (None, Some(curve)) => curve.closest(at).1,
+        _ => return,
+    };
+    let shift = to - at;
+    for p in corners {
+        if let Some(q) = sk.point(p) {
+            let _ = sk.set_point(p, q + shift);
+        }
+    }
 }
 
 /// What a constraint from two picks moves, the rest held where it can be (live2 11-17): the second pick; a point and a
@@ -11268,6 +11314,24 @@ mod tests {
             } else {
                 assert!((center - v(0.0, 0.008)).length() < 1e-9 && (at - v(0.0, 0.003)).length() < 1e-9, "the point moves: {at}");
             }
+        }
+    }
+
+    /// Live (c2-surf-intro-mutualtrim's Title, live title-frame-1118): a text box's corner made coincident with a fixed
+    /// line 40 mm below it: the box moves down whole, its size and direction kept (the solve alone scaled it).
+    #[test]
+    fn a_text_box_coincident_with_a_fixed_line_moves_whole() {
+        let mut sk = Sketch::new();
+        let bx = sk.add_text_box(v(-0.010943, -0.026971), 0.01524, 10.3).unwrap();
+        let line = sk.add_line(v(-0.053, -0.067431), v(0.2538, -0.067431));
+        sk.add_constraint(ConstraintKind::Fix { entity: line }).unwrap();
+        let corner = bx.points[0];
+        let before: Vec<DVec2> = bx.points.iter().map(|p| sk.point(*p).unwrap()).collect();
+        assert!(apply_constraint(&mut sk, ConstraintTool::Coincident, &[corner, line]).is_ok_and(|n| n > 0));
+        assert!(solve_after_constraint(&mut sk, ConstraintTool::Coincident, &[corner, line]));
+        for (p, was) in bx.points.iter().zip(&before) {
+            let at = sk.point(*p).unwrap();
+            assert!((at - (*was + v(0.0, -0.04046))).length() < 1e-9, "corner {p:?}: {was} -> {at}");
         }
     }
 
