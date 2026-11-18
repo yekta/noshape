@@ -98,10 +98,8 @@ Open, ranked:
 - Drawing exports 84 / 84 (exp-1115r + the revision / spline / jog runs). drw-broken-out-section compares within ±1 px
   (DECISIONS 11-15). Studios' view fit (69f67433) in.
 ## Next, in order
-P. Parked (lead 21:2x: no OCCT class layout change; fill-pattern 1.6x live, under the 2x bar): OCCT patch 0034
-   (/root/dx-scratch/occt-patch/0034-fclass2d-wire-boxes.patch): BRepTopAdaptor_FClass2d gives each wire's classifier
-   the face's UV box, so no hole is ever box-rejected; per-wire boxes took fill-pattern Iso 11.3 -> 1.98 s, Update
-   7.1 -> 1.86 s, views identical on 16 / 17 corpus drawings. Needs a new member (TabBox): land only ABI-neutral.
+P. Parked (lead 21:2x: no OCCT class layout change): FClass2d per-wire boxes (/root/dx-scratch/occt-patch/
+   0034-fclass2d-wire-boxes.patch, adds a member): fill-pattern Iso 11.3 -> 1.98 s; land only ABI-neutral.
 N. Drawings not deterministic (lead 21:2x: first). Two causes, both fixed (uncommitted):
    - OCCT's Contap_HContTool kept a surface's sample bounds in file statics: parallel views' outline tracing raced.
      patches/occt/0035-contap-thread-local-sample-bounds.patch (thread_local, ABI-neutral; g++-13 / 15, Apple clang).
@@ -114,6 +112,13 @@ N. Drawings not deterministic (lead 21:2x: first). Two causes, both fixed (uncom
    - Proven 22:5x (Mac, dvp35.sh): rings-loft 4522 / impeller 1152 / hex 526 edges, name-stripped dumps identical over
      3 parallel runs and one thread. Next: kernel / drawing / ops tests + clippy (dvtest35.sh), lead installs the
      libs, land; then check hex's DXF counts vs live (was LINE 211/206, LWPOLYLINE 17/25).
+C. (lead 21:55) fan-blade (live Front 2.0 / Top 1.7 / Right 1.6 / Iso 2.1, Update 4.4 s; ours ~5.3 s each, Update
+   6.5): option (b), Hide in 8 threads over one body's edges, tried 23:0x and DROPPED (scratch /root/dx-scratch/p36:
+   OCCT patch 0036 per-thread edge mask + hlr.cpp hide_threaded). Not identical (Mac dvp36.sh, 17 corpus drawings
+   one thread vs 8: impeller 4 lines, rings-loft 2, surface-pattern 66, clamp 4 differ: something per face depends on
+   the edges hidden before) and slower: fan-blade Front 5.3 -> 9.8 s, Update 6.5 -> 37 s (each thread loads the body;
+   so the time is not in the sorted-edge phase but in Update or a face's own edges / outlines). fill-pattern Iso
+   10.5 -> 4.7 s but Top 2.2 -> 5.3. Next if asked: profile fan-blade's phases (Update vs own-edge vs sorted).
 Q. (lead 11-18 20:4x, after fan-blade) asm-robot-relations studio 0c3466's Import 1: live makes six separate SURFACE
    parts REV-21-1650, ours sews them into one 171,987 mm³ solid (BOM 36/42 rows, Thicken 1 11 parts for live's 1):
    Import keeps separate sheets separate. Repro from asm (d8d597e0-675c-497b-a804-544ceab99bbd).
