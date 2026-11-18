@@ -230,6 +230,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   host, deleted after; never in the repo or tickets.
 
 ## Hosts
+**11-18 13:15 (lead): suite stages take the slot per step (suites-rest.sh: the build, each assembly, the exchange suite; suites-models.sh:
+the build and the run), never for a whole stage (it held vibex8's slot 10:26-13:10). vibe2 OOM'd at 12:35 (30 GB): one qa build there at
+a time (tabrel.sh builds with 4 jobs). Run 1118-0505's assembly stage re-runs per assembly (unit qa-rest-redo2, then the loop restarts).**
 **11-18 08:00 (lead): ui-parity suite stages never on vibex7 (core / blend's build host; my shards held its slot 05:06-08:00):
 vibex8 (<= 3 apps, slot) or vibe2. qa-suites.sh UH defaults to vibex8 now. vibex7 keeps the 02:00-04:00 window, compat and
 the private-document runs. Binary uploads go to <path>.new + mv (an scp onto a busy binary fails).**
