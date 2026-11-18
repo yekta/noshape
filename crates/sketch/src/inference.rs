@@ -334,14 +334,20 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                 // sketch inference": 1.9 px off the top or left quadrant the
                 // end stays where it is, on the curve). Ellipse quadrants
                 // (axis end points) are Onshape's QUADRANT constraint.
-                if let (Some(a), SketchTool::Line, Curve2::Circle { center, .. } | Curve2::Arc { center, .. }) = (ctx.anchor, ctx.tool, &c) {
-                    // A line ending on a circle or arc nearly along its
-                    // tangent there: Coincident + Tangent (live, no Horizontal).
+                if let (Some(a), SketchTool::Line, Curve2::Circle { center, radius } | Curve2::Arc { center, radius, .. }) = (ctx.anchor, ctx.tool, &c) {
+                    // A line ending on a circle or arc near the tangent point from its start: ends there, Coincident +
+                    // Tangent (live2 feel (sketch) (1): within 6 px along the circle of the true tangent point, 10 px
+                    // only Coincident; no Horizontal). The tangent point is a snap point, in the snap radius.
                     let (_, q, _) = c.closest(cursor);
-                    let d = seen(q - cursor);
-                    let (u, t) = ((q - a).normalize_or_zero(), (q - *center).perp().normalize_or_zero());
-                    if d <= r && u != DVec2::ZERO && t != DVec2::ZERO && u.perp_dot(t).abs() <= ctx.angle_tolerance.sin() {
-                        push(&mut out, InferenceKind::Tangent, q, Some(e.id), Some(a), vec![AutoConstraint::OnCurve(e.id), AutoConstraint::TangentTo(e.id)], 1);
+                    let to_a = a - *center;
+                    let dist = to_a.length();
+                    if seen(q - cursor) <= r && dist > *radius * (1.0 + 1e-9) {
+                        let turn = (*radius / dist).acos();
+                        let toward = to_a / dist * *radius;
+                        let tangent_points = [DVec2::from_angle(turn).rotate(toward), DVec2::from_angle(-turn).rotate(toward)].map(|v| *center + v);
+                        if let Some(t) = tangent_points.into_iter().filter(|t| c.closest(*t).2 < 1e-9 * (1.0 + radius)).find(|t| seen(*t - q) <= r) {
+                            push(&mut out, InferenceKind::Tangent, t, Some(e.id), Some(a), vec![AutoConstraint::OnCurve(e.id), AutoConstraint::TangentTo(e.id)], 1);
+                        }
                     }
                 }
                 // ellipse quadrants (axis end points)
@@ -727,6 +733,29 @@ mod tests {
         let t = r.iter().find(|x| x.kind == InferenceKind::Tangent).expect("tangent hint");
         assert_eq!(t.constraints, vec![AutoConstraint::TangentTo(a)]);
         assert!((t.position - v(-2.0, 1.0)).length() < 1e-9);
+    }
+
+    /// Live2 feel (sketch) (1): a line ending on a circle within 6 px along it of the true tangent point from the line's
+    /// start ends there, Tangent + Coincident; 10 px off, only on the circle. (px here: 0.01; snap radius 7.5 px.)
+    #[test]
+    fn a_line_ends_tangent_on_a_circle_near_the_tangent_point() {
+        let mut sk = Sketch::new();
+        let c = sk.add_circle(v(0.0, 0.0), 1.0);
+        let start = v(-3.0, 0.0);
+        let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(start), snap_radius: 0.075, ..Default::default() };
+        // The tangent point from (-3, 0) on the upper side.
+        let t = v(-1.0 / 3.0, (8.0f64).sqrt() / 3.0);
+        let along = |px: f64| {
+            let a = t.y.atan2(t.x) - px * 0.01;
+            v(a.cos(), a.sin())
+        };
+        let tangent = |q: DVec2| infer(&sk, q, &ctx).into_iter().find(|i| i.kind == InferenceKind::Tangent);
+        let lit = tangent(along(6.0)).expect("6 px along the circle: tangent");
+        assert_eq!(lit.constraints, vec![AutoConstraint::OnCurve(c), AutoConstraint::TangentTo(c)]);
+        assert!((lit.position - t).length() < 1e-12, "at the tangent point: {}", lit.position);
+        assert!(tangent(along(-6.0)).is_some(), "either side of it");
+        assert!(tangent(along(10.0)).is_none(), "10 px: only on the circle");
+        assert!(infer(&sk, along(10.0), &ctx).iter().any(|i| i.kind == InferenceKind::OnCurve));
     }
 
     #[test]

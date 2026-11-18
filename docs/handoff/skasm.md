@@ -98,6 +98,10 @@ qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, asm d8d597e0-675c-497b-a804-544ceab99bb
   Booleans, surface-pattern sphere cuts (bool); setback fillet (blend); hex-bookcase mesh Uses (dx).
 
 ## Open questions (none blocking)
+- hat15b Sketch 1 (inserted in the doc's last microversion 1229, 11-17 ~17:30): its used point 19 (Vertex ref) was
+  stored at (33.679, 45.182) mm but resolves to the vertex at x 34.75 in 0.4.43…main; nothing of the model lies at the
+  stored x in any build. Not upstream geometry (not core's). How the snap stored it isn't reproduced (needs the user's
+  session); 8b481251 makes the editor take the solve on opening, so the doc edits right.
 - s236 (fuzz probes 11): live solves three linked quads at once; per-case placement rules don't converge. Decision
   for the lead if fuzz work resumes there. s228 has its rule (grow_slot); s226 is 3 µm off (live's anchor drifts).
 - Jog at its reduced angle: our flat lays two bend strips 0.73 mm over each other (features_c
