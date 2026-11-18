@@ -109,8 +109,10 @@ pub fn delete_face(ev: &mut EvalCtx) -> FResult<()> {
                 let del: Vec<Shape> = set.iter().map(|f| all[*f].clone()).collect();
                 let res = k::delete_faces(&body.shape, &del).map_err(failed)?;
                 // Live 1668 (d): the top and bottom of a block can't be
-                // healed; OCCT hands the block back unchanged.
-                if res.shape.faces().len() >= all.len() || !res.shape.is_valid() {
+                // healed; OCCT hands the block back unchanged. A face left in place (OCCT out of its work bound:
+                // c2-impeller-loft's Delete face 2) fails too, never a part with it as if deleted.
+                let left = set.iter().any(|&f| !res.history.modified(0, ShapeType::Face, f as u32).is_empty());
+                if left || res.shape.faces().len() >= all.len() || !res.shape.is_valid() {
                     return err(DELETE_FAILED);
                 }
                 let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None);

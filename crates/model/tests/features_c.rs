@@ -2493,6 +2493,45 @@ fn body_draft_as_live() {
     );
 }
 
+/// A face OCCT can't delete (a block's top: its sides never meet above it) beside one it can (a blind hole from below):
+/// the feature fails, as live's "Could not delete selected faces.", never a part with the top left as if deleted
+/// (c2-impeller-loft's Delete face 2: OCCT out of its work bound on one face, the other deleted, reported Ok).
+#[test]
+fn delete_face_fails_when_a_face_stays() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(0.02, 0.01), 0.004);
+    let hsk = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(hsk);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("5 mm"));
+        p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let hole = vec![face_at(&r, 0, DVec3::new(mm(20.0), mm(10.0), mm(2.5))), face_at(&r, 0, DVec3::new(mm(20.0), mm(10.0), mm(5.0)))];
+    // The hole alone deletes.
+    let mut t = Studio { ps: s.ps.clone(), ..Studio::new() };
+    let faces = hole.clone();
+    t.add("deleteFace", move |p| p.set("deleteFaces", ParamValue::Query(faces)));
+    let v = volume(&t.ok(), 0) * 1e9;
+    assert!((v - 8000.0).abs() < 1e-3, "{v}");
+    // With the top: an error.
+    let mut faces = hole;
+    faces.push(face_at(&r, 0, DVec3::new(mm(20.0), mm(10.0), mm(10.0))));
+    s.add("deleteFace", move |p| p.set("deleteFaces", ParamValue::Query(faces)));
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Could not delete selected faces.".to_string()));
+}
+
 /// Live L11 ("psb L10-11 delete face"): block 40×20×10 with an R3 fillet on
 /// the top front edge, a Ø8×5 boss with an R1 fillet at its base. Deleting
 /// the boss (side + top) with Heal removes its base fillet too (7922.7433 =
