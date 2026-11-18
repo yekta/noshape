@@ -890,7 +890,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| A tab switch: the old element goes at once, the list fills, the canvas last, no spinner [studios] | ? | missing |
+| A tab switch: the old element goes at once, the list fills, the canvas last, no spinner [studios] | = (green c7d388e8, live2 ours-1118: block-drawing, drawing → Part Studio 1: list, canvas and toolbar change together in one frame at 0.17 s, no spinner; live's list-then-canvas order is its loading, not a target) | missing |
 | Ctrl+Y redoes, Ctrl+Shift+Z doesn't (Shift+⌘Z on a Mac); no toast on undo or redo | = | app-core actions::tests::shared_keys_follow_lives_list_per_os; list matrix "undo / a rename is one step, no toast" |
 | A rename is one step; hiding a part is one step; a view change or a selection is none | = | list matrix "undo / a rename is one step, no toast", "undo / hiding a part is one step", "undo / a view change or a selection is no step" |
 | In a dialog with the keyboard in a value field Ctrl+Z does nothing; Esc then cancels | = | sketch_ui_tests::undo_does_nothing_while_a_dialog_control_has_the_keyboard |
@@ -1111,7 +1111,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 |---|---|---|
 | 18 older facts retaken, 16 unchanged (documents rows, tab drag, sketch tool keys, Esc / empty-click selection, Offset arrow, Spline Esc, Trim trail…: their owners' existing rows) | = | their matrices' rows (Documents [studios], sketch tools [skasm]) |
 | The Extrude arrow: a plain click flips the direction (was "does nothing") | = | dialogs matrix "manipulators / a click on Extrude's arrow flips it" |
-| A drawing view's empty inside double-clicked opens View properties [studios] | ? | studios' |
+| A drawing view's empty inside double-clicked opens View properties [studios] | = (green c7d388e8, block-drawing: a double-click inside the Top view's empty rectangle opens View properties with the view selected) | studios' |
 
 ### prefs-1118 (Preferences that change in-app behaviour, live 11-18 02:50) [psui + studios]
 
@@ -1160,7 +1160,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Finding | Ours | Test |
 |---|---|---|
 | Fillets: only fillet faces of the seed's body, by compare type (a torus by its minor radius); Matching: the seed's body only, same size and shape | = | model tests features_b::query_variable_fillets_and_matching_as_live |
-| The dialog shows no count | ? | missing |
+| The dialog shows no count | = (green c7d388e8, block: the Query variable dialog shows no count with a selection) | missing |
 | Coincident of a circle / ellipse with a fixed point translates the curve the shortest way, size kept; a free point moves onto it [skasm] | = (fixed 11-18, constructive.rs) | onshape_ux `a_curve_onto_a_held_point_moves_whole_with_its_size_kept` |
 
 ### consts-1118 (feel constants: context-menu timing, double-click windows, live 11-18 06:48)
