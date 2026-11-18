@@ -3830,7 +3830,7 @@ impl AssemblyView {
         if self.assembly(cx).and_then(|a| a.instance(top)).is_some_and(|i| i.fixed) {
             // Fixed instances do not move; a click still picks their connector.
             if let Some(c) = self.connector_from_hover(cx) {
-                self.snap_drag = Some(SnapDrag { top, press: position, started: false, sources: vec![c], source_ix: 0, target: None, start: Placement::default(), grab: DVec3::ZERO, normal: DVec3::Z });
+                self.snap_drag = Some(SnapDrag { top, press: position, started: false, sources: vec![c], source_ix: 0, target: None, start: Placement::default(), grab: DVec3::ZERO, normal: DVec3::Z, off_parts: false });
                 self.snap_fixed = true;
             }
             return;
@@ -3864,7 +3864,7 @@ impl AssemblyView {
         let center = self.result.instance_bounds(top).map(|(a, b)| (a + b) * 0.5).unwrap_or(DVec3::ZERO);
         let grab = o + d * (center - o).dot(d);
         let normal = self.viewport.read(cx).camera.forward();
-        self.snap_drag = Some(SnapDrag { top, press: position, started: false, sources: uniq, source_ix: 0, target: None, start, grab, normal });
+        self.snap_drag = Some(SnapDrag { top, press: position, started: false, sources: uniq, source_ix: 0, target: None, start, grab, normal, off_parts: false });
     }
 
     /// Target connector near the cursor on another instance: assembly mate
@@ -3888,7 +3888,7 @@ impl AssemblyView {
         if let Some((_, c)) = best {
             return Some(c);
         }
-        let hit = self.raycast_within(position, &[top], SNAP_PICK_RECT_PX, cx)?;
+        let hit = self.raycast(position, &[top], cx)?;
         let o = self.result.occurrences.get(hit.occ)?;
         let units = self.units(cx);
         let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
@@ -3903,22 +3903,6 @@ impl AssemblyView {
             }
         }
         best.map(|(_, c)| c)
-    }
-
-    /// The face under the pointer, else the nearest one within a `rect` px square around it (rings of samples 10 px
-    /// apart, nearest first).
-    pub(super) fn raycast_within(&self, position: DVec2, exclude: &[InstanceId], rect: f64, cx: &App) -> Option<AsmPickTarget> {
-        if let Some(hit) = self.raycast(position, exclude, cx) {
-            return Some(hit);
-        }
-        let steps = (rect / 10.0).floor() as i32;
-        (1..=steps).find_map(|r| {
-            let ring = (-r..=r).flat_map(|i| [(i, -r), (i, r), (-r, i), (r, i)]);
-            let mut offs: Vec<DVec2> = ring.map(|(x, y)| DVec2::new(x as f64, y as f64) * 10.0).collect();
-            offs.sort_by(|a, b| a.length_squared().total_cmp(&b.length_squared()));
-            offs.dedup();
-            offs.into_iter().find_map(|o| self.raycast(position + o, exclude, cx))
-        })
     }
 
     /// Placement of the dragged instance for the current source / target.
@@ -3956,6 +3940,14 @@ impl AssemblyView {
         }
         self.pointer = position;
         let top = s.top;
+        // Live snap-diag-1118: off every other part the connector stays where it last was.
+        let off = self.raycast(position, &[top], cx).is_none();
+        if let Some(s) = &mut self.snap_drag {
+            s.off_parts = off;
+        }
+        if off {
+            return;
+        }
         let target = self.snap_target(position, top, cx);
         if let Some(s) = &mut self.snap_drag {
             s.target = target;
@@ -4003,9 +3995,14 @@ impl AssemblyView {
         }
         // Live (snapmode-1118): the instance stays where it snapped (or, with no snap, where it followed the pointer)
         // and snap mode stays on. A snap opens an uncommitted "Fastened 1" between the two connectors; Esc closes it
-        // with no mate, the instance staying put.
+        // with no mate, the instance staying put. A release off every part moves nothing (snap-diag-1118).
         self.snap = Some(None);
         self.message = None;
+        if s.off_parts {
+            self.schedule_eval(window, cx);
+            cx.notify();
+            return;
+        }
         let name = self.assembly(cx).and_then(|a| a.instance(s.top).map(|i| i.name.clone())).unwrap_or_default();
         self.edit(&format!("Move : {name}"), cx, |_| {});
         if let (Some(src), Some(dst)) = (s.sources.get(s.source_ix).cloned(), s.target) {
@@ -4390,13 +4387,10 @@ impl AssemblyView {
 
 /// Insert › Other documents categories (live assembly/71).
 /// How far from a face's point (corner, edge midpoint, centre) a snap-mode drag takes it (live snapmode-1118).
-const SNAP_DRAG_REACH_PX: f64 = 57.0;
-/// Live's pick rectangle around the pointer (COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX): a face within it offers its
-/// dots though the pointer is off the part.
-const SNAP_PICK_RECT_PX: f64 = 50.0;
+const SNAP_DRAG_REACH_PX: f64 = 51.0;
 
-/// Live (snapmode-1118): a face's point takes the dragged connector within 57 px of the pointer in x and in y (a square:
-/// a corner at 57 px straight up, an edge midpoint at (57, −33)); farther, the part follows the pointer.
+/// Live (snap-diag-1118, retaken): a dot of the face under the pointer takes the dragged connector within 51 px of it
+/// in x and in y (over the top face: 45° up-left at (51, 51), straight up at 50).
 pub(super) fn in_snap_reach(point: DVec2, pointer: DVec2) -> bool {
     let d = (point - pointer).abs();
     d.x.max(d.y) <= SNAP_DRAG_REACH_PX

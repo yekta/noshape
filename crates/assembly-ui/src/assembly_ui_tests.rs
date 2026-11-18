@@ -1343,8 +1343,8 @@ fn an_opened_linear_pattern_counts_its_row(cx: &mut TestAppContext) {
     .unwrap();
 }
 
-/// Live snapmode-1118: Esc during a snap-mode drag doesn't cancel it, a release with no snap leaves the part where it
-/// followed the pointer (no message), and snap mode stays on.
+/// Live snapmode-1118 / snap-diag-1118: Esc during a snap-mode drag doesn't cancel it; off every part the connector
+/// stays put and a release there moves nothing (no message); snap mode stays on.
 #[gpui::test]
 fn a_snap_mode_drag_keeps_its_move_through_esc_and_stays_in_snap_mode(cx: &mut TestAppContext) {
     use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
@@ -1361,13 +1361,13 @@ fn a_snap_mode_drag_keeps_its_move_through_esc_and_stays_in_snap_mode(cx: &mut T
             let at = v.viewport.read(cx).project(v.result.occurrences[occ].transform.transform_point3(glam::DVec3::ZERO)).unwrap();
             v.pointer = at;
             v.start_snap_drag(at, cx);
-            // Far from everything: no snap target, the pin follows the pointer.
+            // Far from everything: off every part, the pin stays where it was.
             v.update_snap_drag(at + glam::DVec2::new(0.0, -300.0), cx);
+            assert!(v.snap_drag.as_ref().is_some_and(|s| s.off_parts));
+            assert!(v.result.instance_bounds(pin).unwrap().0.distance(before.0) < 1e-9, "doesn't follow off the parts");
             v.on_cancel(&crate::actions::Cancel, w, cx);
             assert!(v.snap_drag.is_some(), "Esc doesn't cancel the drag");
             v.finish_snap_drag(w, cx);
-            let after = v.result.instance_bounds(pin).unwrap();
-            assert!(after.0.distance(before.0) > 1e-3, "moved: {before:?} -> {after:?}");
             assert!(v.message.is_none(), "{:?}", v.message);
             assert!(v.snap.is_some(), "snap mode stays on");
         });
@@ -1468,38 +1468,13 @@ fn a_dragged_instance_row_lands_by_the_rows_middle() {
     const { assert!(6.0 <= LIST_DRAG_PX && LIST_DRAG_PX < 8.0) };
 }
 
-/// Live snapmode-1118 / its client's pick rectangle (±50 px): in snap mode a face within 50 px of the pointer offers its
-/// dots though the pointer is off the part (qa: ours needed the pointer over it, 74 px at 45° from a corner).
-#[gpui::test]
-fn snap_mode_finds_a_face_within_the_pick_rectangle_off_the_part(cx: &mut TestAppContext) {
-    let (window, view) = pattern_assembly(cx, "snap-rect");
-    cx.update_window(window, |_, _, cx| {
-        view.update(cx, |v, cx| {
-            let block = instance(v, "Part 1 <1>", cx);
-            let others: Vec<InstanceId> = v.assembly(cx).unwrap().instances.iter().map(|i| i.id).filter(|i| *i != block).collect();
-            let units = v.units(cx);
-            let top = face_connector(v, "Part 1 <1>", true, cx);
-            let centre = v.viewport.read(cx).project(v.result.connector_world(&top, &units).unwrap().origin).unwrap();
-            // Outward from the top face's centre until the pointer leaves the block, then 40 px further.
-            let dir = glam::DVec2::new(-0.6, -0.8);
-            let edge = (0..2000).map(|i| centre + dir * i as f64).find(|p| v.raycast(*p, &others, cx).is_none()).expect("off the block");
-            let off = edge + dir * 40.0;
-            assert!(v.raycast(off, &others, cx).is_none());
-            let hit = v.raycast_within(off, &others, 50.0, cx).expect("the block within 50 px");
-            assert_eq!(v.result.occurrences[hit.occ].top(), block);
-            assert!((0..2000).any(|i| v.raycast_within(edge + dir * i as f64, &others, 50.0, cx).is_none()), "far off: nothing");
-        });
-    })
-    .unwrap();
-}
-
-/// Live snapmode-1118: a snap drag's reach is a 57 px square around the pointer (an edge midpoint at (57, −33), 66 px
-/// away, jumps; a corner at 58 px straight up doesn't).
+/// Live snap-diag-1118 (retaken): a dot of the face under the pointer takes a snap drag's connector within 51 px in x
+/// and in y (45° up-left at (51, 51), straight up at 50); 52 px either way doesn't.
 #[test]
-fn a_snap_drags_reach_is_a_57_px_square() {
-    use super::panels::in_snap_reach;
+fn a_snap_drags_reach_is_51_px_in_x_and_y() {
+    use crate::assembly_view::panels::in_snap_reach;
     let at = glam::DVec2::new(400.0, 300.0);
-    for (d, reach) in [((57.0, -33.0), true), ((0.0, -57.0), true), ((57.0, 57.0), true), ((0.0, -58.0), false), ((58.0, 10.0), false)] {
+    for (d, reach) in [((51.0, 51.0), true), ((0.0, -50.0), true), ((26.0, 49.0), true), ((0.0, -52.0), false), ((52.0, 10.0), false)] {
         assert_eq!(in_snap_reach(at + glam::DVec2::from(d), at), reach, "{d:?}");
     }
 }

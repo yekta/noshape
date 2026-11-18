@@ -288,6 +288,9 @@ struct SnapDrag {
     /// Grab point (world) and camera plane normal for the free follow.
     grab: DVec3,
     normal: DVec3,
+    /// The pointer is off every other part (live snap-diag-1118: the connector stays at its last spot; a release there
+    /// moves nothing).
+    off_parts: bool,
 }
 
 /// Text colour of a Mate features row: suppressed / inactive and hidden
