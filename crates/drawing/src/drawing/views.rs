@@ -1295,6 +1295,10 @@ pub struct ModelEdge {
     /// Its curve is free-form (a B-spline or other), not a line, circle or
     /// ellipse.
     pub freeform: bool,
+    /// Another part in the view has an edge on this one (parts touching along it): live's CAD files write it for each
+    /// part (c2-duct-multipart: 26 LINEs twice or three times), where edges merely on one another in the view are
+    /// written once.
+    pub shared: bool,
 }
 
 impl ModelEdge {
@@ -1577,24 +1581,30 @@ impl ViewGeometry {
                 *x = true;
             }
         }
-        let arcs: Vec<([f64; 2], f64, f64)> = self
+        // Each arc's angular interval: arcs on one circle make it whole when together they go round it, not when their
+        // spans add up to a turn (a wall's top and bottom rims seen from above are one arc twice: c2-variable-fillet-
+        // faceblend's Top view, three centermarks for live's none).
+        let arcs: Vec<([f64; 2], f64, (f64, f64))> = self
             .model_edges
             .iter()
             .enumerate()
             .filter(|(i, _)| drawn[*i] && sharp[*i])
             .filter_map(|(_, m)| match m.geom {
                 EdgeGeom::Circle { center, radius, face_on: true, mid, .. } => {
-                    let span = match (&m.ends[0], &m.ends[1]) {
-                        (Some((_, a)), Some((_, b))) if (a[0] - b[0]).hypot(a[1] - b[1]) >= 1e-9 => arc_span(center, *a, mid, *b),
-                        _ => std::f64::consts::TAU,
+                    let iv = match (&m.ends[0], &m.ends[1]) {
+                        (Some((_, a)), Some((_, b))) if (a[0] - b[0]).hypot(a[1] - b[1]) >= 1e-9 => arc_interval(center, *a, mid, *b),
+                        _ => (0.0, std::f64::consts::TAU),
                     };
-                    Some((center, radius, span))
+                    Some((center, radius, iv))
                 }
                 _ => None,
             })
             .collect();
-        let same = |c: [f64; 2], r: f64, x: &([f64; 2], f64, f64)| (c[0] - x.0[0]).abs() < 1e-9 && (c[1] - x.0[1]).abs() < 1e-9 && (r - x.1).abs() < 1e-9;
-        self.circles().into_iter().filter(|(c, r, _)| arcs.iter().filter(|x| same(*c, *r, x)).map(|x| x.2).sum::<f64>() >= std::f64::consts::TAU - 1e-6).collect()
+        let same = |c: [f64; 2], r: f64, x: &([f64; 2], f64, (f64, f64))| (c[0] - x.0[0]).abs() < 1e-9 && (c[1] - x.0[1]).abs() < 1e-9 && (r - x.1).abs() < 1e-9;
+        self.circles()
+            .into_iter()
+            .filter(|(c, r, _)| angular_coverage(&arcs.iter().filter(|x| same(*c, *r, x)).map(|x| x.2).collect::<Vec<_>>()) >= std::f64::consts::TAU - 1e-6)
+            .collect()
     }
 
     /// Face-on circular bores (holes and bosses): (center, radius, reference),
@@ -2773,7 +2783,7 @@ fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &Bod
     }
     // Not an edge in Onshape (a seam or degenerated edge; a sheet's boundary is one).
     let seam = !topo.shown.edges.get(edge_index).copied().unwrap_or(true);
-    Some(ModelEdge { body: body.id.clone(), name: body.edges[edge_index].clone(), geom, conic, ends, seam, freeform })
+    Some(ModelEdge { body: body.id.clone(), name: body.edges[edge_index].clone(), geom, conic, ends, seam, freeform, shared: false })
 }
 
 /// Axes of (at least half) cylindrical faces perpendicular to the view
@@ -2834,11 +2844,11 @@ fn cylinder_axes(shapes: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]> {
 
 /// Cylindrical and conical faces whose axis is the view direction, grouped
 /// by axis: the axis's projected point and the largest radius (a cone's
-/// widest edge: a countersink), where the group's faces go at least half
-/// way round (holes and bosses, not corner rounds).
+/// widest edge: a countersink), where the group's faces go round (holes and
+/// bosses, not corner rounds; see [`centermarked`]).
 fn cylinder_ends(shapes: &[Shape], frame: &ViewFrame) -> Vec<([f64; 2], f64)> {
-    // (projected axis point, largest radius, angular intervals)
-    type Group = ([f64; 2], f64, Vec<(f64, f64)>);
+    // (projected axis point, largest radius, angular intervals, those of holes)
+    type Group = ([f64; 2], f64, Vec<(f64, f64)>, Vec<(f64, f64)>);
     let mut groups: Vec<Group> = Vec::new();
     for shape in shapes {
         for f in shape.faces() {
@@ -2856,23 +2866,34 @@ fn cylinder_ends(shapes: &[Shape], frame: &ViewFrame) -> Vec<([f64; 2], f64)> {
             }
             let Ok(uv) = f.uv_bounds() else { continue };
             let c = frame.project(origin);
-            match groups.iter_mut().find(|g| (g.0[0] - c[0]).hypot(g.0[1] - c[1]) < 1e-9) {
-                Some(g) => {
-                    g.1 = g.1.max(radius);
-                    g.2.push((uv[0].min(uv[1]), uv[0].max(uv[1])));
+            let iv = (uv[0].min(uv[1]), uv[0].max(uv[1]));
+            // A hole's wall faces its axis.
+            let (um, vm) = ((uv[0] + uv[1]) / 2.0, (uv[2] + uv[3]) / 2.0);
+            let hole = f.point_at_uv(um, vm).ok().zip(f.normal_at_uv(um, vm).ok()).is_some_and(|(p, n)| n.dot((p - origin) - axis * (p - origin).dot(axis)) < 0.0);
+            let i = match groups.iter().position(|g| (g.0[0] - c[0]).hypot(g.0[1] - c[1]) < 1e-9) {
+                Some(i) => i,
+                None => {
+                    groups.push((c, radius, Vec::new(), Vec::new()));
+                    groups.len() - 1
                 }
-                None => groups.push((c, radius, vec![(uv[0].min(uv[1]), uv[0].max(uv[1]))])),
+            };
+            let g = &mut groups[i];
+            g.1 = g.1.max(radius);
+            g.2.push(iv);
+            if hole {
+                g.3.push(iv);
             }
         }
     }
-    groups.into_iter().filter(|g| centermarked(&g.2)).map(|g| (g.0, g.1)).collect()
+    groups.into_iter().filter(|g| centermarked(&g.2, &g.3)).map(|g| (g.0, g.1)).collect()
 }
 
-/// Whether cylinders seen end-on (their angular intervals) get a centermark: all the way round together (a hole in
-/// pieces), or one of them half way at least (a radial hole's bore through a boss, live 1857); not quarter rounds,
-/// nor two of them on one axis (c2-sm-louver's bends: live marks none).
-fn centermarked(iv: &[(f64, f64)]) -> bool {
-    angular_coverage(iv) >= std::f64::consts::TAU - 1e-6 || iv.iter().any(|(a, b)| b - a >= std::f64::consts::PI - 1e-6)
+/// Whether cylinders seen end-on (their angular intervals, `holes` those of hole walls) get a centermark: all the way
+/// round together (a hole in pieces, a boss), or a hole's wall half way at least (a radial hole's bore through a boss,
+/// live 1857); not quarter rounds, nor two of them on one axis (c2-sm-louver's bends), nor a boss's wall part way
+/// round (c2-variable-fillet-faceblend's rounded ends: live marks none).
+fn centermarked(iv: &[(f64, f64)], holes: &[(f64, f64)]) -> bool {
+    angular_coverage(iv) >= std::f64::consts::TAU - 1e-6 || holes.iter().any(|(a, b)| b - a >= std::f64::consts::PI - 1e-6)
 }
 
 /// Total angle covered by a set of angular intervals (radians, union,
@@ -2995,6 +3016,71 @@ fn chain_pieces(pieces: Vec<Vec<[f64; 2]>>, tol: f64) -> Vec<Vec<[f64; 2]>> {
     out
 }
 
+/// A view's model edges by (body index, body edge index), added on first use.
+struct ModelEdges<'a, 'b> {
+    bodies: &'a [ProjBody<'b>],
+    frame: &'a ViewFrame,
+    topo: HashMap<usize, BodyTopo>,
+    index: HashMap<(usize, usize), u32>,
+}
+
+impl ModelEdges<'_, '_> {
+    fn of(&mut self, g: &mut ViewGeometry, bi: usize, ei: usize) -> Option<u32> {
+        if let Some(ix) = self.index.get(&(bi, ei)) {
+            return Some(*ix);
+        }
+        let body = self.bodies[bi].body;
+        let topo = self.topo.entry(bi).or_insert_with(|| BodyTopo::of(&body.shape));
+        let me = model_edge(body, ei, self.frame, topo)?;
+        g.model_edges.push(me);
+        let ix = (g.model_edges.len() - 1) as u32;
+        self.index.insert((bi, ei), ix);
+        Some(ix)
+    }
+}
+
+/// Marks the view's model edges that another body's edge lies on in 3D (parts touching along them, a split part's
+/// cut edges): lines on one line overlapping, circles on one circle (see [`ModelEdge::shared`]).
+fn mark_shared_edges(g: &mut ViewGeometry, models: &ModelEdges, compound: &Shape, cmap: &HashMap<usize, (usize, usize)>, size: f64) {
+    let tol = size * 1e-7;
+    let edges = compound.edges();
+    let r = |x: f64, step: f64| (x / step).round() as i64;
+    // A direction with its sign fixed.
+    let canon = |u: DVec3| if u.x < -1e-9 || (u.x.abs() <= 1e-9 && (u.y < -1e-9 || (u.y.abs() <= 1e-9 && u.z < 0.0))) { -u } else { u };
+    // Edges on one line (its direction and its point nearest the origin) with their extent along it, or on one circle:
+    // (body index, model edge, extent).
+    type Members = Vec<(usize, u32, f64, f64)>;
+    let mut groups: HashMap<[i64; 7], Members> = HashMap::new();
+    for (&ci, &(bi, ei)) in cmap {
+        let Some(&m) = models.index.get(&(bi, ei)) else { continue };
+        let Some(info) = edges.get(ci).and_then(|e| e.edge_info().ok()) else { continue };
+        match info.curve {
+            Curve::Line { .. } if info.start.distance(info.end) > tol => {
+                let u = canon((info.end - info.start).normalize());
+                let foot = info.start - u * info.start.dot(u);
+                let (a, b) = (info.start.dot(u), info.end.dot(u));
+                let key = [0, r(u.x, 1e-6), r(u.y, 1e-6), r(u.z, 1e-6), r(foot.x, tol * 10.0), r(foot.y, tol * 10.0), r(foot.z, tol * 10.0)];
+                groups.entry(key).or_default().push((bi, m, a.min(b), a.max(b)));
+            }
+            Curve::Circle { center, axis, radius, .. } => {
+                let u = canon(axis.normalize());
+                let key = [r(radius, tol * 10.0), r(u.x, 1e-6), r(u.y, 1e-6), r(u.z, 1e-6), r(center.x, tol * 10.0), r(center.y, tol * 10.0), r(center.z, tol * 10.0)];
+                groups.entry(key).or_default().push((bi, m, f64::MIN, f64::MAX));
+            }
+            _ => {}
+        }
+    }
+    for group in groups.values().filter(|gr| gr.iter().any(|x| x.0 != gr[0].0)) {
+        for &(bi, m, lo, hi) in group {
+            if group.iter().any(|&(bj, _, a, b)| bj != bi && b.min(hi) - a.max(lo) > tol)
+                && let Some(me) = g.model_edges.get_mut(m as usize)
+            {
+                me.shared = true;
+            }
+        }
+    }
+}
+
 /// HLR projection of bodies (optionally pre-cut) into a view.
 /// `keep(body index, point)` filters the vertex snap points.
 fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: bool, keep: &dyn Fn(usize, DVec3) -> bool) -> ViewGeometry {
@@ -3005,8 +3091,8 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
         return g;
     }
     // Mesh parts (an imported STL's) go through the hidden line removal as their facets (their own faces have no
-    // surface: it crashed on them, c2-hex-bookcase-derived's drawing); of the facets' edges a view draws the folds and
-    // silhouettes only (below).
+    // surface: it crashed on them, c2-hex-bookcase-derived's drawing); of the facets' edges a view draws the silhouettes
+    // only (below).
     let faceted: Vec<Option<Shape>> = bodies.iter().map(|b| if b.shape.is_mesh() { b.shape.faceted().ok() } else { None }).collect();
     let shapes: Vec<Shape> = bodies.iter().zip(&faceted).filter_map(|(b, f)| if b.shape.is_mesh() { f.clone() } else { Some(b.shape.clone()) }).collect();
     if shapes.is_empty() {
@@ -3041,8 +3127,7 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
             return g;
         }
     };
-    let mut topo_cache: HashMap<usize, BodyTopo> = HashMap::new();
-    let mut me_index: HashMap<(usize, usize), u32> = HashMap::new();
+    let mut models = ModelEdges { bodies, frame, topo: HashMap::new(), index: HashMap::new() };
     let mut mesh_pieces: Vec<(bool, Vec<[f64; 2]>)> = Vec::new();
     // A part's edge behind a mesh glimpsed past the facets' corners, in pieces shorter than the projection's own
     // deflection, is hidden (live: c2-hex-bookcase-derived's hole rims under its mesh's polygonal holes).
@@ -3061,18 +3146,7 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
             }
             continue;
         }
-        let model = pe.source_edge.and_then(|ci| cmap.get(&(ci as usize)).copied()).and_then(|(bi, ei)| {
-            if let Some(ix) = me_index.get(&(bi, ei)) {
-                return Some(*ix);
-            }
-            let body = bodies[bi].body;
-            let topo = topo_cache.entry(bi).or_insert_with(|| BodyTopo::of(&body.shape));
-            let me = model_edge(body, ei, frame, topo)?;
-            g.model_edges.push(me);
-            let ix = (g.model_edges.len() - 1) as u32;
-            me_index.insert((bi, ei), ix);
-            Some(ix)
-        });
+        let model = pe.source_edge.and_then(|ci| cmap.get(&(ci as usize)).copied()).and_then(|(bi, ei)| models.of(&mut g, bi, ei));
         g.edges.push(ViewEdge {
             points: pe.polyline.iter().map(|p| [p.x, p.y]).collect(),
             visible: pe.visibility == Visibility::Visible,
@@ -3082,6 +3156,9 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
             profile: false,
             mesh: false,
         });
+    }
+    if bodies.len() > 1 {
+        mark_shared_edges(&mut g, &models, &compound, &cmap, diag);
     }
     let size = compound.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
     for visible in [true, false] {
@@ -3726,6 +3803,15 @@ pub fn body_under(src: &SourceModel, frame: &ViewFrame, p: [f64; 2], tol: f64) -
 
 /// The angle (radians, 0..2π) an arc of `center` sweeps from `a` through
 /// `mid` to `b`.
+/// An arc's angular interval (start, end) counterclockwise round `center`, from its ends `a`, `b` and a point `mid`.
+fn arc_interval(center: [f64; 2], a: [f64; 2], mid: [f64; 2], b: [f64; 2]) -> (f64, f64) {
+    let ang = |p: [f64; 2]| (p[1] - center[1]).atan2(p[0] - center[0]);
+    let span = arc_span(center, a, mid, b);
+    let ccw = (ang(mid) - ang(a)).rem_euclid(std::f64::consts::TAU) <= (ang(b) - ang(a)).rem_euclid(std::f64::consts::TAU);
+    let start = if ccw { ang(a) } else { ang(b) };
+    (start, start + span)
+}
+
 fn arc_span(center: [f64; 2], a: [f64; 2], mid: [f64; 2], b: [f64; 2]) -> f64 {
     use std::f64::consts::TAU;
     let ang = |p: [f64; 2]| (p[1] - center[1]).atan2(p[0] - center[0]);
@@ -3737,6 +3823,22 @@ fn arc_span(center: [f64; 2], a: [f64; 2], mid: [f64; 2], b: [f64; 2]) -> f64 {
 
 #[cfg(test)]
 mod arc_span_tests {
+    /// An arc's interval is the same whichever end it starts from; one arc twice (a wall's top and bottom rims seen
+    /// from above) doesn't go round its circle, two halves do.
+    #[test]
+    fn an_arc_twice_is_not_a_whole_circle() {
+        use std::f64::consts::{FRAC_PI_2, PI, TAU};
+        let c = [0.0, 0.0];
+        let (a, b) = ([1.0, 0.0], [0.0, 1.0]);
+        let three_quarters = super::arc_interval(c, a, [-0.6, -0.8], b);
+        let back = super::arc_interval(c, b, [-0.6, -0.8], a);
+        assert!((three_quarters.0 - FRAC_PI_2).abs() < 1e-9 && (three_quarters.1 - 2.0 * PI).abs() < 1e-9, "{three_quarters:?}");
+        assert!((back.0 - three_quarters.0).abs() < 1e-9 && (back.1 - three_quarters.1).abs() < 1e-9, "{back:?}");
+        assert!(super::angular_coverage(&[three_quarters, three_quarters]) < TAU - 1e-6);
+        let quarter = super::arc_interval(c, a, [0.6, 0.8], b);
+        assert!((super::angular_coverage(&[three_quarters, quarter]) - TAU).abs() < 1e-6);
+    }
+
     #[test]
     fn spans_of_quarters_halves_and_three_quarters() {
         use std::f64::consts::{FRAC_PI_2, PI};
@@ -4093,16 +4195,50 @@ mod tests {
         assert_eq!(lines.iter().map(|e| e.points.len() - 1).sum::<usize>(), 6, "the hexagon's six sides: {lines:?}");
     }
 
+    /// Two parts touching along a face: the edges each has on the other's are marked shared (live's CAD files write
+    /// them for each part, c2-duct-multipart), not their other edges. Two 10 mm cubes side by side, Front: each one's
+    /// edge on x = 10 mm.
+    #[test]
+    fn edges_of_parts_touching_along_them_are_shared() {
+        let f = crate::reference::FeatureId(1);
+        let body = |i: u32, s: Shape| Arc::new(Body::new(BodyId { feature: f, index: i }, format!("Part {i}"), BodyKind::Solid, s, Vec::new(), 0, f));
+        let a = noshape_kernel::make_box_corners(DVec3::ZERO, DVec3::new(0.01, 0.01, 0.01)).unwrap();
+        let b = noshape_kernel::make_box_corners(DVec3::new(0.01, 0.0, 0.0), DVec3::new(0.02, 0.01, 0.01)).unwrap();
+        let bodies = [body(0, a), body(1, b)];
+        let pbs: Vec<ProjBody> = bodies.iter().map(|b| ProjBody { body: b, shape: b.shape.clone(), edge_map: None }).collect();
+        let frame = ViewFrame::new(DVec3::NEG_Y, DVec3::Z);
+        let g = project_bodies(ViewId(1), &pbs, &frame, true, &|_, _| true);
+        assert!(g.error.is_none(), "{:?}", g.error);
+        let visible = |part: u32, shared: bool| {
+            let mut v: Vec<u32> = g.edges.iter().filter(|e| e.visible).filter_map(|e| e.model).filter(|m| g.model_edges[*m as usize].body.index == part && g.model_edges[*m as usize].shared == shared).collect();
+            v.sort_unstable();
+            v.dedup();
+            v
+        };
+        for part in 0..2 {
+            let shared = visible(part, true);
+            assert_eq!(shared.len(), 1, "part {part}");
+            assert!(g.edges.iter().filter(|e| e.model == Some(shared[0])).all(|e| e.points.iter().all(|p| (p[0] - frame.project(DVec3::new(0.01, 0.0, 0.0))[0]).abs() < 1e-9)));
+            assert_eq!(visible(part, false).len(), 3, "part {part}");
+        }
+        let alone = project_bodies(ViewId(1), &pbs[..1], &frame, true, &|_, _| true);
+        assert!(alone.model_edges.iter().all(|m| !m.shared));
+    }
+
     /// Centermarks: a hole whole or in pieces, a radial hole's half bore; not a quarter round, nor c2-sm-louver's two
-    /// quarter bends on one axis (exchange suite: 24 CENTERMARKS lines in ours, live none).
+    /// quarter bends on one axis (exchange suite: 24 CENTERMARKS lines in ours, live none), nor a boss's wall part way
+    /// round (c2-variable-fillet-faceblend's rounded ends: 18 lines, live none).
     #[test]
     fn centermarks_go_on_holes_not_on_bends() {
         use std::f64::consts::{FRAC_PI_2, PI, TAU};
-        assert!(centermarked(&[(0.0, TAU)]));
-        assert!(centermarked(&[(0.0, PI), (PI, TAU)]));
-        assert!(centermarked(&[(3.0 * FRAC_PI_2, 5.0 * FRAC_PI_2)]));
-        assert!(!centermarked(&[(0.0, FRAC_PI_2)]));
-        assert!(!centermarked(&[(3.0 * FRAC_PI_2, TAU), (0.0, FRAC_PI_2)]));
+        assert!(centermarked(&[(0.0, TAU)], &[]));
+        assert!(centermarked(&[(0.0, PI), (PI, TAU)], &[]));
+        assert!(centermarked(&[(3.0 * FRAC_PI_2, 5.0 * FRAC_PI_2)], &[(3.0 * FRAC_PI_2, 5.0 * FRAC_PI_2)]));
+        assert!(!centermarked(&[(0.0, FRAC_PI_2)], &[(0.0, FRAC_PI_2)]));
+        assert!(!centermarked(&[(3.0 * FRAC_PI_2, TAU), (0.0, FRAC_PI_2)], &[]));
+        // A boss's wall three quarters round (a rounded end) isn't marked; a hole's is.
+        assert!(!centermarked(&[(0.0, 3.0 * FRAC_PI_2)], &[]));
+        assert!(centermarked(&[(0.0, 3.0 * FRAC_PI_2)], &[(0.0, 3.0 * FRAC_PI_2)]));
     }
 
     /// Live drw-crop-spline (dx 11-15): a spline crop through points on a block's bottom and top edges keeps those

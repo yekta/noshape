@@ -165,6 +165,10 @@ pub struct SheetGeometry {
     /// straight (live's drawings of mesh parts).
     #[serde(default)]
     pub mesh_lines: Vec<usize>,
+    /// Lines of model edges another part shares in 3D (sorted), which CAD files write for each part though they lie on
+    /// one another (c2-duct-multipart).
+    #[serde(default)]
+    pub shared_lines: Vec<usize>,
     /// Template format lines (sorted): the screen runs them on half their
     /// pen width past their ends so corners stay closed; exports keep
     /// live's exact ends.

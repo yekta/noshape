@@ -73,7 +73,8 @@ fn kind_runs<T: PartialEq + Clone, S>(v: [&[Option<T>]; 3], mk: impl Fn([std::op
 }
 
 /// A view's edges lying on one another (two parts' coincident edges: a pin in its hole) written once, as live's
-/// exports (drw-bom-table: one circle); the sheet keeps both for picking.
+/// exports (drw-bom-table: one circle); the sheet keeps both for picking. An edge another part shares in 3D (parts
+/// touching along it) is written for each (c2-duct-multipart).
 fn drop_coincident_edges(g: &mut SheetGeometry) {
     let q = |p: [f64; 2]| ((p[0] * 1e5).round() as i64, (p[1] * 1e5).round() as i64);
     for (_, r) in g.view_edges.clone() {
@@ -88,7 +89,7 @@ fn drop_coincident_edges(g: &mut SheetGeometry) {
             let same = |o: &[[f64; 2]]| o.len() == pts.len() && (o.iter().zip(&pts).all(|(x, y)| (x[0] - y[0]).abs() < 1e-5 && (x[1] - y[1]).abs() < 1e-5) || o.iter().zip(pts.iter().rev()).all(|(x, y)| (x[0] - y[0]).abs() < 1e-5 && (x[1] - y[1]).abs() < 1e-5));
             let key = (pts.len(), a, b);
             let style = g.lines[li].style;
-            let dup = seen.get(&key).is_some_and(|ls| ls.iter().any(|&o| g.lines[o].style == style && same(&g.lines[o].points)));
+            let dup = g.shared_lines.binary_search(&li).is_err() && seen.get(&key).is_some_and(|ls| ls.iter().any(|&o| g.lines[o].style == style && same(&g.lines[o].points)));
             if dup {
                 g.lines[li].points.clear();
             } else {
@@ -1249,7 +1250,7 @@ mod tests {
     use crate::drawing::{DimOrientation, Sheet};
 
     /// Live drw-bom-table.dxf: a pin's edge on its hole's (two parts, one circle) is written once; edges merely
-    /// touching stay.
+    /// touching stay; an edge two parts share in 3D is written for each (c2-duct-multipart).
     #[test]
     fn coincident_view_edges_are_written_once() {
         use crate::drawing::sheet::LineStyle;
@@ -1261,6 +1262,10 @@ mod tests {
         let p = prepare(&g, &ExportOptions::default());
         assert_eq!(p.lines.iter().map(|l| l.points.len()).collect::<Vec<_>>(), [2, 0, 2]);
         assert_eq!(g.lines[1].points.len(), 2, "the sheet keeps both");
+        // Unless another part shares the edge in 3D (c2-duct-multipart: each part's).
+        g.shared_lines = vec![0, 1];
+        let p = prepare(&g, &ExportOptions::default());
+        assert_eq!(p.lines.iter().map(|l| l.points.len()).collect::<Vec<_>>(), [2, 2, 2]);
     }
 
     /// Live drw-inspection-item.pdf / .dxf: on paper a dimension's line runs between its arrows' bases; the sheet

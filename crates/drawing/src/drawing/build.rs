@@ -1903,6 +1903,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     if e.model.and_then(|m| geo.model_edges.get(m as usize)).is_some_and(|me| me.freeform) {
                         g.freeform_lines.extend(l0..g.lines.len());
                     }
+                    if e.model.and_then(|m| geo.model_edges.get(m as usize)).is_some_and(|me| me.shared) {
+                        g.shared_lines.extend(l0..g.lines.len());
+                    }
                     if let Some(c) = e.model.and_then(|m| geo.model_edges.get(m as usize)).and_then(|me| me.conic)
                         && pl.breaks().is_empty()
                     {
@@ -3133,6 +3136,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     g.polyline_lines.dedup();
     g.mesh_lines.sort_unstable();
     g.mesh_lines.dedup();
+    g.shared_lines.sort_unstable();
+    g.shared_lines.dedup();
     BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, lost, tables: table_layouts, title_rect, title_cells, title_hits }
 }
 
