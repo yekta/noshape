@@ -1162,13 +1162,18 @@ pub fn dim_value_text_tol(k: &ConstraintKind, v: f64, units: &UnitPrefs, tol: Op
     // Onshape shows lengths without the document unit ("4", "Ø1", "R2.5");
     // angles keep their degree sign.
     let suffix = unit_suffix_of(dim, units);
-    let shown_suffix = if dim == Dim::LENGTH { String::new() } else { suffix.clone() };
+    // (Live's label writes radians out in full: "1.2 radian", live 11-18 server-side number formats.)
+    let label_suffix = if dim == Dim::ANGLE && suffix.trim() == "rad" { " radian".to_string() } else { suffix.clone() };
+    let shown_suffix = if dim == Dim::LENGTH { String::new() } else { label_suffix.clone() };
     let prec = tol.and_then(|t| t.precision);
     let fmt = |x: f64| match prec {
         Some(n) => format!("{}{shown_suffix}", fixed_number(x, dim, units, n)),
         None => {
             let t = noshape_units::format_quantity(Quantity::new(x, dim), units);
-            if dim == Dim::LENGTH { t.strip_suffix(suffix.as_str()).map(str::to_string).unwrap_or(t) } else { t }
+            match t.strip_suffix(suffix.as_str()) {
+                Some(n) => format!("{n}{shown_suffix}"),
+                None => t,
+            }
         }
     };
     let dev = |x: f64| fixed_number(x, dim, units, prec.unwrap_or(if dim == Dim::ANGLE { units.angle_precision } else { units.length_precision }));
@@ -9627,6 +9632,16 @@ mod tests {
         assert!(ed.place(&mut data, end, true).changed);
         let curve = data.sketch.entities().find(|e| e.kind() == EntityKind::BSpline).unwrap().id;
         assert_eq!(data.sketch.bezier_degree(curve), Some(15));
+    }
+
+    #[test]
+    fn an_angle_label_writes_radians_out_and_degrees_as_a_sign() {
+        // Live 11-18 (server-side number formats, row B): "… radian" in a radian workspace, "…°" in degrees.
+        let k = ConstraintKind::Angle { a: EntityId(0), b: EntityId(1), value: 1.2 };
+        let rad = UnitPrefs { angle: noshape_units::AngleUnit::Radian, ..UnitPrefs::default() };
+        let text = dim_value_text(&k, 1.2, &rad);
+        assert!(text.ends_with(" radian") && text.starts_with("1.2"), "{text}");
+        assert!(dim_value_text(&k, std::f64::consts::FRAC_PI_4, &UnitPrefs::default()).ends_with('°'));
     }
 
     #[test]
