@@ -15,8 +15,12 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Sticky snap target (live getInference lastInferenceTarget): `SketchEditor::snap_target` + `Inference::targets`;
   scene test `the_line_snapped_to_last_stays_over_a_point_by_it`; feel row. live REQUESTS 11-18 03:46 asks for the
   real-pointer check (a line slid into its own end).
-- Solver: a circle / ellipse Coincident with a held point translates with its size kept (live coincident.json);
-  test `a_curve_onto_a_held_point_moves_whole_with_its_size_kept` (onshape_ux.rs).
+- Queued f45661ff: the sticky target above.
+- Solver (regeneration's constructive pass): a circle / ellipse Coincident with a Fixed point / model vertex
+  translates with its size kept, a free point comes onto the curve (live coincident.json); was carried centre-onto-
+  point (r 0). `carry_onto_placed` carries only point-point Coincidents; `kept_first_in` keeps a Fixed member and the
+  curve over a lone point; `hold_size` holds an ellipse's radii. Fuzz 801/801 unchanged. Test onshape_ux
+  `a_curve_onto_a_held_point_moves_whole_with_its_size_kept`.
 - Open live REQUESTS 11-18 02:30: the unfold row's colour; Corner taking a rip side face (then the corner disc).
 
 ## Next, in order
@@ -32,8 +36,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 2. Surface workshop: pipe stops at core's Loft (guides with more than two profiles); knifehandle P4 Pierce taken back
    (its edge doesn't end on the plane), first difference Sweep 2 area (core); britatap Split topology (core);
    manualblend Sketch 5 Concentric 128 mm (upstream JNE), Sketch 6 / 7 INTERSECTED geometry not found. A circle or
-   ellipse Coincident / Pierce with something fixed shifts with its radii kept (live 11-17, REQUESTS (d)): ours splits
-   the move with the radius, a solver item.
+   ellipse Coincident with something fixed: done 11-18 (Pierce of a 3D point not checked).
 3. core's sketch cases below. 4. tablet-stand Flange 2. 5. Remaining dropped constraints (see archive).
 
 ## core's sketch cases (2026-11-16), queue item 3

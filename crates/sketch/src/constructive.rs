@@ -1637,6 +1637,10 @@ impl Sketch {
     /// Holds `u`'s size in `sub` (a line's length, a circle's or arc's
     /// radius) as a constraint at its current value; false for a point.
     fn hold_size(&self, sub: &mut Sketch, u: EntityId) -> bool {
+        // An ellipse keeps both radii (live coincident.json: moved onto a fixed point, it translates).
+        if let Some(Geometry::Ellipse { major, minor, .. }) = self.entity(u).map(|e| e.geometry.clone()) {
+            return [(true, major.length()), (false, minor)].into_iter().all(|(m, value)| sub.add_constraint(ConstraintKind::EllipseRadius { ellipse: u, major: m, value }).is_ok());
+        }
         let size = self.size(u);
         let kind = match self.kind(u) {
             Some(EntityKind::Line) => ConstraintKind::Length { curve: u, value: size },
@@ -1778,6 +1782,7 @@ impl Sketch {
                 self.constraints().filter(|o| o.driving && o.id != *cid).any(|o| match (&c.kind, &o.kind) {
                     (ConstraintKind::Parallel { .. } | ConstraintKind::Perpendicular { .. }, ConstraintKind::Horizontal { a, b: None } | ConstraintKind::Vertical { a, b: None }) => *a == u,
                     (ConstraintKind::Equal { .. }, ConstraintKind::Length { curve, .. } | ConstraintKind::Radius { curve, .. } | ConstraintKind::Diameter { curve, .. }) => *curve == u,
+                    (_, ConstraintKind::Fix { entity }) => *entity == u,
                     _ => false,
                 })
             };
@@ -1849,6 +1854,15 @@ impl Sketch {
                 let owns = |u: EntityId| self.entity(u).is_some_and(|e| e.point_refs().contains(&pa)) || self.coincident_with(pa).iter().any(|q| self.entity(u).is_some_and(|e| e.point_refs().contains(q)));
                 if owns(a) != owns(b) {
                     return if owns(a) { a } else { b };
+                }
+            }
+            // A lone point put on a curve comes onto it, the curve stays
+            // (live coincident.json 11-17: a free point onto a circle or an
+            // ellipse's rim).
+            if matches!(c.kind, ConstraintKind::Coincident { .. } | ConstraintKind::Pierce { .. }) {
+                let lone = |u: EntityId| self.kind(u) == Some(EntityKind::Point);
+                if lone(a) != lone(b) {
+                    return if lone(a) { b } else { a };
                 }
             }
             // Structure first: the member with more of its points tied to
@@ -2583,11 +2597,14 @@ impl Sketch {
         let mut shift = None;
         let mut at = None;
         for c in self.constraints().filter(|c| c.driving) {
-            let (a, b) = match c.kind {
-                ConstraintKind::Coincident { a, b } | ConstraintKind::Concentric { a, b } => (a, b),
+            // (A point on a circle is on its rim, not at its centre: only a Concentric carries a centre.)
+            let (Some(pa), Some(pb)) = (match c.kind {
+                ConstraintKind::Coincident { a, b } if self.kind(a) == Some(EntityKind::Point) && self.kind(b) == Some(EntityKind::Point) => (Some(a), Some(b)),
+                ConstraintKind::Concentric { a, b } => (center(self, a), center(self, b)),
                 _ => continue,
+            }) else {
+                continue;
             };
-            let (Some(pa), Some(pb)) = (center(self, a), center(self, b)) else { continue };
             let (mine, theirs) = if own.contains(&pa) && unit_of.get(&pb).is_some_and(|x| placed.contains(x)) {
                 (pa, pb)
             } else if own.contains(&pb) && unit_of.get(&pa).is_some_and(|x| placed.contains(x)) {

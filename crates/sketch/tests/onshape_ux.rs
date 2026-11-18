@@ -955,3 +955,35 @@ fn a_sketchs_first_dimension_scales_all_of_it() {
         assert!((sk.point(*id).unwrap() - (c + (p - c) * k)).length() < 1e-6, "{:?}", sk.point(*id).unwrap());
     }
 }
+
+/// Live (coincident.json, 11-17): a circle or ellipse made coincident with a point that can't move (a model vertex, a
+/// Fixed point) translates the shortest way with its size kept; with a free point the point moves onto it (the
+/// regeneration's solve).
+#[test]
+fn a_curve_onto_a_held_point_moves_whole_with_its_size_kept() {
+    let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+    let circle = |fixed: bool| {
+        let mut sk = Sketch::new();
+        let c = sk.add_circle(mm(65.657, -5.657), 5e-3);
+        let p = sk.add_point(mm(60.0, 0.0));
+        if fixed {
+            sk.add_constraint(ConstraintKind::Fix { entity: p }).unwrap();
+        }
+        sk.add_constraint(ConstraintKind::Coincident { a: c, b: p }).unwrap();
+        assert!(sk.solve_with(&SolveOptions { constructive: true, ..Default::default() }).is_solved());
+        let Some(Curve2::Circle { center, radius }) = sk.curve(c) else { panic!() };
+        (center, radius, sk.point(p).unwrap())
+    };
+    let (c, r, p) = circle(true);
+    assert!((c - mm(63.536, -3.536)).length() < 2e-6 && (r - 5e-3).abs() < 1e-9 && (p - mm(60.0, 0.0)).length() < 1e-12, "{c} {r} {p}");
+    let (c, r, p) = circle(false);
+    assert!((c - mm(65.657, -5.657)).length() < 1e-9 && (r - 5e-3).abs() < 1e-9 && ((p - c).length() - r).abs() < 1e-9, "{c} {r} {p}");
+    let mut sk = Sketch::new();
+    let e = sk.add_ellipse(mm(0.0, 0.0), mm(8.0, 0.0), 4e-3);
+    let p = sk.add_point(mm(11.0, 0.0));
+    sk.add_constraint(ConstraintKind::Fix { entity: p }).unwrap();
+    sk.add_constraint(ConstraintKind::Coincident { a: e, b: p }).unwrap();
+    assert!(sk.solve_with(&SolveOptions { constructive: true, ..Default::default() }).is_solved());
+    let Some(Curve2::Ellipse { center, major, minor }) = sk.curve(e) else { panic!() };
+    assert!((center - mm(3.0, 0.0)).length() < 1e-9 && (major - mm(8.0, 0.0)).length() < 1e-9 && (minor - 4e-3).abs() < 1e-9, "{center} {major} {minor}");
+}
