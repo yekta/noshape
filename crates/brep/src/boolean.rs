@@ -6908,7 +6908,19 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             return Err(Decline(ON_ANOTHER));
         }
         let r = state_at(pi, pieces[pi].inside);
-        if !matches!(&r, Err(Decline(w)) if *w == ON_ANOTHER) || settles(pi) {
+        if !matches!(&r, Err(Decline(w)) if *w == ON_ANOTHER) {
+            return r;
+        }
+        // (A cylinder's piece whose point lies on the line another part's face touches it along (a sheet's bend inside
+        // another's, c2-wire-clip-imported): its other points, clear of its sides, first.)
+        if matches!(cx.faces[pieces[pi].face].s, Surf::Cyl { .. }) {
+            for q in other_points(pi) {
+                if let Ok(st) = state_at(pi, q) {
+                    return Ok(st);
+                }
+            }
+        }
+        if settles(pi) {
             return r;
         }
         // (Its point on another solid's face where no section settles it: a face touching it, tangent there (a
