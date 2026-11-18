@@ -636,7 +636,7 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 - [ ] **P1 ASM-TRIAD-ARROW-JUMP (asm)**: an arrow drag puts the triad's origin under the pointer (6 px -> 4.3 mm at once); live starts
   at 0 mm and keeps the grab offset. Minor: the last handle used stays blue after the release.
 
-## Interaction feel: live2's "Ours" cells, batch 4 (view-tools 992-995, field-keys 1309-1313; live2 12:50, green e503ca2f, landed 422aacaa7 / 34ed09b6c)
+## Interaction feel: live2's "Ours" cells, batch 4 (view-tools 992-995, field-keys 1309-1313; live2 12:50, green e503ca2f, landed 422aacaa7 / ae075b8eb)
 - [ ] **P1 NAMED-VIEW-RESTORE-ANIM (psui)**: a named view restores in one step at 0.24-0.40 s; live animates, 3 frames over ~240 ms.
 - [ ] **P2 SECTION-PREVIEW-COLOUR (psui)**: our section view's preview cap is #E3C9A7; live's #EBBD8A / #E9C497.
 - [ ] **P1 SEARCH-TOOLS-TOOLBAR-HIGHLIGHT (skasm)**: with "Highlight tool" on in Search tools, no toolbar button lights; live lights the
