@@ -50,6 +50,7 @@ live/errors-1118/rel-*.
 | …the item's marks | an amber corner triangle rgb(250, 182, 1) on the thumbnail and on the Revision box; the ✕ (tooltip "Remove from release") full red rgb(189, 48, 57) | the triangles rgb(245, 180, 0); the ✕ pale rgb(212, 119, 125), same tooltip | ≈ / ≠ ✕ colour [studios] |
 | …the footer | "A field required by one or more actions is empty" with a ? whose tooltip is "Submit requires Approvers"; Apply enabled (blue), Save draft disabled; the empty Release name box grey-bordered (only its label's "Required field must not be empty." red rgb(170, 37, 45)) | the same sentence, its ⓘ shows no tooltip; Apply disabled, Save draft enabled; the Release name box red-bordered | ≠ [studios] |
 | …the attention filter (red ⬇ circle) | tooltip "Show only items that need attention" | the same | = |
+| The same with "Prevent if a Part Studio feature list contains errors" on (live 22:48–22:53 UTC, the same record / restore) | the same words "Part belongs to a Part Studio that has regeneration errors" in a red box instead (bg rgb(249, 235, 236), border rgb(245, 223, 225), text dark rgb(51, 51, 51)), inset under the row like the amber one; the rest as with it off (Apply still enabled) | other words, "The Part Studio feature list contains errors.", red text rgb(169, 68, 66) on a borderless rgb(242, 222, 222) band the full width of the row | ≠ [studios] |
 
 ## Part Studio features (live)
 
