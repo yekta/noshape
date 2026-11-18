@@ -303,12 +303,12 @@ impl DrawingEditor {
             "Custom".into(),
             is_custom,
             std::rc::Rc::new(move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| {
-                // Custom keeps the current paper size and zones, with the border.
+                // Custom keeps the current paper size, with the border, and starts with 4 x 4 zones (live).
                 t.edit("Sheet size", cx, |d| {
                     let sh = &mut d.sheets[si];
                     if !matches!(sh.size, SheetSize::Custom { .. }) {
                         let (w, h) = sh.size.size_mm();
-                        sh.format.zones = Some(sh.format.zone_counts(sh.size));
+                        sh.format.zones = Some(noshape_model::drawing::SheetFormat::CUSTOM_ZONES);
                         sh.size = SheetSize::Custom { width_mm: w, height_mm: h };
                     }
                 });
@@ -348,10 +348,13 @@ impl DrawingEditor {
             let icon = |name: &str, cx: &App| div().flex_none().child(crate::assets::icon(name, 24., cx));
             let len_field = |input: &Entity<InputState>| div().flex_1().min_w_0().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(Input::new(input).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()).into_any_element();
             let border = format.border;
-            vec![
-                row("", h_flex().gap(px(4.)).child(icon("sheet-width", cx)).child(len_field(&st.width)).child(icon("sheet-height", cx)).child(len_field(&st.height)).into_any_element(), None).into_any_element(),
-                row("Zones", dropdown("sp-zone-start", start_label.into(), start_items).into_any_element(), None).into_any_element(),
-                row("", h_flex().gap(px(4.)).child(icon("zones-horizontal", cx)).child(div().flex_1().child(dropdown("sp-hzones", nx.to_string(), zone_items(false)))).child(icon("zones-vertical", cx)).child(div().flex_1().child(dropdown("sp-vzones", ny.to_string(), zone_items(true)))).into_any_element(), None).into_any_element(),
+            let mut rows = vec![row("", h_flex().gap(px(4.)).child(icon("sheet-width", cx)).child(len_field(&st.width)).child(icon("sheet-height", cx)).child(len_field(&st.height)).into_any_element(), None).into_any_element()];
+            // Zones only with the border (live2 drw-sheet-properties-custom-zones s9: Include border off hides them).
+            if border {
+                rows.push(row("Zones", dropdown("sp-zone-start", start_label.into(), start_items).into_any_element(), None).into_any_element());
+                rows.push(row("", h_flex().gap(px(4.)).child(icon("zones-horizontal", cx)).child(div().flex_1().child(dropdown("sp-hzones", nx.to_string(), zone_items(false)))).child(icon("zones-vertical", cx)).child(div().flex_1().child(dropdown("sp-vzones", ny.to_string(), zone_items(true)))).into_any_element(), None).into_any_element());
+            }
+            rows.push(
                 div()
                     .pl(px(8.))
                     .py(px(6.))
@@ -360,7 +363,8 @@ impl DrawingEditor {
                         this.edit("Sheet border", cx, |d| d.sheets[si].format.border = on);
                     })))
                     .into_any_element(),
-            ]
+            );
+            rows
         } else {
             Vec::new()
         };
@@ -413,6 +417,18 @@ impl DrawingEditor {
             if sheet.dwt.is_none() {
                 text.text("Size").options(size_items.iter().map(|i| i.0.clone()));
                 fields.push(select("Size", on(&size_items)));
+            }
+            // Size › Custom: the zones (with the border only) and Include border (live2 drw-sheet-properties-custom-zones).
+            if is_custom && sheet.dwt.is_none() {
+                let f = sheet.format;
+                let [nx, ny] = f.zone_counts(sheet.size);
+                if f.border {
+                    let start = if f.start == ZoneStart::TopLeft { "Start from top left" } else { "Start from bottom right" };
+                    text.text("Zones").options(["Start from bottom right", "Start from top left"]).options(ZONES.iter().map(|n| n.to_string())).options(ZONES.iter().map(|n| n.to_string()));
+                    fields.extend([select("Zones", start.into()), select("Horizontal zones", nx.to_string()), select("Vertical zones", ny.to_string())]);
+                }
+                text.text("Include border");
+                fields.push(serde_json::json!({ "label": "Include border", "kind": "checkbox", "value": f.border }));
             }
             text.text("Reference").options(ref_items.iter().map(|i| i.0.clone()));
             fields.push(select("Reference", on(&ref_items)));

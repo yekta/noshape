@@ -2977,6 +2977,10 @@ impl Default for SheetFormat {
 }
 
 impl SheetFormat {
+    /// The zones a sheet starts with when its Size becomes Custom (live2 drw-sheet-properties-custom-zones: ANSI A, whose
+    /// template has 2 x 2, shows 4 x 4).
+    pub const CUSTOM_ZONES: [u32; 2] = [4, 4];
+
     pub fn is_default(&self) -> bool {
         *self == Self::default()
     }

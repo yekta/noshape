@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 10:24 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 10:46 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -35,9 +35,11 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   linestyle selects marked `dropdown:<value>`; runner: Graebert `*_Menu` lists' hover not compared (never read), an
   unnamed menu's "" separators, "start X asm Copy n" field values. run12: BOM / ordinate / linestyle / gtol 12/13;
   run10: rel, ver, prefs, docs-pref all match.
+- Queued (10:4x): Sheet properties › Size › Custom read as live (Zones, Horizontal / Vertical zones, Include border),
+  zones shown only with the border, Custom starts at 4 x 4 zones (live A: template 2 x 2; other sizes asked live2);
+  op drawing_sheet the same, e2e. custom-zones 12/12.
 - Open: drw-bom-table-properties s7 (Esc in BOM table properties: today's retake deselects, the old take kept it;
-  asked live2 10:24); drw-sheet-properties-custom-zones s5 (Size › Custom shows Zones fields in live: ours lacks them);
-  drw-hatch-panel s31 (Pattern list covers its field; asked live2 09:23).
+  asked live2 10:24); drw-hatch-panel s31 (Pattern list covers its field; asked live2 09:23).
 - Checked against live 08:4x, already as live: documents search on Enter only; version row menu (View in repair,
   Restore to Main…, Releases only with candidates; Copy link web-only); Restore strategy dialog; Create version (V<n>
   focused, Enter creates, Esc closes); Branch (B<n> selected, Enter creates and opens).
