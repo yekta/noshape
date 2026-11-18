@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-18 10:37 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-18 11:50 UTC (new blend thread 0672fa20-964d-4fde-a19c-c5b4363729ba, account Bbedward). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -57,11 +57,11 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   x 1.502 vs live 0.097 (live JfR curves to -x). GeomLib C2 extension changes nothing. Dumps Mac
   ~/noshape-host/agents/blend10/zzdump/sections-{31,34,35}.brep (+.txt edges); probes kernel blend.rs zz_halter /
   zz_extdev; ZZ_TOL / ZZ_DUMP / ZZ_FRAME prints in blend_section.rs (blend10, uncommitted). Next: f26's bevel.
-- Agent ids (11-17 09:25, fresh threads): asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm
+- Agent ids (11-18 11:45): asm d8d597e0-675c-497b-a804-544ceab99bbd, skasm
   18a8ce79-5f2e-4089-9ad8-cc9d1182f0e6, bool2 e98465f5-5cc9-4d4f-b67e-aae1d5e6d2e0, studios
   58e9bca8-346c-4847-8012-e15006ae61ef, live e8549719-ef9a-42de-960c-e24b29f142a6, live2
-  79ae5cdb-42a4-4025-b43a-da61a4f92ad7, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core 6692ae35-758a-4442-81c8-29f67be2e21a, qa
-  132756b3-e48d-4b9f-8a0e-3d4f23629c8b, psui 4973e295-9e92-463f-a13f-2ec5258bc5f9.
+  79ae5cdb-42a4-4025-b43a-da61a4f92ad7, bool 7fa8ceab-4549-499f-9b01-3a289c2c95b4, core e8af89fe-d460-49b3-b0bb-9572da230fed,
+  qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b, psui 4973e295-9e92-463f-a13f-2ec5258bc5f9, dx 2108c2b7-2f48-43a7-87a0-3f652e3cda6d.
 - Queued from asm (after the current items): asm-gearbox-std 6a912b / a470167 Fillet 2 (EDGE fillet of 2 faces' edges,
   tangent, 0.125 in: ours 38/92/56, live 38/88/52, -12.1 mm3; repro vibex6/7 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/mgb
   NOSHAPE_PARITY_ONLY=m6a912b); asm-scissor-lift fed22d Fillet 3 (Top - Side 2 45/110/64 vs 48/116/64; Motor Mount Live (q-gearbox-f2/corner.json): each corner a torus (27.55 mm2, its edge on the vertical round the
@@ -110,32 +110,33 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## Next, in order
 
-1. NOW (lead 11-18), in order: (a) impeller Fillet 4, (b) merged-body Fillet 3 recheck + Fillet 3 vs live 103 ms on
-   main, (c) knife re-time on main (take what's still >5x live, 4c/4b), (d) Halter (paused). Landed 11-18 06:27: Fillet
-   3 speed as 0451fe40 (Mac 3996 -> 2271 ms; core told).
-   (a) Fillet 4 (f35, r 5 on JOV, allowEdgeOverflow false). Cause found: live's round (behaviours.md "blend (lead
-   11-18): impeller Fillet 4", live/blend/geo-1118/fillet4-impeller.json) is ONE face JpC 372.45 mm2 spanning z -4..0:
-   r 5 on a 4 mm flange takes the whole wall JOW and rests on its top edge (a cliff round); body 64 faces, 105931.1276
-   mm3 (-270.108). The 0.47 mm2 sliver JOu exists in live's input too and stays untouched: not the cause. Ours: the
-   cliff path (detail.rs overflows()) takes only a Line between two Planes; JOV is a B-spline, JOW extruded -> OCCT,
-   which fails. Fix (UNTESTED, branch blend-f4 in blend9, commit 9539fa674 on main 4ca9526a1, includes core's
-   impeller fix 52c050e1): blend_section station() sets each face's cliff extent per station on curved edges
-   (face_reach: halving along u to the face's far edge, infinite when the face reaches the setback); detail.rs tries
-   section_blend with cliff: true after OCCT's fillet fails and overflow is off. In flight: impeller run on vibex8
-   (task: bin/model-x8.sh with BLEND_WT=blend9 BLEND_HOST=vibex8; log vibex8 ~/tmp/blend/model.log -> /root/blend-
-   scratch/model.log and f4.log); waiting in vibex8's slot. Check: Fillet 4 one face, 105931.13 mm3, valid; then
-   Move face 2 (core: should follow) and the part count at Extrude Bohrungssitz Ansaugflansch (ours 10, live 1;
-   core: ~3 s of 177 ms there). Then gate (strict suite with CHECK lines + userdocs, bin/seq-f3s-v2.sh as a model)
-   and land. Also queued in vibex8's slot: probe crash_inputs::zz_fillet_edge on fillet-32 (edge info + radii sweep,
-   no longer needed; drop it if it's still waiting). Dumps: ~/tmp/blend/f3m on vibex8 / vibe2 (fillet-26, occt-
-   chamfer-fillet-28, fillet-32).
-   (b) Merged-body Fillet 3 (3a): bool2's dump fillet-26 SUCCEEDS at kernel level on main (valid, 34 faces, 34.56
-   mm3 off; it's an r 2 single circle, i.e. like f28 Fillet Stevenrohr einnschub, live -34.77). Recheck the whole
-   feature on main with bool2's merged chamfer; if it passes, tell bool2. Then time Fillet 3 on the Mac on main vs
-   live 103 ms and report.
-   Also open: isaac 850efe Fillet 2 passes OCCT's invalid result on (CHECK: valid true after Extrude 6, false after
-   Fillet 2 on main 539aeb9b3); bool's unify fix (bool-shared2 8ba7c6dcc) gives it live's input, so lower priority;
-   ZZFILLET prints on blend-halter show where (merged_blends / joined_edges have no validity check).
+1. NOW (lead 11-18), in order: (a) impeller Fillet 4 (gating), (b) Fillet 3 speed, (c) knife re-time, (d) Halter.
+   (a) Fillet 4: branch blend-f4 (blend9, f9df34212 on main ab6da5d97): after OCCT fails with overflow off, section
+   blend with cliff (detail.rs); the cliff face is decided once per edge at its middle (the floor turns away at the
+   rim's ends: reach 0.0009 mm there), its reach found per station; no cliff face on a curved chain -> declined. T1
+   features_c::a_round_wider_than_a_curved_flange_takes_its_side_as_live (data impeller-fillet4-input.bin = core's
+   dump fillet-32, 43 faces; live's input 64): 268.31 mm3 off (live 270.11), round 371.22 mm2 (372.45) z -4..0, sliver
+   kept. Mac full doc: Fillet 4 OK valid 105929.52 mm3 (live 105931.13); Move face 2 still ERROR (core told 11:45: input
+   differs from Boolean 3, 43 vs 64 faces). GATE running: unit blend-seq-f4 (bin/seq-f4.sh): suites blend4 (base) /
+   blend9 on vibe2 -> suite-r-f4{base,}.log, .cmp, f4-suite.done; documents on vibex7 -> seq-f4.log, ud-f4.done. Rust
+   only (no g13). DON'T edit blend9 / blend4 / blend-base until it's done. Land when identical but impeller.
+   Speed: Fillet 4 Mac 602 ms (live 102): Boolean 293, face_reach bisection 153 (1915 distances), OCCT try 83.
+   face_reach by projection: blend10 branch blend-f4-speed ac197ab11 (A/B running: bin/ab-mac.sh -> logs/ab-f4.out);
+   land it after (a) (patch parked/f4-reach-speed.patch).
+   (b) Fillet 3 on main (Mac, 3 runs): 2269-2277 ms (live 103). Profile (logs/imp3-prof.log): op_boolean x3 884 ms
+   (OCCT edge-face 594), min_distance x149 339, bounding_box x339 251, op_split x10 223, blend.direct 132 (declined:
+   open shell, 20 free edges at the rounds' ends x 0 / 78.9 and x 1.5-5), unify 73. Path: the conic's untrimmed ball
+   tools go to the direct build (fails), then closed_run_on + Booleans. Next: make the direct build take the
+   closed_run_on-trimmed tools (or close its ends) so the Booleans go. Same run: Chamfer Stevenrohr Halterung 272 (live
+   16-20), Fillet Bohrungssitz 938 (242), Flansch zum Stroemungskanal 137 (66.5), Fillet 1 74 (39), einnschub 55 (30),
+   Delete face 2 226 (12, core's?).
+   (b2) Merged-body Fillet 3 (bool2's fillet-26) recheck: still to do.
+   (e) lead 11-18: Fillet Bohrungssitz Ansaugflasch (f48, last feature) text 'Unfilleted edge overlapped by fillet.'
+   (v0.4.58) -> 'Failed to fillet selections.' (main): its input moves with every upstream change; the text is whichever
+   fallback fails last (fillet_failed maps OCCT's "unfilleted edge overlapped"). Live builds it; both are wrong.
+   (f) live 11-18: cf-setback-fillet Setback Fillet 1 (custom: opSplitFace x2 + opDeleteFace + std fill() G1, 3 corners):
+   ours A 4117.54 vs live 4116.42 mm2 (V 18858.78; corner B-splines 26.07 / 26.98 / 34.46 mm2). Likely the Fill
+   (core's surfaces.rs) -> measure our 3 patches, then hand to core or take it. live/suite-truth-1118/cf-setback-fillet.json.
 2. Halter (multi-day, lead; land in gated steps; tests: Fillet Stevenrohr zum Halter, core's Extrude impellerraum
    input). Branch blend-halter (blend10). tighten_tolerances does NOT land (one more raw face behind equal shown
    counts); keep it only if Halter needs it.
@@ -170,9 +171,6 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
    X, on plane x = 120), r 2. Replay: NOSHAPE_REPLAY=<dir>/fillet-26 cargo test --release -p noshape-kernel --test all
    crash_inputs::replay_one -- --ignored --nocapture; occt-chamfer-fillet-28 (35 faces, unmerged) succeeds. Lead: the
    face cleanup stays; the fillet must take the merged face.
-3a2. impeller Fillet 4 (f35, r 5, edge JOV, 54.8675 mm, mid (23.724, 0.003, -4) mm; faces plane 556.109 / extruded
-   222.876 mm2, as live's JOm / JOW): ERROR "Failed to fillet selections." on core-bis a08b41153's part (live 105929.0
-   mm3). Mine (core 11-18). Dump vibex7 ~/agents/core-keep/f4/fillet-32.{brep,txt} (edge 49, r 5 mm).
 3b. core 11-18 (main 55fc929c): c2-surf-workshop-knifehandle: Fillet 3 Blade 7/15/10 vs live 6/12/8, then Chamfer 1
    20/36/21 vs 7/15/10, 9285.8 vs 10423.8 mm3 returned OK (wrong geometry), Fillet 2 ERROR. Mine (Chamfer 1 likely
    follows Fillet 3). Repro NOSHAPE_PARITY_ONLY=c2-surf-workshop-knifehandle.
