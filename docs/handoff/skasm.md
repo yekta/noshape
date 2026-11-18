@@ -1,48 +1,32 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 00:25 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 02:10 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## Landed today
-- 0bb94eede (11:23) flat-view colour fix (a FeatureScript feature's colours go to the bodies it leaves); psui told.
+## Landed 11-18
+- b6f5e810 (01:01): snap onto another sketch's point / model vertex = one Coincident, no use glyph (qa
+  SKSNAP-SHIFT-ICON, live2 use-glyph-1118); joint row's flat edges (`flat_view_side_edge`); Flange flip row test.
+- 4a4f7e0e (queued 01:25): a double-clicked face's sketch drawn through the part as an edited one (qa
+  SELFEEL-DBLCLICK-FACE-SKETCH; GPU test on two-blocks Part 2). qa told.
 
-## Unlanded (worktree /root/projects/noshape-wt/skasm, branch agent/skasm)
-- Committed: d3e6bcef5 (commit A of 11-16), b0bee2b62 (sheet metal chips on re-edit), a26f18913 (Bezier poles,
-  BEZIER_DEGREE, EQUAL_CURVATURE), 036070cc4 (INTERSECTED, ids-only spline edges), 52447d4eb (Pierce takes a curve,
-  Concentric model point, anchored solves kept), e5f43fb96 (Pierce 3-pick refusal), ca5c2d9f0 (configured documents
-  drawn at sketches.json's captured solve), handoff commits.
-- Uncommitted (parity.rs + tests): a pattern direction naming a mate connector takes the connector (linear-rail
-  24 -> 26/26); a configured Variable's value goes to its typed key (sprockets); a feature list drops ids of features
-  deleted from the document, and a hidden parameter's failed query isn't a problem (pulleys' Circular pattern 1 and
-  Extrude 2); a solve onto where live's edge (ending on the plane) pierces the sketch is kept (pipe's Loft profile 3);
-  tests stale_references_live_ignores_name_nothing, a_configured_variable_value_is_configured,
-  a_solve_onto_lives_pierce_point_is_kept. Our Pierce of a circle grows its radius (5 -> 6.5 mm in that test); live
-  keeps the radius and shifts the circle: a solver item.
-- Single-doc effects vs main: config-parts 86 -> 131/156 (+2 linear-rail now); manualblend 9 -> 11/19; cpcurves
-  7 -> 8/24; tablet-stand 16/16.
-
-## Running
-- skasm-pair-1117a: vibex6 slot pairrun.sh (ops-a = main 143f22c12, ops-b 09:48) -> ~/agents/skasm-keep/pair-1117a-
-  {a,b}.log; a started 11:17.
-- skasm-mac-1117p: Mac parity:: tests -> /root/skasm-scratch/mac-1117p.log (needs a rerun with the hidden-parameter rule).
-- skasm-pu-1117c, then skasm-tr-1117a (pulleys, pipe traces) -> /root/skasm-scratch/tr-<doc>.log, vibex6
-  ~/agents/skasm/trace-<doc>.log.
+## Unlanded (worktree /root/projects/noshape-wt/skasm, branch agent/skasm), uncommitted
+- Rip -> Bend unfold failure (live sm-feel-1117): host `bends_close_a_loop` per part -> no flat
+  (`SheetMetalData::cannot_unfold`, flat_pattern errs) and a WARNING SHEET_METAL_COULD_NOT_UNFOLD on the feature (std's
+  defineFeature aborts on an ERROR, so the bend wouldn't stay; hole.fs reads it as a warning; the toast is yellow);
+  native modify_joint the same; the panel's yellow toast after a joint edit; ui_parity "part 0" selector; test
+  sm::a_corner_rip_made_a_bend_cannot_unfold_as_lives. live2 said "red": recheck the colour with live. A/B on the 16
+  sheet metal parity docs running: vibex7 ~/agents/skasm-keep/ops-{a,b} (smab7.sh), then smrun-like compare.
+- Sketch tools (live 11-18 sketch-tools-1118): Extend picks the nearer line end, the end follows the pointer and
+  stops on a crossing curve (`extend_end`, `extend_target`); Offset arrow drag adds to the press-time offset on 0.1 mm
+  steps; tests (scene) extend_picks_the_nearer_end..., enter_leaves_a_spline..., offset_preview_arrow_and_repeat.
+  Tangent arc, Spline Enter, fillet reach, trim drag already as live. Feel rows written.
 
 ## Next, in order
-0. USER P0 (lead 11-17): interaction feel. Landed 11-17/18: b87dd3dc, 24441238, 4a8381fc, 3621f719, 5245720f,
-   0892eeed (drags, Fix on a line, unsolved state, glyph select, snap let-go, region from the pointer, qa SELFEEL-* x4,
-   value boxes mid-chain, Dimension tool flow, SKSNAP-MODEL-EDGE), a6236ed3 (SKSNAP-ALIGN-WOKEN-POINT, SKSNAP-REACH,
-   menus scenario, Flange / Hem box mutes wall faces, joint row lights its rip in 3D).
-   hat15b by hand (copy deleted): state colours / badge / tooltip / conflict bubble / undo as live. Found: in a
-   1440 x 900 window with the 145-feature list scrolled the viewport reads the pointer ~10 px right (psui told, repro).
-   Open: SKSNAP-GLYPHS-AFTER = Show constraints setting (qa re-runs ticked); SKSNAP-SHIFT-ICON (use glyph on a snapped
-   external point) asked live (REQUESTS 11-18); live: mitred flange corners are not rips (ours the same).
-   sm-feel-1117 rest: Corner / Bend relief taking a rip's side face (tried: std's findCornerDefinitionVertex throws
-   SHEET_METAL_RIP_NO_CORNER for our rip face, and the native corner search needs both bends on one parent: in a
-   converted open box bend 0's parent is wall 0, the others wall 1, so native can't pair them; a vertex works via
-   std); joint row's flat edges; Rip -> Bend unfold-failure toast. Rigs on vibex6 :391: ~/tmp/skasm/{uh,sf,sk}
-   (qa's scripts pointed at ~/agents/skasm-keep/noshape; bin/appbuild.sh rebuilds it). Land
-   NOSHAPE_LAND_QUEUE_HOST=vibe2.
+0. USER P0 (lead 11-17): interaction feel. sm-feel-1117 left: Corner / Bend relief taking a rip's side face +
+   the corner disc (std's findCornerDefinitionVertex throws SHEET_METAL_RIP_NO_CORNER for our rip face; native corner
+   search needs both bends on one parent). Rigs on vibex6 :391: ~/tmp/skasm/sk (sks.sh start|shot|stop, SNAP=<json>;
+   dbl.json = two-blocks double-click), keep binary ~/agents/skasm-keep/noshape (bin/appbuild.sh). Land
+   NOSHAPE_LAND_QUEUE_HOST=vibe2. psui owns the pointer-offset report (latency, not an offset).
 1. config-parts: linear-rail 26/26, links 35/35 (live fetched Derived 1's source), standoffs 32/32, sprockets 24/24
    (live's volume band carried while its volume stays: carry_volume_bands); pulleys 12/22 (Circular pattern 1, a face
    pattern ADD, fails in our op on main too: core's since 11:45); nuts 14/17 (Sweep 1, bool's). Standoffs regenerates

@@ -287,7 +287,8 @@ enum DragState {
     Text { entity: EntityId, start: DVec2, points: Vec<(EntityId, DVec2)>, moved: bool },
     Box { start: DVec2 },
     /// Dragging (or clicking) the offset direction arrow.
-    OffsetArrow { start: DVec2, moved: bool },
+    /// `from`: the offset at the press, signed along the first curve's left normal.
+    OffsetArrow { start: DVec2, moved: bool, from: f64 },
     /// Dragging the fillet radius manipulator (the session's first fillet).
     FilletRadius { arc: EntityId },
     /// The arrow of an invalid (red) fillet preview ([`SketchEditor::invalid_corner`]).
@@ -430,6 +431,8 @@ const DRAG_START_PX: f64 = 5.0;
 /// The square round a snapped point: its 1 px sides 8 px from the point (live qsnap/za-p2p-d8: 17 px outside), #FFC92A.
 const SNAP_SQUARE_HALF_PX: f64 = 8.0;
 const SNAP_SQUARE_COLOR: [u8; 4] = [0xff, 0xc9, 0x2a, 0xff];
+/// The offset arrow's drag step (live 11-18 sketch-tools: 10.1 mm).
+const OFFSET_DRAG_STEP: f64 = 1e-4;
 
 /// Glyph ids of "Use" links (Onshape's use glyph on projected geometry):
 /// not solver constraints but the entity's link in `SketchData::external_refs`.
@@ -728,6 +731,8 @@ pub struct SketchEditor {
     mirror_axis: Option<EntityId>,
     /// Extend: the curve picked first, waiting for its boundary.
     pub extend_from: Option<EntityId>,
+    /// Extend on a line: the end picked (the nearer one), which follows the pointer (live 11-18 sketch-tools t4-ext).
+    pub extend_end: Option<EntityId>,
     /// On-the-fly dimension boxes of the geometry created last.
     pub otf: Option<OnTheFly>,
     /// The user started typing into the active on-the-fly box.
@@ -1444,6 +1449,7 @@ impl SketchEditor {
             slot_session: None,
             mirror_axis: None,
             extend_from: None,
+            extend_end: None,
             pending_image: None,
             dxf_unit_scale: None,
             dxf_use_origin: false,
@@ -1525,6 +1531,7 @@ impl SketchEditor {
         self.offset_repeat = false;
         self.mirror_axis = None;
         // Extend's pending pick goes with the tool (live: Esc, selection 0).
+        self.extend_end = None;
         if self.extend_from.take().is_some() {
             self.selection.clear();
         }
@@ -2521,6 +2528,22 @@ impl SketchEditor {
                 self.drag = Some(DragState::TrimPath { points: vec![p] });
                 self.trim_at(data, p, hovered)
             }
+            // A line's picked end goes where the pointer sets it (`extend_target`).
+            Tool::Extend if self.extend_end.is_some() => {
+                let Some((q, on)) = self.extend_target(&data.sketch, p) else { return EditOutcome::none() };
+                let end = self.extend_end.take().unwrap_or(EntityId(0));
+                self.extend_from = None;
+                self.selection.clear();
+                if data.sketch.set_point(end, q).is_err() {
+                    return EditOutcome::redraw();
+                }
+                if let Some(c) = on {
+                    let _ = data.sketch.add_constraint(ConstraintKind::Coincident { a: end, b: c });
+                }
+                data.sketch.solve();
+                prune_exprs(data);
+                EditOutcome::changed()
+            }
             Tool::Extend | Tool::Split => {
                 // The curve under the click, even where an end point is nearer
                 // (live: Extend 2 mm from a line's end takes the line).
@@ -2540,6 +2563,8 @@ impl SketchEditor {
                         None => {
                             self.extend_from = Some(id);
                             self.selection = vec![id];
+                            // A line: its nearer end is picked and follows the pointer (live 11-18 sketch-tools).
+                            self.extend_end = nearer_line_end(&data.sketch, id, p);
                             return EditOutcome::redraw();
                         }
                         Some(curve) => {
@@ -2593,7 +2618,8 @@ impl SketchEditor {
                 if let Some((base, tip)) = self.offset_arrow(&data.sketch)
                     && (p - tip).length().min((p - (base + tip) * 0.5).length()) <= self.world_per_px * 9.0
                 {
-                    self.drag = Some(DragState::OffsetArrow { start: p, moved: false });
+                    let sign = if (self.offset_flip != self.offset_out) != self.offset_flip_base(&data.sketch) { -1.0 } else { 1.0 };
+                    self.drag = Some(DragState::OffsetArrow { start: p, moved: false, from: sign * self.offset_distance });
                     return EditOutcome::redraw();
                 }
                 // While previewing, the picked curves stay selected (live: orange) and a click picks under the pointer.
@@ -2762,6 +2788,35 @@ impl SketchEditor {
     }
 
     /// Fillet / chamfer tool click: a corner point, or the first / second curve.
+    /// Extend (live 11-18 sketch-tools t4-ext, t7): where the picked line end goes for the pointer at `p`: along the
+    /// line to the pointer's foot, back over the line too (shorter); past a crossing curve it stops on the first one
+    /// (even clicked 42 px beyond it). The place and the curve it stops on.
+    pub fn extend_target(&self, sk: &Sketch, p: DVec2) -> Option<(DVec2, Option<EntityId>)> {
+        let (line, end) = (self.extend_from?, self.extend_end?);
+        let (s, e) = sk.endpoints(line)?;
+        let fixed = if e == end { s } else { e };
+        let (a, b) = (sk.point(fixed)?, sk.point(end)?);
+        let d = (b - a).try_normalize()?;
+        let t = (p - a).dot(d).max(self.world_per_px);
+        let q = a + d * t;
+        if t <= (b - a).length() {
+            return Some((q, None));
+        }
+        let path = Curve2::Line { a: b, b: q };
+        let near_end = self.world_per_px * 0.5;
+        let hit = sk
+            .entities()
+            .filter(|x| x.id != line && x.kind() != EntityKind::Point && x.handle_of.is_none())
+            .filter_map(|x| sk.curve(x.id).map(|c| (x.id, c)))
+            .flat_map(|(id, c)| noshape_sketch::intersect::intersect(&path, &c, self.world_per_px * 0.01).into_iter().map(move |h| (h.point, id)))
+            .filter(|(at, _)| at.distance(b) > near_end)
+            .min_by(|x, y| x.0.distance(b).total_cmp(&y.0.distance(b)));
+        Some(match hit {
+            Some((at, id)) => (at, Some(id)),
+            None => (q, None),
+        })
+    }
+
     fn corner_click(&mut self, data: &mut SketchData, p: DVec2, hovered: Option<EntityId>) -> EditOutcome {
         if self.pending_corner.is_some() {
             return self.commit_corner(data);
@@ -4358,14 +4413,15 @@ impl SketchEditor {
                 self.box_end = Some(p);
                 EditOutcome::redraw()
             }
-            Some(DragState::OffsetArrow { start, moved }) => {
+            Some(DragState::OffsetArrow { start, moved, from }) => {
                 if !moved && self.below_drag_start(p - start) {
                     return EditOutcome::none();
                 }
-                self.drag = Some(DragState::OffsetArrow { start, moved: true });
-                // Signed distance of the cursor from the curve along the arrow's normal.
-                if let Some((mid, n)) = self.offset_frame(&data.sketch) {
-                    let d = (p - mid).dot(n);
+                self.drag = Some(DragState::OffsetArrow { start, moved: true, from });
+                // The offset at the press moved by the drag along the normal, on 0.1 mm steps (live 11-18
+                // sketch-tools: 5 mm and a 27 px = 5.08 mm drag gave 10.1 mm).
+                if let Some((_, n)) = self.offset_frame(&data.sketch) {
+                    let d = ((from + (p - start).dot(n)) / OFFSET_DRAG_STEP).round() * OFFSET_DRAG_STEP;
                     if d.abs() > self.world_per_px {
                         self.offset_distance = d.abs();
                         self.offset_flip = ((d < 0.0) != self.offset_flip_base(&data.sketch)) != self.offset_out;
@@ -6423,6 +6479,25 @@ impl SketchEditor {
             let color = crate::palette::rgb8(crate::palette::viewport::QUERY_HOVER);
             wide.push((data.sketch.tessellate(id, self.world_per_px * 0.25), color, 4.0));
         }
+        // Extend (live 11-18 sketch-tools): a hovered line's nearer end marked; once picked, the light-blue extension
+        // to where the end goes, the orange square where it stops on a crossing curve.
+        if self.tool == Tool::Extend
+            && self.extend_from.is_none()
+            && let (Some(h), Some(c)) = (self.hover, self.cursor)
+            && let Some(q) = nearer_line_end(&data.sketch, h, c).and_then(|e| data.sketch.point(e))
+        {
+            let color = crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT);
+            points.points.push(PointSprite { position: w(q), color, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
+        }
+        if self.tool == Tool::Extend
+            && let (Some(c), Some(end)) = (self.cursor, self.extend_end)
+            && let (Some((q, on)), Some(b)) = (self.extend_target(&data.sketch, c), data.sketch.point(end))
+        {
+            poly(&[b, q], preview_color, false);
+            if on.is_some() {
+                points.points.push(PointSprite { position: w(q), color: SNAP_SQUARE_COLOR, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
+            }
+        }
         // Split marker on the hovered curve.
         if self.tool == Tool::Split
             && let (Some(h), Some(c)) = (self.hover, self.cursor)
@@ -6876,6 +6951,13 @@ fn arc_span(a0: f64, a1: f64, am: f64) -> (f64, f64) {
     let mid_off = norm(am - s);
     let e = if mid_off <= ccw_sweep { s + ccw_sweep } else { s - (TAU - ccw_sweep) };
     (s, e)
+}
+
+/// A line's end nearer `p` (Extend's pick); none for other curves.
+fn nearer_line_end(sk: &Sketch, id: EntityId, p: DVec2) -> Option<EntityId> {
+    let Some(Curve2::Line { .. }) = sk.curve(id) else { return None };
+    let (s, e) = sk.endpoints(id)?;
+    Some(if sk.point(s)?.distance(p) <= sk.point(e)?.distance(p) { s } else { e })
 }
 
 /// Apply a click's inferred constraints to a new point `pt` of `curve`.
@@ -9540,26 +9622,40 @@ mod tests {
     }
 
     #[test]
-    fn extend_takes_the_curve_then_its_boundary() {
-        // Live (audit 1969): one click only picks the curve; the second
-        // click's curve is the boundary, taken as its infinite line.
+    fn enter_leaves_a_spline_being_drawn_as_it_is() {
+        // Live 11-18 sketch-tools: after 3 clicks Enter (twice) does nothing; the pending spline and the tool stay.
+        let (mut ed, mut d) = editor(Tool::Spline);
+        for p in [v(0.01, 0.01), v(0.02, 0.02), v(0.03, 0.01)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert_eq!((ed.enter_target(), ed.clicks.len(), ed.tool), (EnterTarget::Nothing, 3, Tool::Spline));
+    }
+
+    #[test]
+    fn extend_picks_the_nearer_end_which_follows_the_pointer_and_stops_on_a_crossing_curve() {
+        // Live 11-18 sketch-tools (t4-ext, t7): a click picks the line's nearer end (the line lit, selected); the end
+        // follows the pointer along the line and stops on a crossing curve, even clicked 42 px past it.
         let (mut ed, mut data) = editor(Tool::Extend);
         let l = data.sketch.add_line(v(0.01, 0.06), v(0.03, 0.06));
-        data.sketch.add_line(v(0.05, 0.03), v(0.05, 0.05));
-        // Near its end the click still takes the line (live: 2 mm from the end).
+        let x = data.sketch.add_line(v(0.05, 0.03), v(0.05, 0.09));
         click(&mut ed, &mut data, v(0.03 - 2.0 * PX, 0.06));
-        assert_eq!(ed.extend_from, Some(l));
-        assert_eq!(ed.selection, vec![l]);
-        assert!((data.sketch.curve(l).unwrap().end_point() - v(0.03, 0.06)).length() < 1e-12);
-        click(&mut ed, &mut data, v(0.05, 0.04));
-        assert!((data.sketch.curve(l).unwrap().end_point() - v(0.05, 0.06)).length() < 1e-9);
-        assert_eq!(ed.message, None);
-        assert_eq!(ed.extend_from, None);
-        assert_eq!(ed.tool, Tool::Extend);
+        assert_eq!((ed.extend_from, ed.selection.clone()), (Some(l), vec![l]));
+        let end = data.sketch.endpoints(l).unwrap().1;
+        assert_eq!(ed.extend_end, Some(end), "the nearer end");
+        assert_eq!(ed.extend_target(&data.sketch, v(0.04, 0.065)), Some((v(0.04, 0.06), None)), "short of the crossing: at the pointer's foot");
+        click(&mut ed, &mut data, v(0.05 + 42.0 * PX, 0.062));
+        assert!((data.sketch.curve(l).unwrap().end_point() - v(0.05, 0.06)).length() < 1e-9, "stopped on the crossing line");
+        assert!(data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if (a, b) == (end, x))));
+        assert_eq!((ed.extend_from, ed.extend_end, ed.message.clone(), ed.tool), (None, None, None, Tool::Extend));
+        // With nothing in the way the end goes to the pointer, back over the line too: shorter.
+        let l2 = data.sketch.add_line(v(0.01, 0.02), v(0.03, 0.02));
+        click(&mut ed, &mut data, v(0.03 - 2.0 * PX, 0.02));
+        click(&mut ed, &mut data, v(0.025, 0.018));
+        assert!((data.sketch.curve(l2).unwrap().end_point() - v(0.025, 0.02)).length() < 1e-9, "shortened to the pointer");
         click(&mut ed, &mut data, v(0.025, 0.06));
         assert_eq!(ed.selection, vec![l]);
         assert!(ed.cancel());
-        assert!(ed.selection.is_empty(), "Esc drops the pending pick");
+        assert!(ed.selection.is_empty() && ed.extend_end.is_none(), "Esc drops the pending pick");
     }
 
     #[test]
@@ -10918,21 +11014,25 @@ mod tests {
         assert_eq!(ed.selection, vec![l1], "the picked curve stays selected (live)");
         assert_eq!(count(&d, EntityKind::Line), 2, "nothing is created yet");
         let (base, tip) = ed.offset_arrow(&d.sketch).unwrap();
-        // drag the arrow to the other side: 4 mm below the line
+        let (u, from) = ((tip - base).normalize(), ed.offset_distance);
+        // Live 11-18 sketch-tools: the drag adds to the offset at the press, on 0.1 mm steps (5 mm and a 5.08 mm drag:
+        // 10.1 mm); on over the curve the offset goes to its other side.
         ed.pointer_move(&mut d, tip, false, false);
         ed.tool_down(&mut d, tip, None, false, false);
+        ed.tool_drag(&mut d, tip + u * 0.00508);
+        assert!((ed.offset_distance - ((from + 0.00508) / 1e-4).round() * 1e-4).abs() < 1e-12, "{} from {from}", ed.offset_distance);
         for k in 1..=4 {
-            ed.tool_drag(&mut d, tip.lerp(v(0.02, 0.006), k as f64 / 4.0));
+            ed.tool_drag(&mut d, (tip + u * 0.00508).lerp(tip - u * (from + 0.004), k as f64 / 4.0));
         }
-        ed.tool_up(&mut d, v(0.02, 0.006));
-        assert!((ed.offset_distance - 0.004).abs() < 1e-9);
-        let _ = base;
+        ed.tool_up(&mut d, tip - u * (from + 0.004));
+        assert!((ed.offset_distance - 0.004).abs() < 1e-9, "{}", ed.offset_distance);
+        let y = 0.01 - u.y * 0.004;
         assert!(ed.commit_offset(&mut d).changed);
         let cid = ed.dim_edit.as_ref().expect("Enter opens the distance box").constraint;
         assert!(matches!(d.sketch.constraint(cid).map(|c| &c.kind), Some(ConstraintKind::Distance { .. })));
         ed.dim_edit = None;
-        let below = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).filter_map(|e| d.sketch.curve(e.id)).any(|c| (c.start_point().y - 0.006).abs() < 1e-9);
-        assert!(below, "offset toward the dragged side");
+        let beyond = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).filter_map(|e| d.sketch.curve(e.id)).any(|c| (c.start_point().y - y).abs() < 1e-9);
+        assert!(beyond, "offset toward the dragged side");
         // later clicks repeat the offset right away
         click(&mut ed, &mut d, v(0.02, 0.03));
         assert_eq!(count(&d, EntityKind::Line), 4);

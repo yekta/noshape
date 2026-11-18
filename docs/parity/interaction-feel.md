@@ -613,7 +613,12 @@ live2's sketchtools.json (11-13 09:12, Sketch 2 on Top of a block copy). part-st
 | Trim, a click | removes the piece between the crossings | the same | = |
 | Trim, hover | the piece up to the nearest crossings lit tan, orange dots at its ends | the same | = |
 | Trim, a drag | every piece the trail crosses goes; one that nothing crosses any more goes whole (tr0) | the same | = |
-| Extend, hover | the line and its end lit orange, nothing past it; the clicks: the curve, then the boundary (behaviours "psui (2992)"; live2's light blue was the sketch's X axis under its line) | the same (an extension preview added 11-13 from live2's note, taken out 11-14) | = |
+| Extend, hover | the line lit, its nearer end marked; no extension yet (live 11-18 sketch-tools) | the same (the nearer end's dot, `nearer_line_end`) | = |
+| Extend, a line's end picked | the click picks the nearer end (the line yellow-green); a light-blue extension follows the pointer along the line, shorter too when the pointer is back over it; past a crossing curve it stops on it (orange square), and the second click ends there, COINCIDENT, even 42 px beyond (live 11-18 sketch-tools t4-ext, t7) | the same (`extend_end`, `extend_target`); was: the curve, then a boundary curve's infinite line | = (fixed 11-18) |
+| Tangent arc | always tangent: the pointer's path chooses nothing, the end point alone sets the arc; from a line's start it continues backwards; an end nearly in line gives a huge radius (R1575.9 mm) (live 11-18) | the same (`Sketch::tangent_arc`) | = |
+| Spline, Enter | nothing: the pending spline and the tool stay; Esc commits it (live 11-18) | the same (`enter_target` Nothing) | = |
+| Sketch fillet, the corner's reach and two lines | the corner lights at 10 px (not 14); a click on a line selects it, a second line sharing a corner with it previews the fillet there (R5) (live 11-18) | the same (`corner_click`: 10 px, the two picks) | = |
+| Offset | outward from a closed loop by default; a digit typed over the preview does nothing; Enter commits at 5 mm and opens the box "5 mm"; a 27 px drag of the arrow (5.08 mm) from 5 mm gives 10.1 mm, on 0.1 mm steps (live 11-18) | the same (`OffsetArrow { from }`, `OFFSET_DRAG_STEP`); the drag took the pointer's distance from the curve, unstepped | = (fixed 11-18) |
 | Text | two clicks (corners), then its dialog with "Default text" | the same | = |
 | Search tools in a sketch | the sketch tools (Offset o, Linear / Circular pattern, Mirror, Text, Insert image, Trim, Extend) | the same | = |
 | Sketch fillet, a click on a corner | a preview, nothing made; Esc cancels | the same | = |
