@@ -7,28 +7,34 @@ fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_cha
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-18 21:05, new thread)
+## Now (11-18 23:10)
 
 - Background runs MUST be systemd units (`systemd-run -E HOME=/root -E PATH=$PATH`): `( ... &)` jobs die at turn end.
-  Units: blend-seq-x8 (bin/seq-x8.sh: f3d dump -> spring -> suspension 995636, vibex8, blend10 binary), blend-himp
-  (bin/halter-imp.sh: blend8 = blend-halter, impeller with NOSHAPE_BLEND_DEBUG + ZZ_DUMP -> vibex7 ~/tmp/blend/hdump).
-  Logs /root/blend-scratch/logs/*.out. Mac: ONE slot (noshape-env.sh), dx held it 19:52-; I build on vibex7/8.
-- Order (lead 20:05): impeller Fillet 3 speed, Halter, c2-extension-spring Fillet 1, asm-welding-config Part 6
-  fillets; + asm-suspension 995636 Fillet 3 ("Unfilleted edge overlapped by fillet.", live OK; tell asm when landed;
-  805e29e8 Fillets 3/4 after skasm's Sketch 2). Dropped (9e5b481d4): snap-hook Fillet 6, motor-mount Fillet 2 ms items,
-  and the full-round land (more code, not simpler).
-- Fillet 3 (Mac release, f3t logs): ~2.3 s = before_direct 85 + failing direct 146 + closed_run_on 840 (met 280,
-  corners 380) + reface 55 + Boolean 830 + unify 55. Direct build on the trimmed tools (ZZ_DIRECT2) = "an invalid
-  solid" in 395 ms; dumping it (ZZ_DUMP_DIRECT -> vibex8 ~/tmp/blend/f3d2) to replay with bin/f3d-replay.sh <n>.
-  blend10 uncommitted: cached face boxes + threaded touches / corner splits in closed_run_on (met 413 -> 280).
-- Halter: the old dump (Mac zzdump body-36 + add-36-*) is the tighten_tolerances variant: body invalid; tip fills'
-  sides 0.04-0.115 mm off their supports (x 5 fills 2.4e-5) and every fuse invalid. Suspected root upstream: our
-  tip x 1.502 = Chamfer Halterung's foot; live's Fillet 3 extends the chamfer face (6.18 -> 12.67 mm2) down to the
-  tip x 0.097 (live/blend/q-imp-halter). Probes kernel blend.rs zz_fill / zz_desc (blend8 uncommitted).
-- spring Fillet 1: two 0.5 mm CURVATURE rounds meeting in the middle of the slot's 1 mm end (x -11.7): live keeps two
-  faces JMG / JMC (0.8113 mm2) with an edge at y -1.0 (11/27/18); ours 10/24/16 = likely one face. Run pending.
-- live's Fillet / Chamfer pick rows (feel dialogs 11-18 batch 1): green CLI counts = live (R8 block 7; propagation on
-  10, off 8, face 12, chamfer defaults 10); chips / highlight / timing are psui's.
+  Probe scripts (bin/): k-probe-x8.sh <crash_inputs test> [ENV], m-probe-x8.sh <features_c test> [ENV] (blend10 on
+  vibex8), halter-imp.sh <host> [ENV] (blend8 impeller, blend debug, ZZ_DUMP), f3d-replay.sh <n>. Logs logs/*.out.
+  Mac: ONE slot (noshape-env.sh), often held (dx, bool): use vibex8 when it is.
+- Order (lead 23:05): (1) impeller Fillet 3 speed (Mac ~2.3 s: closed_run_on 840 = met 280 + corners 380, Boolean
+  830, failing first direct 146, before_direct 85, reface/unify 110), build directly where the result is the same;
+  (2) asm-suspension 995636 Fillet 3. Tell asm (d8d597e0-675c-497b-a804-544ceab99bbd) when it lands; 805e29e8
+  Fillets 3/4 after skasm's Sketch 2.
+- Fillet 3 direct on the trimmed tools (ZZ_DIRECT2, dump vibex8 ~/tmp/blend/f3d2/direct-1.brep): "an invalid solid";
+  part face 1 (the 840 mm2 Extrusion wall) leaves two invalid pieces. Refacing the tools' strip faces on the part's
+  surfaces before the Boolean: 3 of 4 fail, volume +16.9 mm3, 3.0 -> 2.4 s: dropped. blend10 uncommitted: cached
+  boxes + threaded touches / corner splits in closed_run_on (met 413 -> 280 ms), probes, ZZ_EXT_* in build.cpp.
+- asm-suspension 995636 Fillet 3 (Piston, R5 on two concave 24 mm lines x 211 y +-7.5 between a 5 mm loft and the
+  tab's sides, ~27 deg, live 16 -> 18 faces +11.08 mm3, each round 4-sided ending on the faces at z +-12): OCCT
+  "unfilleted edge overlapped"; section_blend overflow (one 48 mm chain of the two lines) Fuses to 5 solids, invalid.
+  Input vibex8 ~/tmp/blend/sdump/fillet-44.brep (NOSHAPE_DUMP_OPS of the assembly pair, NOSHAPE_PARITY_ASSEMBLIES=
+  ~/tmp/blend/asmonly); probe features_c::zz_susp_fillet3.
+- PARKED (lead 23:05) Halter: Fillet 3's tip must be at x 0.097 (live) for Halter's input. Live (q-imp-chamfer-surf):
+  Parasolid extends the chamfer face linearly, u (ruling) by 0.4008 and v by a straight Bezier span on the end
+  tangent (3 collinear poles), from its surface's end. parked/ext-seg-lin.patch (ZZ_EXT_SEG: segment to the face's UV
+  box, ZZ_EXT_LIN: that linear extension) moves our tip 1.502 -> 0.966 mm, Fillet 3 still = live, Halter then fails
+  at the x 5 corner ("run-on round not closed"). Rest: our chamfer surface (f26) bulges up to 21 um from live's 2 x 12
+  ruled B-spline (boundary rows within 4 um): matching the tip needs Parasolid's chamfer surface (multi-day).
+  Side-face continuation of the rim curve changes nothing (ruled out).
+- c2-extension-spring: = live to the end on main (12/12): nothing to do.
+- live's Fillet / Chamfer pick rows (feel dialogs 11-18 batch 1): green counts = live; chips / highlight are psui's.
 
 ## In flight (older)
 
