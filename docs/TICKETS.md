@@ -20,6 +20,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   still running after 10s" on every view change; a 2 s orbit shows 0-1 screen frames (live ~0.4 fps). The tab click -> assembly drawn
   took 43-200 s and the app stays busy ~5 min (11 min CPU) before going idle; the frame log's presents (UI) don't show the 3D view's lag.
   Load 8-25 (live's Chrome runs alongside). Data qa-scratch/heavy (x1, p1, p2; perf1 with NOSHAPE_PERF=1 follows).
+  qa 23:16 (11-18), v0.4.59 vs a release build of ea33bb69 (psui ce832447d), this host :154, alternating x2 (load ~40: hints):
+  tab open 70.1 / 55.2 s -> 40.7 / 11.9 s; view changes still unanswered in both: a 2 s orbit draws 0-1 screen frames, a wheel
+  notch shows after 6-12 s or not at all (qa-scratch/heavy/q-ea33bb69/q-*/probe.log). Still open.
   qa 12:00 (NOSHAPE_PERF=1 + perf record, sent to asm and psui): loading is ~27 s (115 regens 11.5 s, 99 tessellations 11.7 s); then
   **every viewport frame renders in 46.7-49.4 s** (1674x974, 4x MSAA). CPU: 72% llvmpipe JIT shaders + 12% lvp (= rasterising the
   drawn scene), 11% our meshing. Repro: copy of vibex8 ~/agents/asm-keep/qa-save/asm-xdev-subs.noshape, release app, Xvfb 1920x1080,
