@@ -734,6 +734,10 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
 - **LOFT-PATHS-MIRROR-WRONG-VOLUME (shipped in v0.4.57)**: c064b550a (01:23) is in v0.4.57: c2-loft-paths-guides Mirror 1 is Ok
   with the wrong part (fa6f90cc: 13/33/25 faces/edges/vertices, 5269155 mm³; live 27/67/47, 6325199 mm³). qa-lp-verify runs
   that document alone on the first green with core's revert (vibex6) -> qa-alerts and here.
+  qa 01:10 on 0f7610c8 (revert in): lead 01:18: the revert is enough for the cut (core: Mirror 1 back to live's volume).
+- [ ] **P2 LOFT-PATHS-TOPOLOGY (core)**: c2-loft-paths-guides with the revert: Loft 3 20/42/26 faces/edges/vertices (live 15/33/23),
+  then Mirror 1 37/83/51 (live 27/67/47), Extrude 3 43/98/60 (live 33/82/56); 16/29 features match. Older parity gap, not a
+  blocker (lp/0f7610c83.out).
 - Green 592b0fc9 vs v0.4.57: hat8, hat15, hat15b, the dock, ticket and authored documents ALL-SAME.
 - [ ] **P0 USER-HOVER-STAYS-LIT (psui / skasm; qa 22:11, v0.4.57 Linux release, vibex6 Xvfb, load ~23, real xdotool moves)**:
   the user's flow (new Part Studio, Sketch 1 on Top, a rectangle, default iso, planes shown; each line hovered, the pointer moved
