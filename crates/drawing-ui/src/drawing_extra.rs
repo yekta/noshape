@@ -610,18 +610,15 @@ impl DrawingEditor {
             .into_any_element()
     }
 
-    /// Onshape's Sheets panel: a 258 px `#fafafa` panel beside (left of) the
-    /// drawing area. Blue "Sheets (n)" title with the Insert sheet button,
-    /// a 2 px blue rule, "Sort by sheet | Sort by reference" tabs, then the
-    /// tree (sheet › reference › views; the active sheet `#e9eef2` with a
-    /// 4 px blue bar). Closed, only the sheet chips and the toggle show.
-    /// Left of the drawing tool dialogs: beside the Sheets panel when open.
-    /// Dialogs open at the canvas's left edge (the Sheets panel pushes the
-    /// canvas, so it never covers them).
+    /// Left of the drawing tool dialogs: the canvas's left edge, beside the Sheets panel when it is open over it.
     pub fn dialog_left(&self) -> f32 {
-        0.
+        if self.sheets_open { SHEETS_W } else { 0. }
     }
 
+    /// Onshape's Sheets panel: a 258 px `#fafafa` panel over the drawing area's left. Blue "Sheets (n)" title with
+    /// the Insert sheet button, a 2 px blue rule, "Sort by sheet | Sort by reference" tabs, then the tree (sheet ›
+    /// reference › views; the active sheet `#e9eef2` with a 4 px blue bar). Closed, only the sheet chips and the
+    /// toggle show.
     pub fn render_sheet_bar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         if !self.sheets_open {
             return self.render_sheet_tabs(cx);
@@ -983,8 +980,8 @@ impl DrawingEditor {
             .child(div().h(px(2.)).flex_none().bg(blue))
             .child(h_flex().h(px(29.)).flex_none().bg(rgb(0xffffff)).border_b_1().border_color(rgb(0xdbdbdb)).child(tab("dr-sort-sheet", "Sort by sheet", !by_ref, cx)).child(tab("dr-sort-ref", "Sort by reference", by_ref, cx)))
             .child(list);
-        // The panel takes its width beside the canvas (live drawing/30).
-        div().relative().flex_none().w(px(W)).h_full().child(panel).into_any_element()
+        // Over the canvas's left: the sheet stays where it is (live2 shortcuts-1118 Ctrl+S).
+        panel.into_any_element()
     }
 
     // ------------------------------------------------------------ tools

@@ -629,6 +629,8 @@ pub struct DrawingEditor {
     /// Inspection item dialog (see `drawing_inspection`).
     pub inspection: Option<crate::drawing_inspection::InspectionDlg>,
     pub measure: Option<Vec<crate::drawing_keys::MeasurePick>>,
+    /// The Measure panel's Show dual unit.
+    pub measure_dual: bool,
     pub status: Option<SharedString>,
     /// The green success bubble at the top centre of the sheet (`show_toast`)
     /// and its generation (a newer one replaces it).
@@ -895,6 +897,7 @@ impl DrawingEditor {
             target_dims_shown: None,
             insp_table: Default::default(),
             measure: None,
+            measure_dual: false,
             status: None,
             toast: None,
             toast_gen: 0,
@@ -2296,7 +2299,7 @@ impl DrawingEditor {
             .children(self.render_view_props(cx))
             .children(self.render_zoom_window())
             .children(self.render_shortcut_toolbar(cx))
-            .children(self.render_measure())
+            .children(self.render_measure(cx))
             .child(self.render_measure_button(cx))
             .children(self.render_sheet_props(cx))
             .children(self.render_drawing_props(cx))
@@ -2386,8 +2389,8 @@ impl DrawingEditor {
             }))
             .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.zoom_to_fit(cx)))
             // Live (navigation/50-55): Shift+Z / Z zoom ×2 / ×½ about the view
-            // centre; Ctrl+Shift+arrows move the sheet 10 % of the canvas
-            // width toward the arrow; plain arrows do nothing in drawings.
+            // centre; Ctrl+Shift+arrows and Shift+arrows move the sheet 10 % of
+            // the canvas width toward the arrow; plain arrows do nothing in drawings.
             .on_action(cx.listener(|this, _: &ZoomIn, _, cx| {
                 let s = this.size_px();
                 this.zoom_by(2.0, [s[0] / 2.0, s[1] / 2.0], cx)
@@ -2400,6 +2403,12 @@ impl DrawingEditor {
             .on_action(cx.listener(|this, _: &PanRight, _, cx| this.pan_step(1.0, 0.0, cx)))
             .on_action(cx.listener(|this, _: &PanUp, _, cx| this.pan_step(0.0, -1.0, cx)))
             .on_action(cx.listener(|this, _: &PanDown, _, cx| this.pan_step(0.0, 1.0, cx)))
+            // Shift+arrows (Coarse rotate in 3D) move the sheet the same in a drawing (live2 shortcuts-1118).
+            .on_action(cx.listener(|this, _: &RotateLeft90, _, cx| this.pan_step(-1.0, 0.0, cx)))
+            .on_action(cx.listener(|this, _: &RotateRight90, _, cx| this.pan_step(1.0, 0.0, cx)))
+            .on_action(cx.listener(|this, _: &RotateUp90, _, cx| this.pan_step(0.0, -1.0, cx)))
+            .on_action(cx.listener(|this, _: &RotateDown90, _, cx| this.pan_step(0.0, 1.0, cx)))
+            .on_action(cx.listener(|this, _: &ClearSelection, _, cx| this.clear_selection_key(cx)))
             .on_action(cx.listener(|this, _: &DrawingUpdate, _, cx| this.update_drawing(cx)))
             // Onshape drawing letters that collide with Part Studio bindings.
             .on_action(cx.listener(|this, _: &ViewNormal, _, cx| this.set_tool(Tool::Note, cx)))
@@ -2407,10 +2416,10 @@ impl DrawingEditor {
             .on_key_down(cx.listener(Self::on_key))
             .child(slices.toolbar.clone().cached(StyleRefinement::default().w_full().h(px(crate::ui::TOOLBAR_H)).flex_none()))
             .child({
-                // The open Sheets panel pushes the canvas (live drawing/30);
-                // the closed one's sheet chips are on the canvas.
+                // The open Sheets panel lies over the canvas (live2 shortcuts-1118: Ctrl+S leaves the sheet where it
+                // is); the closed one's sheet chips are on the canvas.
                 let canvas_el = canvas_el.h_full().min_w_0().border_t_1().border_color(pal.border);
-                gpui_kit::component::h_flex().flex_1().min_h_0().relative().children(sheet_bar).child(canvas_el)
+                gpui_kit::component::h_flex().flex_1().min_h_0().relative().child(canvas_el).children(sheet_bar)
             })
             .children(self.render_tool_help())
             .into_any_element()

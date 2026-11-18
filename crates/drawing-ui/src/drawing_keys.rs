@@ -1,12 +1,13 @@
 //! Drawing editor, Onshape shortcuts that need their own state: `w` Zoom
 //! window (drag a box, the sheet zooms to it), Ctrl+S (Sheets panel open /
-//! close), Shift+N (rename the current sheet or the selected view).
+//! close), Shift+N (rename the current sheet or, in the Sheets panel, a view), Space, `[` Measure.
 
 use crate::drawing_sketch::{SkCon, SkTool};
 use crate::drawing_view::*;
 use noshape_model::drawing::ViewId;
 use crate::theme::p;
 use gpui_kit::*;
+use gpui_kit::component::{h_flex, v_flex};
 
 /// A drawing's Control-only shortcuts (live's key list, behaviours "Keys on macOS"): the Control key on every OS,
 /// a Mac's too; Cmd (Super / Windows key elsewhere) never.
@@ -32,8 +33,8 @@ pub fn control_key(m: &Modifiers, key: &str) -> Option<ControlKey> {
 impl DrawingEditor {
     /// `w` / Zoom to window: the next left drag draws the window.
     pub fn start_zoom_window(&mut self, cx: &mut Context<Self>) {
+        // No bubble (live2 shortcuts-1118).
         self.zoom_window = Some(None);
-        self.status = Some("Zoom window: drag a box around the area to zoom to".into());
         cx.notify();
     }
 
@@ -85,11 +86,7 @@ impl DrawingEditor {
     /// Ctrl+S: open / close the Sheets panel ("Display sheet menu").
     pub fn toggle_sheets_panel(&mut self, cx: &mut Context<Self>) {
         self.sheets_open = !self.sheets_open;
-        // The panel pushes the canvas (live drawing/30): pan so the sheet
-        // stays where it was on screen.
-        let half = f64::from(crate::drawing_extra::SHEETS_W) / 2.0 / self.zoom.max(1e-9);
-        self.center[0] += if self.sheets_open { half } else { -half };
-        self.redraw(cx);
+        cx.notify();
     }
 
     /// Shift+/: the Keyboard shortcuts sheet (app-core's, shared by the
@@ -105,9 +102,9 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// Shift+N: rename the selected view (View properties › Name), else the current sheet.
-    /// With the Sheets panel open (live K20): one selected view or sheet row
-    /// gets a "Rename" popup beside its row; any other selection, nothing.
+    /// Shift+N: with the Sheets panel open (live K20), one selected view or sheet row gets a "Rename" popup beside
+    /// its row; any other selection, nothing. Closed: the current sheet's name, nothing with a view selected (live2
+    /// shortcuts-1118).
     pub fn rename_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let view = self.selection.iter().find_map(|s| s.as_view());
         if self.sheets_open {
@@ -118,10 +115,18 @@ impl DrawingEditor {
             };
             return self.open_row_rename(row, window, cx);
         }
-        match view {
-            Some(v) => self.open_view_props(v, window, cx),
-            None => self.open_sheet_name_panel(self.sheet, window, cx),
+        if view.is_none() {
+            self.open_sheet_name_panel(self.sheet, window, cx);
         }
+    }
+
+    /// Space: the selection cleared (live2 shortcuts-1118), not while a dialog is open.
+    pub fn clear_selection_key(&mut self, cx: &mut Context<Self>) {
+        if self.panel.is_some() || self.selection.is_empty() {
+            return;
+        }
+        self.selection.clear();
+        self.redraw(cx);
     }
 }
 
@@ -293,10 +298,13 @@ pub enum MeasurePick {
 impl DrawingEditor {
     /// `[`: Measure on / off. Click points, straight edges or circles; up to
     /// two picks are measured (model units, through the view scale).
+    /// Live2 shortcuts-1118: the Measure panel at the top left, no bubble; opening it clears the selection.
     pub fn toggle_measure(&mut self, cx: &mut Context<Self>) {
         self.measure = if self.measure.is_some() { None } else { Some(Vec::new()) };
-        self.status = self.measure.as_ref().map(|_| "Measure: select points, straight edges or circles".into());
-        cx.notify();
+        if self.measure.is_some() {
+            self.selection.clear();
+        }
+        self.redraw(cx);
     }
 
     /// Click while measuring. True when used.
@@ -330,12 +338,17 @@ impl DrawingEditor {
         true
     }
 
-    /// Model length of a view-coordinate length (view coordinates are model meters).
+    /// Model length of a view-coordinate length (view coordinates are model meters); with Show dual unit, the other
+    /// unit after it in brackets.
     fn measure_text(&self, meters: f64) -> String {
-        noshape_model::drawing::build::format_length(&self.drawing, meters) + if self.drawing.units_mm { " mm" } else { " in" }
+        let main = noshape_model::drawing::build::format_length(&self.drawing, meters) + if self.drawing.units_mm { " mm" } else { " in" };
+        if !self.measure_dual {
+            return main;
+        }
+        let other = if self.drawing.units_mm { format!("{:.3} in", meters / 0.0254) } else { format!("{:.2} mm", meters * 1000.0) };
+        format!("{main} [{other}]")
     }
 
-    /// The Measure results panel (bottom left of the drawing area).
     /// The Measure button at the drawing's bottom right (live keys-1118 hov-measure: "Measure ([)"), pressed while
     /// Measure is on.
     pub fn render_measure_button(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -351,7 +364,8 @@ impl DrawingEditor {
             .into_any_element()
     }
 
-    pub fn render_measure(&self) -> Option<AnyElement> {
+    /// The Measure panel with what the picks measure.
+    pub fn render_measure(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let picks = self.measure.as_ref()?;
         let pal = p();
         let mut rows: Vec<(String, String)> = Vec::new();
@@ -400,13 +414,44 @@ impl DrawingEditor {
             }
             _ => {}
         }
-        let mut col = gpui_kit::component::v_flex().gap_1();
-        col = col.child(div().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Measure"));
-        for (k, v) in rows {
-            col = col.child(gpui_kit::component::h_flex().gap_3().text_size(px(12.)).child(div().w(px(70.)).text_color(pal.text_muted).child(k)).child(div().child(v)));
-        }
-        // Beside the Sheets panel when it is open.
-        Some(div().absolute().left(px(self.dialog_left() + 4.)).bottom(px(34.)).min_w(px(200.)).p_2().bg(pal.dialog_bg).border_1().border_color(pal.border).shadow_md().text_color(pal.text).child(col).into_any_element())
+        // Live2 shortcuts-1118 (measure.png): a drawing panel at the top left: "Measure" with the red ✕, the blue
+        // selection box "Select entities to measure", the unit "Inches (Drawing)" and Show dual unit.
+        let field = rows.iter().fold(
+            v_flex().mx(px(4.)).my(px(3.)).p(px(3.)).border_1().border_color(pal.accent).bg(gpui_kit::rgb(0xe8f1fb)).text_size(px(12.)).child(div().text_color(pal.text_muted).child("Select entities to measure")),
+            |f, (k, v)| f.child(gpui_kit::component::h_flex().gap_3().child(div().w(px(70.)).text_color(pal.text_muted).child(k.clone())).child(div().child(v.clone()))),
+        );
+        let unit = if self.drawing.units_mm { "Millimeters (Drawing)" } else { "Inches (Drawing)" };
+        let dual = self.measure_dual;
+        let dual_box = div().h(px(26.)).px(px(4.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new("measure-dual").label("Show dual unit").checked(dual).on_click(cx.listener(|this, v: &bool, _, cx| {
+            this.measure_dual = *v;
+            cx.notify();
+        })));
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Measure", "text": ["Measure", "Select entities to measure", unit, "Show dual unit"] }));
+        Some(
+            v_flex()
+                .id("dr-measure-panel")
+                .debug_selector(|| "dr-measure-panel".into())
+                .absolute()
+                .top(px(DIALOG_TOP))
+                .left(px(self.dialog_left()))
+                .w(px(220.))
+                .bg(pal.dialog_bg)
+                .shadow(crate::drawing_chrome::dialog_shadow())
+                .text_color(pal.text)
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .child(
+                    h_flex()
+                        .h(px(28.))
+                        .pl(px(11.))
+                        .border_b_1()
+                        .border_color(gpui_kit::rgb(0xd3d7d9))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Measure"))
+                        .child(div().id("measure-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_measure(cx)))),
+                )
+                .child(v_flex().p(px(3.)).child(field).child(div().h(px(26.)).px(px(4.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(12.)).child(unit)).child(dual_box))
+                .into_any_element(),
+        )
     }
 }
 

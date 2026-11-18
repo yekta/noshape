@@ -2010,3 +2010,67 @@ fn insert_views_continuation_places_no_diagonal_view(cx: &mut TestAppContext) {
     }));
     assert!(pending(cx, [base[0] + 150.0, base[1] - 95.0]), "P-started: the isometric view");
 }
+
+/// Live2 shortcuts-1118: Shift+arrows move the sheet as Ctrl+Shift+arrows (a tenth of the canvas width: Shift+Down
+/// down, Shift+Left left); W shows no bubble; Shift+N with a view selected and the Sheets panel closed does nothing;
+/// `[` opens the Measure panel at the top left and clears the selection, no bubble; Space clears the selection;
+/// Ctrl+S opens the Sheets panel over the sheet, which stays where it is.
+#[gpui::test]
+fn drawing_keys_as_lives_shortcut_sweep(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-shortcuts-1118");
+    real_sheet(cx, window, &editor);
+    let act = |cx: &mut TestAppContext, a: Box<dyn gpui_kit::Action>| {
+        cx.update_window(window, |_, w, cx| {
+            let focus = editor.read(cx).focus.clone();
+            w.focus(&focus, cx);
+            w.dispatch_action(a, cx);
+        })
+        .unwrap();
+        draw(cx, window);
+    };
+    // The sheet's origin in canvas pixels.
+    let on_screen = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let s = e.size_px();
+            [s[0] / 2.0 - e.center[0] * e.zoom, s[1] / 2.0 + e.center[1] * e.zoom]
+        })
+    };
+    let step = cx.update(|cx| editor.read(cx).size_px()[0] * 0.1);
+    let p0 = on_screen(cx);
+    act(cx, Box::new(crate::actions::RotateDown90));
+    let p1 = on_screen(cx);
+    assert!((p1[1] - p0[1] - step).abs() < 1e-6 && (p1[0] - p0[0]).abs() < 1e-6, "Shift+Down: down {step} px: {p0:?} → {p1:?}");
+    act(cx, Box::new(crate::actions::RotateLeft90));
+    let p2 = on_screen(cx);
+    assert!((p1[0] - p2[0] - step).abs() < 1e-6, "Shift+Left: left {step} px: {p1:?} → {p2:?}");
+    act(cx, Box::new(crate::actions::ZoomWindow));
+    assert!(cx.update(|cx| editor.read(cx).zoom_window.is_some() && editor.read(cx).status.is_none()), "W: armed, no bubble");
+    act(cx, Box::new(crate::actions::Cancel));
+    let view = cx.update(|cx| editor.read(cx).current_sheet().views.first().map(|v| v.id)).expect("a view");
+    let select = |cx: &mut TestAppContext| cx.update(|cx| editor.update(cx, |e, _| e.selection = vec![Sel::View(view)]));
+    select(cx);
+    act(cx, Box::new(crate::actions::RenameSelected));
+    assert!(cx.update(|cx| editor.read(cx).view_props.is_none() && editor.read(cx).row_rename.is_none()), "Shift+N, panel closed: nothing");
+    act(cx, Box::new(crate::actions::MeasureTool));
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(e.measure.is_some() && e.selection.is_empty() && e.status.is_none(), "[: Measure on, selection cleared, no bubble");
+    });
+    let panel = VisualTestContext::from_window(window, cx).debug_bounds("dr-measure-panel").expect("the Measure panel");
+    let canvas = cx.update(|cx| editor.read(cx).bounds);
+    assert!((panel.left() - canvas.left()).abs() < px(0.5) && (panel.top() - canvas.top()).abs() < px(0.5), "top left: {panel:?} in {canvas:?}");
+    act(cx, Box::new(crate::actions::MeasureTool));
+    select(cx);
+    act(cx, Box::new(crate::actions::ClearSelection));
+    assert!(cx.update(|cx| editor.read(cx).selection.is_empty()), "Space clears the selection");
+    let before = on_screen(cx);
+    cx.update(|cx| editor.update(cx, |e, cx| e.toggle_sheets_panel(cx)));
+    draw(cx, window);
+    draw(cx, window);
+    assert!(cx.update(|cx| editor.read(cx).sheets_open), "Ctrl+S: the Sheets panel");
+    let after = on_screen(cx);
+    assert!((after[0] - before[0]).abs() < 1e-6 && (after[1] - before[1]).abs() < 1e-6, "the sheet stays: {before:?} → {after:?}");
+    assert_eq!(cx.update(|cx| editor.read(cx).bounds), canvas, "the canvas keeps its size");
+}
