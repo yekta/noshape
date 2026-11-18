@@ -966,7 +966,7 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   then Mirror 1 37/83/51 (live 27/67/47), Extrude 3 43/98/60 (live 33/82/56); 16/29 features match. Older parity gap, not a
   blocker (lp/0f7610c83.out).
 - Green 592b0fc9 vs v0.4.57: hat8, hat15, hat15b, the dock, ticket and authored documents ALL-SAME.
-- [ ] **P0 USER-HOVER-STAYS-LIT (psui / skasm; qa 22:11, v0.4.57 Linux release, vibex6 Xvfb, load ~23, real xdotool moves)**:
+- [x] (verified qa 17:55 on green 87edba24, vibex8 :663 at load ~35, uh3.sh x3 with shots 0.7 / 1.5 / 3 s: every "off" rest unlit at all three shots (36 / 36); each line lit when hovered by 1.5 s; at 0.7 s a return was still unlit 7 / 12 and the line before still lit 4 / 12, both gone by 1.5 s: lag on that load, recheck in the 02:00 window; also clean on 7187ac75 / 5e498ffb 11-17 23:40; qa-scratch/uh/g87) **P0 USER-HOVER-STAYS-LIT (psui / skasm; qa 22:11, v0.4.57 Linux release, vibex6 Xvfb, load ~23, real xdotool moves)**:
   the user's flow (new Part Studio, Sketch 1 on Top, a rectangle, default iso, planes shown; each line hovered, the pointer moved
   off onto empty space over the Front plane, then back, a shot 700 ms after each rest; uh/uh2.sh), 3 runs: every line lights
   when hovered (never a plane over a line), but after leaving the top line **all four lines stay lit** with the pointer at rest
