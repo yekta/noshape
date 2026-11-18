@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-18 11:50 UTC (new blend thread 0672fa20-964d-4fde-a19c-c5b4363729ba, account Bbedward). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-18 17:30 UTC (new blend thread 0672fa20-964d-4fde-a19c-c5b4363729ba, account Bbedward). History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -110,21 +110,21 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## Next, in order
 
-1. NOW (lead 11-18), in order: (a) impeller Fillet 4 (gating), (b) Fillet 3 speed, (c) knife re-time, (d) Halter.
-   (a) Fillet 4: branch blend-f4 (blend9, f9df34212 on main ab6da5d97): after OCCT fails with overflow off, section
-   blend with cliff (detail.rs); the cliff face is decided once per edge at its middle (the floor turns away at the
-   rim's ends: reach 0.0009 mm there), its reach found per station; no cliff face on a curved chain -> declined. T1
-   features_c::a_round_wider_than_a_curved_flange_takes_its_side_as_live (data impeller-fillet4-input.bin = core's
-   dump fillet-32, 43 faces; live's input 64): 268.31 mm3 off (live 270.11), round 371.22 mm2 (372.45) z -4..0, sliver
-   kept. Mac full doc: Fillet 4 OK valid 105929.52 mm3 (live 105931.13); Move face 2 still ERROR (core told 11:45: input
-   differs from Boolean 3, 43 vs 64 faces). GATE running: unit blend-seq-f4 (bin/seq-f4.sh): suites blend4 (base) /
-   blend9 on vibe2 -> suite-r-f4{base,}.log, .cmp, f4-suite.done; documents on vibex7 -> seq-f4.log, ud-f4.done. Rust
-   only (no g13). Documents ALL-SAME (vibex7 lacks dock). Suites moved to vibex7 (lead 13:40): unit blend-seq-f4b
-   (bin/seq-f4b.sh) -> suite-x7-f4{base,}.log, .cmp, f4x7.done. Don't edit blend9 / blend4 until done. Land when only
-   the impeller differs.
-   Speed: Fillet 4 Mac 602 ms (live 102): Boolean 293, face_reach bisection 153 (1915 distances), OCCT try 83.
-   face_reach by projection: blend10 branch blend-f4-speed ac197ab11 (A/B running: bin/ab-mac.sh -> logs/ab-f4.out);
-   land it after (a) (patch parked/f4-reach-speed.patch).
+1. NOW (lead 11-18 17:xx): (a) land the full round (gating), (b) Halter = Fillet Stevenrohr zum Halter (P1, impeller's
+   first difference; blocks core's Move face 2 / Delete face 2), (c) c2-extension-spring Fillet 1 (10/24/16 vs live
+   11/27/18), then Fillet 3's direct-build end trimming (multi-day).
+   Landed 11-18: 7c60d5ea impeller Fillet 4 (cliff rounds on curved edges; T1 features_c::a_round_wider_than_a_
+   curved_flange...), 51510232 its face reach by projection (Mac 612 -> 370 ms), 270e489b by-tools direct build checked
+   once (snap-hook Fillet 6 25 -> 23 ms; the rest is 40 cone x torus IntSS 5.9 ms, axes parallel 50-230 mm apart: left).
+   (a) blend-fullround 16a7b76ae (blend10 branch; blend-base detached at it): op_full_round_coaxial (blend_direct.cpp):
+   a bore's FULL_ROUND by face replacement (half torus revolved from the profile arc, the sides' loops replaced by its
+   circles, only new faces + shells checked), torus renamed as the Boolean's tool face; motor-mount-jack Fillet 2 Mac
+   9 -> 2 ms x5 (live 3), 10/10; T1 kernel_robustness::a_full_round_of_a_bore_or_a_boss_is_a_half_torus passes.
+   Gate: unit blend-seq-fr2 (bin/seq-fr.sh): suites blend4 (main) / blend-base on vibex7 -> suite-x7-fr{base,}.log,
+   .cmp, g13-fr.log, fr.done. Land when only motor-mount... differ in speed (identical results).
+   (b) Halter: branch blend-halter (WIP 663 lines on af331f85e); first look upstream: Chamfer Halterung's bevel (f26)
+   foot at 0.21 mm tolerance, bevel faces 6.097 vs live 6.18 mm2, tip x 1.502 vs live 0.097.
+   qa 11-18 Mac re-time (main): snap-hook Fillet 6 25/8, motor-mount Fillet 2 9/3 (now 2), others within 1.5x.
    (b) Fillet 3 on main (Mac, 3 runs): 2269-2277 ms (live 103). Profile (logs/imp3-prof.log): op_boolean x3 884 ms
    (OCCT edge-face 594), min_distance x149 339, bounding_box x339 251, op_split x10 223, blend.direct 132 (declined:
    open shell, 20 free edges at the rounds' ends x 0 / 78.9 and x 1.5-5), unify 73. Path: the conic's untrimmed ball
