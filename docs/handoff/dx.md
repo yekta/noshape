@@ -94,31 +94,39 @@ Open, ranked:
 
 ## Open: other
 - c2-impeller-loft: f15's Boolean is a known live difference (bool, DECISIONS); 24/48, see Next 2.
-- Exchange ("live imports ours") 43/48 (live re-import of the 14:51 files; the gear STL re-imported at 15° 22:0x,
-  synced). Left: hose x_t (deliberate split rings); 65-tooth STEP area -0.17 mm² (lead: left); STL rows (gear,
-  radijator, sheet metal plus): the suite exports Custom chord 100 / REST angle but Medium's 0.254 mm minimum facet
-  width; live's REST has none that binds (radijator r 0.92 arcs in 0.08 mm segments). Floor 0.254: radijator 4,186
-  triangles vs live 5,052; floor 0.0254: 5,338 (gear 11,124 vs 9,000). The rest is OCCT BRepMesh (analysis by 01:54,
-  /root/dx-scratch/bin/stl{faces,loops,arcs,seg,curved}.py): (1) BRepMesh_CurveTessellator's OCC287 minimum of 4 points
-  on a circle / conic (radijator's 18 2.5° arcs: 3 segments, live 1: +144 triangles); (2) the 45° cone (z 11-15) gets 3
-  rows, live 1 (+150). Parked P3, no OCCT patch (lead, DECISIONS 7210b453e): STL rows compare by area, volume and
-  deviation within live's error, not triangle counts. Live's REST STL default: 5°, 15° over 500
-  exported faces (live2 /root/onshape-research/live/exchange-kw/README.md), the default chord (chord 100 in ours
-  matches at 15° within 0.4 % per part); a tiny feature in a large export goes coarser (r 0.05 in a 520 mm studio,
-  dx/q1137; none of our rows). Sync the hosts' live-ours*.json after every live re-import.
-- cf-spur-gear 13/14 since live's 19:28 refs (Sketch 2 near-singular, "could not be solved" vs "over defined" by
-  rounding): skasm's 62893b1ed takes back over-defining model-geometry constraints. Its in-feature cPoint (CAP_EDGE of
-  the Spur Gear's own `….blank` extrude) is untranslated: low value.
-- drw-centermark regression (qa, greens 45aa7a0e..f8cbf3c6): sent back pointing at studios' f2b9b1087 (take page
-  height / click mapping); mine in the range don't touch centermarks.
+- Exchange STL rows parked P3 (lead DECISIONS 7210b453e: area / volume / deviation, not triangle counts); archive 11-18.
 - Drawing exports 84 / 84 (exp-1115r + the revision / spline / jog runs). drw-broken-out-section compares within ±1 px
   (DECISIONS 11-15). Studios' view fit (69f67433) in.
-- Speed: cf-part-draft's Spur Gear 452 -> ~236 ms (live 227). Left there: its opFillet blend 65-120 ms (blend) and
-  model-core's own 28 region profiles. cf-snap-hook ×3.4: Snap Hook Booleans + Shell 1 -> bool (took it), fillets ->
-  blend (FYI). draft_robust whole-body is_valid: core's 77715251. The kernel profile's per-feature block also counts
-  the suite's measurement after the feature (boxes, props, display mesh): compare with the feature's own regen ms.
-
 ## Next, in order
+P. Parked (lead 21:2x: no OCCT class layout change; fill-pattern 1.6x live, under the 2x bar): OCCT patch 0034
+   (/root/dx-scratch/occt-patch/0034-fclass2d-wire-boxes.patch): BRepTopAdaptor_FClass2d gives each wire's classifier
+   the face's UV box, so no hole is ever box-rejected; per-wire boxes took fill-pattern Iso 11.3 -> 1.98 s, Update
+   7.1 -> 1.86 s, views identical on 16 / 17 corpus drawings. Needs a new member (TabBox): land only ABI-neutral.
+N. Drawings not deterministic (lead 21:2x: first). Two causes, both fixed (uncommitted):
+   - OCCT's Contap_HContTool kept a surface's sample bounds in file statics: parallel views' outline tracing raced.
+     patches/occt/0035-contap-thread-local-sample-bounds.patch (thread_local, ABI-neutral; g++-13 / 15, Apple clang).
+     Mac proof (private OCCT root ~/noshape-host/dx-keep/occt35, dvp35.sh): rings-loft + impeller identical over
+     3 parallel runs and one thread, exact work counts too. Staged: x86 vibex8 ~/agents/dx-keep/occt0035/x86/
+     libTKHLR.a (only Contap_HContTool.cxx.o swapped, -march=x86-64, no ymm/fma, sha256 6d9c9d00), arm64 Mac
+     ~/noshape-host/dx-keep/occt35/lib/libTKHLR.a. The lead installs them before the land (DECISIONS 11-15).
+   - mesh_body.cpp faceted(): facet edges ran from the lower vertex address (differs run to run): hex-bookcase's mesh
+     lines varied even on one thread (533-541 edges). Now by vertex creation order.
+   - Proven 22:5x (Mac, dvp35.sh): rings-loft 4522 / impeller 1152 / hex 526 edges, name-stripped dumps identical over
+     3 parallel runs and one thread. Next: kernel / drawing / ops tests + clippy (dvtest35.sh), lead installs the
+     libs, land; then check hex's DXF counts vs live (was LINE 211/206, LWPOLYLINE 17/25).
+Q. (lead 11-18 20:4x, after fan-blade) asm-robot-relations studio 0c3466's Import 1: live makes six separate SURFACE
+   parts REV-21-1650, ours sews them into one 171,987 mm³ solid (BOM 36/42 rows, Thicken 1 11 parts for live's 1):
+   Import keeps separate sheets separate. Repro from asm (d8d597e0-675c-497b-a804-544ceab99bbd).
+   Found 22:3x (/root/dx-scratch/bin/stepcomp.py, /root/dx-scratch/rr/rrprobe.cpp on vibex8): the STEP
+   (foreign/0fc7dd7c….step) is ONE closed shell, 174 faces, one component; OCCT: valid, 171,983 mm3. Live's six
+   sheets = that shell with plane face #5090 (live JFX, 1 face) cut out: every link between JFD (45 faces), JFT
+   (110) and the three rods (6 each) runs through #5090's 14 edges. Not why yet: #5090 is exact (edges on its plane
+   to 1e-5 mm), loops >= 0.05 mm apart, edge use consistent, no self-intersection (BOPAlgo), curve-on-surface <= 1e-3
+   mm. Next: what Parasolid rejects there (ask live2 whether live flags Import 1 faulty?).
+R. (live 11-18 22:3x, docs/parity/error-wording.md "Import / export (live)") a broken STEP via + > Import...: live shows
+   the "Import to Onshape" dialog, then a red bubble "bad.step uploaded but failed to translate. Open document x" and
+   keeps the file tab; ours: "Import failed: <path>: i/o error: could not read STEP file <path>". Evidence
+   live/errors-1118/import/, files /root/live-scratch/err18/files/.
 0. Speed vs live (lead 11-18 06:1x; release, vibex8, dx_perf, same run; live behaviours "speed: drawings", "dx speed:
    drawing creation and NIST import", "dx (2026-11-02, P1 drawing speed on big models)"):
    - bracket drawing, cold (no cached view): create 10 ms (live 30.1 s, server 3.0), insert view 7 ms (3.0 s),
@@ -132,7 +140,13 @@ Open, ranked:
      studio's regeneration; live2 asked in REQUESTS 18:07, no live times yet): impeller Front 150 / Top 121 / Right 170
      / Iso 127 ms, Update after a suppression 194; rings-loft 393 / 291 / 448 / 474, Update 612; snap-hook 22 / 10 / 31
      / 28, 36; xDev Bushing <2, guide adapter 6 / 4 / 17 / 6, 19. Fixed: the agent API's Insert view into an empty
-     drawing regenerated the studio afresh (impeller 9.7 s): SheetModel::build primes `extra`. Rule (DECISIONS
+     drawing regenerated the studio afresh (impeller 9.7 s): SheetModel::build primes `extra` (the app's Insert view
+     already uses the open studio's committed_context). Next 8 by faces: fill-pattern 1.9 / 2.4 / 1.8 / Iso 11.3 s,
+     Update 7.1 (62 % BRepTopAdaptor_FClass2d::Perform: every hole wire box-tested per classify, a BRepAdaptor_Surface
+     per call: OCCT patch, wire-box grid); fan-blade-sweep ~5.5 s each, Update 8.6 (HLRBRep_Data::Classify's exact
+     line / B-spline intersections); straight-spline 0.7-1.7 s, Update 2.0; drive-train 1.3-2.0 s; surface-pattern
+     0.6-0.7; spur-gear 0.4-0.6; sm-louver < 0.14; socket-head < 0.01. Profiles: Mac dx-keep/dvs-<doc>.txt
+     (dvsample.sh, /root/skasm-scratch/bin/sample_under.py). Waiting on live2's times (REQUESTS 18:07). Rule (DECISIONS
      9e5b481d4): only views >= 100 ms and >= 2x over live's count.
    - Mac (11-18, release, median of 3): c2-rings-loft x_t import 2.28 s (live 8.6), STEP 0.95; cf-o-ring ACIS 0.63 s
      (live 10.6; vibex8 4.3-13 s by load); cf-spur-gear regenerates in 467 ms (live's full-regen per-feature sum 697 ms; qa's TICKETS row was loaded vibe2).
@@ -155,8 +169,9 @@ Open, ranked:
    - clamp-guillem Top y 6.5867 x 4.29-4.62: our model edge is there but HLR hides it where it meets a fillet
      tangentially (live visible); ours 7.077-7.161 at 30° live hides: grazing HLR, open. hex ELLIPSE 0 / 2: live's
      degenerate ellipses on a 0.5 mm mesh hole (noise).
-   - Model-side (not the writer): housing-draft's 0.499 in edges bow 0.5 mm in ours (live LINEs) and its Right hole
-     rim isn't an exact circle (core's Draft, sent 16:2x with numbers); extension-spring's Top has a second end rectangle (x 2.230 / 2.268) and
+   - Mine after all (core 22:3x: the part = live through every Draft, 22 real circles, 36 lines): housing-draft's
+     0.499 in edges bowing 0.3-0.5 mm (live LINEs) and the Right-view hole rim as a SPLINE (live CIRCLE) come from our
+     projection (at most Rotieren 1's grazing cut, bool's parked BOOL-ROTIEREN-TANGENT); extension-spring's Top has a second end rectangle (x 2.230 / 2.268) and
      Fillet 1 (blend); bottle-split's lip outline is live's noise (18 tiny pieces); hex mesh splits (no rule).
    - Import: "Upload only" for a bare assembly (live upload-only-1118) landed 0e95ad97; "Preserve source IDs" is
      server-off for live's users (behaviours 15:00): nothing to build.
@@ -178,26 +193,9 @@ Open, ranked:
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## Since 19:50 (this thread)
-- DXF rows (lead 23:0x), exchange suite drawings 0/10 (vibex6 exch-dxf / exch-fix2 logs, /root/dx-scratch/bin/
-  dxflayercount.py, dxfanntext.py, dxfents.py, dxfsheet.py (two DXFs side by side), hlrplot.py / hlrgrid.py).
-  Landed 5076e98c (view-label MTEXT, tangent-only circles, mesh crash; archive) and 12a38f9e (03:23):
-  - 46d2c427d mesh parts drawn as live, silhouettes only (live2 q-mesh-drawing: hex "imported" alone and the rings Iso
-    show no folds between facets toward the viewer, not even 90 deg: the far half of a hole rim), edge-on facets
-    count as away (MESH_FACING); a B-rep edge glimpsed past mesh facet corners (piece < deflection of a longer edge)
-    dropped; no centermark on a wholly hidden circle; on_conic: ends meeting make a whole circle only past half its
-    length. hex-bookcase 0 CIRCLE / 0 ELLIPSE / 211 LINE / 17 LWPOLYLINE for live's 0 / 2 / 206 / 25.
-  - be583d88d edges two parts share in 3D (ModelEdge::shared, SheetGeometry::shared_lines) written for each part:
-    duct-multipart matches (live 26 LINEs doubled); 2D-only coincidences still once (drw-bom-table pin). Centermarks:
-    a part-way wall marks only if a hole's (faceblend's convex ends); arcs' union, not sum, for full circles.
-  Open: live splits each mesh silhouette loop into ~4 open LWPOLYLINEs (ours one per loop; rule unknown); live's 2
-  Iso ELLIPSEs in hex are B-rep hole rim quarters inside the mesh hole (ours hidden). 943e05e14: a mark only where
-  the cylinders' edges go all the way round seen end-on (faceblend's pocket ends none, as live; the radial-hole e2e
-  had cut a half groove, now drilled mid-height). faceblend left: ELLIPSE 25/13, SPLINE 8/23, LINE 108/103.
-  Lead 11-18: the suite takes each drawing's stored scale and view positions (place_as_live in parity.rs); the
-  suggested-views rule is judged only by live's Create Drawing captures (clamp Part 3 1:1 = ours; live's Iso centre
-  7.786-8.061 in varies by part, ours fixed 7.810: rule unknown). clamp-guillem now 271 / 268 LINE only. sm-louver ARC/CIRCLE now match.
-  Landed 05:55 (7db466c6) with 59d761674 no mark on a wholly hidden hole: hex CENTERMARKS gone, as live; c284709fa
-  suite views placed by their silhouette box centre, live2 iso-place-1118); 943e05e14 landed 06:26 (8a74d626).
+- DXF rows (lead 23:0x), exchange suite drawings: landed through 8a74d626 (archive 11-18 22:3x). Open: live splits
+  each mesh silhouette loop into ~4 open LWPOLYLINEs (rule unknown); live's 2 hex Iso ELLIPSEs (B-rep hole rim quarters
+  inside the mesh hole, ours hidden); live's Iso centre varies by part (rule unknown). Tools /root/dx-scratch/bin/dxf*.py.
 - Import / Export dialogs (live import-export-1118): queued 15790a91: import reads its files off the UI
   thread, tabs come when done, bubble "<file> has been imported." / "<file> uploaded but failed to translate." with
   Open document (file kept in CAD Imports); Export dialog keys test (focus on the dialog, Esc, Enter in File name).

@@ -3543,3 +3543,49 @@ Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live i
   "Download and store file in a new tab". Landed bfac0a31: import_files keeps the active tab; the
   export UI test (export_feel_tests.rs; turned main red 04:19, parked T2 by the lead: it read doc.tabs, creation
   order, where Assembly 1 precedes the stored file; fix = ordered_tabs(), T1 again in 1b62e831).
+
+- cf-spur-gear 13/14 since live's 19:28 refs (Sketch 2 near-singular, "could not be solved" vs "over defined" by
+  rounding): skasm's 62893b1ed takes back over-defining model-geometry constraints. Its in-feature cPoint (CAP_EDGE of
+  the Spur Gear's own `….blank` extrude) is untranslated: low value.
+- drw-centermark regression (qa, greens 45aa7a0e..f8cbf3c6): sent back pointing at studios' f2b9b1087 (take page
+  height / click mapping); mine in the range don't touch centermarks.
+
+- Exchange ("live imports ours") 43/48 (live re-import of the 14:51 files; the gear STL re-imported at 15° 22:0x,
+  synced). Left: hose x_t (deliberate split rings); 65-tooth STEP area -0.17 mm² (lead: left); STL rows (gear,
+  radijator, sheet metal plus): the suite exports Custom chord 100 / REST angle but Medium's 0.254 mm minimum facet
+  width; live's REST has none that binds (radijator r 0.92 arcs in 0.08 mm segments). Floor 0.254: radijator 4,186
+  triangles vs live 5,052; floor 0.0254: 5,338 (gear 11,124 vs 9,000). The rest is OCCT BRepMesh (analysis by 01:54,
+  /root/dx-scratch/bin/stl{faces,loops,arcs,seg,curved}.py): (1) BRepMesh_CurveTessellator's OCC287 minimum of 4 points
+  on a circle / conic (radijator's 18 2.5° arcs: 3 segments, live 1: +144 triangles); (2) the 45° cone (z 11-15) gets 3
+  rows, live 1 (+150). Parked P3, no OCCT patch (lead, DECISIONS 7210b453e): STL rows compare by area, volume and
+  deviation within live's error, not triangle counts. Live's REST STL default: 5°, 15° over 500
+  exported faces (live2 /root/onshape-research/live/exchange-kw/README.md), the default chord (chord 100 in ours
+  matches at 15° within 0.4 % per part); a tiny feature in a large export goes coarser (r 0.05 in a 520 mm studio,
+  dx/q1137; none of our rows). Sync the hosts' live-ours*.json after every live re-import.
+
+- Speed: cf-part-draft's Spur Gear 452 -> ~236 ms (live 227). Left there: its opFillet blend 65-120 ms (blend) and
+  model-core's own 28 region profiles. cf-snap-hook ×3.4: Snap Hook Booleans + Shell 1 -> bool (took it), fillets ->
+  blend (FYI). draft_robust whole-body is_valid: core's 77715251. The kernel profile's per-feature block also counts
+  the suite's measurement after the feature (boxes, props, display mesh): compare with the feature's own regen ms.
+
+## 11-18 22:3x, moved from the handoff (DXF rows, landed)
+- DXF rows (lead 23:0x), exchange suite drawings 0/10 (vibex6 exch-dxf / exch-fix2 logs, /root/dx-scratch/bin/
+  dxflayercount.py, dxfanntext.py, dxfents.py, dxfsheet.py (two DXFs side by side), hlrplot.py / hlrgrid.py).
+  Landed 5076e98c (view-label MTEXT, tangent-only circles, mesh crash; archive) and 12a38f9e (03:23):
+  - 46d2c427d mesh parts drawn as live, silhouettes only (live2 q-mesh-drawing: hex "imported" alone and the rings Iso
+    show no folds between facets toward the viewer, not even 90 deg: the far half of a hole rim), edge-on facets
+    count as away (MESH_FACING); a B-rep edge glimpsed past mesh facet corners (piece < deflection of a longer edge)
+    dropped; no centermark on a wholly hidden circle; on_conic: ends meeting make a whole circle only past half its
+    length. hex-bookcase 0 CIRCLE / 0 ELLIPSE / 211 LINE / 17 LWPOLYLINE for live's 0 / 2 / 206 / 25.
+  - be583d88d edges two parts share in 3D (ModelEdge::shared, SheetGeometry::shared_lines) written for each part:
+    duct-multipart matches (live 26 LINEs doubled); 2D-only coincidences still once (drw-bom-table pin). Centermarks:
+    a part-way wall marks only if a hole's (faceblend's convex ends); arcs' union, not sum, for full circles.
+  Open: live splits each mesh silhouette loop into ~4 open LWPOLYLINEs (ours one per loop; rule unknown); live's 2
+  Iso ELLIPSEs in hex are B-rep hole rim quarters inside the mesh hole (ours hidden). 943e05e14: a mark only where
+  the cylinders' edges go all the way round seen end-on (faceblend's pocket ends none, as live; the radial-hole e2e
+  had cut a half groove, now drilled mid-height). faceblend left: ELLIPSE 25/13, SPLINE 8/23, LINE 108/103.
+  Lead 11-18: the suite takes each drawing's stored scale and view positions (place_as_live in parity.rs); the
+  suggested-views rule is judged only by live's Create Drawing captures (clamp Part 3 1:1 = ours; live's Iso centre
+  7.786-8.061 in varies by part, ours fixed 7.810: rule unknown). clamp-guillem now 271 / 268 LINE only. sm-louver ARC/CIRCLE now match.
+  Landed 05:55 (7db466c6) with 59d761674 no mark on a wholly hidden hole: hex CENTERMARKS gone, as live; c284709fa
+  suite views placed by their silhouette box centre, live2 iso-place-1118); 943e05e14 landed 06:26 (8a74d626).
