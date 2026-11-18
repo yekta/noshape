@@ -195,13 +195,15 @@ Open, ranked:
   Lead 11-18: the suite takes each drawing's stored scale and view positions (place_as_live in parity.rs); the
   suggested-views rule is judged only by live's Create Drawing captures (clamp Part 3 1:1 = ours; live's Iso centre
   7.786-8.061 in varies by part, ours fixed 7.810: rule unknown). clamp-guillem now 271 / 268 LINE only. sm-louver ARC/CIRCLE now match.
-  hex still writes CENTERMARKS: cylinder_ends marks shrunk's holes wholly hidden behind the mesh (live none).
+  Queued 05:32 as 1b62e831 (with 59d761674 no mark on a wholly hidden hole: hex CENTERMARKS gone, as live; c284709fa
+  suite views placed by their silhouette box centre, live2 iso-place-1118).
 - Export feel (live2 export-feel-1118, behaviours "dx (lead 11-18 ~02:38, feel)"): in a1bc5ce3: solid exports
   (Part Studio, part, assembly) show the "<file name> is being prepared…" bubble (~5 s; assembly's message fades at
   4 s) and the bell's "Export completed" / "<name> was exported successfully." (no extension); drawing Options
   "Download and store file in a new tab". Open: a part row's Format "Inspection list" (needs live's file: ask live2);
-  the assembly bubble is live2's to confirm (translate quota). Queued 04:0x: import_files keeps the active tab; the
-  export UI test (export_feel_tests.rs); the suite placement.
+  the assembly bubble is live2's to confirm (translate quota). Landed bfac0a31: import_files keeps the active tab; the
+  export UI test (export_feel_tests.rs; turned main red 04:19, parked T2 by the lead: it read doc.tabs, creation
+  order, where Assembly 1 precedes the stored file; fix = ordered_tabs(), T1 again in 1b62e831).
 - Queued for later (live 11-18, behaviours "studios + dx (lead 11-18, P0 feel)", live/studios/docs-import-feel-1118/):
   Import into a document feel: + > Import... opens the OS picker at once (multi), 400 px "Import to Onshape" modal with
   focus on [Import], folder tab "CAD Imports" at the end at 1.8 s, the Part Studio tab at 6.9 s, active tab unchanged,
