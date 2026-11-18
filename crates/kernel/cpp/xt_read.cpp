@@ -992,9 +992,10 @@ struct Builder
   // station an exact rational circle (v) in a rotation-minimizing frame,
   // the stations' poles interpolated along u (exact at the stations, O(h^4)
   // between them). Stations start a sixteenth of the spine's least radius of
-  // curvature apart and halve until the tube is round to 1 nm between them,
-  // a tenth of Parasolid's precision (a small radius needs no more: the
-  // frame turns with the spine, not the tube).
+  // curvature apart and halve until the tube is round to 10 nm between them,
+  // Parasolid's precision (a small radius needs no more: the frame turns with
+  // the spine, not the tube). At 1 nm c2-rings-loft's blends round an
+  // ellipse took 204 stations and the read 4.6 s; at 10 nm 102, 2.6 s.
   static occ::handle<Geom_Surface> tube(const occ::handle<Geom_Curve>& c, double f, double l, double r)
   {
     double len = 0, rho = 1e300;
@@ -1015,7 +1016,7 @@ struct Builder
           rho = std::min(rho, 1 / k);
       }
     }
-    const double tol = 1e-9;
+    const double tol = 1e-8;
     int          n   = std::max(16, std::min(4000, (int)std::ceil(len / std::max(rho / 16, 1e-12))));
     for (;;)
     {
