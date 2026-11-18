@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-18 15:35 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
+Updated 11-18 16:10 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
 (NOSHAPE_GATE_HOST=vibe2); Mac for crate tests, probes and speed numbers (NOSHAPE_RB_HOST=mac; vibex8 runs ~x10 slower at
 load 26); land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs on vibex7 ~/lead-private (hat8, hat15,
 hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree from a computed pid (lead 21:06):
@@ -25,6 +25,13 @@ hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree 
   rules) hide the 4 vertices at the draft's sliver faces (0.13 / 0.21 mm2, 3 edges): hidden at (-13.27, +-21.73, 29.85),
   (24.84, +-21.81, 17.36), (-39.27, +-21.81, 39.47). Fix there, not in the Boolean.
 - qa's P0 (impeller Extrude Bohrungssitz 16 parts on bcbe6b0f): range eddaea27f..168edd676 is bool2's batch; told qa.
+- GATE unit bool-gate-8086f188b on vibe2 (15:35): bool-hat top = d04c232c8 (impeller checked glue) + 8086f188b (the
+  grazing decline only where the whole offset face is within 1 um of the circle's radius: parity56 0c382c79 / 34b59920
+  ours again 8.7 ms vs OCCT 90, fan-blade still declined at once). -> chain-8086f188b.out.
+- 168edd676 (unify volume check revert) is bool2's (lead asked 16:00: Form preview 1.3 -> 2.4 s, skasm timing).
+- Shell Gehäuse (impdump/shell-59, 178 ms Mac a run): by_quadrics' first try (continued polynomials) fails after ~60 ms
+  (offsets 20, corners 12, edges 25: edge 3's marched point 0.2 mm off face 1), the tangent-extension try succeeds:
+  CheckerSI ~52 ms, add_pcurve ~26, BRepCheck ~8. Levers: fail the first try earlier / share its offsets; own SI check.
 - NEXT GATE: bee868f71 on bool-hat (after 4cf4ce0ca): a pattern's checked glue whose < 16 instances our Boolean found
   reaching into the part ("pattern instances overlapping") runs OCCT's plain fuse at once (impeller Extrude Bohrungssitz
   Ansaugflansch fuse 87647d5a 1000 -> 295 ms Mac, same summary + history; the Mac corpora's 232 checked-glue fuses of
