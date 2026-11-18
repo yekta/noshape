@@ -4582,6 +4582,10 @@ impl AssemblyView {
         let row = h_flex()
             .id(SharedString::from(format!("mate-{}", id.0)))
             .group(SharedString::from(format!("mate-row-{}", id.0)))
+            .debug_selector({
+                let name = name.clone();
+                move || format!("mate-row {name}")
+            })
             .h(px(crate::ui::ROW_H))
             .pl(px(5.))
             .pr(px(3.))

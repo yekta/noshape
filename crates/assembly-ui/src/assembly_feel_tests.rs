@@ -429,3 +429,24 @@ fn show_mates_mode_shows_the_hovered_instances_mates(cx: &mut TestAppContext) {
     wait_until(cx, window, &view, |v, _| !v.ui.overlay_mates.is_empty());
     assert!(cx.update(|cx| !view.read(cx).ui.overlay_mates.is_empty()), "H: the hovered part's mate glyph shows");
 }
+
+/// A mate row's double-click opens the mate's edit dialog; a single click only selects it (interaction-feel "Mate row
+/// double-click").
+#[gpui::test]
+fn a_mate_rows_double_click_edits_the_mate(cx: &mut TestAppContext) {
+    let (window, view) = mated_blocks(cx, "mate-dblclick");
+    let id = cx.update(|cx| view.read(cx).result.mates[0].id);
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let at = vcx.debug_bounds("mate-row Fastened 1").expect("Fastened 1's row").center();
+    vcx.simulate_click(at, Modifiers::default());
+    draw(cx, window);
+    cx.update(|cx| assert!(view.read(cx).mate.is_none() && view.read(cx).selected_mate == Some(id), "a click selects it, no dialog"));
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    for count in [1, 2] {
+        vcx.simulate_event(gpui_kit::MouseDownEvent { position: at, modifiers: Modifiers::default(), button: gpui_kit::MouseButton::Left, click_count: count, first_mouse: false });
+        vcx.simulate_event(gpui_kit::MouseUpEvent { position: at, modifiers: Modifiers::default(), button: gpui_kit::MouseButton::Left, click_count: count });
+    }
+    draw(cx, window);
+    cx.update(|cx| assert_eq!(view.read(cx).mate.as_ref().and_then(|m| m.editing), Some(id), "a double-click opens Fastened 1's dialog"));
+}
