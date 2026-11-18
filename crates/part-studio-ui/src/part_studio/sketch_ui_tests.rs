@@ -1871,6 +1871,40 @@ fn an_open_under_defined_sketch_has_the_rows_badge(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|cx| view.read(cx).display.feature_state(id).map(|s| s.underdefined)), Some(true), "closed");
 }
 
+/// qa session-1118 (live): with no tool, a rectangle's corner selected, then a click on the sketch's Origin: both
+/// selected, and i makes the corner coincident with it (ours: the Origin click cleared the selection).
+#[gpui::test]
+fn a_corner_and_the_origin_selected_take_a_coincident(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "origin-coincident", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    draw(cx, window);
+    let corner = cx.update(|cx| {
+        let sk = view.read(cx).sketch_data(cx).unwrap().sketch.clone();
+        let l = sk.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).map(|e| e.id).unwrap();
+        sk.endpoints(l).unwrap().0
+    });
+    let origin = cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::ZERO).unwrap());
+    cx.update_window(window, |_, _, cx| view.update(cx, |v, _| {
+        v.sketch.as_mut().unwrap().selection = vec![corner];
+        // (The GPU's pick under the pointer there.)
+        v.hover = Some(Reference::Origin);
+    }))
+    .unwrap();
+    click(cx, window, &view, (origin.x, origin.y));
+    let (sel, model) = cx.update(|cx| {
+        let ed = view.read(cx).sketch.as_ref().unwrap();
+        (ed.selection.clone(), ed.model_selection.clone())
+    });
+    assert_eq!((sel, model), (vec![corner], vec![Reference::Origin]), "both selected");
+    keys(cx, window, &["i"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let at = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.point(corner).unwrap());
+    assert!(at.length() < 1e-9, "the corner on the Origin: {at}");
+}
+
 /// Live2 sketch-state (11-17): a free line's sketch is under defined (the row's badge, the line and its ends blue);
 /// Fix on the line holds the line (black) but not its ends (blue, free along it), the badge stays; a HORIZONTAL on
 /// that slanted line can't be solved: the row red ("Sketch could not be solved."), no badge, the bubble, the line

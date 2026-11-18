@@ -1279,7 +1279,7 @@ impl PartStudioView {
                         self.external_entity(&r, false, true, cx)
                     }
                     (None, Some(r), Some(t @ (Tool::Dimension | Tool::Constraint(_) | Tool::Mirror)))
-                        if matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_))
+                        if matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Origin | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_))
                             || matches!(&r, Reference::SketchEntity { sketch, .. } if Some(*sketch) != self.sketch.as_ref().map(|s| s.feature)) =>
                     {
                         let pierce = t == Tool::Constraint(ConstraintTool::Pierce) && matches!(r, Reference::Edge(_) | Reference::SketchEntity { .. });
@@ -1294,7 +1294,8 @@ impl PartStudioView {
                 if tool_now == Some(Tool::Select) && hovered.is_none() {
                     // Picked at the click itself: the hover pick can lag a quick
                     // move (qa: 4 of 10 clicks missed the edge).
-                    let model = self.model_edge_at(*position, cx).or_else(|| self.hover.clone().filter(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_))));
+                    // (The Origin too: live session-1118, a corner then the Origin selected, i makes them coincident.)
+                    let model = self.model_edge_at(*position, cx).or_else(|| self.hover.clone().filter(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Origin)));
                     // A plane: selected on release unless the press becomes a box (live2 Part 2).
                     let plane = self.hover.clone().filter(|r| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) && !self.is_own_sketch_plane(r, cx));
                     if let Some(ed) = &mut self.sketch {
