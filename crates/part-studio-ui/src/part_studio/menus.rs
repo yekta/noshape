@@ -1115,6 +1115,7 @@ impl PartStudioView {
         self.ui.measure_readout.clear();
         // None while a feature dialog is open (live ui-parity dialog-enter-commits-new, edge-rclick-fillet: measure null).
         if self.edit.is_some() {
+            self.ui.measure_last_line = None;
             return None;
         }
         let line = if let Some(o) = self.readout_connector_origin() {
@@ -1125,11 +1126,18 @@ impl PartStudioView {
             let sel = self.selection.clone();
             let sel_count = sel.len();
             let ctx = self.measure_context(&sel, cx)?;
-            // Nothing until the measurement arrives (two big imported parts take seconds).
-            let results = self.selection_measurement(&sel, ctx, cx)?;
-            // Live (psb 10-20 m): the first primary row, plus the distances
-            // of a circular context on the same line; nothing for three edges.
-            measure::quick_line(&results, sel_count)
+            // Live (measure-mass-1118): the old text stays until the measurement arrives (two big imported parts take
+            // seconds), then refills.
+            match self.selection_measurement(&sel, ctx, cx) {
+                Some(results) => {
+                    // Live (psb 10-20 m): the first primary row, plus the distances
+                    // of a circular context on the same line; nothing for three edges.
+                    let line = measure::quick_line(&results, sel_count);
+                    self.ui.measure_last_line = Some(line.clone());
+                    line
+                }
+                None => self.ui.measure_last_line.clone()?,
+            }
         };
         if line.is_empty() {
             return None;
@@ -1288,6 +1296,7 @@ impl PartStudioView {
         } else {
             // (The state's readout goes with it: a dialog's OK clears the selection, live's measure is then null.)
             self.ui.measure_readout.clear();
+            self.ui.measure_last_line = None;
             None
         };
         h_flex()

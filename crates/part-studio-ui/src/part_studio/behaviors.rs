@@ -515,6 +515,8 @@ pub struct UiState {
     pub mass_state: Option<serde_json::Value>,
     /// The bottom-right Measure readout as live's recorder reads it (`measure.readout`: name, value, units).
     pub measure_readout: Vec<serde_json::Value>,
+    /// The summary's last answered line, shown while a changed selection is measured (live measure-mass-1118).
+    pub measure_last_line: Option<Vec<(String, noshape_model::regen::measure::Measurement)>>,
     /// Summary bar values clicked to 5 decimals (live measure.json "value_click": a click toggles 3 / 5), for the
     /// selection they were clicked on.
     pub measure_precise: (Vec<Reference>, std::collections::BTreeSet<String>),
@@ -953,6 +955,7 @@ impl UiState {
             mass_reference: None,
             mass_variance: false,
             mass_state: None,
+            measure_last_line: None,
             measure_readout: Vec::new(),
             measure_precise: Default::default(),
             measure_text: None,

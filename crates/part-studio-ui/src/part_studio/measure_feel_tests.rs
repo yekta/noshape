@@ -502,3 +502,24 @@ fn mass_keeps_the_old_totals_until_an_added_parts_come(cx: &mut TestAppContext) 
     let both = volume(cx);
     assert!(still_out && !one.is_empty() && pending == one && both != one && !both.is_empty(), "Volume: Part 1 {one:?}, as Part 2 is added {pending:?} (measuring: {still_out}), then {both:?}");
 }
+
+/// Live measure-mass-1118: the bottom-right summary keeps its old text until the new selection's answer arrives, then
+/// refills (no blank between).
+#[gpui::test]
+fn the_summary_keeps_its_old_text_until_the_answer(cx: &mut TestAppContext) {
+    let b = Bench::open(cx, "summary-keeps", 1.0);
+    let point = b.readout(cx, &[V40], &[]).unwrap();
+    let edge = b.reference(cx, FRONT_EDGE).unwrap();
+    cx.update(|cx| b.view.update(cx, |v, cx| {
+        v.selection = vec![edge.clone()];
+        v.refresh_scene(false, cx);
+        cx.notify();
+    }));
+    // (One frame, no task run after it: the measurement is still out.)
+    cx.update_window(b.window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+    let rows = |cx: &mut TestAppContext| cx.update(|cx| b.view.read(cx).ui.measure_readout.iter().map(|r| format!("{}: {} {}", r["name"].as_str().unwrap_or(""), r["value"].as_str().unwrap_or(""), r["units"].as_str().unwrap_or("")).trim().to_string()).collect::<Vec<_>>());
+    let pending = rows(cx);
+    let measuring = cx.update(|cx| b.view.read(cx).measure_cache.as_ref().is_some_and(|m| m.results.is_none()));
+    let after = b.readout(cx, &[FRONT_EDGE], &[]).unwrap();
+    assert!(measuring && pending == point && after != point && !after.is_empty(), "the summary: a vertex {point:?}; an edge clicked, measuring ({measuring}) {pending:?}; answered {after:?}");
+}

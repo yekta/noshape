@@ -1049,7 +1049,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Finding | Ours | Test |
 |---|---|---|
 | 22 readouts on live's studio: a sloped edge's length, edge and face angles toward each one's middle (56.310 / 146.310 / 123.690 / 33.690), a cylinder's Diameter, Perp axes angle, Center axes dist, Face tangent angle first, vertex + face Min dist | = | measure_feel_tests::measure_pairs_on_lives_wedges_and_cylinder |
-| The summary: the old text stays until the answer, then refills | ? | missing |
+| The summary: the old text stays until the answer, then refills | = (fixed: it blanked while measuring) | measure_feel_tests::the_summary_keeps_its_old_text_until_the_answer |
 | The Measure panel (`[`): 220 px at the right; two faces Area the sum; Length unit → Inch re-measures the panel only, kept in the session; Measure type filters the panel only | = | measure matrix "the details panel: 220 × 345 for a distance and its components" (the unit and type rows: missing) |
 | Mass properties opens top-left over the list, (214, 79), 440 × 521; inertia in the account's mass unit | ? | missing |
 | Mass and section properties timing (live2 mass-appear-1118, software GL): panel +466 ms, values +555; a part added: chip +494, totals +1026, the old totals shown until then (no blank or spinner); removed: chip +96, totals +210 | local, faster; the old totals stay until the new ones come (they blanked: fixed) | measure_feel_tests::mass_keeps_the_old_totals_until_an_added_parts_come |
