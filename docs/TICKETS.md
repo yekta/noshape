@@ -615,7 +615,7 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
   showing (right edge x 405, bottom ~y 288); live puts it over the list at (214, 79), 440 x 521.
 - [ ] (psui 12:4x: fixed with a test, land queue; qa re-runs on its green) **P1 FEEL-HIDE-TIMING (psui)** (ps-feel2-1118, 60 fps capture): Y: row 269 ms, part gone 669 ms (live 73 / 436); Shift+Y 408 /
   774 ms (live 108 / 562).
-- [ ] **P1 FEEL-SKETCH-REACH-OUTSIDE (psui + skasm)** (hover-p0): outside sketch mode a sketch line lights from 8 px and holds to 9; at
+- [ ] (skasm 13:05: fixed in 6389133a, queued; live2 re-measures on its green, then close) **P1 FEEL-SKETCH-REACH-OUTSIDE (psui + skasm)** (hover-p0): outside sketch mode a sketch line lights from 8 px and holds to 9; at
   a corner the whole line lights at 6 and the point never lights alone; live: line 6-7 px, point 9 px (the point beats the line).
 
 ## Interaction feel: live2's "Ours" cells, batch 2 (live2 12:3x, landed 8b5439895 / 1eae71e40; evidence live/psui/ours-1118/)
@@ -639,9 +639,13 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
 ## Interaction feel: live2's "Ours" cells, batch 4 (view-tools 992-995, field-keys 1309-1313; live2 12:50, green e503ca2f, landed 422aacaa7 / ae075b8eb)
 - [ ] **P1 NAMED-VIEW-RESTORE-ANIM (psui)**: a named view restores in one step at 0.24-0.40 s; live animates, 3 frames over ~240 ms.
 - [ ] **P2 SECTION-PREVIEW-COLOUR (psui)**: our section view's preview cap is #E3C9A7; live's #EBBD8A / #E9C497.
-- [ ] **P1 SEARCH-TOOLS-TOOLBAR-HIGHLIGHT (skasm)**: with "Highlight tool" on in Search tools, no toolbar button lights; live lights the
+- [ ] (skasm 13:05: fixed in 6389133a, queued; live2 re-measures on its green, then close) **P1 SEARCH-TOOLS-TOOLBAR-HIGHLIGHT (skasm)**: with "Highlight tool" on in Search tools, no toolbar button lights; live lights the
   match #FCDA7F.
 - Equal to live (live2): view-tools 992, field-keys 1309-1312.
+
+## Interaction feel: live2's "Ours" cells, batch 5 (pattern-hole-1118 rows 1268-1280: 11 equal, 2 not; live2 13:05, green e503ca2f, landed 4f4dc4df3)
+- [ ] **P2 HOLE-NOPOINT-TOOLTIP (psui)**: the Hole's no-point tooltip appends "A parameter value is not valid."; live's doesn't.
+- [ ] **P1 HOLE-CALLOUT-PLACE (psui)**: our hole callout runs on a long leader along the face's far edge; live's lies by the hole.
 
 ## Interaction feel in assemblies, drawings and the feature list vs live2's 11-18 06:2x-07:05 captures (qa 07:10, green cafe3c2af, vibex8 Xvfb, real pointer)
 Sessions opened without the UI runner (stable view): asm-feel (Part 1 40x30x10, Part 3 20x20x5), block-fillet, hole-plate-drawing.
