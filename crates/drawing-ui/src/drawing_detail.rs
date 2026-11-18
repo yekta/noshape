@@ -86,7 +86,7 @@ impl DrawingEditor {
 
     /// [`Self::closed_loop_at`] with the sketch curves bounding it.
     pub fn closed_loop_curves_at(&self) -> Option<(Vec<[f64; 2]>, Vec<noshape_sketch::EntityId>)> {
-        noshape_scene::drawing_tools::closed_loop_curves_through(&self.sketch().sketch, self.cursor, self.tol_mm(5.0))
+        noshape_scene::drawing_tools::closed_loop_curves_through(&self.sketch().sketch, self.cursor, self.tol_mm(noshape_scene::drawing_tools::PICKBOX_PX))
     }
 
     /// The view a picked closed loop lies on (its middle in the view, else the nearest within 20 mm).

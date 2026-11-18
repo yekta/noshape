@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 11:07 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 11:40 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -26,25 +26,21 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
 - Landed 49cfe99b 09:12: the Release dialog ignores Esc (real-app check on vibex6 Xvfb: xdotool "abc" Return "xyz"
   lands as two lines, Esc leaves it open; the unit test's dropped letters are the harness), Feature Studio error /
   completion timings.
-- Queued (10:2x): Preferences (live 11-18): shortcut "Create release" (Unassigned; a key opens the active tab's
-  Release…), Length Display decimals per unit (list to the last decimal ≥ 1e-8 m: mm 0.12345, in 0.123456; Workspace
-  units too), the Versions flyout's open state carries to the next document (thread-local flag); live2's BOM retakes:
-  the BOM panel read as fields + options, a placed table reads TABLE + EDGE <view> (recorder ≥ 2026-11-18.1) until
-  right-clicked; Add to ordinate dimension group reads nothing until its first click; tooltips: Adjust linestyle's on
-  the Edges label + field, Select a DWT through ours (the kit's Button tooltip isn't read); Sheet properties / Adjust
-  linestyle selects marked `dropdown:<value>`; runner: Graebert `*_Menu` lists' hover not compared (never read), an
-  unnamed menu's "" separators, "start X asm Copy n" field values. run12: BOM / ordinate / linestyle / gtol 12/13;
-  run10: rel, ver, prefs, docs-pref all match.
-- Queued (10:4x): Sheet properties › Size › Custom read as live (Zones, Horizontal / Vertical zones, Include border),
-  zones shown only with the border, Custom starts at 4 x 4 zones (live A: template 2 x 2; other sizes asked live2);
-  op drawing_sheet the same, e2e. custom-zones 12/12.
-- Local, to land: VS value tooltip centred over the cell (qa VSFEEL, test); Derived's Select Part Studio panel: the
-  first Esc / Enter close only the panel (live docs-import-feel-1118; dialogs matrix row).
-- Local, to land: drawings draw an Inches fractional / Feet and inches value's fraction stacked (live numfmt-1118:
-  full height, rule through the whole number's middle; test); merge preview Edited cells' tooltip "Last change by
-  <user> at <time>" (newest change since the base touching the tab; test).
-- Open: drw-bom-table-properties s7 (Esc in BOM table properties: today's retake deselects, the old take kept it;
-  asked live2 10:24); drw-hatch-panel s31 (Pattern list covers its field; asked live2 09:23).
+- In 64680c1d (from the 10:2x / 10:4x batches): Preferences (shortcut "Create release", Length decimals per unit,
+  the Versions flyout's open state carried over); live2's BOM retakes (BOM panel fields, TABLE + EDGE <view> until
+  right-clicked); ordinate add-to-group reads nothing until its first click; linestyle / DWT tooltips; selects marked
+  `dropdown:<value>`; runner: Graebert `*_Menu` hover not compared, unnamed "" separators, "start X asm Copy n";
+  Sheet properties › Custom fields read as live. run12 12/13, run13 custom-zones 12/12, run10 all match.
+  Also in it: VS value tooltip over its cell; Derived's panel takes the first Esc / Enter; stacked fractions; merge
+  preview "Last change by <user> at <time>".
+- Local, to land: Custom's zones are the standard's (ANSI 4 x 4, ISO 6 x 4; live2 custom-zones-1118; e2e, test);
+  drw-bom-table-properties s7 excluded (live2 bomprops-1118: live keeps the table selected after Esc / ✕ / ✓, the
+  recorder's empty selection is a reader miss; ours keeps it); PICKBOX 7 for the detail loop hover and the hole
+  table's X-direction pick, GRIPSIZE 6 for a leader anchor drag (they had 5; feel test); a test that an open custom
+  feature dialog keeps its labels after a Feature Studio commit (live custom-feature-1118: ours already).
+- Queued 64680c1d 11:07 (5 commits: Preferences, Custom zones, VS tooltip / Derived Esc, the shortcut-count fix,
+  stacked fractions + merge Edited tooltip).
+- Open: drw-hatch-panel s31 (Pattern list covers its field; asked live2 09:23).
 - Checked against live 08:4x, already as live: documents search on Enter only; version row menu (View in repair,
   Restore to Main…, Releases only with candidates; Copy link web-only); Restore strategy dialog; Create version (V<n>
   focused, Enter creates, Esc closes); Branch (B<n> selected, Enter creates and opens).
@@ -83,7 +79,7 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   centermark_point, section edge), grips GRIPSIZE 6 px (detail circle resize, aux indicator); fractional inches round
   to the precision (digits = power of two, drawing 0.123 = 1/8": "2 3/4"), feet and inches `1'-2 1/4"`, the fractional
   precision list 0" … 1/256", an explicit unit's button bare ("ft in"). Fraction stacked: done 11-18 (the reader joins its
-  pieces "2 3 4": no take reads one yet); jog / leader / hole-table / attach picks still 5 px (not named by live: ask if they are getIntersected too);
+  pieces "2 3 4": no take reads one yet); the last 5 px picks (detail loop, hole table X direction, leader anchor) now PICKBOX / GRIPSIZE;
   24 h time H:mm done (history rows keep the time on older days).
 - live2 workspaces (behaviours "studios (lead 11-18 ~02:23, feel): workspaces", live/studios/ws-1118/). Done locally:
   Delete on every non-default workspace row (current too, none on the default), deleting the one you're in lands

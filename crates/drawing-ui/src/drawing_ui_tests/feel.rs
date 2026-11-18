@@ -528,6 +528,18 @@ fn a_tool_picks_an_edge_within_7_px(cx: &mut TestAppContext) {
             assert_eq!(lit == edge, lights, "{} px off the edge: lit {lit:?}", sign * px);
         }
     }
+    // The hole table's X direction pick is the same PICKBOX (getIntersected for every tool), it had 5 px.
+    let view = cx.update(|cx| editor.read(cx).built.as_ref().and_then(|b| b.placements.first().map(|p| p.id))).expect("a view");
+    for (px, picks) in [(6.0, true), (9.0, false)] {
+        let at = off(cx, px);
+        let dir = cx.update(|cx| {
+            editor.update(cx, |e, _| {
+                e.cursor = at;
+                e.straight_edge_dir_near(view)
+            })
+        });
+        assert_eq!(dir.is_some(), picks, "X direction {px} px off the edge");
+    }
 }
 
 /// Live2 drw-inspection-table-iso-scrolled: in an ISO drawing a linear dimension's value (drawn above its line) is

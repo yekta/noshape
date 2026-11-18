@@ -2977,9 +2977,11 @@ impl Default for SheetFormat {
 }
 
 impl SheetFormat {
-    /// The zones a sheet starts with when its Size becomes Custom (live2 drw-sheet-properties-custom-zones: ANSI A, whose
-    /// template has 2 x 2, shows 4 x 4).
-    pub const CUSTOM_ZONES: [u32; 2] = [4, 4];
+    /// The zones a sheet starts with when its Size becomes Custom: the standard's own, whatever the size switched from
+    /// (live2 custom-zones-1118: ANSI 4 x 4, ISO 6 x 4).
+    pub fn custom_zones(from: SheetSize) -> [u32; 2] {
+        if from.is_ansi() { [4, 4] } else { [6, 4] }
+    }
 
     pub fn is_default(&self) -> bool {
         *self == Self::default()
@@ -4789,6 +4791,17 @@ pub mod inspection;
 #[cfg(test)]
 mod multi_edit_tests {
     use super::*;
+
+    /// Live2 custom-zones-1118: Custom's zones are the standard's, not the size's: ANSI 4 x 4, ISO 6 x 4.
+    #[test]
+    fn custom_size_zones_follow_the_standard() {
+        for s in [SheetSize::AnsiA, SheetSize::AnsiAPortrait, SheetSize::AnsiD] {
+            assert_eq!(SheetFormat::custom_zones(s), [4, 4], "{s:?}");
+        }
+        for s in [SheetSize::A4, SheetSize::A4Portrait, SheetSize::A3, SheetSize::A0] {
+            assert_eq!(SheetFormat::custom_zones(s), [6, 4], "{s:?}");
+        }
+    }
 
     /// One palette for two dimensions (live request 1744): Precision set
     /// there reaches both; each keeps its own tolerance and prefix.

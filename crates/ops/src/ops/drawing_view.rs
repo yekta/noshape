@@ -841,14 +841,14 @@ fn sheet_prop_steps(od: &OpenDoc, d: &noshape_model::drawing::Drawing, i: usize,
             }
             "size" if dwt.is_some() => return Err(err(k, "the sheet's format is a DWT's (set dwt: null first)")),
             "size" if x.as_str() == Some("Custom") => {
-                // Custom keeps the current paper size, with the border, and starts with 4 x 4 zones (live).
+                // Custom keeps the current paper size, with the border, and starts with its standard's zones (live).
                 steps.push((
                     "Sheet size",
                     Box::new(move |d| {
                         let sh = &mut d.sheets[i];
                         if !matches!(sh.size, SheetSize::Custom { .. }) {
                             let (w, h) = sh.size.size_mm();
-                            sh.format.zones = Some(noshape_model::drawing::SheetFormat::CUSTOM_ZONES);
+                            sh.format.zones = Some(noshape_model::drawing::SheetFormat::custom_zones(sh.size));
                             sh.size = SheetSize::Custom { width_mm: w, height_mm: h };
                         }
                     }),

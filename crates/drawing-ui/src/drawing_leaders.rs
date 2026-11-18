@@ -146,7 +146,7 @@ impl DrawingEditor {
     /// A drag starting on a selected note's or callout's leader anchor (its
     /// circle grip, live (1)).
     pub fn leader_end_drag(&self, start: [f64; 2]) -> Option<Drag> {
-        let tol = self.tol_mm(5.0);
+        let tol = self.tol_mm(noshape_scene::drawing_tools::GRIPSIZE_PX);
         self.current_sheet().annotations.iter().filter(|a| self.selection.contains(&Sel::Annotation(a.id))).find_map(|a| {
             let (leader, _) = self.leader_paths_of(a).into_iter().find(|(_, p)| p.points.last().is_some_and(|q| (q[0] - start[0]).hypot(q[1] - start[1]) < tol))?;
             Some(Drag::LeaderEnd { id: a.id, leader, orig: a.clone() })

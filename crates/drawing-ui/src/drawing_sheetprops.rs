@@ -303,12 +303,12 @@ impl DrawingEditor {
             "Custom".into(),
             is_custom,
             std::rc::Rc::new(move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| {
-                // Custom keeps the current paper size, with the border, and starts with 4 x 4 zones (live).
+                // Custom keeps the current paper size, with the border, and starts with its standard's zones (live).
                 t.edit("Sheet size", cx, |d| {
                     let sh = &mut d.sheets[si];
                     if !matches!(sh.size, SheetSize::Custom { .. }) {
                         let (w, h) = sh.size.size_mm();
-                        sh.format.zones = Some(noshape_model::drawing::SheetFormat::CUSTOM_ZONES);
+                        sh.format.zones = Some(noshape_model::drawing::SheetFormat::custom_zones(sh.size));
                         sh.size = SheetSize::Custom { width_mm: w, height_mm: h };
                     }
                 });

@@ -5870,6 +5870,39 @@ fn a_custom_features_dialog_is_generated_and_fails_as_live(cx: &mut TestAppConte
     assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Probe all 1 did not regenerate properly: Probe failure on purpose A parameter value is not valid."));
 }
 
+/// Live2 custom-feature-1118 (Feature Studio edits): a committed edit is picked up by the document at once (the next
+/// dialog and regeneration use it), but an open dialog keeps its labels: a renamed parameter isn't shown in it.
+#[gpui::test]
+fn an_open_custom_feature_dialog_keeps_its_labels_after_a_commit(cx: &mut TestAppContext) {
+    let (window, view) = probe_dialog(cx, "cf-probe-commit");
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    let labels = |cx: &mut TestAppContext| -> Vec<String> {
+        let s = cx.update_window(window, |_, w, cx| dialog.read(cx).ui_state(w, cx)).unwrap();
+        s["fields"].as_array().into_iter().flatten().filter_map(|f| f["label"].as_str().map(str::to_string)).collect()
+    };
+    assert!(labels(cx).iter().any(|l| l == "Length"), "{:?}", labels(cx));
+    let fs = cx.update(|cx| view.read(cx).doc.read(cx).session.doc.tabs.iter().find(|t| t.name == "Probe").map(|t| t.id)).expect("the Probe tab");
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_tab(fs, "Commit Feature Studio", cx, |c| {
+                    if let noshape_model::TabContent::FeatureStudio(f) = c {
+                        f.save(PROBE_FS.replace("\"Name\" : \"Length\"", "\"Name\" : \"Length renamed\""));
+                        f.commit();
+                    }
+                });
+                let _ = doc.custom_features();
+            });
+        })
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let ty = noshape_model::features::get(&noshape_model::custom::type_id(fs, "probeAll")).expect("the committed type");
+    assert!(ty.params.iter().any(|p| p.label == "Length renamed"), "the document has the edit");
+    let shown = labels(cx);
+    assert!(shown.iter().any(|l| l == "Length") && !shown.iter().any(|l| l == "Length renamed"), "the open dialog unchanged: {shown:?}");
+}
+
 /// Live2 custom-feature-1118 (e2, e4): a custom feature from another document's V1 once that document has a V2: the
 /// row's blue update indicator ("Change version of linked document") and, in its menu, Update linked document… and
 /// Open linked document.

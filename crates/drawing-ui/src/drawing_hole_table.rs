@@ -223,7 +223,7 @@ impl DrawingEditor {
     /// (pointing right, or up when vertical), by geometry (with the table
     /// and datum tools the hover is the view, not its edge).
     pub fn straight_edge_dir_near(&self, v: noshape_model::drawing::ViewId) -> Option<[f64; 2]> {
-        let tol = self.tol_mm(5.0);
+        let tol = self.tol_mm(noshape_scene::drawing_tools::PICKBOX_PX);
         let g = self.geoms.get(&v)?;
         let pl = self.placement(v)?;
         let c = self.cursor;

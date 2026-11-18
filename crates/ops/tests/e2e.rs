@@ -5745,9 +5745,10 @@ fn drawing_sheet_menu_and_properties() {
     assert!(e.message.contains("A4 Portrait"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties", "set": { "zones": [4, 4] } })).unwrap_err();
     assert!(e.message.contains("Custom"), "{e:?}");
-    // Size › Custom starts with 4 x 4 zones (live2 drw-sheet-properties-custom-zones).
+    // Size › Custom starts with the standard's zones, ISO 6 x 4, at the previous size (live2 custom-zones-1118).
     let p = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties", "set": { "size": "Custom" } }));
-    assert_eq!(p["properties"]["zones"], json!([4, 4]), "{p}");
+    assert_eq!(p["properties"]["zones"], json!([6, 4]), "{p}");
+    assert_eq!((p["properties"]["width"].as_f64(), p["properties"]["height"].as_f64()), (Some(594.0), Some(420.0)), "{p}");
     let p = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties", "set": { "size": "Custom", "width": 500, "zones": [8, 4], "border": false } }));
     assert_eq!(last(&mut ctx), "Sheet border");
     let pr = &p["properties"];
