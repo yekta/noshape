@@ -4411,10 +4411,12 @@ impl<'a> Translator<'a> {
             "EDGE" if r.sketch && r.geometry.is_none() && r.ends.is_some() && self.part_of(k, &r).is_none() && let Some(curve) = self.sketch_curve_at(p, None, r.ends) => Ok(curve),
             "EDGE" => {
                 let part = self.part_of(k, &r);
-                // A body that is no part, its type not given (c2-loft-paths-guides' PIERCE targets, Sketch 3's arc JOB):
-                // a sketch's curve with live's midpoint and length, before the nearest part edge.
+                // A PIERCE's edge on a body that is no part, its type not given (c2-loft-paths-guides' Sketch 3 arc JOB):
+                // a sketch's curve with live's midpoint and length, before the nearest part edge. Only a PIERCE's: a
+                // Draft's parting edges took a sketch line (c2-parting-line-draft-parting-line's Draft 1).
                 if part.is_none()
                     && r.measure.is_some()
+                    && r.constraints.iter().any(|(_, p)| p == "externalEdge")
                     && let Some(curve) = self.sketch_curve_at(p, r.measure, r.ends)
                 {
                     return Ok(curve);
@@ -5549,7 +5551,11 @@ impl<'a> Translator<'a> {
             .filter_map(|c| c["parameters"].as_array()?.iter().find(|p| p["parameterId"] == "localCurve")?["value"].as_str())
             .filter(|l| self.used.contains(&(oid.to_string(), l.to_string())))
             .collect();
-        for c in f["constraints"].as_array().into_iter().flatten() {
+        // Patterns first, linked while the stored geometry is still live's (copies of the seeds): a constraint before
+        // them that moves the pivot leaves the instances behind (c2-sm-rocker-enclosure-body's Sketch 6 hexagon).
+        let mut ordered: Vec<&Value> = f["constraints"].as_array().into_iter().flatten().collect();
+        ordered.sort_by_key(|c| !matches!(c["constraintType"].as_str(), Some("CIRCULAR_PATTERN" | "LINEAR_PATTERN")));
+        for c in ordered {
             let ty = c["constraintType"].as_str().unwrap_or("");
             // A PIERCE on an end of such a curve is the Intersection's own: the end is where the face's boundary edge
             // crosses the plane, ours there already (c2-loft-paths-guides' Sketch 5: refused on our fixed section).

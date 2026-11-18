@@ -1,35 +1,28 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 08:18 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 11:58 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## Landed 11-18
-- 9c015658 (03:39): Rip -> Bend unfold failure, Corner / Bend relief boxes, offset zoom step, " radian", snap trace.
-  Its 2f93c018c clash check flagged rolled-wall models (no flat): shipped in v0.4.58, fixed in 7b8bb249 (must-carry).
-- 4b4e4915 sticky snap; circle / ellipse onto a held point keeps its size. 8b481251 an opened sketch's draft takes
-  the solve (hat15b). cafe3c2a tangent on a circle. 4ca852b6 exact model vertex snap. 7b8bb249 rolled walls, unfold
-  failure listed as failed, sticky target only against its rank, elliptical arc on its axis.
-- b5c4ccc4: Corner / Bend relief take a rip side face as its edge (live sm-rip-1118 (b)); translator decal image.
-- cfb07d1c: pierce_point finds where a curve only touches the plane.
+## Landed 11-18 (since the morning)
+- b5c4ccc4 Corner / Bend relief side face; decal image. cfb07d1c pierce at a touching circle. 52c050e1 / e9e27edc:
+  double-clicked sketch in its constraint colours, dots on top; Trim reach 6.5 px + tan; glyph hover margin 4 px /
+  hold 6 px; length-edit test; sk-feel2 / sm-feel2 rows. 485943a9 CONCENTRIC anchors (manualblend Sketch 5).
+  7d0eb11c anchors on a used circle's centre (rocker-body Sketch 6). a98d2543 double-click counts the OS click count
+  (lead P0, Windows CI 44275458892; unconfirmed until the next Windows run). Ctrl+A row + test; rows filled.
 
-## In the worktree (to land together)
-- ccbc09bc9: test only: a free line's new length moves both ends equally, label kept (live sellat-1118; ours already
-  did it through scale_for_edit about the box centre).
-- 51d20f639 parity.rs: an EDGE ref whose part isn't known and that has live's length tries the sketch curve with live's
-  midpoint / length first (`r.measure.is_some()`: the assembly mate-connector refs have a point only, which broke
-  an_assembly / a_subassembly_is_rebuilt_as_lives; refs.jsonl never fills `body`); `anchors_off` counts a PIERCE
-  edge's middle. parity:: 113/113; loft-paths-guides keeps Sketch 4 / 7 / 10's PIERCEs (16/29 unchanged: Loft 3 first).
-- qa SELFEEL-DBLCLICK-FACE-SKETCH on 850ae7f3 (TICKETS 8f99bc5f7): the through-drawn sketch was grey because
-  sketch_display gave every sketch not edited the Inactive state; now its solve's states (blue under-defined), the
-  cache no longer keyed on editing; its points ON_TOP as well. Model test a_sketch_not_edited_carries_its_constraint_states.
+## Queued 11:59 (verified: parting-line 10/17, loft-paths keeps its PIERCEs, rocker-body 28/28, parity:: 113)
+- parity.rs: sketch patterns linked first: rocker-enclosure-body 15/28 -> 28/28 (30 pattern docs otherwise unchanged).
+- parity.rs: the EDGE -> sketch-curve fallback (59e7a5fe) only for a PIERCE's `externalEdge` ref: it took Draft 1's
+  parting edges (c2-parting-line-draft-parting-line 10/17 -> 5/17 on main). Tell bool (7fa8ceab) when it lands.
 
-- live2 sktools-1118 / sk-feel2-1118: Trim reach 6.5 px (`in_sketch_reach`) and tan #D6BD95 (`TRIM_PIECE`); glyph hover
-  margin 4 px (`GLYPH_MARGIN`, lit to 14 px), 6 px once lit (live's 16 px slide hold); fillet drag and the Offset drag across
-  the curve already live's; a new dimension's label has no snap (test). Rows filled in interaction-feel.
+## Feel rows open
+- sm-form-1118 Form row (on main, "?"): ours = chip "Vertex of Sketch N", std fills Target face(s), preview per point,
+  no drag; ≠ Location(s) row buttons (ours one mate-connector toggle, live create point + sketch); no "Preparing
+  form…" (ours has no load wait). Fill the row.
 
-## config-parts (07:40 run, ut-0800.log): links 35/35, linear-rail 26/26, pulleys 22/22, sprockets 24/24, standoffs
-32/32 match to the end; nuts 14/17 (Sweep 1 non-manifold: core); screws not run (bool's > 14 GB Boolean).
-Our solver keeps links' waist arcs on live's branch (probe /root/skasm-scratch/probes/links-waist-probe.patch).
+- search-tools-1118 (live2 11:5x, rows on main, "?"): Search tools in a sketch, Alt+C: 600 px panel under the toolbar
+  box, "Close search [escape]", "Start typing to search tools", footer hint + "Highlight tool in toolbar" (on), rows
+  icon / name / shortcut, first row lit with an info pane, toolbar button lit yellow. Check ours, fill the rows.
 
 ## Waiting on live (REQUESTS)
 - 11:12 c2-surf-intro-mutualtrim "Title" (feature 4, its first difference): the text sketch is on face JHG (y = 0,
