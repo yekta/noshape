@@ -1,19 +1,23 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-18 12:55 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-18 15:15 UTC (restart on a new account 10:45). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Hosts: core builds on vibex7 (rb-hosts); land
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh (since 11-17 21:23; vibe2 is the user's own server: only ~ngyekta and
 /opt/occt, no heavy runs). Never kill a process tree from a computed pid (11-17 21:00 incident).
 
 ## In flight
-- **P0 (qa compat 11:42, vs 0.4.58): 77ba403e7 broke saved references** (impeller Fillet Flansch zum Stroemungskanal "2
-  missing selections", Fillet Ansaugflansch zum Gehaeuse "Select edges"): its tweak names every face Offset(old); 0.4.58
-  took the booleans (OCCT's offset invalid) and kept the neighbours' names. Revert db96888b QUEUED 12:39 (core-p0,
-  verified Ok on qa's copy). Fix forward c609ad23b (core-p0 branch core-offnames, on the revert): same tweak + aliases
-  old name -> new for every face not moved (T1 features_a::move_face_offset_keeps_references_to_its_neighbours_old_names
-  fails without them). Compat sets 0.4.58 vs it: vibex7 ~/tmp/core/imp/compat-on.sh -> /root/core-scratch/compat-on.out.
-  Land it when the compat run shows no new DIFF beyond qa's ALERT-ab6da5d9 minus the 3 impeller fillets.
-  e9caeead0 (offset_planes) and core-rp flansch need the same aliases (+ a compat run) before landing.
+- **P0s for the 17:00 cut (vs 0.4.58, qa's compat corpus vibex7 ~/qa/corpus):**
+  - 77ba403e7 (planar Move face tweak) renamed Flansch (vorne)'s neighbours Offset(..): impeller fillets lost edges.
+    REVERTED bcbe6b0f (13:52).
+  - 27b7836e0 (impeller rim splits = "walls") made Extrude Bohrungssitz Ansaugflansch's Add (scope = main body) drop
+    the main body silently (16 small parts; 0.4.58 10). 77ba403e7 had masked it. Revert 1a69d1ef QUEUED 15:10
+    (core-rw); main without it = 0.4.58's 10 parts, no status change. The walls come back only with a fix that keeps
+    the body (a Boolean on the split walls: bool's?) and a clean compat run.
+  - Fix forward of the tweak: 8eaf0a734 (core-p0 branch core-offnames): moved faces Offset(old), others keep names
+    (= 0.4.58's booleans), aliases Split{Offset(old), F, 0} -> moved face (Move face 2) and Offset(old) -> face (OCCT
+    era). Compat (on4): user docs / tickets / authored SAME; corpus = pre-existing diffs + the walls' two. After the
+    walls revert lands: rebase, rebuild cli-on, `bash ~/tmp/core/imp/compat-on.sh <cli> <tag>` (vibex7), land if clean.
+    Variants that failed: all-Offset + kept aliases (Move face 2), Split{Offset} primary (3 cf custom features).
 - **Background jobs, results on vibex7 ~/tmp/core:** pair 7 `pair7.sh ms mt` (running since 11:12; p7-ms/mt.log,
   p7-cmp.out, p7.done); pair 5 `pair5.sh pm pt <42 docs>` queued behind it (p4-pm/pt.log, p5-cmp.out, p5.done). After
   both: `~/bin/slot bash pair8.sh mt fl` (Flansch, p8-cmp.out; copy core-rp's ops build to ~/tmp/core/pair-fl first).
