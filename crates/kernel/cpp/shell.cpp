@@ -20,6 +20,7 @@
 
 #include "internal.hpp"
 #include <atomic>
+#include <exception>
 #include <chrono>
 #include <BRepGProp_Vinert.hxx>
 #include <BRepGProp_Domain.hxx>
@@ -5123,6 +5124,13 @@ occ::handle<Geom_BSplineSurface> linear_extension(const occ::handle<Geom_BSpline
 
 namespace {
 
+// The tangent-extension try's stop (by_quadrics: the first try's result is the one, or none is wanted): checked at its
+// stages' ends.
+thread_local const std::atomic<bool>* t_quad_stop = nullptr;
+struct QuadStopped
+{
+};
+
 // `tangent_ext`: free-form faces' offsets extended past their edges along their tangents, not by their own polynomials;
 // `continued_any` set where a face's polynomials were, `why` to the reason it failed.
 bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double thickness, double sign, Built& out,
@@ -5141,6 +5149,8 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
   const double t       = outward ? -thickness : thickness;
   auto         t_lap   = std::chrono::steady_clock::now();
   auto         lap     = [&](const char* what) {
+    if (t_quad_stop != nullptr && t_quad_stop->load(std::memory_order_relaxed))
+      throw QuadStopped{};
     if (!dbg)
       return;
     const auto now = std::chrono::steady_clock::now();
@@ -9395,15 +9405,85 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
 
 // Path 2b: by_quadrics_with, again with tangent extensions where a free-form face's own polynomials curled short of
 // a removed face (live's impeller loft: the inlet's offset never reaches the opening's plane in the middle).
+// A kept face a B-spline open both ways: the first try may continue its polynomials past its edges, and fall short.
+static bool may_continue(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed)
+{
+  for (TopExp_Explorer x(solid, TopAbs_FACE); x.More(); x.Next())
+  {
+    if (std::any_of(removed.begin(), removed.end(), [&](const TopoDS_Shape& r) { return r.IsSame(x.Current()); }))
+      continue;
+    occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(x.Current()));
+    while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(g))
+      g = t->BasisSurface();
+    const occ::handle<Geom_BSplineSurface> bs = occ::down_cast<Geom_BSplineSurface>(g);
+    if (!bs.IsNull() && !bs->IsUPeriodic() && !bs->IsVPeriodic())
+      return true;
+  }
+  return false;
+}
+
 bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double thickness, double sign, Built& out)
 {
   bool        continued_any = false;
   const char* why           = "";
-  if (by_quadrics_with(solid, removed, thickness, sign, out, false, continued_any, why))
+  auto        short_of      = [](const char* w) {
+    return std::strcmp(w, "no intersection of two offsets through an edge's ends") == 0 || std::strcmp(w, "a marched edge's curve on its face failed") == 0;
+  };
+  if (!may_continue(solid, removed))
+  {
+    if (by_quadrics_with(solid, removed, thickness, sign, out, false, continued_any, why))
+      return true;
+    return continued_any && short_of(why) && by_quadrics_with(solid, removed, thickness, sign, out, true, continued_any, why);
+  }
+  // (Both tries at once, the tangent extensions' kept only where the first falls short as it would have alone: the
+  // first's failing third of c2-impeller-loft's Shell Gehäuse no longer before the second. Neither changes the input.)
+  Built              second;
+  bool               ok1 = false, ok2 = false, cont2 = false;
+  const char*        why2 = "";
+  std::atomic<bool>  stop{false};
+  std::exception_ptr err1, err2;
+  OSD_Parallel::For(0, 2, [&](int i) {
+    if (i == 0)
+    {
+      try
+      {
+        ok1 = by_quadrics_with(solid, removed, thickness, sign, out, false, continued_any, why);
+      }
+      catch (...)
+      {
+        err1 = std::current_exception();
+      }
+      if (err1 || ok1 || !continued_any || !short_of(why))
+        stop = true;
+      return;
+    }
+    const std::atomic<bool>* outer = t_quad_stop;
+    t_quad_stop                    = &stop;
+    try
+    {
+      ok2 = !stop.load() && by_quadrics_with(solid, removed, thickness, sign, second, true, cont2, why2);
+    }
+    catch (const QuadStopped&)
+    {
+      ok2 = false;
+    }
+    catch (...)
+    {
+      err2 = std::current_exception();
+    }
+    t_quad_stop = outer;
+  });
+  if (err1)
+    std::rethrow_exception(err1);
+  if (ok1)
     return true;
-  const bool short_of = std::strcmp(why, "no intersection of two offsets through an edge's ends") == 0 || std::strcmp(why, "a marched edge's curve on its face failed") == 0;
-  return continued_any && short_of &&
-         by_quadrics_with(solid, removed, thickness, sign, out, true, continued_any, why);
+  if (!continued_any || !short_of(why))
+    return false;
+  if (err2)
+    std::rethrow_exception(err2);
+  if (ok2)
+    out = second;
+  return ok2;
 }
 
 // Parasolid bounds an opening's cavity by the removed face's own plane, extended past its edges: a kept face meeting a
