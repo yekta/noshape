@@ -580,6 +580,10 @@ fn a_box_drag_lights_nothing_and_selects_at_release(cx: &mut TestAppContext) {
     let end = DVec2::new(if start.x < lo.x { hi.x + 40.0 } else { lo.x - 40.0 }, if start.y < lo.y { hi.y + 40.0 } else { lo.y - 40.0 });
     let at = pointer.window_point(cx, start);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+    // A person's press lasts past the 50 ms a left press needs to become a drag (the viewport's clock: the wall's): the
+    // first move is the drag's (it moved straight on, so the drag began at the second move, which may light by the
+    // first-move rule: main red 18:4x).
+    std::thread::sleep(std::time::Duration::from_millis(100));
     let mut wrong = Vec::new();
     for i in 1..=12 {
         let p = start + (end - start) * (i as f64 / 12.0);
@@ -708,7 +712,17 @@ fn a_box_whose_first_move_ends_on_a_plane_waits_a_move(cx: &mut TestAppContext) 
         pointer.frames(cx, &view);
         (lit(cx), cx.update(|cx| pointer.vp.read(cx).box_drag()))
     };
-    let first = drag_to(cx, centre);
+    let first = {
+        let at = drag_to(cx, centre);
+        // (The first move's pick comes back from the GPU's thread: wait for what it decides, a light or a box.)
+        let t = std::time::Instant::now();
+        let mut at = at;
+        while at == (None, false) && t.elapsed() < std::time::Duration::from_secs(15) {
+            pointer.frames(cx, &view);
+            at = (lit(cx), cx.update(|cx| pointer.vp.read(cx).box_drag()));
+        }
+        at
+    };
     let nudged = drag_to(cx, centre + DVec2::new(1.0, 0.0));
     let next = drag_to(cx, centre + DVec2::new(20.0, 10.0));
     let up = pointer.window_point(cx, centre + DVec2::new(20.0, 10.0));

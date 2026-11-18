@@ -1937,6 +1937,8 @@ impl PartStudioView {
         // Live: with a dialog field active, what it doesn't take isn't
         // highlighted; on a plane's resize ring nothing is.
         let id = id.filter(|_| self.ui.plane_ring_hover.is_none());
+        // A box being drawn lights nothing, whatever pick comes back meanwhile (live; main red 18:4x on a loaded host).
+        let id = id.filter(|_| !vp.read(cx).box_drag());
         let gpu = id;
         let id = self.shown_sketch_hover_id(id, cx);
         self.ui.shown_sketch_gpu_hover = self.sketch.is_none().then_some((gpu, id));

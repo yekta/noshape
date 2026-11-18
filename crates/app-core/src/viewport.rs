@@ -377,6 +377,8 @@ pub struct Viewport {
     box_waits_from: Option<DVec2>,
     /// That move's spot wasn't picked yet: its hover pick decides (geometry lights, empty space starts the box).
     box_pick_pending: bool,
+    /// Whether the left press was on empty space (None: not picked there yet).
+    press_empty: Option<bool>,
     /// The press's summed move path (CSS px) and where it last was: the right-click menu's travel (live sums it).
     press_path: (f64, DVec2),
     last_pos: DVec2,
@@ -708,6 +710,7 @@ impl Viewport {
             press_travel: 0.0,
             box_waits_from: None,
             box_pick_pending: false,
+            press_empty: None,
             press_path: (0.0, DVec2::ZERO),
             last_pos: DVec2::ZERO,
             hover_unconfirmed: false,
@@ -2324,6 +2327,8 @@ impl Viewport {
             return;
         }
         self.press_pos = p;
+        // Whether it pressed on empty space, as the pick there says now (the cache moves on with the pointer).
+        self.press_empty = self.pick_at(p).map(|x| x.is_none());
         self.press_at = (self.clock)();
         self.press_travel = 0.0;
         self.box_waits_from = None;
@@ -2432,7 +2437,7 @@ impl Viewport {
                 self.zoom_anchor = self.press_pos;
                 self.flush_pending_rotate(cx);
                 self.set_nav_mode(mode, self.press_pos);
-            } else if button == MouseButton::Left && self.box_waits_from.is_none() && self.pick_at(self.press_pos) == Some(None) && self.pick_at(p) != Some(None) {
+            } else if button == MouseButton::Left && self.box_waits_from.is_none() && self.press_empty == Some(true) && self.pick_at(p) != Some(None) {
                 // Live (sel-feel 11-17, box-e/ltr-from-plane): a press on empty space whose first move ends over a
                 // plane lights it and draws no box; the box comes with a move past the drag threshold from there. A
                 // spot not picked yet waits for its pick (`on_pick`).
