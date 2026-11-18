@@ -10,16 +10,17 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   Extend picks a line's nearer end, which follows the pointer and stops on a crossing curve; offset arrow drag adds to
   the press-time offset (live sketch-tools-1118; tangent arc, spline Enter, fillet reach, trim drag already as live).
 
-## Committed, not landed (branch agent/skasm)
-- 1286bcbcf: Rip -> Bend unfold failure (host `bends_close_a_loop` per part -> no flat, `cannot_unfold`, WARNING
+## Queued (fbecd909, 02:50; fc4e19fb failed on the land server's link flake, re-queued)
+- Rip -> Bend unfold failure (host `bends_close_a_loop` per part -> no flat, `cannot_unfold`, WARNING
   SHEET_METAL_COULD_NOT_UNFOLD with the bend kept: std's defineFeature rolls an ERROR back; the table's yellow toast);
-  Corner / Bend relief boxes take planar faces with the walls muted (`SM_CORNER`); ui_parity "part 0"; tests. Waits
-  for the A/B over the 16 sheet metal parity docs: vibex8 slot (queued behind qa's suites), binaries
-  ~/agents/skasm-keep/ops-{a,b} there, logs sm-unfold-{a,b}.log; compare "features match" and DIFF lines, then land.
-- 5ad88311e: offset arrow step by the manipulators' zoom rule (live2 triad-step-1118).
+  Corner / Bend relief boxes take planar faces with the walls muted (`SM_CORNER`); ui_parity "part 0". A/B over the 13
+  sheet metal parity docs (vibex6 ~/agents/skasm-keep/sm-unfold-{a,b}.log): identical, 153/159 both.
+- Offset arrow step by the manipulators' zoom rule (live2 triad-step-1118).
+- NOSHAPE_SNAP_TRACE: each sketch pointer move's model snap and inference in continuous viewport px.
 - live REQUESTS 11-18 02:30: the failure row's colour (warning vs error) and Corner taking a rip side face.
-- SKSNAP-REACH (P2): qa's slow sweep lights at 6 px, never 7; headless 7.0 lights (test extended): ~1 px between the X
-  pointer and our viewport coordinates; psui measuring the app side (lead: dig together, may be hat15b's offset).
+- SKSNAP-REACH: proposed not a bug to qa (trace: we measure from the pointer pixel's centre as live's 1x1 pick; P at
+  x 1145.937 makes qa's "7 px" 7.585; the edge alone lights at its 7 px step; with P woken the end goes onto the edge
+  at P's height, combined). Rig: vibex6 ~/tmp/skasm/sk (sks.sh, reach.py; starts.json = repo + qa's merged).
 
 ## Next, in order
 0. USER P0 (lead 11-17): interaction feel. sm-feel-1117 left: Corner / Bend relief taking a rip's side face +
