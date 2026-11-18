@@ -198,6 +198,10 @@ pub(crate) enum EqKind {
     SymMid,
     /// Inputs a, b, l0, l1: (b-a) perpendicular to the line.
     SymPerp,
+    /// Inputs p, a0, a1, l0, l1: p reflected across the line l0-l1 lies on the line a0-a1 (two lines mirrored).
+    MirrorOnLine,
+    /// Inputs a0, a1, b0, b1, l0, l1: (b1-b0) parallel to (a1-a0) reflected across the line l0-l1.
+    MirrorDir,
     /// Inputs p, c, mx, my, minor.
     PointOnEllipse,
     /// Inputs p, c, mx, my: p on the major axis line (or the minor axis
@@ -344,6 +348,20 @@ fn kernel<T: Num>(kind: &EqKind, x: &[T]) -> T {
             let d = V2::at(x, 2).sub(V2::at(x, 0));
             let l = V2::at(x, 6).sub(V2::at(x, 4));
             d.dot(l) / l.norm()
+        }
+        EqKind::MirrorOnLine => {
+            let (p, l0) = (V2::at(x, 0), V2::at(x, 6));
+            let u = V2::at(x, 8).sub(l0);
+            let v = p.sub(l0);
+            let r = l0.add(u.mul(v.dot(u).scale(2.0) / u.dot(u))).sub(v);
+            pld(r, V2::at(x, 2), V2::at(x, 4))
+        }
+        EqKind::MirrorDir => {
+            let da = V2::at(x, 2).sub(V2::at(x, 0));
+            let db = V2::at(x, 6).sub(V2::at(x, 4));
+            let u = V2::at(x, 10).sub(V2::at(x, 8));
+            let ra = u.mul(da.dot(u).scale(2.0) / u.dot(u)).sub(da);
+            ra.cross(db) / (floor_len(ra.norm()) * floor_len(db.norm()))
         }
         EqKind::OnEllipseAxis { minor } => {
             let d = V2::at(x, 0).sub(V2::at(x, 2));
@@ -1803,6 +1821,13 @@ impl<'a, L: Lookup> Builder<'a, L> {
                         let (la, lb) = (self.line(*a)?, self.line(*b)?);
                         let (a0, a1) = ([la[0], la[1]], [la[2], la[3]]);
                         let (b0, b1) = ([lb[0], lb[1]], [lb[2], lb[3]]);
+                        // Live's MIRROR of two lines: the lines mirrored, their ends free (asm-pinslot's washer: one of
+                        // them trimmed shorter later).
+                        if c.hints.lines_only {
+                            self.push(EqKind::MirrorOnLine, cat(&[&b0, &a0, &a1, &ax]));
+                            self.push(EqKind::MirrorDir, cat(&[&a0, &a1, &b0, &b1, &ax]));
+                            return Ok(());
+                        }
                         if c.hints.reverse {
                             self.sym_points(a0, b1, ax);
                             self.sym_points(a1, b0, ax);
@@ -2155,6 +2180,7 @@ mod tests {
             (EqKind::Angle { cos: 0.3f64.cos(), sin: 0.3f64.sin() }, 8),
             (EqKind::SymMid, 8),
             (EqKind::SymPerp, 8),
+            (EqKind::MirrorOnLine, 10),
             (EqKind::ArcLength { len: 1.0 }, 6),
             (EqKind::PointOnEllipse, 7),
             (EqKind::OnEllipseAxis { minor: false }, 6),
@@ -2171,6 +2197,7 @@ mod tests {
             check_grad(&eq, &x);
         }
         let ell = [0.0, 0.0, 2.0, 0.5, 1.0, 0.4, -3.0, 1.0, 3.0, 2.0];
+        check_grad(&Eq { kind: EqKind::MirrorDir, inputs: (0..12).collect() }, &[0.1, 0.2, 1.3, 0.4, -0.5, 0.9, 0.7, -1.1, 2.0, 0.3, -0.4, 1.7]);
         check_grad(&Eq { kind: EqKind::EllipseTangent, inputs: (0..10).collect() }, &ell);
         check_grad(&Eq { kind: EqKind::EllipseOnLine, inputs: (0..10).collect() }, &ell);
         let sp = Nurbs::new(3, vec![glam::DVec2::ZERO; 5]);

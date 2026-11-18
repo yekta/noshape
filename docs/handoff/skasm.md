@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 13:09 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 15:10 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -13,28 +13,20 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - efd27713 sketch patterns linked first (rocker-enclosure-body 28/28); EDGE -> sketch-curve fallback only for a
   PIERCE's edge (parting-line back to 10/17; bool told).
 
-## Feel rows (12:2x, in the worktree)
-- search-tools-1118: our panel already as live (600 px, "Close search", start text, footer, ranking = live's lists);
-  the gap was the yellow toolbar highlight in a sketch (only Part Studio buttons lit): now the found sketch tool, a
-  group's ⌄ for a member, a constraint, Construction, Extrude / Revolve (`search_lit`, debug selector
-  `search-lit:<name>`); sketchtools row "search / the found tool lit in the sketch toolbar".
-- sm-form-1118 row filled (≈ faster; ≠ Location(s) has no pencil "sketch in the dialog" button: a feature, not done).
-- hover-p0 / qa FEEL-SKETCH-REACH-OUTSIDE (TICKETS 9434d439a): outside sketch mode a shown sketch's point within 9 px
-  wins, a curve lights within 6.5 px, else what the pick finds without it (`shown_sketch_hover_id`, viewport
-  `pick_at_pointer_without`); re-resolved on each move (`ui.shown_sketch_gpu_hover`); clicks take the same. Faces /
-  edges keep their own pick (a point behind a part stays hidden). psui has the plane rows.
-- Queued 6389133a (13:5x): sketch toolbar search highlight + hover reach outside sketch mode (live2 / qa told).
-- Sheet metal model arrow (in the worktree, testing): live smflip-1118: std's qCreatedBy(id, BODY) inside the feature
-  is the definition sheet (live builds the part at the feature's end). `CtxState::sm_built` (parts
-  updateSheetMetalGeometry made in this feature) left out of CREATED_BY for bodies, the hidden definitions in. Arrow
-  now at the plate's middle, +z, on the sheet = std's START cap at z = thickness (live's "z 0" was inferred).
-  model tests 525 ok; SM suite docs 12/13 to the end as before, cf-sheet-metal-model-plus 11/14 -> 14/14. Queued.
-- c2-surf-intro-* Title (live title-frame-1118): the translator maps a text's `.sketch_text.baseline/left.start/.end`
-  and counts its start in off_live_points; a text box's corner made coincident with fixed geometry carries the whole box
-  (`carry_text_box`, size kept). Text docs: surf-intro-* +1 each (mutualtrim 3 -> 5/17, simple 10 -> 12/15), others same.
-- Next: the surf-intro Derived 1 sources now resolve: "its source's Isocline Title ... moved 271 mm (first MIDPOINT on
-  H9x2pgUs2VQ4.start)" in boundary / fill / offset / ruled; -moveboundary NOT BUILT; -simple Revolve 1 ("Select sketch
-  curves to revolve."); wave-washer with live's sketches.json.
+## In the worktree (15:10; land after suite-1515 on vibe2, compared with suite-0545)
+- Committed (queue FAILED 14:15 on ops prefs: a Form warned; fixed): search highlight in the sketch toolbar; hover reach
+  outside sketch mode (point 9 px beats lines, line 6.5 px); SM flip arrow (`CtxState::sm_built` part -> definition:
+  CREATED_BY of bodies inside the feature skips those parts and adds only their definitions; the first version let in
+  every hidden body made by the feature, so Form's registered tools looked unused); Title text (carry_text_box +
+  translator text ends). SM suite docs 12/13 as before, cf-sheet-metal-model-plus 11/14 -> 14/14 (first version).
+- Uncommitted: translator keeps a query's text when it names one of our sketch entities (live gave no ids; its
+  evaluated id went to a region: surf-intro-simple Revolve 1, 12 -> 14/15); MIRROR of two lines = the lines mirrored,
+  ends free (asm d8d597e0: asm-pinslot washer, 4 occurrences): Hints::lines_only, EqKind MirrorOnLine / MirrorDir, ops
+  constraint "mirror", translator MIRROR -> "mirror"; tests (sketch constraints_more, e2e, AGENT_API regenerated).
+  Tell asm when landed. live2 asked (REQUESTS 14:40) whether the app's Mirror / Symmetric tools tie ends.
+- Handed: surf-intro-simple Loft 1 (wire profiles as sketch regions; 1 face vs live 4) to core; surf-intro-examples
+  Fill 1 overshoots (boundary curves are live's) is Fill's (blend / core), not yet told.
+- sm-form-1118 row = (Form Part Studio remembered). ≠ Location(s) has no pencil button: REQUESTS 14:01.
 
 ## Waiting on live (REQUESTS)
 - Answered 11-18 13:xx: wave-washer sketches.json (Sketch 4 / 3 solved inward) and surf-intro Derived 1 sources

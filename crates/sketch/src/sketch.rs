@@ -820,6 +820,14 @@ impl Sketch {
         self.add_constraint_ext(kind, true)
     }
 
+    /// A Symmetric of two lines held as Onshape's MIRROR: the lines mirrored, their ends free.
+    pub fn mirror_lines_only(&mut self, id: ConstraintId) -> Result<()> {
+        let c = self.constraints.get_mut(&id).ok_or(SketchError::UnknownConstraint(id))?;
+        c.hints.lines_only = true;
+        self.touch();
+        Ok(())
+    }
+
     /// Adds a driven (reference) dimension: measured, not enforced.
     pub fn add_reference(&mut self, kind: ConstraintKind) -> Result<ConstraintId> {
         self.add_constraint_ext(kind, false)

@@ -411,3 +411,31 @@ fn a_minimum_distance_between_overlapping_circles_is_their_overlap() {
     solved(&mut sk);
     assert!((sk.measure(d).unwrap() - 1.0).abs() < 1e-9);
 }
+
+/// Live's MIRROR of two lines (asm-pinslot's washer, Sketch 1): the lines mirrored about the axis, their ends free:
+/// bottom x 2.65–4.75 at y 0.5 and top 2.65–5.0 at y −0.5 hold it as they are; a turn of one turns the other.
+#[test]
+fn mirrored_lines_hold_as_lines_with_their_ends_free() {
+    let mut sk = Sketch::new();
+    let axis = sk.add_line(v(0.0, 0.0), v(1.0, 0.0));
+    sk.add_constraint(ConstraintKind::Fix { entity: axis }).unwrap();
+    let a = sk.add_line(v(2.65, 0.5), v(4.75, 0.5));
+    let b = sk.add_line(v(2.65, -0.5), v(5.0, -0.5));
+    let c = sk.add_constraint(ConstraintKind::Symmetric { a, b, axis }).unwrap();
+    sk.mirror_lines_only(c).unwrap();
+    solved(&mut sk);
+    let ends = |sk: &Sketch, l: EntityId| match sk.curve(l) {
+        Some(Curve2::Line { a, b }) => (a, b),
+        _ => panic!("a line"),
+    };
+    let (b0, b1) = ends(&sk, b);
+    assert!((b0 - v(2.65, -0.5)).length() < 1e-9 && (b1 - v(5.0, -0.5)).length() < 1e-9, "the trimmed end stays: {b0} {b1}");
+    let (_, a1) = ends(&sk, a);
+    let a_end = sk.entity(a).and_then(|e| e.point_refs().get(1).copied()).unwrap();
+    assert!(sk.drag(&[(DragHandle::Point(a_end), a1 + v(0.0, 0.5))]).is_solved());
+    let ((a0, a1), (b0, b1)) = (ends(&sk, a), ends(&sk, b));
+    let mirror = |p: DVec2| v(p.x, -p.y);
+    let (da, db) = ((a1 - a0).normalize(), (b1 - b0).normalize());
+    assert!(mirror(da).perp_dot(db).abs() < 1e-9, "directions mirrored: {da} {db}");
+    assert!((mirror(b0) - a0).perp_dot(da).abs() < 1e-9, "b's line the mirror of a's: {a0} {a1} {b0} {b1}");
+}

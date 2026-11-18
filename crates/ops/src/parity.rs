@@ -2284,7 +2284,11 @@ impl<'a> Translator<'a> {
                     // (Not a query naming one of its in-feature construction points or mate connectors: those are ours
                     // as translated, asm-corexy studio 4a6a96's Plane 1 through three Mesh points.)
                     let own_sub = |q: &Value| q["featureId"].as_str().is_some_and(|f| self.sub_points.contains_key(f) || self.sub_params.contains_key(f));
-                    for (n, q) in queries.iter_mut().enumerate().filter(|(_, q)| q["deterministicIds"].as_array().is_none_or(|a| a.is_empty()) && !own_sub(q)) {
+                    // (Nor one whose text names a sketch entity of ours: that entity (c2-surf-intro-simple's Revolve 1, Sketch 1's
+                    // ellipse; by live's id it went to a region).)
+                    let named = |q: &Value| q["queryString"].as_str().is_some_and(|t| self.sketch_entity_from_query(t).is_some());
+                    let keep: Vec<bool> = queries.iter().map(|q| own_sub(q) || named(q)).collect();
+                    for (n, q) in queries.iter_mut().enumerate().filter(|(n, q)| q["deterministicIds"].as_array().is_none_or(|a| a.is_empty()) && !keep[*n]) {
                         let mut own: Vec<String> = mine.iter().filter(|(_, m)| *m == Some(n)).map(|(id, _)| id.clone()).collect();
                         own.sort();
                         let ids = if per_query && !own.is_empty() { own } else { evaluated.clone() };
@@ -5594,7 +5598,8 @@ impl<'a> Translator<'a> {
                 "MIDPOINT" => "midpoint",
                 "PERPENDICULAR" => "perpendicular",
                 "EQUAL" => "equal",
-                "SYMMETRIC" | "MIRROR" => "symmetric",
+                "SYMMETRIC" => "symmetric",
+                "MIRROR" => "mirror",
                 "FIX" => "fix",
                 "NORMAL" => "normal",
                 // Live's Bezier joints: equal curvature (G2) and its G3 (our Flow).
@@ -5655,7 +5660,7 @@ impl<'a> Translator<'a> {
             // Ours takes the mirror line last, a midpoint's point last (between
             // two points: Onshape's centre-point rectangle).
             let order: &[&str] = match ours {
-                "symmetric" => &["localFirst", "localSecond", "localMirror"],
+                "symmetric" | "mirror" => &["localFirst", "localSecond", "localMirror"],
                 "midpoint" => &["localFirst", "localEntity1", "localSecond", "localEntity2", "localMidpoint"],
                 "pierce" => &["localEntity"],
                 _ => &["localFirst", "localSecond"],
@@ -5774,7 +5779,7 @@ impl<'a> Translator<'a> {
             }
             let ours = if ours == "quadrant" { "coincident" } else { ours };
             // A point mirrored onto itself (ours merged the pair: a point on the mirror line) lies on the line.
-            let (ours, entities) = if ours == "symmetric" && entities.len() == 3 && entities[0] == entities[1] { ("coincident", vec![entities[0].clone(), entities[2].clone()]) } else { (ours, entities) };
+            let (ours, entities) = if matches!(ours, "symmetric" | "mirror") && entities.len() == 3 && entities[0] == entities[1] { ("coincident", vec![entities[0].clone(), entities[2].clone()]) } else { (ours, entities) };
             let reply = if entities.is_empty() {
                 None
             } else {

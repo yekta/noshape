@@ -1838,10 +1838,17 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             // Bodies: not the sheet metal parts this feature built (live makes them at its end), and the (hidden)
             // definition sheets it made instead (live smflip-1118: Sheet metal model's flip arrow on its region).
             let sm_feature = entity_type == Some(EType::Body) && !q.st.sm_built.is_empty();
+            let swapped = |e: &Ent| match e {
+                Ent::Body(b) if sm_feature => {
+                    let body = &q.st.ctx.bodies[*b].id;
+                    !q.st.sm_built.contains_key(body) && (!q.st.hidden.contains(body) || q.st.sm_built.values().any(|d| d == body))
+                }
+                _ => true,
+            };
             let visible: Vec<Ent> = q
                 .all_with(entity_type, sm_feature)
                 .into_iter()
-                .filter(|e| !(sm_feature && matches!(e, Ent::Body(b) if q.st.sm_built.contains(&q.st.ctx.bodies[*b].id))))
+                .filter(|e| swapped(e))
                 .filter(|e| q.created_by(e).is_some_and(|c| has_prefix(&c, &id)) || merged(e))
                 .collect();
             let found: Vec<Ent> = if !visible.is_empty() {

@@ -15,7 +15,7 @@ use noshape_model::reference::{FeatureId, Reference};
 use noshape_model::regen::RegenResult;
 use noshape_model::sketch_feature::SketchData;
 use noshape_scene::sketch_mode::{self as sm, ConstraintTool, SketchEditor, Tool};
-use noshape_sketch::{ConstraintId, ConstraintKind, DistanceMode, EntityId, Geometry};
+use noshape_sketch::{ConstraintId, ConstraintKind, DistanceMode, EntityId, EntityKind, Geometry};
 use noshape_units::{Dim, UnitPrefs};
 use serde_json::{Value, json};
 
@@ -46,7 +46,7 @@ const DRAW_TOOLS: [(&str, Tool, &str); 19] = [
     ("elliptical_arc", Tool::EllipticalArc, "[center, major axis end, start point (also sets the minor radius), end point] (counter-clockwise)."),
 ];
 
-const CONSTRAINTS: [(&str, ConstraintTool, &str); 15] = [
+const CONSTRAINTS: [(&str, ConstraintTool, &str); 16] = [
     ("coincident", ConstraintTool::Coincident, "points/curves coincide (point on curve, collinear lines, same circle)"),
     ("concentric", ConstraintTool::Concentric, "centers of circles/arcs coincide"),
     ("parallel", ConstraintTool::Parallel, "lines parallel"),
@@ -57,6 +57,7 @@ const CONSTRAINTS: [(&str, ConstraintTool, &str); 15] = [
     ("perpendicular", ConstraintTool::Perpendicular, "lines perpendicular"),
     ("equal", ConstraintTool::Equal, "equal lengths / radii"),
     ("symmetric", ConstraintTool::Symmetric, "two entities symmetric about a line (the last entity)"),
+    ("mirror", ConstraintTool::Symmetric, "a Mirror's constraint: two lines mirrored about a line (the last entity), their ends free; other entities symmetric"),
     ("fix", ConstraintTool::Fix, "fix in place"),
     ("normal", ConstraintTool::Normal, "line normal to a curve"),
     ("pierce", ConstraintTool::Pierce, "a point, or a curve through it, where external geometry pierces the sketch plane"),
@@ -913,10 +914,24 @@ fn constrain(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Ok(v.into());
     }
     let before: Vec<ConstraintId> = t.data.sketch.constraints().map(|c| c.id).collect();
+    // Onshape's MIRROR of two lines holds the lines, not their ends (asm-pinslot's washer: one trimmed shorter after):
+    // added with that hint before its solve, which would otherwise pair the ends.
+    let line = |e: &EntityId| t.data.sketch.kind(*e) == Some(EntityKind::Line);
+    let mirrored_lines = name == "mirror" && ids.len() == 3 && ids.iter().all(line);
+    if mirrored_lines {
+        let sketch = &mut t.data.sketch;
+        let was = sketch.clone();
+        let made = sketch.add_constraint(ConstraintKind::Symmetric { a: ids[0], b: ids[1], axis: ids[2] }).map_err(|e| OpError::invalid(e.to_string()).with_param("entities"))?;
+        sketch.mirror_lines_only(made).map_err(|e| OpError::invalid(e.to_string()))?;
+        if !sketch.solve().is_solved() {
+            *sketch = was;
+            return Err(OpError::invalid("These lines can't be mirrored about that line here (the sketch can't be solved with it)").with_param("entities"));
+        }
+    }
     let mut ed = editor(&t);
     let picked = ids.len();
     ed.selection = ids;
-    if !ed.constraint_command(&mut t.data, c) {
+    if !mirrored_lines && !ed.constraint_command(&mut t.data, c) {
         // (The tool shows no hint, as live; the reply says what's missing.)
         let why = ed.refusal.clone().or_else(|| ed.message.clone()).unwrap_or_else(|| {
             if picked < c.arity() {

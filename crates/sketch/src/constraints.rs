@@ -400,6 +400,9 @@ pub struct Hints {
     /// Fix constraint anchor values.
     #[serde(default)]
     pub anchor: Vec<f64>,
+    /// Symmetric lines: the lines mirrored, their ends free (live's MIRROR), not their ends paired.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub lines_only: bool,
 }
 
 impl Default for Hints {
@@ -414,6 +417,7 @@ impl Default for Hints {
             end_b: false,
             internal: false,
             anchor: Vec::new(),
+            lines_only: false,
         }
     }
 }

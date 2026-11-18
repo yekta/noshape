@@ -9045,6 +9045,28 @@ fn document_create_defaults_to_the_documents_folder() {
     let _ = std::fs::remove_dir_all(&documents);
 }
 
+/// Onshape's MIRROR (asm-pinslot's washer): two lines mirrored about a line, their ends free: a pair whose ends differ
+/// (one trimmed shorter) takes it as it is; "symmetric" pairs the ends and moves them.
+#[test]
+fn mirror_holds_two_lines_with_their_ends_free() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "mirror-lines.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [
+        { "tool": "line", "points": [[0, 0], [10, 0]], "construction": true },
+        { "tool": "line", "points": [[2.65, 0.5], [4.75, 0.5]] },
+        { "tool": "line", "points": [[2.65, -0.5], [5.0, -0.5]] }] }));
+    let lines: Vec<Value> = r["created"].as_array().unwrap().iter().filter(|e| e["type"] == "line").map(|e| e["id"].clone()).collect();
+    let (axis, a, b) = (lines[0].clone(), lines[1].clone(), lines[2].clone());
+    let ends = |ctx: &mut Ctx| {
+        let g = call(ctx, "sketch_get", json!({ "sketch": sk }));
+        let e = g["entities"].as_array().unwrap().iter().find(|e| e["id"] == b).cloned().unwrap();
+        (e["start"][0].as_f64().unwrap(), e["end"][0].as_f64().unwrap())
+    };
+    call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "mirror", "entities": [a, b, axis] }));
+    let (s, e) = ends(&mut ctx);
+    assert!((s - 2.65).abs() < 1e-6 && (e - 5.0).abs() < 1e-6, "the trimmed line as it was: {s} .. {e}");
+}
+
 /// qa's agent session v0.4.36: Symmetric about "origin" (a point) is refused, saying what it takes and how to centre a
 /// shape on the origin instead.
 #[test]
