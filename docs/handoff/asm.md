@@ -149,16 +149,15 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   live's 332112, a studio tail). Its Extrude 12 (17 faces vs live 14, same volume): not the Boolean (bool, OCCT-only too) -> core 11-17 (repro vibex8 ~/agents/asm-keep/mps).
 
 ### Next, in order
-0. live2 truth (behaviours "asm (lead 11-18 ~13:32)", live/asm/truth-1118/), worked 11-18 14:07:
-   pattern-std BOM: live's Linear pattern 5 is ERROR (direction lost) and live's BOM drops its instances; scorer counts
-   that as a live defect (5ef547724, on the stack). pinslot washer 0.2985 mm: std studio 26bb0b's Sketch 1 MIRROR of
-   two lines of unequal length; our solver mirrors endpoints, live the lines -> undone edits, washer stays M5 1.0 mm ->
-   skasm (sent 14:05). bjr OPG006 Description: set by 5e35bf's custom "Wire clip 1", whose imported FS c5f922…/3c1eea…
-   isn't in the corpus -> REQUESTS 13:55 live2. robot-relations REV-21-1650: live's 6 sheet bodies vs our one solid
-   (DECISIONS 11-17), so ×6 merged: as ruled. suspension / scissor-lift: refetched 14:11. isaac Helical:
-   custom GearLabFeature not registered ("unknown feature type") -> FS owner via lead. infento Wheellock: studio
-   f0eedd (Sketch 7 ANGLE undone 81 mm, fillets) -> model side. welding "Part 2"/"Part 6" merged in sub 0eadef: tracing
-   (vibex8 ~/agents/asm-keep/trace-welding.out; one.sh <bin> <asm dir> <out> = one traced assembly via slot).
+0. live2 truth (behaviours "asm (lead 11-18 ~13:32)", live/asm/truth-1118/), worked 11-18: pattern-std BOM: live's
+   Linear pattern 5 ERROR drops its instances from live's BOM -> scorer live defect (5ef547724). pinslot washer 0.2985
+   mm: std studio 26bb0b Sketch 1 MIRROR of two unequal lines, ours mirrors endpoints -> edits undone, washer stays M5
+   -> skasm taking it. bjr OPG006 Description: 5e35bf's "Wire clip 1" imports an FS missing from the corpus -> REQUESTS
+   13:55. bjr grubs (UJ <2> 4 mm): live's 103_06_ASM flexible inside each flexible UJ (per-copy angles); ours keeps a sub
+   holding a flexible sub rigid (eval.rs prepare_subassembly), `nested` one level -> nested flexible = work item (lead).
+   robot-relations ×6: 6 sheets vs our solid, as ruled (11-17). scissor Top <3>: fed22d model side (lead). isaac
+   Helical: GearLabFeature unregistered -> FS owner. infento Wheellock: f0eedd sketch/fillets, model side. welding
+   "Part 2"/"Part 6": ours one part fewer in 9c7704, tracing (vibex8 asm-keep/trace-welding.out; one.sh <bin> <dir> <out>).
 2. Lost mates still mine: tvc (c10 on vibex8: 11/12 mates, 26/26 BOM; alike-volume parts now settled by their mate
    connectors, 62043ea70). Left: Cylindrical 1's edge on ".2_Peça <1>" is on no SG90 body of ours; endcheck/find_ent in vibex8 ~/tmp/asm),
    xdev-subs (c16: 262/266 occurrences, BOM 74/74 and no extra rows). 59e7fd03d: a nested flexible subassembly
