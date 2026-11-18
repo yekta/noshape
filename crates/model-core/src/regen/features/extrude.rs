@@ -3,7 +3,7 @@
 
 use crate::display::BodyKind;
 use crate::features::common::is_up_to;
-use crate::reference::Reference;
+use crate::reference::{FeatureId, Reference, Source};
 use crate::regen::eval::{EvalCtx, FResult, NamedShape, Profile, err, err_at, names_for, sweep_names};
 use glam::DVec3;
 use noshape_kernel as k;
@@ -68,7 +68,8 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
     let t_tools = t0.elapsed();
     let op = ev.enum_("operationType").to_string();
     let scope = scope(ev);
-    let r = ev.apply_operation(tools, &op, scope, BodyKind::Solid);
+    let sketches: Vec<Option<FeatureId>> = profiles.iter().map(|p| if let Source::Region { sketch, .. } = &p.key { Some(*sketch) } else { None }).collect();
+    let r = ev.apply_operation_from(tools, (!thin).then_some(&sketches[..]), &op, scope, BodyKind::Solid);
     if crate::regen::display::perf_enabled() {
         log::info!(target: "perf", "extrude: {} profiles {:.1} ms, tools {:.1} ms, operation {:.1} ms", profiles.len(), t_profiles.as_secs_f64() * 1e3, (t_tools - t_profiles).as_secs_f64() * 1e3, (t0.elapsed() - t_tools).as_secs_f64() * 1e3);
     }
@@ -495,7 +496,7 @@ pub fn curve_to_segment(c: &noshape_sketch::Curve2) -> Option<k::Segment2d> {
 /// other way: their curves reversed, the swept faces as the loop made them (a unify merges those; built from the
 /// drawn ways they didn't merge, pulley02's fillet and clamp-hms's extrude). Studios saved before keep the loop's.
 fn drawn_edge_directions(ev: &EvalCtx, t: NamedShape) -> FResult<NamedShape> {
-    use crate::reference::{Role, Source, TopoName};
+    use crate::reference::{Role, TopoName};
     let side = |f: &TopoName| match f {
         TopoName::Face { role: Role::Side(Source::Sketch { sketch, entity, .. }), .. } => Some((*sketch, *entity)),
         _ => None,

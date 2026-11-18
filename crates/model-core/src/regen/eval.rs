@@ -1016,6 +1016,14 @@ impl<'a> EvalCtx<'a> {
     /// Apply a feature's result-body operation (New / Add / Remove /
     /// Intersect) with tool solids already named.
     pub fn apply_operation(&mut self, tools: Vec<NamedShape>, op: &str, scope: Option<Vec<usize>>, kind: BodyKind) -> FResult<()> {
+        self.apply_operation_from(tools, None, op, scope, kind)
+    }
+
+    /// [`Self::apply_operation`] with each tool's sketch (an Extrude's regions): New parts from different sketches stay
+    /// apart where they only touch, as live keeps asm-welding-config's disc in its ring's hole a part of its own (std's
+    /// opExtrude sweeps each sketch's faces, which share no edges across sketches); tools of one sketch that touch are
+    /// one part.
+    pub fn apply_operation_from(&mut self, tools: Vec<NamedShape>, sketches: Option<&[Option<FeatureId>]>, op: &str, scope: Option<Vec<usize>>, kind: BodyKind) -> FResult<()> {
         if tools.is_empty() {
             return err("Nothing was created");
         }
@@ -1028,7 +1036,11 @@ impl<'a> EvalCtx<'a> {
         match op {
             "NEW" => {
                 // Tools that touch are merged into one part (like Onshape).
-                let merged = if tools.len() > 1 { self.fuse_named(tools)? } else { tools };
+                let merged = match sketches {
+                    Some(sk) if tools.len() > 1 && sk.len() == tools.len() && sk.iter().any(|x| *x != sk[0]) => self.fuse_by_sketch(tools, sk)?,
+                    _ if tools.len() > 1 => self.fuse_named(tools)?,
+                    _ => tools,
+                };
                 for (i, t) in merged.into_iter().enumerate() {
                     self.add_new_bodies(t, kind, i as u32)?;
                 }
@@ -1117,6 +1129,24 @@ impl<'a> EvalCtx<'a> {
         let names = self.name_unified(&[&tool.names], tool.names.faces.clone(), &unified);
         let mut pieces = split_solids(&unified.shape, &names, Some(self.feature));
         Ok(if pieces.len() == 1 { pieces.swap_remove(0) } else { tool.clone() })
+    }
+
+    /// The tools fused within each sketch; all fused as one when no tools of different sketches touch (the parts and
+    /// their order as before).
+    fn fuse_by_sketch(&mut self, tools: Vec<NamedShape>, sketches: &[Option<FeatureId>]) -> FResult<Vec<NamedShape>> {
+        let mut keys: Vec<Option<FeatureId>> = Vec::new();
+        for k in sketches {
+            if !keys.contains(k) {
+                keys.push(*k);
+            }
+        }
+        let mut apart = Vec::new();
+        for key in &keys {
+            let group: Vec<NamedShape> = tools.iter().zip(sketches).filter(|(_, k)| *k == key).map(|(t, _)| t.clone()).collect();
+            apart.extend(if group.len() > 1 { self.fuse_named(group)? } else { group });
+        }
+        let all = self.fuse_named(tools)?;
+        Ok(if all.len() == apart.len() { all } else { apart })
     }
 
     fn fuse_named(&mut self, tools: Vec<NamedShape>) -> FResult<Vec<NamedShape>> {

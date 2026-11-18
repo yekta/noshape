@@ -2666,6 +2666,23 @@ fn adjacent_regions_extrude_without_a_seam() {
     assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), 6);
 }
 
+/// Touching regions of two sketches extruded New together stay two parts (live: asm-welding-config's Extrude 8, a ring
+/// and the disc in its hole from another sketch: 6 parts, the disc its own 3/2/0 cylinder); one sketch's are one part.
+#[test]
+fn touching_regions_of_two_sketches_extrude_to_two_parts() {
+    let mut t = T::new();
+    let (_, a) = t.sketch(&[&[(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)]], &[]);
+    let (_, b) = t.sketch(&[&[(20.0, 0.0), (40.0, 0.0), (40.0, 20.0), (20.0, 20.0)]], &[]);
+    let x = t.add("extrude", &[("entities", q(vec![a[0].clone(), b[0].clone()])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let r = t.ok(x);
+    assert_eq!(r.context.bodies.len(), 2);
+    for body in &r.context.bodies {
+        let v = body.shape.volume().unwrap() / MM3;
+        assert!((v - 4000.0).abs() < 1e-6, "{v}");
+        assert_eq!(body.shape.count(noshape_kernel::ShapeType::Face), 6);
+    }
+}
+
 /// qa5 ADV2: loft of a 20 × 20 square (z 0) to a Ø16 circle (z 20). Live: side
 /// faces 324.6214685 mm² each (ours the same), volume 5927.728022 mm³, which
 /// is Onshape's approximation: the exact ruled solid (the circle split at the
