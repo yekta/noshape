@@ -648,8 +648,10 @@ point gets no coincident (= live). Ending on a point / midpoint: COINCIDENT (sha
   (live row 1 / 3: coincident on the edge at 7 px, midpoint at the middle at 6 px; COINCIDENT (end, edge) after the click).
 - [ ] **P0 SKSNAP-ALIGN-WOKEN-POINT (skasm)**: after resting on Sketch 2's point, no vertical alignment to it is offered at 60 or
   150 px below, 0-14 px off its vertical (no dashed line, no glyph) (live row 2: a ±6-7 px band, yellow dashed line to the point).
-- [ ] **P1 SKSNAP-GLYPHS-AFTER (skasm)**: after the click no constraint glyph is drawn (H, V, coincident, midpoint, edge) (live row
+- [x] not a bug **P1 SKSNAP-GLYPHS-AFTER (skasm)**: after the click no constraint glyph is drawn (H, V, coincident, midpoint, edge) (live row
   3: "—" under the line's middle, "|" beside it, coincident / midpoint glyphs above-left of the end).
+  qa 11-18 00:31 (green 0f7610c83, Show constraints ticked, sk/run4): "—", "|", coincident and midpoint glyphs stay after each line
+  as live; it was Show constraints off in our start. The model-edge end shows none here: re-check with SKSNAP-MODEL-EDGE (085fa6af1).
 - [ ] **P2 SKSNAP-REACH (skasm)**: a point lights at 5 px along x (live 6-7) and a circle centre at 4 px (live 5-8).
 - [ ] **P2 SKSNAP-SHIFT-ICON (skasm)**: with Shift held near the point a black cube icon shows by the pointer (live: nothing).
 - Not run: a local point beating an external one 1 px apart.
