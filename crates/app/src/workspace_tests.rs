@@ -309,3 +309,24 @@ fn a_bare_assembly_is_uploaded_only_once_upload_only_is_ticked(cx: &mut TestAppC
     assert!(doc.read_with(cx, |d, _| d.notice_link("probe.sldasm has been imported.").is_some_and(|l| l.label == "Open document")));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live2 doc-level-1117 / ours-1118: a tab switch takes the old element away at once and shows the new tab's list in
+/// the same frame (no loading state between): Part Studio 1's feature list in the first frame after it is activated,
+/// gone in the first frame after a Variable Studio is.
+#[gpui::test]
+fn a_tab_switch_shows_the_new_tab_in_its_first_frame(cx: &mut TestAppContext) {
+    let (w, ws, [studio, a, ..]) = workspace(cx, "tab-switch-frame");
+    let list = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(w, cx).debug_bounds("feature-list").is_some();
+    let one_frame = |cx: &mut TestAppContext, t: TabId| {
+        cx.update_window(w, |_, window, cx| {
+            ws.update(cx, |ws, cx| ws.activate(t, window, cx));
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+    };
+    one_frame(cx, studio);
+    assert!(list(cx), "the Part Studio's feature list in the first frame");
+    one_frame(cx, a);
+    assert!(!list(cx), "gone in the first frame after the Variable Studio is activated");
+    cx.run_until_parked();
+}

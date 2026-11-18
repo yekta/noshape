@@ -896,7 +896,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| A tab switch: the old element goes at once, the list fills, the canvas last, no spinner [studios] | = (green c7d388e8, live2 ours-1118: block-drawing, drawing → Part Studio 1: list, canvas and toolbar change together in one frame at 0.17 s, no spinner; live's list-then-canvas order is its loading, not a target) | missing |
+| A tab switch: the old element goes at once, the list fills, the canvas last, no spinner [studios] | = (green c7d388e8, live2 ours-1118: block-drawing, drawing → Part Studio 1: list, canvas and toolbar change together in one frame at 0.17 s, no spinner; live's list-then-canvas order is its loading, not a target) | app workspace_tests `a_tab_switch_shows_the_new_tab_in_its_first_frame` |
 | Ctrl+Y redoes, Ctrl+Shift+Z doesn't (Shift+⌘Z on a Mac); no toast on undo or redo | = | app-core actions::tests::shared_keys_follow_lives_list_per_os; list matrix "undo / a rename is one step, no toast" |
 | A rename is one step; hiding a part is one step; a view change or a selection is none | = | list matrix "undo / a rename is one step, no toast", "undo / hiding a part is one step", "undo / a view change or a selection is no step" |
 | In a dialog with the keyboard in a value field Ctrl+Z does nothing; Esc then cancels | = | sketch_ui_tests::undo_does_nothing_while_a_dialog_control_has_the_keyboard |
