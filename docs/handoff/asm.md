@@ -49,7 +49,11 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   1.17 M, 7 mm bearing 67k, _787261002 691k ×5); chord mesh 1.05 M; headless render 15–18 s -> 2.95 s (vibex8
   ~/tmp/asm/perf, probe /root/tmp/render.rs.main). Handed to psui 11-18 12:3x; assembly side doesn't scale it.
 - Snap retake (snap-diag-1118) + Display states focus QUEUED 679e306e (undoes a9f670ef's pick rectangle).
-- Suite pair main vs 28-commit stack: vibe2 ~/agents/asm-keep/pair.sh -> pair/{mainbase,stack}.log, pair/done.
+- Suite pair main vs 28-commit stack (lead: land on the light 20 if none worse): ~/agents/asm-keep/pairlist.sh <tag>
+  <dirs>: vibe2 tag a (9: clamp … keyboard), vibex8 tag b (10: linear-limits … welding-config) -> pair/{mainbase,stack}
+  -<tag>.log, done-<tag>; bjr-config done (BOM 20->22/23). Heavy 4 (xdev, isaac, infento, scissor) tag c tonight 02:00
+  on vibe2 (night.sh).
+- suspension and scissor-lift 4ce5c7 corpora mix microversions: refetch asked of live2 (REQUESTS 13:42).
 - Thread ids (11-18 lead): core e8af89fe-d460-49b3-b0bb-9572da230fed, blend 0672fa20-964d-4fde-a19c-c5b4363729ba,
   qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b (old core 6692ae35 / blend 0e6e9942 stopped: never message them).
 - Solver reorient fix QUEUED from worktree asm-solver (ce07890bb; c28 A/B: none of 10 worse, scissor-lift 214/242);
