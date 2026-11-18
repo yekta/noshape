@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-17 23:26 UTC (restarted 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 00:05 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed today
@@ -29,19 +29,17 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   ~/agents/skasm/trace-<doc>.log.
 
 ## Next, in order
-0. USER P0 (lead 11-17): interaction feel. Landed today: b87dd3dc, 24441238, 4a8381fc, 3621f719, 5245720f. Stack
-   re-landing via vibe2 (40ac5da1 failed only on psui's fragile a_block_behind… test, fixed by their 5e498ffb):
-   1a1c5936b chain / ellipse drags, Fix on a line, unsolved sketch state, one glyph at a time; 40ac5da16 snap let-go
-   hold, region from the pointer (qa's uh2 hover flow 4/4 on my build: /root/skasm-scratch/uh1/sheet.png);
-   5b89e3f79 line-drawing bands / Shift scenario; 3ed5d2401 qa SELFEEL-* (double-click face sketch LIFTED over the
-   base edges, cleared by the next click; hidden sketch row hover draws it; Default geometry related); bbb220eed
-   value boxes mid-chain (a click drops the value, invalid box, vertical box 39 px left); fc5615ebd model edges on
-   the plane snap unhovered (qa SKSNAP-MODEL-EDGE), Dimension tool flow, "1abc" no longer completes to abs().
-   Next: qa SKSNAP-ALIGN-WOKEN-POINT (P0: another sketch's rested point offers no vertical alignment), SKSNAP-GLYPHS-
-   AFTER (P1), SKSNAP-REACH / SHIFT-ICON (P2); live's sketch right-click menus (behaviours "Part Studio right-click
-   menus and the Shift+/ shortcut sheet", menus-sk.json); hat15b sketch state by hand (vibex7 ~/lead-private ->
-   ~/tmp/skasm, mode 700, delete after). Rigs on vibex6 :391: ~/tmp/skasm/{uh,sf,sk} (qa's uh2 / sel-feel / snap
-   scripts pointed at ~/agents/skasm-keep/noshape; bin/appbuild.sh rebuilds it). Land NOSHAPE_LAND_QUEUE_HOST=vibe2.
+0. USER P0 (lead 11-17): interaction feel. Landed 11-17: b87dd3dc, 24441238, 4a8381fc, 3621f719, 5245720f, and
+   0892eeed (11-18 00:00: drags, Fix on a line, unsolved state, glyph select, snap let-go, region from the pointer,
+   qa SELFEEL-* x4, value boxes mid-chain, Dimension tool flow, SKSNAP-MODEL-EDGE). Queued next: SKSNAP-ALIGN-WOKEN-
+   POINT (another sketch's rested point wakes; checked in the app: guide + "|" at 60 / 150 px, lights ~5 px off,
+   live 6-7), sketch menus scenario (already as live), Flange / Hem edges box mutes wall faces (sm-feel-1117), SKSNAP-
+   REACH (other sketches' points snap from their 15 px square), a joint row hovered lights its rip (3D).
+   Open: SKSNAP-GLYPHS-AFTER is likely the Show constraints setting (live's account had it ticked; told qa);
+   SKSNAP-SHIFT-ICON = our use glyph on a snapped external point (live unknown: ask live before changing);
+   sm-feel-1117 rest (Bend relief / Corner side face + corner disc, Flange flip button, joint flat edges, Rip -> Bend
+   toast); hat15b sketch state by hand. Rigs on vibex6 :391: ~/tmp/skasm/{uh,sf,sk} (qa's scripts pointed at
+   ~/agents/skasm-keep/noshape; bin/appbuild.sh rebuilds it). Land NOSHAPE_LAND_QUEUE_HOST=vibe2.
 1. config-parts: linear-rail 26/26, links 35/35 (live fetched Derived 1's source), standoffs 32/32, sprockets 24/24
    (live's volume band carried while its volume stays: carry_volume_bands); pulleys 12/22 (Circular pattern 1, a face
    pattern ADD, fails in our op on main too: core's since 11:45); nuts 14/17 (Sweep 1, bool's). Standoffs regenerates
