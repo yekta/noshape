@@ -6044,3 +6044,41 @@ fn a_linked_feature_behind_a_newer_version_shows_the_update_indicator(cx: &mut T
     assert!(labels.iter().any(|l| l == "Update linked document…") && labels.iter().any(|l| l == "Open linked document"), "{labels:?}");
 }
 
+
+/// Live errors-1118 (Configurations): a Variable input's value out of range ("500" for 1–100 mm) or not a value ("abc")
+/// stays in the box, the unit added, pink with a red underline and no message, and the model keeps the last good value;
+/// a good one applies.
+#[gpui::test]
+fn the_configurations_box_refuses_a_value_out_of_range_or_not_a_value(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-refused", &[("width", "30 mm")]);
+    let input = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let mut input = String::new();
+            v.edit_config("Configure", cx, |ps| input = noshape_ops::config::add_variable_input(ps, "Len", "LENGTH", "10 mm", Some(("1 mm".into(), "100 mm".into()))));
+            input
+        })
+    });
+    draw(cx, window);
+    let key = format!("cfgbox-val-{input}");
+    let enter = |cx: &mut TestAppContext, text: &str| {
+        cx.update_window(window, |_, w, cx| {
+            let st = view.read(cx).panel_inputs.get(&key).map(|(st, _)| st.clone()).expect("the box's Len field");
+            st.update(cx, |s, cx| {
+                s.focus(w, cx);
+                s.set_value(text.to_string(), w, cx);
+            });
+        })
+        .unwrap();
+        draw(cx, window);
+        keys(cx, window, &["enter"]);
+        draw(cx, window);
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let shown = v.panel_inputs.get(&key).map(|(st, _)| st.read(cx).value().to_string()).unwrap_or_default();
+            (shown, v.config_values.0.get(&input).cloned())
+        })
+    };
+    assert_eq!(enter(cx, "500"), ("500 mm".to_string(), None), "out of range: kept with its unit, not applied");
+    assert_eq!(enter(cx, "abc"), ("abc".to_string(), None), "not a value: kept, not applied");
+    assert_eq!(enter(cx, "20").1.as_deref(), Some("20 mm"), "a good value applies");
+}

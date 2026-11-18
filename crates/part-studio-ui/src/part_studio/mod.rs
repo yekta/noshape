@@ -481,6 +481,8 @@ pub struct PartStudioView {
     show_mass: bool,
     right_panel: Option<config_panel::RightPanel>,
     panel_inputs: std::collections::HashMap<String, (Entity<gpui_kit::component::input::InputState>, String)>,
+    /// The Configurations box's refused values as the field keeps them (the unit added), by field key.
+    cfg_refused: std::collections::HashMap<String, String>,
     /// Panel cells whose value must pass a check before it commits.
     panel_checks: std::collections::HashMap<String, fn(&str) -> bool>,
     panel_subs: Vec<Subscription>,
@@ -647,6 +649,7 @@ impl PartStudioView {
             show_mass: false,
             right_panel: None,
             panel_inputs: Default::default(),
+            cfg_refused: Default::default(),
             panel_checks: Default::default(),
             panel_subs: Vec::new(),
             panel_focused: None,

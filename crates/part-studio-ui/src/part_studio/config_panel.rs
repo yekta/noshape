@@ -2578,21 +2578,21 @@ impl PartStudioView {
                         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_config_value(&iid, (!on).to_string(), window, cx)))
                         .into_any_element()
                 }
-                // Variables and texts are typed in the box; a variable outside
-                // its range turns pink with the reason (live psb/s-716–717).
+                // Variables and texts are typed in the box, a variable's value right-aligned; one out of range or not a
+                // value turns pink with a red underline, no message (live errors-1118).
                 ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. } => match self.panel_inputs.get(&format!("cfgbox-val-{}", input.id)) {
                     Some((st, _)) => {
-                        let err = config_value_error(input, &st.read(cx).value(), &self.doc.read(cx).session.doc.settings.units);
+                        let bad = config_value_refused(input, &st.read(cx).value(), &self.doc.read(cx).session.doc.settings.units);
+                        let right = matches!(input.kind, ConfigInputKind::Variable { .. });
                         div()
                             .id(SharedString::from(format!("cfgbox-val-{}", input.id)))
                             .child(gpui_kit::base::input::input_frame(
                                 div()
                                     .border_b_1()
-                                    .border_color(if err.is_some() { gpui_kit::rgb(0xbd3039) } else { gpui_kit::rgb(0xd7d7d7) })
-                                    .when(err.is_some(), |d| d.bg(gpui_kit::rgb(0xf9ebec)))
-                                    .child(Input::new(st).small().appearance(false).text_size(px(14.))),
+                                    .border_color(if bad { gpui_kit::rgb(0xbd3039) } else { gpui_kit::rgb(0xd7d7d7) })
+                                    .when(bad, |d| d.bg(gpui_kit::rgb(0xf9ebec)))
+                                    .child(Input::new(st).small().appearance(false).text_size(px(14.)).when(right, |i| i.text_align(TextAlign::Right))),
                             ))
-                            .when_some(err, |d, e| d.tooltip(crate::ui::tooltip(e)))
                             .into_any_element()
                     }
                     None => div().text_size(px(14.)).text_color(pal.text).child(current).into_any_element(),
@@ -3118,10 +3118,12 @@ impl PartStudioView {
         let (_, effective) = cfg.visibility(&self.config_values);
         for input in cfg.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. })) {
             let key = format!("cfgbox-val-{}", input.id);
-            // An out-of-range value stays in the field (live 716).
-            let typed = self.panel_inputs.get(&key).map(|(st, _)| st.read(cx).value().to_string()).filter(|t| config_value_error(input, t, &units).is_some());
-            let current = typed.unwrap_or_else(|| effective.0.get(&input.id).cloned().unwrap_or_default());
+            // A refused value stays in the field, the unit added and its text selected after Enter (live 716, live
+            // errors-1118).
+            let typed = self.panel_inputs.get(&key).map(|(st, _)| st.read(cx).value().to_string()).filter(|t| config_value_refused(input, t, &units));
+            let current = self.cfg_refused.get(&key).cloned().or(typed).unwrap_or_else(|| effective.0.get(&input.id).cloned().unwrap_or_default());
             let i = input.clone();
+            let k = key.clone();
             self.cell_input(key, current, window, cx, move |this, v, cx| {
                 // Live (qa5 C8): a bare number takes the workspace unit, "25" →
                 // "25 mm" (lengths) / "25 deg" (angles).
@@ -3130,11 +3132,14 @@ impl PartStudioView {
                     ConfigInputKind::Variable { kind: VariableKind::Angle, .. } => noshape_model::variable_table::with_workspace_unit("ANGLE", &v, &units),
                     _ => v,
                 };
-                // An invalid value stays in the field and isn't applied.
-                if config_value_error(&i, &v, &units).is_some() {
+                // A value out of range or not a value stays in the field and isn't applied: the model keeps the last
+                // good one (live errors-1118).
+                if config_value_refused(&i, &v, &units) {
+                    this.cfg_refused.insert(k.clone(), v);
                     cx.notify();
                     return;
                 }
+                this.cfg_refused.remove(&k);
                 this.config_values.0.insert(i.id.clone(), v);
                 crate::part_studio_hooks::note_viewed_config(this.tab, &this.config_values);
                 this.config_dirty(cx);
@@ -3300,11 +3305,12 @@ impl PartStudioView {
     }
 }
 
-/// A configuration variable value outside its range (live psb/s-717:
-/// "Enter a value between 0 and 20.0. Current value is 50.", numbers in the
-/// range's unit without it).
-fn config_value_error(input: &ConfigInput, text: &str, units: &noshape_units::UnitPrefs) -> Option<String> {
-    noshape_ops::config::value_error(input, text, units)
+/// A configuration variable value the box refuses: outside its range, or not a value of its kind ("abc", "3 kg" for a
+/// length; live errors-1118).
+fn config_value_refused(input: &ConfigInput, text: &str, units: &noshape_units::UnitPrefs) -> bool {
+    let ConfigInputKind::Variable { kind, .. } = &input.kind else { return false };
+    let Some(dim) = noshape_ops::config::kind_dim(*kind) else { return false };
+    noshape_ops::config::value_error(input, text, units).is_some() || (!text.trim().is_empty() && noshape_units::evaluate_as(text, dim, units, &noshape_units::EmptyScope).is_err())
 }
 
 /// Dragging the splitter under the feature list's Configurations block.
