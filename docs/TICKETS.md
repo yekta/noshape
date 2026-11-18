@@ -719,7 +719,7 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   (qa-keep/sel-feel/selfeel-c2-591643fc.png, sent to skasm 01:03).
 - [x] a65a2d3cf **verified 591643fc** (qa 00:57: the row hovered draws Sketch 1's base edge lit) **P0 SELFEEL-HIDDEN-SKETCH-HOVER (skasm)**: hovering the hidden Sketch 1 row shows the tooltip but doesn't draw the sketch
   light orange in place (live row 4).
-- [ ] **P0 SELFEEL-PART-ROW (psui)**: clicking the Part 2 row selects the body (state) with Extrude 2 related, but Part 2 isn't
+- [x] **verified 08597f71** (qa 03:10, vibex7 at load 0.2, 2 runs: Part 2 drawn selected, no outline left on Part 1; with psui's latest-wins 5e498ffb) **P0 SELFEEL-PART-ROW (psui)**: clicking the Part 2 row selects the body (state) with Extrude 2 related, but Part 2 isn't
   drawn selected and Part 1 keeps a light-orange hover outline (the pointer crossed the Part 1 row on its way): a stale list hover,
   as USER-HOVER-STAYS-LIT (live row 5: the part drawn selected).
 - [x] a65a2d3cf **verified 591643fc** (qa 00:57: the Default geometry header tinted with Top selected) **P1 SELFEEL-PLANE-DEFAULT-GEOMETRY (skasm)**: a default plane picked in the viewport selects its row, but "Default
