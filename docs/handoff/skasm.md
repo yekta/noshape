@@ -56,40 +56,19 @@ Our solver keeps links' waist arcs on live's branch (probe /root/skasm-scratch/p
   circles (both rows map onto one), so Extrude 2 names one region twice ([0, 19] twice) and cuts 2 holes of live's 4
   (ours 26/52/24, live 28/56/24). Probe: `NOSHAPE_PROBE_SKETCH="Sketch 4" NOSHAPE_PROBE_PARAM=entities` in
   parity::bodies_after_feature_probe (core's probe patch).
-- c2-loft-guide-curves-wave-washer Loft 1 ("Could not create loft", 6/7): Sketch 4's two rectangles (Right plane)
-  stay at their stored x 77.47–88.9 mm; live solves them onto the ring at 13.97–25.4 (live's Loft 1 faces all lie in
-  r 13.97–25.4). Each has COINCIDENT bottom.start to an external vertex by deterministic id only (queryString ""):
-  JHk (0, 25.4, 3.81) mm, body JHb, and JH4 (0, −25.4, 3.81), body JHv, both in refs.jsonl. No vertex of ours sits
-  there (our Routing curve is one closed B-spline edge, its one vertex at (17.96, 17.96, 3.81)), and parity.rs's
-  VERTEX resolution then falls back to the nearest vertex anywhere (`pick(&r, "vertices")`). The constraint seems to
-  have no effect (the rectangles stay as stored). Live's point probably wants a fixed point at live's position when
-  nothing of ours is there. Loft 1 itself (four profiles round a closed path) is core's once the profiles are right.
-- c2-config-parts-links Extrude 1 (10/35; parts 3.2 mm across, live 5): Sketch 1 is stored at Pitch 03B (p 5 mm)
-  and live solves it at 05B (p 8 mm, sketches.json). Our dimensions do reach live's points except the two waist arcs
-  (h5M8JHVkSHwo, U0aWy9P0xf2C: tangent to both circles, through the waist point at (4, ±2.6625) mm). Live keeps the
-  large concave arcs (centre (4, ∓8.57), r 5.91, as stored); our solve jumps to the small convex ones (centre
-  (4, ∓1.82), r 0.84). Off live by 6.75 mm instead of 3.35 before, so the translator takes the edits back and the
-  stored 5 mm sketch stays. A solve that keeps the branch (step large dimension changes, or keep each arc's side of
-  its chord as stored) would fix it. Seen with a temporary eprintln in off_live_points (per-point live vs ours).
-- The other c2-config-parts documents stop at a sketch the translator takes back too, where the stored geometry is
-  another configuration's (core's 97b778e7d, queued: they're now built at sketches.json's capturedConfiguration, the
-  defaults live's lines are at): pulleys Sketch 2 (after the solve only qW2yvEmz0tbj.end, the free end of a
-  construction mirror line, sits 0.2 mm off live's: 1.09 -> 0.20 mm, but `closer` wants <= 1e-6), linear-rail
-  Sketch 2 (1.92 -> 0.30 mm), standoffs Sketch 3 (2.38 -> 3.29 mm), sprockets Sketch 3. A `closer` that ignores free
-  construction points (or compares only points the regions use) would likely keep pulleys' and linear-rail's.
-- c2-surf-workshop-cpcurves Main pipe (7/24): Sketch 4 (on Plane 1, a curve-point plane at live vertex JPg
-  (158.574, -97.976, 0) mm) has its circle centre COINCIDENT to JPg. The stored circle is 18.8 mm off it (stale: the
-  Layout moved), and live re-solves it onto JPg. With no sketches.json for that document, the translator takes the
-  move back ("moved the geometry by up to 18.798 mm ... taken back"), so our tube runs 18.8 mm off live's. A solve
-  that lands an external COINCIDENT exactly on live's recorded refs point could count as `closer`.
+- c2-loft-guide-curves-wave-washer Loft 1 ("Could not create loft", 6/7): live says JHk / JH4 are Sketch 2's points
+  (POINT bodies JHb / JHv at (0, ±25.4, 3.81) mm); our Sketch 4 now coincides with them but solves its rectangles
+  outward (live's stored geometry is inconsistent): waiting on live's sketches.json (REQUESTS 06:2x).
 - c2-surf-workshop-manualblend Sweep 2 (11/19): Sketch 5's CONCENTRIC to vertex JNE now kept (anchors_off counts a
   CONCENTRIC in the plane, within 10 µm when the stored was 0.1 mm+ off); our sweep now lies where live's does (x
   −60.9…−26.3), but it takes the path's name "Curve 2" and the wire becomes "Surface 3": Sweep's body identity (core).
 - c2-sm-rocker-enclosure-body Extrude 6 (15/28): Sketch 6 now kept (its hexagon's pattern centre COINCIDENT with
   the Use of JRR's centre, which live's refs `center` has; the stored was 2.8 mm off). Extrude 6's counts now match
   (39/97/58); volume 379696 vs live 379830 mm³, area 85398 vs 85317 (were 379715 / 85478): the cut's regions next.
-  Sketch 5 still taken back (57 mm, first COINCIDENT f3C7mDTbYgiG.center on aHSQXvBb1hEh.0.center).
-
+  Sketch 5's take-back is right: its circles are stored on live's centres, our Use of JZB lands 6.43 mm off (our
+  model's edge: core's split-face fix).
+- Settled 11-18: config-parts links / pulleys / linear-rail / standoffs / sprockets match to the end; cpcurves has no
+  sketch difference left (first: 3D fit spline 1, "Cannot evaluate tangency for end condition.").
 
 ## Agents (lead's roster 11-17 10:30; only these ids)
 psui 4973e295-9e92-463f-a13f-2ec5258bc5f9 (since 11-17 ~10:35), core 6692ae35-758a-4442-81c8-29f67be2e21a, blend
