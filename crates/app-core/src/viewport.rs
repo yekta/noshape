@@ -1320,8 +1320,10 @@ impl Viewport {
                 let newest = token == self.hover_query_newest.0;
                 if !newest {
                     let (x, y) = self.device_px(self.last_pos);
+                    // (Not while a box is drawn: it lights nothing, main red 17:53.)
                     if self.pointer_inside
                         && self.paused_hover.is_none()
+                        && self.drag != Drag::Box
                         && layout_epoch == self.pick_layout_epoch
                         && let Some(b) = buf.as_ref().filter(|b| b.covers(x, y, r))
                     {
@@ -2450,6 +2452,11 @@ impl Viewport {
                 // (Onshape only drags geometry inside sketches/assemblies);
                 // other unbound drags do nothing (and open no menu).
                 self.drag = if button == MouseButton::Left { Drag::Box } else { Drag::None };
+                // A box lights nothing: not what its first move lit either (main red 17:53: that stayed lit on a loaded
+                // host, where the first move's pick was already there).
+                if self.drag == Drag::Box {
+                    self.set_hover(None, cx);
+                }
             }
         }
         match self.drag {
