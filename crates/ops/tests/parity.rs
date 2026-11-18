@@ -1101,9 +1101,10 @@ fn exchange_round_trip() {
 }
 
 /// Give `drawing`'s first sheet the scale and view positions of live's stored drawing (`live`, DRAWING_JSON: sheet
-/// inches): the scale of its view on the sheet's scale, then each view, paired in order (Front, Right, Top,
-/// Isometric: suggested views' order), dragged there: Front first (Right and Top follow across their axes), then Right
-/// along x, Top along y, the Isometric whole.
+/// inches; a view's position is its silhouette box's centre, live2 iso-place-1118): the scale of its view on the
+/// sheet's scale, then each view, paired in order (Front, Right, Top, Isometric: suggested views' order), dragged so
+/// its drawn geometry's box centre sits there: Front first (Right and Top follow across their axes), then Right along
+/// x, Top along y, the Isometric whole.
 fn place_as_live(t: &mut Translator, drawing: &str, live: &Path) -> Result<(), String> {
     let live: Value = serde_json::from_str(&std::fs::read_to_string(live).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let views = live["sheets"][0]["views"].as_array().ok_or("no views in live's drawing")?;
@@ -1114,7 +1115,11 @@ fn place_as_live(t: &mut Translator, drawing: &str, live: &Path) -> Result<(), S
     let ours = |t: &mut Translator| -> Result<Vec<(Value, [f64; 2])>, String> {
         let g = t.call("drawing_get", json!({ "drawing": drawing, "edges": false }))?;
         let views = g["views"].as_array().or_else(|| g["sheet"]["views"].as_array()).ok_or_else(|| format!("no views in {g}"))?;
-        Ok(views.iter().map(|v| (v["id"].clone(), [v["position"][0].as_f64().unwrap_or(0.0), v["position"][1].as_f64().unwrap_or(0.0)])).collect())
+        let at = |v: &Value, k: usize| match (v["bounds"]["min"][k].as_f64(), v["bounds"]["max"][k].as_f64()) {
+            (Some(a), Some(b)) => (a + b) / 2.0,
+            _ => v["position"][k].as_f64().unwrap_or(0.0),
+        };
+        Ok(views.iter().map(|v| (v["id"].clone(), [at(v, 0), at(v, 1)])).collect())
     };
     if ours(t)?.len() != views.len() {
         return Err(format!("{} views for live's {}", ours(t)?.len(), views.len()));
