@@ -163,15 +163,6 @@ Open, ranked:
    - cf-setback-fillet: parked (lead 11-05, skasm's RABC fill patch; TICKETS SETBACK-FILL-PATCH).
 2. After ~10:17: live's answers to REQUESTS 01:47 (sm-louver scale, live's own SAT import) and 05:46; set 2 after
    live2's refetch.
-4. Landed 19:30 as 3621f719 (batch with 1471d405): seam join, ACIS guard 1 mrad, the import split of a solid's
-   disjoint pieces ("<part>__<solid>", live2 q-step-twopiece 12:53: live splits them too), 3MF Zip64, mesh pieces
-   touching along edges, Parasolid / STEP mesh-part import. Decision asked of the lead 20:0x: the 19:50 order said land
-   without the split; it was in already and matches live2's capture, kept unless the lead rules a revert.
-5. asm-robot-relations 0c3466 Import 1: landed 58c29811 (live's six sheets = its failed import of a valid solid;
-   LIVE_IMPORT_FAILURES leaves both out from Import 1 on; lead 11-17). asm mapped Thicken 1's JFD face to ours by
-   geometry on asm-partorigin (Thicken then makes 11 tiny parts: sent to core).
-5b. asm-isaac-ball 8f5622 GearLab: landed bc58c02b; gear teeth caps (core, 15:0x) and its fuses' time (bool) sent;
-   detail in the archive.
 6. config-parts after live's retake at defaultValue (16c51e2a / 8d3a0ec2 landed); 1dc32b / 74d3d6 studio reruns.
 
 ## Since 19:50 (this thread)
@@ -189,8 +180,8 @@ Open, ranked:
 - DXF rows (lead 23:0x), exchange suite drawings 0/10 (vibex6 exch-dxf / exch-fix2 logs, /root/dx-scratch/bin/
   dxflayercount.py, dxfanntext.py, dxfents.py, dxfsheet.py (two DXFs side by side), hlrplot.py / hlrgrid.py).
   Landed 00:47 as 5076e98c: empty view-label MTEXT for base / pictorial views off 1:1, no centermark on tangent-only
-  circles, mesh parts out of HLR (crash). In dx-land, proof running (vibex8 held ssh, ~/agents/dx-keep/mesh2.sh:
-  e2e then the exchange suite; mesh2.out, exch-mesh2.log), then queue:
+  circles, mesh parts out of HLR (crash). QUEUED 03:2x as a1bc5ce3 via vibe2 (ops e2e 226/226; drawing rows from the
+  full run + single-doc reruns on vibex8):
   - 46d2c427d mesh parts drawn as live, silhouettes only (live2 q-mesh-drawing: hex "imported" alone and the rings Iso
     show no folds between facets toward the viewer, not even 90 deg: the far half of a hole rim), edge-on facets
     count as away (MESH_FACING); a B-rep edge glimpsed past mesh facet corners (piece < deflection of a longer edge)
@@ -204,6 +195,13 @@ Open, ranked:
   concave ~250 deg walls (pocket ends?) where live 1857 marks a radial hole's half bore: needs a live capture.
   clamp-guillem: live 1:1 (views overflow the A sheet, not at the suggested spots) for our 1:3 suggested scale: the
   suite drawings may come from another creation path (decision asked of the lead). sm-louver ARC/CIRCLE now match.
+  hex still writes CENTERMARKS: cylinder_ends marks shrunk's holes wholly hidden behind the mesh (live none).
+- Export feel (live2 export-feel-1118, behaviours "dx (lead 11-18 ~02:38, feel)"): in a1bc5ce3: solid exports
+  (Part Studio, part, assembly) show the "<file name> is being prepared…" bubble (~5 s; assembly's message fades at
+  4 s) and the bell's "Export completed" / "<name> was exported successfully." (no extension); drawing Options
+  "Download and store file in a new tab". Open: a part row's Format "Inspection list" (needs live's file: ask live2);
+  the assembly bubble and part › Store result are live2's to confirm (translate quota). Our import op switches to the
+  first new tab; live keeps the active tab (import feel below).
 - Queued for later (live 11-18, behaviours "studios + dx (lead 11-18, P0 feel)", live/studios/docs-import-feel-1118/):
   Import into a document feel: + > Import... opens the OS picker at once (multi), 400 px "Import to Onshape" modal with
   focus on [Import], folder tab "CAD Imports" at the end at 1.8 s, the Part Studio tab at 6.9 s, active tab unchanged,

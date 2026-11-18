@@ -3495,3 +3495,14 @@ Suite x1117a (vibe6 00:04, with all of these): ours imports live's 59/75, live i
    solid_names), split_connected_pieces names a split solid's pieces "<part>__<solid>" (only a split: live's control
    with the solid named as its product, and robot-relations' Combine1 in REV-21-1650, keep the product's name); test
    expects "Combine1__Two pieces", ops import 32/32). Tell asm when the split lands.
+
+## Moved from the handoff 11-18 03:2x
+4. Landed 19:30 as 3621f719 (batch with 1471d405): seam join, ACIS guard 1 mrad, the import split of a solid's
+   disjoint pieces ("<part>__<solid>", live2 q-step-twopiece 12:53: live splits them too), 3MF Zip64, mesh pieces
+   touching along edges, Parasolid / STEP mesh-part import. Decision asked of the lead 20:0x: the 19:50 order said land
+   without the split; it was in already and matches live2's capture, kept unless the lead rules a revert.
+5. asm-robot-relations 0c3466 Import 1: landed 58c29811 (live's six sheets = its failed import of a valid solid;
+   LIVE_IMPORT_FAILURES leaves both out from Import 1 on; lead 11-17). asm mapped Thicken 1's JFD face to ours by
+   geometry on asm-partorigin (Thicken then makes 11 tiny parts: sent to core).
+5b. asm-isaac-ball 8f5622 GearLab: landed bc58c02b; gear teeth caps (core, 15:0x) and its fuses' time (bool) sent;
+   detail in the archive.
