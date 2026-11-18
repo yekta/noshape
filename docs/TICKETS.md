@@ -736,7 +736,7 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   snaps, a3974c745 Flange, 59cad3c05 joint hover), and **P0 FACES-PATTERN-SLOTS (core)**: compat 00:37 on green 0f7610c8 vs 0.4.57:
   faces-pattern-slots refs 16 / 17 / 18 Ok -> Error "Select a sketch plane." (suspects 2c51590b0 / 215c12d6b): HOLD unless fixed or
   reverted in the candidate.
-- **Known, not blocking (lead 03:32)**: P0 DOCK-TAB-SWITCH-TRAILING-FRAMES (psui), shipped since v0.4.54, still faster than live's
+- **Known, not blocking (lead 03:28)**: P0 DOCK-TAB-SWITCH-TRAILING-FRAMES (psui), shipped since v0.4.54, still faster than live's
   2.3-2.7 s tab switch; must be fixed for the 17:00 cut.
 - **LOFT-PATHS-MIRROR-WRONG-VOLUME (shipped in v0.4.57)**: c064b550a (01:23) is in v0.4.57: c2-loft-paths-guides Mirror 1 is Ok
   with the wrong part (fa6f90cc: 13/33/25 faces/edges/vertices, 5269155 mm³; live 27/67/47, 6325199 mm³). qa-lp-verify runs
