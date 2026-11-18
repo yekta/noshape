@@ -736,6 +736,11 @@ Space clears both sides; click again removes, Shift adds, Shift+empty keeps, Ctr
   snaps, a3974c745 Flange, 59cad3c05 joint hover), and **P0 FACES-PATTERN-SLOTS (core)**: compat 00:37 on green 0f7610c8 vs 0.4.57:
   faces-pattern-slots refs 16 / 17 / 18 Ok -> Error "Select a sketch plane." (suspects 2c51590b0 / 215c12d6b): HOLD unless fixed or
   reverted in the candidate.
+- **Verdict 04:46: GO** on green 9c015658 vs 0.4.57 (cut-1118-0415.txt): every must-carry commit in it (psui 40a994a16 / db4ff933c /
+  65ceee7f2 / ea25d544e / hover fix 5e498ffb, core f824d120b and 55fc929c, skasm a6236ed3a); user documents as the baseline (hat15 vs
+  0.4.43: the known Fan Riser +5.83 mm³); faces-pattern-slots SAME; one ticket change, sk211-step89 "Sketch could not be solved."
+  (accepted as live's, lead 04:30); USER-HOVER-STAYS-LIT fixed (5e498ffb in, verified on 7187ac75). psui's tab fix fff088e5 is not in
+  this green: next item stays known.
 - **Known, not blocking (lead 03:28)**: P0 DOCK-TAB-SWITCH-TRAILING-FRAMES (psui), shipped since v0.4.54, still faster than live's
   2.3-2.7 s tab switch; must be fixed for the 17:00 cut.
 - **LOFT-PATHS-MIRROR-WRONG-VOLUME (shipped in v0.4.57)**: c064b550a (01:23) is in v0.4.57: c2-loft-paths-guides Mirror 1 is Ok

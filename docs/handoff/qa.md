@@ -139,6 +139,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    SELFEEL-PART-ROW verified on 08597f71 at load 0.2.
 0q. **17:00 cut must carry** psui fff088e5 (= 67ebc10a; P0 DOCK-TAB-SWITCH-TRAILING-FRAMES, from 2219c4373; unit qa-wait-67eb reruns the A/B on vibex7
    on its first green vs 0.4.53, 3 rounds -> nightly/tab67-*.txt). Known on 05:00 (lead 03:28). Put fff088e5 in cut-must.txt after the 05:00 cut.
+0r. **05:00 cut GO (04:46, green 9c015658)**; cut-must.txt rewritten for 17:00 (fff088e5; old list cut-must-0500.txt). compat/accepted.txt
+   holds lead-accepted differences (sk211-step89), filtered from compat alerts (loop restarted 04:47). Restart qa-suites after the cut.
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
