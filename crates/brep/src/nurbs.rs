@@ -19,9 +19,13 @@ pub struct NurbsCurve {
 /// A NURBS curve's non-empty knot spans as Bézier pieces of its homogeneous form (w x, w y, w z, w): (start, end,
 /// control points). Evaluated by de Casteljau's algorithm instead of the basis functions each time. Then their
 /// control points' boxes, then `param_of`'s samples as runs on one span each (span, first, past the last), then the
-/// spans' lengths summed (`length`: the length before each span).
+/// spans' lengths summed (`length`: the length before each span), then those runs' sample points (each run's when
+/// first looked at).
 #[derive(Debug, Default)]
-pub struct Spans(OnceLock<Vec<(f64, f64, Vec<DVec4>)>>, OnceLock<Vec<(DVec3, DVec3)>>, OnceLock<Vec<(usize, usize, usize)>>, OnceLock<Vec<f64>>);
+pub struct Spans(OnceLock<Vec<(f64, f64, Vec<DVec4>)>>, OnceLock<Vec<(DVec3, DVec3)>>, OnceLock<Vec<(usize, usize, usize)>>, OnceLock<Vec<f64>>, OnceLock<Vec<RunPoints>>);
+
+/// One run's sample points, made when first looked at.
+type RunPoints = OnceLock<Vec<DVec3>>;
 
 impl Clone for Spans {
     /// (Empty: a copy's poles may be changed, scaled.)
@@ -594,22 +598,30 @@ impl NurbsCurve {
                 }
                 out
             });
-            let mut runs: Vec<(f64, usize, usize)> = on_spans
+            let mut runs: Vec<(f64, usize)> = on_spans
                 .iter()
-                .map(|&(span, from, k)| {
+                .enumerate()
+                .map(|(r, &(span, _, _))| {
                     let (lo, hi) = boxes[span];
                     let scale = lo.abs().max(hi.abs()).max(p.abs()).max_element();
                     let away = ((lo - p).max(p - hi).max(DVec3::ZERO).length() - 1e-12 * scale).max(0.0);
-                    (away * away, from, k)
+                    (away * away, r)
                 })
                 .collect();
             runs.sort_by(|a, b| a.0.total_cmp(&b.0));
-            for (away, k0, k1) in runs {
+            // (A run's points kept for the next call: a section's curve has hundreds of points found on it.)
+            let points = self.spans.4.get_or_init(|| on_spans.iter().map(|_| OnceLock::new()).collect());
+            for (away, r) in runs {
                 if away > best.1 {
                     break;
                 }
-                for k in k0..k1 {
-                    look(k, &mut best);
+                let (_, k0, k1) = on_spans[r];
+                let pts = points[r].get_or_init(|| (k0..k1).map(|k| self.at(t0 + (t1 - t0) * k as f64 / n as f64)).collect());
+                for (k, q) in (k0..k1).zip(pts) {
+                    let d = (*q - p).length_squared();
+                    if d < best.1 || (d == best.1 && k < best.0) {
+                        best = (k, d);
+                    }
                 }
             }
         }
