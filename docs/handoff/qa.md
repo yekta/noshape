@@ -117,6 +117,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    SNAPMODE-REACH (70 vs 57 px), P1 SNAPMODE-RELEASE-DIALOG; psui P1 ROW-DBLCLICK-DISTANCE. Runner-built docs reopened without the
    runner (vibex8 ~/tmp/qa/fl/docs: asm-feel, hole-plate-drawing): stable views. Drivers qa-scratch/af/snapm2.py, hv2/rowk.py, hv2/drw.py.
    qa-wait-33c5 re-runs FEEL-FL-AUTOSCROLL-DROP on psui's 33c57541 green.
+0z3. **live2 fills interaction-feel's "Ours ?" cells on P0 rows (lead 11-18 ~12:15)**: done (2e8057c34): hover-p0 sketch reach outside
+   sketch mode, hover-pick-1120 edge vs face, sel-feel press + move over a default plane, measure-mass-1118 place, ps-feel2-1118
+   Y / Shift+Y. Next (live2's): manip-feel-1118 triad, other ps-feel2 rows, chips-expr-1118, field-keys-1118, asm, studios. Don't redo
+   them; ticket any "Ours != live" row live2 reports that has no ticket yet.
 0z2. **P0 HEAVY-ASM-SOFTWARE-FRAME (lead 11:45; asm leads, psui later)**: xDev frames render in 46.7-49.4 s on llvmpipe (live 3.4 s
    per zoom on SwiftShader); 84% llvmpipe in the profile. Repro + data sent 12:00 (TICKETS; qa-scratch/heavy perf1, prof1). Re-run
    runperf.sh / probe.py (screen timings; the frame log's presents are UI frames only) on asm's fix. Driven-pattern rows wait for core's
