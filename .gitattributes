@@ -6,3 +6,9 @@ crates/update/tests/fixtures/** -text
 # Onshape's std sources: the older releases are zstd packs against these exact bytes (no CRLF on a Windows checkout).
 crates/featurescript/std/** -text
 crates/featurescript/std-versions/** -text
+# Shared tables every agent edits (lead 11-18: rebase conflicts here failed 5 lands in 25 min). Union keeps both sides'
+# rows; an edited row may then appear twice, and its owner deletes the stale one.
+docs/parity/interaction-feel.md merge=union
+docs/parity/error-wording.md merge=union
+docs/parity/SCORE.md merge=union
+docs/TICKETS.md merge=union
