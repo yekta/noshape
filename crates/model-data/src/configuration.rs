@@ -617,3 +617,17 @@ mod visibility_tests {
         assert_eq!(i.visible_when.map(|v| v.conditions.len()), Some(1));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::fs_option_identifier;
+
+    #[test]
+    fn a_repeated_row_name_is_numbered_from_zero() {
+        let taken = |ids: &[&str]| ids.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(fs_option_identifier("A", &taken(&["Default"])), "A");
+        assert_eq!(fs_option_identifier("A", &taken(&["Default", "A"])), "A0");
+        assert_eq!(fs_option_identifier("A", &taken(&["Default", "A", "A0"])), "A1");
+        assert_eq!(fs_option_identifier("Copy of A", &taken(&["Copy_of_A"])), "Copy_of_A0");
+    }
+}

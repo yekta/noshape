@@ -5392,6 +5392,37 @@ fn a_duplicate_configuration_name_and_a_bad_value_wait_for_their_row(cx: &mut Te
     assert_eq!(status(cx), Some(noshape_model::display::FeatureStatus::Error), "switched to A0: the variable fails");
 }
 
+/// Live2 cfg-1118 (qa CFGFEEL-BAD-CELL-PINK): a value that fails is silent until its row is active, then its cell is
+/// pink.
+#[gpui::test]
+fn a_bad_configured_value_is_pink_only_on_the_active_row(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-bad", &[("width", "30 mm")]);
+    let (rows, input) = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let id = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.type_id == "assignVariable")).map(|f| f.id).expect("the variable");
+            let mut input = String::new();
+            let mut a = None;
+            v.edit_config("Configure", cx, |ps| {
+                input = noshape_ops::config::add_input(ps, "List");
+                a = noshape_ops::config::add_option(ps, &input, "A".into());
+                noshape_ops::config::configure_parameter(ps, id, "lengthValue", &input);
+                noshape_ops::config::set_configured_text(ps, 0, a.as_deref().unwrap_or_default(), "abc".into());
+            });
+            v.right_panel = Some(crate::part_studio::config_panel::RightPanel::Configurations);
+            (a.into_iter().collect::<Vec<_>>(), input)
+        })
+    });
+    draw(cx, window);
+    let bad = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("cfg-bad cp-0-{}", rows[0]).into_boxed_str())).is_some();
+    assert!(!bad(cx), "silent while the row isn't active");
+    view.update(cx, |v, cx| {
+        v.config_values.0.insert(input.clone(), rows[0].clone());
+        cx.notify();
+    });
+    draw(cx, window);
+    assert!(bad(cx), "pink once its row is active");
+}
+
 /// A new Remove extrude of a circle on Top over a block below Top (psui's start hole-sketch): Remove turns the arrow
 /// into the block (std canSetBooleanFlip), also when the next pick comes before the logic's run for Remove is back,
 /// and the hole goes through. `settle`: wait for the dialog between the picks.

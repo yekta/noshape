@@ -1777,7 +1777,7 @@ impl PartStudioView {
                         });
                     for (q, (ci, c)) in columns.iter().enumerate() {
                         // The active configuration's values are bold (live2 config.json cellColours).
-                        row = row.child(cell(col_ws[q]).when(active, |d| d.font_weight(FontWeight::BOLD)).child(self.configured_value_cell(*ci, c, rk, window, cx)));
+                        row = row.child(cell(col_ws[q]).when(active, |d| d.font_weight(FontWeight::BOLD)).child(self.configured_value_cell(*ci, c, rk, active, window, cx)));
                     }
                     section = section.child(row);
                 }
@@ -1893,7 +1893,7 @@ impl PartStudioView {
 
     /// A configured parameter's value for one configuration: a checkbox for
     /// booleans (Suppressed), editable text otherwise.
-    fn configured_value_cell(&mut self, ci: usize, c: &ConfiguredParam, key: &str, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn configured_value_cell(&mut self, ci: usize, c: &ConfiguredParam, key: &str, active: bool, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let val = c.values.get(key).cloned();
         let kk = key.to_string();
         // A propagated input: the Derived source's option, as a dropdown.
@@ -1967,6 +1967,9 @@ impl PartStudioView {
             _ => None,
         }));
         let units = self.doc.read(cx).session.doc.settings.units;
+        let numeric = self.studio(cx).and_then(|s| s.feature(c.feature)).and_then(|f| noshape_model::features::get(&f.type_id)).and_then(|t| t.param(&c.param).map(|p| matches!(p.kind, noshape_model::params::ParamKind::Num(_)))).unwrap_or(false);
+        // The active row's value that fails is pink (live2 cfg-1118 e3: "abc" on f9ebec); other rows stay silent.
+        let bad = active && numeric && !text.trim().is_empty() && noshape_units::evaluate(&dim.map_or(text.clone(), |d| with_default_unit(&text, d, &units)), &self.display.variables).is_err();
         let editor = self.config_name_cell(cell.clone(), text.clone(), (px(13.33), FontWeight::NORMAL), window, cx, move |this, v, cx| {
             let v = dim.map_or(v.clone(), |d| with_default_unit(&v, d, &units));
             let kk = kk.clone();
@@ -1985,7 +1988,7 @@ impl PartStudioView {
         }
         let framed = self.ui.cfg_framed.as_ref().filter(|(k, _)| *k == cell).map(|(_, f)| f.clone());
         let pal = p();
-        let (c1, c2) = (cell.clone(), cell.clone());
+        let (c1, c2, c3) = (cell.clone(), cell.clone(), cell.clone());
         div()
             .id(SharedString::from(format!("cpv-{cell}")))
             .flex_1()
@@ -2016,7 +2019,11 @@ impl PartStudioView {
                     cx.notify();
                 }))
             })
-            .child(div().min_w_0().truncate().text_size(px(13.33)).child(text))
+            .when(bad, |d| d.bg(pal.error_fill).debug_selector(move || format!("cfg-bad {c3}")))
+            // A number cell: the › expander at its left and the parameter's ± icon at its right (live2 cfg-1118 e3).
+            .when(numeric, |d| d.child(div().flex_none().pl(px(5.)).pr(px(12.)).child(crate::ui::glyph("ui-chevron-right", 9., gpui_kit::rgb(0xaaaaaa)))))
+            .child(div().flex_1().min_w_0().truncate().text_size(px(13.33)).child(text))
+            .when(numeric, |d| d.child(crate::assets::icon("tolerance", 22., cx)))
             .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                 cx.stop_propagation();
                 if e.click_count() >= 2 {
