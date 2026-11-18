@@ -1215,14 +1215,14 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| Instance row hover → its outline in the graphics 1.07–1.25 s on live2's software-GL lane (the graphics' own hover 0.86 s there: the list adds ~0.2–0.4 s) | ? | missing |
-| Mate row double-click opens its edit dialog | ? | missing |
-| Mate Suppress / Unsuppress from the row menu: the row italic struck through at 198 ms / plain at 150 ms | ? | missing |
-| Mate rename (menu): the whole name selected; Esc cancels; Enter, Tab and a graphics click commit; F2 and Shift+N do nothing | ? | missing |
-| Instance row drag starts after 8 px; the ghost 5 px below the pointer; the drop line switches at a row's middle; the drop reorders, Ctrl+Z restores | ? | missing (drag look and the drop: the Instance list table) |
-| Insert (I): the shell at 363 ms, the list at 633 ms, the search not focused; filtering 353 ms after the last key; a Part Studio row inserts all its parts ("Inserted: 2"); the preview 1.1–1.8 s after the click, a graphics click places it (1.2 s) | ? | missing |
-| Mate connector tool: a hovered face's boundary, white dots at its vertices, edge midpoints and centre; no dot in reach: the triad at the face's centroid | ? | missing |
-| Mate connector dot reach: a square of about ±48 px (Chebyshev; diagonal kept at (25, 46), lost at (26, 48); off an edge midpoint kept at (47, 40), lost at (49, 42)) | ? | missing |
+| Instance row hover → its outline in the graphics 1.07–1.25 s on live2's software-GL lane (the graphics' own hover 0.86 s there: the list adds ~0.2–0.4 s) | the outline on the next frame, no wait (live's 1.07–1.25 s is its software-GL lane plus its list's 0.2–0.4 s: a delay, not a target) | a_hovered_instance_row_outlines_the_part_without_a_tint (look only) |
+| Mate row double-click opens its edit dialog | the same (`feature_row`: click_count ≥ 2 → `edit_mate`) | missing (edit_mate is tested directly) |
+| Mate Suppress / Unsuppress from the row menu: the row italic struck through at 198 ms / plain at 150 ms | the same, italic struck through and faint on the next frame (`toggle_mate_suppressed`, `suppressed_text`) | suppressed_rows_are_italic_and_struck_through (look) |
+| Mate rename (menu): the whole name selected; Esc cancels; Enter, Tab and a graphics click commit; F2 and Shift+N do nothing | the same: whole name selected, Esc cancels, Enter / leaving the field (Tab, a graphics click) commit; F2 unbound; Shift+N does nothing on a mate (26b5b87ff; an instance still renames) | shift_n_renames_a_selected_instance_but_not_a_mate |
+| Instance row drag starts after 8 px; the ghost 5 px below the pointer; the drop line switches at a row's middle; the drop reorders, Ctrl+Z restores | the same (26b5b87ff): past 7 px, the pill 5 px below the pointer, the line above / below the row by its middle; the drop is one Undo step | a_dragged_instance_row_lands_by_the_rows_middle |
+| Insert (I): the shell at 363 ms, the list at 633 ms, the search not focused; filtering 353 ms after the last key; a Part Studio row inserts all its parts ("Inserted: 2"); the preview 1.1–1.8 s after the click, a graphics click places it (1.2 s) | the same flow: no search focus, a Part Studio row inserts all its parts ("Inserted: N"), the preview follows the pointer, a click places; it filters on each key (no 353 ms wait: a delay, not a target) | closing_the_insert_dialog_after_esc_leaves_no_redo (part) |
+| Mate connector tool: a hovered face's boundary, white dots at its vertices, edge midpoints and centre; no dot in reach: the triad at the face's centroid | the same: white dots at the face's corners (larger), edge midpoints and centre; none in reach: the centroid | a_faces_connector_takes_a_dot_within_a_48_px_square_else_its_centroid (in the mate dialog) |
+| Mate connector dot reach: a square of about ±48 px (Chebyshev; diagonal kept at (25, 46), lost at (26, 48); off an edge midpoint kept at (47, 40), lost at (49, 42)) | a 47.5 px square (26b5b87ff; was a 50 px circle): live's four points kept / lost alike | a_faces_connector_takes_a_dot_within_a_48_px_square_else_its_centroid |
 
 ### chips-expr-1118 (dialog chips, expressions, the #variable list, live2 11-18 09:00) [psui]
 
