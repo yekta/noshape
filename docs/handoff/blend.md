@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-18 10:00 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-18 10:37 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -110,13 +110,32 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## Next, in order
 
-1. Landed 11-18 06:27: Fillet 3 speed as 0451fe40 (core told). Lead's order 11-18: (a) impeller Fillet 4 (3a2 below)
-   and the merged-body Fillet 3 (3a: its dump fillet-26 succeeds at kernel level on main: valid, 34 faces, 34.56 mm3
-   off, live f28 34.77; recheck the whole feature on main), then report Fillet 3 on main vs live 103 ms; (b) knife
-   re-time on main, take what's still >5x live (4c); (c) Halter. Fillet 4 work: branch blend-f4 in blend9 (probe
-   crash_inputs::zz_fillet_edge: edge, faces, edges at its ends, radii 100..20 %), dumps in ~/tmp/blend/f3m on
-   vibex8 / vibe2. core: a 0.47 mm2 sliver on the x = 6 plane at z -3.96 beside JOV where live's round runs (Move
-   face 2 picks it too); live is capturing whether live's input has it.
+1. NOW (lead 11-18), in order: (a) impeller Fillet 4, (b) merged-body Fillet 3 recheck + Fillet 3 vs live 103 ms on
+   main, (c) knife re-time on main (take what's still >5x live, 4c/4b), (d) Halter (paused). Landed 11-18 06:27: Fillet
+   3 speed as 0451fe40 (Mac 3996 -> 2271 ms; core told).
+   (a) Fillet 4 (f35, r 5 on JOV, allowEdgeOverflow false). Cause found: live's round (behaviours.md "blend (lead
+   11-18): impeller Fillet 4", live/blend/geo-1118/fillet4-impeller.json) is ONE face JpC 372.45 mm2 spanning z -4..0:
+   r 5 on a 4 mm flange takes the whole wall JOW and rests on its top edge (a cliff round); body 64 faces, 105931.1276
+   mm3 (-270.108). The 0.47 mm2 sliver JOu exists in live's input too and stays untouched: not the cause. Ours: the
+   cliff path (detail.rs overflows()) takes only a Line between two Planes; JOV is a B-spline, JOW extruded -> OCCT,
+   which fails. Fix (UNTESTED, branch blend-f4 in blend9, commit 9539fa674 on main 4ca9526a1, includes core's
+   impeller fix 52c050e1): blend_section station() sets each face's cliff extent per station on curved edges
+   (face_reach: halving along u to the face's far edge, infinite when the face reaches the setback); detail.rs tries
+   section_blend with cliff: true after OCCT's fillet fails and overflow is off. In flight: impeller run on vibex8
+   (task: bin/model-x8.sh with BLEND_WT=blend9 BLEND_HOST=vibex8; log vibex8 ~/tmp/blend/model.log -> /root/blend-
+   scratch/model.log and f4.log); waiting in vibex8's slot. Check: Fillet 4 one face, 105931.13 mm3, valid; then
+   Move face 2 (core: should follow) and the part count at Extrude Bohrungssitz Ansaugflansch (ours 10, live 1;
+   core: ~3 s of 177 ms there). Then gate (strict suite with CHECK lines + userdocs, bin/seq-f3s-v2.sh as a model)
+   and land. Also queued in vibex8's slot: probe crash_inputs::zz_fillet_edge on fillet-32 (edge info + radii sweep,
+   no longer needed; drop it if it's still waiting). Dumps: ~/tmp/blend/f3m on vibex8 / vibe2 (fillet-26, occt-
+   chamfer-fillet-28, fillet-32).
+   (b) Merged-body Fillet 3 (3a): bool2's dump fillet-26 SUCCEEDS at kernel level on main (valid, 34 faces, 34.56
+   mm3 off; it's an r 2 single circle, i.e. like f28 Fillet Stevenrohr einnschub, live -34.77). Recheck the whole
+   feature on main with bool2's merged chamfer; if it passes, tell bool2. Then time Fillet 3 on the Mac on main vs
+   live 103 ms and report.
+   Also open: isaac 850efe Fillet 2 passes OCCT's invalid result on (CHECK: valid true after Extrude 6, false after
+   Fillet 2 on main 539aeb9b3); bool's unify fix (bool-shared2 8ba7c6dcc) gives it live's input, so lower priority;
+   ZZFILLET prints on blend-halter show where (merged_blends / joined_edges have no validity check).
 2. Halter (multi-day, lead; land in gated steps; tests: Fillet Stevenrohr zum Halter, core's Extrude impellerraum
    input). Branch blend-halter (blend10). tighten_tolerances does NOT land (one more raw face behind equal shown
    counts); keep it only if Halter needs it.
@@ -132,7 +151,8 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
    instead of reversed() (kept), fuzzy 1e-7/1e-6, glue shift/full (fills stay separate solids), corners pushed into the
    part (ZZ_INTO=0.3: x 5 rounds fine, tip fills lose the body: the tip is a sliver). Next idea: build the tip fills
    so they cross the supports transversally only where the part is thick, or trim fill 3 against the body first.
-   Debug prints ZZ* / ZZ_INTO to strip before landing. Paused 11-18 05:50 for the lead's order below.
+   Debug prints ZZ* / ZZ_INTO to strip before landing. Paused 11-18 05:50 for the lead's order (item 1). Branch
+   blend-halter in blend10, last commit 2a74a13b1 (+ handoff commits).
 3. P2 asm: GearLab 1e81ca opFillet FILLET_FAILED (repro vibex7 NOSHAPE_FS_TRACE=1 NOSHAPE_PARITY_MODELS=
    ~/agents/asm-keep/m1e ~/agents/asm-keep/bin/ops-c03 parity::parity_models); isaac-ball a2e4a2 f23 Chamfer 2
    (one edge, TWO_OFFSETS 5.5/6, oppositeDirection false, tangentPropagation true; ours 51/124/68 40986.25 vs live
@@ -187,6 +207,10 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## How to run
 
+- Hosts (11-18): builds on vibex7 or vibex8 (whichever the lead names; vibex7 off 02:00-04:00 for qa), suites/gates
+  on vibe2 via ~/bin/slot; land NOSHAPE_LAND_QUEUE_HOST=vibe2. Scripts: bin/model-x8.sh <models dir under ~> <only>
+  [ENV..] with BLEND_HOST / BLEND_WT (one parity model, release, validity + differing, via slot with 14 GB free ->
+  /root/blend-scratch/model.log); bin/imp-x8.sh = the impeller. Kill only own pids (never from a computed pid).
 - Builds and crate tests on vibex7 (lead 21:23; rb-hosts), from blend10: bin/imp-x7.sh <ENV=..> runs the impeller
   with debug env (log -> /root/blend-scratch/imp.log). The Mac (bin/imp-mac.sh) for speed numbers only. vibe2: land
   queue (NOSHAPE_LAND_QUEUE_HOST=vibe2) and the user's own server: only ~ngyekta there, no more heavy runs.
