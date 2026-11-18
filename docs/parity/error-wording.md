@@ -15,6 +15,13 @@ live/errors-1118/. Status: **=** same, **≠** differs (owner in brackets).
 | Part deleted in its Part Studio (instance can't resolve) | instance row red #aa252d with a red ! badge on its icon; tooltip "Part 2 <1> has error: Failed to resolve instance."; gone from the graphics (behaviours E15, l.8741) | the same words, red row, gone from the graphics (green 548d795fb, pin-block: Extrude 2 deleted); ≠ no ! badge on the part icon, a red dot after the DOF icon instead (errors-1118/oe15.png) | = text, ≠ badge [asm] |
 | …a mate on the lost instance | "Cylindrical 1 has error: Failed to resolve the instance for mate. (Hidden)" then its parameters (E15) | "Revolute 1 has error: Failed to resolve the instance for mate. (Hidden)", Revolute / Offset / Limits / Simulation connection | = |
 
+## Drawings (live2)
+
+| Situation | Live | Ours | Status |
+|---|---|---|---|
+| The part changed (out of date) | the toolbar's Update icon yellow, tooltip "Update from this workspace (ctrl+q)"; views unchanged | the same (green 548d795fb) | = |
+| The part gone (its feature suppressed), after Update | a blue info toast "ⓘ Failed to resolve part. ×"; all views vanish (no geometry, no frame) | no toast; each view shows "No parts to show" in a small box | ≠ [studios] |
+
 ## Part Studio features (live)
 
 Live 2026-11-18 21:48–22:01 UTC: a 40 × 30 × 10 block, then each failing feature added by REST to a scratch Part Studio, and each row read in the
