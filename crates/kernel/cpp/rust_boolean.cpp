@@ -493,19 +493,48 @@ static occ::handle<Geom_BSplineSurface> offset_as_bspline(const occ::handle<Geom
 {
   double u0, u1, v0, v1, a0, a1, b0, b1;
   BRepTools::UVBounds(f, u0, u1, v0, v1);
+  // (Kept for the surface and the face's parameters, the most recent first: the same offset face goes through one
+  // Boolean after another (c2-impeller-loft's shell: a third of Boolean 2's time fitting it again).)
+  struct Fit
+  {
+    occ::handle<Geom_OffsetSurface>  off;
+    std::array<double, 4>            uv;
+    occ::handle<Geom_BSplineSurface> fit;
+  };
+  static std::mutex      fits_lock;
+  static std::deque<Fit> fits;
+  const std::array<double, 4> uv{u0, u1, v0, v1};
+  {
+    const LockedSection               locked_section_fits;
+    const std::lock_guard<std::mutex> lock(fits_lock);
+    for (auto it = fits.begin(); it != fits.end(); ++it)
+      if (it->off == off && it->uv == uv)
+      {
+        Fit hit = *it;
+        fits.erase(it);
+        fits.push_front(hit);
+        return hit.fit;
+      }
+  }
   off->Bounds(a0, a1, b0, b1);
   const double du = 1e-3 * (u1 - u0), dv = 1e-3 * (v1 - v0);
+  occ::handle<Geom_BSplineSurface> made;
   try
   {
     const occ::handle<Geom_RectangularTrimmedSurface> part = new Geom_RectangularTrimmedSurface(off, std::max(a0, u0 - du), std::min(a1, u1 + du), std::max(b0, v0 - dv), std::min(b1, v1 + dv));
     GeomConvert_ApproxSurface fit(part, 1e-7, GeomAbs_C1, GeomAbs_C1, 9, 9, 200, 0);
     if (fit.IsDone() && fit.HasResult() && fit.MaxError() <= 1e-7)
-      return fit.Surface();
+      made = fit.Surface();
   }
   catch (const Standard_Failure&)
   {
   }
-  return occ::handle<Geom_BSplineSurface>();
+  const LockedSection               locked_section_fits;
+  const std::lock_guard<std::mutex> lock(fits_lock);
+  fits.push_front(Fit{off, uv, made});
+  if (fits.size() > 64)
+    fits.pop_back();
+  return made;
 }
 
 // `s` as a flat body (its maps' indices are the body's), or why not.
