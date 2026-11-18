@@ -160,6 +160,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    SNAPMODE-REACH (70 vs 57 px), P1 SNAPMODE-RELEASE-DIALOG; psui P1 ROW-DBLCLICK-DISTANCE. Runner-built docs reopened without the
    runner (vibex8 ~/tmp/qa/fl/docs: asm-feel, hole-plate-drawing): stable views. Drivers qa-scratch/af/snapm2.py, hv2/rowk.py, hv2/drw.py.
    qa-wait-33c5 re-runs FEEL-FL-AUTOSCROLL-DROP on psui's 33c57541 green.
+0w. **Workflow feel vs live (07:38)**: TICKETS "Workflow feel vs live's 11-18 07:09-07:22 timings": ours faster on every row, no
+   tickets (qa-scratch/wf: wflat.py on this host's Xvfb :153, two-blocks reopened without the runner, PIL crops padded to live's
+   139 ms, timestamps at capture). FEEL-FL-AUTOSCROLL-DROP verified 07:21 (b5c4ccc4), psui told. psui's next land has ROW-DBLCLICK.
+   Compat upload fixed 07:45: compat-check.sh snapshots the green, scp to noshape.new + mv (an scp onto the busy binary failed
+   and cfc031fa's run used cafe3c2a's app: its file is renamed cfc031fa.stale-binary.txt when done). qa-wait-67eb's vibex7 load
+   check was never true (ssh quoting); fixed 07:30, still waits for load < 2.
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
@@ -167,22 +173,11 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 0b. **LOADED runs (lead 21:50)**: speed / timing at load > 16 (2 x 8 cores) don't count. suites-diff.py prints "LOADED: …" first,
    skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
    the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.
-1. **17:00 cut**: TICKETS.md "Release blockers for the 2026-11-17 17:00 release" (12:35: GO on 7f287e52; c101c3c0 has core's
-   four Split / Use / Rib lands; suites 827a23a6 clean; fan-blade-sweep Boolean 2 is now live's volume, 8x slower: core's Offset, sent to core). Still to come:
-   blend's impeller Fillet 3 (when it lands: compat on its green + the impeller re-time below).
-   Coming for 17:00 (lead 13:20): psui 452838df + skasm b87dd3dcf (user P0s: verified in the app on c330a760 14:05), blend
-   9e40ad95a, bool2 555bcb4c (queue/bool2-555bcb4c): compat on each green as it lands. Watcher: bin/watch-lands.sh <state>
-   <commit>... (matches by subject, exits when one is in a green with COMPAT-DONE; state compat/lands-1700.state).
-   App user-flow checks: /root/qa-scratch/uh/uh2.sh <app> <out> (sketch hover, real xdotool moves after a UI-script setup)
-   and uf.sh (seeded feature_settings.json; NOSHAPE_UI_REMEMBERED=1 or the runner ignores the memory), on vibex6 :663.
-   The qa-cut-1615 timer runs cut-verdict.sh at 16:15 -> one line in /tmp/lead/qa-alerts + compat/cut-1117-1615.txt. Read
-   the ticket section of that compat file too (a ticket doc's wrong geometry is a HOLD), then update the entry with the
-   verdict and the green it names, commit docs-only. HOLD only for a real P0 (crash, wrong geometry, speed regression, a user
-   document changed). After the cut is published: `systemd-run --unit qa-pub-<v> bash /root/qa-scratch/bin/rel-pub-all.sh
-   0.4.56 <v> <candidate binary on vibe5>` (stage the candidate app at vibe5 ~/tmp/qa/cand/noshape, one fixed path;
-   delete it after); it waits for the release, checks, moves the compat baseline, writes one line to qa-alerts.
-2. **qa-imp-verify is DONE** (09:27): green fa9f84b8 (core c85e75070) gives every c2-impeller-loft feature v0.4.56's status
-   (ab1117/imp-verify.txt); IMPELLER-MOVE-FACE-2-REF marked verified. Nothing left to run for it.
+1. **17:00 cut (11-18)**: TICKETS "Release blockers for the 2026-11-18 17:00 release". The qa-cut-1615 timer runs cut-verdict.sh at
+   16:15 (cut-must.txt: fff088e5, 120ee19c, 7b8bb249, 2549be00; missing -> HOLD) -> qa-alerts + compat/cut-1118-1615.txt. Read the
+   ticket and corpus sections (a status that gets worse is a HOLD unless in compat/accepted.txt; cf-sheet-metal-model-plus's
+   unfold Warning is the 120ee19c regression), update the entry with GO / HOLD and its green, commit docs-only. After the publish:
+   `systemd-run --unit qa-pub-<v> -E HOME=/root -E PATH=$PATH bash /root/qa-scratch/bin/rel-pub-all.sh 0.4.58 <v> <cand on vibex7>`.
 3. Suites: the qa-suites loop's next run picks the newest green (4-hourly). Compare each finished run with the previous one
    (suites/<run>/worse.txt from bin/suites-diff.py: models, scenarios, `failure`, `speed`, `newdiff`; assemblies.log
    `^asm-…: … BOM rows` and `^assemblies:`; exchange.log `exchange score` and times over live). Regressions -> owners as P0
