@@ -11,6 +11,9 @@ use std::time::Duration;
 
 /// From the pointer resting on a tool to its help (live 3.05–3.24 s).
 pub const HELP_DELAY: Duration = Duration::from_millis(3100);
+/// From the pointer resting on a tool to its title tooltip (live2 toolbar-help-1118: 0.45–0.69 s, median 0.47 s, in
+/// Graebert's frame; the kit's default 500 ms showed it at 0.70 s, live2 ours-1118-drawing).
+pub const TIP_DELAY: Duration = Duration::from_millis(450);
 const WIDTH: f32 = 400.;
 
 /// A tool's help: its first paragraph, then numbered steps.
@@ -375,6 +378,9 @@ pub fn help(tip: &str) -> Option<&'static ToolHelp> {
 /// The toolbar tool under the pointer and whether its help shows yet.
 pub struct HelpHover {
     pub tip: &'static str,
+    /// Its title tooltip shows ([`TIP_DELAY`]).
+    pub tip_shown: bool,
+    /// Its help popover shows ([`HELP_DELAY`]).
     pub shown: bool,
     _timer: Task<()>,
 }
@@ -386,19 +392,25 @@ impl DrawingEditor {
         if on == same {
             return;
         }
-        if !on || help(tip).is_none() {
-            if self.help_hover.take().is_some_and(|h| h.shown) {
-                cx.notify();
-            }
+        if self.help_hover.take().is_some_and(|h| h.shown) {
+            cx.notify();
+        }
+        if !on {
             return;
         }
-        let shown = self.help_hover.take().is_some_and(|h| h.shown);
         let timer = cx.spawn_in(window, async move |this, cx| {
-            cx.background_executor().timer(HELP_DELAY).await;
+            cx.background_executor().timer(TIP_DELAY).await;
+            let _ = this.update(cx, |this, _| {
+                if let Some(h) = this.help_hover.as_mut().filter(|h| h.tip == tip) {
+                    h.tip_shown = true;
+                }
+            });
+            if help(tip).is_none() {
+                return;
+            }
+            cx.background_executor().timer(HELP_DELAY - TIP_DELAY).await;
             let _ = this.update_in(cx, |this, window, cx| {
-                if let Some(h) = &mut this.help_hover
-                    && h.tip == tip
-                {
+                if let Some(h) = this.help_hover.as_mut().filter(|h| h.tip == tip) {
                     h.shown = true;
                     // The popover takes the title tooltip's place (live: it covers it).
                     gpui_kit::component::tooltip::hide_tooltip(window, cx);
@@ -406,18 +418,26 @@ impl DrawingEditor {
                 }
             });
         });
-        self.help_hover = Some(HelpHover { tip, shown: false, _timer: timer });
-        if shown {
-            cx.notify();
+        self.help_hover = Some(HelpHover { tip, tip_shown: false, shown: false, _timer: timer });
+    }
+
+    /// The hovered tool's tooltip as live's recorder reads it: its title, and with a help, "title / title help" (the
+    /// help's text is in the tooltip's element from the start, shown or not).
+    /// (Called while drawing and when the runner reads the state: the toolbar's tooltip is the kit's, not noted.)
+    pub(crate) fn note_tool_tip(&self) {
+        let Some(h) = self.help_hover.as_ref().filter(|h| h.tip_shown || h.shown) else { return };
+        match help(h.tip) {
+            Some(help) => crate::ui_script::note_tooltip(format!("{0} / {0} {1} {2}", h.tip, help.intro, help.steps.join(" ")).trim()),
+            None => crate::ui_script::note_tooltip(h.tip),
         }
     }
 
     /// The shown help popover, placed under the toolbar at the editor's left edge.
     pub fn render_tool_help(&self) -> Option<AnyElement> {
+        self.note_tool_tip();
         let tip = self.help_hover.as_ref().filter(|h| h.shown)?.tip;
         let h = help(tip)?;
         let name = tip.split(" (").next().unwrap_or(tip);
-        crate::ui_script::note_tooltip(format!("{name} {} {}", h.intro, h.steps.join(" ")).trim());
         let border = gpui_kit::rgb(0xc9cccf);
         let title = div().h(px(25.)).px(px(8.)).flex().items_center().bg(gpui_kit::rgb(0xcfdbe5)).border_b_1().border_color(gpui_kit::rgb(0xebebeb)).font_weight(FontWeight::BOLD).child(name);
         let steps = h.steps.iter().enumerate().map(|(i, s)| h_flex().w_full().items_start().child(div().w(px(24.)).flex_none().flex().justify_end().pr(px(4.)).child(format!("{}.", i + 1))).child(div().flex_1().min_w_0().whitespace_normal().child(*s)));

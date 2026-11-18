@@ -847,7 +847,18 @@ fn a_toolbar_tools_help_shows_after_3_s_under_the_toolbar(cx: &mut TestAppContex
     let (window, editor) = drawing(cx, "feel-tool-help");
     let shown = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("tool-help");
     cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.tool_hover("Projected view (p)", true, w, cx))).unwrap();
-    cx.executor().advance_clock(std::time::Duration::from_millis(2900));
+    // Its title tooltip at 450 ms (live 0.45–0.69 s, median 0.47), read with the help's text as live's recorder does.
+    let read = |cx: &mut TestAppContext| {
+        crate::ui_script::clear_tooltip();
+        cx.update_window(window, |_, w, _| w.refresh()).unwrap();
+        draw(cx, window);
+        crate::ui_script::shown_tooltip()
+    };
+    cx.executor().advance_clock(std::time::Duration::from_millis(440));
+    assert_eq!(read(cx), None, "no tooltip at 440 ms");
+    cx.executor().advance_clock(std::time::Duration::from_millis(20));
+    assert!(read(cx).is_some_and(|t| t.starts_with("Projected view (p) / Projected view (p) ")), "the tooltip at 460 ms");
+    cx.executor().advance_clock(std::time::Duration::from_millis(2440));
     draw(cx, window);
     assert!(shown(cx).is_none(), "not yet at 2.9 s");
     cx.executor().advance_clock(std::time::Duration::from_millis(300));
@@ -857,7 +868,7 @@ fn a_toolbar_tools_help_shows_after_3_s_under_the_toolbar(cx: &mut TestAppContex
     assert_eq!((b.left(), b.top(), b.size.width), (px(0.), px(crate::ui::TOOLBAR_H + 1.), px(400.)), "{b:?}");
     let h = crate::drawing_help::help("Projected view (p)").expect("Projected view's help");
     assert_eq!(h.steps.len(), 3, "live's three steps");
-    assert_eq!(crate::ui_script::shown_tooltip(), Some(format!("Projected view {} {}", h.intro, h.steps.join(" "))));
+    assert_eq!(crate::ui_script::shown_tooltip(), Some(format!("Projected view (p) / Projected view (p) {} {}", h.intro, h.steps.join(" "))));
     cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.tool_hover("Projected view (p)", false, w, cx))).unwrap();
     draw(cx, window);
     assert!(shown(cx).is_none(), "gone when the pointer leaves");

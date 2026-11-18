@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 11:57 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 12:34 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -23,9 +23,6 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   readers (Break view, Sheet properties, View properties); a selected table read as TABLE for recorders ≥ 2026-11-18.1
   (when live2's BOM retakes land: check TABLE's order beside EDGE Isometric, drop `placed_table`'s reader rule if
   they read TABLE from the placing click).
-- Landed 49cfe99b 09:12: the Release dialog ignores Esc (real-app check on vibex6 Xvfb: xdotool "abc" Return "xyz"
-  lands as two lines, Esc leaves it open; the unit test's dropped letters are the harness), Feature Studio error /
-  completion timings.
 - Landed 64680c1d as 1e21f28e 11:19: Preferences (shortcut "Create release", Length decimals per unit,
   the Versions flyout's open state carried over); live2's BOM retakes (BOM panel fields, TABLE + EDGE <view> until
   right-clicked); ordinate add-to-group reads nothing until its first click; linestyle / DWT tooltips; selects marked
@@ -42,20 +39,23 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   the popover heights fit); the popover hides the title tooltip (vendored gpui-component `tooltip::hide_tooltip`) and
   its steps wrap; a detail's label 5.3 mm under its whole profile (circle / polygon box), centred, clipped border or
   not (live2 labels-1118: 39.2 mm under a 2:1 r 33.9 circle's centre; test).
-- Local, to land: a section / auxiliary label's top 3.02 mm under the geometry (drw-section-vertical.dxf; was 3.1;
-  test). drw-section-exclude-from-cut's 5.81 mm comes after an Edit section… session ended by Escape (excluded parts,
-  a cleared field): not a placement rule; ask live2 for a plain section of pin-block if it matters.
-- live2 retakes queued to land (11:5x): drw-bom-table reads TABLE after placing; drw-note-editor presses ✓, waits
-  1.5 s, Esc ("MATRIX" committed from s6). When on main: rerun both, drop `placed_table`'s reader rule if TABLE reads
-  from the placing click.
+- Queued c63dab06 / 4e2717b5 (12:0x–12:4x): section / auxiliary label 3.02 mm under the geometry; the ui-parity
+  driver finds {"tool": "Undo" / "Redo"} through the shared button marks (drw-toolbar-tips-view-showhide s1).
+  55beaa52 (help texts, popover over the tooltip, detail label under its profile) landed as d92fcab4.
+- drw-section-exclude-from-cut's 5.81 mm label gap: skipped (lead: an Esc-closed edit session isn't the rule).
+- live2's drw-bom-table / drw-note-editor retakes on main (185c4cafe): in the full run below.
+- Full drawing run drw1118c on vibex6 (~/agents/studios-keep/drw1118c, uip-mine.sh 2 shards, 12:4x; vibex8's slot was
+  held by qa's suite): the misses left from drw1118b's 24 are the next items, worst feel first. Of the 24, already
+  fixed since: ordinate s7 / value rclick, BOM, linestyle, gtol, Custom zones, hatch s29/s31, note copy-paste s8
+  (selection's menu on the empty sheet), replicate region reader, toolbar tips (driver).
+- FS / VS timings (live fsvs-feel-1118) re-checked: every row as live (230 / 1891 / 275 / 526 ms; the add row's
+  0.85 s first key is live's slowness).
 - Checked against live 08:4x, already as live: documents search on Enter only; version row menu (View in repair,
   Restore to Main…, Releases only with candidates; Copy link web-only); Restore strategy dialog; Create version (V<n>
   focused, Enter creates, Esc closes); Branch (B<n> selected, Enter creates and opens).
 - Drawing items left: drw-gtol-type-list s5 / drw-hatch-panel s29 (list highlight). Not targets: replicate-region-place s21 (live's
   toast comes ~9.75 s after ✓, server time; ours at once, gone by the 12 s read), drw-revision-table-delete s8,
   drw-inspection-table-iso-scrolled s2 (reader count), drw-note-editor (retake asked).
-- Full drawing run drw1118b on vibex8 (~/agents/studios-keep/drw1118b): 317/341; its fixes landed (d2eb5c15,
-  b5c4ccc4, 4beed1be). Next full run on main after the local batch.
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables: done: the hover / select look (ink black, rows #f1f1f1, header #ebebeb, hovered row / cell

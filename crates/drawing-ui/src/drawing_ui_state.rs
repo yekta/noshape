@@ -427,6 +427,11 @@ impl DrawingEditor {
         if let Some(e) = &self.section_edit {
             framed(&mut selection, e.view, "VIEW");
         }
+        // Edit detail…: its circle orange in the parent view (live2 drw-detail-id-profile-tips s7–s15, recorder
+        // 11-17.7: EDGE Front); older recorders missed its thin line (drw-detail-edit, 11-09: nothing).
+        if let Some(v) = self.detail_dlg.as_ref().filter(|d| d.edit.is_some()).and_then(|d| d.view) {
+            selection.push(("EDGE+".into(), self.ui_view_name(v)));
+        }
         if let Some(Panel::BrokenOut { view, edit: Some(_), .. }) = &self.panel {
             framed(&mut selection, *view, "EDGE");
         }
@@ -617,6 +622,7 @@ impl DrawingEditor {
     /// The state the ui-parity runner records after each step: the drawing's own key, the others empty but the
     /// undo state (README "state").
     pub fn ui_state(&self, cx: &App) -> Value {
+        self.note_tool_tip();
         let undo = self.doc.read(cx).session.can_undo();
         let redo = self.doc.read(cx).session.can_redo();
         json!({

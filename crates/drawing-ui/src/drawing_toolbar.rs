@@ -80,21 +80,21 @@ impl TbTool {
     fn render_button(self, ed: &Entity<DrawingEditor>, quiet: bool, cx: &mut Context<DrawingEditor>) -> AnyElement {
         if self.disabled {
             let b = match self.more {
-                None => crate::ui::tool_button(self.id, self.icon, false, cx).w(px(CELL)).h(px(CELL)).tooltip(self.tip).into_any_element(),
-                Some((caret, _)) => split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, false, cx).tooltip(self.tip), crate::ui::tool_caret_blue(caret, cx).tooltip(self.tip)).into_any_element(),
+                None => crate::ui::tool_button(self.id, self.icon, false, cx).w(px(CELL)).h(px(CELL)).tooltip(self.tip).tooltip_show_delay(crate::drawing_help::TIP_DELAY).into_any_element(),
+                Some((caret, _)) => split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, false, cx).tooltip(self.tip).tooltip_show_delay(crate::drawing_help::TIP_DELAY), crate::ui::tool_caret_blue(caret, cx).tooltip(self.tip).tooltip_show_delay(crate::drawing_help::TIP_DELAY)).into_any_element(),
             };
             return div().opacity(0.3).child(b).into_any_element();
         }
         let run = self.run.clone();
         let click = cx.listener(move |this, _: &ClickEvent, window, cx| run(this, window, cx));
         match self.more {
-            None => crate::ui::tool_button(self.id, self.icon, self.active, cx).w(px(CELL)).h(px(CELL)).when(self.active, |b| b.bg(ACTIVE_BG)).when(!quiet, |b| b.tooltip(self.tip)).on_click(click).into_any_element(),
+            None => crate::ui::tool_button(self.id, self.icon, self.active, cx).w(px(CELL)).h(px(CELL)).when(self.active, |b| b.bg(ACTIVE_BG)).when(!quiet, |b| b.tooltip(self.tip).tooltip_show_delay(crate::drawing_help::TIP_DELAY)).on_click(click).into_any_element(),
             Some((caret, items)) => {
                 let ed = ed.clone();
                 // The ▾ for the ui-parity driver (`{"tool": "Dimension", "menu": …}`).
                 let tip = self.tip;
-                let more = crate::ui_script::mark(crate::ui::tool_caret_blue(caret, cx).when(!quiet, |b| b.tooltip(self.tip)).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx)), || format!("caret:{}", tip.split(" (").next().unwrap_or(tip)));
-                split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, self.active, cx).when(self.active, |b| b.bg(ACTIVE_BG)).when(!quiet, |b| b.tooltip(self.tip)).on_click(click), more).into_any_element()
+                let more = crate::ui_script::mark(crate::ui::tool_caret_blue(caret, cx).when(!quiet, |b| b.tooltip(self.tip).tooltip_show_delay(crate::drawing_help::TIP_DELAY)).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx)), || format!("caret:{}", tip.split(" (").next().unwrap_or(tip)));
+                split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, self.active, cx).when(self.active, |b| b.bg(ACTIVE_BG)).when(!quiet, |b| b.tooltip(self.tip).tooltip_show_delay(crate::drawing_help::TIP_DELAY)).on_click(click), more).into_any_element()
             }
         }
     }
@@ -129,15 +129,15 @@ fn collapsed(gi: usize, group: Vec<TbTool>, ed: &Entity<DrawingEditor>, cx: &mut
     let mut seen = std::collections::HashSet::new();
     let items: Vec<MenuEntry> = group.iter().filter(|t| !t.disabled).flat_map(|t| t.menu_rows()).filter(|m| !matches!(m, MenuEntry::Item { label, .. } if !seen.insert(label.clone()))).collect();
     if all_disabled {
-        return Some(div().opacity(0.3).child(split(SharedString::from(format!("drg-c{gi}")), crate::ui::split_tool_button(SharedString::from(format!("dr-c{gi}")), icon, false, cx).tooltip(tip), crate::ui::tool_caret_blue(SharedString::from(format!("dr-c{gi}-more")), cx).tooltip(tip))).into_any_element());
+        return Some(div().opacity(0.3).child(split(SharedString::from(format!("drg-c{gi}")), crate::ui::split_tool_button(SharedString::from(format!("dr-c{gi}")), icon, false, cx).tooltip(tip).tooltip_show_delay(crate::drawing_help::TIP_DELAY), crate::ui::tool_caret_blue(SharedString::from(format!("dr-c{gi}-more")), cx).tooltip(tip).tooltip_show_delay(crate::drawing_help::TIP_DELAY))).into_any_element());
     }
     let run = run?;
     let ed = ed.clone();
     Some(
         split(
             SharedString::from(format!("drg-c{gi}")),
-            crate::ui::split_tool_button(SharedString::from(format!("dr-c{gi}")), icon, active, cx).when(active, |b| b.bg(ACTIVE_BG)).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| run(this, window, cx))),
-            crate::ui::tool_caret_blue(SharedString::from(format!("dr-c{gi}-more")), cx).tooltip(tip).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx)),
+            crate::ui::split_tool_button(SharedString::from(format!("dr-c{gi}")), icon, active, cx).when(active, |b| b.bg(ACTIVE_BG)).tooltip(tip).tooltip_show_delay(crate::drawing_help::TIP_DELAY).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| run(this, window, cx))),
+            crate::ui::tool_caret_blue(SharedString::from(format!("dr-c{gi}-more")), cx).tooltip(tip).tooltip_show_delay(crate::drawing_help::TIP_DELAY).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx)),
         )
         .into_any_element(),
     )
@@ -308,7 +308,7 @@ impl DrawingEditor {
                     .h(px(CELL))
                     .when(out_of_date, |b| b.bg(gpui_kit::rgb(0xfcda7f)).border_2().border_color(gpui_kit::rgb(0xfab601)))
                     .opacity(if imported { 0.3 } else if up_to_date { 0.4 } else { 1.0 })
-                    .when(help != Some("Update from this workspace (ctrl+q)"), |b| b.tooltip("Update from this workspace (ctrl+q)"))
+                    .when(help != Some("Update from this workspace (ctrl+q)"), |b| b.tooltip("Update from this workspace (ctrl+q)").tooltip_show_delay(crate::drawing_help::TIP_DELAY))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if !up_to_date {
                             this.update_drawing(cx)

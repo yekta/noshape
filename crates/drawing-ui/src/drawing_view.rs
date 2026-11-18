@@ -1672,6 +1672,13 @@ impl DrawingEditor {
                     scene.add_flag(p, state::SELECTED);
                 }
             }
+            // Edit detail…: the detail's circle stays orange in its parent view until another shape is started (live2
+            // drw-detail-id-profile-tips s7–s15).
+            if let Some(id) = self.detail_dlg.as_ref().filter(|d| d.view.is_some()).and_then(|d| d.edit) {
+                for (p, _) in b.picks.iter().enumerate().filter(|(_, t)| **t == PickTarget::DetailCircle(id)) {
+                    scene.add_flag(p as u32, state::SELECTED);
+                }
+            }
             if let Some(h) = self.hover {
                 let single = self.tool_picks_edges();
                 match self.sel_of_pick(h) {

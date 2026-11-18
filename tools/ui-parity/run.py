@@ -1507,6 +1507,11 @@ def compare(live, ours, whole_document=True):
         for side in (a, b):
             if isinstance(side.get("tooltip"), str):
                 side["tooltip"] = " ".join(side["tooltip"].split())
+                # A drawing tool's tooltip with its help ("title / title help"): the help's wording is ours, live's
+                # structure (DECISIONS 11-18), so only the title part is compared.
+                m = re.match(r"^(.+?) / \1 ", side["tooltip"])
+                if m:
+                    side["tooltip"] = f"{m.group(1)} / {m.group(1)} …"
         # A configuration input's FeatureScript id is random ("List_WkWAMF6ZpKo2kz"): compared as one.
         for side in (a, b):
             d = side.get("dialog")
