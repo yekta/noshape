@@ -1707,3 +1707,140 @@ fn a_crop_spline_is_drawn_open_and_closes_within_6_px_of_its_first_point(cx: &mu
     click_sheet(cx, window, &editor, p);
     assert!(cx.update(|cx| editor.read(cx).crop_dlg.as_ref().is_some_and(|d| d.pending.is_some())), "the click on the first point ends it");
 }
+
+/// Live2 ann-1118: the 2 point centerline frames a view's vertex in the Note tool's hollow orange square, lit 9 px off it
+/// on the diagonal and not at 10; the Dimension tool keeps its disc and 8 px.
+#[gpui::test]
+fn the_two_point_centerline_frames_a_vertex_from_9_px(cx: &mut TestAppContext) {
+    use crate::drawing_scene::SnapMark;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-centerline-snap");
+    real_sheet(cx, window, &editor);
+    let corner = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        g.snaps.iter().map(|s| pl.to_sheet(s.p)).min_by(|a, b| (a[0] + a[1]).total_cmp(&(b[0] + b[1]))).expect("a vertex")
+    });
+    let mark_at = |cx: &mut TestAppContext, tool: Tool, px: f64| {
+        cx.update_window(window, |_, _, cx| {
+            editor.update(cx, |e, cx| {
+                e.tool = tool;
+                let mm = e.tol_mm(px) * std::f64::consts::FRAC_1_SQRT_2;
+                e.cursor = [corner[0] - mm, corner[1] - mm];
+                e.update_preview(cx);
+            })
+        })
+        .unwrap();
+        cx.update(|cx| editor.read(cx).overlay.marks.iter().find(|(p, _, _)| (p[0] - corner[0]).hypot(p[1] - corner[1]) < 1e-9).map(|m| m.1))
+    };
+    let centerline = Tool::Centerline { first: None };
+    assert_eq!(mark_at(cx, centerline.clone(), 9.0), Some(SnapMark::Box), "9 px: the square");
+    assert_eq!(mark_at(cx, centerline, 10.0), None, "10 px: none");
+    let dim = Tool::Dimension { kind: noshape_scene::drawing_tools::DimTool::Linear, picks: vec![] };
+    assert_eq!(mark_at(cx, dim.clone(), 7.0), Some(SnapMark::Disc), "the Dimension tool's disc");
+    assert_eq!(mark_at(cx, dim, 9.0), None, "within its 8 px only");
+}
+
+/// A base view's longest horizontal straight edge on the sheet (its ends) and the way out of the view from it.
+fn horizontal_edge(cx: &mut TestAppContext, editor: &Entity<DrawingEditor>) -> ([f64; 2], [f64; 2], f64) {
+    use noshape_model::drawing::ViewKind;
+    use noshape_model::drawing::views::EdgeGeom;
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        let v = e.current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).map(|v| v.id).expect("a base view");
+        let pl = e.placement(v).expect("placed");
+        let g = e.geoms.get(&v).cloned().expect("geometry");
+        let (a, b) = g
+            .model_edges
+            .iter()
+            .filter_map(|me| match me.geom {
+                EdgeGeom::Line { a, b } => Some((pl.to_sheet(a), pl.to_sheet(b))),
+                _ => None,
+            })
+            .filter(|(a, b)| (a[1] - b[1]).abs() < 1e-6)
+            .max_by(|x, y| (x.1[0] - x.0[0]).abs().total_cmp(&(y.1[0] - y.0[0]).abs()))
+            .expect("a horizontal edge");
+        let (a, b) = if a[0] < b[0] { (a, b) } else { (b, a) };
+        let out = if a[1] > (pl.min[1] + pl.max[1]) / 2.0 { 1.0 } else { -1.0 };
+        (a, b, out)
+    })
+}
+
+/// Live2 ann-1118: the Datum tool lights the hovered edge; after the edge click the box rides a leader square to the
+/// edge, its foot under the pointer and kept within the edge's ends (no rubber band).
+#[gpui::test]
+fn a_datums_leader_stays_square_to_its_edge_within_the_edges_ends(cx: &mut TestAppContext) {
+    use noshape_model::drawing::AnnotationKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-datum-square");
+    real_sheet(cx, window, &editor);
+    let (a, b, out) = horizontal_edge(cx, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Datum { anchor: None }, cx)));
+    draw(cx, window);
+    let mid = [(a[0] + b[0]) / 2.0, a[1]];
+    assert!(matches!(lit_at(cx, window, &editor, mid), Some(Sel::Edge(..))), "the hovered edge lit");
+    click_sheet(cx, window, &editor, mid);
+    let datum_at = |cx: &mut TestAppContext, p: [f64; 2]| {
+        cx.update_window(window, |_, _, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = p;
+                e.update_preview(cx);
+            })
+        })
+        .unwrap();
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            assert!(e.overlay.lines.is_empty(), "no rubber band");
+            let ann = e.preview.as_ref().and_then(|d| d.sheets.get(e.sheet)).and_then(|s| s.annotations.last()).cloned().expect("the datum previewed");
+            let AnnotationKind::Datum { anchor, .. } = ann.kind else { panic!("a datum: {:?}", ann.kind) };
+            (anchor, ann.position)
+        })
+    };
+    let near = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-6;
+    let over = [a[0] + (b[0] - a[0]) * 0.3, a[1] + out * 20.0];
+    let (foot, box_at) = datum_at(cx, over);
+    assert!(near(foot, [over[0], a[1]]) && near(box_at, over), "the foot under the pointer: {foot:?} / {box_at:?}");
+    let past = [b[0] + 30.0, a[1] + out * 15.0];
+    let (foot, box_at) = datum_at(cx, past);
+    assert!(near(foot, b) && near(box_at, [b[0], past[1]]), "past the end: the edge's end, square to it: {foot:?} / {box_at:?}");
+}
+
+/// Live2 ann-1118: the Surface finish tool previews the symbol at the pointer, standing on the hovered edge; a click
+/// places it at once and the next preview follows the pointer.
+#[gpui::test]
+fn the_surface_finish_symbol_follows_the_pointer_before_and_after_a_click(cx: &mut TestAppContext) {
+    use noshape_model::drawing::AnnotationKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-sf-preview");
+    real_sheet(cx, window, &editor);
+    let (a, b, out) = horizontal_edge(cx, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::SurfaceFinish, cx)));
+    draw(cx, window);
+    let shown = |cx: &mut TestAppContext, p: [f64; 2]| {
+        cx.update_window(window, |_, _, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = p;
+                e.update_hover(cx);
+                e.update_preview(cx);
+            })
+        })
+        .unwrap();
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let have = e.drawing_sheet().annotations.len();
+            let s = e.preview.as_ref().and_then(|d| d.sheets.get(e.sheet))?;
+            (s.annotations.len() == have + 1).then(|| s.annotations.last().cloned()).flatten().and_then(|x| match x.kind {
+                AnnotationKind::SurfaceFinish { on, .. } => Some((x.position, on.is_some())),
+                _ => None,
+            })
+        })
+    };
+    let mid = [(a[0] + b[0]) / 2.0, a[1]];
+    assert_eq!(shown(cx, mid), Some((mid, true)), "on the hovered edge, standing on it");
+    click_sheet(cx, window, &editor, mid);
+    let placed = cx.update(|cx| editor.read(cx).drawing_sheet().annotations.iter().filter(|x| matches!(x.kind, AnnotationKind::SurfaceFinish { .. })).count());
+    assert_eq!(placed, 1, "placed at once");
+    let free = [mid[0] + 25.0, a[1] + out * 25.0];
+    assert_eq!(shown(cx, free).map(|s| s.0), Some(free), "the next symbol at the pointer");
+}

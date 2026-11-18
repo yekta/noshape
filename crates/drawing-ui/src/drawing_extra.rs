@@ -1117,7 +1117,7 @@ impl DrawingEditor {
             Tool::Table { kind, view, .. } if matches!(kind, TableTool::Revision | TableTool::Bom | TableTool::CutList) || view.is_some() => {
                 overlay.rect([self.cursor[0] - 90.0, self.cursor[1] - 20.0], self.cursor, true);
             }
-            Tool::Datum { anchor: Some(a) } if self.datum_on.is_none() => overlay.lines.push((vec![*a, self.cursor], true)),
+            Tool::Datum { anchor: Some(a) } if self.datum_on.is_none() && self.datum_edge.is_none() => overlay.lines.push((vec![*a, self.cursor], true)),
             Tool::Datum { anchor: None } => {
                 if let Some((p, _)) = self.datum_attach_at(self.cursor) {
                     let r = self.tol_mm(7.0);
@@ -1288,6 +1288,11 @@ impl DrawingEditor {
                 // On a view's geometry: kept as that view point (it follows the view).
                 let pp = if on.is_none() { self.any_point(c) } else { None };
                 self.datum_at = pp.as_ref().map(|s| (s.view, s.p));
+                // A straight edge under it: the leader then stays square to it (live2 ann-1118).
+                self.datum_edge = self.hovered_edge().filter(|(v, _)| on.is_none() && pp.as_ref().is_some_and(|s| s.view == *v)).and_then(|(_, me)| match me.geom {
+                    views::EdgeGeom::Line { a, b } => Some((a, b)),
+                    _ => None,
+                });
                 let p = on.map(|o| o.0).or_else(|| pp.as_ref().and_then(|s| self.pick_sheet(s))).unwrap_or(c);
                 self.tool = Tool::Datum { anchor: Some(p) };
             }
@@ -1298,6 +1303,7 @@ impl DrawingEditor {
                     self.tool = Tool::Datum { anchor: None };
                     self.datum_on = None;
                     self.datum_at = None;
+                    self.datum_edge = None;
                     self.datum_placed(window, cx);
                 }
             }
@@ -2229,40 +2235,48 @@ impl DrawingEditor {
     /// The Surface finish tool's click: a symbol there with the panel's value
     /// (the panel stays for more, help surface_finish).
     fn place_surface_finish(&mut self, at: [f64; 2], cx: &mut Context<Self>) {
-        let (value, spec) = self.sf_panel_values(cx).unwrap_or_default();
+        // On a dimension's line (an extension line) or a view's edge it stands on it (live A45, request 1624).
+        let mut sf = self.surface_finish_symbol(at, cx);
         let id = self.current_sheet().next_annotation_id();
+        sf.id = id;
+        let AnnotationKind::SurfaceFinish { on, leaders, ext, .. } = &mut sf.kind else { return };
         let pending = self.note_leader.take();
-        // On a dimension's line (an extension line) or a view's edge it
-        // stands on it (live A45, request 1624).
-        let pk = self.pk();
-        let on_dim = if pending.is_some() { None } else { pk.surface_finish_on_dimension(at) };
-        let ext = on_dim.and_then(|_| pk.hovered_dim_on(at));
-        let on = if pending.is_some() { None } else { on_dim.or_else(|| pk.surface_finish_on(at)) };
-        // Inside a face region: the first click puts a leader's dot there,
-        // the second places the symbol (live request 1624).
+        // Inside a face region: the first click puts a leader's dot there, the second places the symbol (live request
+        // 1624).
         if pending.is_none()
             && on.is_none()
             && let Some(l) = self.face_leader(at)
         {
             self.note_leader = Some(l);
-            cx.notify();
+            self.update_preview(cx);
             return;
         }
-        let mut sf = noshape_scene::drawing_tools::surface_finish(id, at, value, spec);
-        let had_leader = pending.is_some();
-        if let AnnotationKind::SurfaceFinish { on: o, leaders, ext: e, .. } = &mut sf.kind {
-            *o = on;
-            *e = ext;
-            leaders.extend(pending);
+        if let Some(l) = pending {
+            *on = None;
+            *ext = None;
+            leaders.push(l);
         }
         self.edit_sheet("Surface finish", cx, |s| s.annotations.push(sf));
         if let Some(Panel::SurfaceFinish { placed, .. }) = &mut self.panel {
             placed.push(id);
         }
-        // The leader's rubber band goes with the pending leader.
-        if had_leader {
-            self.update_preview(cx);
+        // The next symbol's preview follows the pointer (the leader's rubber band goes with the pending leader).
+        self.update_preview(cx);
+    }
+
+    /// The symbol the Surface finish tool would place at `at` without a leader: standing on the dimension line or view
+    /// edge there.
+    pub fn surface_finish_symbol(&self, at: [f64; 2], cx: &App) -> Annotation {
+        let (value, spec) = self.sf_panel_values(cx).unwrap_or_default();
+        let pk = self.pk();
+        let on_dim = pk.surface_finish_on_dimension(at);
+        let ext = on_dim.and_then(|_| pk.hovered_dim_on(at));
+        let mut sf = noshape_scene::drawing_tools::surface_finish(0, at, value, spec);
+        if let AnnotationKind::SurfaceFinish { on, ext: e, .. } = &mut sf.kind {
+            *on = on_dim.or_else(|| pk.surface_finish_on(at));
+            *e = ext;
         }
+        sf
     }
 
     /// A panel's Cancel / Esc: closed, nothing applied; the Surface finish

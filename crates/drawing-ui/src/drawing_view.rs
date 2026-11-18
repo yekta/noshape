@@ -520,6 +520,8 @@ pub struct DrawingEditor {
     pub datum_on: Option<noshape_model::drawing::DatumOn>,
     /// Datum tool: the view point the triangle was put on.
     pub datum_at: Option<(ViewId, [f64; 2])>,
+    /// Datum tool: the straight edge the triangle was put on (`datum_at`'s view coordinates).
+    pub datum_edge: Option<([f64; 2], [f64; 2])>,
     /// Datum target tool: the letter of the set being placed (A1, A2…; a
     /// new run of the tool starts the next letter's set).
     pub datum_target_letter: Option<char>,
@@ -817,6 +819,7 @@ impl DrawingEditor {
             woken_points: Vec::new(),
             datum_on: None,
             datum_at: None,
+            datum_edge: None,
             datum_target_letter: None,
             menu_at: [0.0; 2],
             frame_menu: None,
@@ -1746,7 +1749,7 @@ impl DrawingEditor {
     fn tool_picks_edges(&self) -> bool {
         matches!(
             self.tool,
-            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::SurfaceFinish | Tool::Sketch { .. } | Tool::Constrain { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }
+            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::SurfaceFinish | Tool::Sketch { .. } | Tool::Constrain { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Datum { anchor: None }
         )
     }
 

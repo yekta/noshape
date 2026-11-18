@@ -46,6 +46,7 @@ impl DrawingEditor {
         self.woken_plus.clear();
         self.datum_on = None;
         self.datum_at = None;
+        self.datum_edge = None;
         self.sketch_dim_pick = None;
         // Choosing a tool keeps the palette's changes (like a click away).
         if self.palette.is_some() {
@@ -576,6 +577,8 @@ impl DrawingEditor {
         let c = self.cursor;
         match self.tool {
             Tool::Datum { anchor: None } => Some(Annotation { kind: AnnotationKind::Datum { anchor: c, label: self.datum_dialog_label(), on: None, at: None }, position: [c[0] + 8.0, c[1]], ..Default::default() }),
+            // The next symbol at the pointer, on the edge or extension line under it (live2 ann-1118).
+            Tool::SurfaceFinish if self.note_leader.is_none() && matches!(self.panel, Some(Panel::SurfaceFinish { edit: None, .. })) => Some(self.surface_finish_symbol(c, cx)),
             Tool::Gdt if self.gdt_dlg.as_ref().is_some_and(|d| d.edit.is_none()) => {
                 let (frame, extra) = self.gdt_values(cx).unwrap_or_else(|| (vec![noshape_scene::drawing_tools::GDT_TYPES[0].0.to_string(), String::new()], Default::default()));
                 Some(noshape_scene::drawing_tools::gdt(0, c, frame, extra))
@@ -592,6 +595,7 @@ impl DrawingEditor {
             datum_rows: self.datum_dlg.as_ref().map(|d| d.rows.iter().map(|r| r.ann.clone()).collect()).unwrap_or_default(),
             datum_on: self.datum_on,
             datum_at: self.datum_at,
+            datum_edge: self.datum_edge,
             datum_target_letter: self.datum_target_letter,
             sketch_dim_pick: self.sketch_dim_pick,
         }
@@ -727,8 +731,9 @@ impl DrawingEditor {
         }
         self.hover_snap = snap.as_ref().and_then(|s| self.pick_sheet(s));
         if let Some(p) = self.hover_snap {
-            // The Note tool frames the point (live C11 (a)); the dimension tools and others put the disc on it (D21).
-            let mark = if matches!(self.tool, Tool::Note) { crate::drawing_scene::SnapMark::Box } else { crate::drawing_scene::SnapMark::Disc };
+            // The Note tool and the 2 point centerline frame the point (live C11 (a), live2 ann-1118); the dimension tools
+            // and others put the disc on it (D21).
+            let mark = if matches!(self.tool, Tool::Note | Tool::Centerline { .. }) { crate::drawing_scene::SnapMark::Box } else { crate::drawing_scene::SnapMark::Disc };
             overlay.marks.push((p, mark, self.tol_mm(15.0)));
         }
         self.section_edit_overlay(&mut overlay);

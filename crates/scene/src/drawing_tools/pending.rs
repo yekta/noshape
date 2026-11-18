@@ -22,6 +22,9 @@ pub struct ToolValues {
     pub datum_on: Option<DatumOn>,
     /// Datum tool: the view point the triangle was put on.
     pub datum_at: Option<(ViewId, [f64; 2])>,
+    /// Datum tool: the straight edge the triangle was put on (`datum_at`'s view coordinates): the leader stays square to
+    /// it, its foot under the pointer within the edge (live2 ann-1118).
+    pub datum_edge: Option<([f64; 2], [f64; 2])>,
     /// Datum target tool: the letter of the set being placed.
     pub datum_target_letter: Option<char>,
     /// Dimension tool: the drawing-sketch entity picked (SK7).
@@ -261,10 +264,25 @@ impl SheetPick<'_> {
                 Some(a)
             }
             Tool::Datum { anchor: Some(a) } => {
-                if len(sub(c, *a)) < 3.0 {
+                // On a straight edge the leader stays square to it, its foot under the pointer within the edge (live2
+                // ann-1118).
+                let edge = v.datum_at.zip(v.datum_edge).and_then(|((view, _), (ea, eb))| Some((view, self.placement(view)?, ea, eb)));
+                let (anchor, at, position) = match edge {
+                    Some((view, pl, ea, eb)) => {
+                        let (sa, sb) = (pl.to_sheet(ea), pl.to_sheet(eb));
+                        let e = norm(sub(sb, sa));
+                        let t = dot(sub(c, sa), e).clamp(0.0, len(sub(sb, sa)));
+                        let foot = [sa[0] + e[0] * t, sa[1] + e[1] * t];
+                        let n = [-e[1], e[0]];
+                        let d = dot(sub(c, foot), n);
+                        (foot, Some((view, pl.to_view(foot))), [foot[0] + n[0] * d, foot[1] + n[1] * d])
+                    }
+                    None => (*a, v.datum_at, c),
+                };
+                if len(sub(position, anchor)) < 3.0 {
                     return None;
                 }
-                Some(Annotation { id, kind: AnnotationKind::Datum { anchor: *a, label: v.datum_label.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| self.next_datum_label()), on: v.datum_on, at: v.datum_at }, position: c, ..Default::default() })
+                Some(Annotation { id, kind: AnnotationKind::Datum { anchor, label: v.datum_label.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| self.next_datum_label()), on: v.datum_on, at }, position, ..Default::default() })
             }
             _ => None,
         }

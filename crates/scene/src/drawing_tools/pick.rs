@@ -19,6 +19,8 @@ pub const SNAP_REACH_PX: f64 = 8.0;
 /// A circle centre's reach (live2 batch 1, 11-18 16:15: lit at 9 px and not at 11, on the diagonal and from inside the
 /// hole alike; 11-13 had 7 / 9).
 pub const CENTER_SNAP_REACH_PX: f64 = 10.0;
+/// The 2 point centerline's reach to a view's points (live2 ann-1118: lit 9 px from a vertex on the diagonal, not at 10).
+pub const CENTERLINE_SNAP_REACH_PX: f64 = 9.5;
 
 /// How far outside its geometry a view lights and takes a click in Select, in sheet mm (it scales with the zoom;
 /// live2 feel/drawing.json D1: from 14 px at 3.93 px/mm, not 16).
@@ -116,7 +118,7 @@ impl<'a> SheetPick<'a> {
             Tool::EdgeCenterline { .. } => self.built.and_then(|b| b.hit_where(self.cursor, reach6, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. }))).or(hover),
             Tool::Dimension { kind: DimTool::Point2, .. } => hover,
             Tool::Dimension { kind: DimTool::Linear, .. } | Tool::Sketch { .. } | Tool::Constrain { .. } => edges_only(true).or(hover),
-            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note => edges_only(false).or(hover),
+            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note | Tool::Datum { anchor: None } => edges_only(false).or(hover),
             // A surface finish symbol stands on the edge under it (live A45);
             // both it and a geometric tolerance also take a dimension (live
             // request 1624), under whatever else is on top.
@@ -146,8 +148,8 @@ impl<'a> SheetPick<'a> {
             },
             // Dimension-like tools (and the surface finish symbol) only care
             // about view edges.
-            // A note's leader attaches to a view edge too.
-            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
+            // A note's leader attaches to a view edge too, and a datum's triangle (lit orange, live2 ann-1118).
+            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note | Tool::Datum { anchor: None }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
                 Some(PickTarget::Edge { .. }) => Some(h),
                 _ => None,
             },
@@ -343,10 +345,10 @@ impl<'a> SheetPick<'a> {
     pub fn snap_at_with(&self, s: [f64; 2], mid_quad: bool) -> Option<PickedPoint> {
         let built = self.built?;
         let mut best: Option<(f64, PickedPoint)> = None;
-        let reach = self.tol_mm(SNAP_REACH_PX);
+        let reach = self.tol_mm(if matches!(self.tool, Tool::Centerline { .. }) { CENTERLINE_SNAP_REACH_PX } else { SNAP_REACH_PX });
         let center_reach = self.tol_mm(CENTER_SNAP_REACH_PX);
         for pl in &built.placements {
-            if !pl.contains(s, center_reach.max(3.0)) {
+            if !pl.contains(s, center_reach.max(reach).max(3.0)) {
                 continue;
             }
             let Some(g) = self.geoms.get(&pl.id) else { continue };
