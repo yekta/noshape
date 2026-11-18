@@ -829,7 +829,7 @@ impl StartView {
     fn click_row(&mut self, row: &Path, m: &Modifiers) {
         self.row_hit = true;
         self.select_all = false;
-        let (sel, anchor) = click_rows(&self.selection(), self.anchor.as_deref(), &self.page_order(), row, m.shift, m.secondary());
+        let (sel, anchor) = click_rows(&self.selection(), self.anchor.as_deref(), &self.page_order(), row, m.shift, toggles(m));
         self.selected = sel.first().cloned();
         self.also = sel.into_iter().skip(1).collect();
         self.also_of = self.selected.clone();
@@ -2946,7 +2946,7 @@ impl StartView {
         let m = ev.modifiers();
         self.click_row(&d.path, &m);
         window.focus(&self.focus, cx);
-        if ev.click_count() >= 2 && !d.trashed && !m.shift && !m.secondary() {
+        if ev.click_count() >= 2 && !d.trashed && !m.shift && !toggles(&m) {
             self.open_path(d.path.clone(), window, cx);
         }
         cx.notify();
@@ -3416,7 +3416,7 @@ impl StartView {
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
                         let m = ev.modifiers();
                         this.click_row(&f1, &m);
-                        if ev.click_count() >= 2 && !this.trash.items.iter().any(|t| t.stored() == f1) && !m.shift && !m.secondary() {
+                        if ev.click_count() >= 2 && !this.trash.items.iter().any(|t| t.stored() == f1) && !m.shift && !toggles(&m) {
                             this.set_source(Source::Folder(f1.clone()), cx);
                         }
                         cx.notify();
@@ -3617,7 +3617,7 @@ impl StartView {
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
                         let m = ev.modifiers();
                         this.click_row(&f1, &m);
-                        if ev.click_count() >= 2 && this.trash.item_of(&f1).is_none() && !m.shift && !m.secondary() {
+                        if ev.click_count() >= 2 && this.trash.item_of(&f1).is_none() && !m.shift && !toggles(&m) {
                             this.set_source(Source::Folder(f1.clone()), cx);
                         }
                         cx.notify();
@@ -4151,7 +4151,7 @@ impl StartView {
                                     .child(crate::ui::user_text(d.name.clone()))
                                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                                         let m = ev.modifiers();
-                                        if d5.trashed || m.shift || m.secondary() {
+                                        if d5.trashed || m.shift || toggles(&m) {
                                             return;
                                         }
                                         cx.stop_propagation();
@@ -4787,6 +4787,11 @@ fn move_rows(items: &[(PathBuf, String, bool)], dir: &Path) -> (Vec<Moved>, Vec<
 /// last clicked first): the selection after it, the clicked row first, and Shift's anchor. Alone it selects the row;
 /// Ctrl (Cmd on a Mac) toggles it; Shift adds the rows from the anchor (the last row clicked without Shift) to it
 /// (live feel/documents.json `multiSelect`).
+/// Ctrl or Cmd adds a row to the selection or takes it out, on every OS (live's lists: metaKey || ctrlKey; live2 11-17).
+fn toggles(m: &Modifiers) -> bool {
+    m.control || m.platform
+}
+
 fn click_rows(sel: &[PathBuf], anchor: Option<&Path>, order: &[PathBuf], row: &Path, shift: bool, toggle: bool) -> (Vec<PathBuf>, Option<PathBuf>) {
     let at = |p: &Path| order.iter().position(|q| q == p);
     if shift && let Some(a) = anchor && let (Some(i), Some(j)) = (at(a), at(row)) {
@@ -5330,7 +5335,8 @@ mod bench;
 
 #[cfg(test)]
 mod tests {
-    use super::{SelectAllRows, SelectNext, SelectPrev, ToggleRow, click_rows, history_change_matches, key_bindings, lib, move_rows, rows_to_move};
+    use super::{SelectAllRows, SelectNext, SelectPrev, ToggleRow, click_rows, history_change_matches, key_bindings, lib, move_rows, rows_to_move, toggles};
+    use gpui_kit::Modifiers;
     use std::path::PathBuf;
 
     /// Live chrome.json (07:33): no Onshape shortcut works on the documents page, only its list's keys.
@@ -5385,6 +5391,15 @@ mod tests {
         let (done, refused) = move_rows(&[row(f.clone(), true)], &f.join("G"));
         assert!(done.is_empty() && refused.len() == 1 && f.is_dir(), "{refused:?}");
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Live2 11-17 (macOS key mapping): the documents list toggles a row on Ctrl or Cmd on every OS (metaKey || ctrlKey).
+    #[test]
+    fn ctrl_or_cmd_toggles_a_row_on_every_os() {
+        assert!(toggles(&Modifiers { control: true, ..Default::default() }));
+        assert!(toggles(&Modifiers { platform: true, ..Default::default() }));
+        assert!(!toggles(&Modifiers { shift: true, ..Default::default() }));
+        assert!(!toggles(&Modifiers { alt: true, ..Default::default() }));
     }
 
     /// Lead 11-13 (interaction feel; live2 feel/documents.json): a click selects one row, Ctrl toggles one, Shift adds
