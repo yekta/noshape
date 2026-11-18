@@ -403,7 +403,7 @@ impl GFace {
         // most such points are off it (cf-spur-gear's flanks, a third slower).)
         let [u0, u1, v0, v1] = self.uvbox;
         let on_box = |q: DVec2| q.x == u0.min(u1) || q.x == u0.max(u1) || q.y == v0.min(v1) || q.y == v0.max(v1);
-        if d > self.t && on_box(uv) && g.folds {
+        if d > self.t && on_box(uv) && g.folds() {
             let (mut best, mut far) = (uv, d);
             // (The samples go u by u, each a run of the v values: [`free::samples`].)
             let nv = grid.iter().take_while(|x| x.0.x == grid[0].0.x).count().max(1);

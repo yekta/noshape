@@ -151,7 +151,14 @@ impl Nearest {
 
     /// The points within `r` of `p` (squared distances), in no order.
     pub(super) fn within(&self, p: DVec3, r2: f64, out: &mut Vec<usize>) {
-        let mut todo = vec![(0usize, self.pts.len(), 0.0f64)];
+        self.within_using(p, r2, out, &mut Vec::new());
+    }
+
+    /// [`Self::within`] with its own list of the tree's parts still to look at (kept from call to call: a surface's
+    /// thousands of samples each asked once, [`folds`]).
+    fn within_using(&self, p: DVec3, r2: f64, out: &mut Vec<usize>, todo: &mut Vec<(usize, usize, f64)>) {
+        todo.clear();
+        todo.push((0usize, self.pts.len(), 0.0f64));
         while let Some((lo, hi, least)) = todo.pop() {
             if lo >= hi || least > r2 {
                 continue;
@@ -238,8 +245,15 @@ pub(super) fn cached_grouped(g: &GFace) -> std::sync::Arc<Patches> {
 pub(super) struct Grid {
     pub(super) pts: Vec<(DVec2, DVec3)>,
     pub(super) near: Nearest,
-    /// The surface comes back near itself ([`folds`]).
-    pub(super) folds: bool,
+    /// The surface comes back near itself ([`folds`]): found the first time it is asked (cf-spur-gear's flanks, 18
+    /// to 24 grids of ~3000 samples a Boolean, ~90 ms of its threads' time made for every one).
+    folds: std::sync::OnceLock<bool>,
+}
+
+impl Grid {
+    pub(super) fn folds(&self) -> bool {
+        *self.folds.get_or_init(|| folds(&self.pts, &self.near))
+    }
 }
 
 /// Whether samples ([`samples`]: u by u, each a run of the v values) of a surface come back near each other: two
@@ -265,7 +279,14 @@ fn folds(pts: &[(DVec2, DVec3)], near: &Nearest) -> bool {
             along_u[i * nv + j] = along_u[(i - 1) * nv + j] + (at(i, j) - at(i - 1, j)).length();
         }
     }
-    let mut out = Vec::new();
+    // (A long thin strip only: its rows at least eight times as long one way as the other (a thread's root strip,
+    // its turns side by side); a broader surface's points are found from its nearest sample as before.)
+    let lu = (0..nv).map(|j| along_u[(nu - 1) * nv + j]).fold(0.0f64, f64::max);
+    let lv = (0..nu).map(|i| along_v[i * nv + nv - 1]).fold(0.0f64, f64::max);
+    if lu.max(lv) < 8.0 * lu.min(lv) {
+        return false;
+    }
+    let (mut out, mut todo) = (Vec::new(), Vec::new());
     for i in 0..nu {
         for j in 0..nv {
             let p = at(i, j);
@@ -275,7 +296,7 @@ fn folds(pts: &[(DVec2, DVec3)], near: &Nearest) -> bool {
                 .map(|&(a, b)| (at(a, b) - p).length_squared())
                 .fold(0.0f64, f64::max);
             out.clear();
-            near.within(p, h, &mut out);
+            near.within_using(p, h, &mut out, &mut todo);
             for &k in &out {
                 let (a, b) = (k / nv, k % nv);
                 let v_then_u = (along_v[i * nv + b] - along_v[i * nv + j]).abs() + (along_u[a * nv + b] - along_u[i * nv + b]).abs();
@@ -296,8 +317,7 @@ pub(super) fn cached_grid(ns: &FreeSurface, uv: [f64; 4]) -> std::sync::Arc<Grid
     }
     let pts = samples(ns, uv);
     let near = Nearest::new(pts.iter().map(|x| x.1).collect());
-    let folds = folds(&pts, &near);
-    let g = std::sync::Arc::new(Grid { pts, near, folds });
+    let g = std::sync::Arc::new(Grid { pts, near, folds: std::sync::OnceLock::new() });
     if let Ok(mut c) = GRID_CACHE.lock() {
         let bytes = std::mem::size_of::<Grid>() + g.pts.len() * (40 + 24 + 4 + 1);
         c.put(key, g.clone(), bytes);
