@@ -4,7 +4,7 @@ Owner: bool. noshape's own Boolean (crates/brep, kernel cpp rust_boolean.cpp / b
 (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History: docs/handoff/archive/bool.md. Standing
 rulings: docs/DECISIONS.md (wins over anything here). bool2's notes: docs/handoff/archive/bool2.md.
 
-Updated 11-18 12:46 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
+Updated 11-18 13:50 UTC. Hosts (lead 11-17/18): builds and A/Bs on vibex8 (NOSHAPE_RB_HOST=vibex8), gates on vibe2
 (NOSHAPE_GATE_HOST=vibe2); Mac for crate tests, probes and speed numbers (NOSHAPE_RB_HOST=mac; vibex8 runs ~x10 slower at
 load 26); land `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; private docs on vibex7 ~/lead-private (hat8, hat15,
 hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree from a computed pid (lead 21:06):
@@ -14,6 +14,12 @@ hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree 
 - LANDING 7378bd2c (queued 06:05, alone off main): Shell's drop_clear_offset_pairs shared one FClass2d across
   threads; NCollection_Sequence::Value writes its node cache, torn -> SIGSEGV (rings-loft Shell 1 crashed 2 of 10 runs
   on the Mac, on main since 3bba9d430 11-15). One task per face now: 20/20 clean, Shell 1 217 ms as before.
+- NEXT GATE: bee868f71 on bool-hat (after 4cf4ce0ca): a pattern's checked glue whose < 16 instances our Boolean found
+  reaching into the part ("pattern instances overlapping") runs OCCT's plain fuse at once (impeller Extrude Bohrungssitz
+  Ansaugflansch fuse 87647d5a 1000 -> 295 ms Mac, same summary + history; the Mac corpora's 232 checked-glue fuses of
+  < 16 tools identical incl. path). Found: OCCT's BRepGProp volume of impeller's housing is 1.5 % off (96918 vs our
+  volume_props 95512 mm3), so fuse_trimmed's right result failed volumes_add_up; and our volume_props takes ~1.3 s on
+  that housing (GeomAdaptor RebuildCache thrash in face_moments' integrand: B-spline / offset spans): look at it.
 - GATE unit bool-gate-4cf4ce0ca on vibe2 (12:31; the 11:50 one failed: main's build SIGTERMed under blend's suite,
   vibe2 at 5 GB free) -> /root/bool-hat-scratch/chain-4cf4ce0ca.out. bool-hat rebased on main 1e21f28e8: the 13 below +
   14. Shell race fix (on main as 7b8bb249) + 15. param_of cache + 16. Shell add_pcurve analysis cache + 17. offset fit
@@ -56,6 +62,12 @@ hat15b, AppleWatchDock); keep off vibex7 02:00-04:00. Never kill a process tree 
   than face boxes (no(5): the B-spline faces' boxes reach > 1/4). Knife Split 4 5x: project_along's plane sections
   (OCCT 5-10 ms each, half ComputeTolReached3d PSO); the marcher declines the grind face (grid > 257 a way): parked
   /root/bool-scratch/parked-own-plane-section.diff (identical results where it ran). Cases Mac ~/noshape-host/bool-keep/{imprec,kdump-p}.
+- 11-18 13:4x impeller rest: Fillet 3's cut ed9c35dc (OCCT 680 of 720 ms): 4 EF pairs of the housing's 141/144 mm
+  B-spline edges against each tool's offset face lying on the housing's offset surface (geometrically, not the same
+  handle or basis): 135-150 ms each, no common part; ours declines the same coincidence. Told blend (tool oversize past
+  F2) ; our side would be coincident free-form faces in brep (big). 23659e13 (fuse, "a face lost"): ours 57 + OCCT 220;
+  e14e43ba (cut): ours 45 + OCCT 62. Scratch probes: xprobe probe_case_reach (box vs true contacts), PROBE_HIST /
+  PROBE_GLUE_OFF in probe_case_timed; Mac A/B binaries ~/noshape-host/bool-keep/bin/{base,new}, ab.sh, one.sh.
 - parting-line Split 3: skasm's fix efd277131 landed (Draft 1 OK again): next.
 - qa 11-18 (5x live): impeller Shell Gehäuse (Mac 199 after 16.; left: CheckerSI 26 %, quad::foot / ProjectPointOnSurf
   Extrema grid scans per point, meshed copies 12 %), Flansch+Gehäuse 4d5e785f (ours 202 vs OCCT 3302; critical path
