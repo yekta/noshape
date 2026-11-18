@@ -9660,6 +9660,13 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let unresolved = live_msg["message"].as_str().filter(|t| ["Mate cannot resolve mate connectors.", "Failed to resolve the instance for mate."].contains(t)).map(str::to_string).or_else(|| (!red.is_empty()).then(|| format!("{} unresolved", red.join(", "))));
         if ok == live_ok {
             res.mates_matching += 1;
+            // (Traced: each end's offset from live's frame, Z and X angles: a mate OK on both sides whose X turns its
+            // part, asm-scissor-lift's Fastened 35.)
+            if ok && tracing
+                && let Some(e) = mate_ends_off(&mut *placer.ctx, root, name)
+            {
+                trace(&format!("{name}: {e}"));
+            }
         } else if let Some(why) = unresolved.filter(|_| ok) {
             res.mates_matching += 1;
             res.live_defects.push(format!("{name}: live ERROR ({why}), ours solves it"));
