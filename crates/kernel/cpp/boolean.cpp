@@ -9354,6 +9354,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
       return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
     }
   }
+  // A pattern's checked glue whose instances noshape's Boolean found reaching into the arguments.
+  bool reach_in = false;
   // noshape's own Boolean (crates/brep) where it takes the inputs.
   if (rust_boolean_on() && (!facets.source.empty() || opts.fuzzy > 1e-6))
     rust_decline("fuzzy or a mesh body");
@@ -9378,7 +9380,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
           const RustLenient lenient;
           done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, true);
         }
-        if (!done && rust_last_decline() == "pattern instances overlapping")
+        reach_in = !done && rust_last_decline() == "pattern instances overlapping";
+        if (reach_in)
         {
           const KernelTimer trim("boolean.rust.trimmed");
           done = rust_fuse_trimmed(a, t, rs, opts, out, h);
@@ -9476,6 +9479,12 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
   BoolOpts first = opts;
   if (first.glue == 3 && op != 0) // glue is for fusing touching shapes only
     first.glue = 0;
+  // (Instances reaching into the arguments, too few for the plain fuse to be slow: the plain fuse at once. The glued
+  // one can't be right, and fuse_trimmed's is only kept where OCCT's volumes add up, which its integration of
+  // free-form faces can miss by a percent: c2-impeller-loft's nine seats, 0.7 s of glued fuses before the plain one.)
+  const bool plain_at_once = first.glue == 3 && reach_in && t.size() < 16;
+  if (plain_at_once)
+    first.glue = 0;
   if (first.glue == 4) // (a cut by tools inside the part: checked below)
     first.glue = op == 1 ? 1 : 0;
   // Many tools (a knurl's 148 crossing grooves): OCCT's intersection of the
@@ -9513,7 +9522,7 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
           }
     return free && faces >= 100;
   };
-  if (op == 0 && first.glue == 0 && facets.source.empty() && t.size() >= 3 && heavy() && std::getenv("NOSHAPE_BOOL_NO_TREE") == nullptr)
+  if (op == 0 && first.glue == 0 && !plain_at_once && facets.source.empty() && t.size() >= 3 && heavy() && std::getenv("NOSHAPE_BOOL_NO_TREE") == nullptr)
   {
     // At the working scale (in metres OCCT's fuses of those parts failed).
     std::vector<TopoDS_Shape>     all = concat(a, each);
