@@ -683,6 +683,24 @@ per-feature rows below are owners' leads, not gaps (superseded 18:2x).**
 | Shell Gehäuse | 809 | 28 | ×29 | bool |
 | Flansch (vorne) verbreitern (Move face) | 601 | 5 | ×120 | core |
 
+## Speed backlog: whole rebuilds >= 100 ms and >= 2x live (DECISIONS 11-18; qa 19:5x, the Mac, v0.4.58 release CLI, nice 19, 3 runs each,
+## every Part Studio; Mac load 9-11 with a build in the other slot; live = live.jsonl fresh-copy totals; 127 corpus documents)
+8 of 127 over the bar; nothing smaller is a gap. Median (range) vs live, top 3 features (Mac ms):
+- [ ] **P1 SPEED-IMPELLER (blend / bool / core, already with them)**: c2-impeller-loft 13485 (12436-13900) vs 2509 ms (5.4x): Fillet 3 4897,
+  Delete face 2 2170, Extrude Bohrungssitz Ansaugflansch 1335.
+- [ ] **P1 SPEED-STANDOFFS (bool)**: c2-config-parts-standoffs 2701 (2619-2727) vs 176 (15.3x): Revolve 2 1152, Boolean 2 900, Boolean 1 621.
+- [ ] **P1 SPEED-WIRE-CLIP (bool)**: c2-wire-clip-imported 2054 (2042-2056) vs 297 (6.9x): Boolean 2 1489, Move face 1 413, Import 1 122.
+- [ ] **P1 SPEED-GAMMA (bool)**: c2-gamma-imported 1754 (1719-1796) vs 246 (7.1x): Boolean 2 1255, Move face 1 353, Import 1 102.
+- [ ] **P1 SPEED-PARTING-LINE (core)**: c2-parting-line-draft-parting-line 1637 (1526-1654) vs 743 (2.2x): Split 3 398, Rib 2 323, Rib 1 313.
+- [ ] **P1 SPEED-LOFT-PATHS (core)**: c2-loft-paths-guides 878 (865-879) vs 393 (2.2x): Loft 3 394, Mirror 1 304, Loft 4 54.
+- [ ] **P1 SPEED-NUTS (core)**: c2-config-parts-nuts 584 (579-594) vs 135 (4.3x): Sweep 1 556, Revolve 2 18, Revolve 1 9.
+- [ ] **P1 SPEED-SPROCKETS (core)**: c2-config-parts-sprockets 222 (208-234) vs 83 (2.7x): Circular pattern 1 202, Extrude 2 9, Extrude 1 4.
+Near the bar (not a gap): c2-valve-config 308 vs 164 (1.9x). The five vibe2 candidates (snap-hook, fan-blade, motor-mount, michael,
+spur-gear) are under the bar on the Mac. Data qa-scratch/speed/corpus-0.4.58.jsonl, live-all.json.
+- [ ] **P0 SPUR-GEAR-REGRESSION (bisecting)**: cf-spur-gear v0.4.58 -> v0.4.59 +23-28 %, same-host alternating A/B: the Mac 464 (458-480) ->
+  569 (566-585) ms, 5 runs; vibex7 1940 -> 2484 ms median, 7 runs, parts the same; the time is in the four Spur Gear custom features
+  (+11 to +36 ms each on the Mac). git bisect over v0.4.58..515102325 running (qa-sg-bisect, speed/sg-bisect.log).
+
 ## User-flow timings vs live (qa 18:2x; live: behaviours "qa (11-18 ~18:00, user-flow feel)" + ui-speed-1118, 10 rounds, settled ms)
 Ours: green 87edba24 on vibe2 (load 18-44: hints; 2 rounds, settle range), qa-scratch/flow (frame log, lat-steps.py). The valid run is
 tonight's 02:00 window on vibex7 with v0.4.59 (qa-flow-night, 5 rounds). No row is slower than live; nothing to ticket.
