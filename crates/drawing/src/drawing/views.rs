@@ -3190,6 +3190,18 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
     g.snaps.extend(centers);
     g.axes = cylinder_axes(&shapes, frame);
     g.ends = cylinder_ends(&shapes, frame);
+    // A hole wholly hidden gets no automatic mark: some visible edge of a part runs round its axis (a rim, or a radial
+    // hole's saddle seen end-on) at most its radius out (c2-hex-bookcase-derived's holes behind its mesh part: live
+    // none).
+    let tol = diag * 1e-6;
+    let edges = &g.edges;
+    g.ends.retain(|(c, r)| {
+        edges.iter().filter(|e| e.visible && !e.mesh && e.points.len() >= 2).any(|e| {
+            let d: Vec<f64> = e.points.iter().map(|p| (p[0] - c[0]).hypot(p[1] - c[1])).collect();
+            let (lo, hi) = d.iter().fold((f64::MAX, f64::MIN), |(lo, hi), x| (lo.min(*x), hi.max(*x)));
+            hi <= r + tol && hi - lo <= tol.max(hi * 1e-4) && hi > tol
+        })
+    });
     g
 }
 
@@ -4223,6 +4235,25 @@ mod tests {
         }
         let alone = project_bodies(ViewId(1), &pbs[..1], &frame, true, &|_, _| true);
         assert!(alone.model_edges.iter().all(|m| !m.shared));
+    }
+
+    /// A hole's automatic mark needs some of it seen: a plate's through hole in Top has one; with another part laid
+    /// over the plate, none (c2-hex-bookcase-derived's holes behind its mesh part: live none).
+    #[test]
+    fn a_wholly_hidden_hole_gets_no_mark() {
+        let f = crate::reference::FeatureId(1);
+        let body = |i: u32, s: Shape| Arc::new(Body::new(BodyId { feature: f, index: i }, format!("Part {i}"), BodyKind::Solid, s, Vec::new(), 0, f));
+        let block = noshape_kernel::make_box_corners(DVec3::ZERO, DVec3::new(0.04, 0.03, 0.01)).unwrap();
+        let tool = noshape_kernel::make_cylinder(&noshape_kernel::Plane::new(DVec3::new(0.02, 0.015, -0.001), DVec3::Z, DVec3::X), 0.004, 0.012, std::f64::consts::TAU).unwrap();
+        let plate = noshape_kernel::cut(&block, &tool).unwrap().shape;
+        let lid = noshape_kernel::make_box_corners(DVec3::new(0.0, 0.0, 0.01), DVec3::new(0.04, 0.03, 0.012)).unwrap();
+        let bodies = [body(0, plate), body(1, lid)];
+        let pbs: Vec<ProjBody> = bodies.iter().map(|b| ProjBody { body: b, shape: b.shape.clone(), edge_map: None }).collect();
+        let frame = ViewFrame::new(DVec3::NEG_Z, DVec3::Y);
+        let alone = project_bodies(ViewId(1), &pbs[..1], &frame, true, &|_, _| true);
+        assert_eq!(alone.ends.len(), 1, "{:?}", alone.ends);
+        let covered = project_bodies(ViewId(1), &pbs, &frame, true, &|_, _| true);
+        assert!(covered.ends.is_empty(), "{:?}", covered.ends);
     }
 
     /// Centermarks: a hole whole or in pieces, a radial hole's half bore; not a quarter round, nor c2-sm-louver's two
