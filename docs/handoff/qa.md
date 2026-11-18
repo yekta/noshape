@@ -74,7 +74,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 0. **05:00 cut**: TICKETS "Release blockers for the 2026-11-18 05:00 release". cut-verdict.sh reads /root/qa-scratch/cut-must.txt
    (commit or grep:<pattern> per line) and says HOLD if the green lacks one: psui 40a994a16 / db4ff933c / 65ceee7f2 / ea25d544e
    (verified 20:40 on 0cc996f7) and core's revert of c064b550a (c2-loft-paths-guides Mirror 1 wrong-volume Ok, shipped in
-   v0.4.57). **qa-lp-verify** (lp/lp-verify.sh) waits for that revert on a green, runs the document alone on vibex6 -> lp/run.txt +
+   v0.4.57); 00:25 added (lead): f824d120b, psui 5e498ffb, skasm a6236ed3a (stack: a65a2d3cf sel feel, snaps, a3974c745 Flange,
+   59cad3c05 joint hover); green 0f7610c83 has the first two, not a6236ed3a. hats/dock + f197 = cut-check's userdocs. **qa-lp-verify** (lp/lp-verify.sh) waits for that revert on a green, runs the document alone on vibex6 -> lp/run.txt +
    qa-alerts. Rewrite cut-must.txt after each cut.
 0c. **Mac: headless only (lead 22:05)**: no app windows, permission requests or the user's motile app on the Mac; CLI / app records
    only. GUI flows run on the Linux release on vibex6 Xvfb: v0.4.57 Fillet opens empty (Mac state), toolbar search pass,
@@ -94,9 +95,10 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    fls.sh start <doc>|shot|stop (:669), fl2.py / fl3.sh / fl4.sh / vs*.sh / fs.sh. Hover re-run on 7187ac75 (5e498ffb): fixed (sent).
    skasm 00:00: SKSNAP-MODEL-EDGE / ALIGN / REACH fixed (landing after da22ce56); SKSNAP-GLYPHS-AFTER: re-run glyphs.py with Show
    constraints ticked (sketch dialog checkbox, screen (738, 352) in sks.sh's session). qa-wait-da22 re-runs sel-feel C2/C3/B1/D.
-0i. **Re-checks owed on the greens with**: skasm da22ce56 (sel-feel C2/C3/B1/D: qa-wait-da22 runs it), skasm's snap fixes (sweep.py /
-   hv.py / glyphs.py with Show constraints ticked), skasm f90cf944 (Flange broad face; joint-row hover: fl/joint*.sh, sm.sh), psui
-   2234f511 (rollback bar: fl2.py onto-top / back-to-end + bar right-click; face + edge menu: menu.sh; rename click in graphics).
+0i. **Re-checks owed on the greens with** (landed shas): skasm a65a2d3cf (= da22ce56; sel-feel C2/C3/B1/D: qa-wait-da22, re-keyed
+   00:24 after its old grep fired on 0f7610c83 without it), skasm 085fa6af1/fe7ac8832/b8234063a snaps (sweep.py / hv.py; glyphs.py
+   SHOWC=1 = Show constraints ticked, gbatch.sh -> sk/run4; first run 00:30 on 0f7610c83), skasm a3974c745 + 59cad3c05 (Flange broad
+   face; joint-row hover: fl/joint*.sh, sm.sh; mitred corner = no joint row, as live), psui 591643fc4 (= 2234f511: rollback bar: fl2.py onto-top / back-to-end + bar right-click; face + edge menu: menu.sh; rename click in graphics).
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
