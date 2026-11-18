@@ -2107,3 +2107,22 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
 - QUIT-ABORT-DOCK: verified fixed (80e16e42d); guarded by the nightly and rel-published.
 - f197 Fillet 1 vs 0.4.51 was core's 1ac08e247 (reverted on v0.4.52's branch); 0.4.52 baseline is clean.
 
+## Moved 11-18 09:10 (feel items of 11-17 night; their state is in TICKETS)
+0c. **Mac: headless only (lead 22:05)**: no app windows, permission requests or the user's motile app on the Mac; CLI / app records
+   only. GUI flows run on the Linux release on vibex6 Xvfb: v0.4.57 Fillet opens empty (Mac state), toolbar search pass,
+   P0 USER-HOVER-STAYS-LIT sent to psui + skasm 22:12 (re-run uh/uh2.sh <app> <out> on their fix's green; 3 runs, count lit
+   pixels per shot as in TICKETS).
+0d. **Selection feel (lead 22:25)**: live2's sel-feel rows on green 592b0fc9, TICKETS "Part Studio selection feel": 4 P0 + 1 P1 to
+   psui. Tools in qa-scratch/sf (vibex6 ~/tmp/qa/sf): drive.py (actions, real pointer), sfs.sh (held session), mini.sh <tag>
+   <idx,..> (one state per row; feel.sh's timed waits drift ~3 actions), sheet.py (pointer-marked sheets). Re-run on psui's fixes.
+0e. **Sketch snap (lead 22:50)**: live's sketch-snap rows on 592b0fc9 -> TICKETS "Sketch line snap and inference", 2 P0 / 1 P1 / 2 P2 to
+   skasm. qa-scratch/sk: sks.sh (session :666, SNAP=snapg for the glyph run that ends before the runner's 180 s watchdog), batch.sh,
+   sweep.py / hv.py / glyphs.py, ana.py. The runner's watchdog (180 s) ends every session: keep each batch under ~150 s.
+0g. **Assembly feel (lead 23:20)**: live's asm feel rows on 16588aca3 -> TICKETS "Assembly feel", 2 P0 + 2 P1 to asm. qa-scratch/af:
+   starts.json (asm-feel, asm-feel-mated), afs.sh (session :668), af.py groups hover / colours / mate-esc / mate-enter / drag-p2 /
+   drag-p3, afrun.sh <scenario> <out> <groups> (state at the runner's end: instance transforms, mates). EMPTY must avoid the view cube.
+0h. **Feature list / document / VS-FS (lead 23:50)**: TICKETS "Feature list, document and Variable / Feature Studio feel" (3 P2 psui,
+   2 P1 + 1 P2 studios). qa-scratch/fl: build.sh (start documents built by the runner, then opened WITHOUT it: no 180 s watchdog),
+   fls.sh start <doc>|shot|stop (:669), fl2.py / fl3.sh / fl4.sh / vs*.sh / fs.sh. Hover re-run on 7187ac75 (5e498ffb): fixed (sent).
+   skasm 00:00: SKSNAP-MODEL-EDGE / ALIGN / REACH fixed (landing after da22ce56); SKSNAP-GLYPHS-AFTER: re-run glyphs.py with Show
+   constraints ticked (sketch dialog checkbox, screen (738, 352) in sks.sh's session). qa-wait-da22 re-runs sel-feel C2/C3/B1/D.
