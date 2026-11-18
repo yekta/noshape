@@ -148,7 +148,8 @@ Open, ranked:
    - imports: NIST STEP 4.15 / x_t 2.16 s (38.7 / 24.5 s); live big asm STEP 2.8 / x_t 1.7 / IGES 7.1 s (33.5 / 12.9 /
      69.3 s); exchange suite 173/174 at or under live's.
    - Open: c2-rings-loft live.x_t "import" 17 s (live 8.6). Read 4.9 -> 2.6 s (xt_read.cpp tube() at 10 nm, Parasolid's
-     precision: 102 stations, was 204; branch dx-tube bf5094af8: lands after an x_t exchange A/B, identical end to end). Left: query_parts ~13.5 s/pass on the
+     precision: 102 stations, was 204; branch dx-tube bf5094af8; A/B over the 21 live.x_t (vibex8 ~/agents/dx-keep/xtab): 20 identical, rings-loft
+     same counts, Extruded ring volume +0.00056 mm³ (1.3e-6, live's band ±3), import 39 -> 29 s: lead asked 12:4x). Left: query_parts ~13.5 s/pass on the
      two blend tubes (156 edges each); their pcurves (ShapeFix FixAddPCurve projection) carry ~84 knots per edge (STEP's
      15), so face_moments' Green integral runs 50.8k pieces (STEP 8.7k). Grouping C2 knots (common.cpp) broke gear
      volumes (cf-part-draft Spur Gear -0.36 %): reverted. Decision asked of the lead 11-18 11:0x: integrate the inner
@@ -197,12 +198,14 @@ Open, ranked:
 - Export feel (live2 export-feel-1118, behaviours "dx (lead 11-18 ~02:38, feel)"): in a1bc5ce3: solid exports
   (Part Studio, part, assembly) show the "<file name> is being prepared…" bubble (~5 s; assembly's message fades at
   4 s) and the bell's "Export completed" / "<name> was exported successfully." (no extension); drawing Options
-  "Download and store file in a new tab". Open: the assembly bubble is live2's to confirm (translate quota). Landed bfac0a31: import_files keeps the active tab; the
+  "Download and store file in a new tab". Landed bfac0a31: import_files keeps the active tab; the
   export UI test (export_feel_tests.rs; turned main red 04:19, parked T2 by the lead: it read doc.tabs, creation
   order, where Assembly 1 precedes the stored file; fix = ordered_tabs(), T1 again in 1b62e831).
-- Import / Export dialogs (live import-export-1118): c503c87cc (not landed at 11:00): import reads its files off the UI
+- Import / Export dialogs (live import-export-1118): queued 15790a91: import reads its files off the UI
   thread, tabs come when done, bubble "<file> has been imported." / "<file> uploaded but failed to translate." with
   Open document (file kept in CAD Imports); Export dialog keys test (focus on the dialog, Esc, Enter in File name).
+  Assembly export (live2 asm-export-1150): queued 15790a91: written off the UI thread (app-core export_store, the
+  Part Studio's too), bubble 5 s (was 4); format list / PARASOLID default already live's.
 - Inspection list (live inspection-list-1118): a part row's Export… Format "Inspection list" (last, after STL), note
   row, CSV with BOM / quoted / CRLF, rows = Model definitions characteristics; ops export_parts format "Inspection
   list" needs `parts`; feature params take `<param>__tolerance` {type, upper, lower, precision} (null clears) when
