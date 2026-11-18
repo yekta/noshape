@@ -9,35 +9,60 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-17 22:09 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45 and ~18:15.
+Updated 2026-11-17 23:37 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30.
 
 ## In flight
 
-Worktree /root/projects/noshape-wt/studios, branch studios-0811a.
-- Landed 11-17: 7abd9bdf, b5d11ad7, 01fb280e, 1db5e57e's fix; 19:31 as 539aeb9b: 09af37a6 (+358ab7a3, 66eee5f9,
-  a457a82b): mate glyphs per type, part silhouette, instance row tooltips, drawing view frames, leader reach.
-- Queued: on vibex7 b6c54cdd (carries ccab6c95 / c8d30fce, whose 20:42 failure was psui's real-pointer sketch test
-  under load: it and the whole part-studio-ui suite pass on vibex6, 221/221); on vibe2 (`NOSHAPE_LAND_QUEUE_HOST=vibe2
-  tools/tiers/land.sh --no-precheck`, lead 21:23) ec42bd22 = everything since, rebased on main 21:2x: Drawing
-  properties footer / tab headers / hatch values, Styles gap fields (live2 confirmed s27-29), `{"px": [x, y]}` targets,
-  Datum target panel (rows at live's heights, lists, Esc), weld captions, `MenuIcon::Glyph`, View properties' last
-  lines, hole callout palette names / tooltips / count default, gtol type rows, inspection Lower limit, hatch tooltips,
-  the runner's Drawing properties header rule, the matrix refresh.
-- Full drawing run 11-17 (vibex8, outside the slot, 2 apps, memguard): 276/334 on the 20:08 build; the 58 differing +
-  live2's 4 new takes rerun on the 21:17 build: 41 still differing then, many fixed since (checked on vibex6 with 1 app:
-  datum x3, canvas, view properties, dprops, inspection, hcallout fit-tips). Results ~/agents/studios-keep/drw1117c and
-  drwredo on vibex8; local copy /root/studios-scratch/m1117. Matrix: docs/parity/drawing-matrix.md (1046/1875 =).
-- Still differing (next): weld Seam / Spot centered joints (new `WeldJoint`s, glyphs, export); Annotations tab's Edge
-  condition symbols section (a new `AnnType`: shifts `wt_fields` indices); hcallout palette dual Units "(mm)", hatch
-  Esc with a tooltip up, gtol pending annotation (asked live2 22:1x); table cell-format panel (drw-table-cells-*),
-  table menus' disabled rows, leader add / remove node selection, ordinate add-to-group / Reset ordinate, note
-  copy-paste menu, note editor closing, sheet properties zones, view adjust linestyle rows, replicate region panel,
-  detail-id label position, section exclude-from-cut, synchronize-breaks Gap distance, simplification-absolute BOM row
-  name, toolbar Undo tip take.
-- live2's new takes queued on vibe2: drw-hole-table-empty-tips, drw-view-properties-projected-from-section,
-  drw-view-replicate-region-place, the 8 drw-revision-* retakes: run when landed.
-- Side-by-side crops for the lead: /root/studios-scratch/mate-glyphs-live-vs-ours.png, centermark-live-vs-ours.png,
-  dimhover-sbs.png, view-sbs.png.
+Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_LAND_QUEUE_HOST=vibe2
+tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh`; drawing runs vibex8.
+- Landed 11-17 22:23: ec42bd22 (as 0cb2e893): dprops footer / headers, Styles gap, datum target panel, weld captions,
+  hole callout palette names, matrix refresh (1046/1875 =).
+- Queued on vibe2: a4502066 (Edge condition symbols, weld Seam / Spot centered joints, hatch Esc, hole callout dual
+  row; re-carries d88c2f5d / 8593c064, failed on psui's flaky part-studio test), 4014c1fd (P1: a press on a hovered
+  mate glyph is its click; the flaky a_mate_glyph_wins_… test waits for hover / result, 0/12 failures).
+- Working: drawing right-click on a leader: the note is selected but the hover stayed tan over it; the menu now drops
+  the canvas hover (drawing_tools.rs open_context_menu) + feel test
+  a_right_click_on_a_leader_selects_its_note_and_drops_the_hover. Then drw-leader-add-node / -remove-node on vibex6.
+- Still differing (table / note / leader list, in order): leader add / remove node selection, table cell-format panel
+  (drw-table-cells-*), table menus' disabled rows, ordinate add-to-group / Reset ordinate, note copy-paste menu, note
+  editor closing, sheet properties zones, view adjust linestyle rows, replicate region panel, detail-id label
+  position, section exclude-from-cut, synchronize-breaks Gap distance, simplification-absolute BOM row name, toolbar
+  Undo tip take.
+- Run when landed (vibex8): live2's drw-gtol-type-list (73a49af1), drw-hole-table-empty-tips,
+  drw-view-properties-projected-from-section, drw-view-replicate-region-place, the 8 drw-revision-* retakes.
+- Full drawing run 11-17: ~/agents/studios-keep/drw1117c and drwredo on vibex8; local /root/studios-scratch/m1117.
+
+## Feel rows to take (11-17 23:3x, gaps only; check ours against each, fix with a feel test)
+- live, VS / FS editing (behaviours "Variable Studio and Feature Studio editing", live/studios/vs-fs-feel-1117/):
+  VS add: name + Enter makes "w | Length | 0 mm", focus to the next add row's Name; an invalid name red while typing,
+  Enter does nothing; a duplicate becomes "w_0". VS value errors only after Enter: pink cell, red border selected,
+  grey "Error regenerating." bubble over the Value header; "2 in" shows 50.8 mm, the expression in the bubble when
+  selected. FS autocomplete: Enter inserts the snippet, Tab closes the list and inserts a tab, Esc keeps the typed
+  text. FS errors while typing (<0.5 s, before saving): red x at gutter line 1 with a tooltip, squiggle on the token;
+  Ctrl/Cmd+S commits, the Commit button pales; a fixed error greys ~150 ms, gone ~500 ms.
+- live, history panel (behaviours "Versions and history panel: hover, a change row, scrolling a long history",
+  live/studios/history-feel-1117/): hover never previews (row tints #def1fb + tooltip; a change row's "<tab> :: Update
+  feature : Extrude 1: Change by <user> at <time>"; graphics / navbar stay the workspace's). Change rows 30 px, only
+  under an expanded "⌄ N changes"; a click opens that microversion with the bar "History changes are view only.
+  Viewing <change>" [Restore to Main] [Return to Main]. The whole panel scrolls as one (search box and toggles too),
+  "Name | Modified" header pinned, all rows built up front, the graph continuous (amber branch line V1 -> hollow circle).
+- live2, macOS keys: documents list toggles on Ctrl or Cmd on every OS (done, start_window.rs `toggles`); drawing
+  Ctrl+M = Max/min checked: drw-max-min-key matches in the app (the workspace binding has no handler there).
+- live, drawing view feel (behaviours "studios (lead 11-18, P0 feel): drawing view drag preview…",
+  live/studios/drawing-feel-1118/): (1) a dragged view moves alone (orange, old place blank), aligned views follow
+  only after release, no guide line, ends unselected, Ctrl+Z undoes; (2) Esc mid-drag: preview stays while held, the
+  view goes back on release; (3) double-click anywhere a click takes a view (its empty inside too) opens View
+  properties within 200 ms (not 250); on a dimension, its editor; (4) a dimension in a view lights alone, no dwell;
+  (5) box select: no pre-highlight while dragging, shown on release; Esc mid-box nothing; empty box keeps selection.
+- qa VSFEEL (11-18, d65a06570): name red / Esc (done), units 50.8 mm + error tooltip + red border (done); the bubble
+  over the header is the hover tooltip drawn above the cell (live vs-value-decimals s2: none on a click): position
+  still ours (at the pointer).
+- live2, document level (behaviours "studios + psui (11-17, interaction feel)", live/feel/doc-level-1117/): tab switch:
+  the URL changes at once, the old list and canvas vanish at once, then the toolbar swaps and the list fills, the 3D
+  canvas last; no spinner. Undo / redo: Ctrl+Y redoes, Ctrl+Shift+Z doesn't (Linux; ours already: actions.rs), no
+  toast; Rename and part Hide one step each; view changes / selections none; Ctrl+Z in a dialog's value field does
+  nothing. Regen (psui's pending.rs spinner): old model stays drawn, rows grey; after ~0.75 s a 50x50 box at the
+  viewport's bottom centre, blue spinner pulsing 30-42 px; rows update when done, spinner lingers, no toast.
 
 ## Lead's queue (11-17, restated after compaction)
 1. Land what is green. 2. User P0: hover / select parity in Assemblies (instances, mate connectors, mates list <->

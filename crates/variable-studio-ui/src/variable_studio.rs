@@ -508,6 +508,10 @@ impl VariableStudioView {
         let add_row = key == "new";
         let k = key.clone();
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            // The add row's name is checked as it is typed (red while invalid).
+            if add_row && matches!(ev, InputEvent::Change) {
+                cx.notify();
+            }
             // A Value cell's `#` list: the variables above the row, as the Part Studio's table (no "New variable…").
             if let Some(row) = k.strip_prefix('e').and_then(|n| n.parse::<usize>().ok()) {
                 match ev {
@@ -641,6 +645,15 @@ fn rounded_literal(text: &str, units: &noshape_units::UnitPrefs) -> Option<Strin
     (decimals > precision).then(|| format!("{value:.precision$}{rest}"))
 }
 
+/// A plain length written in a unit other than the document's ("2 in" in a millimetre document).
+fn foreign_length(text: &str, units: &noshape_units::UnitPrefs) -> bool {
+    let t = text.trim();
+    let n = t.find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-' || c == '+')).unwrap_or(t.len());
+    let (number, rest) = t.split_at(n);
+    let rest = rest.trim();
+    !number.is_empty() && number.parse::<f64>().is_ok() && rest != units.length.symbol() && noshape_units::LengthUnit::ALL.iter().any(|u| u.symbol() == rest)
+}
+
 fn is_expression(text: &str) -> bool {
     let t = text.trim();
     t.contains('#') || t.trim_start_matches(['-', '+']).contains(['+', '-', '*', '/', '(', '^'])
@@ -728,6 +741,12 @@ fn rows_within(clip: Option<RowsClip>, margin: f32) -> (usize, usize) {
     let Some(c) = clip else { return (0, FIRST_ROWS) };
     let row = |y: f32| ((y - c.top) / ROW_H).max(0.);
     (row(c.clip.0 - margin).floor() as usize, row(c.clip.1 + margin).ceil() as usize)
+}
+
+/// A name typed in the add row that can't be a variable's ("10", "1x", "10 +"): drawn red as it is typed.
+fn invalid_name(typed: &str) -> bool {
+    let name = typed.trim().trim_start_matches('#');
+    !name.is_empty() && !noshape_model::variable_table::is_identifier(name)
 }
 
 fn cell_div(c: usize) -> Div {
@@ -1107,6 +1126,8 @@ impl VariableStudioView {
                 let unit = expression_unit(&studio, &v.expr.text, 0).unwrap_or(units.length);
                 noshape_units::format_quantity(q, &noshape_units::UnitPrefs { length: unit, ..units })
             });
+            // A length written in another unit shows in the document's (live vs-fs-feel-1117: "2 in" -> "50.8 mm").
+            let shown = shown.or_else(|| result.filter(|_| !editing && foreign_length(&v.expr.text, &units)).map(|q| noshape_units::format_quantity(q, &units)));
             let shown = shown.or_else(|| (!editing).then(|| rounded_literal(&v.expr.text, &units)).flatten());
             // From import: the imported value, "Not set" before a file is picked (live vs-type-from-import).
             let import_text = (v.kind == Some(VarKind::FromImport)).then(|| v.import.as_ref().map(|imp| noshape_model::variables::import_value(&self.doc.read(cx).session.doc, imp).map(|x| x.to_string()).unwrap_or_else(|e| e)).unwrap_or_else(|| "Not set".into()));
@@ -1210,12 +1231,14 @@ impl VariableStudioView {
                     // The blue border while the cell has the focus (clicking elsewhere drops it).
                     let selected = self.cell_selected.as_deref() == Some(format!("e{i}").as_str()) && fh.is_focused(window);
                     let text = shown.unwrap_or_else(|| noshape_units::localize(&v.expr.text));
-                    let tip = error.clone().unwrap_or_else(|| noshape_units::localize(&v.expr.text));
+                    // (A failing value's tooltip is "Error regenerating.", live vs-fs-feel-1117.)
+                    let tip = if error.is_some() { "Error regenerating.".to_string() } else { noshape_units::localize(&v.expr.text) };
                     cell_div(2)
                         .id(("vs-val", i))
                         .px(px(7.))
                         .track_focus(&fh)
-                        .when(selected, |d| d.border_2().border_color(rgb(0x1651b0)).px(px(6.)))
+                        // (Red when it fails: live vs-fs-feel-1117 v2-06.)
+                        .when(selected, |d| d.border_2().border_color(if error.is_some() { p().error } else { rgb(0x1651b0) }).px(px(6.)))
                         // Live2 vs-drag.png: a value that fails sits on live's invalid-field pink, its text unchanged.
                         .when(error.is_some(), |d| d.bg(crate::theme::themed(0xf9ebec, 0x4a2326)))
                         .tooltip(crate::ui::tooltip(tip))
@@ -1406,6 +1429,17 @@ impl VariableStudioView {
                 this.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(noshape_ops::variable_studio::RENAMED_MESSAGE.into())));
             }
         });
+        // Live (vs-fs-feel-1117): an invalid name is red as it is typed (red border, pink fill) and Enter adds nothing;
+        // Esc throws the text away, after an Enter too.
+        let name_bad = invalid_name(&new_name.read(cx).value());
+        let esc_name = new_name.clone();
+        let add_cell = cell_div(0)
+            .when(name_bad, |d| d.bg(p().error_fill).border_1().border_color(p().error))
+            .capture_action(cx.listener(move |_, _: &gpui_kit::component::input::Escape, window, cx| {
+                if !esc_name.read(cx).value().is_empty() {
+                    esc_name.update(cx, |s, cx| s.set_value("", window, cx));
+                }
+            }));
         if std::mem::take(&mut self.focus_add_row) {
             // After this frame, once the new row's input is laid out.
             let st = new_name.clone();
@@ -1631,7 +1665,7 @@ impl VariableStudioView {
                 .when(only.is_none(), |t| {
                     // The add row's other columns are one borderless cell band
                     // (live dark/dk-961: `#1c1c1c` across them).
-                    t.child(h_flex().child(gpui_kit::base::input::input_frame(cell_div(0).border_l_1().map(|d| crate::ui_script::mark(d, || "var_cell:Name".into())).child(cell_input(&new_name)))).child(div().w(px(col_w(1) + col_w(2) + col_w(3))).h(px(ROW_H)).flex_none().bg(p().bg_senary)))
+                    t.child(h_flex().child(gpui_kit::base::input::input_frame(add_cell.border_l_1().map(|d| crate::ui_script::mark(d, || "var_cell:Name".into())).child(cell_input(&new_name)))).child(div().w(px(col_w(1) + col_w(2) + col_w(3))).h(px(ROW_H)).flex_none().bg(p().bg_senary)))
                 })
             });
         if self.host.is_some() {
@@ -1766,3 +1800,7 @@ mod tests {
 #[cfg(test)]
 #[path = "variable_bench.rs"]
 mod bench;
+
+#[cfg(test)]
+#[path = "variable_feel_tests.rs"]
+mod feel_tests;

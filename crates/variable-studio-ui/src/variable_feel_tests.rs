@@ -1,0 +1,116 @@
+//! Variable Studio editing feel through real keystrokes (live vs-fs-feel-1117; qa VSFEEL-*, user P0 11-17).
+
+use super::{VariableStudioView, foreign_length, invalid_name};
+use crate::doc_model::DocModel;
+use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, Entity, IntoElement, Keystroke, ParentElement as _, Point, Render, Styled as _, TestAppContext, Window, WindowBounds, WindowOptions, div, px, size};
+use serde_json::json;
+
+struct Host(Entity<VariableStudioView>);
+
+impl Render for Host {
+    fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+        div().size_full().flex().flex_col().child(self.0.clone())
+    }
+}
+
+fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
+    cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+    cx.run_until_parked();
+}
+
+fn keys(cx: &mut TestAppContext, window: AnyWindowHandle, keys: &[&str]) {
+    for key in keys {
+        cx.update_window(window, |_, w, cx| {
+            let mut ks = Keystroke::parse(key).unwrap();
+            if key.len() == 1 {
+                ks.key_char = Some((*key).into());
+            }
+            w.dispatch_keystroke(ks, cx);
+        })
+        .unwrap();
+        draw(cx, window);
+    }
+}
+
+/// A Variable Studio with one variable `w`, its add row's Name focused.
+fn studio(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<VariableStudioView>) {
+    cx.update(gpui_kit::init);
+    let dir = std::env::temp_dir().join(format!("noshape-variables-feel-{name}-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("variables.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    {
+        let mut ctx = noshape_ops::Ctx::new();
+        let mut call = |tool: &str, args: serde_json::Value| noshape_ops::registry::run(&mut ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call("document_create", json!({ "path": path.to_str().unwrap() }));
+        let tab = call("tab_create", json!({ "kind": "variablestudio" }));
+        let tab = tab["tab"]["name"].as_str().unwrap().to_string();
+        call("variable_create", json!({ "tab": tab, "name": "w", "value": "10 mm" }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::VariableStudio(_))).unwrap().id;
+    let (window, view) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
+        let mut view = None;
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| VariableStudioView::new(doc, tab, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Host(v))
+        })
+        .unwrap();
+        (w, view.unwrap())
+    });
+    draw(cx, window);
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        let st = view.read(cx).inputs.get("new").map(|(st, _)| st.clone()).expect("the add row");
+        st.update(cx, |s, cx| s.focus(w, cx));
+    })
+    .unwrap();
+    draw(cx, window);
+    (window, view)
+}
+
+fn add_row_text(cx: &mut TestAppContext, view: &Entity<VariableStudioView>) -> String {
+    cx.update(|cx| view.read(cx).inputs.get("new").map(|(st, _)| st.read(cx).value().to_string()).unwrap_or_default())
+}
+
+fn names(cx: &mut TestAppContext, view: &Entity<VariableStudioView>) -> Vec<String> {
+    cx.update(|cx| view.read(cx).studio(cx).map(|s| s.variables.iter().map(|v| v.name.clone()).collect()).unwrap_or_default())
+}
+
+/// Live vs-fs-feel-1117 (qa VSFEEL-NAME-RED): an invalid name is red as it is typed; Enter adds nothing and keeps the
+/// text in the cell; Esc then throws it away.
+#[gpui::test]
+fn an_invalid_name_is_red_while_typed_enter_adds_nothing_and_esc_drops_it(cx: &mut TestAppContext) {
+    for (typed, bad) in [("10", true), ("1x", true), ("10 +", true), ("w2", false), ("#w2", false), ("", false)] {
+        assert_eq!(invalid_name(typed), bad, "{typed:?}");
+    }
+    let (window, view) = studio(cx, "name-red");
+    keys(cx, window, &["1", "x"]);
+    assert_eq!(add_row_text(cx, &view), "1x");
+    assert!(invalid_name(&add_row_text(cx, &view)), "drawn red while typed");
+    keys(cx, window, &["enter"]);
+    assert_eq!(names(cx, &view), ["w"], "Enter adds nothing");
+    assert_eq!(add_row_text(cx, &view), "1x", "the text stays in the cell");
+    keys(cx, window, &["escape"]);
+    assert_eq!(add_row_text(cx, &view), "", "Esc throws the text away");
+    assert_eq!(names(cx, &view), ["w"]);
+}
+
+/// Live vs-fs-feel-1117 (qa VSFEEL-UNITS): a length written in another unit shows in the document's: "2 in" in a
+/// millimetre document reads 50.8 mm; one in the document's unit, an angle or an expression shows as it is.
+#[test]
+fn a_length_in_another_unit_shows_in_the_documents() {
+    let mm = noshape_units::UnitPrefs::default();
+    for (text, foreign) in [("2 in", true), ("1 m", true), ("10 mm", false), ("10", false), ("10 deg", false), ("#w * 2", false), ("2 in + 1 mm", false)] {
+        assert_eq!(foreign_length(text, &mm), foreign, "{text:?}");
+    }
+    let q = noshape_units::evaluate("2 in", &noshape_units::EmptyScope).expect("2 in");
+    assert_eq!(noshape_units::format_quantity(q, &mm), "50.8 mm");
+    let inch = noshape_units::UnitPrefs { length: noshape_units::LengthUnit::Inch, ..mm };
+    assert!(!foreign_length("2 in", &inch) && foreign_length("10 mm", &inch));
+}
