@@ -687,8 +687,11 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
     };
     // (Tight boxes: a B-spline face's loose box follows its poles, past where a wall cut the piece.)
     let reach = |s: &Shape, q: DVec3, out: DVec3| s.bounding_box(true).map_or(0.0, |b| corner_reach(b, q, out, true));
-    let first = |s: &Shape, q: DVec3, out: DVec3| s.bounding_box(true).map_or(f64::MAX, |b| corner_reach(b, q, out, false));
     let body_faces = shape.faces();
+    // (Each body face's boxes once, not again for every run-on: c2-impeller-loft's Fillet 3 took 280 of them.)
+    let loose: Vec<Option<k::BoundingBox>> = body_faces.iter().map(|f| f.bounding_box(false).ok()).collect();
+    let tight: Vec<std::cell::OnceCell<Option<k::BoundingBox>>> = body_faces.iter().map(|_| std::cell::OnceCell::new()).collect();
+    let tight_of = |i: usize| *tight[i].get_or_init(|| body_faces[i].bounding_box(true).ok());
     let touches = |f: &Shape, p: &Shape| p.vertices().iter().any(|v| k::distance(v, f).is_ok_and(|d| d.distance <= tol)) || k::distance(f, p).is_ok_and(|d| d.distance <= tol);
     // (A point inside a solid without its area integral where its box's middle is one: B-spline and offset faces made
     // c2-impeller-loft's Fillet 3's tools' and cells' centroids 0.6 of its 4 s.)
@@ -740,24 +743,35 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
             return Err(fail("a run-on round's tool with its centroid outside it"));
         }
         let mut piece = t.tool.clone();
+        // (The piece's tight box once until a wall cuts it: lofted pieces' boxes, 264 ms of c2-impeller-loft's Fillet 3.)
+        let mut piece_box = piece.bounding_box(true).ok();
+        let piece_reach = |b: Option<k::BoundingBox>, q: DVec3, out: DVec3| b.map_or(0.0, |b| corner_reach(b, q, out, true));
         // (Boxes are loose: the middle reaches the tip until a wall takes a thousandth of the edge off it.)
         let margin = (1e-3 * t.len).max(10.0 * tol);
         for (run, q, out) in &t.run_on {
-            let tip = reach(&piece, *q, *out).min(reach(run, *q, *out)) - margin;
+            let tip = piece_reach(piece_box, *q, *out).min(reach(run, *q, *out)) - margin;
             let rb = run.bounding_box(false)?;
             let rt = run.bounding_box(true).ok();
-            let mut met: Vec<(f64, usize)> = body_faces
+            let met: Vec<(f64, usize)> = body_faces
                 .iter()
                 .enumerate()
-                .filter(|(i, f)| !t.supports.contains(i) && f.bounding_box(false).is_ok_and(|b| (b.min - DVec3::splat(tol)).cmple(rb.max).all() && rb.min.cmple(b.max + DVec3::splat(tol)).all()))
+                .filter(|(i, _)| !t.supports.contains(i) && loose[*i].is_some_and(|b| (b.min - DVec3::splat(tol)).cmple(rb.max).all() && rb.min.cmple(b.max + DVec3::splat(tol)).all()))
                 // (Tight boxes before the distances: 268 of them were a tenth of c2-impeller-loft's Fillet 3.)
-                .filter(|(_, f)| rt.is_none_or(|r| f.bounding_box(true).is_ok_and(|b| (b.min - DVec3::splat(tol)).cmple(r.max).all() && r.min.cmple(b.max + DVec3::splat(tol)).all())) && touches(f, run))
-                .map(|(i, f)| (first(f, *q, *out), i))
+                .filter(|(i, _)| rt.is_none_or(|r| tight_of(*i).is_some_and(|b| (b.min - DVec3::splat(tol)).cmple(r.max).all() && r.min.cmple(b.max + DVec3::splat(tol)).all())))
+                .map(|(i, _)| (tight_of(i).map_or(f64::MAX, |b| corner_reach(b, *q, *out, false)), i))
                 .collect();
+            // (Each face's distance to the run-on on its own thread: B-spline faces against a lofted run, 280-390 ms of
+            // c2-impeller-loft's Fillet 3 one after another.)
+            let legacy = k::kernel_legacy();
+            let touching: Vec<bool> = std::thread::scope(|sc| {
+                let hs: Vec<_> = met.iter().map(|&(_, i)| { let (f, l) = (&body_faces[i], legacy.clone()); sc.spawn(move || k::with_kernel_legacy(l, || touches(f, run))) }).collect();
+                hs.into_iter().map(|h| h.join().unwrap_or(false)).collect()
+            });
+            let mut met: Vec<(f64, usize)> = met.into_iter().zip(touching).filter_map(|(m, t)| t.then_some(m)).collect();
             met.sort_by(|a, b| a.0.total_cmp(&b.0));
             let points = points_of(run);
             for (n, &(_, i)) in met.iter().enumerate() {
-                if reach(&piece, *q, *out) < tip {
+                if piece_reach(piece_box, *q, *out) < tip {
                     break;
                 }
                 let f = &body_faces[i];
@@ -772,19 +786,23 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
                     corners.push((ti, run.clone(), *q, *out, faces));
                     break;
                 }
+                let cells_n = cells.len();
                 let Some(p) = cells.into_iter().find(|p| p.classify_point(seed, tol).is_ok_and(|c| c == k::PointClass::Inside)) else {
                     return Err(fail("a run-on round's middle lost to the faces past its end"));
                 };
                 // (A free-form wall that cut is the face the round ends on: the body's face rebuilt on its extension.)
-                if free_form && p.volume().unwrap_or(0.0) < piece.volume().unwrap_or(0.0) * (1.0 - 1e-6) {
+                // (It cut where it split the piece: two volume integrals of lofted pieces took 240 ms of c2-impeller-loft's
+                // Fillet 3.)
+                if free_form && cells_n > 1 {
                     refaced.push((i, wall.clone()));
                 }
                 piece = p;
+                piece_box = piece.bounding_box(true).ok();
             }
             if corners.last().is_some_and(|c| c.0 == ti && c.2 == *q) {
                 continue;
             }
-            if reach(&piece, *q, *out) >= tip {
+            if piece_reach(piece_box, *q, *out) >= tip {
                 return Err(fail("a run-on round not closed by the faces past its end"));
             }
         }
@@ -1490,7 +1508,12 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     }
     // Held blends (hold lines) built directly where they can be: the loft's sides only approximate a curved wall, and a
     // cut by them leaves slivers (c2-variable-fillet-faceblend's rounded ends).
-    if (ball || ranges.iter().any(|r| r.2)) && adds.is_empty() && !cuts.is_empty() {
+    // (A conic round's ball tools run on past a free end of the chain, over the part's end: built directly they leave
+    // it open, so they go to closed_run_on first; the build failed there in 140 ms of c2-impeller-loft's Fillet 3.)
+    let near_end = |a: DVec3, b: DVec3| (a - b).length() < scale * 1e-9;
+    let free_end = chain.iter().any(|c| [c.start, c.end].iter().any(|&q| chain.iter().filter(|o| near_end(o.start, q) || near_end(o.end, q)).count() == 1));
+    let conic_run_on = ball && matches!(spec.section, Section::Conic(_)) && free_end && direct.is_none();
+    if (ball || ranges.iter().any(|r| r.2)) && adds.is_empty() && !cuts.is_empty() && !conic_run_on {
         let tools: Vec<Shape> = cuts.iter().map(|t| t.shape.clone()).collect();
         let rims = cut_edges.iter().map(|&e| shape.sub_shape(ShapeType::Edge, e)).collect::<Result<Vec<_>, _>>()?;
         match direct.take().unwrap_or_else(|| k::blend_direct(shape, &tools, &rims)) {
