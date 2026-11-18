@@ -50,6 +50,10 @@ pub struct RegenOptions {
     pub document_variables: BTreeMap<String, Quantity>,
     /// Coarse meshes for immediate feedback; a later `Final` pass refines.
     pub preview_meshes: bool,
+    /// Every body also gets the display levels below its own (Coarse, Medium), the renderer drawing each occurrence
+    /// at the coarsest whose error on screen is under its threshold: a big assembly, as live refines its occurrences
+    /// from Coarse by screen-space error (live2 tess-1118).
+    pub coarser_levels: bool,
     /// Access to other Part Studios of the document (Derived features).
     pub derived: Option<std::sync::Arc<dyn derived::DerivedProvider>>,
     /// Compiled Feature Studios of the document (custom features).
@@ -160,7 +164,7 @@ impl RegenCancel {
 
 impl Default for RegenOptions {
     fn default() -> Self {
-        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None, custom_features: None, cancel: None, touch_probe: None, context_only: false, store: None }
+        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, coarser_levels: false, derived: None, custom_features: None, cancel: None, touch_probe: None, context_only: false, store: None }
     }
 }
 
@@ -333,7 +337,7 @@ fn result_key(studio: &PartStudio, config: &ConfigValues, units: &UnitPrefs, opt
     if !studio.contexts.is_empty() {
         return None;
     }
-    let settings = (config, units, opts.upto, opts.editing_sketch, opts.touch_probe, opts.relative_deflection.to_bits(), opts.angular_deflection.to_bits(), display::angle_display_mesh());
+    let settings = (config, units, opts.upto, opts.editing_sketch, opts.touch_probe, opts.relative_deflection.to_bits(), opts.angular_deflection.to_bits(), display::angle_display_mesh(), opts.coarser_levels);
     let mut key = hash_bytes(hash_bytes(1, &serde_json::to_vec(studio).ok()?), &serde_json::to_vec(&settings).ok()?);
     for (name, v) in &opts.document_variables {
         key = hash_bytes(hash_bytes(key, name.as_bytes()), &v.value.to_le_bytes());

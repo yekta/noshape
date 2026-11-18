@@ -230,12 +230,13 @@ fn body_levels(studio: &PartStudio, b: &super::context::Body, opts: &RegenOption
     }
     let own = setting.unwrap_or(TessQuality::Auto).level();
     let last = if view_scale < 1.0 { TessQuality::VeryFine.level() } else { own };
-    let qualities: Vec<f64> = TessQuality::LEVELS[own..=last].iter().map(|q| q.factor()).collect();
+    let first = if opts.coarser_levels { 0 } else { own };
+    let qualities: Vec<f64> = TessQuality::LEVELS[first..=last].iter().map(|q| q.factor()).collect();
     let refined = || qualities.iter().all(|&q| meshes.get(&world_key(&b.shape, q)).is_some_and(|(n, preview, _)| *n == b.faces.len() as u64 && !*preview));
     if opts.preview_meshes && !refined() {
         return (vec![TessQuality::Coarse.factor()], 0);
     }
-    (qualities, own as u8)
+    (qualities, first as u8)
 }
 
 /// Meshes `shape` at `qualities` (missing levels, coarsest first;

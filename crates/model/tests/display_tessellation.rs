@@ -87,6 +87,28 @@ fn circles_get_onshapes_segments_at_every_size() {
     }
 }
 
+/// A big assembly's Part Studios (`RegenOptions::coarser_levels`): each body also has Coarse and Medium, the finest
+/// its own (live refines a big assembly's occurrences from Coarse by screen-space error, live2 tess-1118).
+#[test]
+fn coarser_levels_give_every_body_coarse_and_medium_below_its_own() {
+    noshape_model::regen::set_angle_display_mesh(true);
+    let mut ps = cylinder(0.02);
+    let opts = RegenOptions { coarser_levels: true, ..Default::default() };
+    let run = |ps: &PartStudio| Regenerator::new().regenerate(ps, &ConfigValues::default(), &UnitPrefs::default(), &opts);
+    let r = run(&ps);
+    assert_eq!(level_segments(&r), [12, 24, 72], "Auto");
+    assert_eq!(r.display.bodies[0].levels_from, 0, "from Coarse");
+    let body = r.display.bodies[0].id.clone();
+    ps.part_properties.insert(body, PartProperties { tessellation: Some(TessQuality::Medium), ..Default::default() });
+    assert_eq!(level_segments(&run(&ps)), [12, 24], "a Medium part");
+    // Switched on for a studio already regenerated (an assembly found big after its first result): the levels come,
+    // not the cached result without them; and off again.
+    let ps = cylinder(0.02);
+    let mut regen = Regenerator::new();
+    let mut with = |coarser_levels: bool| regen.regenerate(&ps, &ConfigValues::default(), &UnitPrefs::default(), &RegenOptions { coarser_levels, ..Default::default() });
+    assert_eq!((level_segments(&with(false)), level_segments(&with(true)), level_segments(&with(false))), (vec![72], vec![12, 24, 72], vec![72]));
+}
+
 #[test]
 fn coarser_levels_stay_coarse_after_finer_meshing() {
     // The shape keeps the finest triangulation it was meshed with (Very

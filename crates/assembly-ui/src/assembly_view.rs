@@ -896,6 +896,8 @@ impl AssemblyView {
         let evaluator = self.evaluator.clone();
         let explode = self.explode;
         let self_tab = self.tab;
+        // A big assembly (the last result's, or the cached one's): its bodies get their coarser levels too.
+        let big = big_scene(&self.result);
         self.eval_seq += 1;
         let seq = self.eval_seq;
         self.eval_task = Some(cx.spawn_in(window, async move |this, cx| {
@@ -906,6 +908,7 @@ impl AssemblyView {
                     noshape_render::threads::lower_priority();
                     let mut ev = evaluator.lock();
                     ev.retain_tabs(&doc);
+                    ev.set_coarser_levels(big);
                     // `NOSHAPE_PERF`: a.eval (evaluate after an edit), a.eval_catalog
                     // (the Insert catalog), a.eval_apply (UI thread).
                     static FIRST: std::sync::Once = std::sync::Once::new();
@@ -946,10 +949,16 @@ impl AssemblyView {
                 }
                 this.catalog = catalog;
                 let t = std::time::Instant::now();
+                // First seen big (an open with no cached result): once more with the coarser levels (only meshing:
+                // the studios' features stay cached).
+                let again = !big && big_scene(&result);
                 this.apply_result(Arc::new(result), window, cx);
                 noshape_render::perf::record("a.eval_apply", t.elapsed());
                 this.note_open_result(cx);
                 this.note_real_result(window, cx);
+                if again {
+                    this.schedule_eval(window, cx);
+                }
             });
         }));
         cx.notify();
@@ -7526,6 +7535,16 @@ mod suppressed_text_tests {
 /// 10 instances; behaviours "(6) Patterns"; qa5 P2-A6).
 fn top_level_rows(instances: impl Iterator<Item = InstanceId>, generated: &std::collections::HashSet<InstanceId>, patterns: usize) -> usize {
     instances.filter(|i| !generated.contains(i)).count() + patterns
+}
+
+/// Scene triangles from which an assembly's bodies get their coarser display levels (live refines a big assembly's
+/// occurrences from Coarse by screen-space error, live2 tess-1118; asm-xdev-subs has 2.1 M at Fine). Under it nothing
+/// changes.
+const BIG_SCENE_TRIANGLES: usize = 1_000_000;
+
+/// Whether `r` draws more than [`BIG_SCENE_TRIANGLES`] at its finest levels.
+fn big_scene(r: &AssemblyResult) -> bool {
+    r.occurrences.iter().map(|o| o.mesh.indices.len() / 3).sum::<usize>() > BIG_SCENE_TRIANGLES
 }
 
 #[cfg(test)]

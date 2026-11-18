@@ -1182,6 +1182,8 @@ pub struct AssemblyEvaluator {
     /// compiles its Feature Studios: per studio and evaluation, asm-infento-subs' rebuild took 3× as long). Empty
     /// outside `evaluate`.
     sources_opts: Option<RegenOptions>,
+    /// Part Studio bodies get their coarser display levels too ([`RegenOptions::coarser_levels`]: a big assembly).
+    coarser_levels: bool,
 }
 
 /// A subassembly's preparation and solve, as [`AssemblyEvaluator::prepare_subassembly`] makes them.
@@ -2118,6 +2120,8 @@ impl AssemblyEvaluator {
             }
             None => RegenOptions::default(),
         };
+        opts.coarser_levels = self.coarser_levels;
+        hash = hash.rotate_left(5) ^ u64::from(self.coarser_levels);
         // The Variable Studio tables the Part Studio shows (its #names).
         opts.document_variables = crate::variables::element_variables(doc, tab);
         hash = hash.rotate_left(5) ^ hash_of(&serde_json::to_string(&opts.document_variables).unwrap_or_default());
@@ -2155,6 +2159,17 @@ impl AssemblyEvaluator {
     /// `doc`'s Part Studios (None: not set).
     pub fn studio_options_for(&self, doc: &Document) -> Option<RegenOptions> {
         self.studio_options.as_ref().map(|make| make(doc))
+    }
+
+    /// Whether Part Studio bodies get their coarser display levels too (a big assembly: the renderer draws each
+    /// occurrence at the level its size on screen asks, as live). Changing it re-meshes the studios (their features
+    /// stay cached).
+    pub fn set_coarser_levels(&mut self, on: bool) {
+        self.coarser_levels = on;
+    }
+
+    pub fn coarser_levels(&self) -> bool {
+        self.coarser_levels
     }
 
     /// Set how Part Studios with Derived or custom features find their
