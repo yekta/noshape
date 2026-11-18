@@ -1188,6 +1188,29 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | The Sketch button's tooltip "Create new sketch (shift+s)" | = (fixed: was "Sketch (shift+s)") | part_studio tool_tooltip_tests::toolbar_tooltips_read_as_live |
 | The Tab manager button's tooltip "Tab manager (alt/⌥+t)" | = (fixed: was "Tab manager (Alt+T)") | – (a literal) |
 
+### ps-feel2-1118 (configuration keys, hide / isolate, suppress, rollback drag, live2 11-18 08:46) [psui]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Configuration table: name + Tab in the add row adds the row, the selection jumps to the first row's Name cell | ? | missing |
+| Typing on a selected configuration cell replaces it (no Enter first); Return commits and moves down; Esc restores the old text; Down / Up move the selection (Down from the last row: the add row) | ? | missing |
+| A row name: a click selects the cell, a double-click edits the name inline (no switch), Esc cancels | ? | missing |
+| The default first row's menu: Switch to "…" · Duplicate row · Move down · Delete row (no Set as default, no Move up) | ? | missing |
+| Switching configuration (dropdown pick or the row menu's Switch to): the model changes in one frame ~1.0 s after the click; both lists stay as they are, no spinner; the dropdown takes Down + Return | ? | missing |
+| Y: the Parts row to opacity 0.5 at 73 ms, the part gone at 436 ms; Shift+Y back: 108 / 562 ms | ? | missing |
+| Shift+I with a part selected: the Isolate dialog at (248, 79) 220 × 196 and the other parts translucent (1.4 s); nothing selected: the part under the pointer; the lists don't change; Esc closes it and ends isolate | ? | missing |
+| Suppress from the row menu: the row italic, struck through, opacity 0.5 at 208 ms; Parts (N−1) at 332 ms; its consumed sketch turns black; the parts left renumber (Part 1, Part 2); the part gone at ~2.0 s. Unsuppress: 141 / 234 ms, graphics 1.0 s | ? | missing |
+| Two features suppressed from one menu: one step, Ctrl+Z restores both | ? | missing |
+| Rollback bar drag: starts after 6–9 px; the drop line snaps to the gaps between rows, switching at each row's middle; nothing regenerates while held (10 s) | = (the line and "nothing until release": the list matrix) | list matrix "rollback bar / while held nothing moves or greys" (the 6–9 px start: missing) |
+| Rollback bar released: the rows below italic at 0.5, not struck through, 0.96 s; the graphics 1.11 s | ? | missing |
+
+### sk-feel2-1118 (sketch Offset across the curve, dimension texts, live2 11-18 08:46) [skasm]
+
+| Finding | Ours | Test |
+|---|---|---|
+| Offset arrow dragged back across the curve: the value goes through 0 and the preview jumps to the other side, the arrow flipping; the value shown has no sign; no stop at 0 or at the opposite edge; release keeps the preview, Enter commits with the palette ("24.8 mm") | ? | missing |
+| A dimension label placed level with another dimension: follows the pointer 1:1 across it, no snap, no alignment line (sketch dimensions have no text inference; drawings do, D4) | ? | missing |
+
 ## Fix queue (biggest feel impact first)
 1. ~~Sketch click vs drag 5 px; inferences (parallel, perpendicular, H 7 / V 6, alignment after a rest); arc colour;
    Ctrl+click~~ (psui 11-13).
