@@ -528,6 +528,9 @@ pub struct UiState {
     /// Mass properties' Part tab: the parts' mass properties and their variance, worked out off the UI thread
     /// (`crate::bg_job`), keyed by the parts, the model, their densities and whether the variance shows.
     pub mass_job: Option<crate::bg_job::BgJob<PartsMassKey, PartsMass>>,
+    /// The values last shown, kept while a changed set of parts is measured (live mass-appear-1118: the old totals stay
+    /// until the new ones come, no blank); cleared when the panel closes.
+    pub mass_shown: Option<PartsMass>,
     /// Its Face tab's: the faces' properties, keyed by the faces, the model and the variance.
     pub face_mass_job: Option<crate::bg_job::BgJob<FaceMassKey, FaceMass>>,
     /// Mass Override changed in the open dialog (live ui-mass/10–15): the
@@ -956,6 +959,7 @@ impl UiState {
             sub_dialog: None,
             material_notice_pending: false,
             mass_job: None,
+            mass_shown: None,
             face_mass_job: None,
             mass_override_edit: None,
             mass_override_input: None,

@@ -464,3 +464,41 @@ fn mass_hides_the_summary_keeps_its_parts_on_an_empty_click_and_esc_keeps_the_se
     let closed = state(cx);
     assert_eq!((open, clicked, (closed.0, closed.1)), ((true, 2, 0), (true, 2, 0), (false, 2)), "(Mass open, selected, summary rows) when opened, after an empty click; (open, selected) after Esc");
 }
+
+/// Live2 mass-appear-1118: a part added to Mass properties keeps the old totals shown until the new ones come (no
+/// blank, no spinner), then the sum.
+#[gpui::test]
+fn mass_keeps_the_old_totals_until_an_added_parts_come(cx: &mut TestAppContext) {
+    let b = Bench::open(cx, "mass-add", 1.0);
+    let (p1, p2) = (b.reference(cx, E::Part("Part 1")).unwrap(), b.reference(cx, E::Part("Part 2")).unwrap());
+    cx.update(|cx| b.view.update(cx, |v, cx| {
+        v.selection = vec![p1.clone()];
+        v.open_mass(cx);
+    }));
+    let volume = |cx: &mut TestAppContext| {
+        draw(cx, b.window);
+        let state = cx.update(|cx| b.view.read(cx).ui.mass_state.clone()).unwrap_or_default();
+        state["fields"].as_array().and_then(|f| f.iter().find(|f| f["label"] == "Volume").and_then(|f| f["text"].as_str().map(str::to_string))).unwrap_or_default()
+    };
+    wait_until(cx, b.window, |cx| {
+        let state = b.view.read(cx).ui.mass_state.clone().unwrap_or_default();
+        state["fields"].as_array().is_some_and(|f| f.iter().any(|f| f["label"] == "Volume" && f["text"].as_str().is_some_and(|t| !t.is_empty())))
+    });
+    let one = volume(cx);
+    // Part 2 added: drawn before its measurement can have come back (the clock held, no task run in between).
+    cx.update(|cx| b.view.update(cx, |v, cx| {
+        v.selection = vec![p1.clone(), p2.clone()];
+        v.refresh_scene(false, cx);
+        cx.notify();
+    }));
+    // (One frame, no task run after it: the measurement is still out.)
+    cx.update_window(b.window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+    let pending = cx.update(|cx| b.view.read(cx).ui.mass_state.clone()).unwrap_or_default()["fields"]
+        .as_array()
+        .and_then(|f| f.iter().find(|f| f["label"] == "Volume").and_then(|f| f["text"].as_str().map(str::to_string)))
+        .unwrap_or_default();
+    let still_out = cx.update(|cx| b.view.read(cx).ui.mass_job.as_ref().is_some_and(|j| j.value.is_none()));
+    wait_until(cx, b.window, |cx| b.view.read(cx).ui.mass_job.as_ref().is_some_and(|j| j.value.is_some()));
+    let both = volume(cx);
+    assert!(still_out && !one.is_empty() && pending == one && both != one && !both.is_empty(), "Volume: Part 1 {one:?}, as Part 2 is added {pending:?} (measuring: {still_out}), then {both:?}");
+}

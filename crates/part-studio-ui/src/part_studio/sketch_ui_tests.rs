@@ -2485,6 +2485,45 @@ fn the_appearance_editors_fields_tab_and_enter_as_live(cx: &mut TestAppContext) 
     assert!(cx.update(|cx| view.read(cx).ui.appearance_edit.is_none()), "Enter closed the editor");
 }
 
+/// Live2 mass-appear-1118, the Mixer tab: a press alone in the saturation / value square changes nothing; a drag sets
+/// the colour (the hex follows); a click on the hue strip takes its hue and keeps saturation and value.
+#[gpui::test]
+fn the_appearance_mixer_changes_on_a_drag_not_a_press(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "appearance-mixer");
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_appearance(super::super::appearance::EditTarget::Parts(vec![]), w, cx))).unwrap();
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.ui.appearance_edit.as_mut().unwrap().mixer = true;
+        cx.notify();
+    }));
+    draw(cx, window);
+    let state = |cx: &mut TestAppContext| cx.update(|cx| {
+        let e = view.read(cx).ui.appearance_edit.as_ref().unwrap();
+        (e.rgb, e.hex.read(cx).value().to_string(), e.mix.s, e.mix.v)
+    });
+    let bounds = |cx: &mut TestAppContext, sel: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel).expect(sel);
+    let sq = bounds(cx, "mixer-square");
+    let at = |b: gpui_kit::Bounds<gpui_kit::Pixels>, fx: f32, fy: f32| gpui_kit::point(b.left() + b.size.width * fx, b.top() + b.size.height * fy);
+    let start = state(cx);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at(sq, 0.5, 0.5), modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+    draw(cx, window);
+    let pressed = state(cx);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at(sq, 0.75, 0.25), pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: Modifiers::default() });
+    vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: at(sq, 0.75, 0.25), modifiers: Modifiers::default(), click_count: 1 });
+    draw(cx, window);
+    let dragged = state(cx);
+    let strip = bounds(cx, "mixer-strip");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at(strip, 0.5, 1.0 / 3.0), Modifiers::default());
+    draw(cx, window);
+    let hued = state(cx);
+    let hex = |rgb: [u8; 3]| format!("{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2]);
+    assert_eq!(pressed.0, start.0, "a press alone changes nothing");
+    assert!(dragged.0 != start.0 && dragged.1.to_lowercase().contains(&hex(dragged.0)), "the drag sets the colour and the hex: {dragged:?}");
+    assert!(hued.0 != dragged.0 && (hued.2, hued.3) == (dragged.2, dragged.3), "a hue click keeps saturation and value: {dragged:?} -> {hued:?}");
+}
+
 /// Live (ui-parity appearance-face-row-remove): the appearance editor commits as you type, so Undo turns on with the
 /// first change; ✓ makes the session one undo step, and ✕ puts the appearances back with no step.
 #[gpui::test]

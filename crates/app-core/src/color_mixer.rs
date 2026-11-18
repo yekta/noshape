@@ -76,7 +76,7 @@ pub fn rgb_to_hsv(c: [u8; 3]) -> (f32, f32, f32) {
 
 /// How a view reaches its mixer.
 pub type Field<V> = fn(&mut V) -> Option<&mut MixerState>;
-/// The colour picked (on every press and drag step).
+/// The colour picked (on a hue press and every drag step).
 pub type OnColor<V> = fn(&mut V, [u8; 3], &mut Window, &mut Context<V>);
 
 fn rgba(c: [u8; 3]) -> Rgba {
@@ -114,6 +114,10 @@ pub fn mixer<V: 'static>(st: &MixerState, field: Field<V>, on_color: OnColor<V>,
                 Part::Square => "mixer-square",
                 Part::Strip => "mixer-strip",
             })
+            .debug_selector(move || match part {
+                Part::Square => "mixer-square".into(),
+                Part::Strip => "mixer-strip".into(),
+            })
             .relative()
             .flex_none()
             .h(px(152.))
@@ -123,7 +127,11 @@ pub fn mixer<V: 'static>(st: &MixerState, field: Field<V>, on_color: OnColor<V>,
                 if let Some(m) = field(v) {
                     m.drag = Some(part);
                 }
-                apply(v, part, e.position, c2.get(), window, cx);
+                // Live (mass-appear-1118): a press alone in the square changes nothing, a drag does; a hue click
+                // takes its hue at once (saturation and value kept).
+                if part == Part::Strip {
+                    apply(v, part, e.position, c2.get(), window, cx);
+                }
             }))
             // Moves come wherever the pointer is: only a press that started
             // here drags (the press is remembered in the view's state).

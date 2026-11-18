@@ -1495,7 +1495,7 @@ impl PartStudioView {
             // all parts; behaviours "qa5 (10-26 p4)", qa5 P1-17).
             self.note_unmaterialed_parts(&bodies, cx);
             // The parts' mass properties (and, shown, their variance) off the UI thread, once per parts, model and
-            // densities (two big imported parts take seconds): the values blank meanwhile.
+            // densities (two big imported parts take seconds): the last values stay meanwhile (blank on opening).
             let (measured, var) = if bodies.is_empty() {
                 (None, None)
             } else {
@@ -1515,7 +1515,10 @@ impl PartStudioView {
                     },
                     cx,
                 );
-                match computed {
+                if computed.is_some() {
+                    self.ui.mass_shown.clone_from(&computed);
+                }
+                match computed.or_else(|| self.ui.mass_shown.clone()) {
                     Some((mp, var)) => (mp.map(|mp| noshape_ops::analysis::studio_mass_from(mp, &self.display, &studio, &bodies, reference.as_ref())), var),
                     None => (None, None),
                 }
@@ -2488,6 +2491,7 @@ impl PartStudioView {
             }
         }
         self.show_mass = show;
+        self.ui.mass_shown = None;
         // Show calculation variance isn't kept (live: reopened, it's unticked).
         self.ui.mass_variance = false;
         self.ui.mass_ref_active = false;
