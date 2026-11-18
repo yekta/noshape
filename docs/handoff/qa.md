@@ -141,6 +141,12 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    on its first green vs 0.4.53, 3 rounds -> nightly/tab67-*.txt). Known on 05:00 (lead 03:28). Put fff088e5 in cut-must.txt after the 05:00 cut.
 0r. **05:00 cut GO (04:46, green 9c015658)**; cut-must.txt rewritten for 17:00 (fff088e5; old list cut-must-0500.txt). compat/accepted.txt
    holds lead-accepted differences (sk211-step89), filtered from compat alerts (loop restarted 04:47). qa-suites-resume restarts the suites loop when qa-rest-redo ends (19/24 at 04:50).
+0s. **06:25 state**: v0.4.58 tagged bc1bc18e4 (9c015658 + docs, no fff088e5); qa-pub-0458 (bin/pub0458.sh) runs the published check
+   when release.yml publishes (candidate = the newest green, so later commits may differ: judge by hand) and moves the baseline.
+   qa-wait-67eb: fff088e5 green (debug) vs 0.4.53 at vibex7 load < 2 (at 5-7 0.4.53 shows the late frames too).
+   qa-feat3 (bin/feat3.sh): release CLI of main 7db466c62 built on vibex8 (slot), ab-feat.py 3 runs vs 0.4.57 on impeller /
+   valve-config / hunting-knife, then bin/feat3-pair.py vs live's rbstep-1118 tables: features > 5x live go to blend / core / bool.
+   ASMFEEL x4 verified on 8b4812511 (06:20). 17:00 list written (TICKETS); cut-must.txt: fff088e5 + Ctrl+Enter fix when it lands.
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
