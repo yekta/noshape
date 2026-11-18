@@ -173,6 +173,17 @@ fn rows() -> Vec<Row> {
             // The middle piece is a third of the crossed line.
             expect((dots, (piece / whole * 3.).round()), (2, 1.), "end dots, the lit piece in thirds of the line")
         } },
+        Row { id: "keys / Ctrl+A selects nothing", live: "keys-1118: Ctrl+A in a sketch, the pointer over the graphics, selects nothing (the browser takes it)", gap: false, check: |cx| {
+            let (window, view) = three_lines(cx, "st-ctrl-a", [(300., 600.), (400., 400.), (500., 500.)]);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+            pointer(cx, window, &view, (700., 450.));
+            keys(cx, window, &["secondary-a"]);
+            let picked = cx.update(|cx| {
+                let v = view.read(cx);
+                (v.sketch.as_ref().unwrap().selection.len(), v.selection.len())
+            });
+            expect(picked, (0, 0), "sketch entities, model references selected")
+        } },
         Row { id: "trim / hover reach", live: "sktools-1118: the piece lit tan with the pointer 3–6 px off the line, nothing at 7", gap: false, check: |cx| {
             let (window, view) = three_lines(cx, "st-trim-reach", [(300., 600.), (400., 400.), (500., 500.)]);
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Trim, w, cx))).unwrap();

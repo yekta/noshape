@@ -814,7 +814,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 
 | Finding | Ours | Test |
 |---|---|---|
-| The sketch dialog's Show constraints is per user, written when a sketch is committed (✓), not on ✗; off by default | ? | missing |
+| The sketch dialog's Show constraints is per user, written when a sketch is committed (✓), not on ✗; off by default | = (`save_options_if_changed` on ✓ only, to the user's config file; `SketchOptions::default` off) | sketch_mode `sketch_options_default_as_live` (the save on ✓: missing, the options are process-wide in tests) |
 
 ### hover-pick-1120 (P0, hover reach and priority in iso with the planes shown, live 11-17 20:41)
 
@@ -943,7 +943,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Delete on a used sketch: no dialog, no toast; its users red, the header ⓘ; the tooltip "… did not regenerate properly: Select face or sketch region to extrude." / "1 missing selection" | = | list matrix "keys / Delete on a used sketch: no dialog, its user fails" |
 | The sketch row's menu, in live's order | = | list matrix "menu / two sketches" (the one-sketch order: missing) |
 | Sketch Ctrl+C / Ctrl+V: the copy centred on the pointer, selected, the Transform tool on it, constraints copied [skasm] | = | editing matrix "copy / sketch entities paste under the pointer" |
-| Ctrl+A in a sketch selects nothing [skasm] | ? | missing |
+| Ctrl+A in a sketch selects nothing [skasm] | = (no graphics binding) | sketch tools matrix "keys / Ctrl+A selects nothing" |
 | Tab from the graphics: Measure → Analysis tools → Mass → out; Shift+Tab back; no row or toolbar button a stop | = | list matrix "keys / Tab from the graphics: Measure, Analysis tools, Mass properties, then out; Shift+Tab back" |
 
 ### nav-1117 (P0, navigation gaps, live 11-17 23:13)
@@ -1004,7 +1004,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 | Another feature row clicked while sketching: nothing | = | list matrix "sketching / another row clicked does nothing" |
 | Editing a sketch rolls back: later rows grey italic, Parts (2) → (1); "Final"; ✗ brings them back | = | list matrix "sketching / later rows grey and the Parts list follows, ✗ brings them back" ("Final": missing) |
 | A hidden later sketch stays hidden while editing | = | missing |
-| Drawing on a face: the light-blue preview, then the solved lines [skasm] | ? | missing |
+| Drawing on a face: the light-blue preview, then the solved lines [skasm] | ≈ faster: the solved lines in the closing click's frame (live's 0.58 s preview is its server solve) | missing |
 | Orient normal to sketch on edit: an animated turn once the edit opens; ✗ leaves the view normal | = | sketch_ui_tests::orient_on_edit_turns_to_the_sketch_and_exit_keeps_the_view |
 
 ### toolbar-highlight (Search tools' highlight, live 11-17 09:43)
@@ -1161,7 +1161,7 @@ live (by its test or the code), "≠" a known difference, "?" not checked yet. P
 |---|---|---|
 | Fillets: only fillet faces of the seed's body, by compare type (a torus by its minor radius); Matching: the seed's body only, same size and shape | = | model tests features_b::query_variable_fillets_and_matching_as_live |
 | The dialog shows no count | ? | missing |
-| Coincident of a circle / ellipse with a fixed point translates the curve the shortest way, size kept; a free point moves onto it [skasm] | ? | missing |
+| Coincident of a circle / ellipse with a fixed point translates the curve the shortest way, size kept; a free point moves onto it [skasm] | = (fixed 11-18, constructive.rs) | onshape_ux `a_curve_onto_a_held_point_moves_whole_with_its_size_kept` |
 
 ### consts-1118 (feel constants: context-menu timing, double-click windows, live 11-18 06:48)
 
