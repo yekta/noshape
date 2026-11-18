@@ -665,7 +665,9 @@ Same two-blocks Part Studio and assembly as live (ours has Part 2 in the assembl
   ps-feel2 1201-1205, chips 1233-1234.
 
 ## c2-impeller-loft per feature after core's reverts (qa 17:2x: release CLI of 515102325 vs v0.4.58, vibex7, 5 alternating runs, load 2 -> 20: hints; live = live's 15:33 step table, impeller-1118b.md)
-Total ours 37.8 s (v0.4.58 31.1 s; geometry differs since Fillet 4 now builds, parts_same False: no regression claim) vs live 2.6 s.
+Total ours 37.8 s (5 runs 25.7-53.6 s, vibex7 load 2 -> 20; v0.4.58 31.1 s, 27.7-54.8 s; geometry differs since Fillet 4 now builds,
+parts_same False: no regression claim) vs live 2.6 s. **The whole-document gap counts (DECISIONS 11-18: >= 100 ms and >= 2x); the
+per-feature rows below are owners' leads, not gaps (superseded 18:2x).**
 | feature | ours ms | live ms | × | owner |
 |---|---|---|---|---|
 | Fillet 3 | 11231 | 101.5 | ×111 | blend |
@@ -682,6 +684,12 @@ Total ours 37.8 s (v0.4.58 31.1 s; geometry differs since Fillet 4 now builds, p
 | Flansch (vorne) verbreitern (Move face) | 601 | 5 | ×120 | core |
 
 ## Slower than live per feature: live's rollback step costs (live 14:1x, live/qa/rbstep-1118/tables2.md) vs ours today (qa 14:5x)
+**Superseded 18:2x by DECISIONS 11-18 (user: human scale, 9e5b481d4): per-feature ratios are not gaps; the rows below are owners' leads
+only.** Whole-document rebuilds, ours = release build of 80a64725 on vibe2 at nice 10, load ~20 (two passes, the range), live = step
+sum: counts (>= 100 ms and >= 2x) only if a Mac re-time agrees (DECISIONS 11-16; blend's Mac fillet times were 3-5x below these):
+cf-snap-hook 983-987 vs 276 ms; c2-fan-blade-sweep 1825-2000 vs 916; motor-mount-jack 199-382 vs 52; learning-center-michael 311-738
+vs 95; cf-spur-gear 1913-2343 vs 720; c2-rings-loft 2539-3701 vs 1405 (1.8-2.6x). Below the bar (< 100 ms apart): c2-tpd-fillet-variable
+142-169 vs 55, c2-helical-sweep 126-129 vs 40, c2-bottle-split 98-126 vs 47, c2-variable-fillet-faceblend 131-146 vs 42.
 Ours: release build of 80a64725 (qa's 08:53 sweep, vibe2 at nice 10, loaded: hints), two passes; live: step ms (≈ its full-regen
 per-feature time). Each owner re-times on the Mac (DECISIONS 11-16) before and after a fix.
 | document | feature | ours ms | live step ms | × | owner |
