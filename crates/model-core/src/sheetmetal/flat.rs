@@ -140,6 +140,20 @@ impl FlatPattern {
         }
     }
 
+    /// The flat's outline edge a face across a wall's thickness shows (a rip's side face), on the flat view's top:
+    /// the face goes flat with the wall it closes, the one it stands square to.
+    pub fn flat_view_side_edge(&self, face: &Shape) -> Option<(DVec3, DVec3)> {
+        let p = self.place.as_ref()?;
+        let n = face.face_plane().ok()??.unit_normal();
+        let pts: Vec<DVec3> = face.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect();
+        let reach = self.thickness * 1.001 + 1e-9;
+        let near = |s: &Shape, q: DVec3| k::make_vertex(q).ok().and_then(|v| k::distance(&v, s).ok()).is_some_and(|d| d.distance <= reach);
+        let (_, m) = p.walls.iter().find(|(def, m)| m.transform_vector3(n).z.abs() < 1e-6 && pts.iter().all(|q| near(def, *q)))?;
+        let on: Vec<DVec2> = pts.iter().map(|q| m.transform_point3(*q).truncate()).collect();
+        let (a, b) = on.iter().flat_map(|a| on.iter().map(move |b| (*a, *b))).max_by(|x, y| x.0.distance_squared(x.1).total_cmp(&y.0.distance_squared(y.1)))?;
+        Some((a.extend(p.front), b.extend(p.front)))
+    }
+
     /// The bend lines in the flat view's place (on its top).
     pub fn flat_view_bend_lines(&self) -> Vec<(DVec3, DVec3)> {
         self.bend_lines.iter().map(|b| (self.flat_view_point(b.a), self.flat_view_point(b.b))).collect()

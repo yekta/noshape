@@ -16,6 +16,18 @@ use noshape_render::{Drawable, Instance, LineData, LineSegment, Scene, StandardV
 use glam::DVec3;
 use std::sync::Arc;
 
+/// What the flat view shows: the pattern, the selected and hovered bends, the hovered joint, the sketches' hash.
+type ShownKey = (usize, Option<usize>, Option<usize>, Option<usize>, u64);
+
+/// The bends and joint marked on the flat: the selected bend (`highlight`), the hovered one, and the hovered joint row
+/// with its rip's faces.
+#[derive(Default)]
+pub struct FlatMarks {
+    pub highlight: Option<usize>,
+    pub hovered: Option<usize>,
+    pub joint: Option<(usize, Vec<noshape_kernel::Shape>)>,
+}
+
 pub struct FlatView {
     gpu: Gpu,
     pub viewport: Entity<Viewport>,
@@ -23,7 +35,9 @@ pub struct FlatView {
     cube_origin: Option<Point<Pixels>>,
     /// The pattern shown (by identity) and its highlighted bend: a change
     /// rebuilds the scene.
-    shown: Option<(usize, Option<usize>, Option<usize>, u64)>,
+    shown: Option<ShownKey>,
+    /// The hovered joint row's rip: its edges on the flat (live 11-17 sm-feel-1117).
+    joint_edges: Vec<(DVec3, DVec3)>,
     /// The pattern shown and its highlighted (table-selected) bend.
     flat: Option<(Arc<FlatPattern>, Option<usize>)>,
     /// The flat's display, its built scene and the overlays (bend lines,
@@ -162,14 +176,15 @@ impl FlatView {
             ViewportEvent::CameraChanged if this.fitted.is_some_and(|c| c != this.viewport.read(cx).camera) && this.viewport.read(cx).size() == this.fit_size => this.pending_fit = false,
             _ => {}
         });
-        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, flat: None, parts: None, hover: None, bend_hover: None, sides: Vec::new(), selected: None, picked: None, sketch_scene: None, selected_bend: None, sketch_frame: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
+        Self { gpu, viewport, cube_hover: None, cube_origin: None, shown: None, joint_edges: Vec::new(), flat: None, parts: None, hover: None, bend_hover: None, sides: Vec::new(), selected: None, picked: None, sketch_scene: None, selected_bend: None, sketch_frame: None, pending_fit: false, fit_size: glam::DVec2::ZERO, fitted: None, _sub: sub }
     }
 
     /// Show `flat` in `color` (linear RGBA, the part's). The first pattern
     /// fits the Top view; later ones keep the camera (live: editing the
     /// model keeps the flat view's zoom).
-    /// `sketches`: the sketches on the flat (live 2468: shown here, not in the main view).
-    pub fn show(&mut self, flat: Option<&Arc<FlatPattern>>, color: [f32; 4], highlight: Option<usize>, hovered: Option<usize>, sketches: Vec<noshape_model::display::SketchDisplay>, cx: &mut Context<Self>) {
+    /// `sketches`: the sketches on the flat (live 2468: shown here, not in the main view). `marks`' joint: the hovered
+    /// joint row and its rip's faces, outlined where they lie on the flat.
+    pub fn show(&mut self, flat: Option<&Arc<FlatPattern>>, color: [f32; 4], marks: FlatMarks, sketches: Vec<noshape_model::display::SketchDisplay>, cx: &mut Context<Self>) {
         let drawn = {
             use std::hash::{Hash, Hasher};
             let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -182,14 +197,16 @@ impl FlatView {
             }
             h.finish()
         };
-        let key = flat.map(|f| (Arc::as_ptr(f) as usize, highlight, hovered, drawn));
+        let FlatMarks { highlight, hovered, joint } = marks;
+        let key = flat.map(|f| (Arc::as_ptr(f) as usize, highlight, hovered, joint.as_ref().map(|j| j.0), drawn));
         if key == self.shown {
             return;
         }
         self.pending_fit |= self.shown.is_none();
         self.shown = key;
         self.flat = flat.map(|f| (f.clone(), highlight));
-        self.parts = flat.and_then(|f| flat_parts(f, color, highlight, hovered, sketches, &self.gpu));
+        self.joint_edges = flat.zip(joint).map(|(f, (_, faces))| faces.iter().filter_map(|s| f.flat_view_side_edge(s)).collect()).unwrap_or_default();
+        self.parts = flat.and_then(|f| flat_parts(f, color, highlight, hovered, &self.joint_edges, sketches, &self.gpu));
         self.sides = flat.and_then(|f| f.flat_view_solid()).map(|s| s.faces().iter().map(|f| f.face_plane().ok().flatten().map(|p| p.unit_normal().z)).map(|z| z.filter(|z| z.abs() > 0.5).map(|z| z > 0.0)).collect()).unwrap_or_default();
         self.hover = None;
         self.compose(true, cx);
@@ -282,6 +299,12 @@ impl FlatView {
         let mid = (z[0] + z[1] + z[2] + z[3]) * 0.25;
         let edge = (z[2] + z[3]) * 0.5;
         self.viewport.read(cx).project(mid + (edge - mid) * frac)
+    }
+
+    /// The hovered joint's edges on the flat (flat view coordinates).
+    #[cfg(test)]
+    pub(crate) fn joint_edges(&self) -> &[(DVec3, DVec3)] {
+        &self.joint_edges
     }
 
     pub fn bend_of_line(&self, line: usize) -> Option<usize> {
@@ -408,7 +431,7 @@ impl FlatView {
 
 /// The flat's display and scene, and its overlays: the bend lines, the
 /// selected bend's strip and the hovered row's outline.
-fn flat_parts(flat: &FlatPattern, color: [f32; 4], highlight: Option<usize>, hovered: Option<usize>, sketches: Vec<noshape_model::display::SketchDisplay>, gpu: &Gpu) -> Option<(StudioDisplay, crate::scene_builder::BuiltScene, Vec<Instance>)> {
+fn flat_parts(flat: &FlatPattern, color: [f32; 4], highlight: Option<usize>, hovered: Option<usize>, joint_edges: &[(DVec3, DVec3)], sketches: Vec<noshape_model::display::SketchDisplay>, gpu: &Gpu) -> Option<(StudioDisplay, crate::scene_builder::BuiltScene, Vec<Instance>)> {
     let mut display = noshape_model::regen::flat_view_display(flat, color)?;
     // (They lie on the flat: shown here as the main view would, were it showing the flat.)
     display.sketches = sketches.into_iter().map(|s| noshape_model::display::SketchDisplay { on_flat: false, ..s }).collect();
@@ -434,6 +457,10 @@ fn flat_parts(flat: &FlatPattern, color: [f32; 4], highlight: Option<usize>, hov
         let n = glam::DVec2::new(-d.y, d.x) * (l.allowance / 2.0);
         let p = |q: glam::DVec2| (flat.flat_view_point(q) + glam::DVec3::Z * 2e-5).as_vec3().to_array();
         outline.push_polyline(&[p(l.a - n), p(l.b - n), p(l.b + n), p(l.a + n), p(l.a - n)], [0xff, 0xc6, 0x85, 0xff], 0, 3.0, LineSegment::ON_TOP);
+    }
+    for (a, b) in joint_edges {
+        let p = |q: DVec3| (q + DVec3::Z * 2e-5).as_vec3().to_array();
+        outline.push_polyline(&[p(*a), p(*b)], [0xff, 0xc6, 0x85, 0xff], 0, 3.0, LineSegment::ON_TOP);
     }
     if !outline.segments.is_empty() {
         extra.push(Instance::new(Drawable::Lines(gpu.uploader().upload_lines(&outline))).per_primitive_color().unpickable().layer(13));

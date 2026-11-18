@@ -1100,6 +1100,17 @@ impl PartStudioView {
             Some((0, row, _)) => Some(row),
             _ => self.ui.sm_flat_hover,
         };
+        // Live 11-17 sm-feel-1117: a joint row hovered lights its rip's edges on the flat too.
+        let joint = match self.ui.sm_hover {
+            Some((1, row, _)) => bodies.first().and_then(|(b, _)| self.context.as_ref()?.body(b)).map(|body| {
+                let faces = self.sm_rip_refs(row).into_iter().filter_map(|r| match r {
+                    Reference::Face(n) => body.faces.iter().position(|f| **f == n).and_then(|i| body.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()),
+                    _ => None,
+                });
+                (row, faces.collect())
+            }),
+            _ => None,
+        };
         // An open sketch on a face of the flat's part: the face's box on the
         // flat, with a margin, and the sketch's name at its top-left (live
         // request 1605, g-4).
@@ -1144,7 +1155,7 @@ impl PartStudioView {
         };
         let on_flat: Vec<noshape_model::display::SketchDisplay> = self.display.sketches.iter().filter(|s| s.on_flat && !s.hidden && flat_part.is_some() && plane_part(s.feature) == flat_part).cloned().collect();
         fv.update(cx, |v, cx| {
-            v.show(flat.as_ref(), color, highlight, hovered, on_flat, cx);
+            v.show(flat.as_ref(), color, super::flat_view::FlatMarks { highlight, hovered, joint }, on_flat, cx);
             v.show_sketch_frame(sketch_frame, cx);
         });
 

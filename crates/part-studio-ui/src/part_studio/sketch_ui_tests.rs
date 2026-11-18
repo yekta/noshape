@@ -1447,6 +1447,19 @@ fn another_sketchs_point_snaps_from_its_square(cx: &mut TestAppContext) {
     };
     assert!(!at(cx, 12.0), "12 px off: free");
     assert!(at(cx, 6.5), "6.5 px along x: on the point");
+    // Live 11-18 use-glyph: the click makes one Coincident to the point and uses nothing: no use glyph, the point not
+    // drawn in this sketch.
+    let p = on_screen(cx, &view, q + DVec2::new(6.5 * wpp, 0.0));
+    click(cx, window, &view, (p.x, p.y));
+    let (coincident, used, uses) = cx.update(|cx| {
+        let v = view.read(cx);
+        let (d, ed) = (v.sketch_data(cx).unwrap(), v.sketch.as_ref().unwrap());
+        let ext = |e: noshape_sketch::EntityId| d.sketch.entity(e).is_some_and(|x| x.external);
+        let coincident = d.sketch.constraints().filter(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Coincident { a, b } if ext(a) || ext(b))).count();
+        let used = d.sketch.entities().filter(|e| e.external && !e.reference_only && e.kind() == noshape_sketch::EntityKind::Point).count();
+        (coincident, used, ed.constraint_glyphs(&d).iter().filter(|g| g.icon == "use").count())
+    });
+    assert_eq!((coincident, used, uses), (1, 0, 0), "(a Coincident to the point, used points, use glyphs)");
 }
 
 /// qa 11-17 SKSNAP-MODEL-EDGE (live 11-17 sketch-snap-1117 rows 1, 3): in a new sketch on Top under a block, the

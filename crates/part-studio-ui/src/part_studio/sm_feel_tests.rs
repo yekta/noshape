@@ -145,7 +145,7 @@ fn rows() -> Vec<Row> {
             }
             Ok(())
         } },
-        Row { id: "table / a joint row hovered lights its rip", live: "hovering Joint A (a rip) lights it in the 3D view (live 11-17 sm-feel-1117; its flat edges too: not yet)", gap: false, check: |s, cx| {
+        Row { id: "table / a joint row hovered lights its rip", live: "hovering Joint A (a rip) lights it in the 3D view and its edges in the flat view (live 11-17 sm-feel-1117)", gap: false, check: |s, cx| {
             s.press(cx, "sm-cell-0-0-0", MouseButton::Right)?;
             let label = cx
                 .update(|cx| s.view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_else(|| crate::os_menu::open_labels(cx)))
@@ -159,7 +159,8 @@ fn rows() -> Vec<Row> {
             gpui_kit::VisualTestContext::from_window(s.window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: NONE });
             s.frames(cx);
             let lit = cx.update(|cx| s.view.read(cx).sm_hover_refs());
-            expect(!lit.is_empty() && lit.iter().all(|r| matches!(r, Reference::Face(_))), true, "the rip's faces lit")
+            let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).joint_edges().len())).ok_or("no flat view")?;
+            expect((!lit.is_empty() && lit.iter().all(|r| matches!(r, Reference::Face(_))), flat > 0), (true, true), "(the rip's faces lit in 3D, its edges on the flat)")
         } },
         Row { id: "flange / no manipulator", live: "the Flange dialog shows a preview wall and no length arrow", gap: false, check: |s, cx| {
             cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| v.start_feature("sheetMetalFlange", w, cx))).unwrap();
@@ -168,6 +169,16 @@ fn rows() -> Vec<Row> {
             cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
             s.frames(cx);
             expect(manip, false, "a manipulator")
+        } },
+        Row { id: "flange / the flip button ends the Bend angle row", live: "[Bend angle ▾] with the opposite-direction arrow button at the right of that row; nothing in the graphics (live 11-17 sm-feel-1117)", gap: false, check: |s, cx| {
+            cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| v.start_feature("sheetMetalFlange", w, cx))).unwrap();
+            s.frames(cx);
+            let (row, flip, own) = (s.bounds(cx, "row-angleControlType"), s.bounds(cx, "flip-oppositeDirection"), s.bounds(cx, "row-oppositeDirection"));
+            cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+            s.frames(cx);
+            let (row, flip) = (row.ok_or("no Angle control type row")?, flip.ok_or("no flip button")?);
+            let inside = flip.top() >= row.top() && flip.bottom() <= row.bottom() && f32::from(row.right() - flip.right()).abs() <= 12.0;
+            expect((inside, own.is_some()), (true, false), "(the button at the right of the row, a row of its own)")
         } },
         Row { id: "flange / its edges box lights edges and side faces, never a wall's faces", live: "Edges or side faces to flange: rim and bend edges and a rip's thin side face light; the walls' broad faces never (live 11-17 sm-feel-1117)", gap: false, check: |s, cx| {
             cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| v.start_feature("sheetMetalFlange", w, cx))).unwrap();

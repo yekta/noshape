@@ -2274,8 +2274,9 @@ impl SketchEditor {
         if let Some(inf) = &click.inference
             && inf.kind == InferenceKind::Endpoint
             && let Some(AutoConstraint::CoincidentPoint(p)) = inf.constraints.first()
-            // On the Origin: a point of its own, coincident (live).
-            && !is_origin(sk, *p)
+            // On the Origin, another sketch's point or a model vertex: a point of its own, coincident (live; 11-18
+            // use-glyph).
+            && !sk.entity(*p).is_some_and(|e| e.reference_only)
         {
             let rest = inf.constraints.iter().skip(1).copied().collect();
             return (*p, rest);
@@ -2401,8 +2402,10 @@ impl SketchEditor {
             }
         }
         let Some(ExternalSnap::Vertex { position, reference }) = self.external_snap.clone() else { return };
-        // (Edge snaps are linked by the view, which can project the edge.)
+        // (Edge snaps are linked by the view, which can project the edge.) Live 11-18 use-glyph: the snap makes only a
+        // Coincident to the point, not a used (projected) point: no use glyph.
         let id = data.sketch.use_external_point(position);
+        let _ = data.sketch.set_reference_only(id, true);
         data.external_refs.insert(id.0, reference);
         if let Some(inf) = &mut self.inference {
             inf.kind = InferenceKind::Endpoint;
@@ -6889,8 +6892,9 @@ fn attach(sk: &mut Sketch, pt: EntityId, curve: Option<EntityId>, click: &Click)
                     continue;
                 }
                 // Live (ORIGIN-COINCIDENT-GLYPH; REST: COINCIDENT start-to-Origin):
-                // a point on the Origin gets a Coincident, with its glyph.
-                if is_origin(sk, q) {
+                // a point on the Origin gets a Coincident, with its glyph; so does one on a point outside the sketch
+                // it doesn't use (live 11-18 use-glyph: another sketch's point, a model vertex).
+                if is_origin(sk, q) || sk.entity(q).is_some_and(|e| e.reference_only) {
                     let _ = sk.add_constraint(ConstraintKind::Coincident { a: pt, b: q });
                     continue;
                 }
