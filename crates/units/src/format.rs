@@ -138,10 +138,11 @@ fn zero_tolerance(dim: Dim) -> f64 {
 /// Live's value formatter writes a value in exponent form when |v| ≥ 1e6, |v| ≤ 1e-5 or it rounds to 0 ("2.000e+6
 /// mm", "4.000e-4 mm"); below the zero tolerance it is "0".
 pub fn format_quantity(q: Quantity, prefs: &UnitPrefs) -> String {
-    let decimals = if q.dim == Dim::ANGLE {
-        prefs.angle_precision
-    } else {
-        prefs.length_precision
+    // A unit of lengths and angles takes the larger of their precisions (live numfmt-1118: "deg mm" at 2 / 4 shows 4).
+    let decimals = match (q.dim.length != 0, q.dim.angle != 0) {
+        (true, true) => prefs.length_precision.max(prefs.angle_precision),
+        (false, true) => prefs.angle_precision,
+        _ => prefs.length_precision,
     };
     let v = q.value / prefs.si_factor(q.dim);
     if !q.dim.is_unitless() && q.value.abs() < zero_tolerance(q.dim) {
@@ -256,6 +257,18 @@ mod tests {
 #[cfg(test)]
 mod live_format_tests {
     use super::*;
+
+    /// Live numfmt-1118: a compound unit shows the largest precision of its units; a pure length or angle its own.
+    #[test]
+    fn a_compound_unit_takes_its_units_largest_precision() {
+        let prefs = UnitPrefs { length_precision: 2, angle_precision: 4, ..UnitPrefs::default() };
+        let q = Quantity::mm(1.0) * Quantity::degrees(2.123456);
+        assert_eq!(format_quantity(q, &prefs), "2.1235 deg mm");
+        assert_eq!(format_quantity(Quantity::mm(1.123456), &prefs), "1.12 mm");
+        assert_eq!(format_quantity(Quantity::degrees(1.123456), &prefs), "1.1235°");
+        let flipped = UnitPrefs { length_precision: 4, angle_precision: 2, ..UnitPrefs::default() };
+        assert_eq!(format_quantity(q, &flipped), "2.1235 deg mm");
+    }
 
     /// Live's formatValue (behaviours "number and unit display rules", 11-18): Math.round of the float product.
     #[test]
