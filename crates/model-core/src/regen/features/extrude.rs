@@ -371,10 +371,12 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     let mut tools = Vec::new();
+    let mut ends: Vec<Vec<DVec3>> = Vec::new();
     for (sketch, entity) in &curves {
         let Some(s) = ev.ctx.sketch_holding(*sketch, *entity).cloned() else { continue };
         // Every curve kind (splines and conics too, live: cf-curve-pattern-normal's fit spline).
         let Some(edge) = super::bshared::sketch_edge(ev, *sketch, *entity)? else { continue };
+        ends.push(edge.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect());
         let dir = if ev.bool("oppositeDirection") { -s.frame.normal } else { s.frame.normal };
         let res = sheet_extrude(ev, &edge, &s.frame, dir)?;
         let mut roles = std::collections::BTreeMap::new();
@@ -387,11 +389,30 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
     if tools.is_empty() {
         return crate::regen::eval::err_at(&["surfaceEntities"], "Select sketch curves to extrude.");
     }
-    let shapes: Vec<k::Shape> = tools.iter().map(|t| t.shape.clone()).collect();
-    let sewn = if shapes.len() > 1 { k::sew(&shapes, 1e-6, false).map(|r| r.shape).unwrap_or_else(|_| k::Shape::compound(&shapes)) } else { shapes[0].clone() };
-    let names: Vec<_> = tools.iter().flat_map(|t| t.names.faces.clone()).collect();
-    let named = if sewn.count(k::ShapeType::Face) == names.len() { NamedShape::new(sewn, names) } else { tools.remove(0) };
-    ev.apply_operation(vec![named], "NEW", None, BodyKind::Surface)
+    // One surface per chain of curves meeting end to end, as live (c2-surf-intro-simple's Extrude 1: a spline apart
+    // from a rectangle, 2 surfaces).
+    let mut chains: Vec<(Vec<NamedShape>, Vec<DVec3>)> = Vec::new();
+    for (tool, points) in tools.into_iter().zip(ends) {
+        let mut chain = (vec![tool], points);
+        let mut i = chains.len();
+        while i > 0 {
+            i -= 1;
+            if chains[i].1.iter().any(|p| chain.1.iter().any(|q| p.distance(*q) <= 1e-6)) {
+                let (t, p) = chains.remove(i);
+                chain.0.extend(t);
+                chain.1.extend(p);
+            }
+        }
+        chains.push(chain);
+    }
+    for (i, (mut tools, _)) in chains.into_iter().enumerate() {
+        let shapes: Vec<k::Shape> = tools.iter().map(|t| t.shape.clone()).collect();
+        let sewn = if shapes.len() > 1 { k::sew(&shapes, 1e-6, false).map(|r| r.shape).unwrap_or_else(|_| k::Shape::compound(&shapes)) } else { shapes[0].clone() };
+        let names: Vec<_> = tools.iter().flat_map(|t| t.names.faces.clone()).collect();
+        let named = if sewn.count(k::ShapeType::Face) == names.len() { NamedShape::new(sewn, names) } else { tools.remove(0) };
+        ev.add_new_bodies(named, BodyKind::Surface, i as u32)?;
+    }
+    Ok(())
 }
 
 /// One curve's sheet with the solid's end conditions (std extrude.fs: opExtrude of the curves): blind, symmetric,

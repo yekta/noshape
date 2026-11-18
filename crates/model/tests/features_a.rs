@@ -358,6 +358,24 @@ fn a_loft_through_two_curved_faces() {
     assert_eq!(solid.shape.faces().len(), 6);
 }
 
+/// A surface Extrude makes one surface per chain of curves meeting end to end, as live (c2-surf-intro-simple's
+/// Extrude 1): a rectangle's 4 sides one 4-face tube, an arc apart from it one face of its own.
+#[test]
+fn a_surface_extrude_makes_one_surface_per_chain_of_curves() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let c = [DVec2::new(0.0, 0.0), DVec2::new(0.02, 0.0), DVec2::new(0.02, 0.01), DVec2::new(0.0, 0.01)];
+    let mut picks: Vec<u32> = (0..4).map(|i| sk.add_line(c[i], c[(i + 1) % 4]).0).collect();
+    picks.push(sk.add_arc(DVec2::new(0.05, 0.0), DVec2::new(0.06, 0.0), DVec2::new(0.04, 0.0)).0);
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let refs = picks.into_iter().map(|entity| Reference::SketchEntity { sketch: s, entity }).collect();
+    t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(refs)), ("depth", e("10 mm"))]);
+    let res = t.ok();
+    let mut faces: Vec<usize> = res.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Surface).map(|b| b.shape.faces().len()).collect();
+    faces.sort();
+    assert_eq!(faces, vec![1, 4], "a surface for the arc and one for the rectangle");
+}
+
 /// std Loft (loft.fs): a connection on edges sits at each edge's connectionEdgeParameters (std's editing logic puts a
 /// new pick at 0.5, its connection manipulator "connection,edge" moves it along the edge's tangent), and, as live
 /// 1810, adds no vertex, edge or face: between parallel edges the side face stays a plane (the frustum, 7000 mm³, 6
