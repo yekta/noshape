@@ -111,6 +111,14 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    Green 5076e98c (01:15) has psui 8d2e0056, skasm a6236ed3a stack, psui 591643fc: run the owed re-checks (0i, 0j) on it.
    Loft: qa-lp-verify done 01:10 on 0f7610c8 (revert in): Mirror 1 37/83/51 vs live 27/67/47 (Loft 3 20/42/26 vs 15/33/23);
    volume not measured.
+0l. **Suites off the watcher host (lead 01:30)**: run 1117-2103-592b0fc9's assembly stage was on vibex6 (7/24 done): qa-suites stopped,
+   own orphaned test killed, stage rerun on vibex8 by unit qa-rest-redo (bin/rest-redo.sh <run> <host>: rest stage + qa-suites.sh's
+   collection / diff / index). qa-suites.sh defaults now H=vibex8 (and SH=vibex8 at night). **The loop (qa-suites) is stopped: restart
+   after the 05:00 cut** (systemd-run -E HOME=/root -E PATH=$PATH --unit=qa-suites --collect bash -c 'cd /root/qa-scratch && exec bash
+   bin/qa-suites-loop.sh'); its UI stage still uses vibex6 21:30-04:05 (UH): ask the lead before the next night.
+   Re-checks done 01:20-01:32 on 5076e98c: Flange broad face + joint-row hover fixed (skasm); bar / Mass / `[` pass, measure angle
+   x=40 pair open with live2 (psui: live's 123.69 was the second wedge); model-edge glyph after the click fixed; sweep / hv analysis
+   pending (sk/sw5, hv5: python3 ana.py sw sw5 / hv hv5).
 0f. **Waiting**: qa-uh5e49 (psui's latest-wins 5e498ffb: uh/uh3.sh x3, shots 0.7 / 1.5 / 3 s, on its first green -> uh/g5e/lit.txt
    + qa-alerts; send psui the numbers); qa-sellat (sf/sellat-night.sh: selection latency, v0.4.57 release on vibex7 after the
    nightly, before 04:00 -> nightly/sellat-<mmdd>.txt; polled crops, so each number includes ~30-60 ms of grab time).
