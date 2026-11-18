@@ -6503,8 +6503,9 @@ impl SketchEditor {
             let period = b - a;
             let at = |t: f64| curve.point(if curve.is_periodic() && t > b { t - period } else { t });
             let pts: Vec<DVec2> = (0..=n).map(|i| at(t0 + (t1 - t0) * i as f64 / n as f64)).collect();
+            // The piece tan (live2 sktools-1118: rgb(214, 189, 149)), its end dots orange.
+            wide.push((pts, crate::palette::rgb8(crate::palette::viewport::TRIM_PIECE), 4.0));
             let color = crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT);
-            wide.push((pts, color, 4.0));
             for q in [at(t0), at(t1)] {
                 points.points.push(PointSprite { position: w(q), color, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
             }

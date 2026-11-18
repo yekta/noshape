@@ -173,6 +173,24 @@ fn rows() -> Vec<Row> {
             // The middle piece is a third of the crossed line.
             expect((dots, (piece / whole * 3.).round()), (2, 1.), "end dots, the lit piece in thirds of the line")
         } },
+        Row { id: "trim / hover reach", live: "sktools-1118: the piece lit tan with the pointer 3–6 px off the line, nothing at 7", gap: false, check: |cx| {
+            let (window, view) = three_lines(cx, "st-trim-reach", [(300., 600.), (400., 400.), (500., 500.)]);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Trim, w, cx))).unwrap();
+            let lit = [6., 7.].map(|d| {
+                pointer(cx, window, &view, (350., 300. - d));
+                cx.update(|cx| {
+                    let v = view.read(cx);
+                    let (ed, data) = (v.sketch.as_ref().unwrap(), v.sketch_data(cx).unwrap());
+                    let vp = v.viewport.read(cx);
+                    let (o, dir) = vp.ray(vp.pointer_position());
+                    let p = ed.plane_point(o, dir).unwrap();
+                    let sk = &data.sketch;
+                    let level = sk.entities().find(|e| sk.curve(e.id).is_some_and(|c| matches!(c, noshape_sketch::Curve2::Line { a, b } if (a.y - b.y).abs() < 1e-12))).unwrap().id;
+                    v.in_sketch_reach(level, p, cx)
+                })
+            });
+            expect(lit, [true, false], "lit at 6 px, at 7 px")
+        } },
         Row { id: "trim / a drag removes every piece its trail crosses", live: "tr0: after the middle piece's trim, one stroke across H's left piece and the line at -70 removes both (that line whole, nothing crosses it any more)", gap: false, check: |cx| {
             // live's -100..0 at y 40, verticals at -70 and -40 (20..60), at 3 px a millimetre.
             let (window, view) = three_lines(cx, "st-trim-drag", [(300., 600.), (390., 390.), (480., 480.)]);

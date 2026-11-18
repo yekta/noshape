@@ -1,5 +1,5 @@
 //! A line's constraint glyphs after the pointer leaves it (qa 11-17, the user's flow on c330a760): they linger briefly
-//! so the pointer can reach them, then go, with no further pointer move to redraw them away.
+//! so the pointer can reach them, then go, with no further pointer move to redraw them away; a glyph's hover reach.
 
 use super::feel::{Pointer, gpu_pointer};
 use super::*;
@@ -125,4 +125,19 @@ fn a_hovered_lines_glyphs_wait_by_the_pointer(cx: &mut TestAppContext) {
     });
     assert_eq!(hovered, Some(first), "the pointer reached the row's first glyph, by its spot on the line");
     assert!(lit, "the line stays lit as the hovered glyph's partner");
+    // Live2 sktools-1118: lit to 14 px from the tile's centre (4 px past its 20 px edge), off at 15–16; straight out from
+    // the line, away from the row's other glyphs.
+    let (ox, oy) = (f32::from(glyph.x - spot.x), f32::from(glyph.y - spot.y));
+    let n = (ox * ox + oy * oy).sqrt();
+    let reach: Vec<(f32, Option<noshape_sketch::ConstraintId>)> = [13.0f32, 16.0]
+        .into_iter()
+        .map(|d| {
+            let at = gpui_kit::point(glyph.x + px(ox / n * d), glyph.y + px(oy / n * d));
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            vcx.simulate_mouse_move(at, None, Modifiers::default());
+            draw(cx, window);
+            (d, cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover_constraint))
+        })
+        .collect();
+    assert_eq!(reach, vec![(13.0, Some(first)), (16.0, None)], "the glyph lit 13 px from its centre, not 16");
 }

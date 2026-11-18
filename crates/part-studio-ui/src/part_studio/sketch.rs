@@ -178,6 +178,10 @@ fn glyph_linger_redraw(cx: &mut Context<PartStudioView>) -> Task<()> {
     })
 }
 
+/// The clear margin round a constraint glyph's 20 px tile that still hovers it (live2 sktools-1118: lit to 14 px from
+/// its centre, off at 15–16).
+const GLYPH_MARGIN: f32 = 4.0;
+
 /// How long a left entity's glyphs stay shown after its orange goes, so the pointer can reach them (live2 feel-1417:
 /// 0.4–0.7 s).
 const GLYPH_LINGER: std::time::Duration = std::time::Duration::from_millis(550);
@@ -733,13 +737,18 @@ impl PartStudioView {
     /// MOUSE_PICK_RADIUS_PX) counting its 2 px drawn width (ui-parity sketch-offset hits a line 3 mm off it,
     /// sketch-offset-key misses one 5 mm off). The Dimension tool's preselection reaches a line from 8 px, not 9
     /// (live/feel/sketch-snaps.json "toolNotes").
-    fn in_sketch_reach(&self, e: noshape_sketch::EntityId, p: DVec2, cx: &App) -> bool {
+    pub(super) fn in_sketch_reach(&self, e: noshape_sketch::EntityId, p: DVec2, cx: &App) -> bool {
         let Some(ed) = self.sketch.as_ref() else { return false };
         let Some(d) = self.sketch_data(cx) else { return false };
         let r = ed.world_per_px * 10.0;
         // Live (live2 11-17 hover-p0): a line lights to 7 px in sketch mode (8 gives the region or plane), a point to 10.
         // (Between the last offset that lights and the first that doesn't: 7 / 8 px, the Dimension tool's 8 / 9.)
-        let curve_r = ed.world_per_px * if ed.tool == Tool::Dimension { 8.5 } else { 7.5 };
+        // Trim's piece lights to 6 px, not 7 (live2 sktools-1118).
+        let curve_r = ed.world_per_px * match ed.tool {
+            Tool::Dimension => 8.5,
+            Tool::Trim => 6.5,
+            _ => 7.5,
+        };
         let screen = ed.screen_metric();
         match (d.sketch.point(e), screen) {
             (Some(q), Some(m)) => m.len(q - p) <= r,
@@ -4274,17 +4283,16 @@ impl PartStudioView {
                 div()
                     .id(SharedString::from(format!("glyph-{}-{}", cid.0, g.entity.0)))
                     .debug_selector(move || format!("glyph-{}-{}", cid.0, gent.0))
+                    // Lit to 14 px from the tile's centre, 4 px past its edge (live2 sktools-1118): a clear margin round
+                    // the tile takes the hover and the clicks.
                     .absolute()
-                    .left(px(x + dx))
-                    .top(px(y + dy))
-                    .size(px(20.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .bg(bg)
+                    .left(px(x + dx - GLYPH_MARGIN))
+                    .top(px(y + dy - GLYPH_MARGIN))
+                    .size(px(20. + 2. * GLYPH_MARGIN))
+                    .p(px(GLYPH_MARGIN))
                     .cursor_pointer()
                     // Live sketch/28: plain 20 px boxes, 18 px icons.
-                    .child(icon_px(g.icon, 18.0, fg))
+                    .child(div().size(px(20.)).flex().items_center().justify_center().bg(bg).child(icon_px(g.icon, 18.0, fg)))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         // Off a glyph of a lingering row: the row lingers again (to reach its next glyph).
                         let lingering = this.sketch.as_ref().is_some_and(|ed| ed.glyph_entity.is_some_and(|(e, _)| e == gent)) || this.ui.glyph_linger.iter().any(|(e, _)| *e == gent);
