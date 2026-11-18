@@ -102,6 +102,26 @@ fn loft_rect_to_circle() {
     assert!(close(m.shape.volume().unwrap(), 5.0 / 3.0 * 28.0, 1e-6));
 }
 
+/// asm-suspension 995636's Loft 1 (live): a Ø24 circle to a 15 x 24 tab 5 mm on, one connection from a point on the
+/// circle to the tab's corner (the circle has no vertex there): the circle in 4 arcs of 90° from the point, so the 4
+/// side faces come in two equal pairs, live's 85.6206 (the 15 mm sides) and 125.1336 mm² (the 24 mm ones); its own seam
+/// split it lopsidedly (101 / 112 / 72 / 137).
+#[test]
+fn a_loft_connection_cuts_a_circle_into_equal_arcs_from_its_point() {
+    let at = |x: f64| Plane::new(DVec3::new(x, 0.0, 0.0), DVec3::X, DVec3::Y);
+    let circle = make_face_2d(&at(0.0), &[Segment2d::Circle { center: DVec2::ZERO, radius: 12.0 }], &[]).unwrap();
+    let tab = rect_face(&at(5.0), 15.0, 24.0);
+    let z = (144.0f64 - 56.25).sqrt();
+    let l = loft(&[circle, tab], &LoftOptions { solid: true, start_points: Some(vec![DVec3::new(0.0, -7.5, z), DVec3::new(5.0, -7.5, 12.0)]), ..Default::default() }).unwrap();
+    assert!(l.shape.is_valid());
+    let mut sides: Vec<f64> = l.shape.faces().iter().filter(|f| !matches!(f.face_surface(), Ok(Surface::Plane(_)))).map(|f| f.area().unwrap()).collect();
+    sides.sort_by(f64::total_cmp);
+    assert_eq!(sides.len(), 4, "{sides:?}");
+    for (got, live) in sides.iter().zip([85.6206, 85.6206, 125.1336, 125.1336]) {
+        assert!((got - live).abs() < 0.01, "{sides:?}");
+    }
+}
+
 /// Live "psb (10-24) loft end derivative": □20 -> □10 20 up with Start
 /// Normal to profile m1 bulges (live 5476.391496; the ruled frustum is
 /// 4666.67). The corner rule with a natural end gives 5476.310271 exactly;

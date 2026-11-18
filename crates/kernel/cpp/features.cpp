@@ -3636,6 +3636,10 @@ static bool connect_sections(std::vector<TopoDS_Wire>& wires, const std::vector<
   std::vector<std::vector<TopoDS_Edge>> all(nw);
   std::vector<std::vector<size_t>>      at(nw, std::vector<size_t>(k));
   gp_Vec                                n0;
+  // A section of one closed curve (a circle): with one connection it is cut into equal arcs from its connection point,
+  // its own seam dropped (live asm-suspension 995636's Loft 1: a Ø24 circle to a 15 x 24 tab, 4 arcs of 90° from the
+  // point, the tab's corner on it).
+  std::vector<TopoDS_Edge> whole(nw);
   for (size_t w = 0; w < nw; ++w)
   {
     std::vector<TopoDS_Edge> es = edges_of(wires[w]);
@@ -3650,6 +3654,13 @@ static bool connect_sections(std::vector<TopoDS_Wire>& wires, const std::vector<
       std::reverse(es.begin(), es.end());
       for (auto& e : es)
         e = TopoDS::Edge(e.Reversed());
+    }
+    if (k == 1 && es.size() == 1 && BRep_Tool::IsClosed(es[0]))
+    {
+      double                  f, l;
+      occ::handle<Geom_Curve> cv = BRep_Tool::Curve(es[0], f, l);
+      if (!cv.IsNull() && cv->IsPeriodic() && std::abs((l - f) - cv->Period()) < 1e-9)
+        whole[w] = es[0];
     }
     // Each point: its edge and parameter (or the vertex starting an edge).
     std::vector<std::vector<double>> cuts(es.size());
@@ -3723,6 +3734,41 @@ static bool connect_sections(std::vector<TopoDS_Wire>& wires, const std::vector<
     for (size_t c = 1; c < k; ++c)
       if (at[w][o0[c]] == at[w][o0[c - 1]])
         return false; // two connections at one point
+  }
+  if (k == 1)
+  {
+    size_t target = 0;
+    for (size_t w = 0; w < nw; ++w)
+      target = std::max(target, all[w].size());
+    for (size_t w = 0; w < nw; ++w)
+    {
+      if (whole[w].IsNull() || target < 2)
+        continue;
+      double                  f, l;
+      occ::handle<Geom_Curve> cv = BRep_Tool::Curve(whole[w], f, l);
+      GeomAPI_ProjectPointOnCurve pr(conns[0][w], cv, f, l);
+      if (pr.NbPoints() == 0)
+        return false;
+      const double  t0  = pr.LowerDistanceParameter(), period = l - f;
+      const bool    fwd = whole[w].Orientation() != TopAbs_REVERSED;
+      std::vector<TopoDS_Vertex> vs;
+      for (size_t i = 0; i < target; ++i)
+        vs.push_back(BRepBuilderAPI_MakeVertex(cv->Value(t0 + (fwd ? 1.0 : -1.0) * period * (double)i / (double)target)));
+      std::vector<TopoDS_Edge> out;
+      for (size_t i = 0; i < target; ++i)
+      {
+        const TopoDS_Vertex& a = vs[i];
+        const TopoDS_Vertex& b = vs[(i + 1) % target];
+        const double         p0 = t0 + period * (double)i / (double)target, p1 = t0 + period * (double)(i + 1) / (double)target;
+        // (Backward along the curve: each arc made forward from its far end, then turned.)
+        TopoDS_Edge piece = fwd ? BRepBuilderAPI_MakeEdge(cv, a, b, p0, p1).Edge()
+                                : TopoDS::Edge(BRepBuilderAPI_MakeEdge(cv, b, a, 2 * t0 - p1, 2 * t0 - p0).Edge().Reversed());
+        origin.emplace_back(piece, key_of(whole[w]));
+        out.push_back(piece);
+      }
+      all[w]   = out;
+      at[w][0] = 0;
+    }
   }
   // Even out the edges between consecutive connections.
   for (size_t j = 0; j < k; ++j)
