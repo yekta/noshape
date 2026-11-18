@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-17 18:15 on the Ubeyd account)
+# QA handoff (agent qa; current state only, updated 2026-11-18 13:20)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -169,7 +169,9 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
    the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.
 1. **17:00 cut (11-18)**: TICKETS "Release blockers for the 2026-11-18 17:00 release". The qa-cut-1615 timer runs cut-verdict.sh at
-   16:15 (cut-must.txt by subject, "subject:<text>|<label>": fff088e5, 7b8bb2491, 8f6424b40, 459976266; missing -> HOLD) -> qa-alerts + compat/cut-1118-1615.txt. Read the
+   16:15 (cut-must.txt by subject, "subject:<text>|<label>": fff088e5, 7b8bb2491, 8f6424b40, 459976266, 9595bbf05 tab return,
+   a98d25431 Windows double-click, 0a50fd4b5 Windows nav (lead said e7d9df8c), core's revert db96888b of 77ba403e7; missing -> HOLD;
+   13:20: the last two not in green c7d388e8, the revert not on main yet; without it HOLD on the impeller renames) -> qa-alerts + compat/cut-1118-1615.txt. Read the
    ticket and corpus sections (a status that gets worse is a HOLD unless in compat/accepted.txt; cf-sheet-metal-model-plus's
    unfold Warning was a stale app copy: SAME on 6dbd91f3), update the entry with GO / HOLD and its green, commit docs-only. After the publish:
    `systemd-run --unit qa-pub-<v> -E HOME=/root -E PATH=$PATH bash /root/qa-scratch/bin/rel-pub-all.sh 0.4.58 <v> <cand on vibex7>`.
@@ -241,15 +243,5 @@ queued changes. land-footer lands through vibe2. No suites on vibe2. Private doc
 **11-17 17:45: hosts renamed (user): vibex6 (watcher), vibex7 (land queue, ~/lead-private: hat8, hat15, hat15b, the dock),
 vibex8; vibeN names are the user's own servers. qa's scripts, units and this handoff use vibexN.**
 **11-17 17:20: vibe5 gone for good (lead), vibe3 gone; no qa script names either (the lock is qa-scratch/qa-host.lock).
-vibex7 ~/lead-private has all four user documents again (hat15b restored 17:17 from the user's upload).** Earlier note: qa's vibe5 work moved: compat-check / rel-* run on vibex7 (H=vibex7; CLIs in vibex7
-~/qa-rel/<v>/noshape-cli from the release's noshape-cli tarball), the nightly streams private docs from vibex7 and the saved
-corpus from vibex6, land-footer lands through vibex7. vibex7 ~/lead-private: hat15, hat8 and the dock (16:40, under
-another file name: compat-check / w7-nightly / tabab-* use it); hat15b out until vibe5 returns (reports say "hat15b not run
-(vibe5 down)", enough to land: lead via bool2). One-off vibe5 scripts in bin/retired. The local lock is still named vibe5.lock.
-Text below this note predates the move.
-vibe5: land queue, compat loop (one CLI at a time), release builds via rb.sh (worktree qa-bisect). vibex6: ad-hoc app runs
-(:661), release quit check, main's watcher since 11-17 16:20 (/tmp/lead/main-status, /root/green come from there). vibex7:
-suites (slot), fuzz :61, nightly :671. vibe3 retired 11-17 ~17:15: qa's unique files copied to vibex7 ~/agents/qa-keep/vibe3-qa
-(tickets, docs, perfdocs, bin, fuzz results and summaries; release binaries / update homes / sources not kept), its scripts
-moved to bin/retired, land-footer points at vibex6. The Mac: off limits except
-its single slot. Heavy runs through `~/bin/slot` (DECISIONS 11-15).
+vibex7 ~/lead-private has all four user documents (hat8, hat15, hat15b, the dock). One-off vibe5 scripts in bin/retired; the
+local lock is still named vibe5.lock. Older host notes: archive. Heavy runs through `~/bin/slot` (DECISIONS 11-15).
