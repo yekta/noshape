@@ -423,6 +423,9 @@ const WOKEN_EDGE_ENDS: [EntityId; 2] = [EntityId(u32::MAX - 2), EntityId(u32::MA
 /// Stands for the woken point outside the sketch (another sketch's point, a model vertex) in an inference's alignments
 /// until the click uses it.
 const WOKEN_POINT: EntityId = EntityId(u32::MAX - 4);
+/// Stand for the midpoints of lines woken while drawing ([`SketchEditor::woken_mids`]) in an inference's alignments until
+/// the click makes a point there.
+const WOKEN_MIDS: [EntityId; 4] = [EntityId(u32::MAX - 5), EntityId(u32::MAX - 6), EntityId(u32::MAX - 7), EntityId(u32::MAX - 8)];
 /// Trim: crossings this close to a chain's corner don't count (live sktools-1118 ~1 px, recheck b5b664aa 0.6 px).
 const TRIM_CORNER_PX: f64 = 1.5;
 /// How far the pointer moves from a press, on screen, before the press is a drag (live2 "feel (sketch)" (5): a drag
@@ -752,6 +755,9 @@ pub struct SketchEditor {
     pub otf_typing: bool,
     /// Curves the cursor passed over while drawing, and points it rested on (wake-up inferences).
     pub woken: Vec<EntityId>,
+    /// Lines whose midpoint a snap landed on while drawing, the newest first ([`WOKEN_MIDS`]; live align-mid-1118: it
+    /// gives alignment, the click making a point there, MIDPOINT on the line).
+    pub woken_mids: Vec<EntityId>,
     /// The straight model edge the pointer is on while drawing, and since when ([`EDGE_WAKE_REST`]); the edge snapped
     /// since the last move.
     edge_acquiring: Option<(noshape_model::reference::Reference, std::time::Instant)>,
@@ -1473,6 +1479,7 @@ impl SketchEditor {
             otf: None,
             otf_typing: false,
             woken: Vec::new(),
+            woken_mids: Vec::new(),
             edge_acquiring: None,
             edge_seen: None,
             woken_edge: None,
@@ -1551,6 +1558,7 @@ impl SketchEditor {
         self.otf = None;
         self.otf_typing = false;
         self.woken.clear();
+        self.woken_mids.clear();
         self.edge_acquiring = None;
         self.woken_edge = None;
         self.woken_point = None;
@@ -1726,7 +1734,7 @@ impl SketchEditor {
             exclude: Vec::new(),
             origin: true,
             woken: self.woken.clone(),
-            woken_at: self.woken_edge.as_ref().map_or(Vec::new(), |(_, a, z)| vec![(WOKEN_EDGE_ENDS[0], *a), (WOKEN_EDGE_ENDS[1], *z)]).into_iter().chain(self.woken_point.as_ref().map(|(_, q)| (WOKEN_POINT, *q))).collect(),
+            woken_at: self.woken_edge.as_ref().map_or(Vec::new(), |(_, a, z)| vec![(WOKEN_EDGE_ENDS[0], *a), (WOKEN_EDGE_ENDS[1], *z)]).into_iter().chain(self.woken_point.as_ref().map(|(_, q)| (WOKEN_POINT, *q))).chain(self.woken_mid_points(sk)).collect(),
             screen: self.screen_metric(),
         };
         let mut all = noshape_sketch::infer(sk, p, &ctx);
@@ -1887,6 +1895,33 @@ impl SketchEditor {
         self.tool.draws() && (!self.clicks.is_empty() || self.chain_end.is_some())
     }
 
+    /// The woken lines' midpoints, by their stand-in ids.
+    fn woken_mid_points<'a>(&'a self, sk: &'a Sketch) -> impl Iterator<Item = (EntityId, DVec2)> + 'a {
+        self.woken_mids.iter().zip(WOKEN_MIDS).filter_map(|(l, k)| match sk.curve(*l)? {
+            Curve2::Line { a, b } => Some((k, (a + b) * 0.5)),
+            _ => None,
+        })
+    }
+
+    /// A click aligned with a woken midpoint: a point there, MIDPOINT on its line, the alignment to that point (live
+    /// align-mid-1118: `<new line>.endSnap0`, MIDPOINT, HORIZONTAL from the new end to it; it follows the line).
+    fn link_woken_mids(&mut self, sk: &mut Sketch, inference: Option<Inference>) -> Option<Inference> {
+        let mut inf = inference?;
+        let mids: Vec<(EntityId, DVec2)> = self.woken_mid_points(sk).collect();
+        for (k, at) in mids {
+            if !inf.constraints.iter().any(|c| matches!(c, AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == k)) {
+                continue;
+            }
+            let Some(line) = WOKEN_MIDS.iter().position(|x| *x == k).and_then(|i| self.woken_mids.get(i).copied()) else { continue };
+            let q = sk.add_point(at);
+            let _ = sk.add_constraint(ConstraintKind::Midpoint { point: q, curve: line });
+            for c in &mut inf.constraints {
+                *c = retarget_auto(*c, k, q);
+            }
+        }
+        Some(inf)
+    }
+
     /// `e` wakes its inferences (the most recent first, ten kept).
     fn wake(&mut self, e: EntityId) {
         self.woken.retain(|x| *x != e);
@@ -2029,6 +2064,12 @@ impl SketchEditor {
             // wakeupInferenceSource, no rest time: a 10 ms rest or a slow pass wakes it) and stays woken for the line.
             if let Some(e) = self.inference.as_ref().filter(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Center)).and_then(|i| i.entity).filter(|e| is_point(&data.sketch, *e)) {
                 self.wake(e);
+            }
+            // A line's midpoint snapped onto wakes too (live align-mid-1118: MIDPOINT, then HORIZONTAL with it later).
+            if let Some(l) = self.inference.as_ref().filter(|i| i.kind == InferenceKind::Midpoint).and_then(|i| i.entity).filter(|l| data.sketch.kind(*l) == Some(EntityKind::Line)) {
+                self.woken_mids.retain(|x| *x != l);
+                self.woken_mids.insert(0, l);
+                self.woken_mids.truncate(WOKEN_MIDS.len());
             }
             return EditOutcome::redraw();
         }
@@ -2507,6 +2548,7 @@ impl SketchEditor {
                 // Continuing to sketch leaves the last geometry undimensioned.
                 self.otf = None;
                 self.otf_typing = false;
+                let inference = self.link_woken_mids(&mut data.sketch, inference);
                 let out = self.place(data, Click { pos, inference }, double_click);
                 // Press-drag-release: the release places the next click.
                 let pending = !self.clicks.is_empty() || (self.tool == Tool::Line && self.chain_end.is_some());
@@ -4375,6 +4417,7 @@ impl SketchEditor {
                 self.drag_origin = data.sketch.begin_drag(&[(handle, p)]).then(|| data.sketch.clone());
                 // A drag aligns only with points it snaps onto itself.
                 self.woken.clear();
+                self.woken_mids.clear();
                 self.drag = Some(DragState::Geometry { handle, at: None });
                 self.tool_drag(data, p)
             }
@@ -4725,6 +4768,7 @@ impl SketchEditor {
             self.inference = self.infer(&data.sketch, p, self.shift_held);
             self.take_vertex_snap(data);
             let (pos, inference) = self.snapped().unwrap_or((p, None));
+            let inference = self.link_woken_mids(&mut data.sketch, inference);
             let out = self.place(data, Click { pos, inference }, false);
             // A dragged line is a single segment (no chaining).
             if tool == Tool::Line && !tangent {
@@ -6790,6 +6834,7 @@ impl SketchEditor {
                 .filter_map(|c| match c {
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == noshape_sketch::ORIGIN => Some(DVec2::ZERO),
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == WOKEN_POINT => self.woken_point.as_ref().map(|w| w.1),
+                    AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if WOKEN_MIDS.contains(p) => self.woken_mid_points(&data.sketch).find(|(k, _)| k == p).map(|(_, q)| q),
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if WOKEN_EDGE_ENDS.contains(p) => {
                         self.woken_edge.as_ref().map(|w| if *p == WOKEN_EDGE_ENDS[0] { w.1 } else { w.2 })
                     }
@@ -10968,6 +11013,46 @@ mod tests {
             ed.pointer_move(&mut d, v(203.0 * PX, 120.0 * PX), false, false);
             let aligned = ed.inference.as_ref().is_some_and(|i| i.constraints.iter().any(|c| matches!(c, AutoConstraint::VerticalWith(p) if *p == pt)));
             assert_eq!(aligned, snapped, "passed {off} px off the point: {:?}", ed.inference);
+        }
+    }
+
+    /// Live align-mid-1118: a pass over a line's midpoint (MIDPOINT) wakes it; the click on the horizontal alignment with it
+    /// makes a point there, MIDPOINT on the line, and the new end HORIZONTAL with it; dragging the line's end then keeps
+    /// the new end level with the line's midpoint. Without the pass there's no alignment.
+    #[test]
+    fn a_passed_midpoint_gives_alignment_and_a_point_there() {
+        for pass in [false, true] {
+            let (mut ed, mut d) = editor(Tool::Line);
+            let l = d.sketch.add_line(v(-300.0 * PX, -200.0 * PX), v(-100.0 * PX, 100.0 * PX));
+            click(&mut ed, &mut d, v(300.0 * PX, 300.0 * PX));
+            if pass {
+                ed.pointer_move(&mut d, v(-200.0 * PX, -50.0 * PX), false, false);
+                assert_eq!(ed.inference.as_ref().map(|i| i.kind), Some(InferenceKind::Midpoint));
+            }
+            let at = v(250.0 * PX, -48.0 * PX);
+            ed.pointer_move(&mut d, at, false, false);
+            let aligned = ed.inference.as_ref().is_some_and(|i| i.kind == InferenceKind::AlignHorizontal);
+            assert_eq!(aligned, pass, "passed over the midpoint: {pass}: {:?}", ed.inference);
+            if !pass {
+                continue;
+            }
+            click(&mut ed, &mut d, at);
+            let q = d.sketch.constraints().find_map(|c| match c.kind {
+                ConstraintKind::Midpoint { point, curve } if curve == l => Some(point),
+                _ => None,
+            });
+            let q = q.expect("a point at the midpoint, MIDPOINT on the line");
+            assert!((d.sketch.point(q).unwrap() - v(-200.0 * PX, -50.0 * PX)).length() < 1e-9);
+            let end = d.sketch.constraints().find_map(|c| match c.kind {
+                ConstraintKind::Horizontal { a, b: Some(b) } if b == q => Some(a),
+                ConstraintKind::Horizontal { a, b: Some(b) } if a == q => Some(b),
+                _ => None,
+            });
+            let end = end.expect("the new end horizontal with it");
+            let le = d.sketch.endpoints(l).unwrap().1;
+            assert!(d.sketch.drag(&[(DragHandle::Point(le), v(-100.0 * PX, 200.0 * PX))]).is_solved());
+            let (m, e) = (d.sketch.point(q).unwrap(), d.sketch.point(end).unwrap());
+            assert!((m.y - e.y).abs() < 1e-9, "the new end follows the midpoint's level: {m} {e}");
         }
     }
 

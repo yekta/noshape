@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 19:13 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 21:31 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18 (since the morning)
@@ -24,26 +24,27 @@ Alignment wakes on the first snap onto a point (no `ACQUIRE_REST`), a drag align
 Symmetric on two lines = one lines-only mirror (second line onto the first's mirror image). ≠ left: a midpoint's /
 quadrant's snap wakes no alignment source (ours aligns with points only).
 
-## Queued 18:46 (8d02aab7, with 53ff668c docs)
-A Use whose live query is empty in a sketch live WARNs about: drawn as stored, pinned to a missing reference (ours warns
-as live's; welding-config 9c7704 Sketch 8, 21 -> 22/37). Gated on live's `featureStates` (hunting-knife's empty-query
-Uses are OK in live: unchanged).
+## Landed / queued 11-18 evening
+- Landed: cce30a1a (welding Sketch 8 warns, 22/37), f6ea6d5c (Modify joint reuse: `sheetmetal::bend_joint_edit`, the
+  joint the bend's faces are named by once it rebuilt it; the panel calls ops' edit_bend / convert_to_rip).
+- Queued: 89704074 (hover outside sketch mode: curve 7.5 px / hold 10.5 `CURVE_HOLD`; a hovered point's 10 px
+  #f8c488 disc in `midpoint_overlay`; psui narrows its midpoint rule), 0437383a (Symmetric: B's start at its foot on
+  A's mirrored line), then Trim near a chain's corner (`trim_near`, 1.5 px: crossings with the corner's two curves
+  don't count when the curve passes within it) + the dimension box's focus assertion.
+- Live rechecks (live 21:xx): dimension box look = (its Xvfb window wasn't focused); Trim / Symmetric recheck on green.
 
-## In flight 19:13 (lead's order after compaction 2)
-- Trim past a chain's corner (live sktools-1118): ours = (a ~1 px miss isn't a crossing); scene test + feel row.
-- Convert to rip / a second Radius edit reuse the bend's Modify joint: `sheetmetal::bend_joint_edit` finds the Modify
-  joint its faces are named by once it rebuilt the bend (creator = the joint's id; the joint's entity names a face of
-  the feature in std's joint id "F<maker>.<n>"). The panel now calls ops' edit_bend / convert_to_rip (no copy).
-  e2e `a_bends_second_edit_and_its_rip_reuse_its_modify_joint`.
-- Box drag: the shown-sketch hover re-resolve skips while a box is drawn (psui's 45f2d798 fixed the main red).
-- 53ff668c failed on main's box-drag red (not mine); its docs go again with the next land.
-- Dimension box (live dimbox-1118 answered 19:2x): only a double-click opens it; a slow second click deselects, a drag
-  keeps it selected: ours the same; scene test + feel row.
-
-## Hover outside sketch mode (feel P0, live2 / qa 548d795f, 20:4x)
-A curve lights within 7.5 px and holds to 10.5 (live retake 7 / 9–11: `CURVE_HOLD`, the lit curve kept while the pick
-finds no other sketch curve / face / edge); a hovered shown point draws a 10 px #f8c488 disc (`midpoint_overlay`).
-psui narrows its midpoint rule (a shown curve's midpoint only with a dialog open).
+## In flight 21:31 (uncommitted; debug traces ZZ_DIM in parity.rs / solver.rs to strip)
+- Solver: a redundant driving dimension is checked on a nearby configuration (`redundant_nearby`): one meeting the rest
+  only at a singular point is kept (welding-config 9c7704 Sketch 13's Ø: an arc's ends at two heights, its centre
+  midway); live 1862's stays redundant. Test `a_dimension_meeting_the_rest_at_a_singular_point_solves`. Needs a full
+  model-suite run before landing (it changes which dimensions translate).
+- Translator: a Use'd edge ours makes a B-spline (live: an arc) maps its `.start` / `.end` by its first pole
+  (asm-suspension 805e29 Sketch 2: "Sketch could not be solved.", its COINCIDENT ends 36 / 10 mm apart). Repro
+  vibe2 `~/tmp/skasm/asmz.sh asm-suspension` (copy of ~/parity/models). Then tell asm (it reruns the pair). Our edges
+  there are B-splines where live's are r40 circles: core's.
+- asm-suspension 995636 Sketch 4 (DISTANCE 8 mm on gShlSVgxaABK.seed moves 18.5 mm) and Sketch 13: next.
+- Alignment with a passed midpoint (live align-mid-1118): the click makes a point `<new>.endSnap0` at the midpoint,
+  MIDPOINT on L, HORIZONTAL / VERTICAL to the new end; circles offer no quadrant. Not started.
 
 ## Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
 regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).
