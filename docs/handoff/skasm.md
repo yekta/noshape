@@ -1,46 +1,37 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 03:55 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 06:44 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18
-- b6f5e810: snap onto another sketch's point / model vertex = one Coincident, no use glyph; joint row's flat edges.
-- 0fda4de5: double-clicked face's sketch drawn through the part; Extend nearer end; offset arrow drag.
-- 9c015658 (03:39): Rip -> Bend unfold failure (host `Unfolded::clashes`: a second bend path placing a wall elsewhere ->
-  no flat, `cannot_unfold`, WARNING SHEET_METAL_COULD_NOT_UNFOLD, bend kept, yellow toast; a consistent loop such as
-  qa4 S1's split plate still unfolds); Corner / Bend relief boxes (`SM_CORNER`); offset arrow zoom step;
-  NOSHAPE_SNAP_TRACE; " radian" label; copy/paste test. SKSNAP-REACH closed not a bug by qa.
+- b6f5e810 / 0fda4de5: snap onto another sketch's point = one Coincident; joint flat edges; double-clicked face's
+  sketch drawn through; Extend; offset arrow drag.
+- 9c015658 (03:39): Rip -> Bend unfold failure, Corner / Bend relief boxes, offset zoom step, " radian", snap trace.
+  Its 2f93c018c clash check flagged rolled-wall models (no flat): shipped in v0.4.58, fixed in 120ee19c (must-carry).
+- 4b4e4915: sticky snap target; circle / ellipse onto a held point keeps its size (constructive.rs).
+- 8b481251: an opened sketch's draft takes the regeneration's solve (hat15b Sketch 1, 1.1 mm off its stored place).
+- cafe3c2a: a line ending on a circle snaps tangent within the snap radius of the true tangent point.
+- 4ca852b6: a model vertex snaps to its exact point (not the mesh's f32).
 
-## In flight
-- Sticky snap target (live getInference lastInferenceTarget): `SketchEditor::snap_target` + `Inference::targets`;
-  scene test `the_line_snapped_to_last_stays_over_a_point_by_it`; feel row. live REQUESTS 11-18 03:46 asks for the
-  real-pointer check (a line slid into its own end).
-- Landed 4b4e4915 (05:04): sticky target, held-point solver fix.
-- Queued: an opened sketch's draft takes the regeneration's solve (hat15b Sketch 1 was 1.1 mm off its stored place:
-  hover / snaps / drags on the stored lines); `take_solved_draft`, `Sketch::adopt_geometry`.
-- Solver (regeneration's constructive pass): a circle / ellipse Coincident with a Fixed point / model vertex
-  translates with its size kept, a free point comes onto the curve (live coincident.json); was carried centre-onto-
-  point (r 0). `carry_onto_placed` carries only point-point Coincidents; `kept_first_in` keeps a Fixed member and the
-  curve over a lone point; `hold_size` holds an ellipse's radii. Fuzz 801/801 unchanged. Test onshape_ux
-  `a_curve_onto_a_held_point_moves_whole_with_its_size_kept`.
-- Open live REQUESTS 11-18 02:30: the unfold row's colour; Corner taking a rip side face (then the corner disc).
+## Queued (vibe2)
+- 120ee19c: rolled walls not flagged; unfold failure listed as failed (live sm-rip-1118 (a)); sticky target only
+  against its rank (live sticky-snap: a point / the line's end takes over); translator elliptical arc on its axis.
+- db01062d: Corner / Bend relief take a rip side face as its long edge, chip "Edge of Sheet metal model 1", fail as live.
+- next: decal image (fetched file tab or placeholder): seven surf-intro docs 4 -> 5 features.
+
+## Waiting on live (REQUESTS)
+- 06:2x wave-washer sketches.json (Sketch 4's rectangles stored inconsistently; ours solves them outward).
+- 06:4x surf-intro Derived 1 sources (5 docs stop at Derived 1 NOT BUILT).
 
 ## Next, in order
-0. USER P0 (lead 11-17): interaction feel. sm-feel-1117 left: Corner / Bend relief taking a rip's side face +
-   the corner disc (std's findCornerDefinitionVertex throws SHEET_METAL_RIP_NO_CORNER for our rip face; native corner
-   search needs both bends on one parent). Rigs on vibex6 :391: ~/tmp/skasm/sk (sks.sh start|shot|stop, SNAP=<json>;
-   dbl.json = two-blocks double-click), keep binary ~/agents/skasm-keep/noshape (bin/appbuild.sh). Land
-   NOSHAPE_LAND_QUEUE_HOST=vibe2. psui owns the pointer-offset report (latency, not an offset).
-1. config-parts: linear-rail 26/26, links 35/35 (live fetched Derived 1's source), standoffs 32/32, sprockets 24/24
-   (live's volume band carried while its volume stays: carry_volume_bands); pulleys 12/22 (Circular pattern 1, a face
-   pattern ADD, fails in our op on main too: core's since 11:45); nuts 14/17 (Sweep 1, bool's). Standoffs regenerates
-   in 12.4 s against live's 0.2 s: bool2's thread Booleans.
-2. Surface workshop: pipe stops at core's Loft (guides with more than two profiles); knifehandle P4 Pierce taken back
-   (its edge doesn't end on the plane), first difference Sweep 2 area (core); britatap Split topology (core);
-   manualblend Sketch 5 Concentric 128 mm (upstream JNE), Sketch 6 / 7 INTERSECTED geometry not found. A circle or
-   ellipse Coincident with something fixed: done 11-18 (Pierce of a 3D point not checked).
-3. core's sketch cases below (links 35/35 now; wave-washer: live REQUESTS 11-18 04:1x asks what bodies JHk / JH4
-   are). 4. Remaining dropped constraints: suite on vibex7 with ops-b (built 11-18 04:1x). tablet-stand 16/16 now.
+0. USER P0 feel: rows of docs/parity/interaction-feel.md in my areas are "=" now; Hover timing is psui's.
+1. config-parts (lead pushes owners): pulleys = Circular pattern 1 (core's gated aa714b30a); nuts = Sweep 1
+   non-manifold (core-rp 56328dd0b); screws = helix Sweep Boolean > 14 GB (bool).
+2. Suite 11-18 05:45 vibex8 (~/agents/skasm-keep/suite-0545.log): 88/126 docs, 1292/1585; untranslated sketch
+   constraints 121 (45 PROJECTED model geometry not found, 24 PIERCE rejected: loft-paths-guides, surf-intro tail fin,
+   manualblend Sketch 6/7). surf-intro-examples Fill 1 (area 2.6x live) and -simple Extrude 1, -mutualtrim Title next.
+3. core's sketch cases below. Rocker-enclosure Sketch 4's projected circles: bodies RXBD.. outside the part box
+   (x 45-60 mm), waiting on core's split-face fix.
 
 ## core's sketch cases (2026-11-16), queue item 3
 - c2-sm-rocker-enclosure-sm Extrude 2 (now its first difference once core's split-face attributes fix lands, 8/14):
