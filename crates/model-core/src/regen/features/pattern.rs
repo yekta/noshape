@@ -603,7 +603,6 @@ fn run_pattern_paths(ev: &mut EvalCtx, instances: Vec<Instance>) -> FResult<()> 
                         return e;
                     }
                     log::debug!("face pattern: {}", e.message);
-                    trace(ev, format!("face pattern failed: {}", e.message));
                     fe(failed)
                 })?;
             }
@@ -759,30 +758,19 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
     let mut caps: Vec<Shape> = Vec::new();
     if !boundary.is_empty() {
         for w in k::edges_to_wires(&Shape::compound(&boundary), 1e-6)? {
-            // Where the loop lies on a curved face beside it (a slot through a tube's wall; a pulley's tooth groove,
-            // its rim's cylinder and the chamfers at its ends), the cap lies on that face's surface: the faces beside
-            // the loop, most edges first, the first that takes it.
+            // Where the faces leave one curved face all round (a slot through a tube's wall), the cap lies on it.
             let beside = || {
-                let mut count: Vec<(u32, usize)> = Vec::new();
-                for e in w.edges() {
-                    let Some(f) = body.shape.index_of(&e, ShapeType::Edge).and_then(|ei| ef.get(ei)?.iter().find(|f| !sel.contains(f)).copied()) else { continue };
-                    match count.iter_mut().find(|(g, _)| *g == f) {
-                        Some((_, n)) => *n += 1,
-                        None => count.push((f, 1)),
-                    }
+                let mut faces = w.edges().into_iter().map(|e| {
+                    let ei = body.shape.index_of(&e, ShapeType::Edge)?;
+                    ef.get(ei)?.iter().find(|f| !sel.contains(f)).copied()
+                });
+                let first = faces.next()??;
+                if !faces.all(|f| f == Some(first)) {
+                    return None;
                 }
-                count.sort_by_key(|&(f, n)| (std::cmp::Reverse(n), f));
-                count.into_iter().find_map(|(f, _)| {
-                    let on = body.shape.sub_shape(ShapeType::Face, f as usize).ok()?;
-                    // (A rim running clockwise on a periodic surface gives the face everything but the pocket: the wire the
-                    // other way round.)
-                    [Some(w.clone()), w.reversed().ok()].into_iter().flatten().find_map(|w| k::make_face_on(&on, &w).ok().filter(|c| c.is_valid()))
-                })
+                body.shape.sub_shape(ShapeType::Face, first as usize).ok()
             };
-            let cap = k::make_face_from_wire(&w, true).or_else(|e| beside().ok_or(e)).map_err(|e| {
-                trace(ev, format!("face tool: no cap on a boundary loop of {} edges ({e})", w.edges().len()));
-                fe("Failed to create pattern, check input.")
-            })?;
+            let cap = k::make_face_from_wire(&w, true).or_else(|e| beside().map_or(Err(e), |f| k::make_face_on(&f, &w))).map_err(|_| fe("Failed to create pattern, check input."))?;
             caps.push(cap);
         }
     }
@@ -791,10 +779,7 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
     let sewn = k::sew(&inputs, 1e-6, true).map_err(kerr("Failed to create pattern, check input."))?;
     // Separate closed pieces (a Hole at several points) make one tool.
     let solid = match sewn.shape.count(ShapeType::Solid) {
-        0 => {
-            trace(ev, format!("face tool: {} faces and {} caps sew into no solid ({} shells)", face_shapes.len(), caps.len(), sewn.shape.count(ShapeType::Shell)));
-            return err("Failed to create pattern, check input.");
-        }
+        0 => return err("Failed to create pattern, check input."),
         1 => sewn.shape.solids().into_iter().next().ok_or_else(|| fe("Failed to create pattern, check input."))?,
         _ => Shape::compound(&sewn.shape.solids()),
     };
@@ -802,7 +787,6 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
     // seconds in OCCT for an empty part (FACE-PATTERN-30-CUT-SLOW).
     let extent = solid.bounding_box(false).map(|b| b.diagonal()).unwrap_or(0.0);
     if solid.volume().map_or(true, |v| v.abs() <= 1e-9 * extent.powi(3)) {
-        trace(ev, "face tool: no volume");
         return err("Failed to create pattern, check input.");
     }
     // Names: selected faces keep their names, caps are new.
