@@ -262,3 +262,21 @@ fn an_associated_drawing_goes_under_its_part_with_its_pending_update(cx: &mut Te
     });
     draw(cx, window);
 }
+
+/// Live2 errors-1118: with "Prevent if a Part Studio feature list contains errors" off, a part of a Part Studio with a
+/// failing feature gets the amber notice "Part belongs to a Part Studio that has regeneration errors" (not blocking);
+/// Apply stays enabled with the Release name still empty, Save draft waits for a change.
+#[gpui::test]
+fn a_part_of_a_failing_part_studio_gets_the_regeneration_errors_notice(cx: &mut TestAppContext) {
+    let (_window, view, _) = dialog_with(cx, "regen-notice", Mode::Release, "", |ctx, call| {
+        let f = call(ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [], "depth": "5 mm", "operationType": "NEW" } }));
+        assert_eq!(f["feature_status"]["status"], "Error", "{f}");
+    });
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let issues = v.issues(cx);
+        let notice = noshape_model::release::Issue::Notice("Part belongs to a Part Studio that has regeneration errors".into());
+        assert!(issues.first().is_some_and(|i| i.contains(&notice)), "{issues:?}");
+        assert!(!notice.blocks());
+    });
+}

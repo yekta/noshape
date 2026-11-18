@@ -55,15 +55,18 @@ pub fn condition_issues(session: &Session, items: &[ReleaseItem]) -> Vec<Vec<Iss
                             v.push(Issue::Notice(format!("{r} is not a valid revision in your company revision scheme. The next available revision for this scheme is {next}.")));
                         }
                     }
-                    if on[FEATURE_ERRORS] {
-                        let failed = *studio_errors.entry((it.tab, it.config.clone())).or_insert_with(|| {
-                            let mut values = ps.configuration.defaults();
-                            values.0.extend(it.config.0.clone());
-                            let result = noshape_model::regen::Regenerator::new().regenerate(ps, &values, &session.doc.settings.units, &noshape_model::regen::RegenOptions::default());
-                            result.display.features.iter().any(|f| f.status == FeatureStatus::Error)
-                        });
-                        if failed {
+                    let failed = *studio_errors.entry((it.tab, it.config.clone())).or_insert_with(|| {
+                        let mut values = ps.configuration.defaults();
+                        values.0.extend(it.config.0.clone());
+                        let result = noshape_model::regen::Regenerator::new().regenerate(ps, &values, &session.doc.settings.units, &noshape_model::regen::RegenOptions::default());
+                        result.display.features.iter().any(|f| f.status == FeatureStatus::Error)
+                    });
+                    // With the condition off live still notes it (live2 errors-1118: an amber band under the row).
+                    if failed {
+                        if on[FEATURE_ERRORS] {
                             prevented(&mut v, "The Part Studio feature list contains errors.");
+                        } else {
+                            v.push(Issue::Notice("Part belongs to a Part Studio that has regeneration errors".into()));
                         }
                     }
                     if ps.rollback.is_some_and(|r| r < ps.features.len()) {

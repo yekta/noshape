@@ -1727,7 +1727,9 @@ const COL_STATE: f32 = 140.;
 const COL_PART_NUMBER: f32 = 150.;
 const GRID: u32 = 0xdddddd;
 /// An item row's bands (background, text): Bootstrap's alert-warning, alert-danger and alert-info.
-const BAND_WARNING: (u32, u32) = (0xfcf8e3, 0x8a6d3b);
+/// Live2 errors-1118 (`alert alert-warning`): bg rgb(255,248,230), text rgb(51,51,51), border rgb(252,218,127).
+const BAND_WARNING: (u32, u32) = (0xfff8e6, 0x333333);
+const BAND_WARNING_BORDER: u32 = 0xfcda7f;
 const BAND_DANGER: (u32, u32) = (0xf2dede, 0xa94442);
 const BAND_INFO: (u32, u32) = (0xd9edf7, INFO_BLUE);
 /// An item's INFO message (Bootstrap's alert-info text).
@@ -2123,7 +2125,8 @@ impl Render for ReleaseDialog {
                                     .id(SharedString::from(format!("rel-x-{i}")))
                                     .flex_none()
                                     .cursor_pointer()
-                                    .child(Icon::new(IconName::Close).with_size(px(16.)).text_color(red))
+                                    // Live2 errors-1118: a bold ✕ in full red rgb(189,48,57), 14 px across.
+                                    .child(crate::ui::glyph("release-remove", 20., red))
                                     .tooltip(crate::ui::tooltip("Remove from release"))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         if i < this.rows.len() {
@@ -2201,7 +2204,21 @@ impl Render for ReleaseDialog {
                         }),
                 );
             // Live (release.json): a band under the row, Bootstrap's alert-warning / -danger / -info colours.
-            let note = |text: SharedString, (bg, fg): (u32, u32)| div().ml(px(col_item())).mr(px(8.)).mb(px(4.)).px(px(10.)).py(px(6.)).rounded(px(3.)).bg(gpui_kit::rgb(bg)).text_size(px(12.)).text_color(gpui_kit::rgb(fg)).child(text).into_any_element();
+            let note = |text: SharedString, (bg, fg): (u32, u32)| {
+                div()
+                    .ml(px(col_item()))
+                    .mr(px(8.))
+                    .mb(px(4.))
+                    .px(px(10.))
+                    .py(px(6.))
+                    .rounded(px(3.))
+                    .bg(gpui_kit::rgb(bg))
+                    .when((bg, fg) == BAND_WARNING, |d| d.border_1().border_color(gpui_kit::rgb(BAND_WARNING_BORDER)).text_size(px(14.)))
+                    .when((bg, fg) != BAND_WARNING, |d| d.text_size(px(12.)))
+                    .text_color(gpui_kit::rgb(fg))
+                    .child(text)
+                    .into_any_element()
+            };
             rows_el.push(
                 v_flex()
                     .child(main)
@@ -2295,7 +2312,8 @@ impl Render for ReleaseDialog {
         let label = |text: String, required: bool, empty: bool| {
             h_flex()
                 .gap_2()
-                .child(h_flex().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(text).when(required, |d| d.child(div().pl(px(3.)).text_color(red).child("*"))))
+                // Live2 errors-1118: a required field left empty has its label red too.
+                .child(h_flex().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(if required && empty { red } else { pal.text }).child(text).when(required, |d| d.child(div().pl(px(3.)).text_color(red).child("*"))))
                 .when(required && empty, |d| d.child(div().text_size(px(12.)).text_color(red).child("Required field must not be empty.")))
         };
         let form = h_flex()
@@ -2312,7 +2330,7 @@ impl Render for ReleaseDialog {
                     .when(self.mode != Mode::Review, |d| d.child(
                         h_flex()
                             .gap(px(4.))
-                            .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(30.)).flex().items_center().border_1().rounded(px(3.)).border_color(if name_empty { red } else { gpui_kit::rgb(0xcccccc) }).map(|d| { let l = name_label.clone(); crate::ui_script::mark(d, move || format!("field:{l}")) }).child(Input::new(&self.name).appearance(false).small().disabled(read_only))))
+                            .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(30.)).flex().items_center().border_1().rounded(px(3.)).border_color(gpui_kit::rgb(0xcccccc)).map(|d| { let l = name_label.clone(); crate::ui_script::mark(d, move || format!("field:{l}")) }).child(Input::new(&self.name).appearance(false).small().disabled(read_only))))
                             // Numbering schemes › Release names: "Generate next
                             // release name" (not for obsoletions).
                             .when(self.seq_names && self.mode == Mode::Release, |d| {
@@ -2365,7 +2383,13 @@ impl Render for ReleaseDialog {
         let approver_missing = self.mode == Mode::Release && settings.require_approver && self.approvers.is_empty();
         let fields_blocked = attention > 0 || name_empty || (self.mode == Mode::Release && notes_required && notes_empty);
         let blocked = fields_blocked || approver_missing;
-        let status = (blocked && !read_only).then(|| div().text_size(px(12.)).text_color(pal.text_muted).child("A field required by one or more actions is empty ⓘ"));
+        // Live2 errors-1118: the text, then a light blue ? whose tooltip names what Submit lacks.
+        let status = (blocked && !read_only).then(|| {
+            h_flex()
+                .gap(px(4.))
+                .child(div().text_size(px(14.)).text_color(pal.text).child("A field required by one or more actions is empty"))
+                .child(div().id("rel-required-help").child(crate::ui::glyph("help-outline", 20., gpui_kit::rgb(0x6ba5da))).when(self.approvers.is_empty(), |d| d.tooltip(crate::ui::tooltip("Submit requires Approvers"))))
+        });
         let button = |id: &'static str, text: &'static str, bg: u32, enabled: bool| {
             div()
                 .id(id)
@@ -2408,8 +2432,10 @@ impl Render for ReleaseDialog {
             left = left
                 .child(undo_btn("rel-undo", "undo", "Undo", can_undo, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.undo(false, window, cx))))
                 .child(undo_btn("rel-redo", "redo", "Redo", can_redo, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.undo(true, window, cx))));
-            left = left.child(os::secondary_button("rel-draft", "Save draft", cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                if this.save_draft(cx) {
+            // Live2 errors-1118: Save draft waits for a change.
+            let changed = can_undo;
+            left = left.child(os::secondary_button("rel-draft", "Save draft", cx).when(!changed, |d| d.opacity(0.5)).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                if this.at > 0 && this.save_draft(cx) {
                     close(window, cx);
                 }
             })));
@@ -2460,7 +2486,8 @@ impl Render for ReleaseDialog {
         match self.mode {
             Mode::Release => {
                 footer = footer
-                    .child(button("rel-apply", "Apply", 0x1651b0, !name_empty).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    // Live2 errors-1118: Apply enabled while a required field is still empty.
+                    .child(button("rel-apply", "Apply", 0x1651b0, true).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.save_draft(cx);
                     })))
                     // Live (release.json): Submit (blue) needs approvers; Release (green) is for none. With approvers
