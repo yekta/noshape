@@ -129,7 +129,8 @@ const GLYPHS: &[(char, f64, &str)] = &[
     ('⟂', 7.0, "3.5,8 3.5,1;0,1 7,1"),
     ('⊥', 7.0, "3.5,8 3.5,1;0,1 7,1"),
     ('∥', 6.0, "1.5,1 4,8;3.5,1 6,8"),
-    ('⌖', 7.0, "@3.5,4.5,2.5,2.5,0,360;3.5,0.5 3.5,8.5;-0.5,4.5 7.5,4.5"),
+    // Live's position symbol: the circle a digit tall, the cross a quarter longer (live2 GTOL retake 11-18).
+    ('⌖', 12.5, "@6.25,5,5,5,0,360;6.25,-1.25 6.25,11.25;0,5 12.5,5"),
     ('◎', 7.0, "@3.5,4.5,3.5,3.5,0,360;@3.5,4.5,1.8,1.8,0,360"),
     ('⌯', 7.0, "0,4.5 7,4.5;1.5,6.5 5.5,6.5;1.5,2.5 5.5,2.5"),
     ('↗', 6.0, "0,1 6,7;3,7 6,7 6,4"),
@@ -525,6 +526,22 @@ mod tests {
             let max_y = pts.iter().map(|p| p[1]).fold(f64::MIN, f64::max);
             assert!(max_y < 10.0 + 3.5 * 1.25, "{text}");
         }
+    }
+
+    /// Live2 GTOL retake 11-18: the position symbol's circle is a digit tall, its cross a quarter longer, both
+    /// centred on the digits' middle (ours was a 4 px blob beside 6 px digits).
+    #[test]
+    fn the_position_symbol_is_a_digit_tall() {
+        let span = |c: &str| {
+            let t = Text2 { pos: [0.0, 0.0], height: 3.0, text: c.into(), angle: 0.0, anchor: Anchor::BottomLeft, pick: 0 };
+            let ys: Vec<f64> = text_strokes(&t).into_iter().flatten().map(|p| p[1]).collect();
+            (ys.iter().copied().fold(f64::MAX, f64::min), ys.iter().copied().fold(f64::MIN, f64::max))
+        };
+        let (d0, d1) = span("0");
+        let (s0, s1) = span("⌖");
+        let ratio = (s1 - s0) / (d1 - d0);
+        assert!((1.2..=1.35).contains(&ratio), "cross {ratio} digit heights");
+        assert!(((s0 + s1) - (d0 + d1)).abs() < 1e-6, "centred: {s0}..{s1} on {d0}..{d1}");
     }
 
     #[test]
