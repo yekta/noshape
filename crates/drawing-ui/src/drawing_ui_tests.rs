@@ -24,6 +24,8 @@ thread_local! {
     static DIMENSIONED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The next test drawing's block has a Ø6 hole through it at (20, 10).
     static HOLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The next test drawing is on ANSI_A_MM.dwt (ANSI dimensions) instead of ISO A3.
+    static ANSI: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The next test drawing is ui-parity's start of this name (tests/ui-parity/starts.json) instead.
     static START: std::cell::Cell<Option<&'static str>> = const { std::cell::Cell::new(None) };
     /// The next test drawing is given more through the agent API (its tab's name) before the editor opens.
@@ -56,7 +58,8 @@ fn drawing(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Draw
             let region = d["regions"][0]["id"].clone();
             call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "endBound": "BLIND", "symmetric": true, "depth": "40 mm", "operationType": "REMOVE" } }));
         }
-        let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": SUGGESTED.get() }));
+        let template = if ANSI.replace(false) { "ANSI_A_MM.dwt" } else { "ISO A3" };
+        let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": template, "suggested_views": SUGGESTED.get() }));
         if let Some(f) = SETUP.take() {
             f(&mut ctx, d["drawing"].as_str().unwrap_or_default());
         }
@@ -896,7 +899,11 @@ fn a_section_view_waits_where_it_was_placed_for_its_depth_entity(cx: &mut TestAp
     })
     .unwrap();
     draw(cx, window);
+    // The first click picks the view; the cut is fixed on an inference point, the left edge at mid height (live2
+    // place-1118).
     click(cx, centre);
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Section { parent: Some(_), line: None, .. })), "the view picked");
+    click(cx, [corner[0], centre[1]]);
     assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Section { line: Some(_), .. })), "the cutting line is placed");
     // An empty corner of the sheet, inside its frame.
     click(cx, [30.0, 30.0]);

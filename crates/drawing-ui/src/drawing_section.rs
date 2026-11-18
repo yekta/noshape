@@ -138,6 +138,48 @@ impl DrawingEditor {
         }
     }
 
+    /// Vertical / Horizontal section: a point a click fixes the cut on (live2 place-1118), and whether to mark it with
+    /// a dot of its own: a vertex or circle centre (the snap, already marked), an edge's midpoint within 7 px (a ~14 px
+    /// orange dot), or a point on an edge within 4 px. Elsewhere a click only picks the view.
+    pub fn section_inference(&self, c: [f64; 2]) -> Option<(noshape_scene::drawing_tools::PickedPoint, Option<f64>)> {
+        use noshape_model::drawing::views::EdgeGeom;
+        use noshape_scene::drawing_tools::PickedPoint;
+        if let Some(pp) = self.snap_at(c) {
+            return Some((pp, None));
+        }
+        let b = self.built.as_ref()?;
+        let (mid_reach, edge_reach) = (self.tol_mm(7.5), self.tol_mm(4.5));
+        let dist = |p: [f64; 2]| (p[0] - c[0]).hypot(p[1] - c[1]);
+        let mut mid: Option<(f64, PickedPoint)> = None;
+        let mut on_edge: Option<(f64, PickedPoint)> = None;
+        for pl in b.placements.iter().filter(|pl| pl.contains(c, mid_reach)) {
+            let Some(g) = self.geoms.get(&pl.id) else { continue };
+            let drawn = g.drawn_model_edges();
+            for (me, _) in g.model_edges.iter().zip(&drawn).filter(|(_, d)| **d) {
+                let EdgeGeom::Line { a, b } = me.geom else { continue };
+                let m = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
+                let d = dist(pl.to_sheet(m));
+                if d <= mid_reach && mid.as_ref().is_none_or(|(bd, _)| d < *bd) {
+                    mid = Some((d, PickedPoint { view: pl.id, p: m, r: Some(noshape_model::drawing::PointRef::Midpoint { body: me.body.clone(), name: (*me.name).clone() }) }));
+                }
+            }
+            for e in g.edges.iter().filter(|e| e.visible) {
+                for w in e.points.windows(2) {
+                    let (p, q) = (pl.to_sheet(w[0]), pl.to_sheet(w[1]));
+                    let pq = [q[0] - p[0], q[1] - p[1]];
+                    let l2 = pq[0] * pq[0] + pq[1] * pq[1];
+                    let t = if l2 > 0.0 { (((c[0] - p[0]) * pq[0] + (c[1] - p[1]) * pq[1]) / l2).clamp(0.0, 1.0) } else { 0.0 };
+                    let foot = [p[0] + pq[0] * t, p[1] + pq[1] * t];
+                    let d = dist(foot);
+                    if d <= edge_reach && on_edge.as_ref().is_none_or(|(bd, _)| d < *bd) {
+                        on_edge = Some((d, PickedPoint { view: pl.id, p: pl.to_view(foot), r: None }));
+                    }
+                }
+            }
+        }
+        mid.map(|(_, pp)| (pp, Some(self.tol_mm(14.0)))).or(on_edge.map(|(_, pp)| (pp, Some(self.tol_mm(8.0)))))
+    }
+
     /// Angular with Cut angle unticked: the cutting line pivots about the first click toward the pointer, not
     /// square to the view (live2 asm-feel (6)).
     pub fn section_free_angle(&self) -> bool {

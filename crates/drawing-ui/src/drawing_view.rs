@@ -45,6 +45,11 @@ pub use noshape_scene::drawing_tools::{Button, DimTool, Drag, Pick, PickedPoint,
 /// A sheet's lines drawn at one zoom, and its shaded views' edges (hovered or selected, plain).
 type ZoomedLines = (Option<LinesHandle>, Vec<(ViewId, LinesHandle, LinesHandle)>);
 
+/// The pick ids of a view being placed, drawn grey: its edges and its own lines (hatch).
+pub(crate) fn ghost_picks(built: &BuiltSheet, id: ViewId) -> HashSet<u32> {
+    built.picks.iter().enumerate().filter(|(_, t)| matches!(t, PickTarget::View(v) | PickTarget::Edge { view: v, .. } if *v == id)).map(|(i, _)| i as u32).collect()
+}
+
 /// The pick ids of dangling annotations (drawn red).
 fn dangling_picks(built: &BuiltSheet) -> HashSet<u32> {
     built.picks.iter().enumerate().filter(|(_, t)| matches!(t, PickTarget::Annotation(a) if built.dangling.contains(a))).map(|(i, _)| i as u32).collect()
@@ -1498,10 +1503,11 @@ impl DrawingEditor {
         // selected (live behaviours "Shaded drawing views").
         let shaded: Vec<(ViewId, std::ops::Range<usize>)> = built.geometry.view_edges.iter().filter(|(v, r)| !r.is_empty() && self.shaded.images.contains_key(v)).cloned().collect();
         let paper = self.model_bg.is_none();
+        let ghost = self.placing_view().map(|id| ghost_picks(&built, id)).unwrap_or_default();
         move |zoom, up| {
             let edges = shaded.iter().map(|(v, r)| (*v, up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), zoom, true)), up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), zoom, false)))).collect();
             let skip: Vec<std::ops::Range<usize>> = shaded.iter().map(|(_, r)| r.clone()).collect();
-            (Some(up.upload_lines(&drawing_scene::sheet_lines(&built, zoom, &dangling, &skip, paper))), edges)
+            (Some(up.upload_lines(&drawing_scene::sheet_lines(&built, zoom, &dangling, &skip, &ghost, paper))), edges)
         }
     }
 
@@ -1699,6 +1705,7 @@ impl DrawingEditor {
                 }
             }
             self.push_view_frames(&mut scene);
+            self.push_placing_frame(&mut scene);
             self.push_table_looks(&mut scene);
             // The hovered / selected annotations' referenced edges (blue) and
             // group members (yellow).
@@ -1759,6 +1766,32 @@ impl DrawingEditor {
             for w in q.windows(2) {
                 lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color, pick_id: 0, width, style: LineSegment::ON_TOP });
             }
+        }
+        let up = self.gpu.uploader();
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
+    }
+
+    /// The projected or section view being placed: its preview's id (drawn grey in a 1 px frame, a section's label
+    /// left out, live2 place-1118).
+    pub(crate) fn placing_view(&self) -> Option<ViewId> {
+        if !matches!(self.tool, Tool::Projected { parent: Some(_) } | Tool::Section { line: Some(_), .. }) {
+            return None;
+        }
+        let shown = self.preview.as_ref()?.sheets.get(self.sheet)?;
+        let have = self.drawing.sheets.get(self.sheet)?;
+        shown.views.iter().map(|v| v.id).find(|id| have.view(*id).is_none())
+    }
+
+    /// The placed projected view's box: a 1 px frame rgb(154,165,175), as far out as a selected view's frame.
+    fn push_placing_frame(&self, scene: &mut Scene) {
+        use noshape_render::{LineData, LineSegment};
+        let Some(pl) = self.placing_view().and_then(|v| self.placement(v)) else { return };
+        let off = self.tol_mm(8.0);
+        let (a, c) = ([pl.min[0] - off, pl.min[1] - off], [pl.max[0] + off, pl.max[1] + off]);
+        let q = [[a[0], a[1]], [c[0], a[1]], [c[0], c[1]], [a[0], c[1]], [a[0], a[1]]];
+        let mut lines = LineData::default();
+        for w in q.windows(2) {
+            lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: drawing_scene::GHOST_FRAME, pick_id: 0, width: 1.0, style: LineSegment::ON_TOP });
         }
         let up = self.gpu.uploader();
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));

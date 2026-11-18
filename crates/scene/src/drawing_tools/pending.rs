@@ -108,7 +108,16 @@ impl SheetPick<'_> {
                 let o = auto_orientation(ps, qs, c);
                 let c = self.iso_value_on_pointer(ps, qs, o, c);
                 let offset = dim_offset(ps, qs, o, c);
-                Some(Annotation { one_edge, position: c, ..ann(AnnotationKind::LinearDimension { view: a.view, a: a.p, b: b.p, offset, orientation: o, override_text: None }, vec![(0, a.r), (1, b.r)]) })
+                // ANSI: the value follows the pointer along the line, inside the extension lines too (live2 place-1118).
+                let text_along = self.drawing.is_ansi().then(|| {
+                    let dir = match o {
+                        DimOrientation::Horizontal => [1.0, 0.0],
+                        DimOrientation::Vertical => [0.0, 1.0],
+                        DimOrientation::Aligned => norm(sub(qs, ps)),
+                    };
+                    dot(sub(c, [(ps[0] + qs[0]) / 2.0, (ps[1] + qs[1]) / 2.0]), dir)
+                }).filter(|s| s.abs() > 1e-6);
+                Some(Annotation { one_edge, position: c, text_along, ..ann(AnnotationKind::LinearDimension { view: a.view, a: a.p, b: b.p, offset, orientation: o, override_text: None }, vec![(0, a.r), (1, b.r)]) })
             }
             // Diameter on a cylinder's silhouette: across both silhouettes.
             Tool::Dimension { kind: DimTool::Diameter, picks } if matches!(picks.as_slice(), [Pick::Line { .. }, Pick::Line { .. }]) => {

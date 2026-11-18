@@ -811,14 +811,19 @@ impl DrawingEditor {
                     overlay.lines.push((pts.iter().map(|p| pl.to_sheet(*p)).collect(), true));
                 }
             }
-            // Vertical / horizontal section: the cutting line follows the cursor across the view.
-            Tool::Section { p0: None, partial: false, .. } if self.section_axis().is_some() => {
-                let at = self.hover_snap.unwrap_or(c);
-                if let (Some(e), Some(v)) = (self.section_axis(), self.view_at(at))
+            // Vertical / horizontal section: once a view is picked the cutting line follows the pointer 1:1 across it,
+            // jumping to an inference point in reach, marked (live2 place-1118); none before.
+            Tool::Section { parent: Some(pid), p0: None, partial: false, .. } if self.section_axis().is_some() => {
+                let inference = self.section_inference(c);
+                let (v, at) = inference.as_ref().and_then(|(pp, _)| Some((pp.view, self.pick_sheet(pp)?))).unwrap_or((*pid, c));
+                if let Some(e) = self.section_axis()
                     && let Some((la, lb)) = self.extend_cut(v, at, e)
                     && let Some(pl) = self.placement(v)
                 {
                     overlay.lines.push((vec![pl.to_sheet(la), pl.to_sheet(lb)], true));
+                }
+                if let Some((_, Some(size))) = inference {
+                    overlay.marks.push((at, crate::drawing_scene::SnapMark::Disc, size));
                 }
             }
             Tool::Detail { parent: Some(pid), center: Some(ctr), radius: None } => {
@@ -844,9 +849,13 @@ impl DrawingEditor {
         self.closed_loop_overlay(&mut overlay);
         // The Datum dialog's targets show until ✓ (under the pending one).
         let base = self.datum_rows_drawing();
-        if let Some(v) = self.pending_view() {
+        if let Some(mut v) = self.pending_view() {
             let mut d = self.drawing.clone();
             let insert = matches!(self.tool, Tool::InsertView { .. });
+            // A section view's preview is grey with no label (live2 place-1118).
+            if matches!(self.tool, Tool::Section { .. }) {
+                v.hide_label = true;
+            }
             if let Some(s) = d.sheets.get_mut(self.sheet) {
                 if insert {
                     noshape_model::drawing::create::push_inserted_view(s, v);
@@ -1020,13 +1029,28 @@ impl DrawingEditor {
                     .into());
                 }
             }
-            Tool::Section { p0: None, partial, .. } => {
+            Tool::Section { parent, p0: None, partial, .. } => {
                 // A click just outside a view still cuts it (8 mm around it).
                 let near = self.view_at(c).or_else(|| {
                     let b = self.built.as_ref()?;
                     b.placements.iter().filter(|p| p.contains(c, 8.0)).min_by(|x, y| x.dist_to(c).total_cmp(&y.dist_to(c))).map(|p| p.id)
                 });
-                let pick = self.snap_at(c).or_else(|| near.and_then(|v| self.placement(v).map(|pl| PickedPoint { view: v, p: pl.to_view(c), r: None })));
+                // Vertical / Horizontal (live2 place-1118): a click fixes the cut only on an inference point; elsewhere it
+                // picks the view (the line then follows the pointer) or, once picked, does nothing.
+                if self.section_axis().is_some() && !partial {
+                    match (self.section_inference(c), parent) {
+                        (Some(_), _) => {}
+                        (None, None) => {
+                            match near {
+                                Some(v) => self.tool = Tool::Section { parent: Some(v), p0: None, line: None, partial, jogs: vec![] },
+                                None => self.status = Some("Select a view to section".into()),
+                            }
+                            return;
+                        }
+                        (None, Some(_)) => return,
+                    }
+                }
+                let pick = self.section_inference(c).map(|(pp, _)| pp).filter(|_| self.section_axis().is_some() && !partial).or_else(|| self.snap_at(c)).or_else(|| near.and_then(|v| self.placement(v).map(|pl| PickedPoint { view: v, p: pl.to_view(c), r: None })));
                 if pick.is_none() {
                     self.status = Some("Select a view to section".into());
                 }

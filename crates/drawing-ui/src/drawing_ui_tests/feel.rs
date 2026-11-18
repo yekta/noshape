@@ -526,6 +526,134 @@ fn the_dimension_tool_lights_a_hovered_edge_alone_in_orange(cx: &mut TestAppCont
     assert_eq!((hovered, style.hover_color), (0, crate::theme::lin(DRAWING_HOVER)), "Select: the view's tan frame, its edges as they are");
 }
 
+/// Live2 place-1118: placing a one-edge dimension (ANSI), its value follows the pointer along the line, inside the
+/// extension lines too; against an extension line both arrows flip outside, pointing in; past an end the line is carried
+/// out under the value, arrows inside.
+#[gpui::test]
+fn a_placed_dimensions_value_follows_the_pointer_and_crowds_its_arrows_out(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    ANSI.set(true);
+    let (window, editor) = drawing(cx, "feel-dim-follow");
+    real_sheet(cx, window, &editor);
+    let (l, r, y) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let ends = |x: &noshape_model::drawing::views::ViewEdge| (pl.to_sheet(x.points[0]), pl.to_sheet(x.points[1]));
+        let top = g.edges.iter().filter(|x| x.visible && x.points.len() == 2).map(ends).filter(|(a, b)| (a[1] - b[1]).abs() < 1e-6).max_by(|a, b| (a.0[1] + (a.1[0] - a.0[0]).abs() * 1e-3).total_cmp(&(b.0[1] + (b.1[0] - b.0[0]).abs() * 1e-3))).expect("a horizontal edge");
+        (top.0[0].min(top.1[0]), top.0[0].max(top.1[0]), top.0[1])
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)));
+    draw(cx, window);
+    click_at(cx, window, &editor, [(l + r) / 2.0, y], Modifiers::default());
+    // The value at x, the line 15 mm above the edge: (text along, the line's leftmost and rightmost x).
+    let place = |cx: &mut TestAppContext, x: f64| {
+        cx.update_window(window, |_, _, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = [x, y + 15.0];
+                e.update_preview(cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let a = e.preview.as_ref().and_then(|d| d.sheets.get(e.sheet)).and_then(|s| s.annotations.last()).cloned().expect("the dimension previewed");
+            let b = e.built.as_ref().expect("built");
+            let pick = b.picks.iter().position(|t| *t == PickTarget::Annotation(a.id)).expect("drawn") as u32;
+            let xs: Vec<f64> = b.geometry.lines.iter().filter(|q| q.pick == pick && q.points.len() == 2 && (q.points[0][1] - q.points[1][1]).abs() < 1e-9).flat_map(|q| [q.points[0][0], q.points[1][0]]).collect();
+            (a.text_along, xs.iter().copied().fold(f64::MAX, f64::min), xs.iter().copied().fold(f64::MIN, f64::max))
+        })
+    };
+    let mid = (l + r) / 2.0;
+    let (along, lo, _) = place(cx, mid + 8.0);
+    assert!(along.is_some_and(|s| (s - 8.0).abs() < 1e-6), "inside, clear of the ends: at the pointer, {along:?}");
+    assert!((lo - l).abs() < 1e-6, "arrows inside: the line starts at the extension line, {lo} vs {l}");
+    let (along, lo, _) = place(cx, l + 2.0);
+    assert!(along.is_some_and(|s| (s - (l + 2.0 - mid)).abs() < 1e-6), "against the left end: at the pointer, {along:?}");
+    assert!(lo < l - 1.0, "arrows flipped outside: the line runs past the extension line, {lo} vs {l}");
+    let (along, lo, hi) = place(cx, r + 15.0);
+    assert!(along.is_some_and(|s| (s - (r + 15.0 - mid)).abs() < 1e-6), "past the right end: at the pointer, {along:?}");
+    assert!((lo - l).abs() < 1e-6 && hi > r + 5.0, "arrows inside, the line carried out under the value: {lo}..{hi} vs {l}..{r}");
+}
+
+/// Live2 place-1118: a projected view being placed is drawn grey rgb(159,159,159) in a 1 px rgb(154,165,175) frame;
+/// the views already there keep their ink.
+#[gpui::test]
+fn a_projected_views_preview_is_grey_in_a_thin_frame(cx: &mut TestAppContext) {
+    use noshape_model::drawing::ViewKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-projected-ghost");
+    real_sheet(cx, window, &editor);
+    let (base, at) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let s = e.current_sheet();
+        let v = s.views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).expect("a base view");
+        (v.id, [v.position[0] + 90.0, v.position[1]])
+    });
+    cx.update_window(window, |_, _, cx| {
+        editor.update(cx, |e, cx| {
+            e.set_tool(Tool::Projected { parent: Some(base) }, cx);
+            e.cursor = at;
+            e.update_preview(cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        let id = e.placing_view().expect("the projected view previewed");
+        assert!(e.placement(id).is_some(), "its box framed");
+        let b = e.built.as_ref().expect("built");
+        let ghost = crate::drawing_view::ghost_picks(b, id);
+        assert!(b.geometry.lines.iter().any(|l| ghost.contains(&l.pick)), "the preview has geometry");
+        let lines = crate::drawing_scene::sheet_lines(b, e.zoom, &Default::default(), &[], &ghost, false);
+        let grey = lines.segments.iter().filter(|s| s.color == crate::drawing_scene::GHOST_INK).count();
+        let ink = lines.segments.iter().filter(|s| s.color != crate::drawing_scene::GHOST_INK).count();
+        assert!(grey > 0 && ink > 0, "the preview grey ({grey}), the other views as they are ({ink})");
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Select, cx)));
+    draw(cx, window);
+    assert!(cx.update(|cx| editor.read(cx).placing_view().is_none()), "no preview once the tool ends");
+}
+
+/// Live2 place-1118: Section view (Vertical): a click away from an inference point only picks the view (the cutting line
+/// then follows the pointer), another such click does nothing, and a click on an edge's midpoint fixes the cut.
+#[gpui::test]
+fn a_vertical_sections_cut_is_fixed_only_on_an_inference_point(cx: &mut TestAppContext) {
+    use noshape_model::drawing::ViewKind;
+    use noshape_model::drawing::views::EdgeGeom;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-section-infer");
+    real_sheet(cx, window, &editor);
+    let (inside, mid) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let v = e.current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).map(|v| v.id).expect("a base view");
+        let pl = e.placement(v).expect("placed");
+        let g = e.geoms.get(&v).cloned().expect("geometry");
+        let m = g.model_edges.iter().find_map(|me| match me.geom {
+            EdgeGeom::Line { a, b } => Some(pl.to_sheet([(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0])),
+            _ => None,
+        });
+        ([(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0], m.expect("a straight edge"))
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Section { parent: None, p0: None, line: None, partial: false, jogs: vec![] }, cx)));
+    draw(cx, window);
+    assert!(cx.update(|cx| editor.read(cx).section_axis().is_some()), "Vertical by default");
+    let state = |cx: &mut TestAppContext| cx.update(|cx| match &editor.read(cx).tool {
+        Tool::Section { parent, p0, line, .. } => (parent.is_some(), p0.is_some(), line.is_some()),
+        _ => (false, false, false),
+    });
+    click_at(cx, window, &editor, inside, Modifiers::default());
+    assert_eq!(state(cx), (true, false, false), "away from an inference point: the view picked, no cut");
+    click_at(cx, window, &editor, [inside[0] + 1.0, inside[1]], Modifiers::default());
+    assert_eq!(state(cx), (true, false, false), "again away from one: nothing");
+    click_at(cx, window, &editor, mid, Modifiers::default());
+    assert_eq!(state(cx), (true, true, true), "on an edge's midpoint: the cut fixed");
+}
+
 /// Live drawing-sysvars.json: a tool picks within Graebert's PICKBOX, 7 px (ours had 5): the Dimension tool lights an
 /// edge 6 px off it, not 9 px off.
 #[gpui::test]

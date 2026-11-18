@@ -23,6 +23,11 @@ const DANGLING_INK: [u8; 4] = [(DANGLING_RGB >> 16) as u8, (DANGLING_RGB >> 8) a
 /// Pixel width of a line style at a zoom (pixels per mm). Onshape's lines
 /// are hairlines at the fitted zoom (1 px for visible edges, frame and
 /// dimensions on a 4.3 px/mm A sheet) and thicken as you zoom in.
+/// A projected view's preview geometry while it is placed (live2 place-1118: rgb(159,159,159)).
+pub const GHOST_INK: [u8; 4] = [159, 159, 159, 255];
+/// Its box's 1 px frame (rgb(154,165,175)).
+pub const GHOST_FRAME: [u8; 4] = [154, 165, 175, 255];
+
 pub fn px_width(style: LineStyle, zoom: f64) -> f32 {
     pen_px(style, style.width_mm(), zoom)
 }
@@ -51,8 +56,9 @@ fn push(lines: &mut LineData, pts: &[[f64; 2]], color: [u8; 4], pick: u32, width
 
 /// All sheet polylines as line segments, plus texts the filled font
 /// can't draw (the others: [`sheet_text`]).
-/// `skip`: line ranges drawn separately (shaded views' edges).
-pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>, skip: &[std::ops::Range<usize>], paper: bool) -> LineData {
+/// `skip`: line ranges drawn separately (shaded views' edges); `ghost`: the picks drawn grey (a view being placed, its
+/// edges and hatch, live2 place-1118).
+pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>, skip: &[std::ops::Range<usize>], ghost: &HashSet<u32>, paper: bool) -> LineData {
     let g = &built.geometry;
     let mut lines = LineData::default();
     lines.segments.reserve(g.lines.len() * 4);
@@ -64,7 +70,7 @@ pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>,
     }
     for li in 0..g.lines.len() {
         if !skip.iter().any(|r| r.contains(&li)) {
-            push_sheet_line(&mut lines, built, li, zoom, dangling_picks, true);
+            push_sheet_line(&mut lines, built, li, zoom, dangling_picks, g.lines.get(li).is_some_and(|l| ghost.contains(&l.pick)), true);
         }
     }
     // Drawing properties › Dimensions › Underline overridden dimensions.
@@ -92,15 +98,17 @@ pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>,
 pub fn range_lines(built: &BuiltSheet, range: std::ops::Range<usize>, zoom: f64, picked: bool) -> LineData {
     let mut lines = LineData::default();
     for li in range {
-        push_sheet_line(&mut lines, built, li, zoom, &HashSet::new(), picked);
+        push_sheet_line(&mut lines, built, li, zoom, &HashSet::new(), false, picked);
     }
     lines
 }
 
-fn push_sheet_line(lines: &mut LineData, built: &BuiltSheet, li: usize, zoom: f64, dangling_picks: &HashSet<u32>, picked: bool) {
+fn push_sheet_line(lines: &mut LineData, built: &BuiltSheet, li: usize, zoom: f64, dangling_picks: &HashSet<u32>, ghost: bool, picked: bool) {
     let g = &built.geometry;
     let Some(l) = g.lines.get(li).filter(|l| l.points.len() >= 2) else { return };
-    let color = if dangling_picks.contains(&l.pick) {
+    let color = if ghost {
+        GHOST_INK
+    } else if dangling_picks.contains(&l.pick) {
         DANGLING_INK
     } else if let Some(c) = g.line_color(li) {
         [c[0], c[1], c[2], 255]

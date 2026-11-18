@@ -11,8 +11,8 @@ use std::time::Duration;
 
 /// From the pointer resting on a tool to its help (live 3.05–3.24 s).
 pub const HELP_DELAY: Duration = Duration::from_millis(3100);
-/// From the pointer resting on a tool to its title tooltip (live2 toolbar-help-1118: 0.45–0.69 s, median 0.47 s, in
-/// Graebert's frame; the kit's default 500 ms showed it at 0.70 s, live2 ours-1118-drawing).
+/// From the pointer resting on a tool to its title tooltip (live2 toolbar-help-1118: 0.45–0.69 s, median 0.47 s). Ours
+/// read later (qa DRW-TOOLBAR-TOOLTIP-DELAY) by the kit's fade starting at 0 opacity, one more frame, now gone.
 pub const TIP_DELAY: Duration = Duration::from_millis(450);
 const WIDTH: f32 = 400.;
 

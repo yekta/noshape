@@ -176,10 +176,12 @@ pub(crate) fn render_tooltip(
                 )
                 .into_any_element()
         }
+        // From 0.25, not 0: the first frame after the delay already shows it (a frame of 0 opacity added one frame,
+        // ~130 ms on a software-GL display, to every tooltip's onset: qa DRW-TOOLBAR-TOOLTIP-DELAY).
         BaseTooltipTransition::Enter { epoch } => EffectTransition::new(ENTER_DURATION)
             .ease(ease_out_cubic)
             .slide_y(px(4.), px(0.))
-            .fade(0.0, 1.0)
+            .fade(0.25, 1.0)
             .apply(
                 element,
                 ElementId::NamedInteger("tooltip-enter".into(), epoch as u64),

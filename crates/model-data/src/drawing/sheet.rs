@@ -3297,6 +3297,9 @@ impl SheetGeometry {
         let c = [mid[0] + dir[0] * s_along, mid[1] + dir[1] * s_along];
         let outside = (s_along.abs() > half_line && self.text_along.is_some()) || iso_out;
         let squeezed = iso_squeezed || (inline && !self.flip_arrows && !outside && gap.is_some_and(|g| 2.0 * g + 2.0 * a_len > dl));
+        // ANSI: a value moved against an extension line (within its gap and an arrow of it) sends both arrows outside,
+        // pointing in (live2 place-1118: flipped 13–19 px inside an end, not 53–59).
+        let crowded = inline && !self.style.iso && !squeezed && !outside && self.text_along.is_some() && gap.is_some_and(|g| half_line - s_along.abs() < g + a_len);
         if outside {
             // From the extension line on the value's side to its gap.
             let g = gap.unwrap_or(self.dim_main_width(text, h) / 2.0 + 0.65 * h);
@@ -3335,7 +3338,7 @@ impl SheetGeometry {
             }
             self.arrow(dp, d, 3.0);
             self.arrow(dq, [-d[0], -d[1]], 3.0);
-        } else if self.flip_arrows {
+        } else if self.flip_arrows || crowded {
             // Flipped: arrows outside pointing in, the line runs past them.
             let ext = self.style.dim_arrow + 3.0;
             for seg in broken([[dp[0] - du[0] * ext, dp[1] - du[1] * ext], [dq[0] + du[0] * ext, dq[1] + du[1] * ext]]) {

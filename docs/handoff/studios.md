@@ -34,7 +34,12 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   Release…, one row per configuration named as the part, tooltip "Part 1 / Size / Small"; op release_create
   `all_configurations`, e2e). run19–22: drw-detail-* all match, drw-section-exclude-from-cut 22/23 before the Esc fix.
 - Landed e24a63d1 16:13, 145333a8 16:34 (associated drawings under their part); 44f4fc11 queued (ops order).
-- Landing: live2 feel batch 1 (11-18 16:15): note leader lights to 8 px (SELECT_LEADER_REACH_PX 9, was 11), a circle
+- Landed 44f4fc11 17:09, 56b1ce62 17:28. Landing now: live2 place-1118 (dimension value follows the pointer, ANSI;
+  crowded arrows flip; projected / section preview grey in a thin frame, section label hidden; Vertical / Horizontal
+  section cut fixed only on an inference point, else the click picks the view); kit tooltip fade from 0.25 (qa
+  DRW-TOOLBAR-TOOLTIP-DELAY: measured 511–625 ms after, 666–810 before; the rest is one software-GL frame). drw1118f
+  46/46. ui-parity runs now on vibe2 / vibex7 via ~/bin/slot (vibex6 = watcher), one per host.
+- Earlier: live2 feel batch 1 (11-18 16:15): note leader lights to 8 px (SELECT_LEADER_REACH_PX 9, was 11), a circle
   centre snaps from 9 px (CENTER_SNAP_REACH_PX 10, vertices stay 8); mouse table's Alt swap test; feel doc rows
   (PICKBOX, fractions, toolbar tooltip). "Unshare selected (N) with me": cloud, left out (lead).
 - Local (next land): release dialog associated drawings as live (release-gaps-1118): Include associated drawings puts
