@@ -2565,11 +2565,25 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // scale or user label (live2 positions: SECTION A - A ~3.1 mm, SCALE 2:1 ~5.6 mm below the geometry;
             // drw-auxiliary-view-no-indicator: Auxiliary A - A 20.7 mm under the view's centre, as a section's).
             let aux_label = shown && matches!(v.kind, ViewKind::Auxiliary { .. }) && v.aux_ref.as_ref().is_some_and(|a| !a.letter.is_empty());
-            let mut y = pl.min[1] - if auto_label || aux_label { 3.1 } else { 6.0 };
+            // A detail's label hangs 5.3 mm under its whole profile, centred on it, clipped border or not (live2
+            // labels-1118: DETAIL A / SCALE 2:1 39.2 mm under the centre of a 2:1 circle of radius 33.9 mm).
+            let profile = matches!(v.kind, ViewKind::Detail { .. }).then(|| match (&geo.clip_poly, geo.clip) {
+                (Some(poly), _) => poly.iter().map(|q| pl.to_sheet(*q)).fold(None, |b: Option<([f64; 2], [f64; 2])>, q| Some(b.map_or((q, q), |(lo, hi)| ([lo[0].min(q[0]), lo[1].min(q[1])], [hi[0].max(q[0]), hi[1].max(q[1])])))),
+                (None, Some((c, r))) => {
+                    let (c, r) = (pl.to_sheet(c), pl.len_to_sheet(r));
+                    Some(([c[0] - r, c[1] - r], [c[0] + r, c[1] + r]))
+                }
+                _ => None,
+            }).flatten();
+            let (lo, hi, gap) = match profile {
+                Some((lo, hi)) => (lo, hi, 5.3),
+                None => (pl.min, pl.max, if auto_label || aux_label { 3.1 } else { 6.0 }),
+            };
+            let mut y = lo[1] - gap;
             let label_mark = g.texts.len();
             for (text, height) in label_lines {
                 y -= height;
-                g.texts.push(Text2 { pos: [(pl.min[0] + pl.max[0]) / 2.0 + at[0], y + at[1]], height, text, angle: 0.0, anchor: Anchor::BottomCenter, pick: label_pick });
+                g.texts.push(Text2 { pos: [(lo[0] + hi[0]) / 2.0 + at[0], y + at[1]], height, text, angle: 0.0, anchor: Anchor::BottomCenter, pick: label_pick });
                 y -= 2.0;
             }
             // A base or pictorial view at a scale other than 1:1 keeps its label when it says nothing: live's DXF has an

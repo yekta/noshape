@@ -3810,6 +3810,26 @@ fn exact_export_clips_detail_views_to_their_circle() {
     }
 }
 
+/// Live2 labels-1118 (drw-detail-view-clip-border.dxf): a detail's label hangs 5.3 mm under its whole circle, centred
+/// on it, with Clip border to geometry too (live: 38.96 mm under the clipped border, under the unclipped circle).
+#[test]
+fn a_detail_label_hangs_under_its_whole_circle() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let id = drawing.sheets[0].views.iter().find(|v| matches!(v.kind, ViewKind::Detail { .. })).expect("demo detail view").id;
+    for clip in [false, true] {
+        drawing.sheets[0].view_mut(id).unwrap().detail_clip_border = clip;
+        let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+        let ViewKind::Detail { center, radius, .. } = drawing.sheets[0].view(id).unwrap().kind else { unreachable!() };
+        let pl = built.placement(id).unwrap();
+        let (c, r) = (pl.to_sheet(center), pl.len_to_sheet(radius));
+        let first = built.geometry.texts.iter().find(|t| built.picks.get(t.pick as usize) == Some(&PickTarget::ViewLabel(id))).expect("the label");
+        assert!((first.pos[0] - c[0]).abs() < 1e-6, "clip {clip}: centred: {first:?} / {c:?}");
+        assert!((first.pos[1] + first.height - (c[1] - r - 5.3)).abs() < 1e-6, "clip {clip}: top 5.3 mm under the circle: {first:?} / {c:?} r {r}");
+    }
+}
+
 /// Detail profile In line on a circle (live qa4-r5-s11.dxf, detail B): the
 /// label on the circle at 0°, the circle broken around it, an arrow each
 /// side along the circle, tips 0.75 of the text height from the label's

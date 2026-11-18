@@ -68,14 +68,16 @@ impl TbTool {
         self
     }
 
-    fn render(self, ed: &Entity<DrawingEditor>, cx: &mut Context<DrawingEditor>) -> AnyElement {
+    /// `help`: the tool whose help popover shows (its own tooltip goes: live's popover covers it).
+    fn render(self, ed: &Entity<DrawingEditor>, help: Option<&'static str>, cx: &mut Context<DrawingEditor>) -> AnyElement {
         // Named by its tooltip without the shortcut, for the ui-parity driver (tests/ui-parity: `{"tool": "Note"}`).
         let tip = self.tip;
-        let button = div().id(SharedString::from(format!("tbh-{}", self.id))).flex_none().on_hover(cx.listener(move |this, on: &bool, _, cx| this.tool_hover(tip, *on, cx))).child(self.render_button(ed, cx));
+        let quiet = help == Some(tip);
+        let button = div().id(SharedString::from(format!("tbh-{}", self.id))).flex_none().on_hover(cx.listener(move |this, on: &bool, window, cx| this.tool_hover(tip, *on, window, cx))).child(self.render_button(ed, quiet, cx));
         crate::ui_script::wrap(button.into_any_element(), || format!("tool:{}", tip.split(" (").next().unwrap_or(tip)))
     }
 
-    fn render_button(self, ed: &Entity<DrawingEditor>, cx: &mut Context<DrawingEditor>) -> AnyElement {
+    fn render_button(self, ed: &Entity<DrawingEditor>, quiet: bool, cx: &mut Context<DrawingEditor>) -> AnyElement {
         if self.disabled {
             let b = match self.more {
                 None => crate::ui::tool_button(self.id, self.icon, false, cx).w(px(CELL)).h(px(CELL)).tooltip(self.tip).into_any_element(),
@@ -86,13 +88,13 @@ impl TbTool {
         let run = self.run.clone();
         let click = cx.listener(move |this, _: &ClickEvent, window, cx| run(this, window, cx));
         match self.more {
-            None => crate::ui::tool_button(self.id, self.icon, self.active, cx).w(px(CELL)).h(px(CELL)).when(self.active, |b| b.bg(ACTIVE_BG)).tooltip(self.tip).on_click(click).into_any_element(),
+            None => crate::ui::tool_button(self.id, self.icon, self.active, cx).w(px(CELL)).h(px(CELL)).when(self.active, |b| b.bg(ACTIVE_BG)).when(!quiet, |b| b.tooltip(self.tip)).on_click(click).into_any_element(),
             Some((caret, items)) => {
                 let ed = ed.clone();
                 // The ▾ for the ui-parity driver (`{"tool": "Dimension", "menu": …}`).
                 let tip = self.tip;
-                let more = crate::ui_script::mark(crate::ui::tool_caret_blue(caret, cx).tooltip(self.tip).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx)), || format!("caret:{}", tip.split(" (").next().unwrap_or(tip)));
-                split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, self.active, cx).when(self.active, |b| b.bg(ACTIVE_BG)).tooltip(self.tip).on_click(click), more).into_any_element()
+                let more = crate::ui_script::mark(crate::ui::tool_caret_blue(caret, cx).when(!quiet, |b| b.tooltip(self.tip)).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx)), || format!("caret:{}", tip.split(" (").next().unwrap_or(tip)));
+                split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, self.active, cx).when(self.active, |b| b.bg(ACTIVE_BG)).when(!quiet, |b| b.tooltip(self.tip)).on_click(click), more).into_any_element()
             }
         }
     }
@@ -286,6 +288,7 @@ impl DrawingEditor {
 
     pub fn render_toolbar(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
+        let help = self.help_hover.as_ref().filter(|h| h.shown).map(|h| h.tip);
         // An image whose tab is gone also makes it out of date (live 1613 (a):
         // Update highlighted until the image is dropped).
         let out_of_date = self.out_of_date || self.images_stale(cx);
@@ -300,12 +303,12 @@ impl DrawingEditor {
             .child(sep())
             .child(crate::ui_script::wrap(
                 // Onshape: the update button is highlighted (#fcda7f, #fab601 border) when out of date.
-                div().id("tbh-dr-update").flex_none().on_hover(cx.listener(|this, on: &bool, _, cx| this.tool_hover("Update from this workspace (ctrl+q)", *on, cx))).child(crate::ui::tool_button("dr-update", "drawing-update", false, cx)
+                div().id("tbh-dr-update").flex_none().on_hover(cx.listener(|this, on: &bool, window, cx| this.tool_hover("Update from this workspace (ctrl+q)", *on, window, cx))).child(crate::ui::tool_button("dr-update", "drawing-update", false, cx)
                     .w(px(CELL))
                     .h(px(CELL))
                     .when(out_of_date, |b| b.bg(gpui_kit::rgb(0xfcda7f)).border_2().border_color(gpui_kit::rgb(0xfab601)))
                     .opacity(if imported { 0.3 } else if up_to_date { 0.4 } else { 1.0 })
-                    .tooltip("Update from this workspace (ctrl+q)")
+                    .when(help != Some("Update from this workspace (ctrl+q)"), |b| b.tooltip("Update from this workspace (ctrl+q)"))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if !up_to_date {
                             this.update_drawing(cx)
@@ -327,7 +330,7 @@ impl DrawingEditor {
                 1 if compact => {
                     let rest = g.split_off(1.min(g.len()));
                     for t in g {
-                        bar = bar.child(t.render(&ed, cx));
+                        bar = bar.child(t.render(&ed, help, cx));
                     }
                     bar = bar.children(collapsed(gi + 100, rest, &ed, cx));
                 }
@@ -339,12 +342,12 @@ impl DrawingEditor {
                     let keep = g.split_off(6.min(g.len()));
                     bar = bar.children(collapsed(gi, g, &ed, cx));
                     for t in keep {
-                        bar = bar.child(t.render(&ed, cx));
+                        bar = bar.child(t.render(&ed, help, cx));
                     }
                 }
                 _ => {
                     for t in g {
-                        bar = bar.child(t.render(&ed, cx));
+                        bar = bar.child(t.render(&ed, help, cx));
                     }
                 }
             }

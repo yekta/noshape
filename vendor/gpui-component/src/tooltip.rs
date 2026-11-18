@@ -227,6 +227,13 @@ impl ComponentTooltip {
     }
 }
 
+/// Hides the window's shown tooltip at once (noshape: a drawing tool's help popover takes its place).
+pub fn hide_tooltip(window: &Window, cx: &mut App) {
+    if let Some(overlay) = WindowState::tooltip_overlay(window, cx) {
+        overlay.update(cx, |overlay, cx| overlay.hide(cx));
+    }
+}
+
 // ── Internal managed tooltip trait ──────────────────────────────────────────
 
 pub(crate) trait ManagedTooltipExt:

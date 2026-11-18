@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-18 11:43 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
+Updated 2026-11-18 11:57 UTC. Restarted 11-17 09:20 after the lead's pause; compacted ~14:45, ~18:15, ~23:30, ~01:40.
 
 ## In flight
 
@@ -34,21 +34,21 @@ tools/tiers/land.sh --no-precheck`; builds `NOSHAPE_RB_HOST=vibex6 tools/tiers/r
   Also in it: VS value tooltip over its cell; Derived's panel takes the first Esc / Enter; stacked fractions; merge
   preview "Last change by <user> at <time>".
 - Landed ba9f9050 as 9f629e6f 11:38: Custom's zones per standard, s7 excluded, PICKBOX / GRIPSIZE picks, the custom-dialog test.
-- Local, to land: the hatch Pattern list as live2 hatch-list-1118 (1 px under the field, 190 px, 30 px rows, at most
-  341 px then it scrolls, above the field when low; OsMenu::max_height; feel test; run14 drw-hatch-* all match); the
-  drawing toolbar help popover (live2 toolbar-help-1118: 3.1 s, 400 px at the frame's left under the toolbar, title
-  bar #cfdbe5, numbered steps, gone on leave, none for Undo / Redo; drawing_help.rs; feel test). Its texts table is
-  EMPTY: decision asked of the lead (copy live's 50 texts from help-popovers.json, or write our own).
-- Queued 64680c1d 11:07 (5 commits: Preferences, Custom zones, VS tooltip / Derived Esc, the shortcut-count fix,
-  stacked fractions + merge Edited tooltip).
-- Open: drw-hatch-panel s31 (Pattern list covers its field; asked live2 09:23).
+- Landed e6e0224d as 8a968155 11:51: the hatch Pattern list as live2 hatch-list-1118 (OsMenu::max_height; run14
+  drw-hatch-* 130/130); the toolbar help popover mechanism (drawing_help.rs).
+- Local, to land: the help popover texts, 45 tools in our own words with live's titles / step counts / facts
+  (DECISIONS 11-18; live's text in help-popovers.json is cut at ~400 chars; steps inferred: first sentence the intro,
+  the rest numbered, prose-only for Update, Trim, Horizontal, Tangent arc, Format painter, the inspection tools, as
+  the popover heights fit); the popover hides the title tooltip (vendored gpui-component `tooltip::hide_tooltip`) and
+  its steps wrap; a detail's label 5.3 mm under its whole profile (circle / polygon box), centred, clipped border or
+  not (live2 labels-1118: 39.2 mm under a 2:1 r 33.9 circle's centre; test).
+- Label rule open: the two sections both have 30 mm of geometry centred on the view, yet live's label gaps are 5.81
+  (exclude-from-cut) and 3.02 mm (vertical); ours keeps 3.1 for sections. The exclude case's extra 2.8 mm is not
+  explained by the visible, hatch or model box; next: compare our section box with live's per take (dxfl.py).
 - Checked against live 08:4x, already as live: documents search on Enter only; version row menu (View in repair,
   Restore to Main…, Releases only with candidates; Copy link web-only); Restore strategy dialog; Create version (V<n>
   focused, Enter creates, Esc closes); Branch (B<n> selected, Enter creates and opens).
-- Drawing items left: section / detail label position (live's distance below the view centre differs per view:
-  11.7 / 10.1, 22.4 / 20.1, 19.6 / 20.1, detail 50.0 / 47.6; DXFs asked of live2, REQUESTS 09:03); toolbar help popovers
-  (Update, Projected view read "title / title description" in live; asked in REQUESTS 08:56);
-  drw-gtol-type-list s5 / drw-hatch-panel s29 (list highlight). Not targets: replicate-region-place s21 (live's
+- Drawing items left: drw-gtol-type-list s5 / drw-hatch-panel s29 (list highlight). Not targets: replicate-region-place s21 (live's
   toast comes ~9.75 s after ✓, server time; ours at once, gone by the 12 s read), drw-revision-table-delete s8,
   drw-inspection-table-iso-scrolled s2 (reader count), drw-note-editor (retake asked).
 - Full drawing run drw1118b on vibex8 (~/agents/studios-keep/drw1118b): 317/341; its fixes landed (d2eb5c15,

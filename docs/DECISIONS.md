@@ -123,3 +123,7 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-17 A gate or suite pair compares each changed feature's solid validity (BRepCheck) too, not only counts, status,
   volume and area: a feature valid on main and invalid on the branch is a difference, and an invalid solid never lands
   (blend's tighten_tolerances: Halter's input became a 36-face invalid solid while the shown counts looked SAME).
+- 11-18 (lead) Help popover texts: our own wording, live's structure. The drawing toolbar's help popovers (and any
+  longer help Onshape authors) keep live's title, numbered steps (same count and order), facts and UI names, written
+  in our own words; never live's paragraphs copied verbatim (Onshape's authored content). Short UI labels and
+  tooltips stay word for word, as parity requires.

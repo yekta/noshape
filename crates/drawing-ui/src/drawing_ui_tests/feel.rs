@@ -846,7 +846,7 @@ fn the_hatch_pattern_list_opens_under_its_field_and_scrolls_past_341_px(cx: &mut
 fn a_toolbar_tools_help_shows_after_3_s_under_the_toolbar(cx: &mut TestAppContext) {
     let (window, editor) = drawing(cx, "feel-tool-help");
     let shown = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("tool-help");
-    cx.update(|cx| editor.update(cx, |e, cx| e.tool_hover("Projected view (p)", true, cx)));
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.tool_hover("Projected view (p)", true, w, cx))).unwrap();
     cx.executor().advance_clock(std::time::Duration::from_millis(2900));
     draw(cx, window);
     assert!(shown(cx).is_none(), "not yet at 2.9 s");
@@ -855,11 +855,13 @@ fn a_toolbar_tools_help_shows_after_3_s_under_the_toolbar(cx: &mut TestAppContex
     // (The editor fills the test window.)
     let b = shown(cx).expect("shown by 3.2 s");
     assert_eq!((b.left(), b.top(), b.size.width), (px(0.), px(crate::ui::TOOLBAR_H + 1.), px(400.)), "{b:?}");
-    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Projected view Test help. First step. Second step."));
-    cx.update(|cx| editor.update(cx, |e, cx| e.tool_hover("Projected view (p)", false, cx)));
+    let h = crate::drawing_help::help("Projected view (p)").expect("Projected view's help");
+    assert_eq!(h.steps.len(), 3, "live's three steps");
+    assert_eq!(crate::ui_script::shown_tooltip(), Some(format!("Projected view {} {}", h.intro, h.steps.join(" "))));
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.tool_hover("Projected view (p)", false, w, cx))).unwrap();
     draw(cx, window);
     assert!(shown(cx).is_none(), "gone when the pointer leaves");
-    cx.update(|cx| editor.update(cx, |e, cx| e.tool_hover("Undo (ctrl+z)", true, cx)));
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.tool_hover("Undo (ctrl+z)", true, w, cx))).unwrap();
     cx.executor().advance_clock(std::time::Duration::from_millis(4000));
     draw(cx, window);
     assert!(shown(cx).is_none(), "Undo has none");
