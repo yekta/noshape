@@ -55,12 +55,16 @@ the assembly corpora's studios. History: docs/handoff/archive/asm.md. Rulings: d
   587cd164 landed as 80a647256; qa: dialog verified; REACH P1 on diagonals (TICKETS 7556969e3: 74 px at 45°, square
   predicts 80.6): ours needs the pointer over the target part (raycast). Asked live2 (REQUESTS 07:56) for the diagonal
   reach and whether an off-part pointer snaps; then match (live's pick rect ±50 px + 15 px dots).
+- P0 HEAVY-ASM-SOFTWARE-FRAME (qa, xDev): cause = angle display mesh density: 7.76 M tris (SCHUNK Gehaeuse 355 faces
+  1.17 M, 7 mm bearing 67k, _787261002 691k ×5); chord mesh 1.05 M; headless render 15–18 s -> 2.95 s (vibex8
+  ~/tmp/asm/perf, probe /root/tmp/render.rs.main). Handed to psui 11-18 12:3x; assembly side doesn't scale it.
+- Snap retake (snap-diag-1118) + Display states focus QUEUED 679e306e (undoes a9f670ef's pick rectangle).
+- Suite pair main vs 28-commit stack: vibe2 ~/agents/asm-keep/pair.sh -> pair/{mainbase,stack}.log, pair/done.
 - Thread ids (11-18 lead): core e8af89fe-d460-49b3-b0bb-9572da230fed, blend 0672fa20-964d-4fde-a19c-c5b4363729ba,
   qa 132756b3-e48d-4b9f-8a0e-3d4f23629c8b (old core 6692ae35 / blend 0e6e9942 stopped: never message them).
 - Solver reorient fix QUEUED from worktree asm-solver (ce07890bb; c28 A/B: none of 10 worse, scissor-lift 214/242);
   snap pick rectangle QUEUED e2c20cb2.
-- LANDED 11-18: asm-feel3 52c050e1, asm-views2 916b2d59, qa's NOSHAPE_PARITY_SAVE b2473af7 (qa told: vibex8
-  ~/agents/asm-keep/qa-save/asm-xdev-subs.noshape). Not copied (delays): list hover 1.1 s, Insert's 353 ms filter wait.
+- LANDED 11-18: asm-feel3 52c050e1, asm-views2 916b2d59, qa's save switch b2473af7 (file sent to qa).
 - scissor-lift: Fastened 35 (Sub 6ed9b2 > T8 Leadscrew edge centre, align face, ↔ Sub aa9534 > Output Coupler edge
   centre) now resolves (main: b end unresolved) but our X turns 45° (live X a (0,1,0), b (0,0,-1)): leadscrew and
   coupler turned. Trace with each OK mate's end angles: ops-c25 vibex7 one/sc25.log (slot).
