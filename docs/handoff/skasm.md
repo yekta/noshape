@@ -1,35 +1,24 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-18 06:44 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-18 07:38 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## Landed 11-18
-- b6f5e810 / 0fda4de5: snap onto another sketch's point = one Coincident; joint flat edges; double-clicked face's
-  sketch drawn through; Extend; offset arrow drag.
 - 9c015658 (03:39): Rip -> Bend unfold failure, Corner / Bend relief boxes, offset zoom step, " radian", snap trace.
-  Its 2f93c018c clash check flagged rolled-wall models (no flat): shipped in v0.4.58, fixed in 120ee19c (must-carry).
-- 4b4e4915: sticky snap target; circle / ellipse onto a held point keeps its size (constructive.rs).
-- 8b481251: an opened sketch's draft takes the regeneration's solve (hat15b Sketch 1, 1.1 mm off its stored place).
-- cafe3c2a: a line ending on a circle snaps tangent within the snap radius of the true tangent point.
-- 4ca852b6: a model vertex snaps to its exact point (not the mesh's f32).
+  Its 2f93c018c clash check flagged rolled-wall models (no flat): shipped in v0.4.58, fixed in 7b8bb249 (must-carry).
+- 4b4e4915 sticky snap; circle / ellipse onto a held point keeps its size. 8b481251 an opened sketch's draft takes
+  the solve (hat15b). cafe3c2a tangent on a circle. 4ca852b6 exact model vertex snap. 7b8bb249 rolled walls, unfold
+  failure listed as failed, sticky target only against its rank, elliptical arc on its axis.
+- b5c4ccc4: Corner / Bend relief take a rip side face as its edge (live sm-rip-1118 (b)); translator decal image.
+- cfb07d1c: pierce_point finds where a curve only touches the plane.
 
-## Queued (vibe2)
-- 120ee19c: rolled walls not flagged; unfold failure listed as failed (live sm-rip-1118 (a)); sticky target only
-  against its rank (live sticky-snap: a point / the line's end takes over); translator elliptical arc on its axis.
-- db01062d: Corner / Bend relief take a rip side face as its long edge, chip "Edge of Sheet metal model 1", fail as live.
-- next: decal image (fetched file tab or placeholder): seven surf-intro docs 4 -> 5 features.
-
-## Held (not committed): /root/skasm-scratch/held/loft-paths-pierce.patch
-- parity.rs: an EDGE ref whose body is no part tries a sketch curve with live's midpoint / length first (Sketch 3's arc
-  JOB in c2-loft-paths-guides); `anchors_off` also counts a PIERCE edge's middle (ref `point`) on the plane. With it
-  loft-paths-guides keeps Sketch 4 / 7 / 10's PIERCEs (were taken back). BREAKS parity::an_assembly_is_rebuilt_as_lives
-  and a_subassembly_is_rebuilt_as_lives (parity.rs:3783 / 3929): find which half, fix, then land.
-- Sketch 5's 2 PIERCE rejected remain: targets are circles touching the plane; pierce_point now finds a touching point
-  (committed, unit test), yet sketch_constrain still refuses: trace `model.shapes(r)` in sketch_use::external_entity.
-
-## To check (live 11-18, qa sellat-1118): a horizontal line 40 mm (Horizontal + length only, start off the origin),
-length set to 50: live moves both ends equally (start -5, end 45), midpoint and label stay; back to 40 returns. Ours has
-onshape_ux `length_edit_moves_both_ends_equally`: confirm it covers this (start off origin, the label stays).
+## In the worktree (not queued)
+- ccbc09bc9: test only: a free line's new length moves both ends equally, label kept (live sellat-1118; ours already
+  did it through scale_for_edit about the box centre).
+- parity.rs (the held loft-paths patch, fixed): an EDGE ref whose body is no part tries a sketch curve with live's
+  midpoint / length first, only when the ref names a body (`r.body.is_some()`: the assembly mate-connector refs have
+  none, which broke an_assembly / a_subassembly_is_rebuilt_as_lives); `anchors_off` also counts a PIERCE edge's middle.
+  parity:: 113/113. Run 07:40 vibex8 (/root/skasm-scratch/ut-0745.log): loft-paths-guides + config-parts (no screws).
 
 ## Waiting on live (REQUESTS)
 - 06:2x wave-washer sketches.json (Sketch 4's rectangles stored inconsistently; ours solves them outward).

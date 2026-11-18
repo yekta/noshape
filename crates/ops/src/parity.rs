@@ -4409,6 +4409,14 @@ impl<'a> Translator<'a> {
             "EDGE" if r.sketch && r.geometry.is_none() && r.ends.is_some() && self.part_of(k, &r).is_none() && let Some(curve) = self.sketch_curve_at(p, None, r.ends) => Ok(curve),
             "EDGE" => {
                 let part = self.part_of(k, &r);
+                // A body that is no part, its type not given (c2-loft-paths-guides' PIERCE targets, Sketch 3's arc JOB):
+                // a sketch's curve with live's midpoint and length, before the nearest part edge.
+                if part.is_none()
+                    && r.measure.is_some()
+                    && let Some(curve) = self.sketch_curve_at(p, r.measure, r.ends)
+                {
+                    return Ok(curve);
+                }
                 self.nearest("edges", &r, part.as_deref()).ok_or_else(|| format!("{id}: no edge of ours at {:?} mm", mm(p)))
             }
             "VERTEX" => {
@@ -5250,9 +5258,11 @@ impl<'a> Translator<'a> {
             let query = params.iter().find(|p| p["parameterId"] == "externalEdge").and_then(|p| p["queries"].as_array()).map(Vec::as_slice);
             let (Some(local), Some([q])) = (local, query) else { continue };
             let Some([id]) = q["deterministicIds"].as_array().map(Vec::as_slice) else { continue };
-            let Some(ends) = id.as_str().and_then(|id| self.refs.get(&(k, id.to_string()))).filter(|r| r.kind == "EDGE").and_then(|r| r.ends) else { continue };
+            let Some(r) = id.as_str().and_then(|id| self.refs.get(&(k, id.to_string()))).filter(|r| r.kind == "EDGE") else { continue };
+            // (Its ends, or its middle where it crosses the plane there: c2-loft-paths-guides' Sketch 3 arc JOB.)
+            let crossings: Vec<[f64; 3]> = r.ends.into_iter().flatten().chain(r.point).collect();
             let Some(e) = self.sketch_entities.get(&(oid.to_string(), local.to_string())).and_then(|e| entities.iter().find(|x| x["id"] == e.as_str())) else { continue };
-            for end in ends {
+            for end in crossings {
                 let rel = [0, 1, 2].map(|i| end[i] / u - o[i]);
                 if (0..3).map(|i| rel[i] * normal[i]).sum::<f64>().abs() * u > 1e-6 {
                     continue;
